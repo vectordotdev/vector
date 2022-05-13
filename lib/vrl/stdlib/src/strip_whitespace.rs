@@ -47,7 +47,7 @@ impl Function for StripWhitespace {
         Ok(Box::new(StripWhitespaceFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
 
         Ok(value.try_bytes_utf8_lossy()?.trim().into())
@@ -60,10 +60,13 @@ struct StripWhitespaceFn {
 }
 
 impl Expression for StripWhitespaceFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
 
-        Ok(value.try_bytes_utf8_lossy()?.trim().into())
+        Ok(Cow::Owned(value.try_bytes_utf8_lossy()?.trim().into()))
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

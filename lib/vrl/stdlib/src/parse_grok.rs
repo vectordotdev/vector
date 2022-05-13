@@ -6,7 +6,7 @@ use vrl::{
     prelude::*,
 };
 
-fn parse_grok(value: Value, remove_empty: Value, pattern: Arc<grok::Pattern>) -> Resolved {
+fn parse_grok(value: Value, remove_empty: Value, pattern: Arc<grok::Pattern>) -> Result<Value> {
     let bytes = value.try_bytes_utf8_lossy()?;
     let remove_empty = remove_empty.try_boolean()?;
     match pattern.match_against(&bytes) {
@@ -162,7 +162,7 @@ impl Function for ParseGrok {
         }
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let remove_empty = args
             .optional("remove_empty")
@@ -187,12 +187,15 @@ struct ParseGrokFn {
 }
 
 impl Expression for ParseGrokFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
-        let remove_empty = self.remove_empty.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
+        let remove_empty = self.remove_empty.resolve(ctx)?.into_owned();
         let pattern = self.pattern.clone();
 
-        parse_grok(value, remove_empty, pattern)
+        parse_grok(value, remove_empty, pattern).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

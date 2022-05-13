@@ -64,7 +64,7 @@ impl Function for TagTypesExternally {
         }]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         Ok(tag_type_externally(value))
     }
@@ -76,11 +76,14 @@ struct TagTypesExternallyFn {
 }
 
 impl Expression for TagTypesExternallyFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
         let tagged_externally = tag_type_externally(value);
 
-        Ok(tagged_externally)
+        Ok(tagged_externally).map(Cow::Owned)
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

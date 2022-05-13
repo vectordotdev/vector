@@ -3,7 +3,7 @@ use std::net::IpAddr;
 use ::value::Value;
 use vrl::prelude::*;
 
-fn ip_ntop(value: Value) -> Resolved {
+fn ip_ntop(value: Value) -> Result<Value> {
     let value = value.try_bytes()?;
 
     match value.len() {
@@ -61,7 +61,7 @@ impl Function for IpNtop {
         Ok(Box::new(IpNtopFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         ip_ntop(value)
     }
@@ -73,9 +73,12 @@ struct IpNtopFn {
 }
 
 impl Expression for IpNtopFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
-        ip_ntop(value)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
+        ip_ntop(value).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

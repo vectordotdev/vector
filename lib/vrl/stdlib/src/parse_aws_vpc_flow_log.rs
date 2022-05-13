@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use ::value::Value;
 use vrl::prelude::*;
 
-fn parse_aws_vpc_flow_log(value: Value, format: Option<Value>) -> Resolved {
+fn parse_aws_vpc_flow_log(value: Value, format: Option<Value>) -> Result<Value> {
     let bytes = value.try_bytes()?;
     let input = String::from_utf8_lossy(&bytes);
     if let Some(expr) = format {
@@ -87,7 +87,7 @@ impl Function for ParseAwsVpcFlowLog {
         ]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let format = args.optional("format");
 
@@ -108,15 +108,19 @@ impl ParseAwsVpcFlowLogFn {
 }
 
 impl Expression for ParseAwsVpcFlowLogFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
         let format = self
             .format
             .as_ref()
             .map(|expr| expr.resolve(ctx))
-            .transpose()?;
+            .transpose()?
+            .map(Cow::into_owned);
 
-        parse_aws_vpc_flow_log(value, format)
+        parse_aws_vpc_flow_log(value, format).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

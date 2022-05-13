@@ -3,7 +3,7 @@ use std::net::IpAddr;
 use ::value::Value;
 use vrl::prelude::*;
 
-fn ipv6_to_ipv4(value: Value) -> Resolved {
+fn ipv6_to_ipv4(value: Value) -> Result<Value> {
     let ip = value
         .try_bytes_utf8_lossy()?
         .parse()
@@ -51,7 +51,7 @@ impl Function for Ipv6ToIpV4 {
         Ok(Box::new(Ipv6ToIpV4Fn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         ipv6_to_ipv4(value)
     }
@@ -63,9 +63,12 @@ struct Ipv6ToIpV4Fn {
 }
 
 impl Expression for Ipv6ToIpV4Fn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
-        ipv6_to_ipv4(value)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
+        ipv6_to_ipv4(value).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

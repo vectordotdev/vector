@@ -15,6 +15,7 @@ pub use std::borrow::Cow;
 pub use std::collections::BTreeMap;
 pub use std::fmt;
 
+pub use ::value::Value;
 pub use bytes::Bytes;
 // pub use crate::{Error, Expr, Expression, Function, Object, Result, TypeDef, Value};
 

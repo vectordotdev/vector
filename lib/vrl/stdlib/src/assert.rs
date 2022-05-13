@@ -1,7 +1,7 @@
 use ::value::Value;
 use vrl::{diagnostic::Note, prelude::*};
 
-fn assert(condition: Value, message: Option<Value>, format: Option<String>) -> Resolved {
+fn assert(condition: Value, message: Option<Value>, format: Option<String>) -> Result<Value> {
     match condition.try_boolean()? {
         true => Ok(true.into()),
         false => {
@@ -78,7 +78,7 @@ impl Function for Assert {
         Ok(Box::new(AssertFn { condition, message }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let condition = args.required("condition");
         let message = args.optional("message");
 
@@ -93,12 +93,20 @@ struct AssertFn {
 }
 
 impl Expression for AssertFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let condition = self.condition.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let condition = self.condition.resolve(ctx)?.into_owned();
         let format = self.condition.format();
-        let message = self.message.as_ref().map(|m| m.resolve(ctx)).transpose()?;
+        let message = self
+            .message
+            .as_ref()
+            .map(|m| m.resolve(ctx))
+            .transpose()?
+            .map(Cow::into_owned);
 
-        assert(condition, message, format)
+        assert(condition, message, format).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

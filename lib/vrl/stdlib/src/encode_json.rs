@@ -1,7 +1,7 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn encode_json(value: Value) -> Resolved {
+fn encode_json(value: Value) -> Result<Value> {
     // With `vrl::Value` it should not be possible to get `Err`.
     match serde_json::to_string(&value) {
         Ok(value) => Ok(value.into()),
@@ -44,7 +44,7 @@ impl Function for EncodeJson {
         }]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         encode_json(value)
     }
@@ -56,9 +56,12 @@ struct EncodeJsonFn {
 }
 
 impl Expression for EncodeJsonFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
-        encode_json(value)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
+        encode_json(value).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

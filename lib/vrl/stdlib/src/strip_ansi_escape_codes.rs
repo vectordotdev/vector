@@ -2,7 +2,7 @@ use ::value::Value;
 use bytes::Bytes;
 use vrl::prelude::*;
 
-fn strip_ansi_escape_codes(bytes: Value) -> Resolved {
+fn strip_ansi_escape_codes(bytes: Value) -> Result<Value> {
     let bytes = bytes.try_bytes()?;
     strip_ansi_escapes::strip(&bytes)
         .map(Bytes::from)
@@ -42,7 +42,7 @@ impl Function for StripAnsiEscapeCodes {
         Ok(Box::new(StripAnsiEscapeCodesFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         strip_ansi_escape_codes(value)
     }
@@ -54,10 +54,13 @@ struct StripAnsiEscapeCodesFn {
 }
 
 impl Expression for StripAnsiEscapeCodesFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let bytes = self.value.resolve(ctx)?.into_owned();
 
-        strip_ansi_escape_codes(bytes)
+        strip_ansi_escape_codes(bytes).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

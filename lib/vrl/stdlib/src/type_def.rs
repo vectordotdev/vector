@@ -2,7 +2,7 @@ use vrl::prelude::*;
 
 use vrl::prelude::TypeDef as VrlTypeDef;
 
-fn type_def(type_def: &VrlTypeDef) -> Resolved {
+fn type_def(type_def: &VrlTypeDef) -> Result<Value> {
     let mut tree = type_def.kind().debug_info();
 
     if type_def.is_fallible() {
@@ -52,7 +52,7 @@ impl Function for TypeDef {
         Ok(Box::new(TypeDefFn { type_def }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Result<Value> {
         Err("function not supported in VM runtime.".into())
     }
 }
@@ -63,8 +63,11 @@ struct TypeDefFn {
 }
 
 impl Expression for TypeDefFn {
-    fn resolve(&self, _ctx: &mut Context) -> Resolved {
-        type_def(&self.type_def.clone())
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        _: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        type_def(&self.type_def.clone()).map(Cow::Owned)
     }
 
     fn type_def(&self, _state: (&state::LocalEnv, &state::ExternalEnv)) -> VrlTypeDef {

@@ -2,7 +2,7 @@ use ::value::Value;
 use vector_common::conversion::Conversion;
 use vrl::prelude::*;
 
-fn parse_timestamp(value: Value, format: Value, ctx: &Context) -> Resolved {
+fn parse_timestamp(value: Value, format: Value, ctx: &Context) -> Result<Value> {
     match value {
         Value::Bytes(v) => {
             let format = format.try_bytes_utf8_lossy()?;
@@ -59,7 +59,7 @@ impl Function for ParseTimestamp {
         ]
     }
 
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let format = args.required("format");
         parse_timestamp(value, format, ctx)
@@ -73,10 +73,13 @@ struct ParseTimestampFn {
 }
 
 impl Expression for ParseTimestampFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
-        let format = self.format.resolve(ctx)?;
-        parse_timestamp(value, format, ctx)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
+        let format = self.format.resolve(ctx)?.into_owned();
+        parse_timestamp(value, format, ctx).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

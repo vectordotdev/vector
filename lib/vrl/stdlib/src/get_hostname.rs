@@ -1,6 +1,6 @@
 use vrl::prelude::*;
 
-fn get_hostname() -> Resolved {
+fn get_hostname() -> Result<Value> {
     Ok(hostname::get()
         .map_err(|error| format!("failed to get hostname: {}", error))?
         .to_string_lossy()
@@ -32,7 +32,7 @@ impl Function for GetHostname {
         }]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Result<Value> {
         get_hostname()
     }
 }
@@ -41,8 +41,11 @@ impl Function for GetHostname {
 struct GetHostnameFn;
 
 impl Expression for GetHostnameFn {
-    fn resolve(&self, _: &mut Context) -> Resolved {
-        get_hostname()
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        _: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        get_hostname().map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

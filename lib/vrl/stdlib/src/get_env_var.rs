@@ -1,7 +1,7 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn get_env_var(value: Value) -> Resolved {
+fn get_env_var(value: Value) -> Result<Value> {
     let name = value.try_bytes_utf8_lossy()?;
     std::env::var(name.as_ref())
         .map(Into::into)
@@ -43,7 +43,7 @@ impl Function for GetEnvVar {
         Ok(Box::new(GetEnvVarFn { name }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let name = args.required("name");
         get_env_var(name)
     }
@@ -55,9 +55,12 @@ struct GetEnvVarFn {
 }
 
 impl Expression for GetEnvVarFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.name.resolve(ctx)?;
-        get_env_var(value)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.name.resolve(ctx)?.into_owned();
+        get_env_var(value).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

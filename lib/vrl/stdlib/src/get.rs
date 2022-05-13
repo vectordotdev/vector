@@ -2,7 +2,7 @@ use ::value::Value;
 use lookup_lib::{LookupBuf, SegmentBuf};
 use vrl::prelude::*;
 
-fn get(value: Value, path: Value) -> Resolved {
+fn get(value: Value, path: Value) -> Result<Value> {
     let path = match path {
         Value::Array(path) => {
             let mut get = LookupBuf::root();
@@ -136,7 +136,7 @@ impl Function for Get {
         Ok(Box::new(GetFn { value, path }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let path = args.required("path");
 
@@ -151,11 +151,14 @@ pub(crate) struct GetFn {
 }
 
 impl Expression for GetFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let path = self.path.resolve(ctx)?;
-        let value = self.value.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let path = self.path.resolve(ctx)?.into_owned();
+        let value = self.value.resolve(ctx)?.into_owned();
 
-        get(value, path)
+        get(value, path).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 use ::value::Value;
 use vrl::prelude::*;
 
-fn format_int(value: Value, base: Option<Value>) -> Resolved {
+fn format_int(value: Value, base: Option<Value>) -> Result<Value> {
     let value = value.try_integer()?;
     let base = match base {
         Some(base) => {
@@ -80,7 +80,7 @@ impl Function for FormatInt {
         ]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let base = args.optional("base");
 
@@ -95,16 +95,19 @@ struct FormatIntFn {
 }
 
 impl Expression for FormatIntFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
 
         let base = self
             .base
             .as_ref()
-            .map(|expr| expr.resolve(ctx))
+            .map(|expr| expr.resolve(ctx).map(Cow::into_owned))
             .transpose()?;
 
-        format_int(value, base)
+        format_int(value, base).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

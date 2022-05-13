@@ -1,7 +1,7 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn to_string(value: Value) -> Resolved {
+fn to_string(value: Value) -> Result<Value> {
     use chrono::SecondsFormat;
     use Value::*;
     let value = match value {
@@ -104,7 +104,7 @@ impl Function for ToString {
         Ok(Box::new(ToStringFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
 
         to_string(value)
@@ -117,10 +117,13 @@ struct ToStringFn {
 }
 
 impl Expression for ToStringFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
 
-        to_string(value)
+        to_string(value).map(Cow::Owned)
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

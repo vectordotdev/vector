@@ -4,7 +4,7 @@ use ::value::Value;
 use dns_lookup::lookup_addr;
 use vrl::prelude::*;
 
-fn reverse_dns(value: Value) -> Resolved {
+fn reverse_dns(value: Value) -> Result<Value> {
     let ip: IpAddr = value
         .try_bytes_utf8_lossy()?
         .parse()
@@ -49,7 +49,7 @@ impl Function for ReverseDns {
         Ok(Box::new(ReverseDnsFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         reverse_dns(value)
     }
@@ -61,9 +61,12 @@ struct ReverseDnsFn {
 }
 
 impl Expression for ReverseDnsFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
-        reverse_dns(value)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
+        reverse_dns(value).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

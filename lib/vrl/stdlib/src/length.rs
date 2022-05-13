@@ -1,7 +1,7 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn length(value: Value) -> Resolved {
+fn length(value: Value) -> Result<Value> {
     match value {
         Value::Array(v) => Ok(v.len().into()),
         Value::Object(v) => Ok(v.len().into()),
@@ -63,7 +63,7 @@ impl Function for Length {
         Ok(Box::new(LengthFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         length(value)
     }
@@ -75,10 +75,13 @@ struct LengthFn {
 }
 
 impl Expression for LengthFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
 
-        length(value)
+        length(value).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

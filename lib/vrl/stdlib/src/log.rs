@@ -7,7 +7,7 @@ fn log(
     level: &Bytes,
     value: Value,
     span: vrl::diagnostic::Span,
-) -> Resolved {
+) -> Result<Value> {
     let rate_limit_secs = rate_limit_secs.try_integer()?;
     let res = value.to_string_lossy();
     match level.as_ref() {
@@ -146,7 +146,7 @@ impl Function for Log {
         }
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let info = args
             .required_any("level")
@@ -174,16 +174,19 @@ struct LogFn {
 }
 
 impl Expression for LogFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
         let rate_limit_secs = match &self.rate_limit_secs {
-            Some(expr) => expr.resolve(ctx)?,
+            Some(expr) => expr.resolve(ctx)?.into_owned(),
             None => value!(1),
         };
 
         let span = self.span;
 
-        log(rate_limit_secs, &self.level, value, span)
+        log(rate_limit_secs, &self.level, value, span).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

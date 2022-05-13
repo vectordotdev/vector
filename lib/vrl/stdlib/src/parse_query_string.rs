@@ -4,7 +4,7 @@ use ::value::Value;
 use url::form_urlencoded;
 use vrl::prelude::*;
 
-fn parse_query_string(bytes: Value) -> Resolved {
+fn parse_query_string(bytes: Value) -> Result<Value> {
     let bytes = bytes.try_bytes()?;
     let mut query_string = bytes.as_ref();
     if !query_string.is_empty() && query_string[0] == b'?' {
@@ -70,7 +70,7 @@ impl Function for ParseQueryString {
         }]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         parse_query_string(value)
     }
@@ -82,9 +82,12 @@ struct ParseQueryStringFn {
 }
 
 impl Expression for ParseQueryStringFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?;
-        parse_query_string(bytes)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let bytes = self.value.resolve(ctx)?.into_owned();
+        parse_query_string(bytes).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

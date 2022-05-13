@@ -119,7 +119,11 @@ impl Function for EncodeKeyValue {
         ]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(
+        &self,
+        _ctx: &mut Context,
+        args: &mut VmArgumentList,
+    ) -> Result<Value, ExpressionError> {
         let value = args.required("value");
         let fields = args.optional("fields_ordering");
 
@@ -167,16 +171,20 @@ fn resolve_fields(fields: Value) -> Result<Vec<String>, ExpressionError> {
 }
 
 impl Expression for EncodeKeyValueFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
         let fields = self
             .fields
             .as_ref()
             .map(|expr| expr.resolve(ctx))
-            .transpose()?;
-        let key_value_delimiter = self.key_value_delimiter.resolve(ctx)?;
-        let field_delimiter = self.field_delimiter.resolve(ctx)?;
-        let flatten_boolean = self.flatten_boolean.resolve(ctx)?;
+            .transpose()?
+            .map(Cow::into_owned);
+        let key_value_delimiter = self.key_value_delimiter.resolve(ctx)?.into_owned();
+        let field_delimiter = self.field_delimiter.resolve(ctx)?.into_owned();
+        let flatten_boolean = self.flatten_boolean.resolve(ctx)?.into_owned();
 
         encode_key_value(
             fields,
@@ -185,6 +193,7 @@ impl Expression for EncodeKeyValueFn {
             field_delimiter,
             flatten_boolean,
         )
+        .map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

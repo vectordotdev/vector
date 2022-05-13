@@ -3,7 +3,7 @@ use vrl::prelude::*;
 
 use crate::util::round_to_precision;
 
-fn round(precision: Value, value: Value) -> Resolved {
+fn round(precision: Value, value: Value) -> Result<Value> {
     let precision = precision.try_integer()?;
     match value {
         Value::Float(f) => Ok(Value::from_f64_or_zero(round_to_precision(
@@ -75,7 +75,7 @@ impl Function for Round {
         Ok(Box::new(RoundFn { value, precision }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let precision = args.optional("precision").unwrap_or_else(|| value!(0));
 
@@ -90,11 +90,14 @@ struct RoundFn {
 }
 
 impl Expression for RoundFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let precision = self.precision.resolve(ctx)?;
-        let value = self.value.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let precision = self.precision.resolve(ctx)?.into_owned();
+        let value = self.value.resolve(ctx)?.into_owned();
 
-        round(precision, value)
+        round(precision, value).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

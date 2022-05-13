@@ -172,7 +172,7 @@ impl Function for ParseGroks {
         }
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let bytes = value.try_bytes_utf8_lossy()?;
 
@@ -261,15 +261,18 @@ struct ParseGrokFn {
 }
 
 impl Expression for ParseGrokFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
         let bytes = value.try_bytes_utf8_lossy()?;
         let remove_empty = self.remove_empty.resolve(ctx)?.try_boolean()?;
 
         let v = parse_grok::parse_grok(bytes.as_ref(), &self.grok_rules, remove_empty)
             .map_err(|err| format!("unable to parse grok: {}", err))?;
 
-        Ok(v)
+        Ok(Cow::Owned(v))
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

@@ -45,7 +45,7 @@ impl Function for ParseLinuxAuthorization {
         Ok(Box::new(ParseSyslogFn { value }))
     }
 
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         super::parse_syslog::parse_syslog(value, ctx)
     }

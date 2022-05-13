@@ -5,7 +5,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use vrl::prelude::*;
 
-fn ip_subnet(value: Value, mask: Value) -> Resolved {
+fn ip_subnet(value: Value, mask: Value) -> Result<Value> {
     let value: IpAddr = value
         .try_bytes_utf8_lossy()?
         .parse()
@@ -83,7 +83,7 @@ impl Function for IpSubnet {
         Ok(Box::new(IpSubnetFn { value, subnet }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let subnet = args.required("subnet");
 
@@ -98,11 +98,14 @@ struct IpSubnetFn {
 }
 
 impl Expression for IpSubnetFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
-        let mask = self.subnet.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
+        let mask = self.subnet.resolve(ctx)?.into_owned();
 
-        ip_subnet(value, mask)
+        ip_subnet(value, mask).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

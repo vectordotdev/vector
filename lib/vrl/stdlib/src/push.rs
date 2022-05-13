@@ -1,7 +1,7 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn push(list: Value, item: Value) -> Resolved {
+fn push(list: Value, item: Value) -> Result<Value> {
     let mut list = list.try_array()?;
     list.push(item);
     Ok(list.into())
@@ -57,7 +57,7 @@ impl Function for Push {
         Ok(Box::new(PushFn { value, item }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let list = args.required("value");
         let item = args.required("item");
 
@@ -72,11 +72,14 @@ struct PushFn {
 }
 
 impl Expression for PushFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let list = self.value.resolve(ctx)?;
-        let item = self.item.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let list = self.value.resolve(ctx)?.into_owned();
+        let item = self.item.resolve(ctx)?.into_owned();
 
-        push(list, item)
+        push(list, item).map(Cow::Owned)
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

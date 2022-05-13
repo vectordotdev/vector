@@ -5,7 +5,7 @@ use serde_json::value::{RawValue, Value as JsonValue};
 use serde_json::{Error, Map};
 use vrl::prelude::*;
 
-fn parse_json(value: Value) -> Resolved {
+fn parse_json(value: Value) -> Result<Value> {
     let bytes = value.try_bytes()?;
     let value = serde_json::from_slice::<'_, Value>(&bytes)
         .map_err(|e| format!("unable to parse json: {}", e))?;
@@ -14,7 +14,7 @@ fn parse_json(value: Value) -> Resolved {
 
 // parse_json_with_depth method recursively traverses the value and returns raw JSON-formatted bytes
 // after reaching provided depth.
-fn parse_json_with_depth(value: Value, max_depth: Value) -> Resolved {
+fn parse_json_with_depth(value: Value, max_depth: Value) -> Result<Value> {
     let bytes = value.try_bytes()?;
     let parsed_depth = validate_depth(max_depth)?;
 
@@ -185,7 +185,7 @@ impl Function for ParseJson {
         }
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let max_depth = args.optional("max_depth");
 
@@ -203,9 +203,12 @@ struct ParseJsonFn {
 }
 
 impl Expression for ParseJsonFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
-        parse_json(value)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
+        parse_json(value).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
@@ -220,10 +223,13 @@ struct ParseJsonMaxDepthFn {
 }
 
 impl Expression for ParseJsonMaxDepthFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
-        let max_depth = self.max_depth.resolve(ctx)?;
-        parse_json_with_depth(value, max_depth)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
+        let max_depth = self.max_depth.resolve(ctx)?.into_owned();
+        parse_json_with_depth(value, max_depth).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

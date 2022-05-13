@@ -5,7 +5,7 @@ use vrl::prelude::*;
 
 use crate::util::Base64Charset;
 
-fn encode_base64(value: Value, padding: Option<Value>, charset: Option<Value>) -> Resolved {
+fn encode_base64(value: Value, padding: Option<Value>, charset: Option<Value>) -> Result<Value> {
     let value = value.try_bytes()?;
     let padding = padding
         .map(|v| v.try_boolean())
@@ -75,7 +75,7 @@ impl Function for EncodeBase64 {
         }]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let padding = args.optional("padding");
         let charset = args.optional("charset");
@@ -92,12 +92,27 @@ struct EncodeBase64Fn {
 }
 
 impl Expression for EncodeBase64Fn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
-        let padding = self.padding.as_ref().map(|p| p.resolve(ctx)).transpose()?;
-        let charset = self.charset.as_ref().map(|c| c.resolve(ctx)).transpose()?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
 
-        encode_base64(value, padding, charset)
+        let padding = self
+            .padding
+            .as_ref()
+            .map(|p| p.resolve(ctx))
+            .transpose()?
+            .map(Cow::into_owned);
+
+        let charset = self
+            .charset
+            .as_ref()
+            .map(|c| c.resolve(ctx))
+            .transpose()?
+            .map(Cow::into_owned);
+
+        encode_base64(value, padding, charset).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

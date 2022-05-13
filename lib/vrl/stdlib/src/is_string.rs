@@ -47,7 +47,7 @@ impl Function for IsString {
         Ok(Box::new(IsStringFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         Ok(value!(args.required("value").is_bytes()))
     }
 }
@@ -58,8 +58,14 @@ struct IsStringFn {
 }
 
 impl Expression for IsStringFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        self.value.resolve(ctx).map(|v| value!(v.is_bytes()))
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        self.value
+            .resolve(ctx)
+            .map(|v| value!(v.is_bytes()))
+            .map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

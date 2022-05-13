@@ -6,7 +6,7 @@ use regex::Regex;
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 use vrl::prelude::*;
 
-fn parse_duration(bytes: Value, unit: Value) -> Resolved {
+fn parse_duration(bytes: Value, unit: Value) -> Result<Value> {
     let bytes = bytes.try_bytes()?;
     let value = String::from_utf8_lossy(&bytes);
     let conversion_factor = {
@@ -105,7 +105,7 @@ impl Function for ParseDuration {
         ]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let unit = args.required("unit");
 
@@ -120,11 +120,14 @@ struct ParseDurationFn {
 }
 
 impl Expression for ParseDurationFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?;
-        let unit = self.unit.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let bytes = self.value.resolve(ctx)?.into_owned();
+        let unit = self.unit.resolve(ctx)?.into_owned();
 
-        parse_duration(bytes, unit)
+        parse_duration(bytes, unit).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

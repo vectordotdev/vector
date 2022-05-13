@@ -43,7 +43,10 @@ pub struct OnlyFieldsFn {
 }
 
 impl Expression for OnlyFieldsFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
         let paths = self.paths.iter().map(Path::to_string).collect::<Vec<_>>();
 
         object

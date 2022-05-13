@@ -1,7 +1,7 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn append(value: Value, items: Value) -> Resolved {
+fn append(value: Value, items: Value) -> Result<Value> {
     let mut value = value.try_array()?;
     let mut items = items.try_array()?;
     value.append(&mut items);
@@ -51,7 +51,7 @@ impl Function for Append {
         Ok(Box::new(AppendFn { value, items }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let items = args.required("items");
 
@@ -66,11 +66,14 @@ struct AppendFn {
 }
 
 impl Expression for AppendFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
-        let items = self.items.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
+        let items = self.items.resolve(ctx)?.into_owned();
 
-        append(value, items)
+        append(value, items).map(Cow::Owned)
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

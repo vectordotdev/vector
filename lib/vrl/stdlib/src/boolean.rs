@@ -1,7 +1,7 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn boolean(value: Value) -> Resolved {
+fn boolean(value: Value) -> Result<Value> {
     match value {
         v @ Value::Boolean(_) => Ok(v),
         v => Err(format!("expected boolean, got {}", v.kind()).into()),
@@ -52,7 +52,7 @@ impl Function for Boolean {
         Ok(Box::new(BooleanFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         boolean(value)
     }
@@ -64,8 +64,11 @@ struct BooleanFn {
 }
 
 impl Expression for BooleanFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        boolean(self.value.resolve(ctx)?)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        boolean(self.value.resolve(ctx)?.into_owned()).map(Cow::Owned)
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

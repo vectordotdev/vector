@@ -1,7 +1,7 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn match_(value: Value, pattern: Value) -> Resolved {
+fn match_(value: Value, pattern: Value) -> Result<Value> {
     let string = value.try_bytes_utf8_lossy()?;
     let pattern = pattern.try_regex()?;
     Ok(pattern.is_match(&string).into())
@@ -57,7 +57,7 @@ impl Function for Match {
         Ok(Box::new(MatchFn { value, pattern }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let pattern = args.required("pattern");
 
@@ -72,11 +72,14 @@ pub(crate) struct MatchFn {
 }
 
 impl Expression for MatchFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
-        let pattern = self.pattern.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
+        let pattern = self.pattern.resolve(ctx)?.into_owned();
 
-        match_(value, pattern)
+        match_(value, pattern).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

@@ -3,7 +3,7 @@ use std::{convert::TryInto, net::Ipv4Addr};
 use ::value::Value;
 use vrl::prelude::*;
 
-fn ip_ntoa(value: Value) -> Resolved {
+fn ip_ntoa(value: Value) -> Result<Value> {
     let i: u32 = value
         .try_integer()?
         .try_into()
@@ -47,7 +47,7 @@ impl Function for IpNtoa {
         Ok(Box::new(IpNtoaFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         ip_ntoa(value)
     }
@@ -59,9 +59,12 @@ struct IpNtoaFn {
 }
 
 impl Expression for IpNtoaFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
-        ip_ntoa(value)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
+        ip_ntoa(value).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

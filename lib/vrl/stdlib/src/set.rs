@@ -2,7 +2,7 @@ use ::value::Value;
 use lookup_lib::{LookupBuf, SegmentBuf};
 use vrl::prelude::*;
 
-fn set(path: Value, mut value: Value, data: Value) -> Resolved {
+fn set(path: Value, mut value: Value, data: Value) -> Result<Value> {
     let path = match path {
         Value::Array(segments) => {
             let mut insert = LookupBuf::root();
@@ -133,7 +133,7 @@ impl Function for Set {
         Ok(Box::new(SetFn { value, path, data }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let path = args.required("path");
         let data = args.required("data");
@@ -150,12 +150,15 @@ pub(crate) struct SetFn {
 }
 
 impl Expression for SetFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let path = self.path.resolve(ctx)?;
-        let value = self.value.resolve(ctx)?;
-        let data = self.data.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let path = self.path.resolve(ctx)?.into_owned();
+        let value = self.value.resolve(ctx)?.into_owned();
+        let data = self.data.resolve(ctx)?.into_owned();
 
-        set(path, value, data)
+        set(path, value, data).map(Cow::Owned)
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

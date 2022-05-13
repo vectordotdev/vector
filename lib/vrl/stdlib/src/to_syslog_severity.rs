@@ -1,7 +1,7 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn to_syslog_severity(level: Value) -> Resolved {
+fn to_syslog_severity(level: Value) -> Result<Value> {
     let level = level.try_bytes_utf8_lossy()?;
     // Severity levels: https://en.wikipedia.org/wiki/Syslog#Severity_level
     let severity = match &level[..] {
@@ -62,7 +62,7 @@ impl Function for ToSyslogSeverity {
         Ok(Box::new(ToSyslogSeverityFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         to_syslog_severity(value)
     }
@@ -74,9 +74,12 @@ struct ToSyslogSeverityFn {
 }
 
 impl Expression for ToSyslogSeverityFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let level = self.value.resolve(ctx)?;
-        to_syslog_severity(level)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let level = self.value.resolve(ctx)?.into_owned();
+        to_syslog_severity(level).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

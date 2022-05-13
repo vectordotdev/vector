@@ -6,9 +6,9 @@ fn map_values<T>(
     recursive: bool,
     ctx: &mut Context,
     runner: closure::Runner<T>,
-) -> Resolved
+) -> Result<Value>
 where
-    T: Fn(&mut Context) -> Resolved,
+    T: Fn(&mut Context) -> Result<Value>,
 {
     let mut iter = value.into_iter(recursive);
 
@@ -124,17 +124,20 @@ struct MapValuesFn {
 }
 
 impl Expression for MapValuesFn {
-    fn resolve(&self, ctx: &mut Context) -> Result<Value> {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
         let recursive = match &self.recursive {
             None => false,
             Some(expr) => expr.resolve(ctx)?.try_boolean()?,
         };
 
-        let value = self.value.resolve(ctx)?;
+        let value = self.value.resolve(ctx)?.into_owned();
         let FunctionClosure { variables, block } = &self.closure;
-        let runner = closure::Runner::new(variables, |ctx| block.resolve(ctx));
+        let runner = closure::Runner::new(variables, |ctx| block.resolve(ctx).map(Cow::into_owned));
 
-        map_values(value, recursive, ctx, runner)
+        map_values(value, recursive, ctx, runner).map(Cow::Owned)
     }
 
     fn type_def(&self, ctx: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

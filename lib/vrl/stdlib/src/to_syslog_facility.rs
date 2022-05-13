@@ -1,7 +1,7 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn to_syslog_facility(value: Value) -> Resolved {
+fn to_syslog_facility(value: Value) -> Result<Value> {
     let value = value.try_integer()?;
     // Facility codes: https://en.wikipedia.org/wiki/Syslog#Facility
     let code = match value {
@@ -78,7 +78,7 @@ impl Function for ToSyslogFacility {
         Ok(Box::new(ToSyslogFacilityFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         to_syslog_facility(value)
     }
@@ -90,10 +90,13 @@ struct ToSyslogFacilityFn {
 }
 
 impl Expression for ToSyslogFacilityFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
 
-        to_syslog_facility(value)
+        to_syslog_facility(value).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

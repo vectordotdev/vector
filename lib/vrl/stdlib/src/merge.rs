@@ -52,7 +52,7 @@ impl Function for Merge {
         Ok(Box::new(MergeFn { to, from, deep }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Result<Value> {
         let to = arguments.required("to");
         let mut to = to.try_object()?;
         let from = arguments.required("from");
@@ -76,14 +76,17 @@ pub(crate) struct MergeFn {
 }
 
 impl Expression for MergeFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
         let mut to_value = self.to.resolve(ctx)?.try_object()?;
         let from_value = self.from.resolve(ctx)?.try_object()?;
         let deep = self.deep.resolve(ctx)?.try_boolean()?;
 
         merge_maps(&mut to_value, &from_value, deep);
 
-        Ok(to_value.into())
+        Ok(Cow::Owned(to_value.into()))
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

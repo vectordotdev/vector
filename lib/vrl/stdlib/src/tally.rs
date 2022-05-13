@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, HashMap};
 use ::value::Value;
 use vrl::prelude::*;
 
-fn tally(value: Value) -> Resolved {
+fn tally(value: Value) -> Result<Value> {
     let value = value.try_array()?;
     #[allow(clippy::mutable_key_type)] // false positive due to bytes::Bytes
     let mut map: HashMap<Bytes, usize> = HashMap::new();
@@ -56,7 +56,7 @@ impl Function for Tally {
         }]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         tally(value)
     }
@@ -68,9 +68,12 @@ pub(crate) struct TallyFn {
 }
 
 impl Expression for TallyFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
-        tally(value)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
+        tally(value).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

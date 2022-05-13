@@ -13,7 +13,7 @@ fn compact(
     array: Option<Value>,
     nullish: Option<Value>,
     value: Value,
-) -> Resolved {
+) -> Result<Value> {
     let options = CompactOptions {
         recursive: match recursive {
             Some(expr) => expr.try_boolean()?,
@@ -145,7 +145,7 @@ impl Function for Compact {
         }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let recursive = args.optional("recursive");
         let null = args.optional("null");
@@ -210,40 +210,55 @@ impl CompactOptions {
 }
 
 impl Expression for CompactFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
         let recursive = self
             .recursive
             .as_ref()
             .map(|expr| expr.resolve(ctx))
-            .transpose()?;
+            .transpose()?
+            .map(Cow::into_owned);
+
         let null = self
             .null
             .as_ref()
             .map(|expr| expr.resolve(ctx))
-            .transpose()?;
+            .transpose()?
+            .map(Cow::into_owned);
+
         let string = self
             .string
             .as_ref()
             .map(|expr| expr.resolve(ctx))
-            .transpose()?;
+            .transpose()?
+            .map(Cow::into_owned);
+
         let object = self
             .object
             .as_ref()
             .map(|expr| expr.resolve(ctx))
-            .transpose()?;
+            .transpose()?
+            .map(Cow::into_owned);
+
         let array = self
             .array
             .as_ref()
             .map(|expr| expr.resolve(ctx))
-            .transpose()?;
+            .transpose()?
+            .map(Cow::into_owned);
+
         let nullish = self
             .nullish
             .as_ref()
             .map(|expr| expr.resolve(ctx))
-            .transpose()?;
-        let value = self.value.resolve(ctx)?;
+            .transpose()?
+            .map(Cow::into_owned);
 
-        compact(recursive, null, string, object, array, nullish, value)
+        let value = self.value.resolve(ctx)?.into_owned();
+
+        compact(recursive, null, string, object, array, nullish, value).map(Cow::Owned)
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

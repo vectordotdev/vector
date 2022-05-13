@@ -5,7 +5,7 @@ use vrl::prelude::*;
 
 use crate::util::Base64Charset;
 
-fn decode_base64(charset: Option<Value>, value: Value) -> Resolved {
+fn decode_base64(charset: Option<Value>, value: Value) -> Result<Value> {
     let charset = charset
         .map(Value::try_bytes)
         .transpose()?
@@ -67,7 +67,7 @@ impl Function for DecodeBase64 {
         }]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let charset = args.optional("charset");
 
@@ -82,11 +82,14 @@ struct DecodeBase64Fn {
 }
 
 impl Expression for DecodeBase64Fn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
-        let charset = self.charset.as_ref().map(|c| c.resolve(ctx)).transpose()?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
+        let charset = self.charset.as_ref().map(|c| c.resolve(ctx)).transpose()?.map(Cow::into_owned);
 
-        decode_base64(charset, value)
+        decode_base64(charset, value).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

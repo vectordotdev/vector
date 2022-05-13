@@ -6,7 +6,7 @@ use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
 use vector_common::TimeZone;
 use vrl::prelude::*;
 
-pub(crate) fn parse_syslog(value: Value, ctx: &Context) -> Resolved {
+pub(crate) fn parse_syslog(value: Value, ctx: &Context) -> Result<Value> {
     let message = value.try_bytes_utf8_lossy()?;
     let timezone = match ctx.timezone() {
         TimeZone::Local => None,
@@ -64,7 +64,7 @@ impl Function for ParseSyslog {
         Ok(Box::new(ParseSyslogFn { value }))
     }
 
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         parse_syslog(value, ctx)
     }
@@ -76,10 +76,13 @@ pub(crate) struct ParseSyslogFn {
 }
 
 impl Expression for ParseSyslogFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
 
-        parse_syslog(value, ctx)
+        parse_syslog(value, ctx).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

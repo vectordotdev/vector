@@ -1,7 +1,7 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn contains(value: Value, substring: Value, case_sensitive: bool) -> Resolved {
+fn contains(value: Value, substring: Value, case_sensitive: bool) -> Result<Value> {
     let substring = {
         let bytes = substring.try_bytes()?;
         let string = String::from_utf8_lossy(&bytes);
@@ -82,7 +82,7 @@ impl Function for Contains {
         ]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let substring = args.required("substring");
         let case_sensitive = args
@@ -102,12 +102,15 @@ struct ContainsFn {
 }
 
 impl Expression for ContainsFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
-        let substring = self.substring.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
+        let substring = self.substring.resolve(ctx)?.into_owned();
         let case_sensitive = self.case_sensitive.resolve(ctx)?.try_boolean()?;
 
-        contains(value, substring, case_sensitive)
+        contains(value, substring, case_sensitive).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

@@ -1,7 +1,7 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn is_empty(value: Value) -> Resolved {
+fn is_empty(value: Value) -> Result<Value> {
     let empty = match value {
         Value::Object(v) => v.is_empty(),
         Value::Array(v) => v.is_empty(),
@@ -72,7 +72,7 @@ impl Function for IsEmpty {
         Ok(Box::new(IsEmptyFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         is_empty(value)
     }
@@ -84,9 +84,12 @@ struct IsEmptyFn {
 }
 
 impl Expression for IsEmptyFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
-        is_empty(value)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
+        is_empty(value).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

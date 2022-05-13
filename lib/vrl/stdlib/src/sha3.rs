@@ -2,7 +2,7 @@ use ::value::Value;
 use sha_3::{Digest, Sha3_224, Sha3_256, Sha3_384, Sha3_512};
 use vrl::prelude::*;
 
-fn sha3(value: Value, variant: &Bytes) -> Resolved {
+fn sha3(value: Value, variant: &Bytes) -> Result<Value> {
     let value = value.try_bytes()?;
     let hash = match variant.as_ref() {
         b"SHA3-224" => encode::<Sha3_224>(&value),
@@ -98,7 +98,7 @@ impl Function for Sha3 {
         }
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let variant = args
             .required_any("variant")
@@ -116,11 +116,14 @@ struct Sha3Fn {
 }
 
 impl Expression for Sha3Fn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
         let variant = &self.variant;
 
-        sha3(value, variant)
+        sha3(value, variant).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

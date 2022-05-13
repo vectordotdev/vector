@@ -111,7 +111,7 @@ impl Function for MatchDatadogQuery {
         }
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Result<Value> {
         let value = arguments.required("value");
         let filter = arguments
             .required_any("query")
@@ -144,12 +144,15 @@ struct MatchDatadogQueryFn {
 }
 
 impl Expression for MatchDatadogQueryFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
 
         // Provide the current VRL event `Value` to the matcher function to determine
         // whether the data matches the given Datadog Search syntax literal.
-        Ok(self.filter.run(&value).into())
+        Ok(Cow::Owned(self.filter.run(&value).into()))
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

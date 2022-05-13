@@ -137,7 +137,7 @@ impl Function for Redact {
         }
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let redactor = Redactor::Full;
         let filters = args
@@ -186,12 +186,15 @@ fn redact(value: Value, filters: &[Filter], redactor: &Redactor) -> Value {
 }
 
 impl Expression for RedactFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
         let filters = &self.filters;
         let redactor = &self.redactor;
 
-        Ok(redact(value, filters, redactor))
+        Ok(Cow::Owned(redact(value, filters, redactor)))
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

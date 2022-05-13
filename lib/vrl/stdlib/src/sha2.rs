@@ -2,7 +2,7 @@ use ::value::Value;
 use sha_2::{Digest, Sha224, Sha256, Sha384, Sha512, Sha512_224, Sha512_256};
 use vrl::prelude::*;
 
-fn sha2(value: Value, variant: &Bytes) -> Resolved {
+fn sha2(value: Value, variant: &Bytes) -> Result<Value> {
     let value = value.try_bytes()?;
     let hash = match variant.as_ref() {
         b"SHA-224" => encode::<Sha224>(&value),
@@ -102,7 +102,7 @@ impl Function for Sha2 {
         }
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let variant = args
             .required_any("variant")
@@ -120,11 +120,14 @@ struct Sha2Fn {
 }
 
 impl Expression for Sha2Fn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
         let variant = &self.variant;
 
-        sha2(value, variant)
+        sha2(value, variant).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

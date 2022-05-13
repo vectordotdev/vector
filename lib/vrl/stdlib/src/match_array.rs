@@ -1,7 +1,7 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn match_array(list: Value, pattern: Value, all: Option<Value>) -> Resolved {
+fn match_array(list: Value, pattern: Value, all: Option<Value>) -> Result<Value> {
     let pattern = pattern.try_regex()?;
     let list = list.try_array()?;
     let all = match all {
@@ -80,7 +80,7 @@ impl Function for MatchArray {
         ]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let pattern = args.required("pattern");
         let all = args.optional("all");
@@ -97,16 +97,20 @@ pub(crate) struct MatchArrayFn {
 }
 
 impl Expression for MatchArrayFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let list = self.value.resolve(ctx)?;
-        let pattern = self.pattern.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let list = self.value.resolve(ctx)?.into_owned();
+        let pattern = self.pattern.resolve(ctx)?.into_owned();
         let all = self
             .all
             .as_ref()
             .map(|expr| expr.resolve(ctx))
-            .transpose()?;
+            .transpose()?
+            .map(Cow::into_owned);
 
-        match_array(list, pattern, all)
+        match_array(list, pattern, all).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

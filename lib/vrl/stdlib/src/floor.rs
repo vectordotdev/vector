@@ -3,7 +3,7 @@ use vrl::prelude::*;
 
 use crate::util::round_to_precision;
 
-fn floor(precision: Option<Value>, value: Value) -> Resolved {
+fn floor(precision: Option<Value>, value: Value) -> Result<Value> {
     let precision = match precision {
         Some(value) => value.try_integer()?,
         None => 0,
@@ -66,7 +66,7 @@ impl Function for Floor {
         }]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let precision = args.optional("precision");
 
@@ -81,15 +81,20 @@ struct FloorFn {
 }
 
 impl Expression for FloorFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
         let precision = self
             .precision
             .as_ref()
             .map(|expr| expr.resolve(ctx))
-            .transpose()?;
-        let value = self.value.resolve(ctx)?;
+            .transpose()?
+            .map(Cow::into_owned);
 
-        floor(precision, value)
+        let value = self.value.resolve(ctx)?.into_owned();
+
+        floor(precision, value).map(Cow::Owned)
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

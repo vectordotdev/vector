@@ -6,7 +6,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use vrl::prelude::*;
 
-fn parse_klog(bytes: Value) -> Resolved {
+fn parse_klog(bytes: Value) -> Result<Value> {
     let bytes = bytes.try_bytes()?;
     let message = String::from_utf8_lossy(&bytes);
     let mut log: BTreeMap<String, Value> = BTreeMap::new();
@@ -116,7 +116,7 @@ impl Function for ParseKlog {
         }]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         parse_klog(value)
     }
@@ -128,9 +128,12 @@ struct ParseKlogFn {
 }
 
 impl Expression for ParseKlogFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?;
-        parse_klog(bytes)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let bytes = self.value.resolve(ctx)?.into_owned();
+        parse_klog(bytes).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

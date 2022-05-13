@@ -1,7 +1,7 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn upcase(value: Value) -> Resolved {
+fn upcase(value: Value) -> Result<Value> {
     Ok(value.try_bytes_utf8_lossy()?.to_uppercase().into())
 }
 
@@ -40,7 +40,7 @@ impl Function for Upcase {
         Ok(Box::new(UpcaseFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         upcase(value)
     }
@@ -52,9 +52,12 @@ struct UpcaseFn {
 }
 
 impl Expression for UpcaseFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
-        upcase(value)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
+        upcase(value).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

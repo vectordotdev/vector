@@ -3,7 +3,7 @@ use vrl::prelude::*;
 
 use crate::util::round_to_precision;
 
-fn ceil(value: Value, precision: Option<Value>) -> Resolved {
+fn ceil(value: Value, precision: Option<Value>) -> Result<Value> {
     let precision = match precision {
         Some(expr) => expr.try_integer()?,
         None => 0,
@@ -66,7 +66,7 @@ impl Function for Ceil {
         }]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let precision = args.optional("precision");
 
@@ -81,15 +81,19 @@ struct CeilFn {
 }
 
 impl Expression for CeilFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
         let precision = self
             .precision
             .as_ref()
-            .map(|expr| expr.resolve(ctx))
+            .map(|expr| expr.resolve(ctx).map(Cow::into_owned))
             .transpose()?;
-        let value = self.value.resolve(ctx)?;
 
-        ceil(value, precision)
+        let value = self.value.resolve(ctx)?.into_owned();
+
+        ceil(value, precision).map(Cow::Owned)
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

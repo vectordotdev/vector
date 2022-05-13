@@ -26,7 +26,7 @@ impl Function for Now {
         Ok(Box::new(NowFn))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Result<Value> {
         Ok(Utc::now().into())
     }
 }
@@ -35,8 +35,11 @@ impl Function for Now {
 struct NowFn;
 
 impl Expression for NowFn {
-    fn resolve(&self, _: &mut Context) -> Resolved {
-        Ok(Utc::now().into())
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        _: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        Ok(Cow::Owned(Utc::now().into()))
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

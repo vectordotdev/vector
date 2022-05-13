@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{borrow::Cow, collections::BTreeMap};
 
 use value::{kind::Collection, Kind, Value};
 use vrl::{
@@ -26,19 +26,21 @@ fn get_enrichment_table_record<'a>(
     case_sensitive: Case,
     condition: &'a [Condition],
     index: Option<IndexHandle>,
-) -> Resolved<'a> {
+) -> Result<Value> {
     let select = select
         .map(|array| match array {
             Value::Array(arr) => arr
                 .iter()
                 .map(|value| Ok(value.try_bytes_utf8_lossy()?.to_string()))
                 .collect::<std::result::Result<Vec<_>, _>>(),
+
             value => Err(vrl::value::Error::Expected {
                 got: value.kind(),
                 expected: Kind::array(Collection::any()),
             }),
         })
         .transpose()?;
+
     let data = enrichment_tables.find_table_row(
         table,
         case_sensitive,
@@ -225,7 +227,7 @@ impl Expression for GetEnrichmentTableRecordFn {
             .condition
             .iter()
             .map(|(key, value)| {
-                let value = value.resolve(ctx)?;
+                let value = value.resolve(ctx)?.into_owned();
                 evaluate_condition(key, value)
             })
             .collect::<Result<Vec<Condition>>>()?;
@@ -234,7 +236,8 @@ impl Expression for GetEnrichmentTableRecordFn {
             .select
             .as_ref()
             .map(|array| array.resolve(ctx))
-            .transpose()?;
+            .transpose()?
+            .map(Cow::into_owned);
 
         let table = &self.table;
         let case_sensitive = self.case_sensitive;
@@ -249,6 +252,7 @@ impl Expression for GetEnrichmentTableRecordFn {
             &condition,
             index,
         )
+        .map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

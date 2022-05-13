@@ -4,7 +4,7 @@ use ::value::Value;
 use bytes::Bytes;
 use vrl::prelude::*;
 
-fn ip_pton(value: Value) -> Resolved {
+fn ip_pton(value: Value) -> Result<Value> {
     let ip: IpAddr = value
         .try_bytes_utf8_lossy()?
         .parse()
@@ -60,7 +60,7 @@ impl Function for IpPton {
         Ok(Box::new(IpPtonFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         ip_pton(value)
     }
@@ -72,9 +72,12 @@ struct IpPtonFn {
 }
 
 impl Expression for IpPtonFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
-        ip_pton(value)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
+        ip_pton(value).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

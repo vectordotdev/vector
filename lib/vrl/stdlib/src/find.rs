@@ -1,7 +1,7 @@
 use ::value::{Value, ValueRegex};
 use vrl::prelude::*;
 
-fn find(value: Value, pattern: Value, from: Option<Value>) -> Resolved {
+fn find(value: Value, pattern: Value, from: Option<Value>) -> Result<Value> {
     let from = match from {
         Some(value) => value.try_integer()?,
         None => 0,
@@ -65,7 +65,7 @@ impl Function for Find {
         }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let pattern = args.required("pattern");
         let from = args.optional("from");
@@ -117,16 +117,20 @@ impl FindFn {
 }
 
 impl Expression for FindFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
-        let pattern = self.pattern.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
+        let pattern = self.pattern.resolve(ctx)?.into_owned();
         let from = self
             .from
             .as_ref()
             .map(|expr| expr.resolve(ctx))
-            .transpose()?;
+            .transpose()?
+            .map(Cow::into_owned);
 
-        find(value, pattern, from)
+        find(value, pattern, from).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

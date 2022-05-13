@@ -133,7 +133,7 @@ impl Function for StartsWith {
         }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Result<Value> {
         let value = arguments.required("value");
         let substring = arguments.required("substring");
         let case_sensitive = arguments
@@ -172,20 +172,25 @@ struct StartsWithFn {
 }
 
 impl Expression for StartsWithFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
         let case_sensitive = if self.case_sensitive.resolve(ctx)?.try_boolean()? {
             Case::Sensitive
         } else {
             Case::Insensitive
         };
 
-        let substring = self.substring.resolve(ctx)?;
+        let substring = self.substring.resolve(ctx)?.into_owned();
         let substring = substring.try_bytes()?;
 
-        let value = self.value.resolve(ctx)?;
+        let value = self.value.resolve(ctx)?.into_owned();
         let value = value.try_bytes()?;
 
-        Ok(starts_with(&value, &substring, case_sensitive).into())
+        Ok(Cow::Owned(
+            starts_with(&value, &substring, case_sensitive).into(),
+        ))
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

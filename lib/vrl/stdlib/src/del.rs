@@ -2,7 +2,7 @@ use ::value::Value;
 use vrl::prelude::*;
 
 #[inline]
-fn del(query: &expression::Query, ctx: &mut Context) -> Resolved {
+fn del(query: &expression::Query, ctx: &mut Context) -> Result<Value> {
     let path = query.path();
 
     if query.is_external() {
@@ -22,7 +22,7 @@ fn del(query: &expression::Query, ctx: &mut Context) -> Resolved {
             None => Ok(Value::Null),
         }
     } else if let Some(expr) = query.expression_target() {
-        let value = expr.resolve(ctx)?;
+        let value = expr.resolve(ctx)?.into_owned();
 
         // No need to do the actual deletion, as the expression is only
         // available as an argument to the function.
@@ -118,7 +118,7 @@ impl Function for Del {
         }
     }
 
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let query = args
             .required_any("target")
             .downcast_ref::<expression::Query>()
@@ -162,8 +162,11 @@ impl Expression for DelFn {
     // future to potentially improve this situation.
     //
     // see tracking issue: https://github.com/vectordotdev/vector/issues/5887
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        del(&self.query, ctx)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        del(&self.query, ctx).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

@@ -2,7 +2,7 @@ use ::value::Value;
 use percent_encoding::percent_decode;
 use vrl::prelude::*;
 
-fn decode_percent(value: Value) -> Resolved {
+fn decode_percent(value: Value) -> Result<Value> {
     let value = value.try_bytes()?;
     Ok(percent_decode(&value)
         .decode_utf8_lossy()
@@ -45,7 +45,7 @@ impl Function for DecodePercent {
         }]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
 
         decode_percent(value)
@@ -58,10 +58,13 @@ struct DecodePercentFn {
 }
 
 impl Expression for DecodePercentFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
 
-        decode_percent(value)
+        decode_percent(value).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

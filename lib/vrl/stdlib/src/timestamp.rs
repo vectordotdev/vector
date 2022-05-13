@@ -1,7 +1,7 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn timestamp(value: Value) -> Resolved {
+fn timestamp(value: Value) -> Result<Value> {
     match value {
         v @ Value::Timestamp(_) => Ok(v),
         v => Err(format!(r#"expected timestamp, got {}"#, v.kind()).into()),
@@ -52,7 +52,7 @@ impl Function for Timestamp {
         Ok(Box::new(TimestampFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         timestamp(value)
     }
@@ -64,9 +64,12 @@ struct TimestampFn {
 }
 
 impl Expression for TimestampFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
-        timestamp(value)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
+        timestamp(value).map(Cow::Owned)
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

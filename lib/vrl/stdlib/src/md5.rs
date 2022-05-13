@@ -2,7 +2,7 @@ use ::value::Value;
 use md5::Digest;
 use vrl::prelude::*;
 
-fn md5(value: Value) -> Resolved {
+fn md5(value: Value) -> Result<Value> {
     let value = value.try_bytes()?;
     Ok(hex::encode(md5::Md5::digest(&value)).into())
 }
@@ -42,7 +42,7 @@ impl Function for Md5 {
         Ok(Box::new(Md5Fn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         md5(value)
     }
@@ -54,9 +54,12 @@ struct Md5Fn {
 }
 
 impl Expression for Md5Fn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
-        md5(value)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
+        md5(value).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

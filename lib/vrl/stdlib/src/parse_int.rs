@@ -1,7 +1,7 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn parse_int(value: Value, base: Option<Value>) -> Resolved {
+fn parse_int(value: Value, base: Option<Value>) -> Result<Value> {
     let string = value.try_bytes_utf8_lossy()?;
     let (base, index) = match base {
         Some(base) => {
@@ -88,7 +88,7 @@ impl Function for ParseInt {
         Ok(Box::new(ParseIntFn { value, base }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let base = args.optional("base");
 
@@ -103,15 +103,18 @@ struct ParseIntFn {
 }
 
 impl Expression for ParseIntFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
         let base = self
             .base
             .as_ref()
-            .map(|expr| expr.resolve(ctx))
+            .map(|expr| expr.resolve(ctx).map(Cow::into_owned))
             .transpose()?;
 
-        parse_int(value, base)
+        parse_int(value, base).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

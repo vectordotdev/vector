@@ -64,7 +64,7 @@ impl Function for ParseUrl {
         ]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Result<Value> {
         let value = arguments.required("value");
         let string = value.try_bytes_utf8_lossy()?;
         let default_known_ports = arguments
@@ -102,8 +102,11 @@ struct ParseUrlFn {
 }
 
 impl Expression for ParseUrlFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
         let string = value.try_bytes_utf8_lossy()?;
 
         let default_known_ports = self.default_known_ports.resolve(ctx)?.try_boolean()?;
@@ -111,6 +114,7 @@ impl Expression for ParseUrlFn {
         Url::parse(&string)
             .map_err(|e| format!("unable to parse url: {}", e).into())
             .map(|url| url_to_value(url, default_known_ports))
+            .map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

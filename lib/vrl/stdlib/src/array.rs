@@ -1,7 +1,7 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn array(value: Value) -> Resolved {
+fn array(value: Value) -> Result<Value> {
     match value {
         v @ Value::Array(_) => Ok(v),
         v => Err(format!("expected array, got {}", v.kind()).into()),
@@ -52,7 +52,7 @@ impl Function for Array {
         Ok(Box::new(ArrayFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         array(value)
     }
@@ -64,8 +64,11 @@ struct ArrayFn {
 }
 
 impl Expression for ArrayFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        array(self.value.resolve(ctx)?)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        array(self.value.resolve(ctx)?.into_owned()).map(Cow::Owned)
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

@@ -2,7 +2,7 @@ use ::value::Value;
 use tracing::warn;
 use vrl::prelude::*;
 
-fn to_regex(value: Value) -> Resolved {
+fn to_regex(value: Value) -> Result<Value> {
     let string = value.try_bytes_utf8_lossy()?;
     let regex = regex::Regex::new(string.as_ref())
         .map_err(|err| format!("could not create regex: {}", err))
@@ -45,7 +45,7 @@ impl Function for ToRegex {
         Ok(Box::new(ToRegexFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
 
         to_regex(value)
@@ -58,9 +58,12 @@ struct ToRegexFn {
 }
 
 impl Expression for ToRegexFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
-        to_regex(value)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
+        to_regex(value).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

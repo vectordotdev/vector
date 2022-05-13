@@ -2,7 +2,7 @@ use ::value::Value;
 use lookup_lib::LookupBuf;
 use vrl::{prelude::*, value::kind::merge};
 
-fn unnest(path: &expression::Query, root_lookup: &LookupBuf, ctx: &mut Context) -> Resolved {
+fn unnest(path: &expression::Query, root_lookup: &LookupBuf, ctx: &mut Context) -> Result<Value> {
     let path_path = path.path();
 
     let value: Value;
@@ -13,11 +13,11 @@ fn unnest(path: &expression::Query, root_lookup: &LookupBuf, ctx: &mut Context) 
             Box::new(v as &dyn Target) as Box<_>
         }
         expression::Target::Container(expr) => {
-            value = expr.resolve(ctx)?;
+            value = expr.resolve(ctx)?.into_owned();
             Box::new(&value as &dyn Target) as Box<&dyn Target>
         }
         expression::Target::FunctionCall(expr) => {
-            value = expr.resolve(ctx)?;
+            value = expr.resolve(ctx)?.into_owned();
             Box::new(&value as &dyn Target) as Box<&dyn Target>
         }
     };
@@ -127,7 +127,7 @@ impl Function for Unnest {
         }
     }
 
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let path = args
             .required_any("path")
             .downcast_ref::<expression::Query>()
@@ -160,8 +160,11 @@ impl UnnestFn {
 }
 
 impl Expression for UnnestFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        unnest(&self.path, &self.root, ctx)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        unnest(&self.path, &self.root, ctx).map(Cow::Owned)
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

@@ -1,9 +1,9 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn for_each<T>(value: Value, ctx: &mut Context, runner: closure::Runner<T>) -> Resolved
+fn for_each<T>(value: Value, ctx: &mut Context, runner: closure::Runner<T>) -> Result<Value>
 where
-    T: Fn(&mut Context) -> Resolved,
+    T: Fn(&mut Context) -> Result<Value>,
 {
     for item in value.into_iter(false) {
         match item {
@@ -101,12 +101,15 @@ struct ForEachFn {
 }
 
 impl Expression for ForEachFn {
-    fn resolve(&self, ctx: &mut Context) -> Result<Value> {
-        let value = self.value.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
         let FunctionClosure { variables, block } = &self.closure;
-        let runner = closure::Runner::new(variables, |ctx| block.resolve(ctx));
+        let runner = closure::Runner::new(variables, |ctx| block.resolve(ctx).map(Cow::into_owned));
 
-        for_each(value, ctx, runner)
+        for_each(value, ctx, runner).map(Cow::Owned)
     }
 
     fn type_def(&self, ctx: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

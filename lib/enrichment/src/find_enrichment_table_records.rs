@@ -8,14 +8,14 @@ use crate::{
     Case, Condition, IndexHandle, TableRegistry, TableSearch,
 };
 
-fn find_enrichment_table_records<'a>(
+fn find_enrichment_table_records(
     select: Option<Value>,
-    enrichment_tables: &'a TableSearch,
-    table: &'a str,
+    enrichment_tables: &TableSearch,
+    table: &str,
     case_sensitive: Case,
-    condition: &'a [Condition],
+    condition: &[Condition],
     index: Option<IndexHandle>,
-) -> Resolved<'a> {
+) -> Result<Value> {
     let select = select
         .map(|select| match select {
             Value::Array(arr) => arr
@@ -40,6 +40,7 @@ fn find_enrichment_table_records<'a>(
         .into_iter()
         .map(Value::Object)
         .collect();
+
     Ok(Value::Array(data))
 }
 
@@ -222,7 +223,7 @@ impl Expression for FindEnrichmentTableRecordsFn {
             .condition
             .iter()
             .map(|(key, value)| {
-                let value = value.resolve(ctx)?;
+                let value = value.resolve(ctx)?.into_owned();
                 evaluate_condition(key, value)
             })
             .collect::<Result<Vec<Condition>>>()?;
@@ -230,7 +231,7 @@ impl Expression for FindEnrichmentTableRecordsFn {
         let select = self
             .select
             .as_ref()
-            .map(|array| array.resolve(ctx))
+            .map(|array| array.resolve(ctx).map(Cow::into_owned))
             .transpose()?;
 
         let table = &self.table;
@@ -246,6 +247,7 @@ impl Expression for FindEnrichmentTableRecordsFn {
             &condition,
             index,
         )
+        .map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

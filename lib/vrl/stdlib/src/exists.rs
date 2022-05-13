@@ -57,7 +57,7 @@ impl Function for Exists {
         }
     }
 
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let field = args
             .required_any("field")
             .downcast_ref::<expression::Query>()
@@ -83,7 +83,7 @@ pub(crate) struct ExistsFn {
     query: expression::Query,
 }
 
-fn exists(query: &expression::Query, ctx: &mut Context) -> Resolved {
+fn exists(query: &expression::Query, ctx: &mut Context) -> Result<Value> {
     let path = query.path();
 
     if query.is_external() {
@@ -104,7 +104,7 @@ fn exists(query: &expression::Query, ctx: &mut Context) -> Resolved {
     }
 
     if let Some(expr) = query.expression_target() {
-        let value = expr.resolve(ctx)?;
+        let value = expr.resolve(ctx)?.into_owned();
 
         return Ok(value.get_by_path(path).is_some().into());
     }
@@ -113,8 +113,11 @@ fn exists(query: &expression::Query, ctx: &mut Context) -> Resolved {
 }
 
 impl Expression for ExistsFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        exists(&self.query, ctx)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        exists(&self.query, ctx).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

@@ -3,7 +3,7 @@ use std::str::FromStr;
 use ::value::Value;
 use vrl::{function::Error, prelude::*};
 
-fn to_unix_timestamp(value: Value, unit: Unit) -> Resolved {
+fn to_unix_timestamp(value: Value, unit: Unit) -> Result<Value> {
     let ts = value.try_timestamp()?;
     let time = match unit {
         Unit::Seconds => ts.timestamp(),
@@ -102,7 +102,7 @@ impl Function for ToUnixTimestamp {
         }
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let unit = args
             .optional_any("unit")
@@ -169,11 +169,14 @@ struct ToUnixTimestampFn {
 }
 
 impl Expression for ToUnixTimestampFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
         let unit = self.unit;
 
-        to_unix_timestamp(value, unit)
+        to_unix_timestamp(value, unit).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

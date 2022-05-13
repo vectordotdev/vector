@@ -3,7 +3,7 @@ use std::collections::btree_map;
 use ::value::Value;
 use vrl::prelude::*;
 
-fn flatten(value: Value) -> Resolved {
+fn flatten(value: Value) -> Result<Value> {
     match value {
         Value::Array(arr) => Ok(Value::Array(
             ArrayFlatten::new(arr.iter()).cloned().collect(),
@@ -62,7 +62,7 @@ impl Function for Flatten {
         Ok(Box::new(FlattenFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         flatten(value)
     }
@@ -74,8 +74,11 @@ struct FlattenFn {
 }
 
 impl Expression for FlattenFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        flatten(self.value.resolve(ctx)?)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        flatten(self.value.resolve(ctx)?.into_owned()).map(Cow::Owned)
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

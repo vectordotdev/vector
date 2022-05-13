@@ -22,7 +22,7 @@ struct ParseOptions {
     parse_number: Option<Value>,
 }
 
-fn parse_xml(value: Value, options: ParseOptions) -> Resolved {
+fn parse_xml(value: Value, options: ParseOptions) -> Result<Value> {
     let string = value.try_bytes_utf8_lossy()?;
     let trim = match options.trim {
         Some(value) => value.try_boolean()?,
@@ -191,7 +191,7 @@ impl Function for ParseXml {
         ]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
 
         let options = ParseOptions {
@@ -224,60 +224,63 @@ struct ParseXmlFn {
 }
 
 impl Expression for ParseXmlFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
 
         let options = ParseOptions {
             trim: self
                 .trim
                 .as_ref()
-                .map(|expr| expr.resolve(ctx))
+                .map(|expr| expr.resolve(ctx).map(Cow::into_owned))
                 .transpose()?,
 
             include_attr: self
                 .include_attr
                 .as_ref()
-                .map(|expr| expr.resolve(ctx))
+                .map(|expr| expr.resolve(ctx).map(Cow::into_owned))
                 .transpose()?,
 
             attr_prefix: self
                 .attr_prefix
                 .as_ref()
-                .map(|expr| expr.resolve(ctx))
+                .map(|expr| expr.resolve(ctx).map(Cow::into_owned))
                 .transpose()?,
 
             text_key: self
                 .text_key
                 .as_ref()
-                .map(|expr| expr.resolve(ctx))
+                .map(|expr| expr.resolve(ctx).map(Cow::into_owned))
                 .transpose()?,
 
             always_use_text_key: self
                 .always_use_text_key
                 .as_ref()
-                .map(|expr| expr.resolve(ctx))
+                .map(|expr| expr.resolve(ctx).map(Cow::into_owned))
                 .transpose()?,
 
             parse_bool: self
                 .parse_bool
                 .as_ref()
-                .map(|expr| expr.resolve(ctx))
+                .map(|expr| expr.resolve(ctx).map(Cow::into_owned))
                 .transpose()?,
 
             parse_null: self
                 .parse_null
                 .as_ref()
-                .map(|expr| expr.resolve(ctx))
+                .map(|expr| expr.resolve(ctx).map(Cow::into_owned))
                 .transpose()?,
 
             parse_number: self
                 .parse_number
                 .as_ref()
-                .map(|expr| expr.resolve(ctx))
+                .map(|expr| expr.resolve(ctx).map(Cow::into_owned))
                 .transpose()?,
         };
 
-        parse_xml(value, options)
+        parse_xml(value, options).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

@@ -14,7 +14,7 @@ use nom::{
 };
 use vrl::prelude::*;
 
-fn parse_ruby_hash(value: Value) -> Resolved {
+fn parse_ruby_hash(value: Value) -> Result<Value> {
     let input = value.try_bytes_utf8_lossy()?;
     parse(&input)
 }
@@ -62,7 +62,7 @@ impl Function for ParseRubyHash {
         }]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         parse_ruby_hash(value)
     }
@@ -74,9 +74,12 @@ struct ParseRubyHashFn {
 }
 
 impl Expression for ParseRubyHashFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
-        parse_ruby_hash(value)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
+        parse_ruby_hash(value).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

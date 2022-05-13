@@ -1,7 +1,7 @@
 use ::value::Value;
 use vrl::{diagnostic::Note, prelude::*};
 
-fn assert_eq(left: Value, right: Value, message: Option<Value>) -> Resolved {
+fn assert_eq(left: Value, right: Value, message: Option<Value>) -> Result<Value> {
     if left == right {
         Ok(true.into())
     } else if let Some(message) = message {
@@ -86,7 +86,7 @@ impl Function for AssertEq {
         }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let left = args.required("left");
         let right = args.required("right");
         let message = args.optional("message");
@@ -103,12 +103,15 @@ struct AssertEqFn {
 }
 
 impl Expression for AssertEqFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let left = self.left.resolve(ctx)?;
-        let right = self.right.resolve(ctx)?;
-        let message = self.message.as_ref().map(|m| m.resolve(ctx)).transpose()?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let left = self.left.resolve(ctx)?.into_owned();
+        let right = self.right.resolve(ctx)?.into_owned();
+        let message = self.message.as_ref().map(|m| m.resolve(ctx)).transpose()?.map(Cow::into_owned);
 
-        assert_eq(left, right, message)
+        assert_eq(left, right, message).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

@@ -3,7 +3,7 @@ use std::ops::Range;
 use ::value::Value;
 use vrl::prelude::*;
 
-fn slice(start: i64, end: Option<i64>, value: Value) -> Resolved {
+fn slice(start: i64, end: Option<i64>, value: Value) -> Result<Value> {
     let range = |len: i64| -> Result<Range<usize>> {
         let start = match start {
             start if start < 0 => start + len,
@@ -101,7 +101,7 @@ impl Function for Slice {
         Ok(Box::new(SliceFn { value, start, end }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let start = args.required("start").try_integer()?;
         let end = args
@@ -121,15 +121,18 @@ struct SliceFn {
 }
 
 impl Expression for SliceFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
         let start = self.start.resolve(ctx)?.try_integer()?;
         let end = match &self.end {
             Some(expr) => Some(expr.resolve(ctx)?.try_integer()?),
             None => None,
         };
-        let value = self.value.resolve(ctx)?;
+        let value = self.value.resolve(ctx)?.into_owned();
 
-        slice(start, end, value)
+        slice(start, end, value).map(Cow::Owned)
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

@@ -1,7 +1,7 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn split(value: Value, limit: Value, pattern: Value) -> Resolved {
+fn split(value: Value, limit: Value, pattern: Value) -> Result<Value> {
     let string = value.try_bytes_utf8_lossy()?;
     let limit = limit.try_integer()? as usize;
     match pattern {
@@ -90,7 +90,7 @@ impl Function for Split {
         }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let pattern = args.required("pattern");
         let limit = args.optional("limit").unwrap_or_else(|| value!(999999999));
@@ -107,12 +107,15 @@ pub(crate) struct SplitFn {
 }
 
 impl Expression for SplitFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
-        let limit = self.limit.resolve(ctx)?;
-        let pattern = self.pattern.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
+        let limit = self.limit.resolve(ctx)?.into_owned();
+        let pattern = self.pattern.resolve(ctx)?.into_owned();
 
-        split(value, limit, pattern)
+        split(value, limit, pattern).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

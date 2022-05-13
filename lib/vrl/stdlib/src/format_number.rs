@@ -7,7 +7,7 @@ fn format_number(
     scale: Option<Value>,
     grouping_separator: Option<Value>,
     decimal_separator: Option<Value>,
-) -> Resolved {
+) -> Result<Value> {
     let value: Decimal = match value {
         Value::Integer(v) => v.into(),
         Value::Float(v) => Decimal::from_f64(*v).expect("not NaN"),
@@ -141,7 +141,7 @@ impl Function for FormatNumber {
         }]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let scale = args.optional("scale");
         let decimal_separator = args.optional("decimal_separator");
@@ -160,25 +160,31 @@ struct FormatNumberFn {
 }
 
 impl Expression for FormatNumberFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
+
         let scale = self
             .scale
             .as_ref()
-            .map(|expr| expr.resolve(ctx))
+            .map(|expr| expr.resolve(ctx).map(Cow::into_owned))
             .transpose()?;
+
         let grouping_separator = self
             .grouping_separator
             .as_ref()
-            .map(|expr| expr.resolve(ctx))
+            .map(|expr| expr.resolve(ctx).map(Cow::into_owned))
             .transpose()?;
+
         let decimal_separator = self
             .decimal_separator
             .as_ref()
-            .map(|expr| expr.resolve(ctx))
+            .map(|expr| expr.resolve(ctx).map(Cow::into_owned))
             .transpose()?;
 
-        format_number(value, scale, grouping_separator, decimal_separator)
+        format_number(value, scale, grouping_separator, decimal_separator).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

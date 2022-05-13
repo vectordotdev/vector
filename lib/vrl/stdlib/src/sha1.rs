@@ -2,7 +2,7 @@ use ::sha1::Digest;
 use ::value::Value;
 use vrl::prelude::*;
 
-fn sha1(value: Value) -> Resolved {
+fn sha1(value: Value) -> Result<Value> {
     let value = value.try_bytes()?;
     Ok(hex::encode(sha1::Sha1::digest(&value)).into())
 }
@@ -42,7 +42,7 @@ impl Function for Sha1 {
         Ok(Box::new(Sha1Fn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         sha1(value)
     }
@@ -54,9 +54,12 @@ struct Sha1Fn {
 }
 
 impl Expression for Sha1Fn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
-        sha1(value)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
+        sha1(value).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

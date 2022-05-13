@@ -2,7 +2,7 @@ use ::value::Value;
 use vector_common::conversion::Conversion;
 use vrl::prelude::*;
 
-fn to_int(value: Value) -> Resolved {
+fn to_int(value: Value) -> Result<Value> {
     use Value::*;
 
     match value {
@@ -113,7 +113,7 @@ impl Function for ToInt {
         Ok(Box::new(ToIntFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
 
         to_int(value)
@@ -126,10 +126,13 @@ struct ToIntFn {
 }
 
 impl Expression for ToIntFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
 
-        to_int(value)
+        to_int(value).map(Cow::Owned)
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

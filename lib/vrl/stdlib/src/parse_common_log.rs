@@ -5,7 +5,7 @@ use vrl::prelude::*;
 
 use crate::log_util;
 
-fn parse_common_log(bytes: Value, timestamp_format: Option<Value>, ctx: &Context) -> Resolved {
+fn parse_common_log(bytes: Value, timestamp_format: Option<Value>, ctx: &Context) -> Result<Value> {
     let message = bytes.try_bytes_utf8_lossy()?;
     let timestamp_format = match timestamp_format {
         None => "%d/%b/%Y:%T %z".to_owned(),
@@ -82,7 +82,7 @@ impl Function for ParseCommonLog {
         }]
     }
 
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let timestamp_format = args.optional("timestamp_format");
 
@@ -97,15 +97,18 @@ struct ParseCommonLogFn {
 }
 
 impl Expression for ParseCommonLogFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let bytes = self.value.resolve(ctx)?.into_owned();
         let timestamp_format = self
             .timestamp_format
             .as_ref()
-            .map(|expr| expr.resolve(ctx))
+            .map(|expr| expr.resolve(ctx).map(Cow::into_owned))
             .transpose()?;
 
-        parse_common_log(bytes, timestamp_format, ctx)
+        parse_common_log(bytes, timestamp_format, ctx).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

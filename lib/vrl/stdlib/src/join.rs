@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use ::value::Value;
 use vrl::prelude::*;
 
-fn join(array: Value, separator: Option<Value>) -> Resolved {
+fn join(array: Value, separator: Option<Value>) -> Result<Value> {
     let array = array.try_array()?;
     let string_vec = array
         .iter()
@@ -62,7 +62,7 @@ impl Function for Join {
         }]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let separator = args.optional("separator");
 
@@ -77,15 +77,18 @@ struct JoinFn {
 }
 
 impl Expression for JoinFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let array = self.value.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let array = self.value.resolve(ctx)?.into_owned();
         let separator = self
             .separator
             .as_ref()
-            .map(|s| s.resolve(ctx))
+            .map(|s| s.resolve(ctx).map(Cow::into_owned))
             .transpose()?;
 
-        join(array, separator)
+        join(array, separator).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

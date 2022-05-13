@@ -4,7 +4,7 @@ use vrl::{function::Error, prelude::*};
 
 use crate::util;
 
-fn parse_regex_all(value: Value, numeric_groups: bool, pattern: &Regex) -> Resolved {
+fn parse_regex_all(value: Value, numeric_groups: bool, pattern: &Regex) -> Result<Value> {
     let bytes = value.try_bytes()?;
     let value = String::from_utf8_lossy(&bytes);
     Ok(pattern
@@ -100,7 +100,7 @@ impl Function for ParseRegexAll {
         match (name, expr) {
             ("pattern", Some(expr)) => {
                 let regex: regex::Regex = match expr {
-                    expression::Expr::Literal(expression::Literal::Regex(regex)) => {
+                    expression::Expr::Literal(expression::Literal::Regex(_, regex)) => {
                         Ok((**regex).clone())
                     }
                     expr => Err(Error::UnexpectedExpression {
@@ -116,7 +116,7 @@ impl Function for ParseRegexAll {
         }
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let pattern = args
             .required_any("pattern")
             .downcast_ref::<regex::Regex>()
@@ -140,12 +140,15 @@ pub(crate) struct ParseRegexAllFn {
 }
 
 impl Expression for ParseRegexAllFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
-        let numeric_groups = self.numeric_groups.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
+        let numeric_groups = self.numeric_groups.resolve(ctx)?.into_owned();
         let pattern = &self.pattern;
 
-        parse_regex_all(value, numeric_groups.try_boolean()?, pattern)
+        parse_regex_all(value, numeric_groups.try_boolean()?, pattern).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

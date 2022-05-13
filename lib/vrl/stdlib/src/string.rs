@@ -1,7 +1,7 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn string(value: Value) -> Resolved {
+fn string(value: Value) -> Result<Value> {
     match value {
         v @ Value::Bytes(_) => Ok(v),
         v => Err(format!("expected string, got {}", v.kind()).into()),
@@ -52,7 +52,7 @@ impl Function for String {
         Ok(Box::new(StringFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Result<Value> {
         let value = arguments.required("value");
         string(value)
     }
@@ -64,8 +64,11 @@ struct StringFn {
 }
 
 impl Expression for StringFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        string(self.value.resolve(ctx)?)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        string(self.value.resolve(ctx)?.into_owned()).map(Cow::Owned)
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

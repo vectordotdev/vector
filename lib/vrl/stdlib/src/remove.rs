@@ -2,7 +2,7 @@ use ::value::Value;
 use lookup_lib::{LookupBuf, SegmentBuf};
 use vrl::prelude::*;
 
-fn remove(path: Value, compact: Value, mut value: Value) -> Resolved {
+fn remove(path: Value, compact: Value, mut value: Value) -> Result<Value> {
     let path = match path {
         Value::Array(path) => {
             let mut lookup = LookupBuf::root();
@@ -158,7 +158,7 @@ impl Function for Remove {
         }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let path = args.required("path");
         let compact = args.optional("compact").unwrap_or_else(|| value!(false));
@@ -175,12 +175,15 @@ pub(crate) struct RemoveFn {
 }
 
 impl Expression for RemoveFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let path = self.path.resolve(ctx)?;
-        let compact = self.compact.resolve(ctx)?;
-        let value = self.value.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let path = self.path.resolve(ctx)?.into_owned();
+        let compact = self.compact.resolve(ctx)?.into_owned();
+        let value = self.value.resolve(ctx)?.into_owned();
 
-        remove(path, compact, value)
+        remove(path, compact, value).map(Cow::Owned)
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

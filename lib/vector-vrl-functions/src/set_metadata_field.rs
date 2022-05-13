@@ -1,8 +1,7 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn set_metadata_field(ctx: &mut Context, key: &str, value: Value) -> Result<Value> {
-    let value = value.try_bytes_utf8_lossy()?.to_string();
+fn set_metadata_field(ctx: &mut Context, key: &str, value: String) -> Result<Value> {
     ctx.target_mut().set_metadata(key, value)?;
     Ok(Value::Null)
 }
@@ -76,6 +75,7 @@ impl Function for SetMetadataField {
 
     fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
+        let value = value.try_bytes_utf8_lossy()?.to_string();
         let key = args.required_any("key").downcast_ref::<String>().unwrap();
 
         set_metadata_field(ctx, key, value)
@@ -94,6 +94,7 @@ impl Expression for SetMetadataFieldFn {
         ctx: &'ctx mut Context,
     ) -> Resolved<'value> {
         let value = self.value.resolve(ctx)?;
+        let value = value.try_bytes_utf8_lossy()?.to_string();
         let key = &self.key;
 
         set_metadata_field(ctx, key, value).map(Cow::Owned)

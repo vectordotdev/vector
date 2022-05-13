@@ -4,7 +4,7 @@ use ::value::Value;
 use vector_common::aws_cloudwatch_logs_subscription::AwsCloudWatchLogsSubscriptionMessage;
 use vrl::prelude::*;
 
-fn parse_aws_cloudwatch_log_subscription_message(bytes: Value) -> Resolved {
+fn parse_aws_cloudwatch_log_subscription_message(bytes: Value) -> Result<Value> {
     let bytes = bytes.try_bytes()?;
     let message = serde_json::from_slice::<AwsCloudWatchLogsSubscriptionMessage>(&bytes)
         .map_err(|e| format!("unable to parse: {}", e))?;
@@ -88,7 +88,7 @@ impl Function for ParseAwsCloudWatchLogSubscriptionMessage {
         }]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         parse_aws_cloudwatch_log_subscription_message(value)
     }
@@ -100,9 +100,12 @@ struct ParseAwsCloudWatchLogSubscriptionMessageFn {
 }
 
 impl Expression for ParseAwsCloudWatchLogSubscriptionMessageFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?;
-        parse_aws_cloudwatch_log_subscription_message(bytes)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let bytes = self.value.resolve(ctx)?.into_owned();
+        parse_aws_cloudwatch_log_subscription_message(bytes).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

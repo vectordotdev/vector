@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use vrl::prelude::*;
 
-fn uuid_v4() -> Resolved {
+fn uuid_v4() -> Result<Value> {
     let mut buf = [0; 36];
     let uuid = uuid::Uuid::new_v4().hyphenated().encode_lower(&mut buf);
     Ok(Bytes::copy_from_slice(uuid.as_bytes()).into())
@@ -32,7 +32,7 @@ impl Function for UuidV4 {
         Ok(Box::new(UuidV4Fn))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Result<Value> {
         uuid_v4()
     }
 }
@@ -41,8 +41,11 @@ impl Function for UuidV4 {
 struct UuidV4Fn;
 
 impl Expression for UuidV4Fn {
-    fn resolve(&self, _: &mut Context) -> Resolved {
-        uuid_v4()
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        _: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        uuid_v4().map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

@@ -111,7 +111,7 @@ pub(crate) fn is_valid_algorithm(algorithm: Value) -> bool {
     )
 }
 
-fn encrypt(plaintext: Value, algorithm: Value, key: Value, iv: Value) -> Resolved {
+fn encrypt(plaintext: Value, algorithm: Value, key: Value, iv: Value) -> Result<Value> {
     let plaintext = plaintext.try_bytes()?;
     let algorithm = algorithm.try_bytes_utf8_lossy()?.as_ref().to_uppercase();
     let ciphertext = match algorithm.as_str() {
@@ -213,7 +213,7 @@ impl Function for Encrypt {
         }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let plaintext = args.required("plaintext");
         let algorithm = args.required("algorithm");
         let key = args.required("key");
@@ -231,12 +231,16 @@ struct EncryptFn {
 }
 
 impl Expression for EncryptFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let plaintext = self.plaintext.resolve(ctx)?;
-        let algorithm = self.algorithm.resolve(ctx)?;
-        let key = self.key.resolve(ctx)?;
-        let iv = self.iv.resolve(ctx)?;
-        encrypt(plaintext, algorithm, key, iv)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let plaintext = self.plaintext.resolve(ctx)?.into_owned();
+        let algorithm = self.algorithm.resolve(ctx)?.into_owned();
+        let key = self.key.resolve(ctx)?.into_owned();
+        let iv = self.iv.resolve(ctx)?.into_owned();
+
+        encrypt(plaintext, algorithm, key, iv).map(Cow::Owned)
     }
 
     fn type_def(&self, _state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

@@ -11,7 +11,7 @@ fn parse_nginx_log(
     timestamp_format: Option<Value>,
     format: &Bytes,
     ctx: &Context,
-) -> Resolved {
+) -> Result<Value> {
     let message = bytes.try_bytes_utf8_lossy()?;
     let timestamp_format = match timestamp_format {
         None => time_format_for_format(format.as_ref()),
@@ -115,7 +115,7 @@ impl Function for ParseNginxLog {
         }
     }
 
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let format = args.required_any("format").downcast_ref::<Bytes>().unwrap();
         let timestamp_format = args.optional("timestamp_format");
@@ -157,16 +157,20 @@ struct ParseNginxLogFn {
 }
 
 impl Expression for ParseNginxLogFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let bytes = self.value.resolve(ctx)?.into_owned();
         let timestamp_format = self
             .timestamp_format
             .as_ref()
             .map(|expr| expr.resolve(ctx))
-            .transpose()?;
+            .transpose()?
+            .map(Cow::into_owned);
         let format = &self.format;
 
-        parse_nginx_log(bytes, timestamp_format, format, ctx)
+        parse_nginx_log(bytes, timestamp_format, format, ctx).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

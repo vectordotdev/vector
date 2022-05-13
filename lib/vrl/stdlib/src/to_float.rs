@@ -2,7 +2,7 @@ use ::value::Value;
 use vector_common::conversion::Conversion;
 use vrl::prelude::*;
 
-fn to_float(value: Value) -> Resolved {
+fn to_float(value: Value) -> Result<Value> {
     use Value::*;
     match value {
         Float(_) => Ok(value),
@@ -114,7 +114,7 @@ impl Function for ToFloat {
         Ok(Box::new(ToFloatFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
 
         to_float(value)
@@ -127,10 +127,13 @@ struct ToFloatFn {
 }
 
 impl Expression for ToFloatFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
 
-        to_float(value)
+        to_float(value).map(Cow::Owned)
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

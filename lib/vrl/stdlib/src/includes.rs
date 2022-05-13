@@ -1,7 +1,7 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn includes(list: Value, item: Value) -> Resolved {
+fn includes(list: Value, item: Value) -> Result<Value> {
     let list = list.try_array()?;
     let included = list.iter().any(|i| i == &item);
     Ok(included.into())
@@ -57,7 +57,7 @@ impl Function for Includes {
         Ok(Box::new(IncludesFn { value, item }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let item = args.required("item");
 
@@ -72,11 +72,14 @@ struct IncludesFn {
 }
 
 impl Expression for IncludesFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let list = self.value.resolve(ctx)?;
-        let item = self.item.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let list = self.value.resolve(ctx)?.into_owned();
+        let item = self.item.resolve(ctx)?.into_owned();
 
-        includes(list, item)
+        includes(list, item).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

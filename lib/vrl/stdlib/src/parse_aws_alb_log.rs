@@ -11,7 +11,7 @@ use nom::{
 };
 use vrl::prelude::*;
 
-fn parse_aws_alb_log(bytes: Value) -> Resolved {
+fn parse_aws_alb_log(bytes: Value) -> Result<Value> {
     let bytes = bytes.try_bytes()?;
     parse_log(&String::from_utf8_lossy(&bytes))
 }
@@ -53,7 +53,7 @@ impl Function for ParseAwsAlbLog {
         }]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         parse_aws_alb_log(value)
     }
@@ -71,9 +71,12 @@ impl ParseAwsAlbLogFn {
 }
 
 impl Expression for ParseAwsAlbLogFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?;
-        parse_aws_alb_log(bytes)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let bytes = self.value.resolve(ctx)?.into_owned();
+        parse_aws_alb_log(bytes).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

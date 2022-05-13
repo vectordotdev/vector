@@ -5,7 +5,7 @@ use chrono::{
 };
 use vrl::prelude::*;
 
-fn format_timestamp(bytes: Value, ts: Value) -> Resolved {
+fn format_timestamp(bytes: Value, ts: Value) -> Result<Value> {
     let bytes = bytes.try_bytes()?;
     let format = String::from_utf8_lossy(&bytes);
     let ts = ts.try_timestamp()?;
@@ -56,7 +56,7 @@ impl Function for FormatTimestamp {
         }]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let format = args.required("format");
 
@@ -71,11 +71,14 @@ struct FormatTimestampFn {
 }
 
 impl Expression for FormatTimestampFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.format.resolve(ctx)?;
-        let ts = self.value.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let bytes = self.format.resolve(ctx)?.into_owned();
+        let ts = self.value.resolve(ctx)?.into_owned();
 
-        format_timestamp(bytes, ts)
+        format_timestamp(bytes, ts).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

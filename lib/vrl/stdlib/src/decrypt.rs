@@ -51,7 +51,7 @@ macro_rules! decrypt_keystream {
     }};
 }
 
-fn decrypt(ciphertext: Value, algorithm: Value, key: Value, iv: Value) -> Resolved {
+fn decrypt(ciphertext: Value, algorithm: Value, key: Value, iv: Value) -> Result<Value> {
     let ciphertext = ciphertext.try_bytes()?;
     let algorithm = algorithm.try_bytes_utf8_lossy()?.as_ref().to_uppercase();
     let ciphertext = match algorithm.as_str() {
@@ -153,7 +153,7 @@ impl Function for Decrypt {
         }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let ciphertext = args.required("ciphertext");
         let algorithm = args.required("algorithm");
         let key = args.required("key");
@@ -171,12 +171,16 @@ struct DecryptFn {
 }
 
 impl Expression for DecryptFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let ciphertext = self.ciphertext.resolve(ctx)?;
-        let algorithm = self.algorithm.resolve(ctx)?;
-        let key = self.key.resolve(ctx)?;
-        let iv = self.iv.resolve(ctx)?;
-        decrypt(ciphertext, algorithm, key, iv)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let ciphertext = self.ciphertext.resolve(ctx)?.into_owned();
+        let algorithm = self.algorithm.resolve(ctx)?.into_owned();
+        let key = self.key.resolve(ctx)?.into_owned();
+        let iv = self.iv.resolve(ctx)?.into_owned();
+
+        decrypt(ciphertext, algorithm, key, iv).map(Cow::Owned)
     }
 
     fn type_def(&self, _state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

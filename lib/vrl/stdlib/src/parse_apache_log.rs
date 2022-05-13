@@ -10,7 +10,7 @@ fn parse_apache_log(
     timestamp_format: Option<Value>,
     format: &Bytes,
     ctx: &Context,
-) -> Resolved {
+) -> Result<Value> {
     let message = bytes.try_bytes_utf8_lossy()?;
     let timestamp_format = match timestamp_format {
         None => "%d/%b/%Y:%T %z".to_owned(),
@@ -126,7 +126,7 @@ impl Function for ParseApacheLog {
         ]
     }
 
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let format = args.required_any("format").downcast_ref::<Bytes>().unwrap();
         let timestamp_format = args.optional("timestamp_format");
@@ -143,15 +143,19 @@ struct ParseApacheLogFn {
 }
 
 impl Expression for ParseApacheLogFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let bytes = self.value.resolve(ctx)?.into_owned();
         let timestamp_format = self
             .timestamp_format
             .as_ref()
             .map(|expr| expr.resolve(ctx))
-            .transpose()?;
+            .transpose()?
+            .map(Cow::into_owned);
 
-        parse_apache_log(bytes, timestamp_format, &self.format, ctx)
+        parse_apache_log(bytes, timestamp_format, &self.format, ctx).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

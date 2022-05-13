@@ -2,7 +2,7 @@ use ::value::Value;
 use percent_encoding::{utf8_percent_encode, AsciiSet};
 use vrl::prelude::*;
 
-fn encode_percent(value: Value, ascii_set: &Bytes) -> Resolved {
+fn encode_percent(value: Value, ascii_set: &Bytes) -> Result<Value> {
     let string = value.try_bytes_utf8_lossy()?;
     let ascii_set = match ascii_set.as_ref() {
         b"NON_ALPHANUMERIC" => percent_encoding::NON_ALPHANUMERIC,
@@ -150,7 +150,7 @@ impl Function for EncodePercent {
         }
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let ascii_set = args
             .required_any("ascii_set")
@@ -168,9 +168,12 @@ struct EncodePercentFn {
 }
 
 impl Expression for EncodePercentFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
-        encode_percent(value, &self.ascii_set)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
+        encode_percent(value, &self.ascii_set).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

@@ -2,7 +2,7 @@ use ::value::Value;
 use regex::bytes::RegexSet;
 use vrl::prelude::*;
 
-fn match_any(value: Value, pattern: &RegexSet) -> Resolved {
+fn match_any(value: Value, pattern: &RegexSet) -> Result<Value> {
     let bytes = value.try_bytes()?;
     Ok(pattern.is_match(&bytes).into())
 }
@@ -105,7 +105,7 @@ impl Function for MatchAny {
         }
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let pattern = args
             .required_any("patterns")
@@ -123,9 +123,12 @@ struct MatchAnyFn {
 }
 
 impl Expression for MatchAnyFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
-        match_any(value, &self.regex_set)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
+        match_any(value, &self.regex_set).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

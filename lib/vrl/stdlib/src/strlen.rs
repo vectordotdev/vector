@@ -1,7 +1,7 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn strlen(value: Value) -> Resolved {
+fn strlen(value: Value) -> Result<Value> {
     let v = value.try_bytes()?;
 
     Ok(String::from_utf8_lossy(&v).chars().count().into())
@@ -42,7 +42,7 @@ impl Function for Strlen {
         Ok(Box::new(StrlenFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         strlen(value)
     }
@@ -54,10 +54,13 @@ struct StrlenFn {
 }
 
 impl Expression for StrlenFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
 
-        strlen(value)
+        strlen(value).map(Cow::Owned)
     }
 
     fn type_def(&self, _state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

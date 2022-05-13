@@ -1,7 +1,7 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn truncate(value: Value, limit: Value, ellipsis: Value) -> Resolved {
+fn truncate(value: Value, limit: Value, ellipsis: Value) -> Result<Value> {
     let mut value = value.try_bytes_utf8_lossy()?.into_owned();
     let limit = limit.try_integer()?;
     let limit = if limit < 0 { 0 } else { limit as usize };
@@ -89,7 +89,7 @@ impl Function for Truncate {
         }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let limit = args.required("limit");
         let ellipsis = args.optional("ellipsis").unwrap_or_else(|| value!(false));
@@ -106,12 +106,15 @@ struct TruncateFn {
 }
 
 impl Expression for TruncateFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
-        let limit = self.limit.resolve(ctx)?;
-        let ellipsis = self.ellipsis.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
+        let limit = self.limit.resolve(ctx)?.into_owned();
+        let ellipsis = self.ellipsis.resolve(ctx)?.into_owned();
 
-        truncate(value, limit, ellipsis)
+        truncate(value, limit, ellipsis).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

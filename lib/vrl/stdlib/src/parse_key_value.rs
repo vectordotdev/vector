@@ -20,7 +20,7 @@ pub(crate) fn parse_key_value(
     field_delimiter: Value,
     standalone_key: Value,
     whitespace: Whitespace,
-) -> Resolved {
+) -> Result<Value> {
     let bytes = bytes.try_bytes_utf8_lossy()?;
     let key_value_delimiter = key_value_delimiter.try_bytes_utf8_lossy()?;
     let field_delimiter = field_delimiter.try_bytes_utf8_lossy()?;
@@ -163,7 +163,7 @@ impl Function for ParseKeyValue {
         }
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let bytes = args.required("value");
         let key_value_delimiter = args
             .optional("key_value_delimiter")
@@ -247,11 +247,14 @@ pub(crate) struct ParseKeyValueFn {
 }
 
 impl Expression for ParseKeyValueFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?;
-        let key_value_delimiter = self.key_value_delimiter.resolve(ctx)?;
-        let field_delimiter = self.field_delimiter.resolve(ctx)?;
-        let standalone_key = self.standalone_key.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let bytes = self.value.resolve(ctx)?.into_owned();
+        let key_value_delimiter = self.key_value_delimiter.resolve(ctx)?.into_owned();
+        let field_delimiter = self.field_delimiter.resolve(ctx)?.into_owned();
+        let standalone_key = self.standalone_key.resolve(ctx)?.into_owned();
         let whitespace = self.whitespace;
 
         parse_key_value(
@@ -261,6 +264,7 @@ impl Expression for ParseKeyValueFn {
             standalone_key,
             whitespace,
         )
+        .map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

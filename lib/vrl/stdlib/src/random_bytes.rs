@@ -6,7 +6,7 @@ const MAX_LENGTH: i64 = 1024 * 64;
 const LENGTH_TOO_LARGE_ERR: &str = "Length is too large. Maximum is 64k";
 const LENGTH_TOO_SMALL_ERR: &str = "Length cannot be negative";
 
-fn random_bytes(length: Value) -> Resolved {
+fn random_bytes(length: Value) -> Result<Value> {
     let mut output = vec![0_u8; get_length(length)?];
 
     // ThreadRng is a cryptographically secure generator
@@ -61,7 +61,7 @@ impl Function for RandomBytes {
         Ok(Box::new(RandomBytesFn { length }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let length = args.required("length");
         random_bytes(length)
     }
@@ -84,9 +84,12 @@ struct RandomBytesFn {
 }
 
 impl Expression for RandomBytesFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let length = self.length.resolve(ctx)?;
-        random_bytes(length)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let length = self.length.resolve(ctx)?.into_owned();
+        random_bytes(length).map(Cow::Owned)
     }
 
     fn type_def(&self, _state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

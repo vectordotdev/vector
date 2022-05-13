@@ -2,7 +2,7 @@ use ::value::Value;
 use cidr_utils::cidr::IpCidr;
 use vrl::prelude::*;
 
-fn ip_cidr_contains(value: Value, cidr: Value) -> Resolved {
+fn ip_cidr_contains(value: Value, cidr: Value) -> Result<Value> {
     let value = value
         .try_bytes_utf8_lossy()?
         .parse()
@@ -79,7 +79,7 @@ impl Function for IpCidrContains {
         Ok(Box::new(IpCidrContainsFn { cidr, value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let cidr = args.required("cidr");
         let value = args.required("value");
 
@@ -94,11 +94,14 @@ struct IpCidrContainsFn {
 }
 
 impl Expression for IpCidrContainsFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
-        let cidr = self.cidr.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
+        let cidr = self.cidr.resolve(ctx)?.into_owned();
 
-        ip_cidr_contains(value, cidr)
+        ip_cidr_contains(value, cidr).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

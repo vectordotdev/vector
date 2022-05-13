@@ -1,7 +1,7 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn int(value: Value) -> Resolved {
+fn int(value: Value) -> Result<Value> {
     match value {
         v @ Value::Integer(_) => Ok(v),
         v => Err(format!(r#"expected integer, got {}"#, v.kind()).into()),
@@ -52,7 +52,7 @@ impl Function for Integer {
         Ok(Box::new(IntegerFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         int(value)
     }
@@ -64,8 +64,11 @@ struct IntegerFn {
 }
 
 impl Expression for IntegerFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        int(self.value.resolve(ctx)?)
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        int(self.value.resolve(ctx)?.into_owned()).map(Cow::Owned)
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

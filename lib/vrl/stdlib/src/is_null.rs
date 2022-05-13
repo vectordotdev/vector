@@ -47,7 +47,7 @@ impl Function for IsNull {
         Ok(Box::new(IsNullFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         Ok(value!(args.required("value").is_null()))
     }
 }
@@ -58,8 +58,14 @@ struct IsNullFn {
 }
 
 impl Expression for IsNullFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        self.value.resolve(ctx).map(|v| value!(v.is_null()))
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        self.value
+            .resolve(ctx)
+            .map(|v| value!(v.is_null()))
+            .map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

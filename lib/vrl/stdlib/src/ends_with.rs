@@ -1,7 +1,7 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn ends_with(value: Value, substring: Value, case_sensitive: bool) -> Resolved {
+fn ends_with(value: Value, substring: Value, case_sensitive: bool) -> Result<Value> {
     let substring = {
         let bytes = substring.try_bytes()?;
         let string = String::from_utf8_lossy(&bytes);
@@ -87,7 +87,7 @@ impl Function for EndsWith {
         ]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let substring = args.required("substring");
         let case_sensitive = args
@@ -108,13 +108,16 @@ struct EndsWithFn {
 }
 
 impl Expression for EndsWithFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let case_sensitive = self.case_sensitive.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let case_sensitive = self.case_sensitive.resolve(ctx)?.into_owned();
         let case_sensitive = case_sensitive.try_boolean()?;
-        let substring = self.substring.resolve(ctx)?;
-        let value = self.value.resolve(ctx)?;
+        let substring = self.substring.resolve(ctx)?.into_owned();
+        let value = self.value.resolve(ctx)?.into_owned();
 
-        ends_with(value, substring, case_sensitive)
+        ends_with(value, substring, case_sensitive).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

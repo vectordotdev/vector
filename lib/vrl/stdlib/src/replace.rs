@@ -1,7 +1,7 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn replace(value: Value, with_value: Value, count: Value, pattern: Value) -> Resolved {
+fn replace(value: Value, with_value: Value, count: Value, pattern: Value) -> Result<Value> {
     let value = value.try_bytes_utf8_lossy()?;
     let with = with_value.try_bytes_utf8_lossy()?;
     let count = count.try_integer()?;
@@ -116,7 +116,7 @@ impl Function for Replace {
         }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let pattern = args.required("pattern");
         let with = args.required("with");
@@ -135,13 +135,16 @@ struct ReplaceFn {
 }
 
 impl Expression for ReplaceFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
-        let with_value = self.with.resolve(ctx)?;
-        let count = self.count.resolve(ctx)?;
-        let pattern = self.pattern.resolve(ctx)?;
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
+        let value = self.value.resolve(ctx)?.into_owned();
+        let with_value = self.with.resolve(ctx)?.into_owned();
+        let count = self.count.resolve(ctx)?.into_owned();
+        let pattern = self.pattern.resolve(ctx)?.into_owned();
 
-        replace(value, with_value, count, pattern)
+        replace(value, with_value, count, pattern).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
