@@ -87,7 +87,12 @@ impl Expression for DecodeBase64Fn {
         ctx: &'ctx mut Context,
     ) -> Resolved<'value> {
         let value = self.value.resolve(ctx)?.into_owned();
-        let charset = self.charset.as_ref().map(|c| c.resolve(ctx)).transpose()?.map(Cow::into_owned);
+        let charset = self
+            .charset
+            .as_ref()
+            .map(|c| c.resolve(ctx))
+            .transpose()?
+            .map(Cow::into_owned);
 
         decode_base64(charset, value).map(Cow::Owned)
     }

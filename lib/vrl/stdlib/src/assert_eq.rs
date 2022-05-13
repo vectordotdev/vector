@@ -109,7 +109,12 @@ impl Expression for AssertEqFn {
     ) -> Resolved<'value> {
         let left = self.left.resolve(ctx)?.into_owned();
         let right = self.right.resolve(ctx)?.into_owned();
-        let message = self.message.as_ref().map(|m| m.resolve(ctx)).transpose()?.map(Cow::into_owned);
+        let message = self
+            .message
+            .as_ref()
+            .map(|m| m.resolve(ctx))
+            .transpose()?
+            .map(Cow::into_owned);
 
         assert_eq(left, right, message).map(Cow::Owned)
     }
