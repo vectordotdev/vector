@@ -81,7 +81,7 @@ where
         self,
         mut chans: C,
         mut shutdown_data: S1,
-        mut shutdown_checkpointer: S2,
+        shutdown_checkpointer: S2,
         mut checkpointer: Checkpointer,
     ) -> Result<Shutdown, <C as Sink<Vec<Line>>>::Error>
     where
@@ -137,34 +137,12 @@ where
         let mut stats = TimingStats::default();
 
         // Spawn the checkpoint writer task
-        //
-        // We have to do a lot of cloning here to convince the compiler that we
-        // aren't going to get away with anything, but none of it should have
-        // any perf impact.
-        let emitter = self.emitter.clone();
-        let checkpointer = Arc::new(checkpointer);
-        let sleep_duration = self.glob_minimum_cooldown;
-        let checkpoint_task_handle = self.handle.spawn(async move {
-            loop {
-                let sleep = sleep(sleep_duration);
-                tokio::select! {
-                    _ = &mut shutdown_checkpointer => return checkpointer,
-                    _ = sleep => {},
-                }
-
-                let emitter = emitter.clone();
-                let checkpointer = Arc::clone(&checkpointer);
-                tokio::task::spawn_blocking(move || {
-                    let start = time::Instant::now();
-                    match checkpointer.write_checkpoints() {
-                        Ok(count) => emitter.emit_file_checkpointed(count, start.elapsed()),
-                        Err(error) => emitter.emit_file_checkpoint_write_error(error),
-                    }
-                })
-                .await
-                .ok();
-            }
-        });
+        let checkpoint_task_handle = self.handle.spawn(checkpoint_writer(
+            checkpointer,
+            self.glob_minimum_cooldown,
+            shutdown_checkpointer,
+            self.emitter.clone(),
+        ));
 
         // Alright friends, how does this work?
         //
@@ -431,6 +409,35 @@ where
             Err(error) => self.emitter.emit_file_watch_error(&path, error),
         };
     }
+}
+
+async fn checkpoint_writer(
+    checkpointer: Checkpointer,
+    sleep_duration: Duration,
+    mut shutdown: impl Future + Unpin,
+    emitter: impl FileSourceInternalEvents,
+) -> Arc<Checkpointer> {
+    let checkpointer = Arc::new(checkpointer);
+    loop {
+        let sleep = sleep(sleep_duration);
+        tokio::select! {
+            _ = &mut shutdown => break,
+            _ = sleep => {},
+        }
+
+        let emitter = emitter.clone();
+        let checkpointer = Arc::clone(&checkpointer);
+        tokio::task::spawn_blocking(move || {
+            let start = time::Instant::now();
+            match checkpointer.write_checkpoints() {
+                Ok(count) => emitter.emit_file_checkpointed(count, start.elapsed()),
+                Err(error) => emitter.emit_file_checkpoint_write_error(error),
+            }
+        })
+        .await
+        .ok();
+    }
+    checkpointer
 }
 
 /// A sentinel type to signal that file server was gracefully shut down.
