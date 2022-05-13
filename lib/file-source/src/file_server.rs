@@ -11,7 +11,7 @@ use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use futures::{
     future::{select, Either},
-    stream, Future, Sink, SinkExt,
+    Future, Sink, SinkExt,
 };
 use indexmap::IndexMap;
 use tokio::time::sleep;
@@ -330,8 +330,7 @@ where
 
             let start = time::Instant::now();
             let to_send = std::mem::take(&mut lines);
-            let mut stream = stream::once(futures::future::ok(to_send));
-            let result = self.handle.block_on(chans.send_all(&mut stream));
+            let result = self.handle.block_on(chans.send(to_send));
             match result {
                 Ok(()) => {}
                 Err(error) => {
