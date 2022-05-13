@@ -245,6 +245,49 @@ impl<'a> PipelinesVersionPayload<'a> {
     }
 }
 
+pub fn attach_enterprise_components(
+    config: &mut Config,
+    opts: &Options,
+    api_key: String,
+    config_hash: String,
+) {
+    setup_metrics_reporting(config, &opts, api_key.clone(), config_hash.clone());
+
+    if opts.enable_logs_reporting {
+        setup_logs_reporting(config, &opts, api_key, config_hash);
+    }
+}
+
+pub fn validate_enterprise(config: &Config) -> Result<String, PipelinesError> {
+    // Only valid if a [enterprise] section is present in config.
+    let opts = match config.enterprise.clone() {
+        Some(opts) => opts,
+        _ => return Err(PipelinesError::Disabled),
+    };
+
+    // Return early if the feature isn't enabled.
+    if !opts.enabled {
+        return Err(PipelinesError::Disabled);
+    }
+
+    let api_key = match &opts.api_key {
+        // API key provided explicitly.
+        Some(api_key) => api_key.clone(),
+        // No API key; attempt to get it from the environment.
+        None => match env::var("DATADOG_API_KEY").or_else(|_| env::var("DD_API_KEY")) {
+            Ok(api_key) => api_key,
+            _ => return Err(PipelinesError::MissingApiKey),
+        },
+    };
+
+    info!(
+        "Datadog API key provided. Integration with {} is enabled.",
+        DATADOG_REPORTING_PRODUCT
+    );
+
+    Ok(api_key)
+}
+
 /// Augment configuration with observability via Datadog if the feature is enabled and
 /// an API key is provided.
 pub async fn try_attach(
