@@ -1,10 +1,15 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn timestamp(value: Value) -> Result<Value> {
+#[inline]
+fn check(value: &Value) -> Result<()> {
     match value {
-        v @ Value::Timestamp(_) => Ok(v),
-        v => Err(format!(r#"expected timestamp, got {}"#, v.kind()).into()),
+        Value::Timestamp(_) => Ok(()),
+        _ => Err(value::Error::Expected {
+            got: value.kind(),
+            expected: Kind::timestamp(),
+        }
+        .into()),
     }
 }
 
@@ -54,7 +59,9 @@ impl Function for Timestamp {
 
     fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
-        timestamp(value)
+        check(&value)?;
+
+        Ok(value)
     }
 }
 
@@ -68,8 +75,10 @@ impl Expression for TimestampFn {
         &'rt self,
         ctx: &'ctx mut Context,
     ) -> Resolved<'value> {
-        let value = self.value.resolve(ctx)?.into_owned();
-        timestamp(value).map(Cow::Owned)
+        let value = self.value.resolve(ctx)?;
+        check(&value)?;
+
+        Ok(value)
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

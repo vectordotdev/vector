@@ -1,25 +1,72 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn ends_with(value: Value, substring: Value, case_sensitive: bool) -> Result<Value> {
-    let substring = {
-        let bytes = substring.try_bytes()?;
-        let string = String::from_utf8_lossy(&bytes);
+struct Chars<'a> {
+    bytes: &'a Bytes,
+    pos: usize,
+}
 
-        match case_sensitive {
-            true => string.into_owned(),
-            false => string.to_lowercase(),
-        }
-    };
-    let value = {
-        let string = value.try_bytes_utf8_lossy()?;
+impl<'a> Chars<'a> {
+    fn new(bytes: &'a Bytes) -> Self {
+        Self { bytes, pos: 0 }
+    }
+}
 
-        match case_sensitive {
-            true => string.into_owned(),
-            false => string.to_lowercase(),
+impl<'a> Iterator for Chars<'a> {
+    type Item = std::result::Result<char, u8>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.pos >= self.bytes.len() {
+            return None;
         }
-    };
-    Ok(value.ends_with(&substring).into())
+
+        let width = utf8_width::get_width(self.bytes[self.pos]);
+        if width == 1 {
+            self.pos += 1;
+            Some(Ok(self.bytes[self.pos - 1] as char))
+        } else {
+            let c = std::str::from_utf8(&self.bytes[self.pos..self.pos + width]);
+            match c {
+                Ok(chr) => {
+                    self.pos += width;
+                    Some(Ok(chr.chars().next().unwrap()))
+                }
+                Err(_) => {
+                    self.pos += 1;
+                    Some(Err(self.bytes[self.pos]))
+                }
+            }
+        }
+    }
+}
+
+enum Case {
+    Sensitive,
+    Insensitive,
+}
+
+fn ends_with(bytes: &Bytes, ends: &Bytes, case: Case) -> bool {
+    if bytes.len() < ends.len() {
+        return false;
+    }
+
+    match case {
+        Case::Sensitive => ends[..] == bytes[bytes.len() - ends.len()..],
+        Case::Insensitive => {
+            return Chars::new(ends)
+                .zip(Chars::new(&bytes.slice(bytes.len() - ends.len()..)))
+                .all(|(a, b)| match (a, b) {
+                    (Ok(a), Ok(b)) => {
+                        if a.is_ascii() && b.is_ascii() {
+                            a.to_ascii_lowercase() == b.to_ascii_lowercase()
+                        } else {
+                            a.to_lowercase().zip(b.to_lowercase()).all(|(a, b)| a == b)
+                        }
+                    }
+                    _ => false,
+                });
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -87,16 +134,34 @@ impl Function for EndsWith {
         ]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
-        let value = args.required("value");
-        let substring = args.required("substring");
-        let case_sensitive = args
+    fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Result<Value> {
+        let value = arguments.required("value");
+        let substring = arguments.required("substring");
+        let case_sensitive = arguments
             .optional("case_sensitive")
-            .map(|value| value.try_boolean())
+            .map(|arg| arg.try_boolean())
             .transpose()?
             .unwrap_or(true);
+        let substring = {
+            let value = substring;
+            let string = value.try_bytes_utf8_lossy()?;
 
-        ends_with(value, substring, case_sensitive)
+            match case_sensitive {
+                true => string.into_owned(),
+                false => string.to_lowercase(),
+            }
+        };
+
+        let value = {
+            let string = value.try_bytes_utf8_lossy()?;
+
+            match case_sensitive {
+                true => string.into_owned(),
+                false => string.to_lowercase(),
+            }
+        };
+
+        Ok(value.ends_with(&substring).into())
     }
 }
 
@@ -112,12 +177,18 @@ impl Expression for EndsWithFn {
         &'rt self,
         ctx: &'ctx mut Context,
     ) -> Resolved<'value> {
-        let case_sensitive = self.case_sensitive.resolve(ctx)?.into_owned();
-        let case_sensitive = case_sensitive.try_boolean()?;
-        let substring = self.substring.resolve(ctx)?.into_owned();
-        let value = self.value.resolve(ctx)?.into_owned();
+        let case_sensitive = if self.case_sensitive.resolve(ctx)?.try_boolean()? {
+            Case::Sensitive
+        } else {
+            Case::Insensitive
+        };
 
-        ends_with(value, substring, case_sensitive).map(Cow::Owned)
+        let substring = self.substring.resolve(ctx)?.try_bytes()?;
+        let value = self.value.resolve(ctx)?.try_bytes()?;
+
+        Ok(Cow::Owned(
+            ends_with(&value, &substring, case_sensitive).into(),
+        ))
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

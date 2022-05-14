@@ -1,10 +1,15 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn int(value: Value) -> Result<Value> {
+#[inline]
+fn check(value: &Value) -> Result<()> {
     match value {
-        v @ Value::Integer(_) => Ok(v),
-        v => Err(format!(r#"expected integer, got {}"#, v.kind()).into()),
+        Value::Integer(_) => Ok(()),
+        _ => Err(value::Error::Expected {
+            got: value.kind(),
+            expected: Kind::integer(),
+        }
+        .into()),
     }
 }
 
@@ -54,7 +59,9 @@ impl Function for Integer {
 
     fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
-        int(value)
+        check(&value)?;
+
+        Ok(value)
     }
 }
 
@@ -68,7 +75,10 @@ impl Expression for IntegerFn {
         &'rt self,
         ctx: &'ctx mut Context,
     ) -> Resolved<'value> {
-        int(self.value.resolve(ctx)?.into_owned()).map(Cow::Owned)
+        let value = self.value.resolve(ctx)?;
+        check(&value)?;
+
+        Ok(value)
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

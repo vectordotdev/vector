@@ -1,25 +1,23 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn contains(value: Value, substring: Value, case_sensitive: bool) -> Result<Value> {
-    let substring = {
-        let bytes = substring.try_bytes()?;
-        let string = String::from_utf8_lossy(&bytes);
+fn contains(value: &Bytes, substring: &Bytes, case_sensitive: bool) -> bool {
+    if value.len() < substring.len() {
+        return false;
+    }
 
-        match case_sensitive {
-            true => string.into_owned(),
-            false => string.to_lowercase(),
-        }
-    };
-    let value = {
-        let string = value.try_bytes_utf8_lossy()?;
+    match case_sensitive {
+        true => value
+            .windows(substring.len())
+            .position(|window| window == substring)
+            .is_some(),
+        false => {
+            let value = String::from_utf8_lossy(&value).to_lowercase();
+            let substring = String::from_utf8_lossy(&substring).to_lowercase();
 
-        match case_sensitive {
-            true => string.into_owned(),
-            false => string.to_lowercase(),
+            value.contains(&substring)
         }
-    };
-    Ok(value.contains(&substring).into())
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -83,14 +81,14 @@ impl Function for Contains {
     }
 
     fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
-        let value = args.required("value");
-        let substring = args.required("substring");
+        let value = args.required("value").try_bytes()?;
+        let substring = args.required("substring").try_bytes()?;
         let case_sensitive = args
             .optional("case_sensitive")
             .map(|value| value.try_boolean().unwrap_or(true))
             .unwrap_or(true);
 
-        contains(value, substring, case_sensitive)
+        Ok(contains(&value, &substring, case_sensitive).into())
     }
 }
 
@@ -106,11 +104,13 @@ impl Expression for ContainsFn {
         &'rt self,
         ctx: &'ctx mut Context,
     ) -> Resolved<'value> {
-        let value = self.value.resolve(ctx)?.into_owned();
-        let substring = self.substring.resolve(ctx)?.into_owned();
+        let value = self.value.resolve(ctx)?.try_bytes()?;
+        let substring = self.substring.resolve(ctx)?.try_bytes()?;
         let case_sensitive = self.case_sensitive.resolve(ctx)?.try_boolean()?;
 
-        contains(value, substring, case_sensitive).map(Cow::Owned)
+        Ok(Cow::Owned(
+            contains(&value, &substring, case_sensitive).into(),
+        ))
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

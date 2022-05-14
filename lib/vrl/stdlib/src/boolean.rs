@@ -1,10 +1,15 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn boolean(value: Value) -> Result<Value> {
+#[inline]
+fn check(value: &Value) -> Result<()> {
     match value {
-        v @ Value::Boolean(_) => Ok(v),
-        v => Err(format!("expected boolean, got {}", v.kind()).into()),
+        Value::Boolean(_) => Ok(()),
+        _ => Err(value::Error::Expected {
+            got: value.kind(),
+            expected: Kind::boolean(),
+        }
+        .into()),
     }
 }
 
@@ -54,7 +59,9 @@ impl Function for Boolean {
 
     fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
-        boolean(value)
+        check(&value)?;
+
+        Ok(value)
     }
 }
 
@@ -68,7 +75,10 @@ impl Expression for BooleanFn {
         &'rt self,
         ctx: &'ctx mut Context,
     ) -> Resolved<'value> {
-        boolean(self.value.resolve(ctx)?.into_owned()).map(Cow::Owned)
+        let value = self.value.resolve(ctx)?;
+        check(&value)?;
+
+        Ok(value)
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

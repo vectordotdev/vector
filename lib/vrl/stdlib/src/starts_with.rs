@@ -182,11 +182,8 @@ impl Expression for StartsWithFn {
             Case::Insensitive
         };
 
-        let substring = self.substring.resolve(ctx)?.into_owned();
-        let substring = substring.try_bytes()?;
-
-        let value = self.value.resolve(ctx)?.into_owned();
-        let value = value.try_bytes()?;
+        let substring = self.substring.resolve(ctx)?.try_bytes()?;
+        let value = self.value.resolve(ctx)?.try_bytes()?;
 
         Ok(Cow::Owned(
             starts_with(&value, &substring, case_sensitive).into(),

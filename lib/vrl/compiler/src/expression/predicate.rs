@@ -1,4 +1,4 @@
-use std::{borrow::Cow, fmt};
+use std::fmt;
 
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 use value::Value;

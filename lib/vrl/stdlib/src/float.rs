@@ -1,10 +1,15 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn float(value: Value) -> Result<Value> {
+#[inline]
+fn check(value: &Value) -> Result<()> {
     match value {
-        v @ Value::Float(_) => Ok(v),
-        v => Err(format!("expected float, got {}", v.kind()).into()),
+        Value::Float(_) => Ok(()),
+        _ => Err(value::Error::Expected {
+            got: value.kind(),
+            expected: Kind::float(),
+        }
+        .into()),
     }
 }
 
@@ -54,7 +59,9 @@ impl Function for Float {
 
     fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
-        float(value)
+        check(&value)?;
+
+        Ok(value)
     }
 }
 
@@ -68,7 +75,10 @@ impl Expression for FloatFn {
         &'rt self,
         ctx: &'ctx mut Context,
     ) -> Resolved<'value> {
-        float(self.value.resolve(ctx)?.into_owned()).map(Cow::Owned)
+        let value = self.value.resolve(ctx)?;
+        check(&value)?;
+
+        Ok(value)
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

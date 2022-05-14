@@ -1,10 +1,15 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn string(value: Value) -> Result<Value> {
+#[inline]
+fn check(value: &Value) -> Result<()> {
     match value {
-        v @ Value::Bytes(_) => Ok(v),
-        v => Err(format!("expected string, got {}", v.kind()).into()),
+        Value::Bytes(_) => Ok(()),
+        _ => Err(value::Error::Expected {
+            got: value.kind(),
+            expected: Kind::bytes(),
+        }
+        .into()),
     }
 }
 
@@ -54,7 +59,9 @@ impl Function for String {
 
     fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Result<Value> {
         let value = arguments.required("value");
-        string(value)
+        check(&value)?;
+
+        Ok(value)
     }
 }
 
@@ -68,7 +75,10 @@ impl Expression for StringFn {
         &'rt self,
         ctx: &'ctx mut Context,
     ) -> Resolved<'value> {
-        string(self.value.resolve(ctx)?.into_owned()).map(Cow::Owned)
+        let value = self.value.resolve(ctx)?;
+        check(&value)?;
+
+        Ok(value)
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
