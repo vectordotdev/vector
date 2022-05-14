@@ -70,11 +70,13 @@ impl Expression for Predicate {
         &'rt self,
         ctx: &'ctx mut Context,
     ) -> Resolved<'value> {
-        self.inner
+        let (last, other) = self.inner.split_last().expect("at least one expression");
+
+        other
             .iter()
-            .map(|expr| expr.resolve(ctx).map(Cow::into_owned).map(Cow::Owned))
-            .collect::<std::result::Result<Vec<_>, _>>()
-            .map(|mut v| v.pop().unwrap_or_else(|| Value::Boolean(false).into()))
+            .try_for_each(|expr| expr.resolve(ctx).map(|_| ()))?;
+
+        last.resolve(ctx)
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
