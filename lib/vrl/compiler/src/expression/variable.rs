@@ -49,9 +49,9 @@ impl Variable {
 }
 
 impl Expression for Variable {
-    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx, T: crate::Target>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context<T>,
     ) -> Resolved<'value> {
         Ok(ctx
             .state()

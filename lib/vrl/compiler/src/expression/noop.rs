@@ -13,9 +13,9 @@ use crate::{
 pub struct Noop;
 
 impl Expression for Noop {
-    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx, T: crate::Target>(
         &'rt self,
-        _: &'ctx mut Context,
+        _: &'ctx Context<T>,
     ) -> Resolved<'value> {
         Ok(Cow::Owned(Value::Null))
     }

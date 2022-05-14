@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, fmt, ops::Deref};
+use std::{borrow::Cow, collections::BTreeMap, fmt, ops::Deref};
 
 use value::Value;
 
@@ -29,13 +29,16 @@ impl Deref for Object {
 }
 
 impl Expression for Object {
-    fn resolve<'a, 'b: 'a, 'c: 'b>(&'b self, ctx: &'a mut Context) -> Resolved<'c> {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx, T: crate::Target>(
+        &'rt self,
+        ctx: &'ctx Context<T>,
+    ) -> Resolved<'value> {
         self.inner
             .iter()
             .map(|(key, expr)| expr.resolve(ctx).map(|v| (key.to_owned(), v.into_owned())))
             .collect::<Result<BTreeMap<_, _>, _>>()
             .map(Value::Object)
-            .map(Into::into)
+            .map(Cow::Owned)
     }
 
     fn as_value(&self) -> Option<Value> {

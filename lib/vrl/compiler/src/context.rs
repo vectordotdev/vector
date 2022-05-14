@@ -1,16 +1,18 @@
+use std::{cell::RefCell, rc::Rc};
+
 use vector_common::TimeZone;
 
 use crate::{state::Runtime, Target};
 
 pub struct Context<'a> {
-    target: &'a mut dyn Target,
-    state: &'a mut Runtime,
+    target: Rc<RefCell<dyn Target>>,
+    state: RefCell<Runtime>,
     timezone: &'a TimeZone,
 }
 
 impl<'a> Context<'a> {
     /// Create a new [`Context`].
-    pub fn new(target: &'a mut dyn Target, state: &'a mut Runtime, timezone: &'a TimeZone) -> Self {
+    pub fn new(target: Rc<dyn Target>, state: &'a mut Runtime, timezone: &'a TimeZone) -> Self {
         Self {
             target,
             state,

@@ -1,5 +1,5 @@
-use core::ExpressionError;
-use std::collections::BTreeMap;
+use core::{ExpressionError, Target};
+use std::{collections::BTreeMap, marker::PhantomData};
 
 use parser::ast::Ident;
 use value::{
@@ -141,17 +141,23 @@ impl Output {
     }
 }
 
-pub struct Runner<'a, T> {
+pub struct Runner<'a, F, T> {
     pub(crate) variables: &'a [Ident],
-    pub(crate) runner: T,
+    pub(crate) runner: F,
+    _marker: PhantomData<T>,
 }
 
-impl<'a, T> Runner<'a, T>
+impl<'a, F, T> Runner<'a, F, T>
 where
-    T: Fn(&mut Context) -> Result<Value, ExpressionError>,
+    F: Fn(&Context<T>) -> Result<Value, ExpressionError>,
+    T: Target,
 {
-    pub fn new(variables: &'a [Ident], runner: T) -> Self {
-        Self { variables, runner }
+    pub fn new(variables: &'a [Ident], runner: F) -> Self {
+        Self {
+            variables,
+            runner,
+            _marker: PhantomData,
+        }
     }
 
     /// Run the closure to completion, given the provided key/value pair, and
@@ -162,7 +168,7 @@ where
     /// mutating alternatives.
     pub fn run_key_value(
         &self,
-        ctx: &mut Context,
+        ctx: &Context<T>,
         key: &str,
         value: &Value,
     ) -> Result<(), ExpressionError> {
@@ -193,7 +199,7 @@ where
     /// mutating alternatives.
     pub fn run_index_value(
         &self,
-        ctx: &mut Context,
+        ctx: &Context<T>,
         index: usize,
         value: &Value,
     ) -> Result<(), ExpressionError> {
@@ -222,7 +228,7 @@ where
     /// value of the closure after completion.
     ///
     /// See `run_key_value` and `run_index_value` for immutable alternatives.
-    pub fn map_key(&self, ctx: &mut Context, key: &mut String) -> Result<(), ExpressionError> {
+    pub fn map_key(&self, ctx: &Context<T>, key: &mut String) -> Result<(), ExpressionError> {
         // TODO: we need to allow `LocalEnv` to take a muable reference to
         // values, instead of owning them.
         let cloned_key = key.clone();
@@ -243,7 +249,7 @@ where
     /// value of the closure after completion.
     ///
     /// See `run_key_value` and `run_index_value` for immutable alternatives.
-    pub fn map_value(&self, ctx: &mut Context, value: &mut Value) -> Result<(), ExpressionError> {
+    pub fn map_value(&self, ctx: &Context<T>, value: &mut Value) -> Result<(), ExpressionError> {
         // TODO: we need to allow `LocalEnv` to take a muable reference to
         // values, instead of owning them.
         let cloned_value = value.clone();

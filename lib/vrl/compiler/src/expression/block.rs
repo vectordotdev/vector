@@ -32,9 +32,9 @@ impl Block {
 }
 
 impl Expression for Block {
-    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx, T: crate::Target>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context<T>,
     ) -> Resolved<'value> {
         // NOTE:
         //

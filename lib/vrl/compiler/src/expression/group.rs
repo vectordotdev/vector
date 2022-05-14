@@ -20,9 +20,9 @@ impl Group {
 }
 
 impl Expression for Group {
-    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx, T: crate::Target>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context<T>,
     ) -> Resolved<'value> {
         self.inner.resolve(ctx)
     }

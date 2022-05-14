@@ -2,7 +2,7 @@ use ::value::Value;
 use lookup_lib::{LookupBuf, SegmentBuf};
 use vrl::prelude::*;
 
-fn get(value: Value, path: Value) -> Result<Value> {
+fn get<'a>(value: &'a Value, path: &'a Value) -> Result<Option<&'a Value>> {
     let path = match path {
         Value::Array(path) => {
             let mut get = LookupBuf::root();
@@ -10,9 +10,9 @@ fn get(value: Value, path: Value) -> Result<Value> {
             for segment in path {
                 let segment = match segment {
                     Value::Bytes(field) => {
-                        SegmentBuf::Field(String::from_utf8_lossy(&field).into_owned().into())
+                        SegmentBuf::Field(String::from_utf8_lossy(field).into_owned().into())
                     }
-                    Value::Integer(index) => SegmentBuf::Index(index as isize),
+                    Value::Integer(index) => SegmentBuf::Index(*index as isize),
                     value => {
                         return Err(format!(
                             r#"path segment must be either string or integer, not {}"#,
@@ -35,7 +35,8 @@ fn get(value: Value, path: Value) -> Result<Value> {
             .into())
         }
     };
-    Ok(value.target_get(&path)?.cloned().unwrap_or(Value::Null))
+
+    value.target_get(&path).map_err(Into::into)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -140,7 +141,7 @@ impl Function for Get {
         let value = args.required("value");
         let path = args.required("path");
 
-        get(value, path)
+        Ok(get(&value, &path)?.cloned().unwrap_or(Value::Null))
     }
 }
 
@@ -155,10 +156,12 @@ impl Expression for GetFn {
         &'rt self,
         ctx: &'ctx mut Context,
     ) -> Resolved<'value> {
-        let path = self.path.resolve(ctx)?.into_owned();
-        let value = self.value.resolve(ctx)?.into_owned();
+        let path = self.path.resolve(ctx)?;
+        let value = self.value.resolve(ctx)?;
 
-        get(value, path).map(Cow::Owned)
+        Ok(get(&value, &path)?
+            .map(Cow::Borrowed)
+            .unwrap_or(Cow::Owned(Value::Null)))
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

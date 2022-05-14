@@ -1,3 +1,5 @@
+use core::Target;
+
 use lookup::LookupBuf;
 
 use crate::{
@@ -34,7 +36,7 @@ impl Program {
     /// Resolve the program to its final [`Value`].
     pub fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         self.expressions.resolve(ctx)
     }
