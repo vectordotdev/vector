@@ -1,8 +1,26 @@
 use ::value::Value;
+use bytes::{BufMut, BytesMut};
 use vrl::prelude::*;
 
-fn upcase(value: Value) -> Result<Value> {
-    Ok(value.try_bytes_utf8_lossy()?.to_uppercase().into())
+use std::fmt::Write;
+
+fn upcase(bytes: &Bytes) -> Option<Value> {
+    // Bail early if no action needs to be taken.
+    if Chars::new(bytes).all(|ch| ch.map(char::is_uppercase).unwrap_or(true)) {
+        return None;
+    }
+
+    let mut upper = BytesMut::with_capacity(bytes.len());
+
+    // Upcase UTF-8 chars, but keep other data as-is.
+    Chars::new(bytes).for_each(|ch| match ch {
+        Ok(ch) => ch.to_uppercase().for_each(|ch| {
+            let _ = upper.write_char(ch);
+        }),
+        Err(b) => upper.put_u8(b),
+    });
+
+    Some(upper.freeze().into())
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -41,8 +59,8 @@ impl Function for Upcase {
     }
 
     fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
-        let value = args.required("value");
-        upcase(value)
+        let value = args.required("value").try_bytes()?;
+        Ok(upcase(&value).unwrap_or_else(|| Value::from(value)))
     }
 }
 
@@ -56,8 +74,10 @@ impl Expression for UpcaseFn {
         &'rt self,
         ctx: &'ctx mut Context,
     ) -> Resolved<'value> {
-        let value = self.value.resolve(ctx)?.into_owned();
-        upcase(value).map(Cow::Owned)
+        let value = self.value.resolve(ctx)?.try_bytes()?;
+        Ok(upcase(&value)
+            .map(Cow::Owned)
+            .unwrap_or_else(|| Cow::Owned(value.into())))
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

@@ -27,6 +27,10 @@ pub trait VrlValueConvert: Sized {
     fn try_into_f64(&self) -> Result<f64, Error>;
 
     fn try_bytes_utf8_lossy(&self) -> Result<Cow<'_, str>, Error>;
+
+    fn try_chars_iter(&self) -> Result<Chars, Error>;
+
+    fn try_as_bytes(&self) -> Result<&Bytes, Error>;
 }
 
 impl VrlValueConvert for Value {
@@ -147,6 +151,25 @@ impl VrlValueConvert for Value {
             _ => Err(Error::Expected {
                 got: self.kind(),
                 expected: Kind::timestamp(),
+            }),
+        }
+    }
+
+    fn try_chars_iter(&self) -> Result<Chars, Error> {
+        let bytes = self.as_bytes().ok_or(Error::Expected {
+            got: self.kind(),
+            expected: Kind::bytes(),
+        })?;
+
+        Ok(Chars::new(bytes))
+    }
+
+    fn try_as_bytes(&self) -> Result<&Bytes, Error> {
+        match self {
+            Value::Bytes(v) => Ok(v),
+            _ => Err(Error::Expected {
+                got: self.kind(),
+                expected: Kind::bytes(),
             }),
         }
     }
@@ -272,6 +295,57 @@ impl<'a> VrlValueConvert for Cow<'a, Value> {
                 expected: Kind::timestamp(),
             }),
         }
+    }
+
+    fn try_chars_iter(&self) -> Result<Chars, Error> {
+        self.as_ref().try_chars_iter()
+    }
+
+    fn try_as_bytes(&self) -> Result<&Bytes, Error> {
+        self.as_ref().try_as_bytes()
+    }
+}
+
+pub struct Chars<'a> {
+    bytes: &'a Bytes,
+    pos: usize,
+}
+
+impl<'a> Chars<'a> {
+    pub fn new(bytes: &'a Bytes) -> Self {
+        Self { bytes, pos: 0 }
+    }
+}
+
+impl<'a> Iterator for Chars<'a> {
+    type Item = std::result::Result<char, u8>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.pos >= self.bytes.len() {
+            return None;
+        }
+
+        let width = utf8_width::get_width(self.bytes[self.pos]);
+        if width == 1 {
+            self.pos += 1;
+            Some(Ok(self.bytes[self.pos - 1] as char))
+        } else {
+            let c = std::str::from_utf8(&self.bytes[self.pos..self.pos + width]);
+            match c {
+                Ok(chr) => {
+                    self.pos += width;
+                    Some(Ok(chr.chars().next().unwrap()))
+                }
+                Err(_) => {
+                    self.pos += 1;
+                    Some(Err(self.bytes[self.pos]))
+                }
+            }
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, Some(self.bytes.len()))
     }
 }
 

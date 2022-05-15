@@ -64,7 +64,21 @@ impl Expression for StripWhitespaceFn {
         &'rt self,
         ctx: &'ctx mut Context,
     ) -> Resolved<'value> {
-        let value = self.value.resolve(ctx)?.into_owned();
+        let value = self.value.resolve(ctx)?;
+        let bytes = value.try_as_bytes()?;
+        let mut chars = Chars::new(bytes);
+
+        if !chars
+            .next()
+            .and_then(|ch| ch.ok().map(char::is_whitespace))
+            .unwrap_or(false)
+            && chars
+                .last()
+                .and_then(|ch| ch.ok().map(char::is_whitespace))
+                .unwrap_or(false)
+        {
+            return Ok(value);
+        }
 
         Ok(Cow::Owned(value.try_bytes_utf8_lossy()?.trim().into()))
     }

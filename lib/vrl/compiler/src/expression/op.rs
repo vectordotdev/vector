@@ -111,14 +111,14 @@ impl Expression for Op {
                 .resolve(ctx)?
                 .into_owned()
                 .try_or(|| self.rhs.resolve(ctx).map(Cow::into_owned))
-                .map(Into::into)
+                .map(Cow::Owned)
                 .map_err(Into::into);
         } else if let And = self.opcode {
             return match self.lhs.resolve(ctx)?.into_owned() {
                 Null | Boolean(false) => Ok(Value::from(false).into()),
                 v => v
                     .try_and(self.rhs.resolve(ctx)?.into_owned())
-                    .map(Into::into)
+                    .map(Cow::Owned)
                     .map_err(Into::into),
             };
         };

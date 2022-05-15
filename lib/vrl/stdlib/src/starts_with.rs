@@ -1,44 +1,5 @@
 use vrl::prelude::*;
 
-struct Chars<'a> {
-    bytes: &'a Bytes,
-    pos: usize,
-}
-
-impl<'a> Chars<'a> {
-    fn new(bytes: &'a Bytes) -> Self {
-        Self { bytes, pos: 0 }
-    }
-}
-
-impl<'a> Iterator for Chars<'a> {
-    type Item = std::result::Result<char, u8>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.pos >= self.bytes.len() {
-            return None;
-        }
-
-        let width = utf8_width::get_width(self.bytes[self.pos]);
-        if width == 1 {
-            self.pos += 1;
-            Some(Ok(self.bytes[self.pos - 1] as char))
-        } else {
-            let c = std::str::from_utf8(&self.bytes[self.pos..self.pos + width]);
-            match c {
-                Ok(chr) => {
-                    self.pos += width;
-                    Some(Ok(chr.chars().next().unwrap()))
-                }
-                Err(_) => {
-                    self.pos += 1;
-                    Some(Err(self.bytes[self.pos]))
-                }
-            }
-        }
-    }
-}
-
 enum Case {
     Sensitive,
     Insensitive,

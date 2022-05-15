@@ -27,7 +27,7 @@ pub use bytes::Bytes;
 pub use compiler::function::{
     ArgumentList, Compiled, CompiledArgument, Example, FunctionCompileContext, Parameter,
 };
-pub use compiler::value::{VrlValueArithmetic, VrlValueConvert};
+pub use compiler::value::{Chars, VrlValueArithmetic, VrlValueConvert};
 // commonly used macros
 pub use compiler::{
     bench_function, expr,

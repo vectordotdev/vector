@@ -5,26 +5,24 @@ use serde_json::value::{RawValue, Value as JsonValue};
 use serde_json::{Error, Map};
 use vrl::prelude::*;
 
-fn parse_json(value: Value) -> Result<Value> {
-    let bytes = value.try_bytes()?;
-    let value = serde_json::from_slice::<'_, Value>(&bytes)
-        .map_err(|e| format!("unable to parse json: {}", e))?;
+fn parse_json(bytes: &Bytes) -> Result<Value> {
+    let value = serde_json::from_slice::<'_, Value>(bytes)
+        .map_err(|err| format!("unable to parse json: {err}"))?;
     Ok(value)
 }
 
 // parse_json_with_depth method recursively traverses the value and returns raw JSON-formatted bytes
 // after reaching provided depth.
-fn parse_json_with_depth(value: Value, max_depth: Value) -> Result<Value> {
-    let bytes = value.try_bytes()?;
+fn parse_json_with_depth(bytes: &Bytes, max_depth: i64) -> Result<Value> {
     let parsed_depth = validate_depth(max_depth)?;
 
-    let raw_value = serde_json::from_slice::<'_, &RawValue>(&bytes)
-        .map_err(|e| format!("unable to read json: {}", e))?;
+    let raw_value = serde_json::from_slice::<'_, &RawValue>(bytes)
+        .map_err(|err| format!("unable to read json: {err}"))?;
 
-    let res = parse_layer(raw_value, parsed_depth)
-        .map_err(|e| format!("unable to parse json with max depth: {}", e))?;
+    let json = parse_layer(raw_value, parsed_depth)
+        .map_err(|err| format!("unable to parse json with max depth: {err}"))?;
 
-    Ok(Value::from(res))
+    Ok(json.into())
 }
 
 fn parse_layer(value: &RawValue, remaining_depth: u8) -> std::result::Result<JsonValue, Error> {
@@ -69,21 +67,19 @@ fn parse_layer(value: &RawValue, remaining_depth: u8) -> std::result::Result<Jso
     }
 }
 
-fn validate_depth(value: Value) -> std::result::Result<u8, ExpressionError> {
-    let res = value.try_integer()?;
-
+fn validate_depth(depth: i64) -> std::result::Result<u8, ExpressionError> {
     // The lower cap is 1 because it is pointless to use anything lower,
     // because 'data = parse_json!(.message, max_depth: 0)' equals to 'data = .message'.
     //
     // The upper cap is 128 because serde_json has the same recursion limit by default.
     // https://github.com/serde-rs/json/blob/4d57ebeea8d791b8a51c229552d2d480415d00e6/json/src/de.rs#L111
-    if !(1..=128).contains(&res) {
+    if depth < 1 || depth > 127 {
         Err(ExpressionError::from(format!(
             "max_depth value should be greater than 0 and less than 128, got {}",
-            res
+            depth
         )))
     } else {
-        Ok(res as u8)
+        Ok(depth as u8)
     }
 }
 
@@ -186,13 +182,13 @@ impl Function for ParseJson {
     }
 
     fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
-        let value = args.required("value");
+        let value = args.required("value").try_bytes()?;
         let max_depth = args.optional("max_depth");
 
         if let Some(max_depth) = max_depth {
-            parse_json_with_depth(value, max_depth)
+            parse_json_with_depth(&value, max_depth.try_integer()?)
         } else {
-            parse_json(value)
+            parse_json(&value)
         }
     }
 }
@@ -207,8 +203,8 @@ impl Expression for ParseJsonFn {
         &'rt self,
         ctx: &'ctx mut Context,
     ) -> Resolved<'value> {
-        let value = self.value.resolve(ctx)?.into_owned();
-        parse_json(value).map(Cow::Owned)
+        let value = self.value.resolve(ctx)?.try_bytes()?;
+        parse_json(&value).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
@@ -227,9 +223,9 @@ impl Expression for ParseJsonMaxDepthFn {
         &'rt self,
         ctx: &'ctx mut Context,
     ) -> Resolved<'value> {
-        let value = self.value.resolve(ctx)?.into_owned();
-        let max_depth = self.max_depth.resolve(ctx)?.into_owned();
-        parse_json_with_depth(value, max_depth).map(Cow::Owned)
+        let value = self.value.resolve(ctx)?.try_bytes()?;
+        let max_depth = self.max_depth.resolve(ctx)?.try_integer()?;
+        parse_json_with_depth(&value, max_depth).map(Cow::Owned)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
