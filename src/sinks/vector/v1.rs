@@ -1,3 +1,4 @@
+// TODO: no integration tests to apply `assert_sink_compliance` to
 use bytes::{BufMut, BytesMut};
 use prost::Message;
 use serde::{Deserialize, Serialize};

@@ -333,6 +333,7 @@ async fn healthcheck(config: LogdnaConfig, client: HttpClient) -> crate::Result<
 #[cfg(test)]
 mod tests {
     use futures::{channel::mpsc, StreamExt};
+    use futures_util::stream;
     use http::{request::Parts, StatusCode};
     use serde_json::json;
     use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
@@ -342,7 +343,7 @@ mod tests {
         config::SinkConfig,
         sinks::util::test::{build_test_server_status, load_sink},
         test_util::{
-            components::{self, HTTP_SINK_TAGS},
+            components::{self, assert_sink_compliance, HTTP_SINK_TAGS},
             next_addr, random_lines,
         },
     };
@@ -446,7 +447,7 @@ mod tests {
         }
         drop(batch);
 
-        sink.run_events(events).await.unwrap();
+        assert_sink_compliance(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
         if batch_status == BatchStatus::Delivered {
             components::SINK_TESTS.assert(&HTTP_SINK_TAGS);
         }

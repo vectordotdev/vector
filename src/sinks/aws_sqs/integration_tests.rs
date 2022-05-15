@@ -15,7 +15,10 @@ use crate::common::sqs::SqsClientBuilder;
 use crate::config::{ProxyConfig, SinkContext};
 use crate::sinks::util::encoding::EncodingConfig;
 use crate::sinks::VectorSink;
-use crate::test_util::{components::{assert_sink_compliance, AWS_SINK_TAGS}, random_lines_with_stream, random_string};
+use crate::test_util::{
+    components::{assert_sink_compliance, AWS_SINK_TAGS},
+    random_lines_with_stream, random_string,
+};
 
 fn sqs_address() -> String {
     std::env::var("SQS_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into())

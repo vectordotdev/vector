@@ -405,7 +405,10 @@ mod integration_tests {
 
     use super::*;
     use crate::sinks::VectorSink;
-    use crate::test_util::{random_lines_with_stream, random_string, trace_init};
+    use crate::test_util::{
+        components::{assert_sink_compliance, SINK_TAGS},
+        random_lines_with_stream, random_string, trace_init,
+    };
 
     fn pulsar_address() -> String {
         std::env::var("PULSAR_ADDRESS").unwrap_or_else(|_| "pulsar://127.0.0.1:6650".into())
@@ -448,7 +451,7 @@ mod integration_tests {
         let producer = cnf.create_pulsar_producer().await.unwrap();
         let sink = PulsarSink::new(producer, cnf.encoding, acker).unwrap();
         let sink = VectorSink::from_event_sink(sink);
-        sink.run(events).await.unwrap();
+        assert_sink_compliance(sink, events, &SINK_TAGS).await;
 
         assert_eq!(
             ack_counter.load(std::sync::atomic::Ordering::Relaxed),

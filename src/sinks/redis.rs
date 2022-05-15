@@ -452,11 +452,15 @@ mod tests {
 #[cfg(feature = "redis-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
+    use futures::stream;
     use rand::Rng;
     use redis::AsyncCommands;
 
     use super::*;
-    use crate::test_util::{random_lines_with_stream, random_string, trace_init};
+    use crate::test_util::{
+        components::{assert_sink_compliance, SINK_TAGS},
+        random_lines_with_stream, random_string, trace_init,
+    };
 
     fn redis_server() -> String {
         std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379/0".to_owned())
@@ -501,7 +505,7 @@ mod integration_tests {
             events.push(e);
         }
 
-        sink.run_events(events.clone()).await.unwrap();
+        assert_sink_compliance(sink, stream::iter(events.clone()), &SINK_TAGS).await;
 
         let mut conn = cnf.build_client().await.unwrap();
 

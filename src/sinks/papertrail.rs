@@ -1,3 +1,4 @@
+// TODO: no integration test to apply `assert_sink_compliance` to
 use bytes::{BufMut, BytesMut};
 use codecs::{encoding::SerializerConfig, JsonSerializerConfig, TextSerializerConfig};
 use serde::{Deserialize, Serialize};

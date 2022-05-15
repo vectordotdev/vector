@@ -104,8 +104,6 @@ pub static SINK_TESTS: Lazy<ComponentTests> = Lazy::new(|| {
         events: &["BytesSent", "EventsSent", "BytesSent"], // EventsReceived is emitted in the topology
         tagged_counters: &["component_sent_bytes_total"],
         untagged_counters: &[
-            "component_received_events_total",
-            "component_received_event_bytes_total",
             "component_sent_events_total",
             "component_sent_event_bytes_total",
         ],

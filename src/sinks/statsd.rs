@@ -290,7 +290,13 @@ mod test {
     use {crate::sources::statsd::parser::parse, std::str::from_utf8};
 
     use super::*;
-    use crate::{event::Metric, test_util::*};
+    use crate::{
+        event::Metric,
+        test_util::{
+            components::{assert_sink_compliance, SINK_TAGS},
+            *,
+        },
+    };
 
     #[test]
     fn generate_config() {
@@ -518,7 +524,7 @@ mod test {
             }
         });
 
-        sink.run_events(events).await.unwrap();
+        assert_sink_compliance(sink, stream::iter(events), &SINK_TAGS).await;
 
         let messages = collect_n(rx, 1).await;
         assert_eq!(
