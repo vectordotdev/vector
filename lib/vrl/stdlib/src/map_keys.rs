@@ -4,11 +4,11 @@ use vrl::prelude::*;
 fn map_keys<T>(
     value: Value,
     recursive: bool,
-    ctx: &mut Context,
+    ctx: &Context,
     runner: closure::Runner<T>,
 ) -> Result<Value>
 where
-    T: Fn(&mut Context) -> Result<Value>,
+    T: Fn(&Context) -> Result<Value>,
 {
     let mut iter = value.into_iter(recursive);
 

@@ -1,4 +1,4 @@
-use std::{borrow::Cow, error::Error, fmt, sync::Arc};
+use std::{borrow::Cow, cell::RefCell, error::Error, fmt, rc::Rc, sync::Arc};
 
 use compiler::{
     state::{ExternalEnv, LocalEnv},
@@ -15,7 +15,7 @@ pub type RuntimeResult = Result<Value, Terminate>;
 
 #[derive(Debug, Default)]
 pub struct Runtime {
-    state: state::Runtime,
+    state: Rc<RefCell<state::Runtime>>,
     root_lookup: LookupBuf,
 }
 
@@ -50,6 +50,8 @@ impl Error for Terminate {
 
 impl Runtime {
     pub fn new(state: state::Runtime) -> Self {
+        let state = Rc::new(RefCell::new(state));
+
         Self {
             state,
 
@@ -62,18 +64,18 @@ impl Runtime {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.state.is_empty()
+        self.state.borrow().is_empty()
     }
 
     pub fn clear(&mut self) {
-        self.state.clear();
+        self.state.borrow_mut().clear();
     }
 
     /// Given the provided [`Target`], resolve the provided [`Program`] to
     /// completion.
     pub fn resolve(
         &mut self,
-        target: &mut dyn Target,
+        target: Rc<RefCell<dyn Target>>,
         program: &Program,
         timezone: &TimeZone,
     ) -> RuntimeResult {
@@ -81,7 +83,7 @@ impl Runtime {
         //
         // VRL technically supports any `Value` object as the root, but the
         // assumption is people are expected to use it to query objects.
-        match target.target_get(&self.root_lookup) {
+        match target.borrow().target_get(&self.root_lookup) {
             Ok(Some(&Value::Object(_))) => {}
             Ok(Some(value)) => {
                 return Err(Terminate::Error(
@@ -105,7 +107,8 @@ impl Runtime {
             }
         };
 
-        let mut ctx = Context::new(target, &mut self.state, timezone);
+        let state = Rc::clone(&self.state);
+        let mut ctx = Context::new(target, state, timezone);
 
         program
             .resolve(&mut ctx)
@@ -137,10 +140,11 @@ impl Runtime {
     pub fn run_vm(
         &mut self,
         vm: &Vm,
-        target: &mut dyn Target,
+        target: Rc<RefCell<dyn Target>>,
         timezone: &TimeZone,
     ) -> Result<Value, Terminate> {
-        let mut context = Context::new(target, &mut self.state, timezone);
+        let state = Rc::clone(&self.state);
+        let mut context = Context::new(target, state, timezone);
         vm.interpret(&mut context).map_err(|err| match err {
             #[cfg(feature = "expr-abort")]
             ExpressionError::Abort { .. } => Terminate::Abort(err),

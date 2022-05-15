@@ -1,5 +1,5 @@
-use core::{ExpressionError, Target};
-use std::{collections::BTreeMap, marker::PhantomData, ops::DerefMut};
+use core::ExpressionError;
+use std::{collections::BTreeMap, ops::DerefMut};
 
 use parser::ast::Ident;
 use value::{
@@ -141,23 +141,17 @@ impl Output {
     }
 }
 
-pub struct Runner<'a, F, T> {
+pub struct Runner<'a, F> {
     pub(crate) variables: &'a [Ident],
     pub(crate) runner: F,
-    _marker: PhantomData<T>,
 }
 
-impl<'a, F, T> Runner<'a, F, T>
+impl<'a, F> Runner<'a, F>
 where
     F: Fn(&Context) -> Result<Value, ExpressionError>,
-    T: Target,
 {
     pub fn new(variables: &'a [Ident], runner: F) -> Self {
-        Self {
-            variables,
-            runner,
-            _marker: PhantomData,
-        }
+        Self { variables, runner }
     }
 
     /// Run the closure to completion, given the provided key/value pair, and

@@ -9,7 +9,7 @@ use crate::{state::Runtime, Target};
 
 pub struct Context<'a> {
     target: Rc<RefCell<dyn Target>>,
-    state: RefCell<Runtime>,
+    state: Rc<RefCell<Runtime>>,
     timezone: &'a TimeZone,
 }
 
@@ -17,7 +17,7 @@ impl<'a> Context<'a> {
     /// Create a new [`Context`].
     pub fn new(
         target: Rc<RefCell<dyn Target>>,
-        state: RefCell<Runtime>,
+        state: Rc<RefCell<Runtime>>,
         timezone: &'a TimeZone,
     ) -> Self {
         Self {

@@ -1,9 +1,9 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn for_each<T>(value: Value, ctx: &mut Context, runner: closure::Runner<T>) -> Result<Value>
+fn for_each<T>(value: Value, ctx: &Context, runner: closure::Runner<T>) -> Result<Value>
 where
-    T: Fn(&mut Context) -> Result<Value>,
+    T: Fn(&Context) -> Result<Value>,
 {
     for item in value.into_iter(false) {
         match item {

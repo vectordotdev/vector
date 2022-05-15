@@ -181,7 +181,7 @@ impl Function for GetEnrichmentTableRecord {
         }
     }
 
-    fn call_by_vm(&self, _: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let condition = args.required("condition");
         let condition = condition
             .into_object()
@@ -219,10 +219,7 @@ pub struct GetEnrichmentTableRecordFn {
 }
 
 impl Expression for GetEnrichmentTableRecordFn {
-    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
-        &'rt self,
-        ctx: &'ctx mut Context,
-    ) -> Resolved<'value> {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(&'rt self, ctx: &'ctx Context) -> Resolved<'value> {
         let condition = self
             .condition
             .iter()
