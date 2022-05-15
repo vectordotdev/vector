@@ -43,7 +43,7 @@ impl Function for GetEnvVar {
         Ok(Box::new(GetEnvVarFn { name }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let name = args.required("name");
         get_env_var(name)
     }
@@ -57,7 +57,7 @@ struct GetEnvVarFn {
 impl Expression for GetEnvVarFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let value = self.name.resolve(ctx)?.into_owned();
         get_env_var(value).map(Cow::Owned)

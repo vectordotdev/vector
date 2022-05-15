@@ -57,7 +57,7 @@ impl Function for Timestamp {
         Ok(Box::new(TimestampFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         check(&value)?;
 
@@ -73,7 +73,7 @@ struct TimestampFn {
 impl Expression for TimestampFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let value = self.value.resolve(ctx)?;
         check(&value)?;

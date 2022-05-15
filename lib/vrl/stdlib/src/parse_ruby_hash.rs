@@ -62,7 +62,7 @@ impl Function for ParseRubyHash {
         }]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         parse_ruby_hash(value)
     }
@@ -76,7 +76,7 @@ struct ParseRubyHashFn {
 impl Expression for ParseRubyHashFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let value = self.value.resolve(ctx)?.into_owned();
         parse_ruby_hash(value).map(Cow::Owned)

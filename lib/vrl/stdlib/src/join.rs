@@ -62,7 +62,7 @@ impl Function for Join {
         }]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let separator = args.optional("separator");
 
@@ -79,7 +79,7 @@ struct JoinFn {
 impl Expression for JoinFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let array = self.value.resolve(ctx)?.into_owned();
         let separator = self

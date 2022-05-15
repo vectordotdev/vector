@@ -52,7 +52,7 @@ impl Function for Merge {
         Ok(Box::new(MergeFn { to, from, deep }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, arguments: &mut VmArgumentList) -> Result<Value> {
         let to = arguments.required("to");
         let mut to = to.try_object()?;
         let from = arguments.required("from");
@@ -78,7 +78,7 @@ pub(crate) struct MergeFn {
 impl Expression for MergeFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let mut to_value = self.to.resolve(ctx)?.try_object()?;
         let from_value = self.from.resolve(ctx)?.try_object()?;

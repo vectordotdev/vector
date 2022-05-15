@@ -78,7 +78,7 @@ impl Function for Assert {
         Ok(Box::new(AssertFn { condition, message }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let condition = args.required("condition");
         let message = args.optional("message");
 
@@ -95,7 +95,7 @@ struct AssertFn {
 impl Expression for AssertFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let condition = self.condition.resolve(ctx)?.into_owned();
         let format = self.condition.format();

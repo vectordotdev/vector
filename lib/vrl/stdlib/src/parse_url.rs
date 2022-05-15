@@ -64,7 +64,7 @@ impl Function for ParseUrl {
         ]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, arguments: &mut VmArgumentList) -> Result<Value> {
         let value = arguments.required("value");
         let string = value.try_bytes_utf8_lossy()?;
         let default_known_ports = arguments
@@ -104,7 +104,7 @@ struct ParseUrlFn {
 impl Expression for ParseUrlFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let value = self.value.resolve(ctx)?.into_owned();
         let string = value.try_bytes_utf8_lossy()?;

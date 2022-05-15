@@ -70,7 +70,7 @@ impl Function for ParseQueryString {
         }]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         parse_query_string(value)
     }
@@ -84,7 +84,7 @@ struct ParseQueryStringFn {
 impl Expression for ParseQueryStringFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let bytes = self.value.resolve(ctx)?.into_owned();
         parse_query_string(bytes).map(Cow::Owned)

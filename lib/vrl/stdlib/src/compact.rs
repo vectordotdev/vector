@@ -145,7 +145,7 @@ impl Function for Compact {
         }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let recursive = args.optional("recursive");
         let null = args.optional("null");
@@ -212,7 +212,7 @@ impl CompactOptions {
 impl Expression for CompactFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let recursive = self
             .recursive

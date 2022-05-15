@@ -73,7 +73,7 @@ impl Function for ParseCsv {
         ]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let delimiter = args
             .optional("delimiter")
@@ -92,7 +92,7 @@ struct ParseCsvFn {
 impl Expression for ParseCsvFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let csv_string = self.value.resolve(ctx)?.into_owned();
         let delimiter = self.delimiter.resolve(ctx)?.into_owned();

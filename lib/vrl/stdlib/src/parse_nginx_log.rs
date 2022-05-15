@@ -115,7 +115,7 @@ impl Function for ParseNginxLog {
         }
     }
 
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let format = args.required_any("format").downcast_ref::<Bytes>().unwrap();
         let timestamp_format = args.optional("timestamp_format");
@@ -159,7 +159,7 @@ struct ParseNginxLogFn {
 impl Expression for ParseNginxLogFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let bytes = self.value.resolve(ctx)?.into_owned();
         let timestamp_format = self

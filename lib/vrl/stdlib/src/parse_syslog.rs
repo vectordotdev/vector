@@ -64,7 +64,7 @@ impl Function for ParseSyslog {
         Ok(Box::new(ParseSyslogFn { value }))
     }
 
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         parse_syslog(value, ctx)
     }
@@ -78,7 +78,7 @@ pub(crate) struct ParseSyslogFn {
 impl Expression for ParseSyslogFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let value = self.value.resolve(ctx)?.into_owned();
 

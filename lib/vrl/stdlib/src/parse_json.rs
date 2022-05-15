@@ -181,7 +181,7 @@ impl Function for ParseJson {
         }
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value").try_bytes()?;
         let max_depth = args.optional("max_depth");
 
@@ -201,7 +201,7 @@ struct ParseJsonFn {
 impl Expression for ParseJsonFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let value = self.value.resolve(ctx)?.try_bytes()?;
         parse_json(&value).map(Cow::Owned)
@@ -221,7 +221,7 @@ struct ParseJsonMaxDepthFn {
 impl Expression for ParseJsonMaxDepthFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let value = self.value.resolve(ctx)?.try_bytes()?;
         let max_depth = self.max_depth.resolve(ctx)?.try_integer()?;

@@ -102,7 +102,7 @@ impl Function for MapKeys {
         })
     }
 
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let recursive = args
             .optional("recursive")
@@ -127,7 +127,7 @@ struct MapKeysFn {
 impl Expression for MapKeysFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let recursive = match &self.recursive {
             None => false,

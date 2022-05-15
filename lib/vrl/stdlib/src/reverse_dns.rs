@@ -49,7 +49,7 @@ impl Function for ReverseDns {
         Ok(Box::new(ReverseDnsFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         reverse_dns(value)
     }
@@ -63,7 +63,7 @@ struct ReverseDnsFn {
 impl Expression for ReverseDnsFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let value = self.value.resolve(ctx)?.into_owned();
         reverse_dns(value).map(Cow::Owned)

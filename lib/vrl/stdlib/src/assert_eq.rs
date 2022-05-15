@@ -86,7 +86,7 @@ impl Function for AssertEq {
         }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let left = args.required("left");
         let right = args.required("right");
         let message = args.optional("message");
@@ -105,7 +105,7 @@ struct AssertEqFn {
 impl Expression for AssertEqFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let left = self.left.resolve(ctx)?.into_owned();
         let right = self.right.resolve(ctx)?.into_owned();

@@ -101,7 +101,7 @@ impl Function for Slice {
         Ok(Box::new(SliceFn { value, start, end }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let start = args.required("start").try_integer()?;
         let end = args
@@ -123,7 +123,7 @@ struct SliceFn {
 impl Expression for SliceFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let start = self.start.resolve(ctx)?.try_integer()?;
         let end = match &self.end {

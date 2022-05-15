@@ -1,4 +1,3 @@
-use core::Target;
 use std::{collections::BTreeMap, ops::Deref, sync::Arc};
 
 use value::Value;
@@ -302,7 +301,7 @@ impl Vm {
     /// each one.
     /// The VM is stack based. When the `Return` `OpCode` is encountered the top item on the stack is popped and returned.
     /// It is expected that the final instruction is a `Return`.
-    pub fn interpret<'a>(&self, ctx: &mut Context<'a>) -> Result<Value, ExpressionError> {
+    pub fn interpret<'a>(&self, ctx: &Context<'a>) -> Result<Value, ExpressionError> {
         // Any mutable state during the run is stored here.
         let mut state: VmState = VmState::new(self);
 
@@ -704,7 +703,7 @@ where
 /// Sets the value of the given variable to the provided value.
 #[cfg(feature = "expr-assignment")]
 fn set_variable<'a>(
-    ctx: &mut Context<'a>,
+    ctx: &Context<'a>,
     variable: &Variable,
     value: Value,
 ) -> Result<(), ExpressionError> {

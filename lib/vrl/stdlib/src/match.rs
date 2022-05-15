@@ -57,7 +57,7 @@ impl Function for Match {
         Ok(Box::new(MatchFn { value, pattern }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let pattern = args.required("pattern");
 
@@ -74,7 +74,7 @@ pub(crate) struct MatchFn {
 impl Expression for MatchFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let value = self.value.resolve(ctx)?.into_owned();
         let pattern = self.pattern.resolve(ctx)?.into_owned();

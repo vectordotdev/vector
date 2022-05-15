@@ -49,7 +49,7 @@ impl Function for TallyValue {
         ]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let array = args.required("array");
         let value = args.required("value");
 
@@ -66,7 +66,7 @@ pub(crate) struct TallyValueFn {
 impl Expression for TallyValueFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let array = self.array.resolve(ctx)?.into_owned();
         let value = self.value.resolve(ctx)?.into_owned();

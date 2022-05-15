@@ -162,7 +162,7 @@ impl Function for ParseGrok {
         }
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let remove_empty = args
             .optional("remove_empty")
@@ -189,7 +189,7 @@ struct ParseGrokFn {
 impl Expression for ParseGrokFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let value = self.value.resolve(ctx)?.into_owned();
         let remove_empty = self.remove_empty.resolve(ctx)?.into_owned();

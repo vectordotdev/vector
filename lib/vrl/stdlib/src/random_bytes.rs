@@ -61,7 +61,7 @@ impl Function for RandomBytes {
         Ok(Box::new(RandomBytesFn { length }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let length = args.required("length");
         random_bytes(length)
     }
@@ -86,7 +86,7 @@ struct RandomBytesFn {
 impl Expression for RandomBytesFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let length = self.length.resolve(ctx)?.into_owned();
         random_bytes(length).map(Cow::Owned)

@@ -57,7 +57,7 @@ impl Function for String {
         Ok(Box::new(StringFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, arguments: &mut VmArgumentList) -> Result<Value> {
         let value = arguments.required("value");
         check(&value)?;
 
@@ -73,7 +73,7 @@ struct StringFn {
 impl Expression for StringFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let value = self.value.resolve(ctx)?;
         check(&value)?;

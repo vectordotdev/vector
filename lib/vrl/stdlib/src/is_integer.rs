@@ -47,7 +47,7 @@ impl Function for IsInteger {
         Ok(Box::new(IsIntegerFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         Ok(value!(args.required("value").is_integer()))
     }
 }
@@ -60,7 +60,7 @@ struct IsIntegerFn {
 impl Expression for IsIntegerFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         self.value
             .resolve(ctx)

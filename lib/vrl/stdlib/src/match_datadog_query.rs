@@ -111,7 +111,7 @@ impl Function for MatchDatadogQuery {
         }
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, arguments: &mut VmArgumentList) -> Result<Value> {
         let value = arguments.required("value");
         let filter = arguments
             .required_any("query")
@@ -146,7 +146,7 @@ struct MatchDatadogQueryFn {
 impl Expression for MatchDatadogQueryFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let value = self.value.resolve(ctx)?.into_owned();
 

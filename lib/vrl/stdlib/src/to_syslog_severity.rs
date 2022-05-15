@@ -62,7 +62,7 @@ impl Function for ToSyslogSeverity {
         Ok(Box::new(ToSyslogSeverityFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         to_syslog_severity(value)
     }
@@ -76,7 +76,7 @@ struct ToSyslogSeverityFn {
 impl Expression for ToSyslogSeverityFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let level = self.value.resolve(ctx)?.into_owned();
         to_syslog_severity(level).map(Cow::Owned)

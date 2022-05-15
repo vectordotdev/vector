@@ -213,7 +213,7 @@ impl Function for Encrypt {
         }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let plaintext = args.required("plaintext");
         let algorithm = args.required("algorithm");
         let key = args.required("key");
@@ -233,7 +233,7 @@ struct EncryptFn {
 impl Expression for EncryptFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let plaintext = self.plaintext.resolve(ctx)?.into_owned();
         let algorithm = self.algorithm.resolve(ctx)?.into_owned();

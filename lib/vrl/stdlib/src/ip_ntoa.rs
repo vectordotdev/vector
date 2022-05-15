@@ -47,7 +47,7 @@ impl Function for IpNtoa {
         Ok(Box::new(IpNtoaFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         ip_ntoa(value)
     }
@@ -61,7 +61,7 @@ struct IpNtoaFn {
 impl Expression for IpNtoaFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let value = self.value.resolve(ctx)?.into_owned();
         ip_ntoa(value).map(Cow::Owned)

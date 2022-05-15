@@ -85,7 +85,7 @@ impl Function for ForEach {
         })
     }
 
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let VmFunctionClosure { variables, vm } = args.closure();
         let runner = closure::Runner::new(variables, |ctx| vm.interpret(ctx));
@@ -103,7 +103,7 @@ struct ForEachFn {
 impl Expression for ForEachFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let value = self.value.resolve(ctx)?.into_owned();
         let FunctionClosure { variables, block } = &self.closure;

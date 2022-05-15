@@ -133,7 +133,7 @@ impl Function for Set {
         Ok(Box::new(SetFn { value, path, data }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let path = args.required("path");
         let data = args.required("data");
@@ -152,7 +152,7 @@ pub(crate) struct SetFn {
 impl Expression for SetFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let path = self.path.resolve(ctx)?.into_owned();
         let value = self.value.resolve(ctx)?.into_owned();

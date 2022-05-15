@@ -90,7 +90,7 @@ impl Function for Split {
         }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let pattern = args.required("pattern");
         let limit = args.optional("limit").unwrap_or_else(|| value!(999999999));
@@ -109,7 +109,7 @@ pub(crate) struct SplitFn {
 impl Expression for SplitFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let value = self.value.resolve(ctx)?.into_owned();
         let limit = self.limit.resolve(ctx)?.into_owned();

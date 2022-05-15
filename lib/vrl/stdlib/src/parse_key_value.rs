@@ -163,7 +163,7 @@ impl Function for ParseKeyValue {
         }
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let bytes = args.required("value");
         let key_value_delimiter = args
             .optional("key_value_delimiter")
@@ -249,7 +249,7 @@ pub(crate) struct ParseKeyValueFn {
 impl Expression for ParseKeyValueFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let bytes = self.value.resolve(ctx)?.into_owned();
         let key_value_delimiter = self.key_value_delimiter.resolve(ctx)?.into_owned();

@@ -158,7 +158,7 @@ impl Function for Remove {
         }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let path = args.required("path");
         let compact = args.optional("compact").unwrap_or_else(|| value!(false));
@@ -177,7 +177,7 @@ pub(crate) struct RemoveFn {
 impl Expression for RemoveFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let path = self.path.resolve(ctx)?.into_owned();
         let compact = self.compact.resolve(ctx)?.into_owned();

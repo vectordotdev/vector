@@ -121,7 +121,7 @@ impl Function for EncodeKeyValue {
 
     fn call_by_vm(
         &self,
-        _ctx: &mut Context,
+        _ctx: &Context,
         args: &mut VmArgumentList,
     ) -> Result<Value, ExpressionError> {
         let value = args.required("value");
@@ -173,7 +173,7 @@ fn resolve_fields(fields: Value) -> Result<Vec<String>, ExpressionError> {
 impl Expression for EncodeKeyValueFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let value = self.value.resolve(ctx)?.into_owned();
         let fields = self

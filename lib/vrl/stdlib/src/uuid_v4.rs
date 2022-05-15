@@ -32,7 +32,7 @@ impl Function for UuidV4 {
         Ok(Box::new(UuidV4Fn))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, _args: &mut VmArgumentList) -> Result<Value> {
         uuid_v4()
     }
 }
@@ -43,7 +43,7 @@ struct UuidV4Fn;
 impl Expression for UuidV4Fn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        _: &'ctx mut Context,
+        _: &'ctx Context,
     ) -> Resolved<'value> {
         uuid_v4().map(Cow::Owned)
     }

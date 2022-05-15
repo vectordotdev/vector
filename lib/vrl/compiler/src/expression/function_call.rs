@@ -1199,7 +1199,7 @@ mod tests {
     impl Expression for Fn {
         fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
             &'rt self,
-            _ctx: &'ctx mut Context,
+            _ctx: &'ctx Context,
         ) -> Resolved<'value> {
             todo!()
         }
@@ -1252,7 +1252,7 @@ mod tests {
 
         fn call_by_vm(
             &self,
-            _ctx: &mut Context,
+            _ctx: &Context,
             _args: &mut crate::vm::VmArgumentList,
         ) -> Result<value::Value, ExpressionError> {
             unimplemented!()

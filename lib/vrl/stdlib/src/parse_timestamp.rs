@@ -59,7 +59,7 @@ impl Function for ParseTimestamp {
         ]
     }
 
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let format = args.required("format");
         parse_timestamp(value, format, ctx)
@@ -75,7 +75,7 @@ struct ParseTimestampFn {
 impl Expression for ParseTimestampFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let value = self.value.resolve(ctx)?.into_owned();
         let format = self.format.resolve(ctx)?.into_owned();

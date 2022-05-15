@@ -153,7 +153,7 @@ impl Function for Decrypt {
         }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let ciphertext = args.required("ciphertext");
         let algorithm = args.required("algorithm");
         let key = args.required("key");
@@ -173,7 +173,7 @@ struct DecryptFn {
 impl Expression for DecryptFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let ciphertext = self.ciphertext.resolve(ctx)?.into_owned();
         let algorithm = self.algorithm.resolve(ctx)?.into_owned();

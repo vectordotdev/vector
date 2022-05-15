@@ -95,7 +95,7 @@ impl Function for EndsWith {
         ]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, arguments: &mut VmArgumentList) -> Result<Value> {
         let value = arguments.required("value");
         let substring = arguments.required("substring");
         let case_sensitive = arguments
@@ -136,7 +136,7 @@ struct EndsWithFn {
 impl Expression for EndsWithFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let case_sensitive = if self.case_sensitive.resolve(ctx)?.try_boolean()? {
             Case::Sensitive

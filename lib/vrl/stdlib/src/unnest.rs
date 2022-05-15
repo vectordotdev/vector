@@ -2,33 +2,34 @@ use ::value::Value;
 use lookup_lib::LookupBuf;
 use vrl::{prelude::*, value::kind::merge};
 
-fn unnest(path: &expression::Query, root_lookup: &LookupBuf, ctx: &mut Context) -> Result<Value> {
-    let path_path = path.path();
+fn unnest(query: &expression::Query, root_lookup: &LookupBuf, ctx: &Context) -> Result<Value> {
+    let path = query.path();
 
-    let value: Value;
-    let target: Box<&dyn Target> = match path.target() {
-        expression::Target::External => Box::new(ctx.target()) as Box<_>,
-        expression::Target::Internal(v) => {
-            let v = ctx.state().variable(v.ident()).unwrap_or(&Value::Null);
-            Box::new(v as &dyn Target) as Box<_>
-        }
-        expression::Target::Container(expr) => {
-            value = expr.resolve(ctx)?.into_owned();
-            Box::new(&value as &dyn Target) as Box<&dyn Target>
-        }
-        expression::Target::FunctionCall(expr) => {
-            value = expr.resolve(ctx)?.into_owned();
-            Box::new(&value as &dyn Target) as Box<&dyn Target>
-        }
+    let root = match query.target() {
+        expression::Target::External => ctx
+            .target()
+            .target_get(root_lookup)?
+            .cloned()
+            .unwrap_or(Value::Null),
+        expression::Target::Internal(v) => ctx
+            .state()
+            .variable(v.ident())
+            .cloned()
+            .unwrap_or(Value::Null),
+        expression::Target::Container(expr) => expr
+            .resolve(ctx)?
+            .target_get(root_lookup)?
+            .cloned()
+            .unwrap_or(Value::Null),
+        expression::Target::FunctionCall(expr) => expr
+            .resolve(ctx)?
+            .target_get(root_lookup)?
+            .cloned()
+            .unwrap_or(Value::Null),
     };
 
-    let root = target
-        .target_get(root_lookup)
-        .expect("must never fail")
-        .expect("always a value");
-
     let values = root
-        .get_by_path(path_path)
+        .get_by_path(path)
         .cloned()
         .ok_or(value::Error::Expected {
             got: Kind::null(),
@@ -40,7 +41,7 @@ fn unnest(path: &expression::Query, root_lookup: &LookupBuf, ctx: &mut Context) 
         .into_iter()
         .map(|value| {
             let mut event = root.clone();
-            event.insert_by_path(path_path, value);
+            event.insert_by_path(path, value);
             event
         })
         .collect::<Vec<_>>();
@@ -127,7 +128,7 @@ impl Function for Unnest {
         }
     }
 
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let path = args
             .required_any("path")
             .downcast_ref::<expression::Query>()
@@ -160,10 +161,7 @@ impl UnnestFn {
 }
 
 impl Expression for UnnestFn {
-    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
-        &'rt self,
-        ctx: &'ctx mut Context,
-    ) -> Resolved<'value> {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(&'rt self, ctx: &'ctx Context) -> Resolved<'value> {
         unnest(&self.path, &self.root, ctx).map(Cow::Owned)
     }
 

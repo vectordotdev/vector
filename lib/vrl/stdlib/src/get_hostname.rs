@@ -32,7 +32,7 @@ impl Function for GetHostname {
         }]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, _args: &mut VmArgumentList) -> Result<Value> {
         get_hostname()
     }
 }
@@ -43,7 +43,7 @@ struct GetHostnameFn;
 impl Expression for GetHostnameFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        _: &'ctx mut Context,
+        _: &'ctx Context,
     ) -> Resolved<'value> {
         get_hostname().map(Cow::Owned)
     }

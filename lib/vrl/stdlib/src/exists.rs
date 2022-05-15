@@ -57,7 +57,7 @@ impl Function for Exists {
         }
     }
 
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let field = args
             .required_any("field")
             .downcast_ref::<expression::Query>()
@@ -83,7 +83,7 @@ pub(crate) struct ExistsFn {
     query: expression::Query,
 }
 
-fn exists(query: &expression::Query, ctx: &mut Context) -> Result<Value> {
+fn exists(query: &expression::Query, ctx: &Context) -> Result<Value> {
     let path = query.path();
 
     if query.is_external() {
@@ -115,7 +115,7 @@ fn exists(query: &expression::Query, ctx: &mut Context) -> Result<Value> {
 impl Expression for ExistsFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         exists(&self.query, ctx).map(Cow::Owned)
     }

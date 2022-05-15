@@ -2,7 +2,7 @@ use ::value::Value;
 use lookup_lib::{LookupBuf, SegmentBuf};
 use vrl::prelude::*;
 
-fn get<'a>(value: &'a Value, path: &'a Value) -> Result<Option<&'a Value>> {
+fn get<'a>(value: &'a Value, path: &'a Value) -> Result<Option<Value>> {
     let path = match path {
         Value::Array(path) => {
             let mut get = LookupBuf::root();
@@ -36,7 +36,10 @@ fn get<'a>(value: &'a Value, path: &'a Value) -> Result<Option<&'a Value>> {
         }
     };
 
-    value.target_get(&path).map_err(Into::into)
+    value
+        .target_get(&path)
+        .map(Option::<&Value>::cloned)
+        .map_err(Into::into)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -137,11 +140,11 @@ impl Function for Get {
         Ok(Box::new(GetFn { value, path }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let path = args.required("path");
 
-        Ok(get(&value, &path)?.cloned().unwrap_or(Value::Null))
+        Ok(get(&value, &path)?.unwrap_or(Value::Null))
     }
 }
 
@@ -152,15 +155,12 @@ pub(crate) struct GetFn {
 }
 
 impl Expression for GetFn {
-    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
-        &'rt self,
-        ctx: &'ctx mut Context,
-    ) -> Resolved<'value> {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(&'rt self, ctx: &'ctx Context) -> Resolved<'value> {
         let path = self.path.resolve(ctx)?;
         let value = self.value.resolve(ctx)?;
 
         Ok(get(&value, &path)?
-            .map(Cow::Borrowed)
+            .map(Cow::Owned)
             .unwrap_or(Cow::Owned(Value::Null)))
     }
 

@@ -52,7 +52,7 @@ impl Function for TypeDef {
         Ok(Box::new(TypeDefFn { type_def }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, _args: &mut VmArgumentList) -> Result<Value> {
         Err("function not supported in VM runtime.".into())
     }
 }
@@ -65,7 +65,7 @@ struct TypeDefFn {
 impl Expression for TypeDefFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        _: &'ctx mut Context,
+        _: &'ctx Context,
     ) -> Resolved<'value> {
         type_def(&self.type_def.clone()).map(Cow::Owned)
     }

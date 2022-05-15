@@ -57,7 +57,7 @@ impl Function for Includes {
         Ok(Box::new(IncludesFn { value, item }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let item = args.required("item");
 
@@ -74,7 +74,7 @@ struct IncludesFn {
 impl Expression for IncludesFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let list = self.value.resolve(ctx)?.into_owned();
         let item = self.item.resolve(ctx)?.into_owned();

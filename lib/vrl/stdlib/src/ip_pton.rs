@@ -60,7 +60,7 @@ impl Function for IpPton {
         Ok(Box::new(IpPtonFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         ip_pton(value)
     }
@@ -74,7 +74,7 @@ struct IpPtonFn {
 impl Expression for IpPtonFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let value = self.value.resolve(ctx)?.into_owned();
         ip_pton(value).map(Cow::Owned)

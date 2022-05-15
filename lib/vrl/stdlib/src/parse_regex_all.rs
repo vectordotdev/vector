@@ -116,7 +116,7 @@ impl Function for ParseRegexAll {
         }
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let pattern = args
             .required_any("pattern")
             .downcast_ref::<regex::Regex>()
@@ -142,7 +142,7 @@ pub(crate) struct ParseRegexAllFn {
 impl Expression for ParseRegexAllFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let value = self.value.resolve(ctx)?.into_owned();
         let numeric_groups = self.numeric_groups.resolve(ctx)?.into_owned();

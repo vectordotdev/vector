@@ -57,7 +57,7 @@ impl Function for Push {
         Ok(Box::new(PushFn { value, item }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let list = args.required("value");
         let item = args.required("item");
 
@@ -74,7 +74,7 @@ struct PushFn {
 impl Expression for PushFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let list = self.value.resolve(ctx)?.into_owned();
         let item = self.item.resolve(ctx)?.into_owned();

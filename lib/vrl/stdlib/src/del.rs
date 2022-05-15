@@ -2,7 +2,7 @@ use ::value::Value;
 use vrl::prelude::*;
 
 #[inline]
-fn del(query: &expression::Query, ctx: &mut Context) -> Result<Value> {
+fn del(query: &expression::Query, ctx: &Context) -> Result<Value> {
     let path = query.path();
 
     if query.is_external() {
@@ -118,7 +118,7 @@ impl Function for Del {
         }
     }
 
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let query = args
             .required_any("target")
             .downcast_ref::<expression::Query>()
@@ -164,7 +164,7 @@ impl Expression for DelFn {
     // see tracking issue: https://github.com/vectordotdev/vector/issues/5887
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         del(&self.query, ctx).map(Cow::Owned)
     }

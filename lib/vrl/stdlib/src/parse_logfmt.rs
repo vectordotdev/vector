@@ -58,7 +58,7 @@ impl Function for ParseLogFmt {
         }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, _ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let bytes = args.required("value");
 
         let key_value_delimiter = Value::from("=");
