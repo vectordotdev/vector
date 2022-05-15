@@ -1,4 +1,8 @@
-use std::borrow::Cow::{self, Borrowed, Owned};
+use std::{
+    borrow::Cow::{self, Borrowed, Owned},
+    cell::RefCell,
+    rc::Rc,
+};
 
 use ::value::Value;
 use indoc::indoc;
@@ -17,7 +21,7 @@ use vector_common::TimeZone;
 use vrl::{
     diagnostic::Formatter,
     state::{self, ExternalEnv},
-    value, Runtime, Target, VrlRuntime,
+    value, Runtime, VrlRuntime,
 };
 
 // Create a list of all possible error values for potential docs lookup
@@ -107,7 +111,7 @@ pub(crate) fn run(mut objects: Vec<Value>, timezone: &TimeZone, vrl_runtime: Vrl
                 };
 
                 let (local, result) = resolve(
-                    objects.get_mut(index),
+                    objects.get(index).cloned(),
                     &mut rt,
                     command,
                     &mut external_state,
@@ -142,7 +146,7 @@ pub(crate) fn run(mut objects: Vec<Value>, timezone: &TimeZone, vrl_runtime: Vrl
 }
 
 fn resolve(
-    object: Option<&mut impl Target>,
+    target: Option<Value>,
     runtime: &mut Runtime,
     program: &str,
     external: &mut state::ExternalEnv,
@@ -150,10 +154,9 @@ fn resolve(
     timezone: &TimeZone,
     vrl_runtime: VrlRuntime,
 ) -> (state::LocalEnv, Result<Value, String>) {
-    let mut empty = value!({});
-    let object = match object {
-        None => &mut empty as &mut dyn Target,
-        Some(object) => object,
+    let target = match target {
+        None => Rc::new(RefCell::new(value!({}))),
+        Some(object) => Rc::new(RefCell::new(object)),
     };
 
     let program = match vrl::compile_for_repl(program, &stdlib::all(), external, local.clone()) {
@@ -168,14 +171,14 @@ fn resolve(
 
     (
         program.local_env().clone(),
-        execute(runtime, program, object, timezone, vrl_runtime),
+        execute(runtime, program, target, timezone, vrl_runtime),
     )
 }
 
 fn execute(
     runtime: &mut Runtime,
     program: vrl::Program,
-    object: &mut dyn Target,
+    target: Rc<RefCell<Value>>,
     timezone: &TimeZone,
     vrl_runtime: VrlRuntime,
 ) -> Result<Value, String> {
@@ -185,11 +188,11 @@ fn execute(
         VrlRuntime::Vm => {
             let vm = runtime.compile(stdlib::all(), &program, &mut state)?;
             runtime
-                .run_vm(&vm, object, timezone)
+                .run_vm(&vm, target, timezone)
                 .map_err(|err| err.to_string())
         }
         VrlRuntime::Ast => runtime
-            .resolve(object, &program, timezone)
+            .resolve(target, &program, timezone)
             .map_err(|err| err.to_string()),
     }
 }
@@ -294,7 +297,7 @@ impl Validator for Repl {
         let local_state = state::LocalEnv::default();
         let mut external_state = state::ExternalEnv::default();
         let mut rt = Runtime::new(state::Runtime::default());
-        let target: Option<&mut Value> = None;
+        let target: Option<Value> = None;
 
         let (_, result) = resolve(
             target,

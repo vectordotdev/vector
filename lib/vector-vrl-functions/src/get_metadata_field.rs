@@ -1,7 +1,7 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn get_metadata_field(ctx: &mut Context, key: &str) -> Result<Value> {
+fn get_metadata_field(ctx: &Context, key: &str) -> Result<Value> {
     ctx.target()
         .get_metadata(key)
         .map(|value| value.unwrap_or(Value::Null))
@@ -67,7 +67,7 @@ impl Function for GetMetadataField {
         }
     }
 
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let key = args.required_any("key").downcast_ref::<String>().unwrap();
         get_metadata_field(ctx, key)
     }
@@ -81,7 +81,7 @@ struct GetMetadataFieldFn {
 impl Expression for GetMetadataFieldFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let key = &self.key;
 

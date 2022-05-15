@@ -1,7 +1,7 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn remove_metadata_field(ctx: &mut Context, key: &str) -> Result<Value> {
+fn remove_metadata_field(ctx: &Context, key: &str) -> Result<Value> {
     ctx.target_mut().remove_metadata(key)?;
     Ok(Value::Null)
 }
@@ -65,7 +65,7 @@ impl Function for RemoveMetadataField {
         }
     }
 
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
+    fn call_by_vm(&self, ctx: &Context, args: &mut VmArgumentList) -> Result<Value> {
         let key = args.required_any("key").downcast_ref::<String>().unwrap();
         remove_metadata_field(ctx, key)
     }
@@ -79,7 +79,7 @@ struct RemoveMetadataFieldFn {
 impl Expression for RemoveMetadataFieldFn {
     fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
         &'rt self,
-        ctx: &'ctx mut Context,
+        ctx: &'ctx Context,
     ) -> Resolved<'value> {
         let key = &self.key;
 

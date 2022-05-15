@@ -3,6 +3,8 @@
 
 mod test_enrichment;
 
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::str::FromStr;
 use std::time::Instant;
 
@@ -14,8 +16,8 @@ use clap::Parser;
 use glob::glob;
 use vector_common::TimeZone;
 use vrl::prelude::VrlValueConvert;
-use vrl::VrlRuntime;
 use vrl::{diagnostic::Formatter, state, Runtime, Terminate};
+use vrl::{Target, VrlRuntime};
 use vrl_tests::{docs, Test};
 
 #[cfg(not(target_env = "msvc"))]
@@ -157,7 +159,7 @@ fn main() {
         })
         .collect::<Vec<_>>();
 
-    for mut test in tests {
+    for test in tests {
         if category != test.category {
             category = test.category.clone();
             println!("{}", Colour::Fixed(3).bold().paint(category.to_string()));
@@ -209,7 +211,7 @@ fn main() {
                     runtime,
                     functions,
                     program,
-                    &mut test,
+                    test.object.clone(),
                     timezone,
                     cmd.runtime,
                     state,
@@ -394,21 +396,23 @@ fn run_vrl(
     mut runtime: Runtime,
     functions: Vec<Box<dyn vrl::Function>>,
     program: vrl::Program,
-    test: &mut Test,
+    target: impl Target + 'static,
     timezone: TimeZone,
     vrl_runtime: VrlRuntime,
     mut state: vrl::state::ExternalEnv,
     test_enrichment: enrichment::TableRegistry,
 ) -> Result<Value, Terminate> {
+    let target = Rc::new(RefCell::new(target));
+
     match vrl_runtime {
         VrlRuntime::Vm => {
             let vm = runtime.compile(functions, &program, &mut state).unwrap();
             test_enrichment.finish_load();
-            runtime.run_vm(&vm, &mut test.object, &timezone)
+            runtime.run_vm(&vm, target, &timezone)
         }
         VrlRuntime::Ast => {
             test_enrichment.finish_load();
-            runtime.resolve(&mut test.object, &program, &timezone)
+            runtime.resolve(target, &program, &timezone)
         }
     }
 }

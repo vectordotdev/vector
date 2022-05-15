@@ -1,9 +1,11 @@
 use std::{
+    cell::RefCell,
     collections::BTreeMap,
     fs::File,
     io::{self, Read},
     iter::IntoIterator,
     path::PathBuf,
+    rc::Rc,
 };
 
 use ::value::Value;
@@ -132,11 +134,11 @@ fn run(opts: &Opts) -> Result<(), Error> {
             eprintln!("{warnings}")
         }
 
-        for mut object in objects {
+        for object in objects {
             let state = state::Runtime::default();
             let runtime = Runtime::new(state);
             let result = execute(
-                &mut object,
+                object.clone(),
                 &program,
                 &tz,
                 runtime,
@@ -175,24 +177,26 @@ fn repl(_objects: Vec<Value>, _timezone: &TimeZone, _vrl_runtime: VrlRuntime) ->
 }
 
 fn execute(
-    object: &mut impl Target,
+    object: impl Target + 'static,
     program: &Program,
     timezone: &TimeZone,
     mut runtime: Runtime,
     functions: Vec<Box<dyn vrl::Function>>,
     vrl_runtime: VrlRuntime,
 ) -> Result<Value, Error> {
+    let target = Rc::new(RefCell::new(object));
+
     match vrl_runtime {
         VrlRuntime::Vm => {
             let mut state = ExternalEnv::default();
             let vm = runtime.compile(functions, program, &mut state).unwrap();
 
             runtime
-                .run_vm(&vm, object, timezone)
+                .run_vm(&vm, target, timezone)
                 .map_err(Error::Runtime)
         }
         VrlRuntime::Ast => runtime
-            .resolve(object, program, timezone)
+            .resolve(target, program, timezone)
             .map_err(Error::Runtime),
     }
 }

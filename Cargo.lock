@@ -9022,6 +9022,7 @@ dependencies = [
  "regex",
  "serde",
  "thiserror",
+ "utf8-width",
  "value",
  "vector_common",
  "vrl-core",
