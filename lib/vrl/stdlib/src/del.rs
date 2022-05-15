@@ -22,7 +22,7 @@ fn del(query: &expression::Query, ctx: &mut Context) -> Result<Value> {
             None => Ok(Value::Null),
         }
     } else if let Some(expr) = query.expression_target() {
-        let value = expr.resolve(ctx)?.into_owned();
+        let value = expr.resolve(ctx)?;
 
         // No need to do the actual deletion, as the expression is only
         // available as an argument to the function.

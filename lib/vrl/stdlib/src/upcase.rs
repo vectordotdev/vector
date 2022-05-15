@@ -74,10 +74,10 @@ impl Expression for UpcaseFn {
         &'rt self,
         ctx: &'ctx mut Context,
     ) -> Resolved<'value> {
-        let value = self.value.resolve(ctx)?.try_bytes()?;
-        Ok(upcase(&value)
-            .map(Cow::Owned)
-            .unwrap_or_else(|| Cow::Owned(value.into())))
+        let value = self.value.resolve(ctx)?;
+        let bytes = value.try_as_bytes()?;
+
+        Ok(upcase(bytes).map(Cow::Owned).unwrap_or(value))
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

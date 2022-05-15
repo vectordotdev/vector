@@ -74,10 +74,10 @@ impl Expression for DowncaseFn {
         &'rt self,
         ctx: &'ctx mut Context,
     ) -> Resolved<'value> {
-        let value = self.value.resolve(ctx)?.try_bytes()?;
-        Ok(downcase(&value)
-            .map(Cow::Owned)
-            .unwrap_or_else(|| Cow::Owned(value.into())))
+        let value = self.value.resolve(ctx)?;
+        let bytes = value.try_as_bytes()?;
+
+        Ok(downcase(bytes).map(Cow::Owned).unwrap_or(value))
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
