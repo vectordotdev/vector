@@ -29,10 +29,7 @@ impl Deref for Object {
 }
 
 impl Expression for Object {
-    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx, T: crate::Target>(
-        &'rt self,
-        ctx: &'ctx Context<T>,
-    ) -> Resolved<'value> {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(&'rt self, ctx: &'ctx Context) -> Resolved<'value> {
         self.inner
             .iter()
             .map(|(key, expr)| expr.resolve(ctx).map(|v| (key.to_owned(), v.into_owned())))

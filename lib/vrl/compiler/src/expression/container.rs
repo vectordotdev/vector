@@ -26,10 +26,7 @@ pub enum Variant {
 }
 
 impl Expression for Container {
-    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx, T: crate::Target>(
-        &'rt self,
-        ctx: &'ctx Context<T>,
-    ) -> Resolved<'value> {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(&'rt self, ctx: &'ctx Context) -> Resolved<'value> {
         use Variant::*;
 
         match &self.variant {

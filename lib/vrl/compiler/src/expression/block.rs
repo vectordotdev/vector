@@ -32,10 +32,7 @@ impl Block {
 }
 
 impl Expression for Block {
-    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx, T: crate::Target>(
-        &'rt self,
-        ctx: &'ctx Context<T>,
-    ) -> Resolved<'value> {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(&'rt self, ctx: &'ctx Context) -> Resolved<'value> {
         // NOTE:
         //
         // Technically, this invalidates the scoping invariant of variables

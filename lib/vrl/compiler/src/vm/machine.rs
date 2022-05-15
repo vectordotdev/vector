@@ -304,7 +304,7 @@ impl Vm {
     /// It is expected that the final instruction is a `Return`.
     pub fn interpret<'a, T: Target>(
         &self,
-        ctx: &mut Context<'a, T>,
+        ctx: &mut Context<'a>,
     ) -> Result<Value, ExpressionError> {
         // Any mutable state during the run is stored here.
         let mut state: VmState = VmState::new(self);
@@ -354,17 +354,17 @@ impl Vm {
                 #[cfg(feature = "expr-op")]
                 OpCode::Rem => binary_op(&mut state, Value::try_rem)?,
                 #[cfg(feature = "expr-op")]
-                OpCode::And => binary_op(&mut state, Value::try_and)?,
+                OpCode::And => binary_op_ref(&mut state, Value::try_and)?,
                 #[cfg(feature = "expr-op")]
                 OpCode::Merge => binary_op(&mut state, Value::try_merge)?,
                 #[cfg(feature = "expr-op")]
-                OpCode::Greater => binary_op(&mut state, Value::try_gt)?,
+                OpCode::Greater => binary_op_ref(&mut state, Value::try_gt)?,
                 #[cfg(feature = "expr-op")]
-                OpCode::GreaterEqual => binary_op(&mut state, Value::try_ge)?,
+                OpCode::GreaterEqual => binary_op_ref(&mut state, Value::try_ge)?,
                 #[cfg(feature = "expr-op")]
-                OpCode::Less => binary_op(&mut state, Value::try_lt)?,
+                OpCode::Less => binary_op_ref(&mut state, Value::try_lt)?,
                 #[cfg(feature = "expr-op")]
-                OpCode::LessEqual => binary_op(&mut state, Value::try_le)?,
+                OpCode::LessEqual => binary_op_ref(&mut state, Value::try_le)?,
                 #[cfg(feature = "expr-op")]
                 OpCode::NotEqual => {
                     if state.error.is_none() {
@@ -650,10 +650,11 @@ impl Vm {
 
 /// Op that applies a function to the top two elements on the stack.
 #[cfg(feature = "expr-op")]
-fn binary_op<F, E>(state: &mut VmState, fun: F) -> Result<(), ExpressionError>
+fn binary_op<F, E, V>(state: &mut VmState, fun: F) -> Result<(), ExpressionError>
 where
     E: Into<ExpressionError>,
-    F: Fn(Value, Value) -> Result<Value, E>,
+    F: Fn(Value, Value) -> Result<V, E>,
+    V: Into<Value>,
 {
     // If we are in an error state we don't want to perform the operation
     // so we pass the error along.
@@ -661,7 +662,35 @@ where
         let rhs = state.pop_stack()?;
         let lhs = state.pop_stack()?;
         match fun(lhs, rhs) {
-            Ok(value) => state.stack.push(value),
+            Ok(value) => state.stack.push(value.into()),
+            Err(err) => state.error = Some(err.into()),
+        }
+    } else {
+        // If we are in error, we need to pop the stack to remove the lhs
+        // value from the stack.
+        // (If the lhs had errored, a Jump will have already been evoked to jump
+        // past the binary op.)
+        state.pop_stack()?;
+    }
+
+    Ok(())
+}
+
+/// Op that applies a function to the top two elements on the stack.
+#[cfg(feature = "expr-op")]
+fn binary_op_ref<F, E, V>(state: &mut VmState, fun: F) -> Result<(), ExpressionError>
+where
+    E: Into<ExpressionError>,
+    F: Fn(&Value, &Value) -> Result<V, E>,
+    V: Into<Value>,
+{
+    // If we are in an error state we don't want to perform the operation
+    // so we pass the error along.
+    if state.error.is_none() {
+        let rhs = state.pop_stack()?;
+        let lhs = state.pop_stack()?;
+        match fun(&lhs, &rhs) {
+            Ok(value) => state.stack.push(value.into()),
             Err(err) => state.error = Some(err.into()),
         }
     } else {

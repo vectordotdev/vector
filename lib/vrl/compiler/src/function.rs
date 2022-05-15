@@ -80,9 +80,9 @@ pub trait Function: Send + Sync + fmt::Debug {
     }
 
     /// This function is called by the VM.
-    fn call_by_vm<T>(
+    fn call_by_vm(
         &self,
-        _ctx: &Context<T>,
+        _ctx: &Context,
         _args: &mut VmArgumentList,
     ) -> Result<Value, ExpressionError>;
 

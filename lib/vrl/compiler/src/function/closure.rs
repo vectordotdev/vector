@@ -1,5 +1,5 @@
 use core::{ExpressionError, Target};
-use std::{collections::BTreeMap, marker::PhantomData};
+use std::{collections::BTreeMap, marker::PhantomData, ops::DerefMut};
 
 use parser::ast::Ident;
 use value::{
@@ -149,7 +149,7 @@ pub struct Runner<'a, F, T> {
 
 impl<'a, F, T> Runner<'a, F, T>
 where
-    F: Fn(&Context<T>) -> Result<Value, ExpressionError>,
+    F: Fn(&Context) -> Result<Value, ExpressionError>,
     T: Target,
 {
     pub fn new(variables: &'a [Ident], runner: F) -> Self {
@@ -168,7 +168,7 @@ where
     /// mutating alternatives.
     pub fn run_key_value(
         &self,
-        ctx: &Context<T>,
+        ctx: &Context,
         key: &str,
         value: &Value,
     ) -> Result<(), ExpressionError> {
@@ -180,13 +180,13 @@ where
         let key_ident = self.ident(0);
         let value_ident = self.ident(1);
 
-        let old_key = insert(ctx.state_mut(), key_ident, cloned_key.into());
-        let old_value = insert(ctx.state_mut(), value_ident, cloned_value);
+        let old_key = insert(ctx.state_mut().deref_mut(), key_ident, cloned_key.into());
+        let old_value = insert(ctx.state_mut().deref_mut(), value_ident, cloned_value);
 
         (self.runner)(ctx)?;
 
-        cleanup(ctx.state_mut(), key_ident, old_key);
-        cleanup(ctx.state_mut(), value_ident, old_value);
+        cleanup(ctx.state_mut().deref_mut(), key_ident, old_key);
+        cleanup(ctx.state_mut().deref_mut(), value_ident, old_value);
 
         Ok(())
     }
@@ -199,7 +199,7 @@ where
     /// mutating alternatives.
     pub fn run_index_value(
         &self,
-        ctx: &Context<T>,
+        ctx: &Context,
         index: usize,
         value: &Value,
     ) -> Result<(), ExpressionError> {
@@ -210,13 +210,13 @@ where
         let index_ident = self.ident(0);
         let value_ident = self.ident(1);
 
-        let old_index = insert(ctx.state_mut(), index_ident, index.into());
-        let old_value = insert(ctx.state_mut(), value_ident, cloned_value);
+        let old_index = insert(ctx.state_mut().deref_mut(), index_ident, index.into());
+        let old_value = insert(ctx.state_mut().deref_mut(), value_ident, cloned_value);
 
         (self.runner)(ctx)?;
 
-        cleanup(ctx.state_mut(), index_ident, old_index);
-        cleanup(ctx.state_mut(), value_ident, old_value);
+        cleanup(ctx.state_mut().deref_mut(), index_ident, old_index);
+        cleanup(ctx.state_mut().deref_mut(), value_ident, old_value);
 
         Ok(())
     }
@@ -228,16 +228,16 @@ where
     /// value of the closure after completion.
     ///
     /// See `run_key_value` and `run_index_value` for immutable alternatives.
-    pub fn map_key(&self, ctx: &Context<T>, key: &mut String) -> Result<(), ExpressionError> {
+    pub fn map_key(&self, ctx: &Context, key: &mut String) -> Result<(), ExpressionError> {
         // TODO: we need to allow `LocalEnv` to take a muable reference to
         // values, instead of owning them.
         let cloned_key = key.clone();
         let ident = self.ident(0);
-        let old_key = insert(ctx.state_mut(), ident, cloned_key.into());
+        let old_key = insert(ctx.state_mut().deref_mut(), ident, cloned_key.into());
 
         *key = (self.runner)(ctx)?.try_bytes_utf8_lossy()?.into_owned();
 
-        cleanup(ctx.state_mut(), ident, old_key);
+        cleanup(ctx.state_mut().deref_mut(), ident, old_key);
 
         Ok(())
     }
@@ -249,16 +249,16 @@ where
     /// value of the closure after completion.
     ///
     /// See `run_key_value` and `run_index_value` for immutable alternatives.
-    pub fn map_value(&self, ctx: &Context<T>, value: &mut Value) -> Result<(), ExpressionError> {
+    pub fn map_value(&self, ctx: &Context, value: &mut Value) -> Result<(), ExpressionError> {
         // TODO: we need to allow `LocalEnv` to take a muable reference to
         // values, instead of owning them.
         let cloned_value = value.clone();
         let ident = self.ident(0);
-        let old_value = insert(ctx.state_mut(), ident, cloned_value);
+        let old_value = insert(ctx.state_mut().deref_mut(), ident, cloned_value);
 
         *value = (self.runner)(ctx)?;
 
-        cleanup(ctx.state_mut(), ident, old_value);
+        cleanup(ctx.state_mut().deref_mut(), ident, old_value);
 
         Ok(())
     }

@@ -1,4 +1,7 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::{Ref, RefCell, RefMut},
+    rc::Rc,
+};
 
 use vector_common::TimeZone;
 
@@ -12,7 +15,11 @@ pub struct Context<'a> {
 
 impl<'a> Context<'a> {
     /// Create a new [`Context`].
-    pub fn new(target: Rc<dyn Target>, state: &'a mut Runtime, timezone: &'a TimeZone) -> Self {
+    pub fn new(
+        target: Rc<RefCell<dyn Target>>,
+        state: RefCell<Runtime>,
+        timezone: &'a TimeZone,
+    ) -> Self {
         Self {
             target,
             state,
@@ -21,23 +28,23 @@ impl<'a> Context<'a> {
     }
 
     /// Get a reference to the [`Target`].
-    pub fn target(&self) -> &dyn Target {
-        self.target
+    pub fn target(&self) -> Ref<dyn Target> {
+        self.target.borrow()
     }
 
     /// Get a mutable reference to the [`Target`].
-    pub fn target_mut(&mut self) -> &mut dyn Target {
-        self.target
+    pub fn target_mut(&self) -> RefMut<dyn Target> {
+        self.target.borrow_mut()
     }
 
     /// Get a reference to the [`runtime state`](Runtime).
-    pub fn state(&self) -> &Runtime {
-        self.state
+    pub fn state(&self) -> Ref<Runtime> {
+        self.state.borrow()
     }
 
     /// Get a mutable reference to the [`runtime state`](Runtime).
-    pub fn state_mut(&mut self) -> &mut Runtime {
-        self.state
+    pub fn state_mut(&self) -> RefMut<Runtime> {
+        self.state.borrow_mut()
     }
 
     /// Get a reference to the [`TimeZone`]

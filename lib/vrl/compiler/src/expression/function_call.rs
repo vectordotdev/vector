@@ -570,10 +570,7 @@ impl FunctionCall {
 }
 
 impl Expression for FunctionCall {
-    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
-        &'rt self,
-        ctx: &'ctx mut Context,
-    ) -> Resolved<'value> {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(&'rt self, ctx: &'ctx Context) -> Resolved<'value> {
         self.expr.resolve(ctx).map_err(|err| match err {
             #[cfg(feature = "expr-abort")]
             ExpressionError::Abort { .. } => {

@@ -1,5 +1,3 @@
-use core::Target;
-
 use lookup::LookupBuf;
 
 use crate::{

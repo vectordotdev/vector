@@ -13,15 +13,15 @@ pub trait VrlValueConvert: Sized {
     /// Convert a given [`Value`] into a [`Expression`] trait object.
     fn into_expression(self) -> Box<dyn Expression>;
 
-    fn try_integer(self) -> Result<i64, Error>;
-    fn try_float(self) -> Result<f64, Error>;
+    fn try_integer(&self) -> Result<i64, Error>;
+    fn try_float(&self) -> Result<f64, Error>;
     fn try_bytes(self) -> Result<Bytes, Error>;
-    fn try_boolean(self) -> Result<bool, Error>;
+    fn try_boolean(&self) -> Result<bool, Error>;
     fn try_regex(self) -> Result<ValueRegex, Error>;
-    fn try_null(self) -> Result<(), Error>;
+    fn try_null(&self) -> Result<(), Error>;
     fn try_array(self) -> Result<Vec<Value>, Error>;
     fn try_object(self) -> Result<BTreeMap<String, Value>, Error>;
-    fn try_timestamp(self) -> Result<DateTime<Utc>, Error>;
+    fn try_timestamp(&self) -> Result<DateTime<Utc>, Error>;
 
     fn try_into_i64(&self) -> Result<i64, Error>;
     fn try_into_f64(&self) -> Result<f64, Error>;
@@ -39,9 +39,9 @@ impl VrlValueConvert for Value {
         Box::new(Expr::from(self))
     }
 
-    fn try_integer(self) -> Result<i64, Error> {
+    fn try_integer(&self) -> Result<i64, Error> {
         match self {
-            Value::Integer(v) => Ok(v),
+            Value::Integer(v) => Ok(*v),
             _ => Err(Error::Expected {
                 got: self.kind(),
                 expected: Kind::integer(),
@@ -57,7 +57,7 @@ impl VrlValueConvert for Value {
         }
     }
 
-    fn try_float(self) -> Result<f64, Error> {
+    fn try_float(&self) -> Result<f64, Error> {
         match self {
             Value::Float(v) => Ok(v.into_inner()),
             _ => Err(Error::Expected {
@@ -95,9 +95,9 @@ impl VrlValueConvert for Value {
         }
     }
 
-    fn try_boolean(self) -> Result<bool, Error> {
+    fn try_boolean(&self) -> Result<bool, Error> {
         match self {
-            Value::Boolean(v) => Ok(v),
+            Value::Boolean(v) => Ok(*v),
             _ => Err(Error::Expected {
                 got: self.kind(),
                 expected: Kind::boolean(),
@@ -115,7 +115,7 @@ impl VrlValueConvert for Value {
         }
     }
 
-    fn try_null(self) -> Result<(), Error> {
+    fn try_null(&self) -> Result<(), Error> {
         match self {
             Value::Null => Ok(()),
             _ => Err(Error::Expected {
@@ -145,9 +145,9 @@ impl VrlValueConvert for Value {
         }
     }
 
-    fn try_timestamp(self) -> Result<DateTime<Utc>, Error> {
+    fn try_timestamp(&self) -> Result<DateTime<Utc>, Error> {
         match self {
-            Value::Timestamp(v) => Ok(v),
+            Value::Timestamp(v) => Ok(*v),
             _ => Err(Error::Expected {
                 got: self.kind(),
                 expected: Kind::timestamp(),
@@ -181,70 +181,32 @@ impl<'a> VrlValueConvert for Cow<'a, Value> {
         Box::new(Expr::from(self.into_owned()))
     }
 
-    fn try_integer(self) -> Result<i64, Error> {
-        match self.as_ref() {
-            Value::Integer(v) => Ok(*v),
-            _ => Err(Error::Expected {
-                got: self.kind(),
-                expected: Kind::integer(),
-            }),
-        }
+    fn try_integer(&self) -> Result<i64, Error> {
+        self.as_ref().try_integer()
     }
 
     fn try_into_i64(&self) -> Result<i64, Error> {
-        match self.as_ref() {
-            Value::Integer(v) => Ok(*v),
-            Value::Float(v) => Ok(v.into_inner() as i64),
-            _ => Err(Error::Coerce(self.kind(), Kind::integer())),
-        }
+        self.as_ref().try_into_i64()
     }
 
-    fn try_float(self) -> Result<f64, Error> {
-        match self.as_ref() {
-            Value::Float(v) => Ok(v.into_inner()),
-            _ => Err(Error::Expected {
-                got: self.kind(),
-                expected: Kind::float(),
-            }),
-        }
+    fn try_float(&self) -> Result<f64, Error> {
+        self.as_ref().try_float()
     }
 
     fn try_into_f64(&self) -> Result<f64, Error> {
-        match self.as_ref() {
-            Value::Integer(v) => Ok(*v as f64),
-            Value::Float(v) => Ok(v.into_inner()),
-            _ => Err(Error::Coerce(self.kind(), Kind::float())),
-        }
+        self.as_ref().try_into_f64()
     }
 
     fn try_bytes(self) -> Result<Bytes, Error> {
-        match self.as_ref() {
-            Value::Bytes(v) => Ok(v.clone()),
-            _ => Err(Error::Expected {
-                got: self.kind(),
-                expected: Kind::bytes(),
-            }),
-        }
+        self.as_ref().try_as_bytes().map(Clone::clone)
     }
 
     fn try_bytes_utf8_lossy(&self) -> Result<Cow<'_, str>, Error> {
-        match self.as_bytes() {
-            Some(bytes) => Ok(String::from_utf8_lossy(bytes)),
-            None => Err(Error::Expected {
-                got: self.kind(),
-                expected: Kind::bytes(),
-            }),
-        }
+        self.as_ref().try_bytes_utf8_lossy()
     }
 
-    fn try_boolean(self) -> Result<bool, Error> {
-        match self.as_ref() {
-            Value::Boolean(v) => Ok(*v),
-            _ => Err(Error::Expected {
-                got: self.kind(),
-                expected: Kind::boolean(),
-            }),
-        }
+    fn try_boolean(&self) -> Result<bool, Error> {
+        self.as_ref().try_boolean()
     }
 
     fn try_regex(self) -> Result<ValueRegex, Error> {
@@ -257,14 +219,8 @@ impl<'a> VrlValueConvert for Cow<'a, Value> {
         }
     }
 
-    fn try_null(self) -> Result<(), Error> {
-        match self.as_ref() {
-            Value::Null => Ok(()),
-            _ => Err(Error::Expected {
-                got: self.kind(),
-                expected: Kind::null(),
-            }),
-        }
+    fn try_null(&self) -> Result<(), Error> {
+        self.as_ref().try_null()
     }
 
     fn try_array(self) -> Result<Vec<Value>, Error> {
@@ -287,14 +243,8 @@ impl<'a> VrlValueConvert for Cow<'a, Value> {
         }
     }
 
-    fn try_timestamp(self) -> Result<DateTime<Utc>, Error> {
-        match self.as_ref() {
-            Value::Timestamp(v) => Ok(*v),
-            _ => Err(Error::Expected {
-                got: self.kind(),
-                expected: Kind::timestamp(),
-            }),
-        }
+    fn try_timestamp(&self) -> Result<DateTime<Utc>, Error> {
+        self.as_ref().try_timestamp()
     }
 
     fn try_chars_iter(&self) -> Result<Chars, Error> {

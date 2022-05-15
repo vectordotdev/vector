@@ -1,4 +1,4 @@
-use std::{borrow::Cow, fmt};
+use std::{borrow::Cow, fmt, ops::Deref};
 
 use diagnostic::{DiagnosticMessage, Label};
 use lookup::LookupBuf;
@@ -49,14 +49,14 @@ impl Variable {
 }
 
 impl Expression for Variable {
-    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx, T: crate::Target>(
-        &'rt self,
-        ctx: &'ctx Context<T>,
-    ) -> Resolved<'value> {
-        Ok(ctx
-            .state()
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(&'rt self, ctx: &'ctx Context) -> Resolved<'value> {
+        let state = ctx.state();
+
+        Ok(state
+            .deref()
             .variable(&self.ident)
-            .map(Cow::Borrowed)
+            .cloned()
+            .map(Cow::Owned)
             .unwrap_or_else(|| Cow::Owned(Value::Null)))
     }
 

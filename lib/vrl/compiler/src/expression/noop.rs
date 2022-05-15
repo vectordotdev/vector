@@ -13,10 +13,7 @@ use crate::{
 pub struct Noop;
 
 impl Expression for Noop {
-    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx, T: crate::Target>(
-        &'rt self,
-        _: &'ctx Context<T>,
-    ) -> Resolved<'value> {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(&'rt self, _: &'ctx Context) -> Resolved<'value> {
         Ok(Cow::Owned(Value::Null))
     }
 

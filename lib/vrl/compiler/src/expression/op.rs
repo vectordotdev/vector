@@ -91,54 +91,41 @@ impl Op {
 }
 
 impl Expression for Op {
-    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
-        &'rt self,
-        ctx: &'ctx mut Context,
-    ) -> Resolved<'value> {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(&'rt self, ctx: &'ctx Context) -> Resolved<'value> {
         use ast::Opcode::*;
-        use value::Value::*;
 
         if let Err = self.opcode {
-            return self
-                .lhs
-                .resolve(ctx)
-                .map(Cow::into_owned)
-                .map(Cow::Owned)
-                .or_else(|_| self.rhs.resolve(ctx));
+            return self.lhs.resolve(ctx).or_else(|_| self.rhs.resolve(ctx));
         } else if let Or = self.opcode {
-            return self
-                .lhs
-                .resolve(ctx)?
-                .into_owned()
-                .try_or(|| self.rhs.resolve(ctx).map(Cow::into_owned))
-                .map(Cow::Owned)
-                .map_err(Into::into);
-        } else if let And = self.opcode {
-            return match self.lhs.resolve(ctx)?.into_owned() {
-                Null | Boolean(false) => Ok(Value::from(false).into()),
-                v => v
-                    .try_and(self.rhs.resolve(ctx)?.into_owned())
-                    .map(Cow::Owned)
-                    .map_err(Into::into),
+            let lhs = self.lhs.resolve(ctx)?;
+
+            return match lhs.try_or() {
+                None => Ok(lhs),
+                Some(_) => self.rhs.resolve(ctx),
             };
+        } else if let And = self.opcode {
+            let lhs = self.lhs.resolve(ctx)?;
+            let rhs = self.rhs.resolve(ctx)?;
+
+            return Ok(Cow::Owned(lhs.try_and(&rhs)?.into()));
         };
 
-        let lhs = self.lhs.resolve(ctx)?.into_owned();
-        let rhs = self.rhs.resolve(ctx)?.into_owned();
+        let lhs = self.lhs.resolve(ctx)?;
+        let rhs = self.rhs.resolve(ctx)?;
 
         match self.opcode {
-            Mul => lhs.try_mul(rhs),
-            Div => lhs.try_div(rhs),
-            Add => lhs.try_add(rhs),
-            Sub => lhs.try_sub(rhs),
-            Rem => lhs.try_rem(rhs),
+            Mul => lhs.into_owned().try_mul(rhs.into_owned()),
+            Div => lhs.into_owned().try_div(rhs.into_owned()),
+            Add => lhs.into_owned().try_add(rhs.into_owned()),
+            Sub => lhs.into_owned().try_sub(rhs.into_owned()),
+            Rem => lhs.into_owned().try_rem(rhs.into_owned()),
             Eq => Ok(lhs.eq_lossy(&rhs).into()),
             Ne => Ok((!lhs.eq_lossy(&rhs)).into()),
-            Gt => lhs.try_gt(rhs),
-            Ge => lhs.try_ge(rhs),
-            Lt => lhs.try_lt(rhs),
-            Le => lhs.try_le(rhs),
-            Merge => lhs.try_merge(rhs),
+            Gt => lhs.try_gt(&rhs).map(Value::from),
+            Ge => lhs.try_ge(&rhs).map(Value::from),
+            Lt => lhs.try_lt(&rhs).map(Value::from),
+            Le => lhs.try_le(&rhs).map(Value::from),
+            Merge => lhs.into_owned().try_merge(rhs.into_owned()),
             And | Or | Err => unreachable!(),
         }
         .map(Into::into)

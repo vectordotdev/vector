@@ -48,10 +48,7 @@ impl Literal {
 }
 
 impl Expression for Literal {
-    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx, T: crate::Target>(
-        &'rt self,
-        ctx: &'ctx Context<T>,
-    ) -> Resolved<'value> {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(&'rt self, _: &'ctx Context) -> Resolved<'value> {
         use Literal::*;
 
         Ok(match self {

@@ -29,10 +29,7 @@ impl Deref for Array {
 }
 
 impl Expression for Array {
-    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx, T: crate::Target>(
-        &'rt self,
-        ctx: &'ctx Context<T>,
-    ) -> Resolved<'value> {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(&'rt self, ctx: &'ctx Context) -> Resolved<'value> {
         self.inner
             .iter()
             .map(|expr| expr.resolve(ctx).map(Cow::into_owned))

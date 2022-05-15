@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{borrow::Cow, fmt};
 
 use value::Value;
 
@@ -32,10 +32,7 @@ impl IfStatement {
 }
 
 impl Expression for IfStatement {
-    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
-        &'rt self,
-        ctx: &'ctx mut Context,
-    ) -> Resolved<'value> {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(&'rt self, ctx: &'ctx Context) -> Resolved<'value> {
         let predicate = self.predicate.resolve(ctx)?.try_boolean()?;
 
         match predicate {
@@ -44,7 +41,7 @@ impl Expression for IfStatement {
                 .alternative
                 .as_ref()
                 .map(|block| block.resolve(ctx))
-                .unwrap_or_else(|| Ok(Value::Null.into())),
+                .unwrap_or_else(|| Ok(Cow::Owned(Value::Null))),
         }
     }
 

@@ -163,10 +163,7 @@ impl Assignment {
 
 impl Expression for Assignment {
     #[inline(always)]
-    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
-        &'rt self,
-        ctx: &'ctx mut Context,
-    ) -> Resolved<'value> {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(&'rt self, ctx: &'ctx Context) -> Resolved<'value> {
         self.variant.resolve(ctx)
     }
 
@@ -280,7 +277,7 @@ impl Target {
 
     // FIXME(Jean): Have this take `Cow`, and store the cow for variables, but
     // owned value for external targets.
-    fn insert(&self, value: Value, ctx: &mut Context) {
+    fn insert(&self, value: Value, ctx: &Context) {
         use Target::*;
 
         match self {
@@ -398,10 +395,7 @@ impl<U> Expression for Variant<Target, U>
 where
     U: Expression + Clone,
 {
-    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
-        &'rt self,
-        ctx: &'ctx mut Context,
-    ) -> Resolved<'value> {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(&'rt self, ctx: &'ctx Context) -> Resolved<'value> {
         use Variant::*;
 
         let value = match self {

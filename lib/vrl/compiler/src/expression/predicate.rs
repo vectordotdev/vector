@@ -66,10 +66,7 @@ impl Predicate {
 }
 
 impl Expression for Predicate {
-    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
-        &'rt self,
-        ctx: &'ctx mut Context,
-    ) -> Resolved<'value> {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(&'rt self, ctx: &'ctx Context) -> Resolved<'value> {
         let (last, other) = self.inner.split_last().expect("at least one expression");
 
         other
