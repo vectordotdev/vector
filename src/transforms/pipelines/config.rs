@@ -9,11 +9,13 @@ use vector_core::{
         InnerTopology, InnerTopologyTransform, SyncTransform, Transform, TransformContext,
         TransformOutputsBuf,
     },
+    ByteSizeOf,
 };
 
 use crate::{
     conditions::{AnyCondition, Condition},
     config::{ComponentKey, DataType, Output, TransformConfig},
+    internal_events::EventsReceived,
 };
 
 // 64 is a lowish number and arbitrarily chosen: there is no magic to this magic
@@ -97,13 +99,18 @@ impl TransformConfig for PipelineConfig {
         }
 
         let mut transforms = Vec::with_capacity(self.transforms.len());
-        for config in &self.transforms {
+        for (n, config) in self.transforms.iter().enumerate() {
             let transform = match config.build(ctx).await? {
                 Transform::Function(transform) => Box::new(transform),
                 Transform::Synchronous(transform) => transform,
                 _ => return Err(format!("non-sync transform in pipeline: {:?}", config).into()),
             };
-            transforms.push(transform);
+            let entry = TransformEntry {
+                id: format!("{}.{}", self.name, n),
+                transform_type: config.transform_type(),
+                transform,
+            };
+            transforms.push(entry);
         }
 
         let buf_in = TransformOutputsBuf::new_with_capacity(
@@ -174,9 +181,16 @@ impl PipelineConfig {
 #[derive(Clone)]
 struct Pipeline {
     condition: Option<Condition>,
-    transforms: Vec<Box<dyn SyncTransform>>,
+    transforms: Vec<TransformEntry>,
     buf_in: TransformOutputsBuf,
     buf_out: TransformOutputsBuf,
+}
+
+#[derive(Clone)]
+struct TransformEntry {
+    id: String,
+    transform_type: &'static str,
+    transform: Box<dyn SyncTransform>,
 }
 
 impl SyncTransform for Pipeline {
@@ -217,11 +231,27 @@ impl SyncTransform for Pipeline {
         // emptied. Once all the transforms are run, the Events in `buf_out` are
         // emitted to `output`. When this function runs again `buf_out` is
         // empty, `buf_in` is empty and the process is ready to begin again.
-        for transform in &mut self.transforms {
+        for entry in &mut self.transforms {
             std::mem::swap(&mut self.buf_out, &mut self.buf_in);
-            for event in self.buf_in.drain() {
-                transform.transform(event, &mut self.buf_out);
-            }
+
+            let span = error_span!(
+                "transform",
+                component_kind = "transform",
+                component_id = %entry.id,
+                component_type = %entry.transform_type,
+                // maintained for compatibility
+                component_name = %entry.id,
+            );
+            span.in_scope(|| {
+                emit!(EventsReceived {
+                    count: self.buf_in.len(),
+                    byte_size: self.buf_in.size_of(),
+                });
+
+                for event in self.buf_in.drain() {
+                    entry.transform.transform(event, &mut self.buf_out);
+                }
+            })
         }
         output.extend(self.buf_out.drain());
     }
