@@ -37,6 +37,7 @@ use std::{
 };
 
 use arc_swap::ArcSwapOption;
+use crossbeam_utils::CachePadded;
 use metrics::Key;
 use once_cell::sync::OnceCell;
 use thingbuf::mpsc::blocking::{StaticChannel, StaticReceiver, StaticSender};
@@ -47,6 +48,36 @@ use vector_core::metrics::{Controller, Handle};
 
 static ALLOCATION_LUT: ArcSwapOption<Vec<Option<Arc<AllocationGroupEntry>>>> =
     ArcSwapOption::const_empty();
+
+// TOOD: goal of new experimental design is to see if we can reduce atomic contention and reduce the cost of looking up
+// allocation group entries in the tracker phase.
+//
+// we've made changes to `tracking-allocator` that allow reusing allocation group ids which means that we should be able
+// to attempt to use a design that pre-allocates all storage up front with the expectation that, you know, we'll never
+// have a need for more than 1k allocation groups at the same time, or some number like that.
+//
+// this will let us avoid arc-swap and needing to do any atomics to even get access to the group entry for the given
+// group, and lets us avoid needing to (at least for now) consider a design that copies the entries and RCUs them into a
+// new vector
+//
+// further, this means that we now need to figure out when to reset the stats for a given allocation group, since we
+// need to know when to emit the final stats for a group that's been recycled... this will require tracking some sort of
+// information. a token can go out of scope _before_ all the allocations attached to it are actually deallocated, so we
+// need to figure out how to track that. it might be possible to store them in a finalized buffer of some sort, such
+// that when we get back a recycled group during registration, we mark that group as being pending finalization... and
+// essentially store new allocations for it in a separate area, and track deallocations for it separately... but then
+// again, we'd have no clue if the deallocs coming in were from new allocs or old allocs, so hmm.... we almost need to
+// consider the alloc/dealloc count as part of the "can this id be recycled?" logic itself, which is hard to do unless
+// `tracking-allocator` also starts tracking allocation metrics.... or we do the group registration recycling on our
+// end, which is hard to do unless we wrap the token in a custom way, which means reimplementing the logic for using
+// them with tracing, etc... hmmm....
+
+const FIRST_LEVEL: usize = 64;
+const SECOND_LEVEL: usize = 64;
+const MAX_ALLOCATION_GROUP_ID: usize = FIRST_LEVEL * SECOND_LEVEL;
+
+type GroupLeaf = [CachePadded<AllocationGroupEntry>; SECOND_LEVEL];
+type GroupStorage = [GroupLeaf; FIRST_LEVEL];
 
 /*
 static REGISTRATION_EVENTS: OnceCell<RegistrationEvents> = OnceCell::new();
@@ -160,10 +191,44 @@ pub fn init_allocation_tracking() {
 /// the traditional `metrics`/`tracing` are collected, as the metrics are updated directly rather than emitted via the
 /// traditional `metrics` macros, so the given tags should match the span fields that would traditionally be set for a
 /// given span in order to ensure that they match.
-pub fn acquire_allocation_group_token(tags: Vec<(String, String)>) -> AllocationGroupToken {
+pub fn acquire_allocation_group_token(_tags: Vec<(String, String)>) -> AllocationGroupToken {
     let token =
         AllocationGroupToken::register().expect("failed to register allocation group token");
     let group_id = token.id();
+
+    // Register the atomic counters, etc, for this group token.
+    //let group_entry = register_allocation_group_token_entry(&group_id);
+    register_allocation_group_token_entry(&group_id);
+
+    // Send the group ID and entry to our late registration thread so that it can correctly wire up any allocation
+    // groups to our metrics backend once it's been initialized.
+    //let registration_events = get_registration_events();
+    //registration_events.push(RegistrationEvent { group_entry, tags });
+
+    token
+}
+
+/// Acquires an allocation group token.
+///
+/// This creates an allocation group which allows callers to enter/exit the allocation group context, associating all
+/// (de)allocations within the context with that group.  That token can (and typically is) associated with a
+/// /// `tracing::Span` such that the context is entered and exited as the span is entered and exited. This allows
+/// ensuring that we track all (de)allocations when the span is active.
+///
+/// # Tags
+///
+/// The provided `tags` are used for the metrics that get registered and attached to the allocation group. No tags from
+/// the traditional `metrics`/`tracing` are collected, as the metrics are updated directly rather than emitted via the
+/// traditional `metrics` macros, so the given tags should match the span fields that would traditionally be set for a
+/// given span in order to ensure that they match.
+pub fn acquire_allocation_group_token2(_tags: Vec<(String, String)>) -> AllocationGroupToken {
+    let token = AllocationGroupToken::register()
+        .expect("failed to register allocation group token");
+
+    let group_id = token.id();
+    if group_id.as_usize().get() > MAX_ALLOCATION_GROUP_ID {
+        panic!("registered more than {} allocation groups; this should be practically impossible given normal configuration sizes", MAX_ALLOCATION_GROUP_ID);
+    }
 
     // Register the atomic counters, etc, for this group token.
     //let group_entry = register_allocation_group_token_entry(&group_id);

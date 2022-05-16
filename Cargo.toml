@@ -221,6 +221,7 @@ chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.6", default-features = false }
 clap = { version = "3.1.18", default-features = false, features = ["derive", "env", "std"] }
 colored = { version = "2.0.0", default-features = false }
+crossbeam-utils = { version = "0.8.8", default-features = false, features = ["std"] }
 csv = { version = "1.1", default-features = false, optional = true }
 derivative = { version = "2.2.0", default-features = false }
 dirs-next = { version = "2.0.0", default-features = false, optional = true }

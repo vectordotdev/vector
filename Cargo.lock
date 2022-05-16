@@ -8223,6 +8223,7 @@ dependencies = [
 name = "tracking-allocator"
 version = "0.3.0"
 dependencies = [
+ "crossbeam-queue",
  "tracing 0.1.34",
  "tracing-subscriber 0.3.11",
 ]
@@ -8635,6 +8636,7 @@ dependencies = [
  "colored",
  "console-subscriber",
  "criterion",
+ "crossbeam-utils",
  "crossterm",
  "csv",
  "datadog-filter",
