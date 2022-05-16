@@ -2,7 +2,7 @@ use std::{
     cmp,
     collections::{BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
-    fmt::{Debug, Display},
+    fmt::Debug,
     iter::FromIterator,
     mem::size_of,
     num::NonZeroUsize,
@@ -12,7 +12,6 @@ use std::{
 use bytes::Bytes;
 use chrono::Utc;
 use crossbeam_utils::atomic::AtomicCell;
-use lookup::path;
 use lookup::{lookup_v2::Path, LookupBuf};
 use serde::{Deserialize, Serialize, Serializer};
 use vector_common::EventDataEq;

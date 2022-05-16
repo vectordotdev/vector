@@ -6,8 +6,7 @@ use vector_buffers::EventCount;
 use vector_common::EventDataEq;
 
 use super::{
-    util, BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable, LogEvent,
-    Value,
+    BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable, LogEvent, Value,
 };
 use crate::ByteSizeOf;
 use lookup::path;
