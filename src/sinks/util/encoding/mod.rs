@@ -342,11 +342,12 @@ pub enum TimestampFormat {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use codecs::{
         CharacterDelimitedEncoder, JsonSerializer, NewlineDelimitedEncoder, RawMessageSerializer,
     };
     use indoc::indoc;
-    use vector_common::btreemap;
 
     use super::*;
     use crate::{config::log_schema, sinks::util::encoding::Transformer};
@@ -461,7 +462,7 @@ mod tests {
             log.insert("e[1]", 1);
             log.insert("\"f.z\"", 1);
             log.insert("\"g.z\"", 1);
-            log.insert("h", btreemap! {});
+            log.insert("h", BTreeMap::new());
             log.insert("i", Vec::<Value>::new());
         }
         config.encoding.apply_rules(&mut event);
@@ -552,9 +553,10 @@ mod tests {
         let mut writer = Vec::new();
         let written = encoding
             .encode_input(
-                vec![Event::from(btreemap! {
-                    "key" => "value"
-                })],
+                vec![Event::from(BTreeMap::from([(
+                    String::from("key"),
+                    Value::from("value"),
+                )]))],
                 &mut writer,
             )
             .unwrap();
@@ -577,15 +579,18 @@ mod tests {
         let written = encoding
             .encode_input(
                 vec![
-                    Event::from(btreemap! {
-                        "key" => "value1"
-                    }),
-                    Event::from(btreemap! {
-                        "key" => "value2"
-                    }),
-                    Event::from(btreemap! {
-                        "key" => "value3"
-                    }),
+                    Event::from(BTreeMap::from([(
+                        String::from("key"),
+                        Value::from("value1"),
+                    )])),
+                    Event::from(BTreeMap::from([(
+                        String::from("key"),
+                        Value::from("value2"),
+                    )])),
+                    Event::from(BTreeMap::from([(
+                        String::from("key"),
+                        Value::from("value3"),
+                    )])),
                 ],
                 &mut writer,
             )
@@ -628,9 +633,10 @@ mod tests {
         let mut writer = Vec::new();
         let written = encoding
             .encode_input(
-                vec![Event::from(btreemap! {
-                    "key" => "value"
-                })],
+                vec![Event::from(BTreeMap::from([(
+                    String::from("key"),
+                    Value::from("value"),
+                )]))],
                 &mut writer,
             )
             .unwrap();
@@ -653,15 +659,18 @@ mod tests {
         let written = encoding
             .encode_input(
                 vec![
-                    Event::from(btreemap! {
-                        "key" => "value1"
-                    }),
-                    Event::from(btreemap! {
-                        "key" => "value2"
-                    }),
-                    Event::from(btreemap! {
-                        "key" => "value3"
-                    }),
+                    Event::from(BTreeMap::from([(
+                        String::from("key"),
+                        Value::from("value1"),
+                    )])),
+                    Event::from(BTreeMap::from([(
+                        String::from("key"),
+                        Value::from("value2"),
+                    )])),
+                    Event::from(BTreeMap::from([(
+                        String::from("key"),
+                        Value::from("value3"),
+                    )])),
                 ],
                 &mut writer,
             )
@@ -684,9 +693,10 @@ mod tests {
         let mut writer = Vec::new();
         let written = encoding
             .encode_input(
-                Event::from(btreemap! {
-                    "key" => "value"
-                }),
+                Event::from(BTreeMap::from([(
+                    String::from("key"),
+                    Value::from("value"),
+                )])),
                 &mut writer,
             )
             .unwrap();
@@ -705,9 +715,10 @@ mod tests {
         let mut writer = Vec::new();
         let written = encoding
             .encode_input(
-                Event::from(btreemap! {
-                    "message" => "value"
-                }),
+                Event::from(BTreeMap::from([(
+                    String::from("message"),
+                    Value::from("value"),
+                )])),
                 &mut writer,
             )
             .unwrap();

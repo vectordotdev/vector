@@ -170,18 +170,6 @@ macro_rules! __prep_bench_or_test {
 }
 
 #[macro_export]
-macro_rules! map {
-    () => (
-        ::std::collections::BTreeMap::new()
-    );
-    ($($k:tt: $v:expr),+ $(,)?) => {
-        vec![$(($k.into(), $v.into())),+]
-            .into_iter()
-            .collect::<::std::collections::BTreeMap<_, _>>()
-    };
-}
-
-#[macro_export]
 macro_rules! type_def {
     (unknown) => {
         TypeDef::any()

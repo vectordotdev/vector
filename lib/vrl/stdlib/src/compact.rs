@@ -336,11 +336,17 @@ mod test {
                 Default::default(),
             ),
             (
-                vec![1.into(), Value::Object(map!["field2": 2]), 2.into()],
+                vec![
+                    Value::from(1),
+                    Value::Object(BTreeMap::from([(String::from("field2"), Value::from(2))])),
+                    Value::from(2),
+                ],
                 vec![
                     1.into(),
-                    Value::Object(map!["field1": Value::Null,
-                                    "field2": 2]),
+                    Value::Object(BTreeMap::from([
+                        (String::from("field1"), Value::Null),
+                        (String::from("field2"), Value::from(2)),
+                    ])),
                     2.into(),
                 ],
                 Default::default(),
@@ -383,43 +389,63 @@ mod test {
                 Default::default(),
             ),
             (
-                map!["key1": Value::from(1),
-                     "key2": Value::Object(map!["key2": Value::from(3)]),
-                     "key3": Value::from(2),
-                ],
-                map![
-                    "key1": Value::from(1),
-                    "key2": Value::Object(map!["key1": Value::Null,
-                                            "key2": Value::from(3),
-                                            "key3": Value::Null]),
-                    "key3": Value::from(2),
-                ],
+                BTreeMap::from([
+                    (String::from("key1"), Value::from(1)),
+                    (
+                        String::from("key2"),
+                        Value::Object(BTreeMap::from([(String::from("key2"), Value::from(3))])),
+                    ),
+                    (String::from("key3"), Value::from(2)),
+                ]),
+                BTreeMap::from([
+                    (String::from("key1"), Value::from(1)),
+                    (
+                        String::from("key2"),
+                        Value::Object(BTreeMap::from([
+                            (String::from("key1"), Value::Null),
+                            (String::from("key2"), Value::from(3)),
+                            (String::from("key3"), Value::Null),
+                        ])),
+                    ),
+                    (String::from("key3"), Value::from(2)),
+                ]),
                 Default::default(),
             ),
             (
-                map!["key1": Value::from(1),
-                     "key2": Value::Object(map!["key1": Value::Null,]),
-                     "key3": Value::from(2),
-                ],
-                map![
-                    "key1": Value::from(1),
-                    "key2": Value::Object(map!["key1": Value::Null,]),
-                    "key3": Value::from(2),
-                ],
+                BTreeMap::from([
+                    (String::from("key1"), Value::from(1)),
+                    (
+                        String::from("key2"),
+                        Value::Object(BTreeMap::from([(String::from("key1"), Value::Null)])),
+                    ),
+                    (String::from("key3"), Value::from(2)),
+                ]),
+                BTreeMap::from([
+                    (String::from("key1"), Value::from(1)),
+                    (
+                        String::from("key2"),
+                        Value::Object(BTreeMap::from([(String::from("key1"), Value::Null)])),
+                    ),
+                    (String::from("key3"), Value::from(2)),
+                ]),
                 CompactOptions {
                     recursive: false,
                     ..Default::default()
                 },
             ),
             (
-                map!["key1": Value::from(1),
-                     "key3": Value::from(2),
-                ],
-                map![
-                    "key1": Value::from(1),
-                    "key2": Value::Object(map!["key1": Value::Null,]),
-                    "key3": Value::from(2),
-                ],
+                BTreeMap::from([
+                    (String::from("key1"), Value::from(1)),
+                    (String::from("key3"), Value::from(2)),
+                ]),
+                BTreeMap::from([
+                    (String::from("key1"), Value::from(1)),
+                    (
+                        String::from("key2"),
+                        Value::Object(BTreeMap::from([(String::from("key1"), Value::Null)])),
+                    ),
+                    (String::from("key3"), Value::from(2)),
+                ]),
                 Default::default(),
             ),
             (
@@ -446,11 +472,8 @@ mod test {
         compact => Compact;
 
         with_map {
-            args: func_args![value: map!["key1": Value::Null,
-                                         "key2": 1,
-                                         "key3": "",
-            ]],
-            want: Ok(Value::Object(map!["key2": 1])),
+            args: func_args![value: Value::from(BTreeMap::from([(String::from("key1"), Value::Null), (String::from("key2"), Value::from(1)), (String::from("key3"), Value::from(""))]))],
+            want: Ok(Value::Object(BTreeMap::from([(String::from("key2"), Value::from(1))]))),
             tdef: TypeDef::object(Collection::any()),
         }
 
@@ -469,7 +492,7 @@ mod test {
                 },
                 nullish: true
             ],
-            want: Ok(Value::Object(map!["key2": 1])),
+            want: Ok(Value::Object(BTreeMap::from([(String::from("key2"), Value::from(1))]))),
             tdef: TypeDef::object(Collection::any()),
         }
     ];
