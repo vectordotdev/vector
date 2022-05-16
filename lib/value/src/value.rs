@@ -188,15 +188,16 @@ impl Value {
     /// ```rust
     /// use value::Value;
     /// use std::collections::BTreeMap;
+    /// use lookup::path;
     ///
     /// let val = Value::from(1);
     /// assert_eq!(val.is_empty(), false);
     ///
     /// let mut val = Value::from(Vec::<Value>::default());
     /// assert_eq!(val.is_empty(), true);
-    /// val.insert(0, 1);
+    /// val.insert(path!(0), 1);
     /// assert_eq!(val.is_empty(), false);
-    /// val.insert(3, 1);
+    /// val.insert(path!(3), 1);
     /// assert_eq!(val.is_empty(), false);
     ///
     /// let mut val = Value::from(BTreeMap::default());
