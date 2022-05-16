@@ -69,15 +69,26 @@ impl Condition {
 }
 
 pub trait Conditional {
-    fn check(&self, e: &Event) -> bool;
+    /// Check if the condition succeeded or not.
+    ///
+    /// The `Ok` variant of the return type signals a positive check, while
+    /// `Err` signals the opposite.
+    ///
+    /// The [`Event`] is taken by value, to allow transforms to use it in
+    /// whatever way needed, while both the `Ok` and `Err` variants return the
+    /// event after the check.
+    ///
+    /// It is expected, but not enforced, that conditions do not modify the
+    /// event.
+    fn check(&self, e: Event) -> Result<Event, Event>;
 
     /// Provides context for a failure. This is potentially mildly expensive if
     /// it involves string building and so should be avoided in hot paths.
-    fn check_with_context(&self, e: &Event) -> Result<(), String> {
+    fn check_with_context(&self, e: Event) -> Result<Event, (Event, String)> {
         if self.check(e) {
-            Ok(())
+            Ok(e)
         } else {
-            Err("condition failed".into())
+            Err((e, "condition failed".into()))
         }
     }
 }

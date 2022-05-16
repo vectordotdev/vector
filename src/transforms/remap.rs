@@ -1,9 +1,11 @@
-use std::sync::Arc;
 use std::{
+    cell::RefCell,
     collections::BTreeMap,
     fs::File,
     io::{self, Read},
     path::PathBuf,
+    rc::Rc,
+    sync::Arc,
 };
 
 use serde::{Deserialize, Serialize};
@@ -207,7 +209,7 @@ where
 pub trait VrlRunner {
     fn run(
         &mut self,
-        target: &mut VrlTarget,
+        target: Rc<RefCell<VrlTarget>>,
         program: &Program,
         timezone: &TimeZone,
     ) -> std::result::Result<value::Value, Terminate>;
@@ -231,7 +233,7 @@ impl Clone for VmRunner {
 impl VrlRunner for VmRunner {
     fn run(
         &mut self,
-        target: &mut VrlTarget,
+        target: Rc<RefCell<VrlTarget>>,
         _: &Program,
         timezone: &TimeZone,
     ) -> std::result::Result<value::Value, Terminate> {
@@ -255,7 +257,7 @@ impl Clone for AstRunner {
 impl VrlRunner for AstRunner {
     fn run(
         &mut self,
-        target: &mut VrlTarget,
+        target: Rc<RefCell<VrlTarget>>,
         program: &Program,
         timezone: &TimeZone,
     ) -> std::result::Result<value::Value, Terminate> {
@@ -393,7 +395,10 @@ where
         }
     }
 
-    fn run_vrl(&mut self, target: &mut VrlTarget) -> std::result::Result<value::Value, Terminate> {
+    fn run_vrl(
+        &mut self,
+        target: Rc<RefCell<VrlTarget>>,
+    ) -> std::result::Result<value::Value, Terminate> {
         self.runner.run(target, &self.program, &self.timezone)
     }
 }
@@ -423,8 +428,10 @@ where
             None
         };
 
-        let mut target = VrlTarget::new(event, self.program.info());
-        let result = self.run_vrl(&mut target);
+        let target = Rc::new(RefCell::new(VrlTarget::new(event, self.program.info())));
+        let result = self.run_vrl(Rc::clone(&target));
+
+        let target = target.try_unwrap().expect("no lingering references");
 
         match result {
             Ok(_) => match target.into_events() {

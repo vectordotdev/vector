@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 use serde::{Deserialize, Serialize};
 use value::Value;
@@ -93,23 +93,14 @@ pub struct Vrl {
 
 impl Vrl {
     fn run(&self, event: &Event) -> vrl::RuntimeResult {
-        // TODO(jean): This clone exists until vrl-lang has an "immutable"
-        // mode.
-        //
-        // For now, mutability in reduce "vrl ends-when conditions" is
-        // allowed, but it won't mutate the original event, since we cloned it
-        // here.
-        //
-        // Having first-class immutability support in the language allows for
-        // more performance (one less clone), and boot-time errors when a
-        // program wants to mutate its events.
-        //
-        // see: https://github.com/vectordotdev/vector/issues/4744
-        let mut target = VrlImmutableTarget::new(event, self.program.info());
+        let target = Rc::new(RefCell::new(VrlImmutableTarget::new(
+            event,
+            self.program.info(),
+        )));
         // TODO: use timezone from remap config
         let timezone = TimeZone::default();
 
-        Runtime::default().resolve(&mut target, &self.program, &timezone)
+        Runtime::default().resolve(target, &self.program, &timezone)
     }
 }
 
@@ -173,23 +164,14 @@ pub struct VrlVm {
 
 impl VrlVm {
     fn run(&self, event: &Event) -> vrl::RuntimeResult {
-        // TODO(jean): This clone exists until vrl-lang has an "immutable"
-        // mode.
-        //
-        // For now, mutability in reduce "vrl ends-when conditions" is
-        // allowed, but it won't mutate the original event, since we cloned it
-        // here.
-        //
-        // Having first-class immutability support in the language allows for
-        // more performance (one less clone), and boot-time errors when a
-        // program wants to mutate its events.
-        //
-        // see: https://github.com/vectordotdev/vector/issues/4744
-        let mut target = VrlImmutableTarget::new(event, self.program.info());
+        let target = Rc::new(RefCell::new(VrlImmutableTarget::new(
+            event,
+            self.program.info(),
+        )));
         // TODO: use timezone from remap config
         let timezone = TimeZone::default();
 
-        Runtime::default().run_vm(&self.vm, &mut target, &timezone)
+        Runtime::default().run_vm(&self.em, target, &timezone)
     }
 }
 
