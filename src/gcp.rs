@@ -13,6 +13,7 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use smpl_jwt::Jwt;
 use snafu::{ResultExt, Snafu};
+use tokio::time::Instant;
 use tokio_stream::wrappers::IntervalStream;
 
 use crate::{config::ProxyConfig, http::HttpClient, http::HttpError};
@@ -125,8 +126,9 @@ impl GcpCredentials {
     pub fn spawn_regenerate_token(&self) {
         let this = self.clone();
 
-        let period = this.token.read().unwrap().expires_in() as u64 / 2;
-        let interval = IntervalStream::new(tokio::time::interval(Duration::from_secs(period)));
+        let period = Duration::from_secs(this.token.read().unwrap().expires_in() as u64 / 2);
+        let interval =
+            IntervalStream::new(tokio::time::interval_at(Instant::now() + period, period));
         let task = interval.for_each(move |_| {
             let this = this.clone();
             async move {
