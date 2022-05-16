@@ -55,19 +55,21 @@ where
 }
 
 /// Set label on all nodes to discover this label from the pod.
-pub async fn label_nodes<Cmd, Label>(
-    kubectl_command: Cmd,
-    label: Label,
-) -> Result<String>
+pub async fn label_nodes<Cmd, Label>(kubectl_command: Cmd, label: Label) -> Result<String>
 where
     Cmd: AsRef<OsStr>,
     Label: AsRef<OsStr>,
 {
     let mut command = Command::new(&kubectl_command);
-    command.arg("label").arg("node").arg(label).arg("--all").arg("--overwrite");
+    command
+        .arg("label")
+        .arg("node")
+        .arg(label)
+        .arg("--all")
+        .arg("--overwrite");
 
     let res = run_command_output(command).await?;
-    Ok(res.to_string())
+    Ok(res)
 }
 
 pub async fn get_pod_on_node<Cmd, NS>(

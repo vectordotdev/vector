@@ -494,9 +494,7 @@ async fn metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     // Set label on all nodes to check it later.
-    framework
-        .label_nodes("label5=foobazbar")
-        .await?;
+    framework.label_nodes("label5=foobazbar").await?;
 
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(
