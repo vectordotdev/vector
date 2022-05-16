@@ -443,5 +443,5 @@ metadata (only from the 2nd kafka source)
 ## Plan Of Attack
 
 - Complete the proof of concept PR for the Data Agent Logs source. ([12218](https://github.com/vectordotdev/vector/pull/12218))
-- Add log namespace support to each source
+- Add log namespace support to each component
 
