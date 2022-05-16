@@ -245,20 +245,7 @@ impl<'a> PipelinesVersionPayload<'a> {
     }
 }
 
-pub fn attach_enterprise_components(
-    config: &mut Config,
-    opts: &Options,
-    api_key: String,
-    config_hash: String,
-) {
-    setup_metrics_reporting(config, &opts, api_key.clone(), config_hash.clone());
-
-    if opts.enable_logs_reporting {
-        setup_logs_reporting(config, &opts, api_key, config_hash);
-    }
-}
-
-pub fn validate_enterprise(config: &Config) -> Result<String, PipelinesError> {
+pub fn validate_enterprise(config: &Config) -> Result<(Options, String), PipelinesError> {
     // Only valid if a [enterprise] section is present in config.
     let opts = match config.enterprise.clone() {
         Some(opts) => opts,
@@ -285,7 +272,91 @@ pub fn validate_enterprise(config: &Config) -> Result<String, PipelinesError> {
         DATADOG_REPORTING_PRODUCT
     );
 
-    Ok(api_key)
+    Ok((opts, api_key))
+}
+
+pub fn attach_enterprise_components(config: &mut Config, opts: &Options, api_key: String) {
+    // In DD Pipelines, this is referred to as the 'config hash'.
+    let config_version = config.version.clone().expect("Config should be versioned");
+
+    setup_metrics_reporting(config, &opts, api_key.clone(), config_version.clone());
+
+    if opts.enable_logs_reporting {
+        setup_logs_reporting(config, &opts, api_key, config_version);
+    }
+}
+
+pub async fn report_configuration(
+    config: &Config,
+    opts: &Options,
+    config_paths: &[ConfigPath],
+    api_key: String,
+) {
+    // In DD Pipelines, this is referred to as the 'config hash'.
+    let config_version = config.version.clone().expect("Config should be versioned");
+
+    // Get the Vector version. This is reported to Pipelines along with a config hash.
+    let vector_version = crate::get_version();
+
+    // Report the internal configuration to Datadog Observability Pipelines.
+    // First, we need to create a JSON representation of config, based on the original files
+    // that Vector was spawned with.
+    let (table, _) = process_paths(config_paths)
+        .map(|paths| load_source_from_paths(&paths).ok())
+        .flatten()
+        .expect("Couldn't load source from config paths. Please report.");
+
+    // Set the relevant fields needed to report a config to Datadog. This is a struct rather than
+    // exploding as func arguments to avoid confusion with multiple &str fields.
+    let fields = PipelinesStrFields {
+        config_version: config_version.as_ref(),
+        vector_version: &vector_version,
+    };
+
+    // Set the Datadog authorization fields. There's an API and app key, to allow read/write
+    // access in tandem with RBAC on the Datadog side.
+    let auth = PipelinesAuth {
+        api_key: &api_key,
+        application_key: &opts.application_key,
+    };
+
+    // Create a HTTP client for posting a Vector version to Datadog OP. This will
+    // respect any proxy settings provided in top-level config.
+    let client = HttpClient::new(None, &opts.proxy)
+        .expect("couldn't instrument Datadog HTTP client. Please report");
+
+    // Endpoint to report a config to Datadog OP.
+    let endpoint = get_reporting_endpoint(
+        opts.endpoint.as_ref(),
+        opts.site.as_ref(),
+        opts.region,
+        &opts.configuration_key,
+    );
+    // Datadog uses a JSON:API, so we'll serialize the config to a JSON
+    let payload = PipelinesVersionPayload::new(&table, &fields);
+
+    match report_serialized_config_to_datadog(&client, &endpoint, &auth, &payload, opts.max_retries)
+        .await
+    {
+        Ok(()) => {
+            info!(
+                "Vector config {} successfully reported to {}.",
+                &config_version, DATADOG_REPORTING_PRODUCT
+            );
+        }
+        Err(err) => {
+            error!(
+                err = ?err.to_string(),
+                "Could not report Vector config to {}.", DATADOG_REPORTING_PRODUCT
+            );
+
+            // if datadog.exit_on_fatal_error {
+            //     return Err(PipelinesError::FatalCouldNotReportConfig);
+            // } else {
+            //     return Err(PipelinesError::CouldNotReportConfig);
+            // }
+        }
+    }
 }
 
 /// Augment configuration with observability via Datadog if the feature is enabled and

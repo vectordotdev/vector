@@ -18,7 +18,8 @@ use crate::service;
 use crate::{api, internal_events::ApiStarted};
 use crate::{
     cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand},
-    config, generate, graph, heartbeat, list,
+    config::{self, enterprise::validate_enterprise},
+    generate, graph, heartbeat, list,
     signal::{self, SignalTo},
     topology::{self, RunningTopology},
     trace, unit_test, validate,
@@ -188,17 +189,17 @@ impl Application {
                 config.healthchecks.set_require_healthy(require_healthy);
 
                 #[cfg(feature = "enterprise")]
-                // Augment config to enable observability within Datadog, if applicable.
-                if let Err(PipelinesError::FatalCouldNotReportConfig) =
-                    config::enterprise::try_attach(
-                        &mut config,
-                        &config_paths,
-                        signal_handler.subscribe(),
-                    )
-                    .await
-                {
-                    error!(message = "Exiting due to configuration reporting failure.");
-                    return Err(exitcode::UNAVAILABLE);
+                // Enable enterprise features, if applicable.
+                match validate_enterprise(&config) {
+                    Ok((enterprise_options, api_key)) => {}
+                    Err(err) => {
+                        if let PipelinesError::MissingApiKey = err {
+                            error!(
+                                message = "Enterprise configuration incomplete: missing API key"
+                            );
+                            return Err(exitcode::CONFIG);
+                        }
+                    }
                 }
 
                 let diff = config::ConfigDiff::initial(&config);
