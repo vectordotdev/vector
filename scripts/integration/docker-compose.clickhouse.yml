@@ -2,7 +2,7 @@ version: "3"
 
 services:
   clickhouse:
-    image: yandex/clickhouse-server:19
+    image: docker.io/yandex/clickhouse-server:19
 
   runner:
     build:
