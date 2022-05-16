@@ -404,7 +404,6 @@ mod test {
         fn single_field() {
             let mut value = Value::from(BTreeMap::default());
             let key = "root";
-            // let lookup = LookupBuf::from_str(key).unwrap();
             let mut marker = Value::from(true);
             assert_eq!(value.insert_by_path_v2(key, marker.clone()), None);
             assert_eq!(value.as_object().unwrap()[key], marker);
@@ -552,7 +551,7 @@ mod test {
             );
             assert_eq!(value.as_object().unwrap()["a"].as_array_unwrap()[2], marker);
 
-            // // Replace the value at 0.
+            // Replace the value at 0.
             let marker = Value::from(false);
             assert_eq!(
                 value.insert_by_path_v2(key, marker.clone()),
