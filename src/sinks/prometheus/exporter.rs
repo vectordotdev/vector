@@ -532,10 +532,7 @@ mod tests {
         event::metric::{Metric, MetricValue},
         http::HttpClient,
         sinks::prometheus::{distribution_to_agg_histogram, distribution_to_ddsketch},
-        test_util::{
-            components::{assert_sink_compliance, SINK_TAGS},
-            next_addr, random_string, trace_init,
-        },
+        test_util::{next_addr, random_string, trace_init},
         tls::MaybeTlsSettings,
     };
 
@@ -599,8 +596,10 @@ mod tests {
         };
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
-        let input_events = Box::pin(UnboundedReceiverStream::new(rx));
-        let sink_handle = tokio::spawn(assert_sink_compliance(sink, input_events, &SINK_TAGS));
+        let input_events = UnboundedReceiverStream::new(rx);
+
+        let input_events = input_events.map(Into::into);
+        let sink_handle = tokio::spawn(async move { sink.run(input_events).await.unwrap() });
 
         for event in events {
             tx.send(event).expect("Failed to send event.");
@@ -710,7 +709,7 @@ mod tests {
                 .collect(),
         ));
 
-        let metrics = vec![
+        let events = vec![
             Event::Metric(m1.clone().with_value(MetricValue::Counter { value: 32. })),
             Event::Metric(m2.clone().with_value(MetricValue::Counter { value: 33. })),
             Event::Metric(m1.clone().with_value(MetricValue::Counter { value: 40. })),
@@ -718,12 +717,9 @@ mod tests {
 
         let metrics_handle = Arc::clone(&sink.metrics);
 
-        assert_sink_compliance(
-            VectorSink::from_event_streamsink(sink),
-            stream::iter(metrics),
-            &SINK_TAGS,
-        )
-        .await;
+        let sink = VectorSink::from_event_streamsink(sink);
+        let input_events = stream::iter(events).map(Into::into);
+        sink.run(input_events).await.unwrap();
 
         let metrics_after = metrics_handle.read().unwrap();
 
@@ -833,12 +829,10 @@ mod tests {
             .cloned()
             .map(Event::Metric)
             .collect::<Vec<_>>();
-        assert_sink_compliance(
-            VectorSink::from_event_streamsink(sink),
-            stream::iter(events),
-            &SINK_TAGS,
-        )
-        .await;
+
+        let sink = VectorSink::from_event_streamsink(sink);
+        let input_events = stream::iter(events).map(Into::into);
+        sink.run(input_events).await.unwrap();
 
         let metrics_after = metrics_handle.read().unwrap();
 
@@ -953,12 +947,9 @@ mod tests {
             .map(Event::Metric)
             .collect::<Vec<_>>();
 
-        assert_sink_compliance(
-            VectorSink::from_event_streamsink(sink),
-            stream::iter(events),
-            &SINK_TAGS,
-        )
-        .await;
+        let sink = VectorSink::from_event_streamsink(sink);
+        let input_events = stream::iter(events).map(Into::into);
+        sink.run(input_events).await.unwrap();
 
         let metrics_after = metrics_handle.read().unwrap();
 
@@ -989,14 +980,7 @@ mod integration_tests {
     use tokio_stream::wrappers::UnboundedReceiverStream;
 
     use super::*;
-    use crate::{
-        config::ProxyConfig,
-        http::HttpClient,
-        test_util::{
-            components::{assert_sink_compliance, SINK_TAGS},
-            trace_init,
-        },
-    };
+    use crate::{config::ProxyConfig, http::HttpClient, test_util::trace_init};
 
     fn sink_exporter_address() -> String {
         std::env::var("SINK_EXPORTER_ADDRESS").unwrap_or_else(|_| "127.0.0.1:9101".into())
@@ -1066,7 +1050,9 @@ mod integration_tests {
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
         let input_events = UnboundedReceiverStream::new(rx);
-        let sink_handle = tokio::spawn(assert_sink_compliance(sink, input_events, &SINK_TAGS));
+
+        let input_events = input_events.map(Into::into);
+        let sink_handle = tokio::spawn(async move { sink.run(input_events).await.unwrap() });
 
         let (name, event) = tests::create_metric_gauge(None, 123.4);
         tx.send(event).expect("Failed to send.");
@@ -1103,7 +1089,9 @@ mod integration_tests {
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
         let input_events = UnboundedReceiverStream::new(rx);
-        let sink_handle = tokio::spawn(assert_sink_compliance(sink, input_events, &SINK_TAGS));
+
+        let input_events = input_events.map(Into::into);
+        let sink_handle = tokio::spawn(async move { sink.run(input_events).await.unwrap() });
 
         // Create two sets with different names but the same size.
         let (name1, event) = tests::create_metric_set(None, vec!["0", "1", "2"]);
@@ -1158,7 +1146,9 @@ mod integration_tests {
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
         let input_events = UnboundedReceiverStream::new(rx);
-        let sink_handle = tokio::spawn(assert_sink_compliance(sink, input_events, &SINK_TAGS));
+
+        let input_events = input_events.map(Into::into);
+        let sink_handle = tokio::spawn(async move { sink.run(input_events).await.unwrap() });
 
         // metrics that will not be updated for a full flush period and therefore should expire
         let (name1, event) = tests::create_metric_set(None, vec!["42"]);

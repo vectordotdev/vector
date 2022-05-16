@@ -225,7 +225,7 @@ mod integration_tests {
     use crate::nats::{NatsAuthCredentialsFile, NatsAuthNKey, NatsAuthToken, NatsAuthUserPassword};
     use crate::sinks::VectorSink;
     use crate::test_util::{
-        components::{assert_sink_compliance, SINK_TAGS},
+        components::{run_and_assert_sink_compliance, SINK_TAGS},
         random_lines_with_stream, random_string, trace_init,
     };
     use crate::tls::TlsConfig;
@@ -257,7 +257,7 @@ mod integration_tests {
         let num_events = 1_000;
         let (input, events) = random_lines_with_stream(100, num_events, None);
 
-        assert_sink_compliance(sink, events, &SINK_TAGS).await;
+        run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
 
         // Unsubscribe from the channel.
         thread::sleep(Duration::from_secs(3));

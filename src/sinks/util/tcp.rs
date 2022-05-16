@@ -9,6 +9,7 @@ use std::{
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use futures::{stream::BoxStream, task::noop_waker_ref, SinkExt, StreamExt};
+use futures_util::{future::ready, stream};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::{
@@ -17,6 +18,7 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::Encoder;
+use vector_common::internal_event::{BytesSent, EventsSent};
 use vector_core::{buffers::Acker, ByteSizeOf};
 
 use crate::{
@@ -27,7 +29,6 @@ use crate::{
         ConnectionOpen, OpenGauge, SocketMode, TcpSocketConnectionError,
         TcpSocketConnectionEstablished, TcpSocketConnectionShutdown, TcpSocketError,
     },
-    sink::VecSinkExt,
     sinks::{
         util::{
             encoding::Transformer,
@@ -263,33 +264,43 @@ where
         // We need [Peekable](https://docs.rs/futures/0.3.6/futures/stream/struct.Peekable.html) for initiating
         // connection only when we have something to send.
         let mut encoder = self.encoder.clone();
-        let mut input = input
-            .map(|mut event| {
-                let byte_size = event.size_of();
-                let finalizers = event.metadata_mut().take_finalizers();
-                self.transformer.transform(&mut event);
-                let mut bytes = BytesMut::new();
-                if encoder.encode(event, &mut bytes).is_ok() {
-                    let item = bytes.freeze();
-                    EncodedEvent {
-                        item,
-                        finalizers,
-                        byte_size,
-                    }
-                } else {
-                    EncodedEvent::new(Bytes::new(), 0)
+        let mut input = input.map(|mut event| {
+            let byte_size = event.size_of();
+            let finalizers = event.metadata_mut().take_finalizers();
+            self.transformer.transform(&mut event);
+            let mut bytes = BytesMut::new();
+            if encoder.encode(event, &mut bytes).is_ok() {
+                let item = bytes.freeze();
+                EncodedEvent {
+                    item,
+                    finalizers,
+                    byte_size,
                 }
-            })
-            .peekable();
+            } else {
+                EncodedEvent::new(Bytes::new(), 0)
+            }
+        });
 
-        while Pin::new(&mut input).peek().await.is_some() {
+        while let Some(item) = input.next().await {
             let mut sink = self.connect().await;
             let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
 
-            let result = match sink
-                .send_all_peekable(&mut (&mut input).map(|item| item.item).peekable())
-                .await
-            {
+            let mut mapped_input = stream::once(ready(item)).chain(&mut input).map(|event| {
+                emit!(EventsSent {
+                    count: 1,
+                    byte_size: event.byte_size,
+                    output: None,
+                });
+
+                emit!(BytesSent {
+                    byte_size: event.item.len(),
+                    protocol: "tcp",
+                });
+
+                Ok(event.item)
+            });
+
+            let result = match sink.send_all(&mut mapped_input).await {
                 Ok(()) => sink.close().await,
                 Err(error) => Err(error),
             };

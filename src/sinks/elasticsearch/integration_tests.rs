@@ -21,7 +21,9 @@ use crate::{
         HealthcheckError,
     },
     test_util::{
-        components::{assert_sink_compliance, assert_sink_compliance_with_event, HTTP_SINK_TAGS},
+        components::{
+            assert_sink_compliance_with_event, run_and_assert_sink_compliance, HTTP_SINK_TAGS,
+        },
         random_events_with_stream, random_string, trace_init,
     },
     tls::{self, TlsConfig},
@@ -396,9 +398,9 @@ async fn run_insert_tests_with_config(
             events
         });
 
-        assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
+        run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
     } else {
-        assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
+        run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
     }
 
     assert_eq!(receiver.try_recv(), Ok(batch_status));

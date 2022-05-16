@@ -23,7 +23,7 @@ use crate::{
         },
     },
     test_util::{
-        components::{assert_sink_compliance, AWS_SINK_TAGS},
+        components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
         random_events_with_stream, random_string, wait_for_duration,
     },
 };
@@ -71,7 +71,7 @@ async fn firehose_put_records() {
 
     let (input, events) = random_events_with_stream(100, 100, None);
 
-    assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
+    run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
     sleep(Duration::from_secs(5)).await;
 

@@ -17,7 +17,7 @@ use crate::{
         },
     },
     test_util::{
-        components::{assert_sink_compliance, AWS_SINK_TAGS},
+        components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
         random_lines_with_stream, random_string,
     },
 };
@@ -56,7 +56,7 @@ async fn kinesis_put_records() {
 
     let (mut input_lines, events) = random_lines_with_stream(100, 11, None);
 
-    assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
+    run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
     sleep(Duration::from_secs(1)).await;
 

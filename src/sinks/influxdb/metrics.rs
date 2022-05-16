@@ -941,7 +941,7 @@ mod integration_tests {
             },
             InfluxDb1Settings, InfluxDb2Settings,
         },
-        test_util::components::{assert_sink_compliance, HTTP_SINK_TAGS},
+        test_util::components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
         tls::{self, TlsConfig},
     };
 
@@ -989,7 +989,7 @@ mod integration_tests {
 
         let events: Vec<_> = (0..10).map(create_event).collect();
         let (sink, _) = config.build(cx).await.expect("error when building config");
-        assert_sink_compliance(sink, stream::iter(events.clone()), &HTTP_SINK_TAGS).await;
+        run_and_assert_sink_compliance(sink, stream::iter(events.clone()), &HTTP_SINK_TAGS).await;
 
         let res = query_v1_json(url, &format!("show series on {}", database)).await;
 
@@ -1104,7 +1104,7 @@ mod integration_tests {
 
         let client = HttpClient::new(None, cx.proxy()).unwrap();
         let sink = InfluxDbSvc::new(config, cx, client).unwrap();
-        assert_sink_compliance(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
+        run_and_assert_sink_compliance(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
 
         let mut body = std::collections::HashMap::new();
         body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"ns.{}\")", metric));

@@ -19,7 +19,9 @@ mod tests {
             blackhole::{config::BlackholeConfig, sink::BlackholeSink},
             VectorSink,
         },
-        test_util::{components::assert_sink_compliance, random_events_with_stream},
+        test_util::{
+            components::run_and_assert_nonsending_sink_compliance, random_events_with_stream,
+        },
     };
 
     #[tokio::test]
@@ -33,6 +35,6 @@ mod tests {
         let sink = VectorSink::Stream(Box::new(sink));
 
         let (_input_lines, events) = random_events_with_stream(100, 10, None);
-        assert_sink_compliance(sink, events, &[]).await;
+        run_and_assert_nonsending_sink_compliance(sink, events, &[]).await;
     }
 }

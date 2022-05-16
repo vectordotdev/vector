@@ -16,7 +16,7 @@ use crate::config::{ProxyConfig, SinkContext};
 use crate::sinks::util::encoding::EncodingConfig;
 use crate::sinks::VectorSink;
 use crate::test_util::{
-    components::{assert_sink_compliance, AWS_SINK_TAGS},
+    components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
     random_lines_with_stream, random_string,
 };
 
@@ -69,7 +69,7 @@ async fn sqs_send_message_batch() {
     let sink = VectorSink::from_event_streamsink(sink);
 
     let (mut input_lines, events) = random_lines_with_stream(100, 10, None);
-    assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
+    run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
     sleep(Duration::from_secs(1)).await;
 

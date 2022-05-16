@@ -1,6 +1,3 @@
-// TODO: no unit test that actually exercises the sink to apply `assert_sink_compliance` to.. but we could easily write
-// one since `WriterSink<T>` simply takes `T: AsyncWrite`
-
 use async_trait::async_trait;
 use bytes::BytesMut;
 use codecs::encoding::Framer;
@@ -67,7 +64,12 @@ where
 #[cfg(test)]
 mod test {
     use chrono::{offset::TimeZone, Utc};
+<<<<<<< HEAD
     use codecs::{BytesEncoder, NewlineDelimitedEncoder};
+=======
+    use futures::future::ready;
+    use futures_util::stream;
+>>>>>>> a45b670cf (get unit tests passing first)
     use pretty_assertions::assert_eq;
     use vector_core::sink::VectorSink;
 
@@ -77,11 +79,16 @@ mod test {
             metric::{Metric, MetricKind, MetricValue, StatisticKind},
             Event, Value,
         },
+<<<<<<< HEAD
         sinks::util::encoding::{
             EncodingConfig, EncodingConfigWithFramingAdapter, StandardEncodings,
             StandardEncodingsWithFramingMigrator,
         },
         test_util::components::{assert_sink_compliance_with_event, SINK_TAGS},
+=======
+        sinks::util::encoding::StandardEncodings,
+        test_util::components::{run_and_assert_sink_compliance, SINK_TAGS},
+>>>>>>> a45b670cf (get unit tests passing first)
     };
 
     fn encode_event(
@@ -118,9 +125,9 @@ mod test {
             encoder,
         };
 
-        assert_sink_compliance_with_event(
+        run_and_assert_sink_compliance(
             VectorSink::from_event_streamsink(sink),
-            event,
+            stream::once(ready(event)),
             &SINK_TAGS,
         )
         .await;

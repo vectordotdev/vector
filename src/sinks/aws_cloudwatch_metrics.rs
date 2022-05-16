@@ -518,7 +518,7 @@ mod integration_tests {
     use crate::{
         event::{metric::StatisticKind, Event, MetricKind},
         test_util::{
-            components::{assert_sink_compliance, HTTP_SINK_TAGS},
+            components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
             random_string,
         },
     };
@@ -603,7 +603,7 @@ mod integration_tests {
         }
 
         let stream = stream::iter(events).map(Into::into);
-        assert_sink_compliance(sink, stream, &HTTP_SINK_TAGS).await;
+        run_and_assert_sink_compliance(sink, stream, &HTTP_SINK_TAGS).await;
     }
 
     #[tokio::test]
@@ -632,6 +632,6 @@ mod integration_tests {
         events.shuffle(&mut rand::thread_rng());
 
         let stream = stream::iter(events).map(Into::into);
-        assert_sink_compliance(sink, stream, &HTTP_SINK_TAGS).await;
+        run_and_assert_sink_compliance(sink, stream, &HTTP_SINK_TAGS).await;
     }
 }

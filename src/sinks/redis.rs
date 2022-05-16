@@ -458,7 +458,7 @@ mod integration_tests {
 
     use super::*;
     use crate::test_util::{
-        components::{assert_sink_compliance, SINK_TAGS},
+        components::{run_and_assert_sink_compliance, SINK_TAGS},
         random_lines_with_stream, random_string, trace_init,
     };
 
@@ -505,7 +505,7 @@ mod integration_tests {
             events.push(e);
         }
 
-        assert_sink_compliance(sink, stream::iter(events.clone()), &SINK_TAGS).await;
+        run_and_assert_sink_compliance(sink, stream::iter(events.clone()), &SINK_TAGS).await;
 
         let mut conn = cnf.build_client().await.unwrap();
 

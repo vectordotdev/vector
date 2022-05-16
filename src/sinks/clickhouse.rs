@@ -308,6 +308,7 @@ mod integration_tests {
     };
 
     use futures::future;
+    use futures_util::stream;
     use serde_json::Value;
     use tokio::time::{timeout, Duration};
     use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
@@ -318,7 +319,7 @@ mod integration_tests {
         config::{log_schema, SinkConfig, SinkContext},
         sinks::util::encoding::TimestampFormat,
         test_util::{
-            components::{assert_sink_compliance_with_event, HTTP_SINK_TAGS},
+            components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
             random_string, trace_init,
         },
     };
@@ -364,7 +365,8 @@ mod integration_tests {
             .as_mut_log()
             .insert("items", vec!["item1", "item2"]);
 
-        assert_sink_compliance_with_event(sink, input_event.clone(), &HTTP_SINK_TAGS).await;
+        run_and_assert_sink_compliance(sink, stream::once(input_event.clone()), &HTTP_SINK_TAGS)
+            .await;
 
         let output = client.select_all(&table).await;
         assert_eq!(1, output.rows);
@@ -408,7 +410,8 @@ mod integration_tests {
         let (mut input_event, mut receiver) = make_event();
         input_event.as_mut_log().insert("unknown", "mysteries");
 
-        assert_sink_compliance_with_event(sink, input_event.clone(), &HTTP_SINK_TAGS).await;
+        run_and_assert_sink_compliance(sink, stream::once(input_event.clone()), &HTTP_SINK_TAGS)
+            .await;
 
         let output = client.select_all(&table).await;
         assert_eq!(1, output.rows);
@@ -459,7 +462,8 @@ mod integration_tests {
 
         let (mut input_event, _receiver) = make_event();
 
-        assert_sink_compliance_with_event(sink, input_event.clone(), &HTTP_SINK_TAGS).await;
+        run_and_assert_sink_compliance(sink, stream::once(input_event.clone()), &HTTP_SINK_TAGS)
+            .await;
 
         let output = client.select_all(&table).await;
         assert_eq!(1, output.rows);
@@ -516,7 +520,8 @@ timestamp_format = "unix""#,
 
         let (mut input_event, _receiver) = make_event();
 
-        assert_sink_compliance_with_event(sink, input_event.clone(), &HTTP_SINK_TAGS).await;
+        run_and_assert_sink_compliance(sink, stream::once(input_event.clone()), &HTTP_SINK_TAGS)
+            .await;
 
         let output = client.select_all(&table).await;
         assert_eq!(1, output.rows);

@@ -406,7 +406,7 @@ mod integration_tests {
     use super::*;
     use crate::sinks::VectorSink;
     use crate::test_util::{
-        components::{assert_sink_compliance, SINK_TAGS},
+        components::{run_and_assert_sink_compliance, SINK_TAGS},
         random_lines_with_stream, random_string, trace_init,
     };
 
@@ -451,7 +451,7 @@ mod integration_tests {
         let producer = cnf.create_pulsar_producer().await.unwrap();
         let sink = PulsarSink::new(producer, cnf.encoding, acker).unwrap();
         let sink = VectorSink::from_event_sink(sink);
-        assert_sink_compliance(sink, events, &SINK_TAGS).await;
+        run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
 
         assert_eq!(
             ack_counter.load(std::sync::atomic::Ordering::Relaxed),

@@ -427,7 +427,7 @@ mod tests {
     use crate::{
         config::log_schema,
         test_util::{
-            components::{assert_sink_compliance, FILE_SINK_TAGS},
+            components::{run_and_assert_sink_compliance, FILE_SINK_TAGS},
             lines_from_file, lines_from_gzip_file, random_events_with_stream,
             random_lines_with_stream, temp_dir, temp_file, trace_init,
         },
@@ -456,7 +456,7 @@ mod tests {
         let (input, _events) = random_lines_with_stream(100, 64, None);
 
         let events = Box::pin(stream::iter(input.clone().into_iter().map(Event::from)));
-        assert_sink_compliance(
+        run_and_assert_sink_compliance(
             VectorSink::from_event_streamsink(sink),
             events,
             &FILE_SINK_TAGS,
@@ -487,7 +487,7 @@ mod tests {
         let (input, _) = random_lines_with_stream(100, 64, None);
 
         let events = Box::pin(stream::iter(input.clone().into_iter().map(Event::from)));
-        assert_sink_compliance(
+        run_and_assert_sink_compliance(
             VectorSink::from_event_streamsink(sink),
             events,
             &FILE_SINK_TAGS,
@@ -540,7 +540,7 @@ mod tests {
         input[7].as_mut_log().insert("level", "error");
 
         let events = Box::pin(stream::iter(input.clone().into_iter()));
-        assert_sink_compliance(
+        run_and_assert_sink_compliance(
             VectorSink::from_event_streamsink(sink),
             events,
             &FILE_SINK_TAGS,
@@ -610,7 +610,7 @@ mod tests {
         let (mut tx, rx) = futures::channel::mpsc::channel(0);
 
         let sink_handle = tokio::spawn(async move {
-            assert_sink_compliance(
+            run_and_assert_sink_compliance(
                 VectorSink::from_event_streamsink(sink),
                 Box::pin(rx),
                 &FILE_SINK_TAGS,

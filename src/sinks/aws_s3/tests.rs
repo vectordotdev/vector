@@ -38,7 +38,7 @@ mod integration_tests {
             },
         },
         test_util::{
-            components::{assert_sink_compliance, AWS_SINK_TAGS},
+            components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
             random_lines_with_stream, random_string,
         },
     };
@@ -62,7 +62,7 @@ mod integration_tests {
         let sink = config.build_processor(service, cx).unwrap();
 
         let (lines, events, receiver) = make_events_batch(100, 10);
-        assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
+        run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
         assert_eq!(receiver.await, BatchStatus::Delivered);
 
         let keys = get_keys(&bucket, prefix.unwrap()).await;
@@ -96,7 +96,7 @@ mod integration_tests {
         let sink = config.build_processor(service, cx).unwrap();
 
         let (lines, events, receiver) = make_events_batch(100, 10);
-        assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
+        run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
         assert_eq!(receiver.await, BatchStatus::Delivered);
 
         let keys = get_keys(&bucket, prefix.unwrap()).await;
@@ -148,7 +148,7 @@ mod integration_tests {
             Event::from(e)
         });
 
-        assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
+        run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
         // Hard-coded sleeps are bad, but we're waiting on localstack's state to converge.
         tokio::time::sleep(Duration::from_secs(1)).await;
@@ -193,7 +193,7 @@ mod integration_tests {
         let sink = config.build_processor(service, cx).unwrap();
 
         let (lines, events, receiver) = make_events_batch(100, batch_size * batch_multiplier);
-        assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
+        run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
         assert_eq!(receiver.await, BatchStatus::Delivered);
 
         let keys = get_keys(&bucket, prefix.unwrap()).await;
@@ -255,7 +255,7 @@ mod integration_tests {
         let sink = config.build_processor(service, cx).unwrap();
 
         let (lines, events, receiver) = make_events_batch(100, 10);
-        assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
+        run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
         assert_eq!(receiver.await, BatchStatus::Delivered);
 
         let keys = get_keys(&bucket, prefix.unwrap()).await;
@@ -287,7 +287,7 @@ mod integration_tests {
         let sink = config.build_processor(service, cx).unwrap();
 
         let (_lines, events, receiver) = make_events_batch(1, 1);
-        assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
+        run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
         assert_eq!(receiver.await, BatchStatus::Rejected);
 
         let objects = list_objects(&bucket, prefix.unwrap()).await;

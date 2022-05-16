@@ -145,6 +145,7 @@ mod integration_tests {
     use std::{collections::HashMap, convert::TryFrom};
 
     use chrono::{TimeZone, Utc};
+    use futures_util::stream;
     use indoc::indoc;
     use serde_json::{json, Value as JsonValue};
     use tokio::time::Duration;
@@ -155,7 +156,7 @@ mod integration_tests {
         event::Event,
         sinks::util::Compression,
         test_util::{
-            components::{assert_sink_compliance_with_event, HTTP_SINK_TAGS},
+            components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
             random_string,
         },
     };
@@ -224,7 +225,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let event = Event::from(message.clone());
-        assert_sink_compliance_with_event(sink, event, &HTTP_SINK_TAGS).await;
+        run_and_assert_sink_compliance(sink, stream::once(event), &HTTP_SINK_TAGS).await;
 
         let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 
