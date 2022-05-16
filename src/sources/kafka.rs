@@ -29,7 +29,7 @@ use crate::{
         log_schema, AcknowledgementsConfig, LogSchema, Output, SourceConfig, SourceContext,
         SourceDescription,
     },
-    event::{BatchNotifier, Event, Value},
+    event::{BatchNotifier, BatchStatus, Event, Value},
     internal_events::{
         KafkaBytesReceived, KafkaEventsReceived, KafkaOffsetUpdateError, KafkaReadError,
         StreamClosedError,
@@ -169,42 +169,42 @@ async fn kafka_source(
     config: KafkaSourceConfig,
     consumer: StreamConsumer<KafkaStatisticsContext>,
     decoder: Decoder,
-    shutdown: ShutdownSignal,
+    mut shutdown: ShutdownSignal,
     mut out: SourceSender,
     acknowledgements: bool,
 ) -> Result<(), ()> {
     let consumer = Arc::new(consumer);
-    let finalizer = acknowledgements.then(|| {
-        let consumer = Arc::clone(&consumer);
-        OrderedFinalizer::new(shutdown.clone(), move |entry: FinalizerEntry| {
-            let consumer = Arc::clone(&consumer);
-            async move {
-                if let Err(error) =
-                    consumer.store_offset(&entry.topic, entry.partition, entry.offset)
-                {
-                    emit!(KafkaOffsetUpdateError { error });
-                }
-            }
-        })
-    });
-    let mut stream = consumer.stream().take_until(shutdown);
+    let (finalizer, mut ack_stream) =
+        OrderedFinalizer::<FinalizerEntry>::maybe_new(acknowledgements, shutdown.clone());
+    let mut stream = consumer.stream();
     let keys = Keys::from(log_schema(), &config);
 
-    while let Some(message) = stream.next().await {
-        match message {
-            Err(error) => {
-                emit!(KafkaReadError { error });
-            }
-            Ok(msg) => {
-                emit!(KafkaBytesReceived {
-                    byte_size: msg.payload_len(),
-                    protocol: "tcp",
-                    topic: msg.topic(),
-                    partition: msg.partition(),
-                });
+    loop {
+        tokio::select! {
+            _ = &mut shutdown => break,
+            entry = ack_stream.next() => if let Some((status, entry)) = entry {
+                if status == BatchStatus::Delivered {
+                    if let Err(error) =
+                        consumer.store_offset(&entry.topic, entry.partition, entry.offset)
+                    {
+                        emit!(KafkaOffsetUpdateError { error });
+                    }
+                }
+            },
+            message = stream.next() => match message {
+                None => break,  // WHY?
+                Some(Err(error)) => emit!(KafkaReadError { error }),
+                Some(Ok(msg)) => {
+                    emit!(KafkaBytesReceived {
+                        byte_size: msg.payload_len(),
+                        protocol: "tcp",
+                        topic: msg.topic(),
+                        partition: msg.partition(),
+                    });
 
-                parse_message(msg, decoder.clone(), keys, &finalizer, &mut out, &consumer).await;
-            }
+                    parse_message(msg, decoder.clone(), keys, &finalizer, &mut out, &consumer).await;
+                }
+            },
         }
     }
 
