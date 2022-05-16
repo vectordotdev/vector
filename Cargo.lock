@@ -2144,7 +2144,6 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "criterion",
- "itertools",
  "lalrpop",
  "lalrpop-util",
  "lookup",
