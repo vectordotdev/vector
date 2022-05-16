@@ -3065,12 +3065,12 @@ if exists(.custom.msg) {
 }
 '''
 
-[transforms.processing.logs.pipelines.aws_ecs-agent]
+[[transforms.processing.logs]]
 name = "aws_ecs-agent"
 filter.type = "datadog_search"
 filter.source = "source:amazon-ecs-agent"
 
-[[transforms.processing.logs.pipelines.aws_ecs-agent.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if match_datadog_query(., "@http.status_code:[200 TO 299]") {
@@ -3084,7 +3084,7 @@ if match_datadog_query(., "@http.status_code:[200 TO 299]") {
 }
 '''
 
-[[transforms.processing.logs.pipelines.aws_ecs-agent.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 status = string(.custom.http.status_category) ?? string(.custom.level) ?? ""
@@ -3114,7 +3114,7 @@ if status == "" {
 }
 '''
 
-[[transforms.processing.logs.pipelines.aws_ecs-agent.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.time) {
@@ -3122,7 +3122,7 @@ if exists(.custom.time) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.aws_ecs-agent.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.msg) {
