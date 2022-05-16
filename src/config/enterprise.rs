@@ -6,7 +6,7 @@ use std::{
 use http::Request;
 use hyper::{header::LOCATION, Body, StatusCode};
 use indexmap::IndexMap;
-use rand::{prelude::ThreadRng, Rng};
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use tokio::{
     select,
@@ -179,7 +179,6 @@ impl Display for ReportingError {
 /// Exponential backoff with random jitter for retrying configuration reporting
 struct ReportingRetryBackoff {
     backoff: ExponentialBackoff,
-    jitter_rng: ThreadRng,
 }
 
 impl ReportingRetryBackoff {
@@ -189,12 +188,8 @@ impl ReportingRetryBackoff {
         let backoff = ExponentialBackoff::from_millis(2)
             .factor(1000)
             .max_delay(Duration::from_secs(60));
-        let jitter_rng = rand::thread_rng();
 
-        Self {
-            backoff,
-            jitter_rng,
-        }
+        Self { backoff }
     }
 
     /// Wait before retrying as determined by the backoff and jitter
@@ -213,7 +208,7 @@ impl Iterator for ReportingRetryBackoff {
     type Item = Duration;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let jitter_milliseconds = Duration::from_millis(self.jitter_rng.gen_range(0..1000));
+        let jitter_milliseconds = Duration::from_millis(rand::thread_rng().gen_range(0..1000));
         Some(
             self.backoff
                 .next()
@@ -287,21 +282,18 @@ pub fn attach_enterprise_components(config: &mut Config, opts: &Options, api_key
 }
 
 pub async fn report_configuration(
-    config: &Config,
-    opts: &Options,
-    config_paths: &[ConfigPath],
+    opts: Options,
+    config_paths: Vec<ConfigPath>,
     api_key: String,
+    config_version: String,
 ) {
-    // In DD Pipelines, this is referred to as the 'config hash'.
-    let config_version = config.version.clone().expect("Config should be versioned");
-
     // Get the Vector version. This is reported to Pipelines along with a config hash.
     let vector_version = crate::get_version();
 
     // Report the internal configuration to Datadog Observability Pipelines.
     // First, we need to create a JSON representation of config, based on the original files
     // that Vector was spawned with.
-    let (table, _) = process_paths(config_paths)
+    let (table, _) = process_paths(&config_paths)
         .map(|paths| load_source_from_paths(&paths).ok())
         .flatten()
         .expect("Couldn't load source from config paths. Please report.");

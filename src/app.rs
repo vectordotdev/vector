@@ -1,6 +1,7 @@
 use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf};
 
 use futures::StreamExt;
+use futures_util::stream::FuturesOrdered;
 use once_cell::race::OnceNonZeroUsize;
 use tokio::{
     runtime::{self, Runtime},
@@ -18,7 +19,10 @@ use crate::service;
 use crate::{api, internal_events::ApiStarted};
 use crate::{
     cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand},
-    config::{self, enterprise::validate_enterprise},
+    config::{
+        self,
+        enterprise::{attach_enterprise_components, report_configuration, validate_enterprise},
+    },
     generate, graph, heartbeat, list,
     signal::{self, SignalTo},
     topology::{self, RunningTopology},
@@ -190,8 +194,38 @@ impl Application {
 
                 #[cfg(feature = "enterprise")]
                 // Enable enterprise features, if applicable.
-                match validate_enterprise(&config) {
-                    Ok((enterprise_options, api_key)) => {}
+                let reporting_tx = match validate_enterprise(&config) {
+                    Ok((enterprise_options, api_key)) => {
+                        let (reporting_tx, mut reporting_rx) = mpsc::unbounded_channel();
+                        attach_enterprise_components(
+                            &mut config,
+                            &enterprise_options,
+                            api_key.clone(),
+                        );
+                        let _ = reporting_tx.send(report_configuration(
+                            enterprise_options,
+                            config_paths.clone(),
+                            api_key,
+                            "config_version".to_string(),
+                        ));
+
+                        tokio::spawn(async move {
+                            let mut pending_reports = FuturesOrdered::new();
+                            loop {
+                                tokio::select! {
+                                    maybe_report = reporting_rx.recv() => {
+                                        match maybe_report {
+                                            Some(report) => pending_reports.push(report),
+                                            None => break,
+                                        }
+                                    }
+                                    _ = pending_reports.next(), if !pending_reports.is_empty() => {
+                                    }
+                                }
+                            }
+                        });
+                        Some(reporting_tx)
+                    }
                     Err(err) => {
                         if let PipelinesError::MissingApiKey = err {
                             error!(
@@ -199,8 +233,9 @@ impl Application {
                             );
                             return Err(exitcode::CONFIG);
                         }
+                        None
                     }
-                }
+                };
 
                 let diff = config::ConfigDiff::initial(&config);
                 let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
