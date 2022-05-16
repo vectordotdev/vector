@@ -60,7 +60,7 @@ impl TraceEvent {
         Self(self.0.with_batch_notifier_option(batch))
     }
 
-    /// Convert a `TraceEvent` into a BTreeMap of it's fields
+    /// Convert a `TraceEvent` into a `BTreeMap` of it's fields
     /// # Panics
     ///
     /// Panics if the fields of the `TraceEvent` are not a `Value::Map`.

@@ -87,7 +87,7 @@ impl From<Trace> for Event {
 impl From<Log> for event::LogEvent {
     fn from(log: Log) -> Self {
         if let Some(value) = log.value {
-            Self::from(decode_value(value).unwrap_or(().into()))
+            Self::from(decode_value(value).unwrap_or(::value::Value::Null))
         } else {
             // This is for backwards compatibility. Only `value` should be set
             let fields = log

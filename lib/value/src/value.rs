@@ -232,16 +232,14 @@ impl Value {
         let mut path_iter = path.segment_iter().peekable();
 
         match path_iter.peek() {
-            None => {
-                return Some(std::mem::replace(self, insert_value));
-            }
+            None => Some(std::mem::replace(self, insert_value)),
             Some(BorrowedSegment::Field(field)) => {
-                if let Value::Object(map) = self {
+                if let Self::Object(map) = self {
                     insert::map_insert(map, path_iter, insert_value)
                 } else {
                     let mut map = BTreeMap::new();
                     let prev_value = insert::map_insert(&mut map, path_iter, insert_value);
-                    *self = Value::Object(map);
+                    *self = Self::Object(map);
                     prev_value
                 }
             }
@@ -251,7 +249,7 @@ impl Value {
                 } else {
                     let mut array = vec![];
                     let prev_value = insert::array_insert(&mut array, path_iter, insert_value);
-                    *self = Value::Array(array);
+                    *self = Self::Array(array);
                     prev_value
                 }
             }
@@ -263,7 +261,7 @@ impl Value {
     ///
     /// A special case worth mentioning: if there is a nested array and an item is removed
     /// from the middle of this array, then it is just replaced by `Value::Null`.
-    pub fn remove<'a>(&mut self, path: impl Path<'a>, prune: bool) -> Option<Value> {
+    pub fn remove<'a>(&mut self, path: impl Path<'a>, prune: bool) -> Option<Self> {
         remove::remove(self, path, prune)
     }
 

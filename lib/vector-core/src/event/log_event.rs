@@ -159,7 +159,7 @@ impl LogEvent {
         }
     }
 
-    ///  Create a `LogEvent` from a Value and EventMetadata
+    ///  Create a `LogEvent` from a `Value` and `EventMetadata`
     pub fn from_parts(value: Value, metadata: EventMetadata) -> Self {
         Self {
             inner: Arc::new(value.into()),
@@ -167,7 +167,7 @@ impl LogEvent {
         }
     }
 
-    ///  Create a `LogEvent` from a BTreeMap and EventMetadata
+    ///  Create a `LogEvent` from a `BTreeMap` and `EventMetadata`
     pub fn from_map(map: BTreeMap<String, Value>, metadata: EventMetadata) -> Self {
         let inner = Arc::new(Inner::from(Value::Object(map)));
         Self { inner, metadata }
@@ -267,11 +267,7 @@ impl LogEvent {
     }
 
     pub fn all_fields(&self) -> Option<impl Iterator<Item = (String, &Value)> + Serialize> {
-        if let Some(map) = self.as_map() {
-            Some(util::log::all_fields(map))
-        } else {
-            None
-        }
+        self.as_map().map(util::log::all_fields)
     }
 
     /// Returns an iterator of all fields if the value is an Object. Otherwise,

@@ -248,7 +248,7 @@ impl DataStreamConfig {
         let dataset = self.dataset(&*log);
         let namespace = self.namespace(&*log);
 
-        if !log.as_map().is_some() {
+        if log.as_map().is_none() {
             *log.value_mut() = Value::Object(BTreeMap::new());
         }
         let existing = log

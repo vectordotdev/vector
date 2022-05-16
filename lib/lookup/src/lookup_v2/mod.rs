@@ -323,9 +323,7 @@ impl quickcheck::Arbitrary for BorrowedSegment<'static> {
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
         match self {
             BorrowedSegment::Invalid => Box::new(std::iter::empty()),
-            BorrowedSegment::Index(index) => {
-                Box::new(index.shrink().map(|i| BorrowedSegment::Index(i)))
-            }
+            BorrowedSegment::Index(index) => Box::new(index.shrink().map(BorrowedSegment::Index)),
             BorrowedSegment::Field(field) => Box::new(
                 field
                     .to_string()
