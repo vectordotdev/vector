@@ -588,6 +588,9 @@ mod integration_test {
                 acknowledgements,
             ));
             let events = collect_n(rx, 10).await;
+            // Wait a beat to let the finalization task collect the
+            // status receivers sent to it.
+            tokio::task::yield_now().await;
             drop(trigger_shutdown);
             shutdown_done.await;
 
