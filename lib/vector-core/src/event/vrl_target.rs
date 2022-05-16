@@ -610,32 +610,6 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
     map.into()
 }
 
-// // Turn a `Value` back into `LogEvents`:
-// // * In the common case, where `.` is a map, just create an event using it as the event fields.
-// // * If `.` is an array, map over all of the values to create log events:
-// //   * If an element is an object, create an event using that as fields.
-// //   * If an element is anything else, assign to the `message` key.
-// // * If `.` is anything else, assign to the `message` key.
-// fn value_into_logevents(value: Value, metadata: EventMetadata) -> impl Iterator<Item = LogEvent> {
-//     match value {
-//         Value::Object(object) => Box::new(std::iter::once(LogEvent::from_map(object, metadata)))
-//             as Box<dyn Iterator<Item = LogEvent>>,
-//         Value::Array(values) => Box::new(values.into_iter().map(move |v| match v {
-//             Value::Object(object) => LogEvent::from_map(object, metadata.clone()),
-//             v => {
-//                 let mut log = LogEvent::new_with_metadata(metadata.clone());
-//                 log.insert(log_schema().message_key(), v);
-//                 log
-//             }
-//         })) as Box<dyn Iterator<Item = LogEvent>>,
-//         v => {
-//             let mut log = LogEvent::new_with_metadata(metadata);
-//             log.insert(log_schema().message_key(), v);
-//             Box::new(std::iter::once(log)) as Box<dyn Iterator<Item = LogEvent>>
-//         }
-//     }
-// }
-
 #[derive(Debug, Snafu)]
 enum MetricPathError<'a> {
     #[snafu(display("cannot set root path"))]
