@@ -232,7 +232,7 @@ impl LogEvent {
         path: impl Path<'a>,
         value: impl Into<Value> + Debug,
     ) -> Option<Value> {
-        self.value_mut().insert_by_path_v2(path, value.into())
+        self.value_mut().insert(path, value.into())
     }
 
     // deprecated - using this means the schema is unknown
@@ -570,8 +570,8 @@ mod test {
         });
 
         let mut expected_value = value.clone();
-        let val = expected_value.remove("one", true).unwrap().unwrap();
-        expected_value.insert("three", val).unwrap();
+        let one = expected_value.remove("one", true).unwrap();
+        expected_value.insert("three", one);
 
         let mut base = LogEvent::from_parts(value, EventMetadata::default());
         base.rename_key(path!("one"), path!("three"));
@@ -590,8 +590,8 @@ mod test {
         });
 
         let mut expected_value = value.clone();
-        let val = expected_value.remove("one", true).unwrap().unwrap();
-        expected_value.insert("two".to_string(), val);
+        let val = expected_value.remove("one", true).unwrap();
+        expected_value.insert("two", val);
 
         let mut base = LogEvent::from_parts(value, EventMetadata::default());
         base.rename_key(path!("one"), path!("two"));

@@ -21,7 +21,6 @@ mod serde;
 #[cfg(any(test, feature = "toml"))]
 mod toml;
 
-
 use std::{
     collections::BTreeMap,
     fmt::Debug,
@@ -35,7 +34,6 @@ pub use iter::IterItem;
 use lookup::lookup_v2::{BorrowedSegment, Path};
 
 use ordered_float::NotNan;
-
 
 pub use crate::value::regex::ValueRegex;
 
@@ -224,7 +222,7 @@ impl Value {
 
     /// Returns a reference to a field value specified by a path iter.
     #[allow(clippy::needless_pass_by_value)]
-    pub fn insert_by_path_v2<'a>(
+    pub fn insert<'a>(
         &mut self,
         path: impl Path<'a>,
         insert_value: impl Into<Self>,
@@ -405,7 +403,7 @@ mod test {
             let mut value = Value::from(BTreeMap::default());
             let key = "root";
             let mut marker = Value::from(true);
-            assert_eq!(value.insert_by_path_v2(key, marker.clone()), None);
+            assert_eq!(value.insert(key, marker.clone()), None);
             assert_eq!(value.as_object().unwrap()[key], marker);
             assert_eq!(value.get(key), Some(&marker));
             assert_eq!(value.get_mut(key), Some(&mut marker));
@@ -417,7 +415,7 @@ mod test {
             let mut value = Value::from(BTreeMap::default());
             let key = "root.doot";
             let mut marker = Value::from(true);
-            assert_eq!(value.insert_by_path_v2(key, marker.clone()), None);
+            assert_eq!(value.insert(key, marker.clone()), None);
             assert_eq!(
                 value.as_object().unwrap()["root"].as_object().unwrap()["doot"],
                 marker
@@ -432,7 +430,7 @@ mod test {
             let mut value = Value::from(BTreeMap::default());
             let key = "root.doot.toot";
             let mut marker = Value::from(true);
-            assert_eq!(value.insert_by_path_v2(key, marker.clone()), None);
+            assert_eq!(value.insert(key, marker.clone()), None);
             assert_eq!(
                 value.as_object().unwrap()["root"].as_object().unwrap()["doot"]
                     .as_object()
@@ -449,7 +447,7 @@ mod test {
             let mut value = Value::from(Vec::<Value>::default());
             let key = "[0]";
             let mut marker = Value::from(true);
-            assert_eq!(value.insert_by_path_v2(key, marker.clone()), None);
+            assert_eq!(value.insert(key, marker.clone()), None);
             assert_eq!(value.as_array_unwrap()[0], marker);
             assert_eq!(value.get(key), Some(&marker));
             assert_eq!(value.get_mut(key), Some(&mut marker));
@@ -461,7 +459,7 @@ mod test {
             let mut value = Value::from(Vec::<Value>::default());
             let key = "[0][0]";
             let mut marker = Value::from(true);
-            assert_eq!(value.insert_by_path_v2(key, marker.clone()), None);
+            assert_eq!(value.insert(key, marker.clone()), None);
             assert_eq!(value.as_array_unwrap()[0].as_array_unwrap()[0], marker);
             assert_eq!(value.get(key), Some(&marker));
             assert_eq!(value.get_mut(key), Some(&mut marker));
@@ -473,7 +471,7 @@ mod test {
             let mut value = Value::from(BTreeMap::default());
             let key = "root[0]";
             let mut marker = Value::from(true);
-            assert_eq!(value.insert_by_path_v2(key, marker.clone()), None);
+            assert_eq!(value.insert(key, marker.clone()), None);
             assert_eq!(
                 value.as_object().unwrap()["root"].as_array_unwrap()[0],
                 marker
@@ -488,7 +486,7 @@ mod test {
             let mut value = Value::from(Vec::<Value>::default());
             let key = "[0].boot";
             let mut marker = Value::from(true);
-            assert_eq!(value.insert_by_path_v2(key, marker.clone()), None);
+            assert_eq!(value.insert(key, marker.clone()), None);
             assert_eq!(
                 value.as_array_unwrap()[0].as_object().unwrap()["boot"],
                 marker
@@ -503,7 +501,7 @@ mod test {
             let mut value = Value::from(Vec::<Value>::default());
             let key = "[0][0].boot";
             let mut marker = Value::from(true);
-            assert_eq!(value.insert_by_path_v2(key, marker.clone()), None);
+            assert_eq!(value.insert(key, marker.clone()), None);
             assert_eq!(
                 value.as_array_unwrap()[0].as_array_unwrap()[0]
                     .as_object()
@@ -519,7 +517,7 @@ mod test {
             let mut value = Value::from(BTreeMap::default());
             let key = "root[0][0].boot";
             let mut marker = Value::from(true);
-            assert_eq!(value.insert_by_path_v2(key, marker.clone()), None);
+            assert_eq!(value.insert(key, marker.clone()), None);
             assert_eq!(
                 value.as_object().unwrap()["root"].as_array_unwrap()[0].as_array_unwrap()[0]
                     .as_object()
@@ -535,13 +533,10 @@ mod test {
         fn populated_field() {
             let mut value = Value::from(BTreeMap::default());
             let marker = Value::from(true);
-            assert_eq!(value.insert_by_path_v2("a[2]", marker.clone()), None);
+            assert_eq!(value.insert("a[2]", marker.clone()), None);
 
             let key = "a[0]";
-            assert_eq!(
-                value.insert_by_path_v2(key, marker.clone()),
-                Some(Value::Null)
-            );
+            assert_eq!(value.insert(key, marker.clone()), Some(Value::Null));
 
             assert_eq!(value.as_object().unwrap()["a"].as_array_unwrap().len(), 3);
             assert_eq!(value.as_object().unwrap()["a"].as_array_unwrap()[0], marker);
@@ -553,10 +548,7 @@ mod test {
 
             // Replace the value at 0.
             let marker = Value::from(false);
-            assert_eq!(
-                value.insert_by_path_v2(key, marker.clone()),
-                Some(Value::from(true))
-            );
+            assert_eq!(value.insert(key, marker.clone()), Some(Value::from(true)));
             assert_eq!(value.as_object().unwrap()["a"].as_array_unwrap()[0], marker);
         }
     }
@@ -569,7 +561,7 @@ mod test {
             let mut value = Value::from(BTreeMap::default());
             let key = "foo.bar";
             let marker = Value::from(true);
-            assert_eq!(value.insert_by_path_v2(key, marker.clone()), None);
+            assert_eq!(value.insert(key, marker.clone()), None);
             // Since the `foo` map is now empty, this should get cleaned.
             assert_eq!(value.remove(key, true), Some(marker));
             assert!(!value.contains("foo"));
@@ -580,7 +572,7 @@ mod test {
             let mut value = Value::from(BTreeMap::default());
             let key = "foo[0]";
             let marker = Value::from(true);
-            assert_eq!(value.insert_by_path_v2(key, marker.clone()), None);
+            assert_eq!(value.insert(key, marker.clone()), None);
             // Since the `foo` map is now empty, this should get cleaned.
             assert_eq!(value.remove(key, true), Some(marker));
             assert!(!value.contains("foo"));
@@ -591,7 +583,7 @@ mod test {
             let mut value = Value::from(Vec::<Value>::default());
             let key = "[0].bar";
             let marker = Value::from(true);
-            assert_eq!(value.insert_by_path_v2(key, marker.clone()), None);
+            assert_eq!(value.insert(key, marker.clone()), None);
             // Since the `foo` map is now empty, this should get cleaned.
             assert_eq!(value.remove(key, true), Some(marker));
             assert!(!value.contains(path!(0)));
@@ -602,7 +594,7 @@ mod test {
             let mut value = Value::from(Vec::<Value>::default());
             let key = "[0][0]";
             let marker = Value::from(true);
-            assert_eq!(value.insert_by_path_v2(key, marker.clone()), None);
+            assert_eq!(value.insert(key, marker.clone()), None);
             // Since the `foo` map is now empty, this should get cleaned.
             assert_eq!(value.remove(key, true), Some(marker));
             assert!(!value.contains(path!(0)));
@@ -618,11 +610,7 @@ mod test {
             // Push a field at the start of the path so the top level is a map.
             path.insert(0, BorrowedSegment::from("field"));
 
-            assert_eq!(
-                value.insert_by_path_v2(&path, marker.clone()),
-                None,
-                "inserting value"
-            );
+            assert_eq!(value.insert(&path, marker.clone()), None, "inserting value");
             assert_eq!(value.get(&path), Some(&marker), "retrieving value");
             assert_eq!(
                 value.get_mut(&path),
