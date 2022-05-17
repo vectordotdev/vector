@@ -281,7 +281,10 @@ impl PubsubSource {
                 },
                 response = stream.next() => match response {
                     Some(Ok(response)) => self.handle_response(response, &finalizer).await,
-                    Some(Err(error)) => emit!(GcpPubsubReceiveError { error }),
+                    Some(Err(error)) => {
+                        emit!(GcpPubsubReceiveError { error });
+                        break;
+                    }
                     None => break,
                 },
             }
