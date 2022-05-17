@@ -145,7 +145,6 @@ impl GcpCredentials {
                             %error
                         );
                     }
-                    ()
                 }
             },
         )
