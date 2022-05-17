@@ -10,7 +10,6 @@ use indexmap::IndexMap;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use tokio::{
-    select,
     sync::mpsc::{self},
     time::{sleep, Duration},
 };
@@ -24,7 +23,6 @@ use super::{
 use crate::{
     common::datadog::{get_api_base_endpoint, Region},
     http::{HttpClient, HttpError},
-    signal::{SignalRx, SignalTo},
     sinks::{
         datadog::{logs::DatadogLogsConfig, metrics::DatadogMetricsConfig},
         util::retries::ExponentialBackoff,
@@ -110,9 +108,6 @@ impl Default for Options {
 pub enum EnterpriseError {
     Disabled,
     MissingApiKey,
-    FatalCouldNotReportConfig,
-    CouldNotReportConfig,
-    Interrupt,
 }
 
 /// Holds data required to authorize a request to the Datadog OP reporting endpoint.
@@ -419,116 +414,6 @@ where
             error!(message = "Unable to report configuration due to internal Vector issue: could not send through channel");
         }
     }
-}
-
-/// Augment configuration with observability via Datadog if the feature is enabled and
-/// an API key is provided.
-pub async fn try_attach(
-    config: &mut Config,
-    config_paths: &[ConfigPath],
-    mut signal_rx: SignalRx,
-) -> Result<(), EnterpriseError> {
-    // Only valid if a [enterprise] section is present in config.
-    let datadog = match config.enterprise.clone() {
-        Some(datadog) => datadog,
-        _ => return Err(EnterpriseError::Disabled),
-    };
-
-    // Return early if an API key is missing, or the feature isn't enabled.
-    let api_key = match (&datadog.api_key, datadog.enabled) {
-        // API key provided explicitly.
-        (Some(api_key), true) => api_key.clone(),
-        // No API key; attempt to get it from the environment.
-        (None, true) => match env::var("DATADOG_API_KEY").or_else(|_| env::var("DD_API_KEY")) {
-            Ok(api_key) => api_key,
-            _ => return Err(EnterpriseError::MissingApiKey),
-        },
-        _ => return Err(EnterpriseError::MissingApiKey),
-    };
-
-    info!(
-        "Datadog API key provided. Integration with {} is enabled.",
-        DATADOG_REPORTING_PRODUCT
-    );
-
-    // Get the configuration version. In DD Pipelines, this is referred to as the 'config hash'.
-    let config_version = config.version.clone().expect("Config should be versioned");
-
-    // Get the Vector version. This is reported to Pipelines along with a config hash.
-    let vector_version = crate::get_version();
-
-    // Report the internal configuration to Datadog Observability Pipelines.
-    // First, we need to create a JSON representation of config, based on the original files
-    // that Vector was spawned with.
-    let (table, _) = process_paths(config_paths)
-        .map(|paths| load_source_from_paths(&paths).ok())
-        .flatten()
-        .expect("Couldn't load source from config paths. Please report.");
-
-    // Set the relevant fields needed to report a config to Datadog. This is a struct rather than
-    // exploding as func arguments to avoid confusion with multiple &str fields.
-    let fields = PipelinesStrFields {
-        config_version: config_version.as_ref(),
-        vector_version: &vector_version,
-    };
-
-    // Set the Datadog authorization fields. There's an API and app key, to allow read/write
-    // access in tandem with RBAC on the Datadog side.
-    let auth = PipelinesAuth {
-        api_key: &api_key,
-        application_key: &datadog.application_key,
-    };
-
-    // Create a HTTP client for posting a Vector version to Datadog OP. This will
-    // respect any proxy settings provided in top-level config.
-    let client = HttpClient::new(None, &datadog.proxy)
-        .expect("couldn't instrument Datadog HTTP client. Please report");
-
-    // Endpoint to report a config to Datadog OP.
-    let endpoint = get_reporting_endpoint(
-        datadog.endpoint.as_ref(),
-        datadog.site.as_ref(),
-        datadog.region,
-        &datadog.configuration_key,
-    );
-
-    // Datadog uses a JSON:API, so we'll serialize the config to a JSON
-    let payload = PipelinesVersionPayload::new(&table, &fields);
-
-    select! {
-        biased;
-        Ok(SignalTo::Shutdown | SignalTo::Quit) = signal_rx.recv() => return Err(EnterpriseError::Interrupt),
-        report = report_serialized_config_to_datadog(&client, &endpoint, &auth, &payload, datadog.max_retries) => {
-            match report {
-                Ok(()) => {
-                    info!(
-                        "Vector config {} successfully reported to {}.",
-                        &config_version, DATADOG_REPORTING_PRODUCT
-                    );
-                }
-                Err(err) => {
-                    error!(
-                        err = ?err.to_string(),
-                        "Could not report Vector config to {}.", DATADOG_REPORTING_PRODUCT
-                    );
-
-                    if datadog.exit_on_fatal_error {
-                        return Err(EnterpriseError::FatalCouldNotReportConfig);
-                    } else {
-                        return Err(EnterpriseError::CouldNotReportConfig);
-                    }
-                }
-            }
-        }
-    }
-
-    setup_metrics_reporting(config, &datadog, api_key.clone(), config_version.clone());
-
-    if datadog.enable_logs_reporting {
-        setup_logs_reporting(config, &datadog, api_key, config_version);
-    }
-
-    Ok(())
 }
 
 fn setup_logs_reporting(
