@@ -33,6 +33,7 @@ once_cell = { version = "1.10", optional = true }
 rand = { version = "0.8.5", optional = true }
 regex = { version = "1", optional = true }
 rust_decimal = { version = "1", optional = true }
+serde = { version = "1", default-features = false, features = ["derive"], optional = true }
 serde_json = { version = "1", optional = true }
 sha-1 = { version = "0.10", optional = true }
 sha-2 = { package = "sha2", version = "0.10", optional = true }
@@ -114,6 +115,7 @@ default = [
     "is_empty",
     "is_float",
     "is_integer",
+    "is_json",
     "is_null",
     "is_nullish",
     "is_object",
@@ -249,6 +251,7 @@ is_boolean = []
 is_empty = []
 is_float = []
 is_integer = []
+is_json = ["serde", "serde_json", "value/json"]
 is_null = []
 is_nullish = []
 is_object = []

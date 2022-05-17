@@ -101,6 +101,8 @@ mod is_empty;
 mod is_float;
 #[cfg(feature = "is_integer")]
 mod is_integer;
+#[cfg(feature = "is_json")]
+mod is_json;
 #[cfg(feature = "is_null")]
 mod is_null;
 #[cfg(feature = "is_nullish")]
@@ -372,6 +374,8 @@ pub use is_empty::IsEmpty;
 pub use is_float::IsFloat;
 #[cfg(feature = "is_integer")]
 pub use is_integer::IsInteger;
+#[cfg(feature = "is_json")]
+pub use is_json::IsJson;
 #[cfg(feature = "is_null")]
 pub use is_null::IsNull;
 #[cfg(feature = "is_nullish")]
@@ -642,6 +646,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(IsFloat),
         #[cfg(feature = "is_integer")]
         Box::new(IsInteger),
+        #[cfg(feature = "is_json")]
+        Box::new(IsJson),
         #[cfg(feature = "is_null")]
         Box::new(IsNull),
         #[cfg(feature = "is_nullish")]
