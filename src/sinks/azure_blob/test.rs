@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use chrono::Utc;
-use codecs::{encoding::Framer, NewlineDelimitedEncoder, RawMessageSerializer};
+use codecs::{encoding::Framer, NewlineDelimitedEncoder, TextSerializer};
 use vector_core::partition::Partitioner;
 
 use super::config::AzureBlobSinkConfig;
@@ -60,7 +60,7 @@ fn azure_blob_build_request_without_compression() {
             Default::default(),
             Encoder::<Framer>::new(
                 NewlineDelimitedEncoder::new().into(),
-                RawMessageSerializer::new().into(),
+                TextSerializer::new().into(),
             ),
         ),
         compression,
@@ -101,7 +101,7 @@ fn azure_blob_build_request_with_compression() {
             Default::default(),
             Encoder::<Framer>::new(
                 NewlineDelimitedEncoder::new().into(),
-                RawMessageSerializer::new().into(),
+                TextSerializer::new().into(),
             ),
         ),
         compression,
@@ -142,7 +142,7 @@ fn azure_blob_build_request_with_time_format() {
             Default::default(),
             Encoder::<Framer>::new(
                 NewlineDelimitedEncoder::new().into(),
-                RawMessageSerializer::new().into(),
+                TextSerializer::new().into(),
             ),
         ),
         compression,
@@ -186,7 +186,7 @@ fn azure_blob_build_request_with_uuid() {
             Default::default(),
             Encoder::<Framer>::new(
                 NewlineDelimitedEncoder::new().into(),
-                RawMessageSerializer::new().into(),
+                TextSerializer::new().into(),
             ),
         ),
         compression,

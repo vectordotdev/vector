@@ -158,7 +158,7 @@ impl S3SinkConfig {
                 // TODO: We probably want to use something like octet framing here.
                 return Err("Native encoding is not implemented for this sink yet".into());
             }
-            (None, Serializer::NativeJson(_) | Serializer::RawMessage(_)) => {
+            (None, Serializer::NativeJson(_) | Serializer::RawMessage(_) | Serializer::Text(_)) => {
                 NewlineDelimitedEncoder::new().into()
             }
         };

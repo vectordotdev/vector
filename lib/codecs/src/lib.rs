@@ -21,5 +21,5 @@ pub use encoding::{
     JsonSerializer, JsonSerializerConfig, LengthDelimitedEncoder, LengthDelimitedEncoderConfig,
     NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer, NativeSerializerConfig,
     NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig, RawMessageSerializer,
-    RawMessageSerializerConfig,
+    RawMessageSerializerConfig, TextSerializer, TextSerializerConfig,
 };
