@@ -30,9 +30,8 @@ use crate::{
     schema,
     serde::{default_decoding, default_framing_message_based},
     sources::datadog::agent::{
-        logs::{decode_log_body, LogMsg},
-        metrics::DatadogSeriesRequest,
-        DatadogAgentConfig, DatadogAgentSource, LOGS, METRICS, TRACES,
+        logs::decode_log_body, metrics::DatadogSeriesRequest, DatadogAgentConfig,
+        DatadogAgentSource, LogMsg, LOGS, METRICS, TRACES,
     },
     test_util::{
         components::{assert_source_compliance, HTTP_PUSH_SOURCE_TAGS},

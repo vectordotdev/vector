@@ -133,7 +133,7 @@ pub(super) fn merged_definition(
 /// Si1).
 pub(super) fn expanded_definitions(
     inputs: &[OutputId],
-    config: &topology::Config,
+    config: &dyn ComponentContainer,
     cache: &mut HashMap<Vec<OutputId>, Vec<Definition>>,
 ) -> Vec<Definition> {
     // Try to get the definition from the cache.
@@ -297,15 +297,8 @@ mod tests {
 
     use indexmap::IndexMap;
     use pretty_assertions::assert_eq;
-    use serde::{Deserialize, Serialize};
     use value::Kind;
-    use vector_core::{
-        config::{DataType, Input, Output},
-        source::Source,
-        transform::{Transform, TransformConfig, TransformContext},
-    };
-
-    use crate::config::{SourceConfig, SourceContext, SourceOuter, TransformOuter};
+    use vector_core::config::{DataType, Output};
 
     use super::*;
 
@@ -314,7 +307,7 @@ mod tests {
         struct TestCase {
             inputs: Vec<(&'static str, Option<String>)>,
             sources: IndexMap<&'static str, Vec<Output>>,
-            transforms: IndexMap<&'static str, (Vec<OutputId>, Vec<Output>)>,
+            transforms: IndexMap<&'static str, Vec<Output>>,
             want: Definition,
         }
 
@@ -432,6 +425,24 @@ mod tests {
             sources: IndexMap<&'static str, Vec<Output>>,
             transforms: IndexMap<&'static str, (Vec<OutputId>, Vec<Output>)>,
             want: Vec<Definition>,
+        }
+
+        impl ComponentContainer for TestCase {
+            fn source_outputs(&self, key: &ComponentKey) -> Option<Vec<Output>> {
+                self.sources.get(key.id()).cloned()
+            }
+
+            fn transform_inputs(&self, _key: &ComponentKey) -> Option<&[OutputId]> {
+                Some(&[])
+            }
+
+            fn transform_outputs(
+                &self,
+                key: &ComponentKey,
+                _merged_definition: &Definition,
+            ) -> Option<Vec<Output>> {
+                self.transforms.get(key.id()).cloned().map(|v| v.1)
+            }
         }
 
         for (title, case) in HashMap::from([
