@@ -27,6 +27,19 @@ use crate::{
     tls::TlsEnableableConfig,
 };
 
+#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
+#[derivative(Default)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum HttpMethod {
+    Head,
+    Get,
+    #[derivative(Default)]
+    Post,
+    Put,
+    Patch,
+    Delete,
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub(super) struct SimpleHttpConfig {
     address: SocketAddr,
@@ -44,6 +57,8 @@ pub(super) struct SimpleHttpConfig {
     path: String,
     #[serde(default = "default_path_key")]
     path_key: String,
+    #[serde(default)]
+    method: HttpMethod,
     framing: Option<FramingConfig>,
     decoding: Option<DeserializerConfig>,
     #[serde(default, deserialize_with = "bool_or_struct")]
@@ -63,8 +78,9 @@ impl GenerateConfig for SimpleHttpConfig {
             query_parameters: Vec::new(),
             tls: None,
             auth: None,
-            path_key: "path".to_string(),
             path: "/".to_string(),
+            path_key: "path".to_string(),
+            method: HttpMethod::Post,
             strict_path: true,
             framing: None,
             decoding: Some(default_decoding()),
@@ -180,6 +196,7 @@ impl SourceConfig for SimpleHttpConfig {
         source.run(
             self.address,
             self.path.as_str(),
+            self.method,
             self.strict_path,
             &self.tls,
             &self.auth,
@@ -234,6 +251,7 @@ fn add_headers(events: &mut [Event], headers_config: &[String], headers: HeaderM
 #[cfg(test)]
 mod tests {
     use lookup::path;
+    use std::str::FromStr;
     use std::{collections::BTreeMap, io::Write, net::SocketAddr};
 
     use codecs::{
@@ -245,10 +263,11 @@ mod tests {
         Compression,
     };
     use futures::Stream;
-    use http::HeaderMap;
+    use http::{HeaderMap, Method};
     use pretty_assertions::assert_eq;
 
     use super::SimpleHttpConfig;
+    use crate::sources::http::HttpMethod;
     use crate::{
         config::{log_schema, SourceConfig, SourceContext},
         event::{Event, EventStatus, Value},
@@ -270,6 +289,7 @@ mod tests {
         query_parameters: Vec<String>,
         path_key: &'a str,
         path: &'a str,
+        method: &'a str,
         strict_path: bool,
         status: EventStatus,
         acknowledgements: bool,
@@ -282,6 +302,12 @@ mod tests {
         let path = path.to_owned();
         let path_key = path_key.to_owned();
         let context = SourceContext::new_test(sender, None);
+        let method = match Method::from_str(method).unwrap() {
+            Method::GET => HttpMethod::Get,
+            Method::POST => HttpMethod::Post,
+            _ => HttpMethod::Post,
+        };
+
         tokio::spawn(async move {
             SimpleHttpConfig {
                 address,
@@ -293,6 +319,7 @@ mod tests {
                 strict_path,
                 path_key,
                 path,
+                method,
                 framing,
                 decoding,
                 acknowledgements: acknowledgements.into(),
@@ -352,6 +379,19 @@ mod tests {
             .as_u16()
     }
 
+    async fn send_request(address: SocketAddr, method: &str, body: &str, path: &str) -> u16 {
+        let method = Method::from_bytes(method.to_owned().as_bytes()).unwrap();
+        format!("method: {}", method.as_str());
+        reqwest::Client::new()
+            .request(method, &format!("http://{}{}", address, path))
+            .body(body.to_owned())
+            .send()
+            .await
+            .unwrap()
+            .status()
+            .as_u16()
+    }
+
     async fn send_bytes(address: SocketAddr, body: Vec<u8>, headers: HeaderMap) -> u16 {
         reqwest::Client::new()
             .post(&format!("http://{}/", address))
@@ -384,6 +424,7 @@ mod tests {
             vec![],
             "http_path",
             "/",
+            "POST",
             true,
             EventStatus::Delivered,
             true,
@@ -422,6 +463,7 @@ mod tests {
             vec![],
             "http_path",
             "/",
+            "POST",
             true,
             EventStatus::Delivered,
             true,
@@ -461,6 +503,7 @@ mod tests {
             vec![],
             "http_path",
             "/",
+            "POST",
             true,
             EventStatus::Delivered,
             true,
@@ -491,6 +534,7 @@ mod tests {
                 vec![],
                 "http_path",
                 "/",
+                "POST",
                 true,
                 EventStatus::Delivered,
                 true,
@@ -534,6 +578,7 @@ mod tests {
                 vec![],
                 "http_path",
                 "/",
+                "POST",
                 true,
                 EventStatus::Delivered,
                 true,
@@ -580,6 +625,7 @@ mod tests {
                 vec![],
                 "http_path",
                 "/",
+                "POST",
                 true,
                 EventStatus::Delivered,
                 true,
@@ -625,6 +671,7 @@ mod tests {
                 vec![],
                 "http_path",
                 "/",
+                "POST",
                 true,
                 EventStatus::Delivered,
                 true,
@@ -702,6 +749,7 @@ mod tests {
                 vec![],
                 "http_path",
                 "/",
+                "POST",
                 true,
                 EventStatus::Delivered,
                 true,
@@ -744,6 +792,7 @@ mod tests {
                 ],
                 "http_path",
                 "/",
+                "POST",
                 true,
                 EventStatus::Delivered,
                 true,
@@ -795,6 +844,7 @@ mod tests {
                 vec![],
                 "http_path",
                 "/",
+                "POST",
                 true,
                 EventStatus::Delivered,
                 true,
@@ -825,6 +875,7 @@ mod tests {
                 vec![],
                 "vector_http_path",
                 "/event/path",
+                "POST",
                 true,
                 EventStatus::Delivered,
                 true,
@@ -860,6 +911,7 @@ mod tests {
                 vec![],
                 "vector_http_path",
                 "/event",
+                "POST",
                 false,
                 EventStatus::Delivered,
                 true,
@@ -911,6 +963,7 @@ mod tests {
             vec![],
             "vector_http_path",
             "/",
+            "POST",
             true,
             EventStatus::Delivered,
             true,
@@ -933,6 +986,7 @@ mod tests {
                 vec![],
                 "http_path",
                 "/",
+                "POST",
                 true,
                 EventStatus::Rejected,
                 true,
@@ -961,6 +1015,7 @@ mod tests {
                 vec![],
                 "http_path",
                 "/",
+                "POST",
                 true,
                 EventStatus::Rejected,
                 false,
@@ -981,5 +1036,24 @@ mod tests {
         .await;
 
         assert_eq!(events.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn http_get_method() {
+        let (_rx, addr) = source(
+            vec![],
+            vec![],
+            "http_path",
+            "/",
+            "GET",
+            true,
+            EventStatus::Delivered,
+            true,
+            None,
+            None,
+        )
+        .await;
+
+        assert_eq!(200, send_request(addr, "GET", "", "/").await);
     }
 }

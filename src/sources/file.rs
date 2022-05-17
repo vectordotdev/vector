@@ -1,4 +1,4 @@
-use std::{convert::TryInto, path::PathBuf, sync::Arc, time::Duration};
+use std::{convert::TryInto, path::PathBuf, time::Duration};
 
 use bytes::Bytes;
 use chrono::Utc;
@@ -6,14 +6,11 @@ use file_source::{
     paths_provider::glob::{Glob, MatchOptions},
     Checkpointer, FileFingerprint, FileServer, FingerprintStrategy, Fingerprinter, Line, ReadFrom,
 };
-use futures::{
-    future::TryFutureExt,
-    stream::{Stream, StreamExt},
-};
+use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use tokio::task::spawn_blocking;
+use tokio::{sync::oneshot, task::spawn_blocking};
 use tracing::{Instrument, Span};
 
 use super::util::{finalizer::OrderedFinalizer, EncodingConfig, MultilineConfig};
@@ -23,7 +20,7 @@ use crate::{
         SourceDescription,
     },
     encoding_transcode::{Decoder, Encoder},
-    event::{BatchNotifier, LogEvent},
+    event::{BatchNotifier, BatchStatus, LogEvent},
     internal_events::{
         FileBytesReceived, FileEventsReceived, FileOpen, FileSourceInternalEventsEmitter,
     },
@@ -325,15 +322,34 @@ pub fn file_source(
     let multiline_config = config.multiline.clone();
     let message_start_indicator = config.message_start_indicator.clone();
     let multi_line_timeout = config.multi_line_timeout;
-    let checkpoints = checkpointer.view();
-    let finalizer = acknowledgements.then(|| {
-        let checkpoints = checkpointer.view();
-        OrderedFinalizer::new(shutdown.clone(), move |entry: FinalizerEntry| {
-            let checkpoints = Arc::clone(&checkpoints);
-            async move { checkpoints.update(entry.file_id, entry.offset) }
-        })
-    });
 
+    let (finalizer, shutdown_checkpointer) = if acknowledgements {
+        // The shutdown sent in to the finalizer is the global
+        // shutdown handle used to tell it to stop accepting new batch
+        // statuses and just wait for the remaining acks to come in.
+        let (finalizer, mut ack_stream) = OrderedFinalizer::<FinalizerEntry>::new(shutdown.clone());
+        // We set up a separate shutdown signal to tie together the
+        // finalizer and the checkpoint writer task in the file
+        // server, to make it continue to write out updated
+        // checkpoints until all the acks have come in.
+        let (send_shutdown, shutdown2) = oneshot::channel::<()>();
+        let checkpoints = checkpointer.view();
+        tokio::spawn(async move {
+            while let Some((status, entry)) = ack_stream.next().await {
+                if status == BatchStatus::Delivered {
+                    checkpoints.update(entry.file_id, entry.offset);
+                }
+            }
+            send_shutdown.send(())
+        });
+        (Some(finalizer), shutdown2.map(|_| ()).boxed())
+    } else {
+        // When not dealing with end-to-end acknowledgements, just
+        // clone the global shutdown to stop the checkpoint writer.
+        (None, shutdown.clone().map(|_| ()).boxed())
+    };
+
+    let checkpoints = checkpointer.view();
     Box::pin(async move {
         info!(message = "Starting file server.", include = ?include, exclude = ?exclude);
 
@@ -404,7 +420,7 @@ pub fn file_source(
         let span = info_span!("file_server");
         spawn_blocking(move || {
             let _enter = span.enter();
-            let result = file_server.run(tx, shutdown, checkpointer);
+            let result = file_server.run(tx, shutdown, shutdown_checkpointer, checkpointer);
             emit!(FileOpen { count: 0 });
             // Panic if we encounter any error originating from the file server.
             // We're at the `spawn_blocking` call, the panic will be caught and
@@ -526,18 +542,6 @@ mod tests {
             glob_minimum_cooldown_ms: 100, // millis
             ..Default::default()
         }
-    }
-
-    async fn wait_with_timeout<F, R>(future: F) -> R
-    where
-        F: Future<Output = R> + Send,
-        R: Send,
-    {
-        timeout(Duration::from_secs(5), future)
-            .await
-            .unwrap_or_else(|_| {
-                panic!("Unclosed channel: may indicate file-server could not shutdown gracefully.")
-            })
     }
 
     async fn sleep_500_millis() {
@@ -1682,7 +1686,17 @@ mod tests {
 
             drop(trigger_shutdown);
 
-            let result = wait_with_timeout(rx.collect::<Vec<_>>()).await;
+            let result = if acking_mode == Unfinalized {
+                rx.take_until(tokio::time::sleep(Duration::from_secs(5)))
+                    .collect::<Vec<_>>()
+                    .await
+            } else {
+                timeout(Duration::from_secs(5), rx.collect::<Vec<_>>())
+                    .await
+                    .expect(
+                        "Unclosed channel: may indicate file-server could not shutdown gracefully.",
+                    )
+            };
             if wait_shutdown {
                 shutdown_done.await;
             }

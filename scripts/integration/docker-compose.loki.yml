@@ -2,7 +2,7 @@ version: "3"
 
 services:
   loki:
-    image: grafana/loki:${LOKI_VERSION:-2.4.1}
+    image: docker.io/grafana/loki:${LOKI_VERSION:-2.4.1}
     command: -config.file=/etc/loki/local-config.yaml -auth.enabled=true
   runner:
     build:
