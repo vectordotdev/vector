@@ -307,8 +307,10 @@ mod integration_tests {
         },
     };
 
-    use futures::future;
-    use futures_util::stream;
+    use futures::{
+        future::{ok, ready},
+        stream,
+    };
     use serde_json::Value;
     use tokio::time::{timeout, Duration};
     use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
@@ -365,8 +367,12 @@ mod integration_tests {
             .as_mut_log()
             .insert("items", vec!["item1", "item2"]);
 
-        run_and_assert_sink_compliance(sink, stream::once(input_event.clone()), &HTTP_SINK_TAGS)
-            .await;
+        run_and_assert_sink_compliance(
+            sink,
+            stream::once(ready(input_event.clone())),
+            &HTTP_SINK_TAGS,
+        )
+        .await;
 
         let output = client.select_all(&table).await;
         assert_eq!(1, output.rows);
@@ -410,8 +416,12 @@ mod integration_tests {
         let (mut input_event, mut receiver) = make_event();
         input_event.as_mut_log().insert("unknown", "mysteries");
 
-        run_and_assert_sink_compliance(sink, stream::once(input_event.clone()), &HTTP_SINK_TAGS)
-            .await;
+        run_and_assert_sink_compliance(
+            sink,
+            stream::once(ready(input_event.clone())),
+            &HTTP_SINK_TAGS,
+        )
+        .await;
 
         let output = client.select_all(&table).await;
         assert_eq!(1, output.rows);
@@ -462,8 +472,12 @@ mod integration_tests {
 
         let (mut input_event, _receiver) = make_event();
 
-        run_and_assert_sink_compliance(sink, stream::once(input_event.clone()), &HTTP_SINK_TAGS)
-            .await;
+        run_and_assert_sink_compliance(
+            sink,
+            stream::once(ready(input_event.clone())),
+            &HTTP_SINK_TAGS,
+        )
+        .await;
 
         let output = client.select_all(&table).await;
         assert_eq!(1, output.rows);
@@ -520,8 +534,12 @@ timestamp_format = "unix""#,
 
         let (mut input_event, _receiver) = make_event();
 
-        run_and_assert_sink_compliance(sink, stream::once(input_event.clone()), &HTTP_SINK_TAGS)
-            .await;
+        run_and_assert_sink_compliance(
+            sink,
+            stream::once(ready(input_event.clone())),
+            &HTTP_SINK_TAGS,
+        )
+        .await;
 
         let output = client.select_all(&table).await;
         assert_eq!(1, output.rows);
@@ -592,7 +610,7 @@ timestamp_format = "unix""#,
             assert!(!visited.load(Ordering::SeqCst), "Should not retry request.");
             visited.store(true, Ordering::SeqCst);
 
-            future::ok::<_, Infallible>(warp::reply::with_status(
+            ok::<_, Infallible>(warp::reply::with_status(
                 "Code: 117",
                 StatusCode::INTERNAL_SERVER_ERROR,
             ))

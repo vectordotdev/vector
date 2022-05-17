@@ -1,5 +1,7 @@
 use std::{convert::TryFrom, iter, num::NonZeroU8, sync::Arc};
 
+use futures::{future::ready, stream};
+
 use serde_json::Value as JsonValue;
 use tokio::time::{sleep, Duration};
 use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
@@ -18,9 +20,7 @@ use crate::{
     },
     template::Template,
     test_util::{
-        components::{
-            assert_sink_compliance_with_event, run_and_assert_sink_compliance, HTTP_SINK_TAGS,
-        },
+        components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
         random_lines_with_stream, random_string,
     },
 };
@@ -129,11 +129,9 @@ async fn splunk_insert_message() {
 
     let message = random_string(100);
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-    let event = LogEvent::from(message.clone())
-        .with_batch_notifier(&batch)
-        .into();
+    let event = Event::from(message.clone()).with_batch_notifier(&batch);
     drop(batch);
-    assert_sink_compliance_with_event(sink, event, &HTTP_SINK_TAGS).await;
+    run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
     let entry = find_entry(message.as_str()).await;
@@ -171,7 +169,7 @@ async fn splunk_insert_source() {
 
     let message = random_string(100);
     let event = Event::from(message.clone());
-    assert_sink_compliance_with_event(sink, event, &HTTP_SINK_TAGS).await;
+    run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
     let entry = find_entry(message.as_str()).await;
 
@@ -188,7 +186,7 @@ async fn splunk_insert_index() {
 
     let message = random_string(100);
     let event = Event::from(message.clone());
-    assert_sink_compliance_with_event(sink, event, &HTTP_SINK_TAGS).await;
+    run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
     let entry = find_entry(message.as_str()).await;
 
@@ -208,7 +206,7 @@ async fn splunk_index_is_interpolated() {
     let message = random_string(100);
     let mut event = Event::from(message.clone());
     event.as_mut_log().insert("index_name", "custom_index");
-    assert_sink_compliance_with_event(sink, event, &HTTP_SINK_TAGS).await;
+    run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
     let entry = find_entry(message.as_str()).await;
 
@@ -240,7 +238,7 @@ async fn splunk_custom_fields() {
     let message = random_string(100);
     let mut event = Event::from(message.clone());
     event.as_mut_log().insert("asdf", "hello");
-    assert_sink_compliance_with_event(sink, event, &HTTP_SINK_TAGS).await;
+    run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
     let entry = find_entry(message.as_str()).await;
 
@@ -261,7 +259,7 @@ async fn splunk_hostname() {
     let mut event = Event::from(message.clone());
     event.as_mut_log().insert("asdf", "hello");
     event.as_mut_log().insert("host", "example.com:1234");
-    assert_sink_compliance_with_event(sink, event, &HTTP_SINK_TAGS).await;
+    run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
     let entry = find_entry(message.as_str()).await;
 
@@ -285,7 +283,7 @@ async fn splunk_sourcetype() {
     let message = random_string(100);
     let mut event = Event::from(message.clone());
     event.as_mut_log().insert("asdf", "hello");
-    assert_sink_compliance_with_event(sink, event, &HTTP_SINK_TAGS).await;
+    run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
     let entry = find_entry(message.as_str()).await;
 
@@ -312,7 +310,7 @@ async fn splunk_configure_hostname() {
     event.as_mut_log().insert("asdf", "hello");
     event.as_mut_log().insert("host", "example.com:1234");
     event.as_mut_log().insert("roast", "beef.example.com:1234");
-    assert_sink_compliance_with_event(sink, event, &HTTP_SINK_TAGS).await;
+    run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
     let entry = find_entry(message.as_str()).await;
 

@@ -4,11 +4,12 @@ use aws_smithy_http::body::SdkBody;
 use bytes::Bytes;
 use chrono::Utc;
 use futures::StreamExt;
+use futures::{future::ready, stream};
 use http::{Request, StatusCode};
 use serde_json::{json, Value};
 use vector_core::{
     config::log_schema,
-    event::{BatchNotifier, BatchStatus, LogEvent},
+    event::{BatchNotifier, BatchStatus, Event, LogEvent},
 };
 
 use super::{config::DATA_STREAM_TIMESTAMP_KEY, *};
@@ -21,9 +22,7 @@ use crate::{
         HealthcheckError,
     },
     test_util::{
-        components::{
-            assert_sink_compliance_with_event, run_and_assert_sink_compliance, HTTP_SINK_TAGS,
-        },
+        components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
         random_events_with_stream, random_string, trace_init,
     },
     tls::{self, TlsConfig},
@@ -153,7 +152,12 @@ async fn structures_events_correctly() {
 
     let timestamp = input_event[crate::config::log_schema().timestamp_key()].clone();
 
-    assert_sink_compliance_with_event(sink, input_event, &HTTP_SINK_TAGS).await;
+    run_and_assert_sink_compliance(
+        sink,
+        stream::once(ready(Event::from(input_event))),
+        &HTTP_SINK_TAGS,
+    )
+    .await;
 
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 

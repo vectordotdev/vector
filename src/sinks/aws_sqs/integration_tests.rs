@@ -35,6 +35,7 @@ async fn create_test_client() -> SqsClient {
         Some(Endpoint::immutable(Uri::from_str(&endpoint).unwrap())),
         &proxy,
         &None,
+        true,
     )
     .await
     .unwrap()

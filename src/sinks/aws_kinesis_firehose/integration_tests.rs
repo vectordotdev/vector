@@ -67,7 +67,7 @@ async fn firehose_put_records() {
 
     let cx = SinkContext::new_test();
 
-    let sink = config.build(cx).await.unwrap();
+    let (sink, _) = config.build(cx).await.unwrap();
 
     let (input, events) = random_events_with_stream(100, 100, None);
 
@@ -143,6 +143,7 @@ async fn firehose_client() -> aws_sdk_firehose::Client {
         region_endpoint.endpoint().unwrap(),
         &proxy,
         &None,
+        true,
     )
     .await
     .unwrap()
