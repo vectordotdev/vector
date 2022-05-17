@@ -118,15 +118,21 @@ where
                 *this.is_shutdown = true
             }
             // Only poll for new entries until shutdown is flagged.
-            match this.new_entries.poll_recv(ctx) {
-                Poll::Pending => (),
-                Poll::Ready(Some((receiver, entry))) => {
-                    let entry = Some(entry);
-                    this.status_receivers
-                        .push(FinalizerFuture { receiver, entry });
+            // Loop over all the ready new entries at once.
+            loop {
+                match this.new_entries.poll_recv(ctx) {
+                    Poll::Pending => break,
+                    Poll::Ready(Some((receiver, entry))) => {
+                        let entry = Some(entry);
+                        this.status_receivers
+                            .push(FinalizerFuture { receiver, entry });
+                    }
+                    // The sender went away before shutdown, count it as a shutdown too.
+                    Poll::Ready(None) => {
+                        *this.is_shutdown = true;
+                        break;
+                    }
                 }
-                // The sender went away before shutdown, count it as a shutdown too.
-                Poll::Ready(None) => *this.is_shutdown = true,
             }
         }
 
