@@ -120,7 +120,7 @@ jobs:
           export SOAK_MEMORY="30g"
           export VECTOR_CPUS="4"
           export COEFFICIENT_OF_VARIATION="0.3"
-          export ERRATIC_SOAKS="http_pipelines_blackhole,http_pipelines_blackhole_acks,http_to_http_acks,http_datadog_filter_blackhole"
+          export ERRATIC_SOAKS="http_to_http_acks"
 
           echo "soak cpus total: ${SOAK_CPUS}"
           echo "soak memory total: ${SOAK_MEMORY}"
