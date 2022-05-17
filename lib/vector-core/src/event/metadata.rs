@@ -1,8 +1,10 @@
 #![deny(missing_docs)]
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
+use value::Value;
 use vector_common::EventDataEq;
 
 use super::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus};
@@ -12,6 +14,9 @@ use crate::{schema, ByteSizeOf};
 /// and `struct LogEvent` types.
 #[derive(Clone, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
 pub struct EventMetadata {
+    /// Arbitrary data stored with an event
+    value: Value,
+
     /// Used to store the datadog API from sources to sinks
     #[serde(default, skip)]
     datadog_api_key: Option<Arc<str>>,
@@ -30,6 +35,16 @@ pub struct EventMetadata {
 }
 
 impl EventMetadata {
+    /// Returns a reference to the metadata value
+    pub fn value(&self) -> &Value {
+        &self.value
+    }
+
+    /// Returns a mutable reference to the metadata value
+    pub fn value_mut(&mut self) -> &mut Value {
+        &mut self.value
+    }
+
     /// Return the datadog API key, if it exists
     pub fn datadog_api_key(&self) -> &Option<Arc<str>> {
         &self.datadog_api_key
@@ -54,6 +69,7 @@ impl EventMetadata {
 impl Default for EventMetadata {
     fn default() -> Self {
         Self {
+            value: Value::Object(BTreeMap::new()),
             datadog_api_key: Default::default(),
             splunk_hec_token: Default::default(),
             finalizers: Default::default(),

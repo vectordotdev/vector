@@ -1,11 +1,14 @@
 use ::value::Value;
+use lookup::{Look, Lookup, LookupBuf};
 use vrl::prelude::*;
 
-fn get_metadata_field(ctx: &mut Context, key: &str) -> std::result::Result<Value, ExpressionError> {
-    ctx.target()
-        .get_metadata_deprecated(key)
-        .map(|value| value.unwrap_or(Value::Null))
-        .map_err(Into::into)
+fn get_metadata_field(
+    ctx: &mut Context,
+    path: &LookupBuf,
+) -> std::result::Result<Value, ExpressionError> {
+    let value = ctx.target().get_metadata(path)?.unwrap_or(Value::Null);
+
+    Ok(value)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -39,12 +42,27 @@ impl Function for GetMetadataField {
         mut arguments: ArgumentList,
     ) -> Compiled {
         let key = arguments
-            .required_enum("key", &super::keys())?
-            .try_bytes_utf8_lossy()
-            .expect("key not bytes")
-            .to_string();
+            .required_literal("key")?
+            .to_value()
+            .as_bytes()
+            .cloned()
+            .expect("key not bytes");
+        let key = String::from_utf8_lossy(key.as_ref());
 
-        Ok(Box::new(GetMetadataFieldFn { key }))
+        // TODO: fix error handling
+        let lookup = Lookup::from_str(key.as_ref()).unwrap().into();
+
+        /*
+        return Err(vrl::function::Error::InvalidArgument {
+                    keyword: "algorithm",
+                    value: algorithm,
+                    error: "Invalid algorithm",
+                }
+                .into());
+
+         */
+
+        Ok(Box::new(GetMetadataFieldFn { path: lookup }))
     }
 
     fn compile_argument(
@@ -57,35 +75,40 @@ impl Function for GetMetadataField {
         match (name, expr) {
             ("key", Some(expr)) => {
                 let key = expr
-                    .as_enum("key", super::keys())?
+                    .as_literal("key")?
                     .try_bytes_utf8_lossy()
                     .expect("key not bytes")
                     .to_string();
-                Ok(Some(Box::new(key) as _))
+                //TODO: fix error handling
+                let lookup: LookupBuf = Lookup::from_str(&key).unwrap().into();
+                Ok(Some(Box::new(lookup) as _))
             }
             _ => Ok(None),
         }
     }
 
     fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let key = args.required_any("key").downcast_ref::<String>().unwrap();
-        get_metadata_field(ctx, key)
+        let path = args
+            .required_any("key")
+            .downcast_ref::<LookupBuf>()
+            .unwrap();
+        get_metadata_field(ctx, path)
     }
 }
 
 #[derive(Debug, Clone)]
 struct GetMetadataFieldFn {
-    key: String,
+    path: LookupBuf,
 }
 
 impl Expression for GetMetadataFieldFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let key = &self.key;
-
-        get_metadata_field(ctx, key)
+        get_metadata_field(ctx, &self.path)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        // TODO: special case existing keys to a String for backwards compat
+        // TODO: use metadata schema when it exists to return a better value here
         TypeDef::bytes().add_null().infallible()
     }
 }

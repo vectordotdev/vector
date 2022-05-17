@@ -1,4 +1,5 @@
 use ::value::Value;
+use lookup::LookupBuf;
 use vrl::prelude::*;
 
 fn set_metadata_field(
@@ -6,8 +7,9 @@ fn set_metadata_field(
     key: &str,
     value: Value,
 ) -> std::result::Result<Value, ExpressionError> {
-    let value = value.try_bytes_utf8_lossy()?.to_string();
-    ctx.target_mut().set_metadata_deprecated(key, value)?;
+    // let value = value.try_bytes_utf8_lossy()?.to_string();
+    ctx.target_mut()
+        .set_metadata(&LookupBuf::from(key), value)?;
     Ok(Value::Null)
 }
 

@@ -58,18 +58,6 @@ pub trait Target: std::fmt::Debug {
     /// left behind, it should be removed as well, cascading up to the root.
     fn target_remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String>;
 
-    fn get_metadata_deprecated(&self, _key: &str) -> Result<Option<Value>, String> {
-        Err("metadata not available".to_string())
-    }
-
-    fn set_metadata_deprecated(&mut self, _key: &str, _value: String) -> Result<(), String> {
-        Err("metadata not available".to_string())
-    }
-
-    fn remove_metadata_deprecated(&mut self, _key: &str) -> Result<(), String> {
-        Err("metadata not available".to_string())
-    }
-
     fn get_metadata(&self, _path: &LookupBuf) -> Result<Option<Value>, String> {
         Err("metadata not available".to_string())
     }
@@ -83,24 +71,24 @@ pub trait Target: std::fmt::Debug {
     }
 }
 
-impl Target for Value {
-    fn target_insert(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
-        self.insert_by_path(path, value);
-        Ok(())
-    }
-
-    fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
-        Ok(self.get_by_path(path))
-    }
-
-    fn target_get_mut(&mut self, path: &LookupBuf) -> Result<Option<&mut Value>, String> {
-        Ok(self.get_by_path_mut(path))
-    }
-
-    fn target_remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String> {
-        Ok(self.remove_by_path(path, compact))
-    }
-}
+// impl Target for Value {
+//     fn target_insert(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
+//         self.insert_by_path(path, value);
+//         Ok(())
+//     }
+//
+//     fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
+//         Ok(self.get_by_path(path))
+//     }
+//
+//     fn target_get_mut(&mut self, path: &LookupBuf) -> Result<Option<&mut Value>, String> {
+//         Ok(self.get_by_path_mut(path))
+//     }
+//
+//     fn target_remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String> {
+//         Ok(self.remove_by_path(path, compact))
+//     }
+// }
 
 #[cfg(test)]
 mod tests {
