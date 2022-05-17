@@ -9094,6 +9094,7 @@ dependencies = [
  "regex",
  "roxmltree",
  "rust_decimal",
+ "serde",
  "serde_json",
  "sha-1 0.10.0",
  "sha2 0.10.2",
