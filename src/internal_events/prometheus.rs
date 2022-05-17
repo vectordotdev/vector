@@ -1,13 +1,13 @@
 #[cfg(feature = "sources-prometheus")]
 use std::borrow::Cow;
-use std::time::Instant;
 
-use super::prelude::{error_stage, error_type, http_error_code};
 use hyper::StatusCode;
-use metrics::{counter, histogram};
+use metrics::counter;
 #[cfg(feature = "sources-prometheus")]
 use prometheus_parser::ParserError;
 use vector_core::internal_event::InternalEvent;
+
+use super::prelude::{error_stage, error_type, http_error_code};
 
 #[derive(Debug)]
 pub struct PrometheusEventsReceived {
@@ -37,20 +37,6 @@ impl InternalEvent for PrometheusEventsReceived {
             "events_in_total", self.count as u64,
             "uri" => self.uri.to_string(),
         );
-    }
-}
-
-#[derive(Debug)]
-pub struct PrometheusRequestCompleted {
-    pub start: Instant,
-    pub(crate) end: Instant,
-}
-
-impl InternalEvent for PrometheusRequestCompleted {
-    fn emit(self) {
-        debug!(message = "Request completed.");
-        counter!("requests_completed_total", 1);
-        histogram!("request_duration_seconds", self.end - self.start);
     }
 }
 

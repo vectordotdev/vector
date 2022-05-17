@@ -7,11 +7,11 @@ use k8s_openapi::{
     apimachinery::pkg::apis::meta::v1::ObjectMeta,
 };
 use kube::runtime::reflector::{store::Store, ObjectRef};
+use lookup::lookup_v2::{parse_path, OwnedSegment};
 use serde::{Deserialize, Serialize};
 
 use super::path_helpers::{parse_log_file_path, LogFileInfo};
 use crate::event::{Event, LogEvent};
-use lookup::lookup_v2::{parse_path, OwnedSegment};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]

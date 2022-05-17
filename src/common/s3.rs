@@ -1,10 +1,12 @@
-use crate::aws::ClientBuilder;
+use std::sync::Arc;
+
 use aws_sdk_s3::{Endpoint, Region};
 use aws_smithy_async::rt::sleep::AsyncSleep;
 use aws_smithy_client::erase::DynConnector;
 use aws_smithy_types::retry::RetryConfig;
 use aws_types::credentials::SharedCredentialsProvider;
-use std::sync::Arc;
+
+use crate::aws::ClientBuilder;
 
 pub(crate) struct S3ClientBuilder {}
 

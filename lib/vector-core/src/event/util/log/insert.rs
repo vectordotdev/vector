@@ -1,5 +1,6 @@
-use lookup::lookup_v2::{BorrowedSegment, Path};
 use std::{collections::BTreeMap, iter::Peekable};
+
+use lookup::lookup_v2::{BorrowedSegment, Path};
 
 use super::Value;
 

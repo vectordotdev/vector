@@ -1,6 +1,7 @@
 //! Utilities shared between both VRL functions.
 use std::{collections::BTreeMap, ops::Deref};
 
+use ::value::Value;
 use vrl::{
     diagnostic::{Label, Span},
     prelude::*,

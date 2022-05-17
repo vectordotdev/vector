@@ -19,8 +19,7 @@ use crate::{
     http::{Auth, HttpClient},
     internal_events::{
         EndpointBytesReceived, PrometheusEventsReceived, PrometheusHttpError,
-        PrometheusHttpResponseError, PrometheusParseError, PrometheusRequestCompleted,
-        StreamClosedError,
+        PrometheusHttpResponseError, PrometheusParseError, RequestCompleted, StreamClosedError,
     },
     shutdown::ShutdownSignal,
     sources,
@@ -286,7 +285,7 @@ async fn prometheus(
 
                 ready(match response {
                     Ok((header, body)) if header.status == hyper::StatusCode::OK => {
-                        emit!(PrometheusRequestCompleted {
+                        emit!(RequestCompleted {
                             start,
                             end: Instant::now()
                         });

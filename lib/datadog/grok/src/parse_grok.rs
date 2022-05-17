@@ -1,15 +1,17 @@
-use crate::{
-    grok_filter::apply_filter,
-    parse_grok_rules::{GrokField, GrokRule},
-};
+use std::collections::BTreeMap;
+
 use itertools::{
     FoldWhile::{Continue, Done},
     Itertools,
 };
-use std::collections::BTreeMap;
 use tracing::warn;
 use value::Value;
 use vrl_compiler::Target;
+
+use crate::{
+    grok_filter::apply_filter,
+    parse_grok_rules::{GrokField, GrokRule},
+};
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
@@ -123,12 +125,12 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Re
 #[cfg(test)]
 mod tests {
     use ordered_float::NotNan;
+    use tracing_test::traced_test;
     use value::Value;
+    use vector_common::btreemap;
 
     use super::*;
     use crate::parse_grok_rules::parse_grok_rules;
-    use tracing_test::traced_test;
-    use vector_common::btreemap;
 
     #[test]
     fn parses_simple_grok() {

@@ -1,6 +1,7 @@
-use crate::lookup_v2::{BorrowedSegment, Path};
 use std::borrow::Cow;
 use std::str::CharIndices;
+
+use crate::lookup_v2::{BorrowedSegment, Path};
 
 #[derive(Clone)]
 pub struct JitPath<'a> {
@@ -189,8 +190,9 @@ impl<'a> Iterator for JitLookup<'a> {
 
 #[cfg(test)]
 mod test {
-    use crate::lookup_v2::{BorrowedSegment, JitPath, Path};
     use std::borrow::Cow;
+
+    use crate::lookup_v2::{BorrowedSegment, JitPath, Path};
 
     #[test]
     fn parsing() {

@@ -1,10 +1,13 @@
+use std::{collections::BTreeMap, ops::Deref, sync::Arc};
+
+use value::Value;
+
 use super::VmFunctionClosure;
 use super::{state::VmState, Variable};
 #[cfg(feature = "expr-op")]
 use crate::value::VrlValueArithmetic;
 use crate::value::VrlValueConvert;
-use crate::{vm::argument_list::VmArgument, Context, ExpressionError, Function, Value};
-use std::{collections::BTreeMap, ops::Deref, sync::Arc};
+use crate::{vm::argument_list::VmArgument, Context, ExpressionError, Function};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum OpCode {
@@ -507,11 +510,11 @@ impl Vm {
                         }
                         Variable::Internal(ident, path) => {
                             let value = match ctx.state().variable(ident) {
-                                Some(value) => match path {
-                                    Some(path) => {
+                                Some(value) => match path.is_root() {
+                                    false => {
                                         value.get_by_path(path).cloned().unwrap_or(Value::Null)
                                     }
-                                    None => value.clone(),
+                                    true => value.clone(),
                                 },
                                 None => Value::Null,
                             };
@@ -677,9 +680,9 @@ fn set_variable<'a>(
 ) -> Result<(), ExpressionError> {
     match variable {
         Variable::Internal(ident, path) => {
-            let path = match path {
-                Some(path) => path,
-                None => {
+            let path = match path.is_root() {
+                false => path,
+                true => {
                     ctx.state_mut().insert_variable(ident.clone(), value);
                     return Ok(());
                 }

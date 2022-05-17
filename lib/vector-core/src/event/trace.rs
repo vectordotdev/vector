@@ -1,7 +1,7 @@
-use lookup::LookupBuf;
-use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fmt::Debug, sync::Arc};
 
+use lookup::LookupBuf;
+use serde::{Deserialize, Serialize};
 use vector_buffers::EventCount;
 use vector_common::EventDataEq;
 
@@ -22,6 +22,14 @@ impl TraceEvent {
 
     pub fn from_parts(fields: BTreeMap<String, Value>, metadata: EventMetadata) -> Self {
         Self(LogEvent::from_parts(fields, metadata))
+    }
+
+    pub fn value(&self) -> &Value {
+        self.0.value()
+    }
+
+    pub fn value_mut(&mut self) -> &mut Value {
+        self.0.value_mut()
     }
 
     pub fn metadata(&self) -> &EventMetadata {

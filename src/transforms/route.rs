@@ -159,12 +159,11 @@ mod test {
     use indoc::indoc;
     use vector_core::transform::TransformOutputsBuf;
 
+    use super::*;
     use crate::{
         config::{build_unit_tests, ConfigBuilder},
         test_util::components::{init_test, COMPONENT_MULTIPLE_OUTPUTS_TESTS},
     };
-
-    use super::*;
 
     #[test]
     fn generate_config() {

@@ -1,3 +1,4 @@
+use ::value::Value;
 use cidr_utils::cidr::IpCidr;
 use vrl::prelude::*;
 

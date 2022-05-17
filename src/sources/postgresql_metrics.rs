@@ -30,8 +30,8 @@ use crate::{
     config::{DataType, Output, SourceConfig, SourceContext, SourceDescription},
     event::metric::{Metric, MetricKind, MetricValue},
     internal_events::{
-        EndpointBytesReceived, EventsReceived, PostgresqlMetricsCollectCompleted,
-        PostgresqlMetricsCollectError, StreamClosedError,
+        CollectionCompleted, EndpointBytesReceived, EventsReceived, PostgresqlMetricsCollectError,
+        StreamClosedError,
     },
 };
 
@@ -158,7 +158,7 @@ impl SourceConfig for PostgresqlMetricsConfig {
                 let start = Instant::now();
                 let metrics = join_all(sources.iter_mut().map(|source| source.collect())).await;
                 let count = metrics.len();
-                emit!(PostgresqlMetricsCollectCompleted {
+                emit!(CollectionCompleted {
                     start,
                     end: Instant::now()
                 });
@@ -931,13 +931,14 @@ mod tests {
 
 #[cfg(all(test, feature = "postgresql_metrics-integration-tests"))]
 mod integration_tests {
+    use std::path::PathBuf;
+
     use super::*;
     use crate::{
         event::Event,
         test_util::components::{assert_source_compliance, PULL_SOURCE_TAGS},
         tls, SourceSender,
     };
-    use std::path::PathBuf;
 
     fn pg_host() -> String {
         std::env::var("PG_HOST").unwrap_or_else(|_| "localhost".into())

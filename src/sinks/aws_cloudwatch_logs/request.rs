@@ -1,16 +1,16 @@
-use aws_sdk_cloudwatchlogs::error::{
-    CreateLogGroupError, CreateLogGroupErrorKind, CreateLogStreamError, CreateLogStreamErrorKind,
-    DescribeLogStreamsError, DescribeLogStreamsErrorKind, PutLogEventsError,
-};
-use aws_sdk_cloudwatchlogs::model::InputLogEvent;
-use aws_sdk_cloudwatchlogs::types::SdkError;
 use std::{
     future::Future,
     pin::Pin,
     task::{Context, Poll},
 };
 
+use aws_sdk_cloudwatchlogs::error::{
+    CreateLogGroupError, CreateLogGroupErrorKind, CreateLogStreamError, CreateLogStreamErrorKind,
+    DescribeLogStreamsError, DescribeLogStreamsErrorKind, PutLogEventsError,
+};
+use aws_sdk_cloudwatchlogs::model::InputLogEvent;
 use aws_sdk_cloudwatchlogs::output::{DescribeLogStreamsOutput, PutLogEventsOutput};
+use aws_sdk_cloudwatchlogs::types::SdkError;
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 use futures::{future::BoxFuture, ready, FutureExt};
 use tokio::sync::oneshot;

@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn parse_int(value: Value, base: Option<Value>) -> Resolved {

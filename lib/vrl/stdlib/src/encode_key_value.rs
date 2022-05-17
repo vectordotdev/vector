@@ -1,5 +1,6 @@
 use std::result::Result;
 
+use ::value::Value;
 use vector_common::encode_key_value;
 use vrl::prelude::*;
 

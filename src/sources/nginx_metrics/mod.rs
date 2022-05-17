@@ -16,7 +16,7 @@ use crate::{
     event::metric::{Metric, MetricKind, MetricValue},
     http::{Auth, HttpClient},
     internal_events::{
-        EndpointBytesReceived, NginxMetricsCollectCompleted, NginxMetricsEventsReceived,
+        CollectionCompleted, EndpointBytesReceived, NginxMetricsEventsReceived,
         NginxMetricsRequestError, NginxMetricsStubStatusParseError, StreamClosedError,
     },
     tls::{TlsConfig, TlsSettings},
@@ -105,7 +105,7 @@ impl SourceConfig for NginxMetricsConfig {
                 let start = Instant::now();
                 let metrics = join_all(sources.iter().map(|nginx| nginx.collect())).await;
                 let count = metrics.len();
-                emit!(NginxMetricsCollectCompleted {
+                emit!(CollectionCompleted {
                     start,
                     end: Instant::now()
                 });

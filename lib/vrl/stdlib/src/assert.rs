@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::{diagnostic::Note, prelude::*};
 
 fn assert(condition: Value, message: Option<Value>, format: Option<String>) -> Resolved {
