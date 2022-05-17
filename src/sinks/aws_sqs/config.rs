@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 
 use aws_sdk_sqs::Client as SqsClient;
-use codecs::{encoding::SerializerConfig, JsonSerializerConfig, RawMessageSerializerConfig};
+use codecs::{encoding::SerializerConfig, JsonSerializerConfig, TextSerializerConfig};
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -39,7 +39,7 @@ impl EncodingConfigMigrator for EncodingMigrator {
 
     fn migrate(codec: &Self::Codec) -> SerializerConfig {
         match codec {
-            Encoding::Text => RawMessageSerializerConfig::new().into(),
+            Encoding::Text => TextSerializerConfig::new().into(),
             Encoding::Json => JsonSerializerConfig::new().into(),
         }
     }
