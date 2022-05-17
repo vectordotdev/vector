@@ -637,7 +637,7 @@ mod test {
         use vector_common::btreemap;
 
         let cases = vec![
-            (btreemap! {}, vec![], Ok(Some(btreemap! {}.into()))),
+            (BTreeMap::new(), vec![], Ok(Some(BTreeMap::new().into()))),
             (
                 btreemap! { "foo" => "bar" },
                 vec![],
@@ -831,7 +831,7 @@ mod test {
                 btreemap! { "foo" => "bar" },
                 vec![SegmentBuf::from("foo")],
                 false,
-                Some(btreemap! {}.into()),
+                Some(BTreeMap::new().into()),
             ),
             (
                 btreemap! { "foo" => "bar" },
@@ -840,19 +840,19 @@ mod test {
                     FieldBuf::from("foo"),
                 ])],
                 false,
-                Some(btreemap! {}.into()),
+                Some(BTreeMap::new().into()),
             ),
             (
                 btreemap! { "foo" => "bar", "baz" => "qux" },
                 vec![],
                 false,
-                Some(btreemap! {}.into()),
+                Some(BTreeMap::new().into()),
             ),
             (
                 btreemap! { "foo" => "bar", "baz" => "qux" },
                 vec![],
                 true,
-                Some(btreemap! {}.into()),
+                Some(BTreeMap::new().into()),
             ),
             (
                 btreemap! { "foo" => vec![0] },
@@ -864,7 +864,7 @@ mod test {
                 btreemap! { "foo" => vec![0] },
                 vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
                 true,
-                Some(btreemap! {}.into()),
+                Some(BTreeMap::new().into()),
             ),
             (
                 btreemap! {

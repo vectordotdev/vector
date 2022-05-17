@@ -432,7 +432,7 @@ mod tests {
     fn supports_escaped_quotes() {
         let rules = parse_grok_rules(
             &[r#"%{notSpace:field:nullIf("with \"escaped\" quotes")}"#.to_string()],
-            btreemap! {},
+            BTreeMap::new(),
         )
         .expect("couldn't parse rules");
         assert!(matches!(
