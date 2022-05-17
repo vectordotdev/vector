@@ -1,9 +1,5 @@
 use std::collections::BTreeMap;
 
-use itertools::{
-    FoldWhile::{Continue, Done},
-    Itertools,
-};
 use tracing::warn;
 use value::Value;
 use vrl_compiler::Target;
@@ -27,17 +23,13 @@ pub fn parse_grok(
     grok_rules: &[GrokRule],
     remove_empty: bool,
 ) -> Result<Value, Error> {
-    grok_rules
-        .iter()
-        .fold_while(Err(Error::NoMatch), |_, rule| {
-            let result = apply_grok_rule(source_field, rule, remove_empty);
-            if let Err(Error::NoMatch) = result {
-                Continue(result)
-            } else {
-                Done(result)
-            }
-        })
-        .into_inner()
+    for rule in grok_rules {
+        match apply_grok_rule(source_field, rule, remove_empty) {
+            Err(Error::NoMatch) => continue,
+            other => return other,
+        }
+    }
+    Err(Error::NoMatch)
 }
 
 /// Tries to parse a given string with a given grok rule.
