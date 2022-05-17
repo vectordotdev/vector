@@ -3,7 +3,7 @@ use std::collections::HashMap;
 pub(super) use crate::schema::Definition;
 
 use crate::{
-    config::{ComponentKey, OutputId, SinkOuter},
+    config::{ComponentKey, Config, Output, OutputId, SinkOuter},
     topology,
 };
 
@@ -149,11 +149,11 @@ pub(super) fn expanded_definitions(
 
         // If the input is a source, it'll always have schema definition attached, even if it is an
         // "empty" schema.
-        if let Some(source) = config.sources.get(key) {
+        if let Some(outputs) = config.source_outputs(key) {
             // After getting the source matching to the given input, we need to further narrow the
             // actual output of the source feeding into this input, and then get the definition
             // belonging to that output.
-            let maybe_source_definition = source.inner.outputs().iter().find_map(|output| {
+            let maybe_source_definition = outputs.iter().find_map(|output| {
                 if output.port == input.port {
                     Some(
                         output
@@ -178,12 +178,12 @@ pub(super) fn expanded_definitions(
 
         // A transform can receive from multiple inputs, and each input needs to be expanded to
         // a new pipeline.
-        } else if let Some(transform) = config.transforms.get(key) {
-            let merged_definition = merged_definition(&transform.inputs, config, &mut merged_cache);
+        } else if let Some(inputs) = config.transform_inputs(key) {
+            let merged_definition = merged_definition(inputs, config, &mut merged_cache);
 
-            let maybe_transform_definition = transform
-                .inner
-                .outputs(&merged_definition)
+            let maybe_transform_definition = config
+                .transform_outputs(key, &merged_definition)
+                .expect("already found inputs")
                 .iter()
                 .find_map(|output| {
                     if output.port == input.port {
@@ -198,7 +198,7 @@ pub(super) fn expanded_definitions(
 
             // We need to iterate over the individual inputs of a transform, as we are expected to
             // expand each input into its own pipeline.
-            for input in &transform.inputs {
+            for input in inputs {
                 let mut expanded_definitions = match &maybe_transform_definition {
                     // If the transform defines its own schema definition, we no longer care about
                     // any upstream definitions, and use the transform definition instead.
