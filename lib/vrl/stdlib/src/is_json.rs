@@ -31,12 +31,12 @@ impl Function for IsJson {
             Example {
                 title: "object",
                 source: r#"is_json("{}")"#,
-                result: Ok("false"),
+                result: Ok("true"),
             },
             Example {
                 title: "string",
                 source: r#"is_json(s'"test"')"#,
-                result: Ok("false"),
+                result: Ok("true"),
             },
             Example {
                 title: "invalid",
