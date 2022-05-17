@@ -46,11 +46,11 @@ impl EncodingConfigMigrator for EncodingMigrator {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct SqsSinkConfig {
     pub queue_url: String,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    #[serde(flatten)]
     pub encoding: EncodingConfigAdapter<EncodingConfig<Encoding>, EncodingMigrator>,
     pub message_group_id: Option<String>,
     pub message_deduplication_id: Option<String>,
