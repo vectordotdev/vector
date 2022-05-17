@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn truncate(value: Value, limit: Value, ellipsis: Value) -> Resolved {
@@ -73,7 +74,7 @@ impl Function for Truncate {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -91,7 +92,7 @@ impl Function for Truncate {
     fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
         let value = args.required("value");
         let limit = args.required("limit");
-        let ellipsis = args.optional("ellipsis").unwrap_or(value!(false));
+        let ellipsis = args.optional("ellipsis").unwrap_or_else(|| value!(false));
 
         truncate(value, limit, ellipsis)
     }
@@ -113,7 +114,7 @@ impl Expression for TruncateFn {
         truncate(value, limit, ellipsis)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().infallible()
     }
 }

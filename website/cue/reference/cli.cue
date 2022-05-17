@@ -7,10 +7,6 @@ _default_flags: {
 		_short:      "h"
 		description: "Prints help information "
 	}
-	"version": {
-		_short:      "V"
-		description: "Prints version information"
-	}
 }
 
 cli: {
@@ -104,6 +100,10 @@ cli: {
 			_short:      "v"
 			description: "Enable more detailed logging. Repeat to reduce further. Overrides `--verbose`."
 		}
+		"version": {
+			_short:      "V"
+			description: "Prints version information"
+		}
 		"watch-config": {
 			_short:      "w"
 			description: env_vars.VECTOR_WATCH_CONFIG.description
@@ -111,14 +111,7 @@ cli: {
 		}
 	}
 
-	// Reusable options
-	_core_options: {
-		"color": {
-			description: env_vars.VECTOR_COLOR.description
-			default:     env_vars.VECTOR_COLOR.type.string.default
-			enum:        env_vars.VECTOR_COLOR.type.string.enum
-			env_var:     "VECTOR_COLOR"
-		}
+	_core_config_options: {
 		"config": {
 			_short:      "c"
 			description: env_vars.VECTOR_CONFIG.description
@@ -145,6 +138,16 @@ cli: {
 			description: env_vars.VECTOR_CONFIG_YAML.description
 			type:        "string"
 			env_var:     "VECTOR_CONFIG_YAML"
+		}
+	}
+
+	// Reusable options
+	_core_options: _core_config_options & {
+		"color": {
+			description: env_vars.VECTOR_COLOR.description
+			default:     env_vars.VECTOR_COLOR.type.string.default
+			enum:        env_vars.VECTOR_COLOR.type.string.enum
+			env_var:     "VECTOR_COLOR"
 		}
 		"log-format": {
 			description: env_vars.VECTOR_LOG_FORMAT.description

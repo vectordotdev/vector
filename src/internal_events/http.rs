@@ -1,8 +1,9 @@
 use std::error::Error;
 
-use super::prelude::{error_stage, error_type};
-use metrics::counter;
+use metrics::{counter, histogram};
 use vector_core::internal_event::InternalEvent;
+
+use super::prelude::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct HttpBytesReceived<'a> {
@@ -44,6 +45,8 @@ impl InternalEvent for HttpEventsReceived<'_> {
             http_path = %self.http_path,
             protocol = %self.protocol,
         );
+
+        histogram!("component_received_events_count", self.count as f64);
         counter!(
             "component_received_events_total", self.count as u64,
             "http_path" => self.http_path.to_string(),
@@ -56,7 +59,6 @@ impl InternalEvent for HttpEventsReceived<'_> {
             "protocol" => self.protocol,
         );
         counter!("events_in_total", self.count as u64);
-        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 
@@ -97,18 +99,6 @@ impl<'a> InternalEvent for HttpBadRequest<'a> {
         );
         // deprecated
         counter!("http_bad_requests_total", 1);
-    }
-}
-
-#[derive(Debug)]
-pub struct HttpEventEncoded {
-    pub byte_size: usize,
-}
-
-impl InternalEvent for HttpEventEncoded {
-    fn emit(self) {
-        trace!(message = "Encode event.");
-        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 

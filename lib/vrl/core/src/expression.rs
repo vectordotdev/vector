@@ -1,12 +1,13 @@
-use diagnostic::{DiagnosticError, Label, Note, Span};
+use diagnostic::{DiagnosticMessage, Label, Note};
 use value::Value;
 
 pub type Resolved = Result<Value, ExpressionError>;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ExpressionError {
+    #[cfg(feature = "expr-abort")]
     Abort {
-        span: Span,
+        span: diagnostic::Span,
         message: Option<String>,
     },
     Error {
@@ -28,7 +29,7 @@ impl std::error::Error for ExpressionError {
     }
 }
 
-impl DiagnosticError for ExpressionError {
+impl DiagnosticMessage for ExpressionError {
     fn code(&self) -> usize {
         0
     }
@@ -37,6 +38,7 @@ impl DiagnosticError for ExpressionError {
         use ExpressionError::*;
 
         match self {
+            #[cfg(feature = "expr-abort")]
             Abort { message, .. } => message.clone().unwrap_or_else(|| "aborted".to_owned()),
             Error { message, .. } => message.clone(),
         }
@@ -46,6 +48,7 @@ impl DiagnosticError for ExpressionError {
         use ExpressionError::*;
 
         match self {
+            #[cfg(feature = "expr-abort")]
             Abort { span, .. } => {
                 vec![Label::primary("aborted", span)]
             }
@@ -57,6 +60,7 @@ impl DiagnosticError for ExpressionError {
         use ExpressionError::*;
 
         match self {
+            #[cfg(feature = "expr-abort")]
             Abort { .. } => vec![],
             Error { notes, .. } => notes.clone(),
         }

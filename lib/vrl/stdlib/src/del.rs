@@ -1,31 +1,35 @@
+use ::value::Value;
 use vrl::prelude::*;
 
+#[inline]
 fn del(query: &expression::Query, ctx: &mut Context) -> Resolved {
     let path = query.path();
+
     if query.is_external() {
-        return Ok(ctx
+        Ok(ctx
             .target_mut()
             .target_remove(path, false)
             .ok()
             .flatten()
-            .unwrap_or(Value::Null));
-    }
-    if let Some(ident) = query.variable_ident() {
-        return match ctx.state_mut().variable_mut(ident) {
+            .unwrap_or(Value::Null))
+    } else if let Some(ident) = query.variable_ident() {
+        match ctx.state_mut().variable_mut(ident) {
             Some(value) => {
                 let new_value = value.get_by_path(path).cloned();
                 value.remove_by_path(path, false);
                 Ok(new_value.unwrap_or(Value::Null))
             }
             None => Ok(Value::Null),
-        };
-    }
-    if let Some(expr) = query.expression_target() {
+        }
+    } else if let Some(expr) = query.expression_target() {
         let value = expr.resolve(ctx)?;
 
-        return Ok(value.get_by_path(path).cloned().unwrap_or(Value::Null));
+        // No need to do the actual deletion, as the expression is only
+        // available as an argument to the function.
+        Ok(value.get_by_path(path).cloned().unwrap_or(Value::Null))
+    } else {
+        Ok(Value::Null)
     }
-    Ok(Value::Null)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -79,7 +83,7 @@ impl Function for Del {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -162,18 +166,19 @@ impl Expression for DelFn {
         del(&self.query, ctx)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::any()
     }
 
     fn update_state(
         &mut self,
-        state: &mut state::Compiler,
+        _local: &mut state::LocalEnv,
+        external: &mut state::ExternalEnv,
     ) -> std::result::Result<(), ExpressionError> {
         // FIXME(Jean): This should also delete non-external queries, as `del(foo.bar)` is
         // supported.
         if self.query.is_external() {
-            match self.query.delete_type_def(state) {
+            match self.query.delete_type_def(external) {
                 Err(value::kind::remove::Error::RootPath)
                 | Err(value::kind::remove::Error::CoalescedPath)
                 | Err(value::kind::remove::Error::NegativeIndexPath) => {

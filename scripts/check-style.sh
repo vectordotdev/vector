@@ -34,6 +34,7 @@ for FILE in $(git ls-files); do
     *sig) continue;;
     *html) continue;;
     tests/data*) continue;;
+    lib/codecs/tests/data*) continue;;
     lib/vector-core/tests/data*) continue;;
     distribution/kubernetes/*/*.yaml) continue;;
     tests/helm-snapshots/*/snapshot.yaml) continue;;

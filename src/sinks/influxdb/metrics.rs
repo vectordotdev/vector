@@ -1,7 +1,6 @@
 use std::{
     collections::{BTreeMap, HashMap},
     future::ready,
-    num::NonZeroU64,
     task::Poll,
 };
 
@@ -35,7 +34,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 #[derive(Clone)]
@@ -51,7 +50,7 @@ pub struct InfluxDbDefaultBatchSettings;
 impl SinkBatchSettings for InfluxDbDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(20);
     const MAX_BYTES: Option<usize> = None;
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -69,7 +68,7 @@ pub struct InfluxDbConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tags: Option<HashMap<String, String>>,
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
     #[serde(default = "default_summary_quantiles")]
     pub quantiles: Vec<f64>,
     #[serde(
@@ -170,7 +169,7 @@ impl InfluxDbSvc {
                 stream::iter({
                     let byte_size = event.size_of();
                     normalizer
-                        .apply(event.into_metric())
+                        .normalize(event.into_metric())
                         .map(|metric| Ok(EncodedEvent::new(metric, byte_size)))
                 })
             })
@@ -244,7 +243,7 @@ fn merge_tags(
 pub struct InfluxMetricNormalize;
 
 impl MetricNormalize for InfluxMetricNormalize {
-    fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+    fn normalize(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         match (metric.kind(), &metric.value()) {
             // Counters are disaggregated. We take the previous value from the state
             // and emit the difference between previous and current as a Counter
@@ -357,7 +356,10 @@ fn get_type_and_fields(
                             quantile: *q,
                             value: ddsketch.quantile(*q).unwrap_or(0.0),
                         };
-                        (quantile.as_percentile(), Field::Float(quantile.value))
+                        (
+                            quantile.to_percentile_string(),
+                            Field::Float(quantile.value),
+                        )
                     })
                     .collect::<HashMap<_, _>>();
                 fields.insert("count".to_owned(), Field::UnsignedInt(ddsketch.count()));
@@ -938,14 +940,14 @@ mod integration_tests {
             },
             InfluxDb1Settings, InfluxDb2Settings,
         },
-        tls::{self, TlsOptions},
+        tls::{self, TlsConfig},
     };
 
     #[tokio::test]
     async fn inserts_metrics_v1_over_https() {
         insert_metrics_v1(
             address_v1(true).as_str(),
-            Some(TlsOptions {
+            Some(TlsConfig {
                 ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
                 ..Default::default()
             }),
@@ -958,7 +960,7 @@ mod integration_tests {
         insert_metrics_v1(address_v1(false).as_str(), None).await
     }
 
-    async fn insert_metrics_v1(url: &str, tls: Option<TlsOptions>) {
+    async fn insert_metrics_v1(url: &str, tls: Option<TlsConfig>) {
         crate::test_util::trace_init();
         let database = onboarding_v1(url).await;
 

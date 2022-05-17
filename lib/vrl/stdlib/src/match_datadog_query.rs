@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use ::value::Value;
 use datadog_filter::{
     build_matcher,
     regex::{wildcard_regex, word_regex},
@@ -46,7 +47,7 @@ impl Function for MatchDatadogQuery {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -60,7 +61,7 @@ impl Function for MatchDatadogQuery {
 
         // Compile the Datadog search query to AST.
         let node = parse(&query).map_err(|e| {
-            Box::new(ExpressionError::from(e.to_string())) as Box<dyn DiagnosticError>
+            Box::new(ExpressionError::from(e.to_string())) as Box<dyn DiagnosticMessage>
         })?;
 
         // Build the matcher function that accepts a VRL event value. This will parse the `node`
@@ -94,7 +95,7 @@ impl Function for MatchDatadogQuery {
 
                 // Compile the Datadog search query to AST.
                 let node = parse(&query).map_err(|e| {
-                    Box::new(ExpressionError::from(e.to_string())) as Box<dyn DiagnosticError>
+                    Box::new(ExpressionError::from(e.to_string())) as Box<dyn DiagnosticMessage>
                 })?;
 
                 // Build the matcher function that accepts a VRL event value. This will parse the `node`
@@ -151,7 +152,7 @@ impl Expression for MatchDatadogQueryFn {
         Ok(self.filter.run(&value).into())
     }
 
-    fn type_def(&self, _state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         type_def()
     }
 }

@@ -1,6 +1,7 @@
-use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
+
+use super::prelude::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct ConcatSubstringError<'a> {
@@ -27,7 +28,6 @@ impl<'a> InternalEvent for ConcatSubstringError<'a> {
         );
         counter!(
             "component_errors_total", 1,
-            "error" => "Substring error.",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
         );

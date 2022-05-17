@@ -1,5 +1,3 @@
-// ## skip check-events ##
-
 use std::time::Duration;
 
 use http::{
@@ -9,6 +7,8 @@ use http::{
 use hyper::{body::HttpBody, Error};
 use metrics::{counter, histogram};
 use vector_core::internal_event::InternalEvent;
+
+use super::prelude::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct AboutToSendHttpRequest<'a, T> {
@@ -73,9 +73,16 @@ pub struct GotHttpError<'a> {
 
 impl<'a> InternalEvent for GotHttpError<'a> {
     fn emit(self) {
-        debug!(
+        error!(
             message = "HTTP error.",
             error = %self.error,
+            error_type = error_type::REQUEST_FAILED,
+            stage = error_stage::PROCESSING,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::REQUEST_FAILED,
+            "stage" => error_stage::PROCESSING,
         );
         counter!("http_client_errors_total", 1, "error_kind" => self.error.to_string());
         histogram!("http_client_rtt_seconds", self.roundtrip);

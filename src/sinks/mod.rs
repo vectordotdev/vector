@@ -30,7 +30,8 @@ pub mod console;
 #[cfg(any(
     feature = "sinks-datadog_events",
     feature = "sinks-datadog_logs",
-    feature = "sinks-datadog_metrics"
+    feature = "sinks-datadog_metrics",
+    feature = "sinks-datadog_traces"
 ))]
 pub mod datadog;
 #[cfg(feature = "sinks-datadog_archives")]
@@ -86,6 +87,8 @@ pub mod splunk_hec;
 pub mod statsd;
 #[cfg(feature = "sinks-vector")]
 pub mod vector;
+#[cfg(feature = "sinks-websocket")]
+pub mod websocket;
 
 pub use vector_core::sink::VectorSink;
 

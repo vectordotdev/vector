@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::Utc;
+use codecs::StreamDecodingError;
 use http::StatusCode;
 use tokio_util::codec::Decoder;
 use vector_core::ByteSizeOf;
@@ -12,7 +13,7 @@ use crate::{
     internal_events::EventsReceived,
     sources::{
         datadog::agent::{self, handle_request, ApiKeyQueryParams, DatadogAgentSource, LogMsg},
-        util::{ErrorMessage, StreamDecodingError},
+        util::ErrorMessage,
     },
     SourceSender,
 };

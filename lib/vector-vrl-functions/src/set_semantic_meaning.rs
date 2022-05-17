@@ -1,5 +1,6 @@
 use std::ops::{Deref, DerefMut};
 
+use ::value::Value;
 use lookup::LookupBuf;
 use vrl::{diagnostic::Label, prelude::*};
 
@@ -53,7 +54,7 @@ impl Function for SetSemanticMeaning {
 
     fn compile(
         &self,
-        state: &state::Compiler,
+        (_, state): (&mut state::LocalEnv, &mut state::ExternalEnv),
         ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -87,7 +88,7 @@ impl Function for SetSemanticMeaning {
                 notes: vec![],
             };
 
-            return Err(Box::new(error) as Box<dyn DiagnosticError>);
+            return Err(Box::new(error) as Box<dyn DiagnosticMessage>);
         }
 
         let path = query.path().clone();
@@ -116,7 +117,7 @@ impl Function for SetSemanticMeaning {
                 notes: vec![],
             };
 
-            return Err(Box::new(error) as Box<dyn DiagnosticError>);
+            return Err(Box::new(error) as Box<dyn DiagnosticMessage>);
         }
 
         if let Some(list) = ctx.get_external_context_mut::<MeaningList>() {
@@ -143,7 +144,7 @@ impl Function for SetSemanticMeaning {
                     notes: vec![],
                 };
 
-                return Err(Box::new(error) as Box<dyn DiagnosticError>);
+                return Err(Box::new(error) as Box<dyn DiagnosticMessage>);
             }
 
             list.insert(meaning, path);
@@ -165,7 +166,7 @@ impl Expression for SetSemanticMeaningFn {
         Ok(Value::Null)
     }
 
-    fn type_def(&self, _state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::null().infallible()
     }
 }

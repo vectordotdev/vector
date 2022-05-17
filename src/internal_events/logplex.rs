@@ -1,7 +1,7 @@
-// ## skip check-events ##
-
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
+
+use super::prelude::{error_stage, error_type, io_error_code};
 
 #[derive(Debug)]
 pub struct HerokuLogplexRequestReceived<'a> {
@@ -33,8 +33,18 @@ impl InternalEvent for HerokuLogplexRequestReadError {
         error!(
             message = "Error reading request body.",
             error = ?self.error,
-            internal_log_rate_secs = 10
+            internal_log_rate_secs = 10,
+            error_type = error_type::READER_FAILED,
+            error_code = io_error_code(&self.error),
+            stage = error_stage::PROCESSING,
         );
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::READER_FAILED,
+            "error_code" => io_error_code(&self.error),
+            "stage" => error_stage::PROCESSING,
+        );
+        // deprecated
         counter!("request_read_errors_total", 1);
     }
 }

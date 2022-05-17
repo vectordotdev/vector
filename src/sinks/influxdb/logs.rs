@@ -1,7 +1,4 @@
-use std::{
-    collections::{BTreeMap, HashMap, HashSet},
-    num::NonZeroU64,
-};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use bytes::{Bytes, BytesMut};
 use futures::SinkExt;
@@ -22,13 +19,13 @@ use crate::{
             InfluxDb1Settings, InfluxDb2Settings, ProtocolVersion,
         },
         util::{
-            encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
+            encoding::Transformer,
             http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
             BatchConfig, Buffer, Compression, SinkBatchSettings, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -37,7 +34,7 @@ pub struct InfluxDbLogsDefaultBatchSettings;
 impl SinkBatchSettings for InfluxDbLogsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = None;
     const MAX_BYTES: Option<usize> = Some(1_000_000);
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -56,12 +53,12 @@ pub struct InfluxDbLogsConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
     )]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
+    pub encoding: Transformer,
     #[serde(default)]
     pub batch: BatchConfig<InfluxDbLogsDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -77,15 +74,7 @@ struct InfluxDbLogsSink {
     protocol_version: ProtocolVersion,
     measurement: String,
     tags: HashSet<String>,
-    encoding: EncodingConfig<Encoding>,
-}
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-pub enum Encoding {
-    #[derivative(Default)]
-    Default,
+    transformer: Transformer,
 }
 
 inventory::submit! {
@@ -144,7 +133,7 @@ impl SinkConfig for InfluxDbLogsConfig {
             protocol_version,
             measurement,
             tags,
-            encoding: self.encoding.clone().into(),
+            transformer: self.encoding.clone(),
         };
 
         let sink = BatchedHttpSink::new(
@@ -177,17 +166,21 @@ struct InfluxDbLogsEncoder {
     protocol_version: ProtocolVersion,
     measurement: String,
     tags: HashSet<String>,
-    encoding: EncodingConfig<Encoding>,
+    transformer: Transformer,
 }
 
 impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
     fn encode_event(&mut self, event: Event) -> Option<BytesMut> {
-        let mut event = event.into_log();
-        event.insert("metric_type", "logs".to_string());
-        self.encoding.apply_rules(&mut event);
+        let mut log = event.into_log();
+        log.insert("metric_type", "logs".to_string());
+        let mut log = {
+            let mut event = Event::from(log);
+            self.transformer.transform(&mut event);
+            event.into_log()
+        };
 
         // Timestamp
-        let timestamp = encode_timestamp(match event.remove(log_schema().timestamp_key()) {
+        let timestamp = encode_timestamp(match log.remove(log_schema().timestamp_key()) {
             Some(Value::Timestamp(ts)) => Some(ts),
             _ => None,
         });
@@ -195,7 +188,7 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
         // Tags + Fields
         let mut tags: BTreeMap<String, String> = BTreeMap::new();
         let mut fields: HashMap<String, Field> = HashMap::new();
-        event.all_fields().for_each(|(key, value)| {
+        log.all_fields().for_each(|(key, value)| {
             if self.tags.contains(&key) {
                 tags.insert(key, value.to_string_lossy());
             } else {
@@ -231,7 +224,7 @@ impl HttpSink for InfluxDbLogsSink {
             protocol_version: self.protocol_version,
             measurement: self.measurement.clone(),
             tags: self.tags.clone(),
-            encoding: self.encoding.clone(),
+            transformer: self.transformer.clone(),
         }
     }
 
@@ -348,7 +341,9 @@ mod tests {
             "vector",
             ["metric_type", "host"].to_vec(),
         );
-        sink.encoding.except_fields = Some(vec!["host".into()]);
+        sink.transformer
+            .set_except_fields(Some(vec!["host".into()]))
+            .unwrap();
         let mut encoder = sink.build_encoder();
 
         let bytes = encoder.encode_event(event.clone()).unwrap();
@@ -360,7 +355,9 @@ mod tests {
         assert_fields(line_protocol.2.to_string(), ["message=\"hello\""].to_vec());
         assert_eq!("1542182950000000011\n", line_protocol.3);
 
-        sink.encoding.except_fields = Some(vec!["metric_type".into()]);
+        sink.transformer
+            .set_except_fields(Some(vec!["metric_type".into()]))
+            .unwrap();
         let mut encoder = sink.build_encoder();
         let bytes = encoder.encode_event(event.clone()).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
@@ -735,7 +732,7 @@ mod tests {
             protocol_version,
             measurement,
             tags,
-            encoding: EncodingConfigWithDefault::default().into(),
+            transformer: Default::default(),
         }
     }
 }

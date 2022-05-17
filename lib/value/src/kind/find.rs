@@ -4,9 +4,8 @@ use std::{borrow::Cow, collections::VecDeque};
 
 use lookup::{Field, Lookup, Segment};
 
-use crate::kind::{merge, EmptyKindError};
-
 use super::Kind;
+use crate::kind::{merge, EmptyKindError};
 
 /// The list of errors that can occur when `remove_at_path` fails.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -199,9 +198,8 @@ mod tests {
 
     use lookup::LookupBuf;
 
-    use crate::kind::Collection;
-
     use super::*;
+    use crate::kind::Collection;
 
     #[test]
     #[allow(clippy::too_many_lines)]

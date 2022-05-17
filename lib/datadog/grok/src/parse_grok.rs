@@ -1,14 +1,17 @@
-use crate::{
-    grok_filter::apply_filter,
-    parse_grok_rules::{GrokField, GrokRule},
-};
+use std::collections::BTreeMap;
+
 use itertools::{
     FoldWhile::{Continue, Done},
     Itertools,
 };
 use tracing::warn;
-use vector_common::btreemap;
-use vrl_compiler::{Target, Value};
+use value::Value;
+use vrl_compiler::Target;
+
+use crate::{
+    grok_filter::apply_filter,
+    parse_grok_rules::{GrokField, GrokRule},
+};
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
@@ -43,28 +46,30 @@ pub fn parse_grok(
 /// - FailedToApplyFilter - matches the rule, but there was a runtime error while applying on of the filters
 /// - NoMatch - this rule does not match a given string
 fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Result<Value, Error> {
-    let mut parsed = Value::from(btreemap! {});
+    let mut parsed = Value::Object(BTreeMap::new());
 
     if let Some(ref matches) = grok_rule.pattern.match_against(source) {
-        for (name, value) in matches.iter() {
-            let mut value = Some(Value::from(value));
+        for (name, match_str) in matches.iter() {
+            let mut value = Some(Value::from(match_str));
 
             if let Some(GrokField {
                 lookup: field,
                 filters,
             }) = grok_rule.fields.get(name)
             {
-                filters.iter().for_each(|filter| {
-                    if let Some(ref v) = value {
-                        match apply_filter(v, filter) {
-                            Ok(v) => value = Some(v),
-                            Err(error) => {
-                                warn!(message = "Error applying filter", field = %field, filter = %filter, %error);
-                                value = None;
+                if !match_str.is_empty() {
+                    filters.iter().for_each(|filter| {
+                        if let Some(ref v) = value {
+                            match apply_filter(v, filter) {
+                                Ok(v) => value = Some(v),
+                                Err(error) => {
+                                    warn!(message = "Error applying filter", field = %field, filter = %filter, %error);
+                                    value = None;
+                                }
                             }
                         }
-                    }
-                });
+                    });
+                }
 
                 if let Some(value) = value {
                     match value {
@@ -77,8 +82,17 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Re
                         // ignore empty strings if necessary
                         Value::Bytes(b) if remove_empty && b.is_empty() => {}
                         // otherwise just apply VRL lookup insert logic
-                        _ => match parsed.target_get(field).expect("field does not exist") {
-                            Some(Value::Array(mut values)) => values.push(value),
+                        _ => match parsed
+                            .target_get(field)
+                            .expect("field does not exist")
+                            .cloned()
+                        {
+                            Some(Value::Array(mut values)) => {
+                                values.push(value);
+                                parsed.target_insert(field, values.into()).unwrap_or_else(
+                                    |error| warn!(message = "Error updating field value", field = %field, %error)
+                                );
+                            }
                             Some(v) => {
                                 parsed.target_insert(field, Value::Array(vec![v, value])).unwrap_or_else(
                                     |error| warn!(message = "Error updating field value", field = %field, %error)
@@ -111,7 +125,9 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Re
 #[cfg(test)]
 mod tests {
     use ordered_float::NotNan;
-    use vrl_compiler::Value;
+    use tracing_test::traced_test;
+    use value::Value;
+    use vector_common::btreemap;
 
     use super::*;
     use crate::parse_grok_rules::parse_grok_rules;
@@ -397,13 +413,13 @@ mod tests {
             btreemap! {},
         )
             .expect("couldn't parse rules");
-        let parsed = parse_grok("1 info -", &rules, false).unwrap();
+        let parsed = parse_grok("1 info message", &rules, false).unwrap();
 
         assert_eq!(
             parsed,
             Value::from(btreemap! {
                 "nested" => btreemap! {
-                   "field" =>  Value::Array(vec![1.into(), "INFO".into()]),
+                   "field" =>  Value::Array(vec![1.into(), "INFO".into(), "message".into()]),
                 },
             })
         );
@@ -528,6 +544,21 @@ mod tests {
                 r#"%{date("MMM d y HH:mm:ss z"):field}"#,
                 "Nov 16 2020 13:41:29 GMT",
                 Ok(Value::Integer(1605534089000)),
+            ),
+            (
+                r#"%{date("yyyy-MM-dd HH:mm:ss.SSSS"):field}"#,
+                "2019-11-25 11:21:32.6282",
+                Ok(Value::Integer(1574680892628)),
+            ),
+            (
+                r#"%{date("yyyy-MM-dd'T'HH:mm:ss.SSSZ"):field}"#,
+                "2016-09-02T15:02:29.648Z",
+                Ok(Value::Integer(1472828549648)),
+            ),
+            (
+                r#"%{date("yyMMdd HH:mm:ss"):field}"#,
+                "171113 14:14:20",
+                Ok(Value::Integer(1510582460000)),
             ),
         ]);
 
@@ -828,10 +859,8 @@ mod tests {
                 "%{data::keyvalue}",
                 "db.name=my_db,db.operation=insert",
                 Ok(Value::from(btreemap! {
-                    "db" => btreemap! {
-                        "name" => "my_db",
-                        "operation" => "insert",
-                    }
+                    "db.name" => "my_db",
+                    "db.operation" => "insert",
                 })),
             ),
         ]);
@@ -879,6 +908,20 @@ mod tests {
                  "subfield2" =>  Value::Integer(1)
             })
         );
+    }
+
+    #[test]
+    #[traced_test]
+    fn does_not_emit_error_log_on_alternatives_with_filters() {
+        test_full_grok(vec![(
+            r#"(%{integer:field_int}|%{data:field_str})"#,
+            "abc",
+            Ok(Value::from(btreemap! {
+                "field_int" =>  Value::Bytes("".into()),
+                "field_str" =>  Value::Bytes("abc".into()),
+            })),
+        )]);
+        assert!(!logs_contain("Error applying filter"));
     }
 
     #[test]

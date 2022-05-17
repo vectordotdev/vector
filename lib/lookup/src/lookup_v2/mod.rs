@@ -1,10 +1,22 @@
 mod jit;
 
-use crate::lookup_v2::jit::{JitLookup, JitPath};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::borrow::Cow;
 use std::iter::Cloned;
 use std::slice::Iter;
+
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+use self::jit::{JitLookup, JitPath};
+
+/// Syntactic sugar for creating a pre-parsed path.
+///
+/// Example: `path!("foo", 4, "bar")` is the pre-parsed path of `foo[4].bar`
+#[macro_export]
+macro_rules! path {
+    ($($segment:expr),*) => {{
+           &[$(lookup::lookup_v2::BorrowedSegment::from($segment),)*]
+    }};
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct OwnedPath {
@@ -22,12 +34,52 @@ impl<'de> Deserialize<'de> for OwnedPath {
 }
 
 impl Serialize for OwnedPath {
-    fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        // TODO: Implement canonical way to serialize segments.
-        todo!()
+        if self.segments.is_empty() {
+            serializer.serialize_str("<invalid>")
+        } else {
+            let path = self
+                .segments
+                .iter()
+                .enumerate()
+                .map(|(i, segment)| match segment {
+                    OwnedSegment::Field(field) => {
+                        let needs_quotes = field
+                            .chars()
+                            .any(|c| !matches!(c, 'A'..='Z' | 'a'..='z' | '_' | '0'..='9' | '@'));
+                        // Allocate enough to fit the field, a `.` and two `"` characters. This
+                        // should suffice for the majority of cases when no escape sequence is used.
+                        let mut string = String::with_capacity(field.as_bytes().len() + 3);
+                        if i != 0 {
+                            string.push('.');
+                        }
+                        if needs_quotes {
+                            string.push('"');
+                            for c in field.chars() {
+                                if matches!(c, '"' | '\\') {
+                                    string.push('\\');
+                                }
+                                string.push(c);
+                            }
+                            string.push('"');
+                            string
+                        } else {
+                            string.push_str(field);
+                            string
+                        }
+                    }
+                    OwnedSegment::Index(index) => format!("[{}]", index),
+                    OwnedSegment::Invalid => {
+                        (if i == 0 { "<invalid>" } else { ".<invalid>" }).to_owned()
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join("");
+            serializer.serialize_str(&path)
+        }
     }
 }
 
@@ -77,12 +129,33 @@ pub fn parse_path(path: &str) -> OwnedPath {
     OwnedPath { segments }
 }
 
+#[derive(Clone)]
+pub struct PathConcat<A, B> {
+    a: A,
+    b: B,
+}
+
+impl<'a, A: Path<'a>, B: Path<'a>> Path<'a> for PathConcat<A, B> {
+    type Iter = std::iter::Chain<A::Iter, B::Iter>;
+
+    fn segment_iter(&self) -> Self::Iter {
+        self.a.segment_iter().chain(self.b.segment_iter())
+    }
+}
+
 /// A path is simply the data describing how to look up a value.
 /// This should only be implemented for types that are very cheap to clone, such as references.
 pub trait Path<'a>: Clone {
     type Iter: Iterator<Item = BorrowedSegment<'a>>;
 
     fn segment_iter(&self) -> Self::Iter;
+
+    fn concat<T: Path<'a>>(&self, path: T) -> PathConcat<Self, T> {
+        PathConcat {
+            a: self.clone(),
+            b: path,
+        }
+    }
 }
 
 impl<'a> Path<'a> for &'a Vec<OwnedSegment> {
@@ -119,24 +192,24 @@ impl<'a> Iterator for OwnedSegmentSliceIter<'a> {
     }
 }
 
-impl<'a, 'b: 'a> Path<'a> for &'b Vec<BorrowedSegment<'a>> {
-    type Iter = Cloned<Iter<'a, BorrowedSegment<'a>>>;
+impl<'a, 'b> Path<'a> for &'b Vec<BorrowedSegment<'a>> {
+    type Iter = Cloned<Iter<'b, BorrowedSegment<'a>>>;
 
     fn segment_iter(&self) -> Self::Iter {
         self.as_slice().iter().cloned()
     }
 }
 
-impl<'a, 'b: 'a> Path<'a> for &'b [BorrowedSegment<'a>] {
-    type Iter = Cloned<Iter<'a, BorrowedSegment<'a>>>;
+impl<'a, 'b> Path<'a> for &'b [BorrowedSegment<'a>] {
+    type Iter = Cloned<Iter<'b, BorrowedSegment<'a>>>;
 
     fn segment_iter(&self) -> Self::Iter {
         self.iter().cloned()
     }
 }
 
-impl<'a, 'b: 'a, const A: usize> Path<'a> for &'b [BorrowedSegment<'a>; A] {
-    type Iter = Cloned<Iter<'a, BorrowedSegment<'a>>>;
+impl<'a, 'b, const A: usize> Path<'a> for &'b [BorrowedSegment<'a>; A] {
+    type Iter = Cloned<Iter<'b, BorrowedSegment<'a>>>;
 
     fn segment_iter(&self) -> Self::Iter {
         self.iter().cloned()
@@ -148,6 +221,18 @@ impl<'a> Path<'a> for &'a str {
 
     fn segment_iter(&self) -> Self::Iter {
         JitPath::new(self).segment_iter()
+    }
+}
+
+impl<'a> From<&'a str> for BorrowedSegment<'a> {
+    fn from(field: &'a str) -> Self {
+        BorrowedSegment::field(field)
+    }
+}
+
+impl From<usize> for BorrowedSegment<'_> {
+    fn from(index: usize) -> Self {
+        BorrowedSegment::index(index)
     }
 }
 
@@ -217,6 +302,54 @@ impl<'a> From<BorrowedSegment<'a>> for OwnedSegment {
             BorrowedSegment::Field(value) => OwnedSegment::Field((*value).to_owned()),
             BorrowedSegment::Index(value) => OwnedSegment::Index(value),
             BorrowedSegment::Invalid => OwnedSegment::Invalid,
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn owned_path_serialize() {
+        let test_cases = [
+            ("", "<invalid>"),
+            ("]", "<invalid>"),
+            ("]foo", "<invalid>"),
+            ("..", "<invalid>"),
+            ("...", "<invalid>"),
+            ("f", "f"),
+            ("foo", "foo"),
+            (
+                r#"ec2.metadata."availability-zone""#,
+                r#"ec2.metadata."availability-zone""#,
+            ),
+            ("@timestamp", "@timestamp"),
+            ("foo[", "foo.<invalid>"),
+            ("foo$", "<invalid>"),
+            (r#""$peci@l chars""#, r#""$peci@l chars""#),
+            ("foo.foo bar", "foo.<invalid>"),
+            (r#"foo."foo bar".bar"#, r#"foo."foo bar".bar"#),
+            ("[1]", "[1]"),
+            ("[42]", "[42]"),
+            ("foo.[42]", "foo.<invalid>"),
+            ("[42].foo", "[42].foo"),
+            ("[-1]", "<invalid>"),
+            ("[-42]", "<invalid>"),
+            ("[-42].foo", "<invalid>"),
+            ("[-42]foo", "<invalid>"),
+            (r#""[42]. {}-_""#, r#""[42]. {}-_""#),
+            (r#""a\"a""#, r#""a\"a""#),
+            (r#"foo."a\"a"."b\\b".bar"#, r#"foo."a\"a"."b\\b".bar"#),
+            ("<invalid>", "<invalid>"),
+            (r#""🤖""#, r#""🤖""#),
+        ];
+
+        for (path, expected) in test_cases {
+            let path = parse_path(path);
+            let path = serde_json::to_string(&path).unwrap();
+            let path = serde_json::from_str::<serde_json::Value>(&path).unwrap();
+            assert_eq!(path, expected);
         }
     }
 }

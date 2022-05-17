@@ -1,6 +1,7 @@
 use std::{fs::remove_file, path::PathBuf, time::Duration};
 
 use bytes::Bytes;
+use codecs::StreamDecodingError;
 use futures::{FutureExt, StreamExt};
 use tokio::{
     io::AsyncWriteExt,
@@ -9,21 +10,21 @@ use tokio::{
 };
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::FramedRead;
-use tracing::field;
-use tracing_futures::Instrument;
+use tracing::{field, Instrument};
 use vector_core::ByteSizeOf;
 
 use super::AfterReadExt;
 use crate::{
     async_read::VecAsyncReadExt,
-    codecs,
+    codecs::Decoder,
     event::Event,
     internal_events::{
         BytesReceived, ConnectionOpen, OpenGauge, SocketEventsReceived, SocketMode,
         StreamClosedError, UnixSocketError, UnixSocketFileDeleteError,
     },
     shutdown::ShutdownSignal,
-    sources::{util::codecs::StreamDecodingError, Source},
+    sources::util::change_socket_permissions,
+    sources::Source,
     SourceSender,
 };
 
@@ -33,15 +34,18 @@ use crate::{
 /// syslog source).
 pub fn build_unix_stream_source(
     listen_path: PathBuf,
-    decoder: codecs::Decoder,
+    socket_file_mode: Option<u32>,
+    decoder: Decoder,
     handle_events: impl Fn(&mut [Event], Option<Bytes>) + Clone + Send + Sync + 'static,
     shutdown: ShutdownSignal,
     out: SourceSender,
-) -> Source {
-    Box::pin(async move {
-        let listener = UnixListener::bind(&listen_path).expect("Failed to bind to listener socket");
-        info!(message = "Listening.", path = ?listen_path, r#type = "unix");
+) -> crate::Result<Source> {
+    let listener = UnixListener::bind(&listen_path).expect("Failed to bind to listener socket");
+    info!(message = "Listening.", path = ?listen_path, r#type = "unix");
 
+    change_socket_permissions(&listen_path, socket_file_mode)?;
+
+    Ok(Box::pin(async move {
         let connection_open = OpenGauge::new();
         let stream = UnixListenerStream::new(listener).take_until(shutdown.clone());
         tokio::pin!(stream);
@@ -145,5 +149,5 @@ pub fn build_unix_stream_source(
         }
 
         Ok(())
-    })
+    }))
 }

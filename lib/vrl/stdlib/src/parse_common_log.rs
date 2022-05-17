@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use ::value::Value;
 use vrl::prelude::*;
 
 use crate::log_util;
@@ -47,7 +48,7 @@ impl Function for ParseCommonLog {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -107,27 +108,24 @@ impl Expression for ParseCommonLogFn {
         parse_common_log(bytes, timestamp_format, ctx)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::object(inner_kind()).fallible()
     }
 }
 
 fn inner_kind() -> BTreeMap<Field, Kind> {
-    map! {
-        "host": Kind::bytes() | Kind::null(),
-        "identity": Kind::bytes() | Kind::null(),
-        "user": Kind::bytes() | Kind::null(),
-        "timestamp": Kind::timestamp() | Kind::null(),
-        "message": Kind::bytes() | Kind::null(),
-        "method": Kind::bytes() | Kind::null(),
-        "path": Kind::bytes() | Kind::null(),
-        "protocol": Kind::bytes() | Kind::null(),
-        "status": Kind::integer() | Kind::null(),
-        "size": Kind::integer() | Kind::null(),
-    }
-    .into_iter()
-    .map(|(key, kind): (&str, _)| (key.into(), kind))
-    .collect()
+    BTreeMap::from([
+        (Field::from("host"), Kind::bytes() | Kind::null()),
+        (Field::from("identity"), Kind::bytes() | Kind::null()),
+        (Field::from("user"), Kind::bytes() | Kind::null()),
+        (Field::from("timestamp"), Kind::timestamp() | Kind::null()),
+        (Field::from("message"), Kind::bytes() | Kind::null()),
+        (Field::from("method"), Kind::bytes() | Kind::null()),
+        (Field::from("path"), Kind::bytes() | Kind::null()),
+        (Field::from("protocol"), Kind::bytes() | Kind::null()),
+        (Field::from("status"), Kind::integer() | Kind::null()),
+        (Field::from("size"), Kind::integer() | Kind::null()),
+    ])
 }
 
 #[cfg(test)]

@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use ::value::Value;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -40,7 +41,7 @@ impl Function for Merge {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -85,7 +86,7 @@ impl Expression for MergeFn {
         Ok(to_value.into())
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         self.to
             .type_def(state)
             .merge_shallow(self.from.type_def(state))

@@ -4,6 +4,7 @@ use std::{
     str::FromStr,
 };
 
+use ::value::Value;
 use once_cell::sync::Lazy;
 use vrl::prelude::*;
 
@@ -59,7 +60,7 @@ impl Function for Redact {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -193,7 +194,7 @@ impl Expression for RedactFn {
         Ok(redact(value, filters, redactor))
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         self.value.type_def(state).infallible()
     }
 }

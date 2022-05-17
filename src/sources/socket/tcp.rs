@@ -1,19 +1,17 @@
 use bytes::Bytes;
 use chrono::Utc;
+use codecs::decoding::{DeserializerConfig, FramingConfig};
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 
 use crate::{
-    codecs::{
-        self,
-        decoding::{DeserializerConfig, FramingConfig},
-    },
+    codecs::Decoder,
     config::log_schema,
     event::Event,
     serde::default_decoding,
     sources::util::{SocketListenAddr, TcpNullAcker, TcpSource},
     tcp::TcpKeepaliveConfig,
-    tls::TlsConfig,
+    tls::TlsEnableableConfig,
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -24,7 +22,8 @@ pub struct TcpConfig {
     #[serde(default = "default_shutdown_timeout_secs")]
     shutdown_timeout_secs: u64,
     host_key: Option<String>,
-    tls: Option<TlsConfig>,
+    port_key: Option<String>,
+    tls: Option<TlsEnableableConfig>,
     receive_buffer_bytes: Option<usize>,
     framing: Option<FramingConfig>,
     #[serde(default = "default_decoding")]
@@ -37,32 +36,6 @@ const fn default_shutdown_timeout_secs() -> u64 {
 }
 
 impl TcpConfig {
-    pub const fn new(
-        address: SocketListenAddr,
-        keepalive: Option<TcpKeepaliveConfig>,
-        max_length: Option<usize>,
-        shutdown_timeout_secs: u64,
-        host_key: Option<String>,
-        tls: Option<TlsConfig>,
-        receive_buffer_bytes: Option<usize>,
-        framing: Option<FramingConfig>,
-        decoding: DeserializerConfig,
-        connection_limit: Option<u32>,
-    ) -> Self {
-        Self {
-            address,
-            keepalive,
-            max_length,
-            shutdown_timeout_secs,
-            host_key,
-            tls,
-            receive_buffer_bytes,
-            framing,
-            decoding,
-            connection_limit,
-        }
-    }
-
     pub fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,
@@ -70,6 +43,7 @@ impl TcpConfig {
             max_length: Some(crate::serde::default_max_length()),
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
             host_key: None,
+            port_key: Some(String::from("port")),
             tls: None,
             receive_buffer_bytes: None,
             framing: None,
@@ -82,7 +56,7 @@ impl TcpConfig {
         &self.host_key
     }
 
-    pub const fn tls(&self) -> &Option<TlsConfig> {
+    pub const fn tls(&self) -> &Option<TlsEnableableConfig> {
         &self.tls
     }
 
@@ -124,7 +98,7 @@ impl TcpConfig {
         self
     }
 
-    pub fn set_tls(&mut self, val: Option<TlsConfig>) -> &mut Self {
+    pub fn set_tls(&mut self, val: Option<TlsEnableableConfig>) -> &mut Self {
         self.tls = val;
         self
     }
@@ -143,11 +117,11 @@ impl TcpConfig {
 #[derive(Debug, Clone)]
 pub struct RawTcpSource {
     config: TcpConfig,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
 }
 
 impl RawTcpSource {
-    pub const fn new(config: TcpConfig, decoder: codecs::Decoder) -> Self {
+    pub const fn new(config: TcpConfig, decoder: Decoder) -> Self {
         Self { config, decoder }
     }
 }
@@ -155,14 +129,14 @@ impl RawTcpSource {
 impl TcpSource for RawTcpSource {
     type Error = codecs::decoding::Error;
     type Item = SmallVec<[Event; 1]>;
-    type Decoder = codecs::Decoder;
+    type Decoder = Decoder;
     type Acker = TcpNullAcker;
 
     fn decoder(&self) -> Self::Decoder {
         self.decoder.clone()
     }
 
-    fn handle_events(&self, events: &mut [Event], host: Bytes) {
+    fn handle_events(&self, events: &mut [Event], host: std::net::SocketAddr) {
         let now = Utc::now();
 
         for event in events {
@@ -176,7 +150,10 @@ impl TcpSource for RawTcpSource {
                     .as_deref()
                     .unwrap_or_else(|| log_schema().host_key());
 
-                log.try_insert(host_key, host.clone());
+                log.try_insert(host_key, host.ip().to_string());
+                if let Some(port_key) = &self.config.port_key {
+                    log.try_insert(port_key.as_str(), host.port());
+                }
             }
         }
     }

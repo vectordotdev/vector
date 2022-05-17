@@ -1,3 +1,4 @@
+use ::value::Value;
 use tracing::{debug, error, info, trace, warn};
 use vrl::prelude::*;
 
@@ -8,21 +9,22 @@ fn log(
     span: vrl::diagnostic::Span,
 ) -> Resolved {
     let rate_limit_secs = rate_limit_secs.try_integer()?;
+    let res = value.to_string_lossy();
     match level.as_ref() {
         b"trace" => {
-            trace!(message = %value, internal_log_rate_secs = rate_limit_secs, vrl_position = span.start())
+            trace!(message = %res, internal_log_rate_secs = rate_limit_secs, vrl_position = span.start())
         }
         b"debug" => {
-            debug!(message = %value, internal_log_rate_secs = rate_limit_secs, vrl_position = span.start())
+            debug!(message = %res, internal_log_rate_secs = rate_limit_secs, vrl_position = span.start())
         }
         b"warn" => {
-            warn!(message = %value, internal_log_rate_secs = rate_limit_secs, vrl_position = span.start())
+            warn!(message = %res, internal_log_rate_secs = rate_limit_secs, vrl_position = span.start())
         }
         b"error" => {
-            error!(message = %value, internal_log_rate_secs = rate_limit_secs, vrl_position = span.start())
+            error!(message = %res, internal_log_rate_secs = rate_limit_secs, vrl_position = span.start())
         }
         _ => {
-            info!(message = %value, internal_log_rate_secs = rate_limit_secs, vrl_position = span.start())
+            info!(message = %res, internal_log_rate_secs = rate_limit_secs, vrl_position = span.start())
         }
     }
     Ok(Value::Null)
@@ -83,7 +85,7 @@ impl Function for Log {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -184,13 +186,15 @@ impl Expression for LogFn {
         log(rate_limit_secs, &self.level, value, span)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::null().infallible()
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use tracing_test::traced_test;
+
     use super::*;
 
     test_function![
@@ -204,4 +208,20 @@ mod tests {
             tdef: TypeDef::null().infallible(),
         }
     ];
+
+    #[traced_test]
+    #[test]
+    fn output_quotes() {
+        // Check that a message is logged without additional quotes
+        log(
+            value!(1),
+            &Bytes::from("warn"),
+            value!("simple test message"),
+            Default::default(),
+        )
+        .unwrap();
+
+        assert!(!logs_contain("\"simple test message\""));
+        assert!(logs_contain("simple test message"));
+    }
 }

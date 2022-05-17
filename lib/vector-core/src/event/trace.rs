@@ -1,6 +1,7 @@
-use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fmt::Debug, sync::Arc};
 
+use lookup::LookupBuf;
+use serde::{Deserialize, Serialize};
 use vector_buffers::EventCount;
 use vector_common::EventDataEq;
 
@@ -23,6 +24,14 @@ impl TraceEvent {
         Self(LogEvent::from_parts(fields, metadata))
     }
 
+    pub fn value(&self) -> &Value {
+        self.0.value()
+    }
+
+    pub fn value_mut(&mut self) -> &mut Value {
+        self.0.value_mut()
+    }
+
     pub fn metadata(&self) -> &EventMetadata {
         self.0.metadata()
     }
@@ -35,10 +44,12 @@ impl TraceEvent {
         self.0.add_finalizer(finalizer);
     }
 
+    #[must_use]
     pub fn with_batch_notifier(self, batch: &Arc<BatchNotifier>) -> Self {
         Self(self.0.with_batch_notifier(batch))
     }
 
+    #[must_use]
     pub fn with_batch_notifier_option(self, batch: &Option<Arc<BatchNotifier>>) -> Self {
         Self(self.0.with_batch_notifier_option(batch))
     }
@@ -49,6 +60,14 @@ impl TraceEvent {
 
     pub fn get(&self, key: impl AsRef<str>) -> Option<&Value> {
         self.0.get(key.as_ref())
+    }
+
+    pub fn lookup(&self, path: &LookupBuf) -> Option<&Value> {
+        self.0.lookup(path)
+    }
+
+    pub fn lookup_mut(&mut self, path: &LookupBuf) -> Option<&mut Value> {
+        self.0.lookup_mut(path)
     }
 
     pub fn get_flat(&self, key: impl AsRef<str>) -> Option<&Value> {

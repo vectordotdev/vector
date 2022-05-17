@@ -4,25 +4,27 @@
 use std::convert::TryFrom;
 use std::str::FromStr;
 
+use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
+use aws_sdk_cloudwatchlogs::{Endpoint, Region};
 use chrono::Duration;
 use futures::StreamExt;
+use http::Uri;
 use pretty_assertions::assert_eq;
 
 use super::*;
+use crate::aws::create_client;
+use crate::aws::{AwsAuthentication, RegionOrEndpoint};
+use crate::sinks::aws_cloudwatch_logs::config::CloudwatchLogsClientBuilder;
 use crate::{
     config::{log_schema, ProxyConfig, SinkConfig, SinkContext},
     event::{Event, Value},
-    sinks::util::{encoding::StandardEncodings, BatchConfig},
+    sinks::util::{
+        encoding::{EncodingConfig, StandardEncodings},
+        BatchConfig,
+    },
     template::Template,
     test_util::{random_lines, random_lines_with_stream, random_string, trace_init},
 };
-
-use crate::aws::aws_sdk::create_client;
-use crate::aws::{AwsAuthentication, RegionOrEndpoint};
-use crate::sinks::aws_cloudwatch_logs::config::CloudwatchLogsClientBuilder;
-use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
-use aws_sdk_cloudwatchlogs::{Endpoint, Region};
-use http::Uri;
 
 const GROUP_NAME: &str = "vector-cw";
 
@@ -41,7 +43,7 @@ async fn cloudwatch_insert_log_event() {
         stream_name: Template::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(GROUP_NAME).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
-        encoding: StandardEncodings::Text.into(),
+        encoding: EncodingConfig::from(StandardEncodings::Text).into(),
         create_missing_group: None,
         create_missing_stream: None,
         compression: Default::default(),
@@ -91,7 +93,7 @@ async fn cloudwatch_insert_log_events_sorted() {
         stream_name: Template::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(GROUP_NAME).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
-        encoding: StandardEncodings::Text.into(),
+        encoding: EncodingConfig::from(StandardEncodings::Text).into(),
         create_missing_group: None,
         create_missing_stream: None,
         compression: Default::default(),
@@ -160,7 +162,7 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
         stream_name: Template::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(GROUP_NAME).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
-        encoding: StandardEncodings::Text.into(),
+        encoding: EncodingConfig::from(StandardEncodings::Text).into(),
         create_missing_group: None,
         create_missing_stream: None,
         compression: Default::default(),
@@ -235,7 +237,7 @@ async fn cloudwatch_dynamic_group_and_stream_creation() {
         stream_name: Template::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(group_name.as_str()).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
-        encoding: StandardEncodings::Text.into(),
+        encoding: EncodingConfig::from(StandardEncodings::Text).into(),
         create_missing_group: None,
         create_missing_stream: None,
         compression: Default::default(),
@@ -290,7 +292,7 @@ async fn cloudwatch_insert_log_event_batched() {
         stream_name: Template::try_from(stream_name.as_str()).unwrap(),
         group_name: Template::try_from(group_name.as_str()).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
-        encoding: StandardEncodings::Text.into(),
+        encoding: EncodingConfig::from(StandardEncodings::Text).into(),
         create_missing_group: None,
         create_missing_stream: None,
         compression: Default::default(),
@@ -341,7 +343,7 @@ async fn cloudwatch_insert_log_event_partitioned() {
         group_name: Template::try_from(GROUP_NAME).unwrap(),
         stream_name: Template::try_from(format!("{}-{{{{key}}}}", stream_name)).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
-        encoding: StandardEncodings::Text.into(),
+        encoding: EncodingConfig::from(StandardEncodings::Text).into(),
         create_missing_group: None,
         create_missing_stream: None,
         compression: Default::default(),
@@ -433,7 +435,7 @@ async fn cloudwatch_healthcheck() {
         stream_name: Template::try_from("test-stream").unwrap(),
         group_name: Template::try_from(GROUP_NAME).unwrap(),
         region: RegionOrEndpoint::with_both("localstack", watchlogs_address().as_str()),
-        encoding: StandardEncodings::Text.into(),
+        encoding: EncodingConfig::from(StandardEncodings::Text).into(),
         create_missing_group: None,
         create_missing_stream: None,
         compression: Default::default(),

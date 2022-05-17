@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn push(list: Value, item: Value) -> Resolved {
@@ -46,7 +47,7 @@ impl Function for Push {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -78,7 +79,7 @@ impl Expression for PushFn {
         push(list, item)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         let item = TypeDef::array(BTreeMap::from([(
             0.into(),
             self.item.type_def(state).into(),
@@ -90,8 +91,9 @@ impl Expression for PushFn {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use vector_common::btreemap;
+
+    use super::*;
 
     test_function![
         push => Push;

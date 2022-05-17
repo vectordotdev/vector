@@ -10,7 +10,6 @@ use std::{
 
 use bytes::{Buf, BufMut};
 use clap::{Arg, Command};
-use futures::{stream, SinkExt, StreamExt};
 use hdrhistogram::Histogram;
 use rand::Rng;
 use tokio::{select, sync::oneshot, task, time};
@@ -277,7 +276,7 @@ where
         .expect("should not fail to to add variant to builder");
 
     builder
-        .build(Span::none())
+        .build(String::from("buffer_perf"), Span::none())
         .await
         .expect("build should not fail")
 }
@@ -348,12 +347,10 @@ async fn main() {
                 }
                 n => {
                     let count = cmp::min(n, remaining);
-                    let mut record_chunk = (&mut records).take(count).map(Ok);
-                    let mut record_chunk_iter = stream::iter(&mut record_chunk);
-                    writer
-                        .send_all(&mut record_chunk_iter)
-                        .await
-                        .expect("failed to write record");
+                    let record_chunk = (&mut records).take(count);
+                    for record in record_chunk {
+                        writer.send(record).await.expect("failed to write record");
+                    }
                     count
                 }
             };

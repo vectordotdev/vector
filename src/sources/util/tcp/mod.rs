@@ -1,26 +1,25 @@
 mod request_limiter;
 
+use std::net::SocketAddr;
+use std::{fmt, io, mem::drop, sync::Arc, time::Duration};
+
 use bytes::Bytes;
+use codecs::StreamDecodingError;
 use futures::{future::BoxFuture, FutureExt, StreamExt};
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use smallvec::SmallVec;
 use socket2::SockRef;
-use vector_core::ByteSizeOf;
-
-use std::net::{IpAddr, SocketAddr};
-
-use std::{fmt, io, mem::drop, sync::Arc, time::Duration};
-
 use tokio::{
     io::AsyncWriteExt,
     net::{TcpListener, TcpStream},
     time::sleep,
 };
 use tokio_util::codec::{Decoder, FramedRead};
-use tracing_futures::Instrument;
+use tracing::Instrument;
+use vector_core::ByteSizeOf;
 
-use super::{AfterReadExt as _, StreamDecodingError};
+use super::AfterReadExt as _;
 use crate::sources::util::tcp::request_limiter::RequestLimiter;
 use crate::{
     codecs::ReadyFrames,
@@ -110,10 +109,11 @@ where
 
     fn decoder(&self) -> Self::Decoder;
 
-    fn handle_events(&self, _events: &mut [Event], _host: Bytes) {}
+    fn handle_events(&self, _events: &mut [Event], _host: std::net::SocketAddr) {}
 
     fn build_acker(&self, item: &[Self::Item]) -> Self::Acker;
 
+    #[allow(clippy::too_many_arguments)]
     fn run(
         self,
         addr: SocketListenAddr,
@@ -203,7 +203,7 @@ where
                                 receive_buffer_bytes,
                                 source,
                                 tripwire,
-                                peer_addr.ip(),
+                                peer_addr,
                                 out,
                                 acknowledgements,
                                 request_limiter,
@@ -225,6 +225,7 @@ where
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn handle_stream<T>(
     mut shutdown_signal: ShutdownSignal,
     mut socket: MaybeTlsIncomingStream<TcpStream>,
@@ -232,7 +233,7 @@ async fn handle_stream<T>(
     receive_buffer_bytes: Option<usize>,
     source: T,
     mut tripwire: BoxFuture<'static, ()>,
-    peer_addr: IpAddr,
+    peer_addr: SocketAddr,
     mut out: SourceSender,
     acknowledgements: bool,
     request_limiter: RequestLimiter,
@@ -272,7 +273,6 @@ async fn handle_stream<T>(
     });
     let reader = FramedRead::new(socket, source.decoder());
     let mut reader = ReadyFrames::new(reader);
-    let host = Bytes::from(peer_addr.to_string());
 
     loop {
         let mut permit = tokio::select! {
@@ -334,7 +334,7 @@ async fn handle_stream<T>(
                             }
                         }
 
-                        source.handle_events(&mut events, host.clone());
+                        source.handle_events(&mut events, peer_addr);
                         match out.send_batch(events).await {
                             Ok(_) => {
                                 let ack = match receiver {

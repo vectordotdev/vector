@@ -1,12 +1,12 @@
 use std::borrow::Cow;
 
-use super::prelude::{error_stage, error_type};
 use bytes::Bytes;
 use metrics::{counter, gauge};
 use vector_core::internal_event::InternalEvent;
 
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
 pub use self::source::*;
+use super::prelude::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct FileOpen {
@@ -67,29 +67,6 @@ impl<'a> InternalEvent for FileIoError<'a> {
     }
 }
 
-#[derive(Debug)]
-pub struct FileExpiringError<E> {
-    pub error: E,
-}
-
-impl<E: std::fmt::Display> InternalEvent for FileExpiringError<E> {
-    fn emit(self) {
-        error!(
-            message = "Failed expiring a file.",
-            error = %self.error,
-            error_code = "expiring",
-            error_type = error_type::WRITER_FAILED,
-            stage = error_stage::SENDING,
-        );
-        counter!(
-            "component_errors_total", 1,
-            "error_code" => "expiring",
-            "error_type" => error_type::WRITER_FAILED,
-            "stage" => error_stage::SENDING,
-        );
-    }
-}
-
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
 mod source {
     use std::{io::Error, path::Path, time::Duration};
@@ -140,10 +117,6 @@ mod source {
             );
             counter!(
                 "events_in_total", self.count as u64,
-                "file" => self.file.to_owned(),
-            );
-            counter!(
-                "processed_bytes_total", self.byte_size as u64,
                 "file" => self.file.to_owned(),
             );
             counter!(
@@ -216,7 +189,7 @@ mod source {
 
     impl<'a> InternalEvent for FileDeleteError<'a> {
         fn emit(self) {
-            warn!(
+            error!(
                 message = "Failed in deleting file.",
                 file = %self.file.display(),
                 error = %self.error,

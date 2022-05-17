@@ -13,6 +13,9 @@ use crate::Test;
 ///
 /// This mostly consists of functions that have a non-deterministic result.
 const SKIP_FUNCTION_EXAMPLES: &[&str] = &[
+    "type_def", // Not supported on VM runtime
+    "encrypt",  // uses random_bytes for the IV
+    "random_bytes",
     "uuid_v4",
     "strip_ansi_escape_codes",
     "get_hostname",
@@ -72,7 +75,11 @@ pub enum Error {
     Runtime(String),
 }
 
-pub fn tests() -> Vec<Test> {
+pub fn tests(ignore_cue: bool) -> Vec<Test> {
+    if ignore_cue {
+        return vec![];
+    }
+
     let dir = fs::canonicalize("../../../scripts").unwrap();
 
     let output = Command::new("bash")
@@ -115,7 +122,7 @@ fn examples_to_tests(
 
 impl Test {
     fn from_cue_example(category: &'static str, name: String, example: Example) -> Self {
-        use vrl::Value;
+        use ::value::Value;
 
         let Example {
             title,

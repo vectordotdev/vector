@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use ::value::Value;
 use vrl::prelude::*;
 
 use crate::{
@@ -88,13 +89,13 @@ impl Function for FindEnrichmentTableRecords {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let registry = ctx
             .get_external_context_mut::<TableRegistry>()
-            .ok_or(Box::new(vrl_util::Error::TablesNotLoaded) as Box<dyn DiagnosticError>)?;
+            .ok_or(Box::new(vrl_util::Error::TablesNotLoaded) as Box<dyn DiagnosticMessage>)?;
 
         let tables = registry
             .table_ids()
@@ -113,7 +114,8 @@ impl Function for FindEnrichmentTableRecords {
 
         let case_sensitive = arguments
             .optional_literal("case_sensitive")?
-            .map(|literal| literal.to_value().try_boolean())
+            .and_then(|literal| literal.as_value())
+            .map(|value| value.try_boolean())
             .transpose()
             .expect("case_sensitive should be boolean") // This will have been caught by the type checker.
             .map(|case_sensitive| {
@@ -149,9 +151,10 @@ impl Function for FindEnrichmentTableRecords {
     ) -> CompiledArgument {
         match (name, expr) {
             ("table", Some(expr)) => {
-                let registry = ctx
-                    .get_external_context_mut::<TableRegistry>()
-                    .ok_or(Box::new(vrl_util::Error::TablesNotLoaded) as Box<dyn DiagnosticError>)?;
+                let registry =
+                    ctx.get_external_context_mut::<TableRegistry>()
+                        .ok_or(Box::new(vrl_util::Error::TablesNotLoaded)
+                            as Box<dyn DiagnosticMessage>)?;
 
                 let tables = registry
                     .table_ids()
@@ -242,7 +245,7 @@ impl Expression for FindEnrichmentTableRecordsFn {
         )
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::array(Collection::from_unknown(Kind::object(Collection::any()))).fallible()
     }
 }

@@ -8,9 +8,8 @@ use proptest::{
     strategy::Strategy,
 };
 
-use crate::EventCount;
-
 use super::record::Record;
+use crate::EventCount;
 
 /// Input action for the model/system under test.
 ///

@@ -9,10 +9,11 @@ use tokio::time::{sleep, Duration};
 
 use super::config::{Encoding, SqsSinkConfig};
 use super::sink::SqsSink;
-use crate::aws::aws_sdk::create_client;
+use crate::aws::create_client;
 use crate::aws::{AwsAuthentication, RegionOrEndpoint};
 use crate::common::sqs::SqsClientBuilder;
 use crate::config::{ProxyConfig, SinkContext};
+use crate::sinks::util::encoding::EncodingConfig;
 use crate::sinks::VectorSink;
 use crate::test_util::{random_lines_with_stream, random_string};
 
@@ -48,8 +49,8 @@ async fn sqs_send_message_batch() {
 
     let config = SqsSinkConfig {
         queue_url: queue_url.clone(),
-        region: RegionOrEndpoint::with_endpoint(sqs_address().as_str()),
-        encoding: Encoding::Text.into(),
+        region: RegionOrEndpoint::with_both("local", sqs_address().as_str()),
+        encoding: EncodingConfig::from(Encoding::Text).into(),
         message_group_id: None,
         message_deduplication_id: None,
         request: Default::default(),
@@ -103,15 +104,13 @@ async fn ensure_queue(queue_name: String) {
         None
     };
 
-    if let Err(error) = client
+    client
         .create_queue()
         .set_attributes(attributes)
         .queue_name(queue_name)
         .send()
         .await
-    {
-        println!("Unable to check the queue {:?}", error);
-    }
+        .expect("unable to create queue");
 }
 
 async fn get_queue_url(queue_name: String) -> String {

@@ -1,7 +1,7 @@
-#[cfg(feature = "codecs")]
-use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
+
+use super::prelude::{error_stage, error_type};
 
 #[derive(Debug, Clone, Copy)]
 #[allow(dead_code)] // some features only use some variants
@@ -18,6 +18,26 @@ impl SocketMode {
             Self::Udp => "udp",
             Self::Unix => "unix",
         }
+    }
+}
+#[derive(Debug)]
+pub struct SocketBytesReceived {
+    pub mode: SocketMode,
+    pub byte_size: usize,
+}
+
+impl InternalEvent for SocketBytesReceived {
+    fn emit(self) {
+        let protocol = self.mode.as_str().to_string();
+        trace!(
+            message = "Bytes received.",
+            byte_size = %self.byte_size,
+            protocol = protocol.as_str(),
+        );
+        counter!(
+            "component_received_bytes_total", self.byte_size as u64,
+            "protocol" => protocol,
+        );
     }
 }
 
@@ -40,7 +60,6 @@ impl InternalEvent for SocketEventsReceived {
         counter!("component_received_event_bytes_total", self.byte_size as u64, "mode" => self.mode.as_str());
         // deprecated
         counter!("events_in_total", self.count as u64, "mode" => self.mode.as_str());
-        counter!("processed_bytes_total", self.byte_size as u64, "mode" => self.mode.as_str());
     }
 }
 
@@ -56,19 +75,15 @@ impl InternalEvent for SocketEventsSent {
         trace!(message = "Events sent.", count = %self.count, byte_size = %self.byte_size);
         counter!("component_sent_events_total", self.count as u64, "mode" => self.mode.as_str());
         counter!("component_sent_event_bytes_total", self.byte_size as u64, "mode" => self.mode.as_str());
-        // deprecated
-        counter!("processed_bytes_total", self.byte_size as u64, "mode" => self.mode.as_str());
     }
 }
 
-#[cfg(feature = "codecs")]
 #[derive(Debug)]
 pub struct SocketReceiveError<'a> {
     pub mode: SocketMode,
-    pub error: &'a crate::codecs::decoding::Error,
+    pub error: &'a codecs::decoding::Error,
 }
 
-#[cfg(feature = "codecs")]
 impl<'a> InternalEvent for SocketReceiveError<'a> {
     fn emit(self) {
         error!(

@@ -224,14 +224,25 @@ type = "add_fields"
 [transforms.add_host.fields]
 host = "${HOSTNAME}" # or "$HOSTNAME"
 environment = "${ENV:-development}" # default value when not present
+tenant = "${TENANT:?tenant must be supplied}" # required environment variable
 ```
 
 #### Default values
 
-Default values can be supplied using `:-` syntax:
+Default values can be supplied using `:-` or `-` syntax:
 
 ```toml
-option = "${ENV_VAR:-default}"
+option = "${ENV_VAR:-default}" # default value if variable is unset or empty
+option = "${ENV_VAR-default}" # default value only if variable is unset
+```
+
+#### Required variables
+
+Environment variables that are required can be specified using `:?` or `?` syntax:
+
+```toml
+option = "${ENV_VAR:?err}" # Vector exits with 'err' message if variable is unset or empty
+option = "${ENV_VAR?err}" # Vector exits with 'err' message only if variable is unset
 ```
 
 #### Escaping
@@ -243,8 +254,8 @@ environment variable example.
 ### Formats
 
 Vector supports [TOML], [YAML], and [JSON] to ensure that Vector fits into your
-workflow. A side benefit of supporting JSON is that it enables you to use
-JSON-outputting data templating languages like [Jsonnet] and [Cue].
+workflow. A side benefit of supporting YAML and JSON is that they enable you to use
+data templating languages such as [ytt], [Jsonnet] and [Cue].
 
 #### Location
 
@@ -394,3 +405,4 @@ inputs = ["app*", "system_logs"]
 [jsonnet]: https://jsonnet.org
 [toml]: https://github.com/toml-lang/toml
 [yaml]: https://yaml.org
+[ytt]: https://carvel.dev/ytt/

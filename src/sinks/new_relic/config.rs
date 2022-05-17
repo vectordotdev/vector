@@ -1,3 +1,10 @@
+use std::{fmt::Debug, sync::Arc};
+
+use futures::FutureExt;
+use http::Uri;
+use serde::{Deserialize, Serialize};
+use tower::ServiceBuilder;
+
 use super::{
     healthcheck, Encoding, NewRelicApiResponse, NewRelicApiService, NewRelicSink, NewRelicSinkError,
 };
@@ -10,11 +17,6 @@ use crate::{
     },
     tls::TlsSettings,
 };
-use futures::FutureExt;
-use http::Uri;
-use serde::{Deserialize, Serialize};
-use std::{fmt::Debug, num::NonZeroU64, sync::Arc};
-use tower::ServiceBuilder;
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Copy, Derivative)]
 #[serde(rename_all = "snake_case")]
@@ -41,7 +43,7 @@ pub struct NewRelicDefaultBatchSettings;
 impl SinkBatchSettings for NewRelicDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(100);
     const MAX_BYTES: Option<usize> = Some(1_000_000);
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Debug, Default, Clone)]

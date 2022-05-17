@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::{diagnostic::Note, prelude::*};
 
 fn assert(condition: Value, message: Option<Value>, format: Option<String>) -> Resolved {
@@ -67,7 +68,7 @@ impl Function for Assert {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -100,7 +101,7 @@ impl Expression for AssertFn {
         assert(condition, message, format)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().fallible()
     }
 }

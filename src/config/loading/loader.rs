@@ -1,10 +1,12 @@
-use super::{component_name, open_file, read_dir, Format};
-use crate::config::format;
-use serde_toml_merge::merge_into_table;
 use std::path::{Path, PathBuf};
+
+use serde_toml_merge::merge_into_table;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 use toml::value::{Table, Value};
+
+use super::{component_name, open_file, read_dir, Format};
+use crate::config::format;
 
 /// Provides a hint to the loading system of the type of components that should be found
 /// when traversing an explicitly named directory.
@@ -44,8 +46,9 @@ impl ComponentHint {
 // because there are numerous internal functions for dealing with (non)recursive loading that
 // rely on `&self` but don't need overriding and would be confusingly named in a public API.
 pub(super) mod process {
-    use super::*;
     use std::io::Read;
+
+    use super::*;
 
     /// This trait contains methods that deserialize files/folders. There are a few methods
     /// in here with subtly different names that can be hidden from public view, hence why
@@ -91,7 +94,15 @@ pub(super) mod process {
                         if entry.is_file() {
                             files.push(entry);
                         } else if entry.is_dir() {
-                            folders.push(entry);
+                            // do not load directories when the directory starts with a '.'
+                            if !entry
+                                .file_name()
+                                .and_then(|name| name.to_str())
+                                .map(|name| name.starts_with('.'))
+                                .unwrap_or(false)
+                            {
+                                folders.push(entry);
+                            }
                         }
                     }
                     Err(err) => {
@@ -221,7 +232,7 @@ where
     /// Deserializes a file with the provided format, and makes the result available via `take`.
     /// Returns a vector of non-fatal warnings on success, or a vector of error strings on failure.
     fn load_from_file(&mut self, path: &Path, format: Format) -> Result<Vec<String>, Vec<String>> {
-        if let Ok(Some((_, table, warnings))) = self.load_file(path, format) {
+        if let Some((_, table, warnings)) = self.load_file(path, format)? {
             self.merge(table, None)?;
             Ok(warnings)
         } else {

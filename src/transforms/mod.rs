@@ -14,8 +14,6 @@ pub mod aws_cloudwatch_logs_subscription_parser;
 pub mod aws_ec2_metadata;
 #[cfg(feature = "transforms-coercer")]
 pub mod coercer;
-#[cfg(feature = "transforms-compound")]
-pub mod compound;
 #[cfg(feature = "transforms-concat")]
 pub mod concat;
 #[cfg(feature = "transforms-dedupe")]
@@ -42,7 +40,6 @@ pub mod lua;
 pub mod merge;
 #[cfg(feature = "transforms-metric_to_log")]
 pub mod metric_to_log;
-pub mod noop;
 #[cfg(feature = "transforms-pipelines")]
 pub mod pipelines;
 #[cfg(feature = "transforms-reduce")]

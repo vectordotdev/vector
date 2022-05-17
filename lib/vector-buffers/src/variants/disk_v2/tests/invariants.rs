@@ -772,7 +772,7 @@ async fn writer_updates_ledger_when_buffered_writer_reports_implicit_flush() {
                 let record = MultiEventRecord(record_size);
                 let record_events = record.event_count();
                 let bytes_written = writer
-                    .write_record(record.clone())
+                    .write_record(record)
                     .await
                     .expect("write should not fail");
 
@@ -790,7 +790,7 @@ async fn writer_updates_ledger_when_buffered_writer_reports_implicit_flush() {
             let record = MultiEventRecord(record_size);
             let record_events = record.event_count();
             let bytes_written = writer
-                .write_record(record.clone())
+                .write_record(record)
                 .await
                 .expect("write should not fail");
             assert_enough_bytes_written!(bytes_written, SizedRecord, record_size);

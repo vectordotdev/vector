@@ -1,6 +1,6 @@
-use async_graphql::{Enum, Object};
 use std::collections::BTreeMap;
 
+use async_graphql::{Enum, Object};
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 use vector_common::encode_logfmt;
@@ -78,7 +78,7 @@ impl Metric {
 
     /// Metric timestamp
     async fn timestamp(&self) -> Option<&DateTime<Utc>> {
-        self.event.data().timestamp().as_ref()
+        self.event.data().timestamp()
     }
 
     /// Metric name

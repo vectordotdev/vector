@@ -16,7 +16,7 @@ use crate::{
         Healthcheck, VectorSink,
     },
     template::Template,
-    tls::TlsOptions,
+    tls::TlsConfig,
 };
 
 const HOST: &str = "https://cloud.humio.com";
@@ -42,7 +42,7 @@ pub struct HumioLogsConfig {
     pub(super) request: TowerRequestConfig,
     #[serde(default)]
     pub(super) batch: BatchConfig<SplunkHecDefaultBatchSettings>,
-    pub(super) tls: Option<TlsOptions>,
+    pub(super) tls: Option<TlsConfig>,
     #[serde(default = "timestamp_nanos_key")]
     pub(super) timestamp_nanos_key: Option<String>,
     #[serde(
@@ -142,10 +142,11 @@ mod tests {
 #[cfg(test)]
 #[cfg(feature = "humio-integration-tests")]
 mod integration_tests {
+    use std::{collections::HashMap, convert::TryFrom};
+
     use chrono::{TimeZone, Utc};
     use indoc::indoc;
     use serde_json::{json, Value as JsonValue};
-    use std::{collections::HashMap, convert::TryFrom};
     use tokio::time::Duration;
 
     use super::*;

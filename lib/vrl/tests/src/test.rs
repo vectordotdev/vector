@@ -1,6 +1,7 @@
 use std::{collections::BTreeMap, fs, path::Path};
 
-use vrl::{function::Example, Value};
+use ::value::Value;
+use vrl::function::Example;
 
 #[derive(Debug)]
 pub struct Test {
@@ -100,7 +101,7 @@ impl Test {
         }
     }
 
-    pub fn from_example(func: &'static str, example: &Example) -> Self {
+    pub fn from_example(func: impl ToString, example: &Example) -> Self {
         let object = Value::Object(BTreeMap::default());
         let result = match example.result {
             Ok(string) => string.to_owned(),
@@ -109,7 +110,7 @@ impl Test {
 
         Self {
             name: example.title.to_owned(),
-            category: format!("functions/{}", func),
+            category: format!("functions/{}", func.to_string()),
             error: None,
             source: example.source.to_owned(),
             object,

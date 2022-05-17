@@ -52,6 +52,7 @@ impl Requirement {
     }
 
     /// Add a restriction to the schema.
+    #[must_use]
     pub fn required_meaning(mut self, meaning: &'static str, kind: Kind) -> Self {
         self.insert_meaning(meaning, kind, false);
         self

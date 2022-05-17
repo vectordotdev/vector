@@ -1,13 +1,15 @@
 use std::fmt;
 
-use diagnostic::{DiagnosticError, Label, Note, Span, Urls};
+use diagnostic::{DiagnosticMessage, Label, Note, Span, Urls};
+use value::Value;
 
+use crate::state::{ExternalEnv, LocalEnv};
 use crate::value::VrlValueArithmetic;
 use crate::{
     expression::{self, Expr, Noop, Resolved},
     parser::{ast, Node},
     vm::OpCode,
-    Context, Expression, State, TypeDef, Value,
+    Context, Expression, TypeDef,
 };
 
 #[derive(Clone, PartialEq)]
@@ -22,7 +24,7 @@ impl Op {
         lhs: Node<Expr>,
         opcode: Node<ast::Opcode>,
         rhs: Node<Expr>,
-        state: &State,
+        state: (&LocalEnv, &ExternalEnv),
     ) -> Result<Self, Error> {
         use ast::Opcode::{Eq, Ge, Gt, Le, Lt, Ne};
 
@@ -90,35 +92,45 @@ impl Op {
 impl Expression for Op {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         use ast::Opcode::*;
-        use Value::*;
+        use value::Value::*;
 
-        let lhs = self.lhs.resolve(ctx);
-        let mut rhs = || self.rhs.resolve(ctx);
+        if let Err = self.opcode {
+            return self.lhs.resolve(ctx).or_else(|_| self.rhs.resolve(ctx));
+        } else if let Or = self.opcode {
+            return self
+                .lhs
+                .resolve(ctx)?
+                .try_or(|| self.rhs.resolve(ctx))
+                .map_err(Into::into);
+        } else if let And = self.opcode {
+            return match self.lhs.resolve(ctx)? {
+                Null | Boolean(false) => Ok(false.into()),
+                v => v.try_and(self.rhs.resolve(ctx)?).map_err(Into::into),
+            };
+        };
+
+        let lhs = self.lhs.resolve(ctx)?;
+        let rhs = self.rhs.resolve(ctx)?;
 
         match self.opcode {
-            Mul => lhs?.try_mul(rhs()?),
-            Div => lhs?.try_div(rhs()?),
-            Add => lhs?.try_add(rhs()?),
-            Sub => lhs?.try_sub(rhs()?),
-            Rem => lhs?.try_rem(rhs()?),
-            Or => lhs?.try_or(rhs),
-            And => match lhs? {
-                Null | Boolean(false) => Ok(false.into()),
-                v => v.try_and(rhs()?),
-            },
-            Err => Ok(lhs.or_else(|_| rhs())?),
-            Eq => Ok(lhs?.eq_lossy(&rhs()?).into()),
-            Ne => Ok((!lhs?.eq_lossy(&rhs()?)).into()),
-            Gt => lhs?.try_gt(rhs()?),
-            Ge => lhs?.try_ge(rhs()?),
-            Lt => lhs?.try_lt(rhs()?),
-            Le => lhs?.try_le(rhs()?),
-            Merge => lhs?.try_merge(rhs()?),
+            Mul => lhs.try_mul(rhs),
+            Div => lhs.try_div(rhs),
+            Add => lhs.try_add(rhs),
+            Sub => lhs.try_sub(rhs),
+            Rem => lhs.try_rem(rhs),
+            Eq => Ok(lhs.eq_lossy(&rhs).into()),
+            Ne => Ok((!lhs.eq_lossy(&rhs)).into()),
+            Gt => lhs.try_gt(rhs),
+            Ge => lhs.try_ge(rhs),
+            Lt => lhs.try_lt(rhs),
+            Le => lhs.try_le(rhs),
+            Merge => lhs.try_merge(rhs),
+            And | Or | Err => unreachable!(),
         }
         .map_err(Into::into)
     }
 
-    fn type_def(&self, state: &State) -> TypeDef {
+    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
         use ast::Opcode::*;
         use value::Kind as K;
 
@@ -272,9 +284,11 @@ impl Expression for Op {
     fn compile_to_vm(
         &self,
         vm: &mut crate::vm::Vm,
-        state: &mut crate::state::Compiler,
+        state: (&mut LocalEnv, &mut ExternalEnv),
     ) -> Result<(), String> {
-        self.lhs.compile_to_vm(vm, state)?;
+        let (local, external) = state;
+
+        self.lhs.compile_to_vm(vm, (local, external))?;
 
         let err_jump = if self.opcode != ast::Opcode::Err {
             // For all Ops other than the Err op, we want to jump to the end of
@@ -288,30 +302,30 @@ impl Expression for Op {
         // only compile the rhs in each branch as necessary.
         match self.opcode {
             ast::Opcode::Mul => {
-                self.rhs.compile_to_vm(vm, state)?;
+                self.rhs.compile_to_vm(vm, (local, external))?;
                 vm.write_opcode(OpCode::Multiply);
             }
             ast::Opcode::Div => {
-                self.rhs.compile_to_vm(vm, state)?;
+                self.rhs.compile_to_vm(vm, (local, external))?;
                 vm.write_opcode(OpCode::Divide);
             }
             ast::Opcode::Add => {
-                self.rhs.compile_to_vm(vm, state)?;
+                self.rhs.compile_to_vm(vm, (local, external))?;
                 vm.write_opcode(OpCode::Add);
             }
             ast::Opcode::Sub => {
-                self.rhs.compile_to_vm(vm, state)?;
+                self.rhs.compile_to_vm(vm, (local, external))?;
                 vm.write_opcode(OpCode::Subtract);
             }
             ast::Opcode::Rem => {
-                self.rhs.compile_to_vm(vm, state)?;
+                self.rhs.compile_to_vm(vm, (local, external))?;
                 vm.write_opcode(OpCode::Rem);
             }
             ast::Opcode::Or => {
                 // Or is rewritten as an if statement to allow short circuiting.
                 let if_jump = vm.emit_jump(OpCode::JumpIfTruthy);
                 vm.write_opcode(OpCode::Pop);
-                self.rhs.compile_to_vm(vm, state)?;
+                self.rhs.compile_to_vm(vm, (local, external))?;
                 vm.patch_jump(if_jump);
             }
             ast::Opcode::And => {
@@ -319,7 +333,7 @@ impl Expression for Op {
                 // JumpAndSwapIfFalsey will take any value from the stack that is falsey and
                 // replace it with False
                 let if_jump = vm.emit_jump(OpCode::JumpAndSwapIfFalsey);
-                self.rhs.compile_to_vm(vm, state)?;
+                self.rhs.compile_to_vm(vm, (local, external))?;
                 vm.write_opcode(OpCode::And);
                 vm.patch_jump(if_jump);
             }
@@ -327,35 +341,35 @@ impl Expression for Op {
                 // Err is rewritten as an if statement to allow short circuiting
                 let if_jump = vm.emit_jump(OpCode::JumpIfNotErr);
                 vm.write_opcode(OpCode::ClearError);
-                self.rhs.compile_to_vm(vm, state)?;
+                self.rhs.compile_to_vm(vm, (local, external))?;
                 vm.patch_jump(if_jump);
             }
             ast::Opcode::Ne => {
-                self.rhs.compile_to_vm(vm, state)?;
+                self.rhs.compile_to_vm(vm, (local, external))?;
                 vm.write_opcode(OpCode::NotEqual);
             }
             ast::Opcode::Eq => {
-                self.rhs.compile_to_vm(vm, state)?;
+                self.rhs.compile_to_vm(vm, (local, external))?;
                 vm.write_opcode(OpCode::Equal);
             }
             ast::Opcode::Ge => {
-                self.rhs.compile_to_vm(vm, state)?;
+                self.rhs.compile_to_vm(vm, (local, external))?;
                 vm.write_opcode(OpCode::GreaterEqual);
             }
             ast::Opcode::Gt => {
-                self.rhs.compile_to_vm(vm, state)?;
+                self.rhs.compile_to_vm(vm, (local, external))?;
                 vm.write_opcode(OpCode::Greater);
             }
             ast::Opcode::Le => {
-                self.rhs.compile_to_vm(vm, state)?;
+                self.rhs.compile_to_vm(vm, (local, external))?;
                 vm.write_opcode(OpCode::LessEqual);
             }
             ast::Opcode::Lt => {
-                self.rhs.compile_to_vm(vm, state)?;
+                self.rhs.compile_to_vm(vm, (local, external))?;
                 vm.write_opcode(OpCode::Less);
             }
             ast::Opcode::Merge => {
-                self.rhs.compile_to_vm(vm, state)?;
+                self.rhs.compile_to_vm(vm, (local, external))?;
                 vm.write_opcode(OpCode::Merge);
             }
         };
@@ -403,7 +417,7 @@ pub enum Error {
     Expr(#[from] expression::Error),
 }
 
-impl DiagnosticError for Error {
+impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
         use Error::*;
 
@@ -475,17 +489,19 @@ impl DiagnosticError for Error {
 
 // -----------------------------------------------------------------------------
 
-#[cfg(test)]
+#[cfg(all(test, feature = "expressions"))]
 mod tests {
+    use std::convert::TryInto;
+
+    use ast::Ident;
+    use ast::Opcode::*;
+    use ordered_float::NotNan;
+
     use super::*;
     use crate::{
         expression::{Block, IfStatement, Literal, Predicate, Variable},
         test_type_def,
     };
-    use ast::Ident;
-    use ast::Opcode::*;
-    use ordered_float::NotNan;
-    use std::convert::TryInto;
 
     fn op(
         opcode: ast::Opcode,
@@ -885,7 +901,7 @@ mod tests {
                 lhs: Box::new(
                     IfStatement {
                         predicate: Predicate::new_unchecked(vec![Literal::from(true).into()]),
-                        consequent: Block::new(vec![Literal::from("string").into()]),
+                        consequent: Block::new(vec![Literal::from("string").into()], LocalEnv::default()),
                         alternative: None,
                     }.into()),
                 rhs: Box::new(Literal::from("another string").into()),
@@ -899,8 +915,8 @@ mod tests {
                 lhs: Box::new(
                     IfStatement {
                         predicate: Predicate::new_unchecked(vec![Literal::from(true).into()]),
-                        consequent: Block::new(vec![Literal::from("string").into()]),
-                        alternative:  Some(Block::new(vec![Literal::from(42).into()]))
+                        consequent: Block::new(vec![Literal::from("string").into()], LocalEnv::default()),
+                        alternative:  Some(Block::new(vec![Literal::from(42).into()], LocalEnv::default()))
                 }.into()),
                 rhs: Box::new(Literal::from("another string").into()),
                 opcode: Or,

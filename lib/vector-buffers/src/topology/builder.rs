@@ -14,7 +14,7 @@ use crate::{
 
 /// Value that can be used as a stage in a buffer topology.
 #[async_trait]
-pub trait IntoBuffer<T> {
+pub trait IntoBuffer<T: Bufferable> {
     /// Gets whether or not this buffer stage provides its own instrumentation, or if it should be
     /// instrumented from the outside.
     ///
@@ -57,17 +57,17 @@ pub enum TopologyError {
     StackedAcks,
 }
 
-struct TopologyStage<T> {
+struct TopologyStage<T: Bufferable> {
     untransformed: Box<dyn IntoBuffer<T>>,
     when_full: WhenFull,
 }
 
 /// Builder for constructing buffer topologies.
-pub struct TopologyBuilder<T> {
+pub struct TopologyBuilder<T: Bufferable> {
     stages: Vec<TopologyStage<T>>,
 }
 
-impl<T> TopologyBuilder<T> {
+impl<T: Bufferable> TopologyBuilder<T> {
     /// Adds a new stage to the buffer topology.
     ///
     /// The "when full" behavior can be optionally configured here.  If no behavior is specified,
@@ -106,6 +106,7 @@ impl<T> TopologyBuilder<T> {
     /// explaining the issue.
     pub async fn build(
         self,
+        buffer_id: String,
         span: Span,
     ) -> Result<(BufferSender<T>, BufferReceiver<T>, Acker), TopologyError> {
         // We pop stages off in reverse order to build from the inside out.
@@ -190,16 +191,13 @@ impl<T> TopologyBuilder<T> {
         // Install the buffer usage handler since we successfully created the buffer topology.  This
         // spawns it in the background and periodically emits aggregated metrics about each of the
         // buffer stages.
-        buffer_usage.install();
+        buffer_usage.install(buffer_id.as_str());
 
         Ok((sender, receiver, acker))
     }
 }
 
-impl<T> TopologyBuilder<T>
-where
-    T: Bufferable,
-{
+impl<T: Bufferable> TopologyBuilder<T> {
     /// Creates a memory-only buffer topology.
     ///
     /// The overflow mode (i.e. `WhenFull`) can be configured to either block or drop the newest
@@ -270,7 +268,7 @@ where
     }
 }
 
-impl<T> Default for TopologyBuilder<T> {
+impl<T: Bufferable> Default for TopologyBuilder<T> {
     fn default() -> Self {
         Self { stages: Vec::new() }
     }
@@ -278,6 +276,8 @@ impl<T> Default for TopologyBuilder<T> {
 
 #[cfg(test)]
 mod tests {
+    use std::num::NonZeroUsize;
+
     use tracing::Span;
 
     use super::TopologyBuilder;
@@ -287,8 +287,6 @@ mod tests {
         WhenFull,
     };
 
-    use std::num::NonZeroUsize;
-
     #[tokio::test]
     async fn single_stage_topology_block() {
         let mut builder = TopologyBuilder::<u64>::default();
@@ -296,7 +294,7 @@ mod tests {
             MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
             WhenFull::Block,
         );
-        let result = builder.build(Span::none()).await;
+        let result = builder.build(String::from("test"), Span::none()).await;
         assert!(result.is_ok());
 
         let (mut sender, _, _) = result.unwrap();
@@ -310,7 +308,7 @@ mod tests {
             MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
             WhenFull::DropNewest,
         );
-        let result = builder.build(Span::none()).await;
+        let result = builder.build(String::from("test"), Span::none()).await;
         assert!(result.is_ok());
 
         let (mut sender, _, _) = result.unwrap();
@@ -324,7 +322,7 @@ mod tests {
             MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
             WhenFull::Overflow,
         );
-        let result = builder.build(Span::none()).await;
+        let result = builder.build(String::from("test"), Span::none()).await;
         match result {
             Err(TopologyError::OverflowWhenLast) => {}
             r => panic!("unexpected build result: {:?}", r),
@@ -342,7 +340,7 @@ mod tests {
             MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
             WhenFull::Block,
         );
-        let result = builder.build(Span::none()).await;
+        let result = builder.build(String::from("test"), Span::none()).await;
         match result {
             Err(TopologyError::NextStageNotUsed { stage_idx }) => assert_eq!(stage_idx, 0),
             r => panic!("unexpected build result: {:?}", r),
@@ -360,7 +358,7 @@ mod tests {
             MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
             WhenFull::Block,
         );
-        let result = builder.build(Span::none()).await;
+        let result = builder.build(String::from("test"), Span::none()).await;
         match result {
             Err(TopologyError::NextStageNotUsed { stage_idx }) => assert_eq!(stage_idx, 0),
             r => panic!("unexpected build result: {:?}", r),
@@ -379,7 +377,7 @@ mod tests {
             WhenFull::Block,
         );
 
-        let result = builder.build(Span::none()).await;
+        let result = builder.build(String::from("test"), Span::none()).await;
         assert!(result.is_ok());
 
         let (mut sender, _, _) = result.unwrap();

@@ -269,7 +269,7 @@ impl<W: AsyncWrite + Unpin> TrackingBufWriter<W> {
         }
 
         // If the given buffer is too large to be buffered at all, then bypass the internal buffer.
-        if buf.len() > self.buf.capacity() {
+        if buf.len() >= self.buf.capacity() {
             self.inner.write_all(buf).await?;
 
             let flush_result = flush_result.get_or_insert(FlushResult::default());
@@ -605,6 +605,7 @@ where
     unflushed_bytes: u64,
     data_file_full: bool,
     skip_to_next: bool,
+    ready_to_write: bool,
     _t: PhantomData<T>,
 }
 
@@ -626,6 +627,7 @@ where
             data_file_full: false,
             unflushed_bytes: 0,
             skip_to_next: false,
+            ready_to_write: false,
             next_record_id,
             unflushed_events: 0,
             _t: PhantomData,
@@ -708,6 +710,12 @@ where
     /// the writer/ledger state to start a new file, etc.
     #[instrument(skip(self), level = "debug")]
     pub(super) async fn validate_last_write(&mut self) -> Result<(), WriterError<T>> {
+        // We don't try validating again after doing so initially.
+        if self.ready_to_write {
+            warn!("Writer already initialized.");
+            return Ok(());
+        }
+
         debug!(
             current_writer_data_file = ?self.ledger.get_current_writer_data_file_path(),
             "Validating last written record in current data file."
@@ -716,6 +724,7 @@ where
 
         // If our current file is empty, there's no sense doing this check.
         if self.data_file_size == 0 {
+            self.ready_to_write = true;
             return Ok(());
         }
 
@@ -847,7 +856,15 @@ where
             self.mark_for_skip();
         }
 
+        self.ready_to_write = true;
+
         Ok(())
+    }
+
+    fn is_buffer_full(&self) -> bool {
+        let total_buffer_size = self.ledger.get_total_buffer_size() + self.unflushed_bytes;
+        let max_buffer_size = self.config.max_buffer_size;
+        total_buffer_size >= max_buffer_size
     }
 
     /// Ensures this writer is ready to attempt writer the next record.
@@ -855,17 +872,18 @@ where
     async fn ensure_ready_for_write(&mut self) -> io::Result<()> {
         // Check the overall size of the buffer and figure out if we can write.
         loop {
-            // If we haven't yet exceeded the maximum buffer size, then we can proceed.  Otherwise,
-            // wait for the reader to signal that they've made some progress.
-            let total_buffer_size = self.ledger.get_total_buffer_size();
-            let max_buffer_size = self.config.max_buffer_size;
-            if total_buffer_size < max_buffer_size {
+            // If we haven't yet exceeded the maximum buffer size, then we can proceed. Likewise, if
+            // we're still validating our last write, then we know it doesn't matter if the buffer
+            // is full or not because we're not doing any actual writing here.
+            //
+            // Otherwise, wait for the reader to signal that they've made some progress.
+            if !self.is_buffer_full() || !self.ready_to_write {
                 break;
             }
 
             trace!(
-                total_buffer_size,
-                max_buffer_size,
+                total_buffer_size = self.ledger.get_total_buffer_size() + self.unflushed_bytes,
+                max_buffer_size = self.config.max_buffer_size,
                 "Buffer size limit reached. Waiting for reader progress."
             );
 
@@ -1007,6 +1025,23 @@ where
         }
     }
 
+    /// Attempts to write a record.
+    ///
+    /// If the buffer is currently full, the original record will be immediately returned.
+    /// Otherwise, a write will be executed, which will run to completion, and `None` will be returned.
+    ///
+    /// # Errors
+    ///
+    /// If an error occurred while writing the record, an error variant will be returned describing
+    /// the error.
+    pub async fn try_write_record(&mut self, record: T) -> Result<Option<T>, WriterError<T>> {
+        if self.is_buffer_full() {
+            return Ok(Some(record));
+        }
+
+        self.write_record(record).await.map(|_| None)
+    }
+
     /// Writes a record.
     ///
     /// If the record was written successfully, the number of bytes written to the data file will be
@@ -1016,7 +1051,7 @@ where
     ///
     /// If an error occurred while writing the record, an error variant will be returned describing
     /// the error.
-    #[instrument(skip_all, level = "trace")]
+    #[instrument(skip_all, level = "debug")]
     pub async fn write_record(&mut self, mut record: T) -> Result<usize, WriterError<T>> {
         let record_events: NonZeroUsize = record
             .event_count()
@@ -1085,7 +1120,7 @@ where
         Ok(bytes_written)
     }
 
-    #[instrument(skip(self), level = "trace")]
+    #[instrument(skip(self), level = "debug")]
     async fn flush_inner(&mut self, force_full_flush: bool) -> io::Result<()> {
         // We always flush the `BufWriter` when this is called, but we don't always flush to disk or
         // flush the ledger.  This is enough for readers on Linux since the file ends up in the page

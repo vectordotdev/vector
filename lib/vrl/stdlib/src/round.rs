@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 use crate::util::round_to_precision;
@@ -64,7 +65,7 @@ impl Function for Round {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -76,7 +77,7 @@ impl Function for Round {
 
     fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
         let value = args.required("value");
-        let precision = args.optional("precision").unwrap_or(value!(0));
+        let precision = args.optional("precision").unwrap_or_else(|| value!(0));
 
         round(precision, value)
     }
@@ -96,7 +97,7 @@ impl Expression for RoundFn {
         round(precision, value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::integer().infallible()
     }
 }

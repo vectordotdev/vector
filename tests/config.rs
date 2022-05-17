@@ -425,6 +425,7 @@ async fn bad_s3_region() {
         encoding = "text"
         bucket = "asdf"
         key_prefix = "logs/"
+        region = "moonbase-alpha"
 
         [sinks.out2]
         type = "aws_s3"
@@ -433,18 +434,9 @@ async fn bad_s3_region() {
         encoding = "text"
         bucket = "asdf"
         key_prefix = "logs/"
-        region = "moonbase-alpha"
-
-        [sinks.out3]
-        type = "aws_s3"
-        inputs = ["in"]
-        compression = "gzip"
-        encoding = "text"
-        bucket = "asdf"
-        key_prefix = "logs/"
         endpoint = "this shouldnt work"
 
-        [sinks.out3.batch]
+        [sinks.out2.batch]
         max_bytes = 100000
         "#,
         Format::Toml,
@@ -452,7 +444,7 @@ async fn bad_s3_region() {
     .await
     .unwrap_err();
 
-    assert_eq!(err, vec!["Sink \"out3\": invalid uri character"])
+    assert_eq!(err, vec!["Sink \"out2\": invalid uri character"])
 }
 
 #[cfg(all(
@@ -776,6 +768,7 @@ async fn parses_sink_full_es_aws() {
         type = "elasticsearch"
         inputs = ["in"]
         endpoint = "https://es.us-east-1.amazonaws.com"
+        aws.region = "us-east-1"
 
         [sinks.out.auth]
         strategy = "aws"
@@ -808,14 +801,10 @@ async fn route() {
         type = "check_fields"
         "host.eq" = "gerry"
 
-        [transforms.splitting_gerrys.route.no_gerrys]
-        type = "check_fields"
-        "host.neq" = "gerry"
-
         [sinks.out]
         type = "socket"
         mode = "tcp"
-        inputs = ["splitting_gerrys.only_gerrys", "splitting_gerrys.no_gerrys"]
+        inputs = ["splitting_gerrys.only_gerrys", "splitting_gerrys._unmatched"]
         encoding = "text"
         address = "127.0.0.1:9999"
         "#,

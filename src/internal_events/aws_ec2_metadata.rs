@@ -1,6 +1,7 @@
-use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
+
+use super::prelude::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct AwsEc2MetadataRefreshSuccessful;
@@ -27,7 +28,6 @@ impl InternalEvent for AwsEc2MetadataRefreshError {
         );
         counter!(
             "component_errors_total", 1,
-            "error" => self.error.to_string(),
             "error_type" => error_type::REQUEST_FAILED,
             "stage" => error_stage::PROCESSING,
         );

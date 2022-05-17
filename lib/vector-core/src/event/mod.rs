@@ -5,13 +5,9 @@ use std::{
     sync::Arc,
 };
 
-use bytes::Bytes;
-use vector_buffers::EventCount;
-use vector_common::EventDataEq;
-
-use crate::ByteSizeOf;
 pub use ::value::Value;
 pub use array::{into_event_stream, EventArray, EventContainer, LogArray, MetricArray, TraceArray};
+use bytes::Bytes;
 pub use finalization::{
     BatchNotifier, BatchStatus, BatchStatusReceiver, EventFinalizer, EventFinalizers, EventStatus,
     Finalizable,
@@ -20,9 +16,14 @@ pub use log_event::LogEvent;
 pub use metadata::{EventMetadata, WithMetadata};
 pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
 pub use r#ref::{EventMutRef, EventRef};
+use serde::{Deserialize, Serialize};
 pub use trace::TraceEvent;
+use vector_buffers::EventCount;
+use vector_common::EventDataEq;
 #[cfg(feature = "vrl")]
-pub use vrl_target::VrlTarget;
+pub use vrl_target::{TargetEvents, VrlImmutableTarget, VrlTarget};
+
+use crate::ByteSizeOf;
 
 pub mod array;
 pub mod discriminant;
@@ -46,7 +47,8 @@ mod vrl_target;
 
 pub const PARTIAL: &str = "_partial";
 
-#[derive(PartialEq, PartialOrd, Debug, Clone)]
+#[derive(PartialEq, PartialOrd, Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Event {
     Log(LogEvent),
     Metric(Metric),

@@ -1,5 +1,3 @@
-use std::num::NonZeroU64;
-
 use futures::FutureExt;
 use http::{uri::InvalidUri, Uri};
 use serde::{Deserialize, Serialize};
@@ -12,11 +10,13 @@ use super::{
     service::{DatadogMetricsRetryLogic, DatadogMetricsService},
     sink::DatadogMetricsSink,
 };
+use crate::tls::{MaybeTlsSettings, TlsEnableableConfig};
 use crate::{
+    common::datadog::get_base_domain,
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
-        datadog::{get_api_validate_endpoint, get_base_domain, healthcheck, Region},
+        datadog::{get_api_validate_endpoint, healthcheck, Region},
         util::{
             batch::BatchConfig, Concurrency, ServiceBuilderExt, SinkBatchSettings,
             TowerRequestConfig,
@@ -44,7 +44,7 @@ pub struct DatadogMetricsDefaultBatchSettings;
 impl SinkBatchSettings for DatadogMetricsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(100_000);
     const MAX_BYTES: Option<usize> = None;
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(2) };
+    const TIMEOUT_SECS: f64 = 2.0;
 }
 
 #[derive(Debug, Snafu)]
@@ -106,7 +106,7 @@ pub struct DatadogMetricsConfig {
     pub site: Option<String>,
     // Deprecated name
     #[serde(alias = "api_key")]
-    default_api_key: String,
+    pub default_api_key: String,
     #[serde(default)]
     pub batch: BatchConfig<DatadogMetricsDefaultBatchSettings>,
     #[serde(default)]
@@ -116,7 +116,8 @@ pub struct DatadogMetricsConfig {
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    acknowledgements: AcknowledgementsConfig,
+    pub acknowledgements: AcknowledgementsConfig,
+    pub tls: Option<TlsEnableableConfig>,
 }
 
 impl_generate_config_from_default!(DatadogMetricsConfig);
@@ -146,14 +147,6 @@ impl SinkConfig for DatadogMetricsConfig {
 }
 
 impl DatadogMetricsConfig {
-    /// Creates a default [`DatadogMetricsConfig`] with the given API key.
-    pub fn from_api_key<T: Into<String>>(api_key: T) -> Self {
-        Self {
-            default_api_key: api_key.into(),
-            ..Self::default()
-        }
-    }
-
     /// Gets the base URI of the Datadog agent API.
     ///
     /// Per the Datadog agent convention, we should include a unique identifier as part of the
@@ -188,7 +181,15 @@ impl DatadogMetricsConfig {
     }
 
     fn build_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
-        let client = HttpClient::new(None, proxy)?;
+        let tls_settings = MaybeTlsSettings::from_config(
+            &Some(
+                self.tls
+                    .clone()
+                    .unwrap_or_else(TlsEnableableConfig::enabled),
+            ),
+            false,
+        )?;
+        let client = HttpClient::new(tls_settings, proxy)?;
         Ok(client)
     }
 

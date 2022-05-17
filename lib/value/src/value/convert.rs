@@ -1,11 +1,13 @@
-use crate::value::regex::ValueRegex;
-use crate::{Kind, Value};
+use std::borrow::Cow;
+use std::collections::BTreeMap;
+
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
 use regex::Regex;
-use std::borrow::Cow;
-use std::collections::BTreeMap;
+
+use crate::value::regex::ValueRegex;
+use crate::{Kind, Value};
 
 impl Value {
     /// Returns self as `NotNan<f64>`, only if self is `Value::Float`.
@@ -241,6 +243,18 @@ impl Value {
 impl From<Bytes> for Value {
     fn from(bytes: Bytes) -> Self {
         Self::Bytes(bytes)
+    }
+}
+
+impl<const N: usize> From<[u8; N]> for Value {
+    fn from(data: [u8; N]) -> Self {
+        Self::from(Bytes::copy_from_slice(&data[..]))
+    }
+}
+
+impl<const N: usize> From<&[u8; N]> for Value {
+    fn from(data: &[u8; N]) -> Self {
+        Self::from(Bytes::copy_from_slice(data))
     }
 }
 

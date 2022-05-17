@@ -157,7 +157,7 @@ where
 {
     /// `K` - file name, or other line source,
     /// `Bytes` - the line data,
-    /// `C` - the context related the the line data.
+    /// `C` - the context related to the line data.
     type Item = (K, Bytes, C);
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -211,8 +211,7 @@ where
                 Poll::Pending => {
                     // We didn't get any lines from `inner`, so we just give
                     // a line from keys that have hit their timeout.
-                    while let Poll::Ready(Some(Ok(expired_key))) =
-                        this.logic.timeouts.poll_expired(cx)
+                    while let Poll::Ready(Some(expired_key)) = this.logic.timeouts.poll_expired(cx)
                     {
                         let key = expired_key.into_inner();
                         if let Some((_, aggregate)) = this.logic.buffers.remove(&key) {

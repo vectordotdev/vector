@@ -1,6 +1,8 @@
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
+use super::prelude::{error_stage, error_type};
+
 #[derive(Debug)]
 pub struct WindowsServiceStart<'a> {
     pub already_started: bool,
@@ -85,16 +87,26 @@ impl<'a> InternalEvent for WindowsServiceUninstall<'a> {
 }
 
 #[derive(Debug)]
-pub struct WindowsServiceDoesNotExist<'a> {
+pub struct WindowsServiceDoesNotExistError<'a> {
     pub name: &'a str,
 }
 
-impl<'a> InternalEvent for WindowsServiceDoesNotExist<'a> {
+impl<'a> InternalEvent for WindowsServiceDoesNotExistError<'a> {
     fn emit(self) {
         error!(
+            message = "Windows service does not exist. Maybe it needs to be installed.",
             name = self.name,
-            "Windows service does not exist. Maybe it needs to be installed?",
+            error_code = "service_missing",
+            error_type = error_type::CONDITION_FAILED,
+            stage = error_stage::PROCESSING,
         );
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "service_missing",
+            "error_type" => error_type::CONDITION_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
+        // deprecated
         counter!("windows_service_does_not_exist_total", 1,);
     }
 }

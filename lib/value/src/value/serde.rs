@@ -1,11 +1,13 @@
-use crate::value::{timestamp_to_string, StdError, Value};
+use std::collections::BTreeMap;
+use std::fmt;
+
 use bytes::Bytes;
 use ordered_float::NotNan;
 use serde::de::Error as SerdeError;
 use serde::de::{MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Serialize, Serializer};
-use std::collections::BTreeMap;
-use std::fmt;
+
+use crate::value::{timestamp_to_string, StdError, Value};
 
 impl Value {
     /// Converts self into a `Bytes`, using JSON for Map/Array.
@@ -208,10 +210,11 @@ impl TryInto<serde_json::Value> for Value {
 
 #[cfg(test)]
 mod test {
-    use crate::value::Value;
     use std::fs;
     use std::io::Read;
     use std::path::Path;
+
+    use crate::value::Value;
 
     pub fn parse_artifact(path: impl AsRef<Path>) -> std::io::Result<Vec<u8>> {
         let mut test_file = match fs::File::open(path) {

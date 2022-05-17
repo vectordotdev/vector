@@ -7,7 +7,7 @@ use bytes::Bytes;
 use futures::future::BoxFuture;
 use md5::Digest;
 use tower::Service;
-use tracing_futures::Instrument;
+use tracing::Instrument;
 use vector_core::{
     buffers::Ackable,
     event::{EventFinalizers, EventStatus, Finalizable},
@@ -16,7 +16,7 @@ use vector_core::{
 };
 
 use super::config::S3Options;
-use crate::internal_events::AwsSdkBytesSent;
+use crate::internal_events::AwsBytesSent;
 
 #[derive(Debug, Clone)]
 pub struct S3Request {
@@ -67,10 +67,10 @@ impl DriverResponse for S3Response {
     }
 }
 
-/// Wrapper for the Rusoto S3 client.
+/// Wrapper for the AWS SDK S3 client.
 ///
 /// Provides a `tower::Service`-compatible wrapper around the native
-/// `rusoto_s3::S3Client`, allowing it to be composed within a Tower "stack",
+/// AWS SDK S3 Client, allowing it to be composed within a Tower "stack",
 /// such that we can easily and transparently provide retries, concurrency
 /// limits, rate limits, and more.
 #[derive(Clone)]
@@ -111,13 +111,13 @@ impl Service<S3Request> for S3Service {
 
         let content_md5 = base64::encode(md5::Md5::digest(&request.body));
 
-        let mut tagging = url::form_urlencoded::Serializer::new(String::new());
-        if let Some(tags) = options.tags {
+        let tagging = options.tags.map(|tags| {
+            let mut tagging = url::form_urlencoded::Serializer::new(String::new());
             for (p, v) in tags {
                 tagging.append_pair(&p, &v);
             }
-        }
-        let tagging = tagging.finish();
+            tagging.finish()
+        });
         let count = request.metadata.count;
         let events_byte_size = request.metadata.byte_size;
 
@@ -141,14 +141,14 @@ impl Service<S3Request> for S3Service {
                 .set_server_side_encryption(options.server_side_encryption.map(Into::into))
                 .set_ssekms_key_id(options.ssekms_key_id)
                 .set_storage_class(options.storage_class.map(Into::into))
-                .tagging(tagging)
+                .set_tagging(tagging)
                 .content_md5(content_md5)
                 .send()
                 .in_current_span()
                 .await;
 
             result.map(|_inner| {
-                emit!(AwsSdkBytesSent {
+                emit!(AwsBytesSent {
                     byte_size: request_size,
                     region,
                 });

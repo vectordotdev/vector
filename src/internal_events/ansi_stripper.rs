@@ -1,6 +1,7 @@
-use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
+
+use super::prelude::{error_stage, error_type};
 
 const FIELD_MISSING: &str = "field_missing";
 
@@ -11,7 +12,7 @@ pub struct AnsiStripperFieldMissingError<'a> {
 
 impl InternalEvent for AnsiStripperFieldMissingError<'_> {
     fn emit(self) {
-        debug!(
+        error!(
             message = "Field does not exist.",
             field = %self.field,
             error_code = FIELD_MISSING,

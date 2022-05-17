@@ -1,6 +1,10 @@
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
 use bytes::Bytes;
+use codecs::{
+    decoding::{self, Deserializer, Framer},
+    NewlineDelimitedDecoder,
+};
 use futures::{StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
@@ -11,22 +15,18 @@ use vector_core::ByteSizeOf;
 use self::parser::ParseError;
 use super::util::{SocketListenAddr, TcpNullAcker, TcpSource};
 use crate::{
-    codecs::{
-        self,
-        decoding::{self, Deserializer, Framer},
-        NewlineDelimitedDecoder,
-    },
+    codecs::Decoder,
     config::{
         self, GenerateConfig, Output, Resource, SourceConfig, SourceContext, SourceDescription,
     },
     event::Event,
     internal_events::{
-        BytesReceived, EventsReceived, StatsdInvalidRecordError, StatsdSocketError,
-        StreamClosedError,
+        EventsReceived, SocketBytesReceived, SocketMode, StatsdInvalidRecordError,
+        StatsdSocketError, StreamClosedError,
     },
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
     udp, SourceSender,
 };
 
@@ -67,7 +67,7 @@ struct TcpConfig {
     address: SocketListenAddr,
     keepalive: Option<TcpKeepaliveConfig>,
     #[serde(default)]
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     #[serde(default = "default_shutdown_timeout_secs")]
     shutdown_timeout_secs: u64,
     receive_buffer_bytes: Option<usize>,
@@ -128,7 +128,7 @@ impl SourceConfig for StatsdConfig {
                 )
             }
             #[cfg(unix)]
-            StatsdConfig::Unix(config) => Ok(statsd_unix(config.clone(), cx.shutdown, cx.out)),
+            StatsdConfig::Unix(config) => statsd_unix(config.clone(), cx.shutdown, cx.out),
         }
     }
 
@@ -154,15 +154,35 @@ impl SourceConfig for StatsdConfig {
     }
 }
 
-#[derive(Debug, Clone)]
-pub(crate) struct StatsdDeserializer;
+#[derive(Debug, Default, Clone)]
+pub(crate) struct StatsdDeserializer {
+    socket_mode: Option<SocketMode>,
+}
+
+impl StatsdDeserializer {
+    pub const fn udp() -> Self {
+        Self {
+            socket_mode: Some(SocketMode::Udp),
+        }
+    }
+
+    #[cfg(unix)]
+    pub const fn unix() -> Self {
+        Self {
+            socket_mode: Some(SocketMode::Unix),
+        }
+    }
+}
 
 impl decoding::format::Deserializer for StatsdDeserializer {
     fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
-        emit!(BytesReceived {
-            protocol: "udp",
-            byte_size: bytes.len(),
-        });
+        if let Some(mode) = self.socket_mode {
+            emit!(SocketBytesReceived {
+                mode,
+                byte_size: bytes.len(),
+            });
+        }
+
         match std::str::from_utf8(&bytes)
             .map_err(ParseError::InvalidUtf8)
             .and_then(parse)
@@ -191,6 +211,8 @@ async fn statsd_udp(
     shutdown: ShutdownSignal,
     mut out: SourceSender,
 ) -> Result<(), ()> {
+    // TODO: This should probably be based off of the `socket` source in UDP mode. If it's missing features needed, we
+    // should add them. Reduce, reuse, recycle.
     let socket = UdpSocket::bind(&config.address)
         .map_err(|error| emit!(StatsdSocketError::bind(error)))
         .await?;
@@ -207,9 +229,9 @@ async fn statsd_udp(
         r#type = "udp"
     );
 
-    let codec = codecs::Decoder::new(
+    let codec = Decoder::new(
         Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
-        Deserializer::Boxed(Box::new(StatsdDeserializer)),
+        Deserializer::Boxed(Box::new(StatsdDeserializer::udp())),
     );
     let mut stream = UdpFramed::new(socket, codec).take_until(shutdown);
     while let Some(frame) = stream.next().await {
@@ -235,13 +257,13 @@ struct StatsdTcpSource;
 impl TcpSource for StatsdTcpSource {
     type Error = codecs::decoding::Error;
     type Item = SmallVec<[Event; 1]>;
-    type Decoder = codecs::Decoder;
+    type Decoder = Decoder;
     type Acker = TcpNullAcker;
 
     fn decoder(&self) -> Self::Decoder {
-        codecs::Decoder::new(
+        Decoder::new(
             Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
-            Deserializer::Boxed(Box::new(StatsdDeserializer)),
+            Deserializer::Boxed(Box::new(StatsdDeserializer::default())),
         )
     }
 
@@ -258,14 +280,16 @@ mod test {
         io::AsyncWriteExt,
         time::{sleep, Duration, Instant},
     };
-    use vector_core::config::ComponentKey;
+    use vector_core::{config::ComponentKey, event::EventContainer};
 
     use super::*;
     use crate::test_util::{
+        collect_limited,
+        components::{assert_source_compliance, SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS},
         metrics::{assert_counter, assert_distribution, assert_gauge, assert_set},
         next_addr,
     };
-    use crate::{event::into_event_stream, series, test_util::metrics::AbsoluteMetricState};
+    use crate::{series, test_util::metrics::AbsoluteMetricState};
 
     #[test]
     fn generate_config() {
@@ -274,57 +298,66 @@ mod test {
 
     #[tokio::test]
     async fn test_statsd_udp() {
-        let in_addr = next_addr();
-        let config = StatsdConfig::Udp(UdpConfig::from_address(in_addr));
-        let (sender, mut receiver) = mpsc::channel(200);
-        tokio::spawn(async move {
-            let bind_addr = next_addr();
-            let socket = UdpSocket::bind(bind_addr).await.unwrap();
-            socket.connect(in_addr).await.unwrap();
-            while let Some(bytes) = receiver.next().await {
-                socket.send(bytes).await.unwrap();
-            }
-        });
-        test_statsd(config, sender).await;
+        assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async move {
+            let in_addr = next_addr();
+            let config = StatsdConfig::Udp(UdpConfig::from_address(in_addr));
+            let (sender, mut receiver) = mpsc::channel(200);
+            tokio::spawn(async move {
+                let bind_addr = next_addr();
+                let socket = UdpSocket::bind(bind_addr).await.unwrap();
+                socket.connect(in_addr).await.unwrap();
+                while let Some(bytes) = receiver.next().await {
+                    socket.send(bytes).await.unwrap();
+                }
+            });
+            test_statsd(config, sender).await;
+        })
+        .await;
     }
 
     #[tokio::test]
     async fn test_statsd_tcp() {
-        let in_addr = next_addr();
-        let config = StatsdConfig::Tcp(TcpConfig::from_address(in_addr.into()));
-        let (sender, mut receiver) = mpsc::channel(200);
-        tokio::spawn(async move {
-            while let Some(bytes) = receiver.next().await {
-                tokio::net::TcpStream::connect(in_addr)
-                    .await
-                    .unwrap()
-                    .write_all(bytes)
-                    .await
-                    .unwrap();
-            }
-        });
-        test_statsd(config, sender).await;
+        assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async move {
+            let in_addr = next_addr();
+            let config = StatsdConfig::Tcp(TcpConfig::from_address(in_addr.into()));
+            let (sender, mut receiver) = mpsc::channel(200);
+            tokio::spawn(async move {
+                while let Some(bytes) = receiver.next().await {
+                    tokio::net::TcpStream::connect(in_addr)
+                        .await
+                        .unwrap()
+                        .write_all(bytes)
+                        .await
+                        .unwrap();
+                }
+            });
+            test_statsd(config, sender).await;
+        })
+        .await;
     }
 
     #[cfg(unix)]
     #[tokio::test]
     async fn test_statsd_unix() {
-        let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
-        let config = StatsdConfig::Unix(UnixConfig {
-            path: in_path.clone(),
-        });
-        let (sender, mut receiver) = mpsc::channel(200);
-        tokio::spawn(async move {
-            while let Some(bytes) = receiver.next().await {
-                tokio::net::UnixStream::connect(&in_path)
-                    .await
-                    .unwrap()
-                    .write_all(bytes)
-                    .await
-                    .unwrap();
-            }
-        });
-        test_statsd(config, sender).await;
+        assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async move {
+            let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
+            let config = StatsdConfig::Unix(UnixConfig {
+                path: in_path.clone(),
+            });
+            let (sender, mut receiver) = mpsc::channel(200);
+            tokio::spawn(async move {
+                while let Some(bytes) = receiver.next().await {
+                    tokio::net::UnixStream::connect(&in_path)
+                        .await
+                        .unwrap()
+                        .write_all(bytes)
+                        .await
+                        .unwrap();
+                }
+            });
+            test_statsd(config, sender).await;
+        })
+        .await;
     }
 
     async fn test_statsd(statsd_config: StatsdConfig, mut sender: mpsc::Sender<&'static [u8]>) {
@@ -333,7 +366,6 @@ mod test {
         // and have a more accurate number here, but honestly, who cares?  This is big enough.
         let component_key = ComponentKey::from("statsd");
         let (tx, rx) = SourceSender::new_with_buffer(4096);
-        let rx = rx.flat_map(into_event_stream);
         let (source_ctx, shutdown) = SourceContext::new_shutdown(&component_key, tx);
         let sink = statsd_config
             .build(source_ctx)
@@ -374,7 +406,11 @@ mod test {
         // Read all the events into a `MetricState`, which handles normalizing metrics and tracking
         // cumulative values for incremental metrics, etc.  This will represent the final/cumulative
         // values for each metric sent by the source into the pipeline.
-        let state = rx.collect::<AbsoluteMetricState>().await;
+        let state = collect_limited(rx)
+            .await
+            .into_iter()
+            .flat_map(EventContainer::into_events)
+            .collect::<AbsoluteMetricState>();
         let metrics = state.finish();
 
         assert_counter(&metrics, series!("foo", "a" => "true", "b" => "b"), 100.0);

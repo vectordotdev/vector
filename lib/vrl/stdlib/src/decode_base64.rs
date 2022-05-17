@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use ::value::Value;
 use vrl::prelude::*;
 
 use crate::util::Base64Charset;
@@ -48,7 +49,7 @@ impl Function for DecodeBase64 {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -88,7 +89,7 @@ impl Expression for DecodeBase64Fn {
         decode_base64(charset, value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         // Always fallible due to the possibility of decoding errors that VRL can't detect in
         // advance: https://docs.rs/base64/0.13.0/base64/enum.DecodeError.html
         TypeDef::bytes().fallible()

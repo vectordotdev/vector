@@ -6,11 +6,8 @@
 #![deny(unused_comparisons)]
 #![allow(clippy::approx_constant)]
 #![allow(clippy::float_cmp)]
-#![allow(clippy::blocks_in_if_conditions)]
 #![allow(clippy::match_wild_err_arm)]
 #![allow(clippy::new_ret_no_self)]
-#![allow(clippy::too_many_arguments)]
-#![allow(clippy::trivial_regex)]
 #![allow(clippy::type_complexity)]
 #![allow(clippy::unit_arg)]
 #![deny(clippy::clone_on_ref_ptr)]
@@ -46,14 +43,14 @@ pub mod internal_events;
 pub mod api;
 pub mod app;
 pub mod async_read;
-#[cfg(any(feature = "rusoto_core", feature = "aws-config"))]
+#[cfg(feature = "aws-config")]
 pub mod aws;
-#[cfg(feature = "codecs")]
-#[allow(unreachable_pub)]
 pub mod codecs;
 pub(crate) mod common;
 pub mod encoding_transcode;
 pub mod enrichment_tables;
+#[cfg(feature = "gcp")]
+pub mod gcp;
 pub(crate) mod graph;
 pub mod heartbeat;
 pub mod http;
@@ -146,4 +143,19 @@ pub mod built_info {
 
 pub fn get_hostname() -> std::io::Result<String> {
     Ok(hostname::get()?.to_string_lossy().into())
+}
+
+#[track_caller]
+pub(crate) fn spawn_named<T>(
+    task: impl std::future::Future<Output = T> + Send + 'static,
+    _name: &str,
+) -> tokio::task::JoinHandle<T>
+where
+    T: Send + 'static,
+{
+    #[cfg(tokio_unstable)]
+    return tokio::task::Builder::new().name(_name).spawn(task);
+
+    #[cfg(not(tokio_unstable))]
+    tokio::spawn(task)
 }

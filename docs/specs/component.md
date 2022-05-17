@@ -115,9 +115,8 @@ There is leeway in the implementation of these events:
 
 #### BytesReceived
 
-*Sources* MUST emit a `BytesReceived` event immediately after receiving
-and (optionally) filtering bytes from the upstream source and before the
-creation of a Vector event.
+*Sources* MUST emit a `BytesReceived` event immediately after receiving, decompressing
+and filtering bytes from the upstream source and before the creation of a Vector event.
 
 * Properties
   * `byte_size`
@@ -183,7 +182,7 @@ sending it, like the `prometheus_exporter` sink, SHOULD NOT publish this metric.
 
 *Sinks* that send events down stream, and delete them in Vector, MUST emit
 a `BytesSent` event immediately after sending bytes to the downstream target, if
-the transmission was successful.
+the transmission was successful. The reported bytes MUST be before compression.
 
 Note that for sinks that simply expose data, but don't delete the data after
 sending it, like the `prometheus_exporter` sink, SHOULD NOT publish this metric.

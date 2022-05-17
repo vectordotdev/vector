@@ -1,9 +1,9 @@
-use std::net::IpAddr;
+use std::net::SocketAddr;
 
-use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
+use super::prelude::{error_stage, error_type};
 use crate::tls::TlsError;
 
 #[derive(Debug)]
@@ -172,7 +172,7 @@ impl InternalEvent for TcpSendAckError {
 #[derive(Debug)]
 pub struct TcpBytesReceived {
     pub byte_size: usize,
-    pub peer_addr: IpAddr,
+    pub peer_addr: SocketAddr,
 }
 
 impl InternalEvent for TcpBytesReceived {

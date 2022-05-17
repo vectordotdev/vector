@@ -1,15 +1,18 @@
 use std::{
+    cmp,
     collections::{BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
     fmt::{Debug, Display},
     iter::FromIterator,
+    mem::size_of,
+    num::NonZeroUsize,
     sync::Arc,
 };
 
 use bytes::Bytes;
 use chrono::Utc;
-use derivative::Derivative;
-use lookup::lookup_v2::Path;
+use crossbeam_utils::atomic::AtomicCell;
+use lookup::{lookup_v2::Path, LookupBuf};
 use serde::{Deserialize, Serialize, Serializer};
 use vector_common::EventDataEq;
 
@@ -20,18 +23,121 @@ use super::{
 };
 use crate::{config::log_schema, event::MaybeAsLogMut, ByteSizeOf};
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, Derivative, Deserialize)]
-pub struct LogEvent {
-    // **IMPORTANT:** Due to numerous legacy reasons this **must** be a Map variant.
-    #[derivative(Default(value = "Arc::new(Value::from(BTreeMap::default()))"))]
+#[derive(Debug, Deserialize)]
+struct Inner {
     #[serde(flatten)]
-    fields: Arc<Value>,
+    fields: Value,
+
+    #[serde(skip)]
+    size_cache: AtomicCell<Option<NonZeroUsize>>,
+}
+
+impl Inner {
+    fn invalidate(&self) {
+        self.size_cache.store(None);
+    }
+
+    fn as_value(&self) -> &Value {
+        &self.fields
+    }
+}
+
+impl ByteSizeOf for Inner {
+    fn size_of(&self) -> usize {
+        self.size_cache
+            .load()
+            .unwrap_or_else(|| {
+                let size = size_of::<Self>() + self.allocated_bytes();
+                // The size of self will always be non-zero, and
+                // adding the allocated bytes cannot make it overflow
+                // since `usize` has a range the same as pointer
+                // space. Hence, the expect below cannot fail.
+                let size = NonZeroUsize::new(size).expect("Size cannot be zero");
+                self.size_cache.store(Some(size));
+                size
+            })
+            .into()
+    }
+
+    fn allocated_bytes(&self) -> usize {
+        self.fields.allocated_bytes()
+    }
+}
+
+impl Clone for Inner {
+    fn clone(&self) -> Self {
+        Self {
+            fields: self.fields.clone(),
+            // This clone is only ever used in combination with
+            // `Arc::make_mut`, so don't bother fetching the size
+            // cache to copy it since it will be invalidated anyways.
+            size_cache: None.into(),
+        }
+    }
+}
+
+impl Default for Inner {
+    fn default() -> Self {
+        Self {
+            // **IMPORTANT:** Due to numerous legacy reasons this **must** be a Map variant.
+            fields: Value::Object(Default::default()),
+            size_cache: Default::default(),
+        }
+    }
+}
+
+impl From<BTreeMap<String, Value>> for Inner {
+    fn from(fields: BTreeMap<String, Value>) -> Self {
+        Self {
+            fields: Value::Object(fields),
+            size_cache: Default::default(),
+        }
+    }
+}
+
+impl From<Value> for Inner {
+    fn from(fields: Value) -> Self {
+        Self {
+            fields,
+            size_cache: Default::default(),
+        }
+    }
+}
+
+impl PartialEq for Inner {
+    fn eq(&self, other: &Self) -> bool {
+        self.fields.eq(&other.fields)
+    }
+}
+
+impl PartialOrd for Inner {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        self.fields.partial_cmp(&other.fields)
+    }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, PartialOrd)]
+pub struct LogEvent {
+    #[serde(flatten)]
+    inner: Arc<Inner>,
 
     #[serde(skip)]
     metadata: EventMetadata,
 }
 
 impl LogEvent {
+    pub fn value(&self) -> &Value {
+        self.inner.as_ref().as_value()
+    }
+
+    pub fn value_mut(&mut self) -> &mut Value {
+        let result = Arc::make_mut(&mut self.inner);
+        // We MUST invalidate the inner size cache when making a
+        // mutable copy, since the _next_ action will modify the data.
+        result.invalidate();
+        &mut result.fields
+    }
+
     pub fn metadata(&self) -> &EventMetadata {
         &self.metadata
     }
@@ -41,18 +147,9 @@ impl LogEvent {
     }
 }
 
-impl Default for LogEvent {
-    fn default() -> Self {
-        Self {
-            fields: Arc::new(Value::Object(BTreeMap::new())),
-            metadata: EventMetadata::default(),
-        }
-    }
-}
-
 impl ByteSizeOf for LogEvent {
     fn allocated_bytes(&self) -> usize {
-        self.fields.allocated_bytes() + self.metadata.allocated_bytes()
+        self.inner.size_of() + self.metadata.allocated_bytes()
     }
 }
 
@@ -66,18 +163,21 @@ impl LogEvent {
     #[must_use]
     pub fn new_with_metadata(metadata: EventMetadata) -> Self {
         Self {
-            fields: Arc::new(Value::Object(Default::default())),
+            inner: Default::default(),
             metadata,
         }
     }
 
-    ///  Create a `LogEvent` into a tuple of its components
+    ///  Create a `LogEvent` from a tuple of its components.
     pub fn from_parts(map: BTreeMap<String, Value>, metadata: EventMetadata) -> Self {
-        let fields = Value::Object(map);
-        Self {
-            fields: Arc::new(fields),
-            metadata,
-        }
+        let inner = Arc::new(Inner::from(map));
+        Self { inner, metadata }
+    }
+
+    ///  Create a `LogEvent` from a tuple of its components.
+    pub fn from_value(value: Value, metadata: EventMetadata) -> Self {
+        let inner = Arc::new(Inner::from(value));
+        Self { inner, metadata }
     }
 
     /// Convert a `LogEvent` into a tuple of its components
@@ -86,12 +186,13 @@ impl LogEvent {
     ///
     /// Panics if the fields of the `LogEvent` are not a `Value::Map`.
     pub fn into_parts(mut self) -> (BTreeMap<String, Value>, EventMetadata) {
-        Arc::make_mut(&mut self.fields);
+        self.value_mut();
         (
-            Arc::try_unwrap(self.fields)
-                .expect("already cloned")
+            Arc::try_unwrap(self.inner)
+                .unwrap_or_else(|_| unreachable!("inner fields already cloned after owning"))
+                .fields
                 .into_object()
-                .unwrap_or_else(|| unreachable!("fields must be a map")),
+                .unwrap_or_else(|| unreachable!("inner fields must be a map")),
             self.metadata,
         )
     }
@@ -113,14 +214,22 @@ impl LogEvent {
     }
 
     pub fn get<'a>(&self, key: impl Path<'a>) -> Option<&Value> {
-        self.fields.get_by_path_v2(key)
+        self.inner.fields.get_by_path_v2(key)
+    }
+
+    pub fn lookup(&self, path: &LookupBuf) -> Option<&Value> {
+        self.inner.fields.get_by_path(path)
+    }
+
+    pub fn lookup_mut(&mut self, path: &LookupBuf) -> Option<&mut Value> {
+        self.value_mut().get_by_path_mut(path)
     }
 
     pub fn get_by_meaning(&self, meaning: impl AsRef<str>) -> Option<&Value> {
         self.metadata()
             .schema_definition()
             .meaning_path(meaning.as_ref())
-            .and_then(|path| self.fields.get_by_path(path))
+            .and_then(|path| self.inner.fields.get_by_path(path))
     }
 
     // TODO(Jean): Once the event API uses `Lookup`, the allocation here can be removed.
@@ -136,7 +245,7 @@ impl LogEvent {
     }
 
     pub fn get_mut<'a>(&mut self, path: impl Path<'a>) -> Option<&mut Value> {
-        Arc::make_mut(&mut self.fields).get_mut_by_path_v2(path)
+        self.value_mut().get_mut_by_path_v2(path)
     }
 
     pub fn contains<'a>(&self, path: impl Path<'a>) -> bool {
@@ -173,7 +282,8 @@ impl LogEvent {
         K: AsRef<str> + Into<String> + PartialEq + Display,
     {
         if from_key != to_key {
-            if let Some(val) = Arc::make_mut(&mut self.fields)
+            if let Some(val) = self
+                .value_mut()
                 .as_object_mut_unwrap()
                 .remove(from_key.as_ref())
             {
@@ -207,11 +317,11 @@ impl LogEvent {
     }
 
     pub fn remove_prune<'a>(&mut self, path: impl Path<'a>, prune: bool) -> Option<Value> {
-        util::log::remove(Arc::make_mut(&mut self.fields), path, prune)
+        util::log::remove(self.value_mut(), path, prune)
     }
 
     pub fn keys(&self) -> impl Iterator<Item = String> + '_ {
-        match self.fields.as_ref() {
+        match &self.inner.fields {
             Value::Object(map) => util::log::keys(map),
             _ => unreachable!(),
         }
@@ -226,14 +336,14 @@ impl LogEvent {
     }
 
     pub fn as_map(&self) -> &BTreeMap<String, Value> {
-        match self.fields.as_ref() {
+        match &self.inner.fields {
             Value::Object(map) => map,
             _ => unreachable!(),
         }
     }
 
     pub fn as_map_mut(&mut self) -> &mut BTreeMap<String, Value> {
-        match Arc::make_mut(&mut self.fields) {
+        match self.value_mut() {
             Value::Object(ref mut map) => map,
             _ => unreachable!(),
         }
@@ -265,7 +375,7 @@ impl MaybeAsLogMut for LogEvent {
 
 impl EventDataEq for LogEvent {
     fn event_data_eq(&self, other: &Self) -> bool {
-        self.fields == other.fields && self.metadata.event_data_eq(&other.metadata)
+        self.inner.fields == other.inner.fields && self.metadata.event_data_eq(&other.metadata)
     }
 }
 
@@ -295,26 +405,22 @@ impl From<String> for LogEvent {
 impl From<BTreeMap<String, Value>> for LogEvent {
     fn from(map: BTreeMap<String, Value>) -> Self {
         LogEvent {
-            fields: Arc::new(Value::Object(map)),
+            inner: Arc::new(Inner::from(map)),
             metadata: EventMetadata::default(),
         }
     }
 }
 
 impl From<LogEvent> for BTreeMap<String, Value> {
-    fn from(mut event: LogEvent) -> BTreeMap<String, Value> {
-        Arc::make_mut(&mut event.fields);
-        match Arc::try_unwrap(event.fields).expect("already cloned") {
-            Value::Object(map) => map,
-            _ => unreachable!(),
-        }
+    fn from(event: LogEvent) -> BTreeMap<String, Value> {
+        event.into_parts().0
     }
 }
 
 impl From<HashMap<String, Value>> for LogEvent {
     fn from(map: HashMap<String, Value>) -> Self {
         LogEvent {
-            fields: Arc::new(map.into_iter().collect()),
+            inner: Arc::new(Inner::from(map.into_iter().collect::<BTreeMap<_, _>>())),
             metadata: EventMetadata::default(),
         }
     }
@@ -352,7 +458,7 @@ impl TryInto<serde_json::Value> for LogEvent {
     type Error = crate::Error;
 
     fn try_into(self) -> Result<serde_json::Value, Self::Error> {
-        Ok(serde_json::to_value(self.fields.as_ref())?)
+        Ok(serde_json::to_value(&self.inner.fields)?)
     }
 }
 

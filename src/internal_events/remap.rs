@@ -1,6 +1,7 @@
-use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
+
+use super::prelude::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct RemapMappingError {
@@ -30,6 +31,13 @@ impl InternalEvent for RemapMappingError {
             "error_type" => error_type::CONVERSION_FAILED,
             "stage" => error_stage::PROCESSING,
         );
+        if self.event_dropped {
+            counter!(
+                "component_discarded_events_total", 1,
+                "error_type" => error_type::CONVERSION_FAILED,
+                "stage" => error_stage::PROCESSING,
+            );
+        }
         // deprecated
         counter!("processing_errors_total", 1);
     }
@@ -50,6 +58,14 @@ impl InternalEvent for RemapMappingAbort {
             "Event mapping aborted."
         };
 
-        debug!(message, internal_log_rate_secs = 30)
+        debug!(message, internal_log_rate_secs = 30);
+
+        if self.event_dropped {
+            counter!(
+                "component_discarded_events_total", 1,
+                "error_type" => error_type::CONVERSION_FAILED,
+                "stage" => error_stage::PROCESSING,
+            );
+        }
     }
 }

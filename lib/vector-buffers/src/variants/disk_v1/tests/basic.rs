@@ -1,6 +1,6 @@
 use std::{sync::atomic::Ordering, time::Duration};
 
-use futures::{FutureExt, SinkExt, StreamExt};
+use futures::FutureExt;
 
 use super::{create_default_buffer_v1, create_default_buffer_v1_with_usage};
 use crate::{
@@ -36,10 +36,9 @@ async fn basic_read_write_loop() {
             // them, read them out, and then make sure nothing was missed.
             let write_task = tokio::spawn(async move {
                 for item in input_items {
-                    writer.send(item).await.expect("write should not fail");
+                    writer.send(item).await;
                 }
-                writer.flush().await.expect("writer flush should not fail");
-                writer.close().await.expect("writer close should not fail");
+                writer.flush();
                 writer.offset.load(Ordering::SeqCst)
             });
 
@@ -113,10 +112,9 @@ async fn basic_read_write_loop_multievents() {
             // them, read them out, and then make sure nothing was missed.
             let write_task = tokio::spawn(async move {
                 for item in input_items {
-                    writer.send(item).await.expect("write should not fail");
+                    writer.send(item).await;
                 }
-                writer.flush().await.expect("writer flush should not fail");
-                writer.close().await.expect("writer close should not fail");
+                writer.flush();
                 writer.offset.load(Ordering::SeqCst)
             });
 
@@ -183,17 +181,13 @@ async fn initial_size_correct_with_multievents() {
                 .iter()
                 .map(EventCount::event_count)
                 .sum::<usize>();
-            let expected_bytes = input_items
-                .iter()
-                .map(MultiEventRecord::encoded_size)
-                .sum::<usize>();
+            let expected_bytes = input_items.iter().map(|e| e.encoded_size()).sum::<usize>();
 
             // Write a bunch of records so the buffer has events when we reload it.
             for item in input_items {
-                writer.send(item).await.expect("write should not fail");
+                writer.send(item).await;
             }
-            writer.flush().await.expect("writer flush should not fail");
-            writer.close().await.expect("writer close should not fail");
+            writer.flush();
 
             // Now drop our buffer and reopen it.
             drop(writer);
@@ -238,7 +232,8 @@ async fn ensure_buffer_metrics_accurate_with_poisoned_multievents() {
 
                 let record = PoisonPillMultiEventRecord(count);
 
-                writer.send(record).await.expect("write should not fail");
+                writer.send(record).await;
+                writer.flush();
                 assert_reader_writer_v1_positions!(reader, writer, 0, total_write_offset);
             }
 
@@ -263,10 +258,8 @@ async fn ensure_buffer_metrics_accurate_with_poisoned_multievents() {
             last_write_offset = total_write_offset;
             total_write_offset += poisoned_event_count;
 
-            writer
-                .send(poisoned_record)
-                .await
-                .expect("write should not fail");
+            writer.send(poisoned_record).await;
+            writer.flush();
             assert_reader_writer_v1_positions!(reader, writer, 0, total_write_offset);
 
             let usage_snapshot = usage.snapshot();

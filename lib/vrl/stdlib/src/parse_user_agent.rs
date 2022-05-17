@@ -1,5 +1,6 @@
 use std::{borrow::Cow, fmt, str::FromStr, sync::Arc};
 
+use ::value::Value;
 use once_cell::sync::Lazy;
 use uaparser::UserAgentParser as UAParser;
 use vrl::{function::Error, prelude::*};
@@ -81,7 +82,7 @@ impl Function for ParseUserAgent {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -235,7 +236,7 @@ impl Expression for ParseUserAgentFn {
         Ok((self.parser)(&string))
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         self.mode.type_def()
     }
 }

@@ -19,7 +19,7 @@ components: sources: socket: {
 		multiline: enabled: false
 		codecs: {
 			enabled:         true
-			default_framing: "`newline_delimited` for TCP and Unix stream, `bytes` for UDP and Unix datagram"
+			default_framing: "`newline_delimited` for TCP and Unix stream modes when using codecs other than `native` (which defaults to `length_delimited`), `bytes` for UDP and Unix datagram modes"
 		}
 		receive: {
 			from: {
@@ -38,7 +38,6 @@ components: sources: socket: {
 			keepalive: enabled: true
 			tls: {
 				enabled:                true
-				can_enable:             true
 				can_verify_certificate: true
 				enabled_default:        false
 			}
@@ -68,12 +67,23 @@ components: sources: socket: {
 			category:    "Context"
 			common:      false
 			description: """
-				The key name added to each event representing the current host. This can also be globally set via the
+				The key name added to each event representing the peer host. This can also be globally set via the
 				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
 				"""
 			required:    false
 			type: string: {
 				default: "host"
+			}
+		}
+		port_key: {
+			category: "Context"
+			common:   true
+			description: """
+				The key name added to each event representing the peer source port. If empty, this context is not added.
+				"""
+			required: false
+			type: string: {
+				default: null
 			}
 		}
 		max_length: {
@@ -105,6 +115,22 @@ components: sources: socket: {
 				examples: ["/path/to/socket"]
 			}
 		}
+		socket_file_mode: {
+			common: false
+			description: """
+				Unix file mode bits to be applied to the unix socket file
+				as its designated file permissions.
+				Note that the file mode value can be specified in any numeric format
+				supported by your configuration language, but it is most intuitive to use an octal number.
+				"""
+			relevant_when: "mode = `unix_datagram` or `unix_stream`"
+			required:      false
+			type: uint: {
+				default: null
+				unit:    null
+				examples: [0o777, 0o600, 508]
+			}
+		}
 		shutdown_timeout_secs: {
 			common:        false
 			description:   "The timeout before a connection is forcefully closed during shutdown."
@@ -130,9 +156,25 @@ components: sources: socket: {
 	output: logs: line: {
 		description: "A single socket event."
 		fields: {
-			host:      fields._local_host
+			host: {
+				description: "The peer host IP address."
+				required:    true
+				type: string: {
+					examples: ["129.21.31.122"]
+				}
+			}
 			message:   fields._raw_line
 			timestamp: fields._current_timestamp
+			port: {
+				description: "The peer source port."
+				required:    false
+				common:      true
+				type: uint: {
+					default: null
+					unit:    null
+					examples: [2838]
+				}
+			}
 		}
 	}
 

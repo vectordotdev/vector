@@ -1,5 +1,6 @@
 use std::{convert::TryInto, net::Ipv4Addr};
 
+use ::value::Value;
 use vrl::prelude::*;
 
 fn ip_ntoa(value: Value) -> Resolved {
@@ -37,7 +38,7 @@ impl Function for IpNtoa {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -63,7 +64,7 @@ impl Expression for IpNtoaFn {
         ip_ntoa(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().fallible()
     }
 }

@@ -1,5 +1,3 @@
-use std::num::NonZeroU64;
-
 use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
@@ -8,10 +6,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use snafu::{ResultExt, Snafu};
 
-use super::{GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::Event,
+    gcp::{GcpAuthConfig, GcpCredentials, Scope, PUBSUB_URL},
     http::HttpClient,
     sinks::{
         gcs_common::config::healthcheck_response,
@@ -22,7 +20,7 @@ use crate::{
         },
         Healthcheck, UriParseSnafu, VectorSink,
     },
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 #[derive(Debug, Snafu)]
@@ -40,7 +38,7 @@ pub struct PubsubDefaultBatchSettings;
 impl SinkBatchSettings for PubsubDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(1000);
     const MAX_BYTES: Option<usize> = Some(10_000_000);
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -64,7 +62,7 @@ pub struct PubsubConfig {
     )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
 
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
 
     #[serde(
         default,
@@ -152,7 +150,7 @@ impl PubsubSink {
 
         let uri_base = match config.endpoint.as_ref() {
             Some(host) => host.to_string(),
-            None => "https://pubsub.googleapis.com".into(),
+            None => PUBSUB_URL.into(),
         };
         let uri_base = format!(
             "{}/v1/projects/{}/topics/{}",
@@ -232,7 +230,7 @@ async fn healthcheck(
     }
 
     let response = client.send(request).await?;
-    healthcheck_response(creds, HealthcheckError::TopicNotFound.into())(response)
+    healthcheck_response(response, creds, HealthcheckError::TopicNotFound.into())
 }
 
 #[cfg(test)]
@@ -259,28 +257,24 @@ mod tests {
     }
 }
 
-#[cfg(test)]
-#[cfg(feature = "gcp-pubsub-integration-tests")]
+#[cfg(all(test, feature = "gcp-pubsub-integration-tests"))]
 mod integration_tests {
     use reqwest::{Client, Method, Response};
     use serde_json::{json, Value};
     use vector_core::event::{BatchNotifier, BatchStatus};
 
     use super::*;
+    use crate::gcp;
     use crate::test_util::{
         components::{self, HTTP_SINK_TAGS},
         random_events_with_stream, random_string, trace_init,
     };
 
-    fn emulator_address() -> String {
-        std::env::var("EMULATOR_ADDRESS").unwrap_or_else(|_| "http://localhost:8681".into())
-    }
-
     const PROJECT: &str = "testproject";
 
     fn config(topic: &str) -> PubsubConfig {
         PubsubConfig {
-            endpoint: Some(emulator_address()),
+            endpoint: Some(gcp::PUBSUB_ADDRESS.clone()),
             skip_authentication: true,
             project: PROJECT.into(),
             topic: topic.into(),
@@ -366,7 +360,7 @@ mod integration_tests {
     }
 
     async fn request(method: Method, path: &str, json: Value) -> Response {
-        let url = format!("{}/v1/projects/{}/{}", emulator_address(), PROJECT, path);
+        let url = format!("{}/v1/projects/{}/{}", *gcp::PUBSUB_ADDRESS, PROJECT, path);
         Client::new()
             .request(method.clone(), &url)
             .json(&json)

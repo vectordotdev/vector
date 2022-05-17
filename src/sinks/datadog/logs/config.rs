@@ -1,4 +1,4 @@
-use std::{convert::TryFrom, num::NonZeroU64, sync::Arc};
+use std::{convert::TryFrom, sync::Arc};
 
 use futures::FutureExt;
 use indoc::indoc;
@@ -20,7 +20,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
 // The Datadog API has a hard limit of 5MB for uncompressed payloads. Above this
@@ -33,7 +33,7 @@ use crate::{
 pub const MAX_PAYLOAD_BYTES: usize = 5_000_000;
 pub const BATCH_GOAL_BYTES: usize = 4_250_000;
 pub const BATCH_MAX_EVENTS: usize = 1_000;
-pub const BATCH_DEFAULT_TIMEOUT_SECS: u64 = 5;
+pub const BATCH_DEFAULT_TIMEOUT_SECS: f64 = 5.0;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DatadogLogsDefaultBatchSettings;
@@ -41,37 +41,36 @@ pub struct DatadogLogsDefaultBatchSettings;
 impl SinkBatchSettings for DatadogLogsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(BATCH_MAX_EVENTS);
     const MAX_BYTES: Option<usize> = Some(BATCH_GOAL_BYTES);
-    const TIMEOUT_SECS: NonZeroU64 =
-        unsafe { NonZeroU64::new_unchecked(BATCH_DEFAULT_TIMEOUT_SECS) };
+    const TIMEOUT_SECS: f64 = BATCH_DEFAULT_TIMEOUT_SECS;
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Default, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct DatadogLogsConfig {
     pub(crate) endpoint: Option<String>,
     // Deprecated, replaced by the site option
-    region: Option<Region>,
-    site: Option<String>,
+    pub region: Option<Region>,
+    pub site: Option<String>,
     // Deprecated name
     #[serde(alias = "api_key")]
-    default_api_key: String,
-    tls: Option<TlsConfig>,
+    pub default_api_key: String,
+    pub tls: Option<TlsEnableableConfig>,
 
     #[serde(default)]
-    compression: Option<Compression>,
+    pub compression: Option<Compression>,
 
     #[serde(default)]
-    batch: BatchConfig<DatadogLogsDefaultBatchSettings>,
+    pub batch: BatchConfig<DatadogLogsDefaultBatchSettings>,
 
     #[serde(default)]
-    request: TowerRequestConfig,
+    pub request: TowerRequestConfig,
 
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    acknowledgements: AcknowledgementsConfig,
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 impl GenerateConfig for DatadogLogsConfig {
@@ -146,7 +145,11 @@ impl DatadogLogsConfig {
 
     pub fn create_client(&self, proxy: &ProxyConfig) -> crate::Result<HttpClient> {
         let tls_settings = MaybeTlsSettings::from_config(
-            &Some(self.tls.clone().unwrap_or_else(TlsConfig::enabled)),
+            &Some(
+                self.tls
+                    .clone()
+                    .unwrap_or_else(TlsEnableableConfig::enabled),
+            ),
             false,
         )?;
         Ok(HttpClient::new(tls_settings, proxy)?)

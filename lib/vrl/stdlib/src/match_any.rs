@@ -1,3 +1,4 @@
+use ::value::Value;
 use regex::bytes::RegexSet;
 use vrl::prelude::*;
 
@@ -46,7 +47,7 @@ impl Function for MatchAny {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -64,7 +65,7 @@ impl Function for MatchAny {
 
             let re = value
                 .try_regex()
-                .map_err(|e| Box::new(e) as Box<dyn DiagnosticError>)?;
+                .map_err(|e| Box::new(e) as Box<dyn DiagnosticMessage>)?;
             re_strings.push(re.to_string());
         }
 
@@ -93,7 +94,7 @@ impl Function for MatchAny {
                 for value in patterns {
                     let re = value
                         .try_regex()
-                        .map_err(|e| Box::new(e) as Box<dyn DiagnosticError>)?;
+                        .map_err(|e| Box::new(e) as Box<dyn DiagnosticMessage>)?;
                     re_strings.push(re.to_string());
                 }
 
@@ -127,7 +128,7 @@ impl Expression for MatchAnyFn {
         match_any(value, &self.regex_set)
     }
 
-    fn type_def(&self, _state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().infallible()
     }
 }

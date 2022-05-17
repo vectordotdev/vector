@@ -1,5 +1,6 @@
 use std::net::IpAddr;
 
+use ::value::Value;
 use dns_lookup::lookup_addr;
 use vrl::prelude::*;
 
@@ -39,7 +40,7 @@ impl Function for ReverseDns {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -65,7 +66,7 @@ impl Expression for ReverseDnsFn {
         reverse_dns(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().fallible()
     }
 }

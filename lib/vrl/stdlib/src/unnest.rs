@@ -1,8 +1,10 @@
+use ::value::Value;
 use lookup_lib::LookupBuf;
 use vrl::{prelude::*, value::kind::merge};
 
-fn unnest(path: &expression::Query, ctx: &mut Context) -> Resolved {
+fn unnest(path: &expression::Query, root_lookup: &LookupBuf, ctx: &mut Context) -> Resolved {
     let path_path = path.path();
+
     let value: Value;
     let target: Box<&dyn Target> = match path.target() {
         expression::Target::External => Box::new(ctx.target()) as Box<_>,
@@ -19,10 +21,12 @@ fn unnest(path: &expression::Query, ctx: &mut Context) -> Resolved {
             Box::new(&value as &dyn Target) as Box<&dyn Target>
         }
     };
+
     let root = target
-        .target_get(&LookupBuf::root())
+        .target_get(root_lookup)
         .expect("must never fail")
         .expect("always a value");
+
     let values = root
         .get_by_path(path_path)
         .cloned()
@@ -31,6 +35,7 @@ fn unnest(path: &expression::Query, ctx: &mut Context) -> Resolved {
             expected: Kind::array(Collection::any()),
         })?
         .try_array()?;
+
     let events = values
         .into_iter()
         .map(|value| {
@@ -86,13 +91,14 @@ impl Function for Unnest {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let path = arguments.required_query("path")?;
+        let root = LookupBuf::root();
 
-        Ok(Box::new(UnnestFn { path }))
+        Ok(Box::new(UnnestFn { path, root }))
     }
 
     fn compile_argument(
@@ -126,13 +132,16 @@ impl Function for Unnest {
             .required_any("path")
             .downcast_ref::<expression::Query>()
             .unwrap();
-        unnest(path, ctx)
+        let root = LookupBuf::root();
+
+        unnest(path, &root, ctx)
     }
 }
 
 #[derive(Debug, Clone)]
 struct UnnestFn {
     path: expression::Query,
+    root: LookupBuf,
 }
 
 impl UnnestFn {
@@ -145,21 +154,21 @@ impl UnnestFn {
                 expression::Target::External,
                 FromStr::from_str(path).unwrap(),
             ),
+            root: LookupBuf::root(),
         }
     }
 }
 
 impl Expression for UnnestFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let path = &self.path;
-        unnest(path, ctx)
+        unnest(&self.path, &self.root, ctx)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         use expression::Target;
 
         match self.path.target() {
-            Target::External => match state.target_kind().cloned().map(TypeDef::from) {
+            Target::External => match state.1.target_kind().cloned().map(TypeDef::from) {
                 Some(root_type_def) => invert_array_at_path(&root_type_def, self.path.path()),
                 None => self.path.type_def(state).restrict_array().add_null(),
             },
@@ -545,7 +554,8 @@ mod tests {
             ),
         ];
 
-        let compiler = state::Compiler::new_with_kind(Kind::object(btreemap! {
+        let local = state::LocalEnv::default();
+        let external = state::ExternalEnv::new_with_kind(Kind::object(btreemap! {
             "hostname" => Kind::bytes(),
             "events" => Kind::array(Collection::from_unknown(Kind::object(btreemap! {
                 Field::from("message") => Kind::bytes(),
@@ -558,7 +568,7 @@ mod tests {
             let mut runtime_state = vrl::state::Runtime::default();
             let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
 
-            let got_typedef = func.type_def(&compiler);
+            let got_typedef = func.type_def((&local, &external));
 
             let got = func
                 .resolve(&mut ctx)

@@ -1,6 +1,6 @@
+use std::sync::Arc;
 use std::{
     collections::BTreeMap,
-    num::NonZeroU64,
     task::{Context, Poll},
 };
 
@@ -9,7 +9,9 @@ use aws_sdk_cloudwatch::model::{Dimension, MetricDatum};
 use aws_sdk_cloudwatch::types::DateTime as AwsDateTime;
 use aws_sdk_cloudwatch::types::SdkError;
 use aws_sdk_cloudwatch::{Client as CloudwatchClient, Endpoint, Region};
+use aws_smithy_async::rt::sleep::AsyncSleep;
 use aws_smithy_client::erase::DynConnector;
+use aws_smithy_types::retry::RetryConfig;
 use aws_types::credentials::SharedCredentialsProvider;
 use futures::{future, future::BoxFuture, stream, FutureExt, SinkExt};
 use serde::{Deserialize, Serialize};
@@ -17,8 +19,8 @@ use tower::Service;
 use vector_core::ByteSizeOf;
 
 use super::util::SinkBatchSettings;
-use crate::aws::aws_sdk::{create_client, is_retriable_error, ClientBuilder};
 use crate::aws::RegionOrEndpoint;
+use crate::aws::{create_client, is_retriable_error, ClientBuilder};
 use crate::{
     aws::auth::AwsAuthentication,
     config::{
@@ -34,7 +36,7 @@ use crate::{
         retries::RetryLogic,
         Compression, EncodedEvent, PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
     },
-    tls::TlsOptions,
+    tls::TlsConfig,
 };
 
 #[derive(Clone)]
@@ -48,7 +50,7 @@ pub struct CloudWatchMetricsDefaultBatchSettings;
 impl SinkBatchSettings for CloudWatchMetricsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(20);
     const MAX_BYTES: Option<usize> = None;
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -64,7 +66,7 @@ pub struct CloudWatchMetricsSinkConfig {
     pub batch: BatchConfig<CloudWatchMetricsDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
     // Deprecated name. Moved to auth.
     assume_role: Option<String>,
     #[serde(default)]
@@ -104,6 +106,20 @@ impl ClientBuilder for CloudwatchMetricsClientBuilder {
 
     fn with_region(builder: Self::ConfigBuilder, region: Region) -> Self::ConfigBuilder {
         builder.region(region)
+    }
+
+    fn with_sleep_impl(
+        builder: Self::ConfigBuilder,
+        sleep_impl: Arc<dyn AsyncSleep>,
+    ) -> Self::ConfigBuilder {
+        builder.sleep_impl(sleep_impl)
+    }
+
+    fn with_retry_config(
+        builder: Self::ConfigBuilder,
+        retry_config: RetryConfig,
+    ) -> Self::ConfigBuilder {
+        builder.retry_config(retry_config)
     }
 
     fn client_from_conf_conn(
@@ -206,7 +222,7 @@ impl CloudWatchMetricsSvc {
             .with_flat_map(move |event: Event| {
                 stream::iter({
                     let byte_size = event.size_of();
-                    normalizer.apply(event.into_metric()).map(|mut metric| {
+                    normalizer.normalize(event.into_metric()).map(|mut metric| {
                         let namespace = metric
                             .take_namespace()
                             .take()
@@ -281,7 +297,7 @@ impl CloudWatchMetricsSvc {
 struct AwsCloudwatchMetricNormalize;
 
 impl MetricNormalize for AwsCloudwatchMetricNormalize {
-    fn apply_state(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+    fn normalize(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         match metric.value() {
             MetricValue::Gauge { .. } => state.make_absolute(metric),
             _ => state.make_incremental(metric),
@@ -365,7 +381,7 @@ mod tests {
     fn config() -> CloudWatchMetricsSinkConfig {
         CloudWatchMetricsSinkConfig {
             default_namespace: "vector".into(),
-            region: RegionOrEndpoint::with_endpoint("local".to_owned()),
+            region: RegionOrEndpoint::with_region("local".to_owned()),
             ..Default::default()
         }
     }
@@ -511,7 +527,7 @@ mod integration_tests {
     fn config() -> CloudWatchMetricsSinkConfig {
         CloudWatchMetricsSinkConfig {
             default_namespace: "vector".into(),
-            region: RegionOrEndpoint::with_endpoint(cloudwatch_address().as_str()),
+            region: RegionOrEndpoint::with_both("local", cloudwatch_address().as_str()),
             ..Default::default()
         }
     }

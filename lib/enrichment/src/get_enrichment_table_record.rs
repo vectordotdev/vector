@@ -1,6 +1,18 @@
 use std::collections::BTreeMap;
 
-use vrl::prelude::*;
+use value::{kind::Collection, Kind, Value};
+use vrl::{
+    function::{
+        ArgumentList, Compiled, CompiledArgument, Example, FunctionCompileContext, Parameter,
+    },
+    prelude::{
+        expression, DiagnosticMessage, FunctionArgument, Resolved, Result, TypeDef, VmArgumentList,
+        VrlValueConvert,
+    },
+    state,
+    value::kind,
+    Context, Expression, Function,
+};
 
 use crate::{
     vrl_util::{self, add_index, evaluate_condition, index_from_args, EnrichmentTableRecord},
@@ -21,7 +33,7 @@ fn get_enrichment_table_record(
                 .iter()
                 .map(|value| Ok(value.try_bytes_utf8_lossy()?.to_string()))
                 .collect::<std::result::Result<Vec<_>, _>>(),
-            value => Err(value::Error::Expected {
+            value => Err(vrl::value::Error::Expected {
                 got: value.kind(),
                 expected: Kind::array(Collection::any()),
             }),
@@ -80,13 +92,13 @@ impl Function for GetEnrichmentTableRecord {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let registry = ctx
             .get_external_context_mut::<TableRegistry>()
-            .ok_or(Box::new(vrl_util::Error::TablesNotLoaded) as Box<dyn DiagnosticError>)?;
+            .ok_or(Box::new(vrl_util::Error::TablesNotLoaded) as Box<dyn DiagnosticMessage>)?;
 
         let tables = registry
             .table_ids()
@@ -105,7 +117,8 @@ impl Function for GetEnrichmentTableRecord {
 
         let case_sensitive = arguments
             .optional_literal("case_sensitive")?
-            .map(|literal| literal.to_value().try_boolean())
+            .and_then(|literal| literal.as_value())
+            .map(|value| value.try_boolean())
             .transpose()
             .expect("case_sensitive should be boolean") // This will have been caught by the type checker.
             .map(|case_sensitive| {
@@ -141,9 +154,10 @@ impl Function for GetEnrichmentTableRecord {
     ) -> CompiledArgument {
         match (name, expr) {
             ("table", Some(expr)) => {
-                let registry = ctx
-                    .get_external_context_mut::<TableRegistry>()
-                    .ok_or(Box::new(vrl_util::Error::TablesNotLoaded) as Box<dyn DiagnosticError>)?;
+                let registry =
+                    ctx.get_external_context_mut::<TableRegistry>()
+                        .ok_or(Box::new(vrl_util::Error::TablesNotLoaded)
+                            as Box<dyn DiagnosticMessage>)?;
 
                 let tables = registry
                     .table_ids()
@@ -234,7 +248,7 @@ impl Expression for GetEnrichmentTableRecordFn {
         )
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::object(Collection::any()).fallible()
     }
 }
@@ -269,6 +283,6 @@ mod tests {
 
         let got = func.resolve(&mut ctx);
 
-        assert_eq!(Ok(value! ({ "field": "result" })), got);
+        assert_eq!(Ok(vrl::value! ({ "field": "result" })), got);
     }
 }
