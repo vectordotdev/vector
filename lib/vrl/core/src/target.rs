@@ -58,15 +58,27 @@ pub trait Target: std::fmt::Debug {
     /// left behind, it should be removed as well, cascading up to the root.
     fn target_remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String>;
 
-    fn get_metadata(&self, _key: &str) -> Result<Option<Value>, String> {
+    fn get_metadata_deprecated(&self, _key: &str) -> Result<Option<Value>, String> {
         Err("metadata not available".to_string())
     }
 
-    fn set_metadata(&mut self, _key: &str, _value: String) -> Result<(), String> {
+    fn set_metadata_deprecated(&mut self, _key: &str, _value: String) -> Result<(), String> {
         Err("metadata not available".to_string())
     }
 
-    fn remove_metadata(&mut self, _key: &str) -> Result<(), String> {
+    fn remove_metadata_deprecated(&mut self, _key: &str) -> Result<(), String> {
+        Err("metadata not available".to_string())
+    }
+
+    fn get_metadata(&self, _path: &LookupBuf) -> Result<Option<Value>, String> {
+        Err("metadata not available".to_string())
+    }
+
+    fn set_metadata(&mut self, _path: &LookupBuf, _value: Value) -> Result<(), String> {
+        Err("metadata not available".to_string())
+    }
+
+    fn remove_metadata(&mut self, _path: &LookupBuf) -> Result<(), String> {
         Err("metadata not available".to_string())
     }
 }

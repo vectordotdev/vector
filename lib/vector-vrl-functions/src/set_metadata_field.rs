@@ -7,7 +7,7 @@ fn set_metadata_field(
     value: Value,
 ) -> std::result::Result<Value, ExpressionError> {
     let value = value.try_bytes_utf8_lossy()?.to_string();
-    ctx.target_mut().set_metadata(key, value)?;
+    ctx.target_mut().set_metadata_deprecated(key, value)?;
     Ok(Value::Null)
 }
 

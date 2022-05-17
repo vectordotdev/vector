@@ -5,7 +5,7 @@ fn remove_metadata_field(
     ctx: &mut Context,
     key: &str,
 ) -> std::result::Result<Value, ExpressionError> {
-    ctx.target_mut().remove_metadata(key)?;
+    ctx.target_mut().remove_metadata_deprecated(key)?;
     Ok(Value::Null)
 }
 

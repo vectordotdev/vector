@@ -3,7 +3,7 @@ use vrl::prelude::*;
 
 fn get_metadata_field(ctx: &mut Context, key: &str) -> std::result::Result<Value, ExpressionError> {
     ctx.target()
-        .get_metadata(key)
+        .get_metadata_deprecated(key)
         .map(|value| value.unwrap_or(Value::Null))
         .map_err(Into::into)
 }

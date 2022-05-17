@@ -282,7 +282,7 @@ impl vrl_lib::Target for VrlTarget {
         }
     }
 
-    fn get_metadata(&self, key: &str) -> Result<Option<::value::Value>, String> {
+    fn get_metadata_deprecated(&self, key: &str) -> Result<Option<::value::Value>, String> {
         let metadata = match self {
             VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
             VrlTarget::Metric { metric, .. } => metric.metadata(),
@@ -301,7 +301,7 @@ impl vrl_lib::Target for VrlTarget {
         }
     }
 
-    fn set_metadata(&mut self, key: &str, value: String) -> Result<(), String> {
+    fn set_metadata_deprecated(&mut self, key: &str, value: String) -> Result<(), String> {
         let metadata = match self {
             VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
             VrlTarget::Metric { metric, .. } => metric.metadata_mut(),
@@ -320,7 +320,7 @@ impl vrl_lib::Target for VrlTarget {
         }
     }
 
-    fn remove_metadata(&mut self, key: &str) -> Result<(), String> {
+    fn remove_metadata_deprecated(&mut self, key: &str) -> Result<(), String> {
         let metadata = match self {
             VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
             VrlTarget::Metric { metric, .. } => metric.metadata_mut(),
@@ -401,7 +401,7 @@ impl<'a> vrl_lib::Target for VrlImmutableTarget<'a> {
         Err("cannot modify immutable target".to_string())
     }
 
-    fn get_metadata(&self, key: &str) -> Result<Option<::value::Value>, String> {
+    fn get_metadata_deprecated(&self, key: &str) -> Result<Option<::value::Value>, String> {
         let metadata = match self {
             VrlImmutableTarget::LogEvent(_, metadata) | VrlImmutableTarget::Trace(_, metadata) => {
                 metadata
@@ -422,11 +422,11 @@ impl<'a> vrl_lib::Target for VrlImmutableTarget<'a> {
         }
     }
 
-    fn set_metadata(&mut self, _key: &str, _value: String) -> Result<(), String> {
+    fn set_metadata_deprecated(&mut self, _key: &str, _value: String) -> Result<(), String> {
         Err("cannot modify immutable target".to_string())
     }
 
-    fn remove_metadata(&mut self, _key: &str) -> Result<(), String> {
+    fn remove_metadata_deprecated(&mut self, _key: &str) -> Result<(), String> {
         Err("cannot modify immutable target".to_string())
     }
 }
