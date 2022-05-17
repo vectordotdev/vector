@@ -432,8 +432,8 @@ mod tests {
                 self.sources.get(key.id()).cloned()
             }
 
-            fn transform_inputs(&self, _key: &ComponentKey) -> Option<&[OutputId]> {
-                Some(&[])
+            fn transform_inputs(&self, key: &ComponentKey) -> Option<&[OutputId]> {
+                self.transforms.get(key.id()).map(|v| v.0.as_slice())
             }
 
             fn transform_outputs(
