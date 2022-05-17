@@ -3,6 +3,7 @@ use std::{
     fmt::{Display, Formatter},
 };
 
+use futures_util::{stream::FuturesOrdered, Future, StreamExt};
 use http::Request;
 use hyper::{header::LOCATION, Body, StatusCode};
 use indexmap::IndexMap;
@@ -10,6 +11,7 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 use tokio::{
     select,
+    sync::mpsc::{self},
     time::{sleep, Duration},
 };
 use url::{ParseError, Url};
@@ -240,58 +242,37 @@ impl<'a> PipelinesVersionPayload<'a> {
     }
 }
 
-pub fn validate_enterprise(config: &Config) -> Result<(Options, String), PipelinesError> {
-    // Only valid if a [enterprise] section is present in config.
-    let opts = match config.enterprise.clone() {
-        Some(opts) => opts,
-        _ => return Err(PipelinesError::Disabled),
-    };
+pub(crate) fn attach_enterprise_components(config: &mut Config, metadata: &EnterpriseMetadata) {
+    let api_key = metadata.api_key.clone();
+    let config_version = metadata.config_version.clone();
 
-    // Return early if the feature isn't enabled.
-    if !opts.enabled {
-        return Err(PipelinesError::Disabled);
-    }
-
-    let api_key = match &opts.api_key {
-        // API key provided explicitly.
-        Some(api_key) => api_key.clone(),
-        // No API key; attempt to get it from the environment.
-        None => match env::var("DATADOG_API_KEY").or_else(|_| env::var("DD_API_KEY")) {
-            Ok(api_key) => api_key,
-            _ => return Err(PipelinesError::MissingApiKey),
-        },
-    };
-
-    info!(
-        "Datadog API key provided. Integration with {} is enabled.",
-        DATADOG_REPORTING_PRODUCT
+    setup_metrics_reporting(
+        config,
+        &metadata.opts,
+        api_key.clone(),
+        config_version.clone(),
     );
 
-    Ok((opts, api_key))
-}
-
-pub fn attach_enterprise_components(config: &mut Config, opts: &Options, api_key: String) {
-    // In DD Pipelines, this is referred to as the 'config hash'.
-    let config_version = config.version.clone().expect("Config should be versioned");
-
-    setup_metrics_reporting(config, &opts, api_key.clone(), config_version.clone());
-
-    if opts.enable_logs_reporting {
-        setup_logs_reporting(config, &opts, api_key, config_version);
+    if metadata.opts.enable_logs_reporting {
+        setup_logs_reporting(config, &metadata.opts, api_key, config_version);
     }
 }
 
-pub async fn report_configuration(
-    opts: Options,
+/// Report the internal configuration to Datadog Observability Pipelines.
+pub(crate) async fn report_configuration(
     config_paths: Vec<ConfigPath>,
-    api_key: String,
-    config_version: String,
+    metadata: EnterpriseMetadata,
 ) {
+    let EnterpriseMetadata {
+        api_key,
+        config_version,
+        opts,
+    } = metadata;
+
     // Get the Vector version. This is reported to Pipelines along with a config hash.
     let vector_version = crate::get_version();
 
-    // Report the internal configuration to Datadog Observability Pipelines.
-    // First, we need to create a JSON representation of config, based on the original files
+    // We need to create a JSON representation of config, based on the original files
     // that Vector was spawned with.
     let (table, _) = process_paths(&config_paths)
         .map(|paths| load_source_from_paths(&paths).ok())
@@ -341,12 +322,92 @@ pub async fn report_configuration(
                 err = ?err.to_string(),
                 "Could not report Vector config to {}.", DATADOG_REPORTING_PRODUCT
             );
+        }
+    }
+}
 
-            // if datadog.exit_on_fatal_error {
-            //     return Err(PipelinesError::FatalCouldNotReportConfig);
-            // } else {
-            //     return Err(PipelinesError::CouldNotReportConfig);
-            // }
+#[derive(Clone)]
+pub(crate) struct EnterpriseMetadata {
+    pub opts: Options,
+    pub api_key: String,
+    pub config_version: String,
+}
+
+impl TryFrom<&Config> for EnterpriseMetadata {
+    type Error = PipelinesError;
+
+    fn try_from(value: &Config) -> Result<Self, Self::Error> {
+        // Only valid if a [enterprise] section is present in config.
+        let opts = match value.enterprise.clone() {
+            Some(opts) => opts,
+            _ => return Err(PipelinesError::Disabled),
+        };
+
+        // Return early if the feature isn't enabled.
+        if !opts.enabled {
+            return Err(PipelinesError::Disabled);
+        }
+
+        let api_key = match &opts.api_key {
+            // API key provided explicitly.
+            Some(api_key) => api_key.clone(),
+            // No API key; attempt to get it from the environment.
+            None => match env::var("DATADOG_API_KEY").or_else(|_| env::var("DD_API_KEY")) {
+                Ok(api_key) => api_key,
+                _ => return Err(PipelinesError::MissingApiKey),
+            },
+        };
+
+        info!(
+            "Datadog API key provided. Integration with {} is enabled.",
+            DATADOG_REPORTING_PRODUCT
+        );
+
+        // Get the configuration version. In DD Pipelines, this is referred to as the 'config hash'.
+        let config_version = value.version.clone().expect("Config should be versioned");
+
+        Ok(Self {
+            opts,
+            api_key,
+            config_version,
+        })
+    }
+}
+
+pub(crate) struct EnterpriseReporter<T> {
+    reporting_tx: mpsc::UnboundedSender<T>,
+}
+
+impl<T> EnterpriseReporter<T>
+where
+    T: Future<Output = ()> + Send + 'static,
+{
+    pub fn new() -> Self {
+        let (reporting_tx, mut reporting_rx) = mpsc::unbounded_channel();
+
+        // A long running task to report configurations in order
+        tokio::spawn(async move {
+            let mut pending_reports = FuturesOrdered::new();
+            loop {
+                tokio::select! {
+                    maybe_report = reporting_rx.recv() => {
+                        match maybe_report {
+                            Some(report) => pending_reports.push(report),
+                            None => break,
+                        }
+                    }
+                    _ = pending_reports.next(), if !pending_reports.is_empty() => {
+                    }
+                }
+            }
+        });
+
+        Self { reporting_tx }
+    }
+
+    pub fn send(&self, reporting_task: T) {
+        if let Err(_) = self.reporting_tx.send(reporting_task) {
+            error!(message = "Unable to report configuration due to internal Vector issue: could not send through channel");
         }
     }
 }

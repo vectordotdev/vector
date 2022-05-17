@@ -1,7 +1,6 @@
 use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf};
 
 use futures::StreamExt;
-use futures_util::stream::FuturesOrdered;
 use once_cell::race::OnceNonZeroUsize;
 use tokio::{
     runtime::{self, Runtime},
@@ -21,7 +20,10 @@ use crate::{
     cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand},
     config::{
         self,
-        enterprise::{attach_enterprise_components, report_configuration, validate_enterprise},
+        enterprise::{
+            attach_enterprise_components, report_configuration, EnterpriseMetadata,
+            EnterpriseReporter,
+        },
     },
     generate, graph, heartbeat, list,
     signal::{self, SignalTo},
@@ -194,37 +196,14 @@ impl Application {
 
                 #[cfg(feature = "enterprise")]
                 // Enable enterprise features, if applicable.
-                let reporting_tx = match validate_enterprise(&config) {
-                    Ok((enterprise_options, api_key)) => {
-                        let (reporting_tx, mut reporting_rx) = mpsc::unbounded_channel();
-                        attach_enterprise_components(
-                            &mut config,
-                            &enterprise_options,
-                            api_key.clone(),
-                        );
-                        let _ = reporting_tx.send(report_configuration(
-                            enterprise_options,
-                            config_paths.clone(),
-                            api_key,
-                            "config_version".to_string(),
-                        ));
+                let enterprise = match EnterpriseMetadata::try_from(&config) {
+                    Ok(metadata) => {
+                        let enterprise = EnterpriseReporter::new();
 
-                        tokio::spawn(async move {
-                            let mut pending_reports = FuturesOrdered::new();
-                            loop {
-                                tokio::select! {
-                                    maybe_report = reporting_rx.recv() => {
-                                        match maybe_report {
-                                            Some(report) => pending_reports.push(report),
-                                            None => break,
-                                        }
-                                    }
-                                    _ = pending_reports.next(), if !pending_reports.is_empty() => {
-                                    }
-                                }
-                            }
-                        });
-                        Some(reporting_tx)
+                        attach_enterprise_components(&mut config, &metadata);
+                        enterprise.send(report_configuration(config_paths.clone(), metadata));
+
+                        Some(enterprise)
                     }
                     Err(err) => {
                         if let PipelinesError::MissingApiKey = err {
