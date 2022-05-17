@@ -225,7 +225,6 @@ where
                     .map(|s| s.load(Ordering::Acquire))
                     .unwrap_or(0);
 
-                println!("byte size was {}", byte_size);
                 // TODO: Should we actually emit for any other range of status codes? Right now, `is_success` is true
                 // for `200 <= status < 300`, which feels comprehensive... but are there other valid statuses?
                 if response.http().status().is_success() && byte_size != 0 {
