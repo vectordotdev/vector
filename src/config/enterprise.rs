@@ -104,6 +104,36 @@ impl Default for Options {
     }
 }
 
+/// By default, the Datadog feature is enabled.
+const fn default_enabled() -> bool {
+    true
+}
+
+/// By default, internal logs are reported to Datadog.
+const fn default_enable_logs_reporting() -> bool {
+    true
+}
+
+/// By default, Vector should not exit when a fatal reporting error is encountered.
+const fn default_exit_on_fatal_error() -> bool {
+    false
+}
+
+/// By default, report to Datadog every 5 seconds.
+const fn default_reporting_interval_secs() -> f64 {
+    5.0
+}
+
+/// By default, keep retrying (recoverable) failed reporting
+///
+/// This is set to 8 attempts which, with the exponential backoff strategy and
+/// maximum of 60 second delay (see [`ReportingRetryBackoff`]), works out to
+/// roughly 3 minutes of retrying before giving up and allowing the rest of
+/// Vector to start.
+const fn default_max_retries() -> u32 {
+    8
+}
+
 /// Enterprise error, relevant to an upstream caller.
 pub enum EnterpriseError {
     Disabled,
@@ -236,100 +266,6 @@ impl<'a> PipelinesVersionPayload<'a> {
     }
 }
 
-pub(crate) fn attach_enterprise_components(config: &mut Config, metadata: &EnterpriseMetadata) {
-    let api_key = metadata.api_key.clone();
-    let config_version = metadata.config_version.clone();
-
-    setup_metrics_reporting(
-        config,
-        &metadata.opts,
-        api_key.clone(),
-        config_version.clone(),
-    );
-
-    if metadata.opts.enable_logs_reporting {
-        setup_logs_reporting(config, &metadata.opts, api_key, config_version);
-    }
-}
-
-/// Report the internal configuration to Datadog Observability Pipelines.
-pub(crate) fn report_configuration(
-    config_paths: Vec<ConfigPath>,
-    metadata: EnterpriseMetadata,
-) -> BoxFuture<'static, ()> {
-    let fut = async move {
-        let EnterpriseMetadata {
-            api_key,
-            config_version,
-            opts,
-        } = metadata;
-
-        // Get the Vector version. This is reported to Pipelines along with a config hash.
-        let vector_version = crate::get_version();
-
-        // We need to create a JSON representation of config, based on the original files
-        // that Vector was spawned with.
-        let (table, _) = process_paths(&config_paths)
-            .map(|paths| load_source_from_paths(&paths).ok())
-            .flatten()
-            .expect("Couldn't load source from config paths. Please report.");
-
-        // Set the relevant fields needed to report a config to Datadog. This is a struct rather than
-        // exploding as func arguments to avoid confusion with multiple &str fields.
-        let fields = PipelinesStrFields {
-            config_version: config_version.as_ref(),
-            vector_version: &vector_version,
-        };
-
-        // Set the Datadog authorization fields. There's an API and app key, to allow read/write
-        // access in tandem with RBAC on the Datadog side.
-        let auth = PipelinesAuth {
-            api_key: &api_key,
-            application_key: &opts.application_key,
-        };
-
-        // Create a HTTP client for posting a Vector version to Datadog OP. This will
-        // respect any proxy settings provided in top-level config.
-        let client = HttpClient::new(None, &opts.proxy)
-            .expect("couldn't instrument Datadog HTTP client. Please report");
-
-        // Endpoint to report a config to Datadog OP.
-        let endpoint = get_reporting_endpoint(
-            opts.endpoint.as_ref(),
-            opts.site.as_ref(),
-            opts.region,
-            &opts.configuration_key,
-        );
-        // Datadog uses a JSON:API, so we'll serialize the config to a JSON
-        let payload = PipelinesVersionPayload::new(&table, &fields);
-
-        match report_serialized_config_to_datadog(
-            &client,
-            &endpoint,
-            &auth,
-            &payload,
-            opts.max_retries,
-        )
-        .await
-        {
-            Ok(()) => {
-                info!(
-                    "Vector config {} successfully reported to {}.",
-                    &config_version, DATADOG_REPORTING_PRODUCT
-                );
-            }
-            Err(err) => {
-                error!(
-                    err = ?err.to_string(),
-                    "Could not report Vector config to {}.", DATADOG_REPORTING_PRODUCT
-                );
-            }
-        }
-    };
-
-    Box::pin(fut)
-}
-
 #[derive(Clone)]
 pub(crate) struct EnterpriseMetadata {
     pub opts: Options,
@@ -413,6 +349,22 @@ where
         if let Err(_) = self.reporting_tx.send(reporting_task) {
             error!(message = "Unable to report configuration due to internal Vector issue: could not send through channel");
         }
+    }
+}
+
+pub(crate) fn attach_enterprise_components(config: &mut Config, metadata: &EnterpriseMetadata) {
+    let api_key = metadata.api_key.clone();
+    let config_version = metadata.config_version.clone();
+
+    setup_metrics_reporting(
+        config,
+        &metadata.opts,
+        api_key.clone(),
+        config_version.clone(),
+    );
+
+    if metadata.opts.enable_logs_reporting {
+        setup_logs_reporting(config, &metadata.opts, api_key, config_version);
     }
 }
 
@@ -544,36 +496,6 @@ fn setup_metrics_reporting(
     );
 }
 
-/// By default, the Datadog feature is enabled.
-const fn default_enabled() -> bool {
-    true
-}
-
-/// By default, internal logs are reported to Datadog.
-const fn default_enable_logs_reporting() -> bool {
-    true
-}
-
-/// By default, Vector should not exit when a fatal reporting error is encountered.
-const fn default_exit_on_fatal_error() -> bool {
-    false
-}
-
-/// By default, report to Datadog every 5 seconds.
-const fn default_reporting_interval_secs() -> f64 {
-    5.0
-}
-
-/// By default, keep retrying (recoverable) failed reporting
-///
-/// This is set to 8 attempts which, with the exponential backoff strategy and
-/// maximum of 60 second delay (see [`ReportingRetryBackoff`]), works out to
-/// roughly 3 minutes of retrying before giving up and allowing the rest of
-/// Vector to start.
-const fn default_max_retries() -> u32 {
-    8
-}
-
 /// Converts user configured tags to VRL source code for adding tags/fields to
 /// events
 fn convert_tags_to_vrl(tags: &IndexMap<String, String>, is_metric: bool) -> String {
@@ -583,6 +505,84 @@ fn convert_tags_to_vrl(tags: &IndexMap<String, String>, is_metric: bool) -> Stri
     } else {
         format!(r#". = merge(., {}, deep: true)"#, json_tags)
     }
+}
+
+/// Report the internal configuration to Datadog Observability Pipelines.
+pub(crate) fn report_configuration(
+    config_paths: Vec<ConfigPath>,
+    metadata: EnterpriseMetadata,
+) -> BoxFuture<'static, ()> {
+    let fut = async move {
+        let EnterpriseMetadata {
+            api_key,
+            config_version,
+            opts,
+        } = metadata;
+
+        // Get the Vector version. This is reported to Pipelines along with a config hash.
+        let vector_version = crate::get_version();
+
+        // We need to create a JSON representation of config, based on the original files
+        // that Vector was spawned with.
+        let (table, _) = process_paths(&config_paths)
+            .map(|paths| load_source_from_paths(&paths).ok())
+            .flatten()
+            .expect("Couldn't load source from config paths. Please report.");
+
+        // Set the relevant fields needed to report a config to Datadog. This is a struct rather than
+        // exploding as func arguments to avoid confusion with multiple &str fields.
+        let fields = PipelinesStrFields {
+            config_version: config_version.as_ref(),
+            vector_version: &vector_version,
+        };
+
+        // Set the Datadog authorization fields. There's an API and app key, to allow read/write
+        // access in tandem with RBAC on the Datadog side.
+        let auth = PipelinesAuth {
+            api_key: &api_key,
+            application_key: &opts.application_key,
+        };
+
+        // Create a HTTP client for posting a Vector version to Datadog OP. This will
+        // respect any proxy settings provided in top-level config.
+        let client = HttpClient::new(None, &opts.proxy)
+            .expect("couldn't instrument Datadog HTTP client. Please report");
+
+        // Endpoint to report a config to Datadog OP.
+        let endpoint = get_reporting_endpoint(
+            opts.endpoint.as_ref(),
+            opts.site.as_ref(),
+            opts.region,
+            &opts.configuration_key,
+        );
+        // Datadog uses a JSON:API, so we'll serialize the config to a JSON
+        let payload = PipelinesVersionPayload::new(&table, &fields);
+
+        match report_serialized_config_to_datadog(
+            &client,
+            &endpoint,
+            &auth,
+            &payload,
+            opts.max_retries,
+        )
+        .await
+        {
+            Ok(()) => {
+                info!(
+                    "Vector config {} successfully reported to {}.",
+                    &config_version, DATADOG_REPORTING_PRODUCT
+                );
+            }
+            Err(err) => {
+                error!(
+                    err = ?err.to_string(),
+                    "Could not report Vector config to {}.", DATADOG_REPORTING_PRODUCT
+                );
+            }
+        }
+    };
+
+    Box::pin(fut)
 }
 
 /// Returns the full URL endpoint of where to POST a Datadog Vector configuration.
