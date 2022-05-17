@@ -282,7 +282,7 @@ impl PubsubSource {
             tokio::select! {
                 _ = &mut self.shutdown => return false,
                 _ = &mut token_generator.next() => {
-                    info!("New authentication token generated, restarting stream.");
+                    debug!("New authentication token generated, restarting stream.");
                     return true;
                 },
                 receipts = ack_stream.next() => if let Some((status, receipts)) = receipts {
