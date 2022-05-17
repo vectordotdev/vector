@@ -9,14 +9,7 @@ mod ansi_stripper;
 mod apache_metrics;
 #[cfg(feature = "api")]
 mod api;
-#[cfg(any(
-    feature = "sinks-aws_cloudwatch_logs",
-    feature = "sinks-aws_cloudwatch_metrics",
-    feature = "sinks-aws_kinesis_firehose",
-    feature = "sinks-aws_kinesis_streams",
-    feature = "sinks-aws_s3",
-    feature = "sinks-aws_sqs"
-))]
+#[cfg(feature = "aws-core")]
 mod aws;
 #[cfg(any(
     feature = "sinks-aws_cloudwatch_logs",
@@ -173,14 +166,7 @@ pub(crate) use self::ansi_stripper::*;
 pub(crate) use self::apache_metrics::*;
 #[cfg(feature = "api")]
 pub(crate) use self::api::*;
-#[cfg(any(
-    feature = "sinks-aws_cloudwatch_logs",
-    feature = "sinks-aws_cloudwatch_metrics",
-    feature = "sinks-aws_kinesis_firehose",
-    feature = "sinks-aws_kinesis_streams",
-    feature = "sinks-aws_s3",
-    feature = "sinks-aws_sqs"
-))]
+#[cfg(feature = "aws-core")]
 pub(crate) use self::aws::*;
 #[cfg(any(
     feature = "sinks-aws_cloudwatch_logs",
