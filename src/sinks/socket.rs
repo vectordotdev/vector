@@ -38,6 +38,8 @@ impl EncodingConfigWithFramingMigrator for Migrator {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
+// `#[serde(deny_unknown_fields)]` doesn't work when flattening internally tagged enums, see
+// https://github.com/serde-rs/serde/issues/1358.
 pub struct SocketSinkConfig {
     #[serde(flatten)]
     pub mode: Mode,

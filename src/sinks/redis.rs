@@ -108,8 +108,8 @@ impl EncodingConfigMigrator for EncodingMigrator {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct RedisSinkConfig {
-    #[serde(flatten)]
     encoding: EncodingConfigAdapter<EncodingConfig<Encoding>, EncodingMigrator>,
     #[serde(default)]
     data_type: DataTypeConfig,

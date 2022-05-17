@@ -51,11 +51,11 @@ impl SinkBatchSettings for KinesisFirehoseDefaultBatchSettings {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct KinesisFirehoseSinkConfig {
     pub stream_name: String,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    #[serde(flatten)]
     pub encoding:
         EncodingConfigAdapter<EncodingConfig<StandardEncodings>, StandardEncodingsMigrator>,
     #[serde(default)]

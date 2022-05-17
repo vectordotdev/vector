@@ -61,6 +61,7 @@ impl EncodingConfigWithFramingMigrator for EncodingMigrator {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct FileSinkConfig {
     pub path: Template,
     pub idle_timeout_secs: Option<u64>,

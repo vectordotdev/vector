@@ -36,9 +36,9 @@ impl EncodingConfigMigrator for EncodingMigrator {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
+#[serde(deny_unknown_fields)]
 pub(self) struct PapertrailConfig {
     endpoint: UriSerde,
-    #[serde(flatten)]
     encoding: EncodingConfigAdapter<EncodingConfig<Encoding>, EncodingMigrator>,
     keepalive: Option<TcpKeepaliveConfig>,
     tls: Option<TlsEnableableConfig>,
