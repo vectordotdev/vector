@@ -11,6 +11,7 @@ use std::{fmt::Debug, io::Read, net::SocketAddr, sync::Arc};
 
 use bytes::{Buf, Bytes};
 use chrono::{serde::ts_milliseconds, DateTime, Utc};
+use codecs::decoding::{DeserializerConfig, FramingConfig};
 use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use futures::FutureExt;
 use http::StatusCode;

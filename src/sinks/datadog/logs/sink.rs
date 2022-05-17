@@ -225,7 +225,7 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
     type Metadata = (Arc<str>, usize, EventFinalizers, usize);
     type Events = Vec<Event>;
     type Encoder = EncodingConfigFixed<JsonEncoding>;
-    type Payload = Bytes;
+    type Payload = LogRequestPayload;
     type Request = LogApiRequest;
     type Error = RequestBuildError;
 
@@ -258,10 +258,15 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
         }
 
         // Now just compress it like normal.
+        let uncompressed_size = buf.len();
         let mut compressor = Compressor::from(self.compression);
         let _ = compressor.write_all(&buf)?;
+        let bytes = compressor.into_inner().freeze();
 
-        Ok(compressor.into_inner().freeze())
+        Ok(LogRequestPayload {
+            bytes,
+            uncompressed_size,
+        })
     }
 
     fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
@@ -270,9 +275,10 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
             batch_size,
             api_key,
             compression: self.compression,
-            body: payload,
+            body: payload.bytes,
             finalizers,
             events_byte_size,
+            uncompressed_size: payload.uncompressed_size,
         }
     }
 }
