@@ -1,6 +1,7 @@
 use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf};
 
 use futures::StreamExt;
+use futures_util::future::BoxFuture;
 use once_cell::race::OnceNonZeroUsize;
 use tokio::{
     runtime::{self, Runtime},
@@ -47,7 +48,7 @@ pub struct ApplicationConfig {
     #[cfg(feature = "api")]
     pub api: config::api::Options,
     #[cfg(feature = "enterprise")]
-    pub enterprise: EnterpriseReporter,
+    pub enterprise: Option<EnterpriseReporter<BoxFuture<'static, ()>>>,
     pub signal_handler: signal::SignalHandler,
     pub signal_rx: signal::SignalRx,
 }
@@ -250,7 +251,7 @@ impl Application {
         })
     }
 
-    pub fn run(self) {
+    pub fn run(mut self) {
         let rt = self.runtime;
 
         let mut graceful_crash = UnboundedReceiverStream::new(self.config.graceful_crash);
@@ -302,11 +303,28 @@ impl Application {
                                         new_config.healthchecks.set_require_healthy(opts.require_healthy);
 
                                         #[cfg(feature = "enterprise")]
-                                        if let Err(EnterpriseError::FatalCouldNotReportConfig) =
-                                            config::enterprise::try_attach(&mut new_config, &config_paths, signal_handler.subscribe()).await
-                                        {
-                                            error!(message = "Shutting down due to configuration reporting failure.");
-                                            break SignalTo::Shutdown;
+                                        // Augment config to enable observability within Datadog, if applicable.
+                                        match EnterpriseMetadata::try_from(&new_config) {
+                                            Ok(metadata) => {
+                                                match self.config.enterprise.as_ref() {
+                                                    Some(enterprise) => {
+                                                        attach_enterprise_components(&mut new_config, &metadata);
+                                                        enterprise.send(report_configuration(config_paths.clone(), metadata));
+                                                    }
+                                                    None => {
+                                                        let enterprise = EnterpriseReporter::new();
+                                                        attach_enterprise_components(&mut new_config, &metadata);
+                                                        enterprise.send(report_configuration(config_paths.clone(), metadata));
+                                                        self.config.enterprise = Some(enterprise);
+                                                    }
+                                                }
+                                            },
+                                            Err(err) => {
+                                                if let EnterpriseError::MissingApiKey = err {
+                                                    emit!(VectorReloadError);
+                                                    continue;
+                                                }
+                                            },
                                         }
 
                                         match topology
@@ -350,12 +368,27 @@ impl Application {
                                     new_config.healthchecks.set_require_healthy(opts.require_healthy);
 
                                     #[cfg(feature = "enterprise")]
-                                    // Augment config to enable observability within Datadog, if applicable.
-                                    if let Err(EnterpriseError::FatalCouldNotReportConfig) =
-                                        config::enterprise::try_attach(&mut new_config, &config_paths, signal_handler.subscribe()).await
-                                    {
-                                        error!(message = "Shutting down due to configuration reporting failure.");
-                                        break SignalTo::Shutdown;
+                                    match EnterpriseMetadata::try_from(&new_config) {
+                                        Ok(metadata) => {
+                                            match self.config.enterprise.as_ref() {
+                                                Some(enterprise) => {
+                                                    attach_enterprise_components(&mut new_config, &metadata);
+                                                    enterprise.send(report_configuration(config_paths.clone(), metadata));
+                                                }
+                                                None => {
+                                                    let enterprise = EnterpriseReporter::new();
+                                                    attach_enterprise_components(&mut new_config, &metadata);
+                                                    enterprise.send(report_configuration(config_paths.clone(), metadata));
+                                                    self.config.enterprise = Some(enterprise);
+                                                }
+                                            }
+                                        },
+                                        Err(err) => {
+                                            if let EnterpriseError::MissingApiKey = err {
+                                                emit!(VectorReloadError);
+                                                continue;
+                                            }
+                                        },
                                     }
 
                                     match topology

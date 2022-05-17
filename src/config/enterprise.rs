@@ -3,7 +3,7 @@ use std::{
     fmt::{Display, Formatter},
 };
 
-use futures_util::{stream::FuturesOrdered, Future, StreamExt};
+use futures_util::{future::BoxFuture, stream::FuturesOrdered, Future, StreamExt};
 use http::Request;
 use hyper::{header::LOCATION, Body, StatusCode};
 use indexmap::IndexMap;
@@ -258,71 +258,81 @@ pub(crate) fn attach_enterprise_components(config: &mut Config, metadata: &Enter
 }
 
 /// Report the internal configuration to Datadog Observability Pipelines.
-pub(crate) async fn report_configuration(
+pub(crate) fn report_configuration(
     config_paths: Vec<ConfigPath>,
     metadata: EnterpriseMetadata,
-) {
-    let EnterpriseMetadata {
-        api_key,
-        config_version,
-        opts,
-    } = metadata;
+) -> BoxFuture<'static, ()> {
+    let fut = async move {
+        let EnterpriseMetadata {
+            api_key,
+            config_version,
+            opts,
+        } = metadata;
 
-    // Get the Vector version. This is reported to Pipelines along with a config hash.
-    let vector_version = crate::get_version();
+        // Get the Vector version. This is reported to Pipelines along with a config hash.
+        let vector_version = crate::get_version();
 
-    // We need to create a JSON representation of config, based on the original files
-    // that Vector was spawned with.
-    let (table, _) = process_paths(&config_paths)
-        .map(|paths| load_source_from_paths(&paths).ok())
-        .flatten()
-        .expect("Couldn't load source from config paths. Please report.");
+        // We need to create a JSON representation of config, based on the original files
+        // that Vector was spawned with.
+        let (table, _) = process_paths(&config_paths)
+            .map(|paths| load_source_from_paths(&paths).ok())
+            .flatten()
+            .expect("Couldn't load source from config paths. Please report.");
 
-    // Set the relevant fields needed to report a config to Datadog. This is a struct rather than
-    // exploding as func arguments to avoid confusion with multiple &str fields.
-    let fields = PipelinesStrFields {
-        config_version: config_version.as_ref(),
-        vector_version: &vector_version,
-    };
+        // Set the relevant fields needed to report a config to Datadog. This is a struct rather than
+        // exploding as func arguments to avoid confusion with multiple &str fields.
+        let fields = PipelinesStrFields {
+            config_version: config_version.as_ref(),
+            vector_version: &vector_version,
+        };
 
-    // Set the Datadog authorization fields. There's an API and app key, to allow read/write
-    // access in tandem with RBAC on the Datadog side.
-    let auth = PipelinesAuth {
-        api_key: &api_key,
-        application_key: &opts.application_key,
-    };
+        // Set the Datadog authorization fields. There's an API and app key, to allow read/write
+        // access in tandem with RBAC on the Datadog side.
+        let auth = PipelinesAuth {
+            api_key: &api_key,
+            application_key: &opts.application_key,
+        };
 
-    // Create a HTTP client for posting a Vector version to Datadog OP. This will
-    // respect any proxy settings provided in top-level config.
-    let client = HttpClient::new(None, &opts.proxy)
-        .expect("couldn't instrument Datadog HTTP client. Please report");
+        // Create a HTTP client for posting a Vector version to Datadog OP. This will
+        // respect any proxy settings provided in top-level config.
+        let client = HttpClient::new(None, &opts.proxy)
+            .expect("couldn't instrument Datadog HTTP client. Please report");
 
-    // Endpoint to report a config to Datadog OP.
-    let endpoint = get_reporting_endpoint(
-        opts.endpoint.as_ref(),
-        opts.site.as_ref(),
-        opts.region,
-        &opts.configuration_key,
-    );
-    // Datadog uses a JSON:API, so we'll serialize the config to a JSON
-    let payload = PipelinesVersionPayload::new(&table, &fields);
+        // Endpoint to report a config to Datadog OP.
+        let endpoint = get_reporting_endpoint(
+            opts.endpoint.as_ref(),
+            opts.site.as_ref(),
+            opts.region,
+            &opts.configuration_key,
+        );
+        // Datadog uses a JSON:API, so we'll serialize the config to a JSON
+        let payload = PipelinesVersionPayload::new(&table, &fields);
 
-    match report_serialized_config_to_datadog(&client, &endpoint, &auth, &payload, opts.max_retries)
+        match report_serialized_config_to_datadog(
+            &client,
+            &endpoint,
+            &auth,
+            &payload,
+            opts.max_retries,
+        )
         .await
-    {
-        Ok(()) => {
-            info!(
-                "Vector config {} successfully reported to {}.",
-                &config_version, DATADOG_REPORTING_PRODUCT
-            );
+        {
+            Ok(()) => {
+                info!(
+                    "Vector config {} successfully reported to {}.",
+                    &config_version, DATADOG_REPORTING_PRODUCT
+                );
+            }
+            Err(err) => {
+                error!(
+                    err = ?err.to_string(),
+                    "Could not report Vector config to {}.", DATADOG_REPORTING_PRODUCT
+                );
+            }
         }
-        Err(err) => {
-            error!(
-                err = ?err.to_string(),
-                "Could not report Vector config to {}.", DATADOG_REPORTING_PRODUCT
-            );
-        }
-    }
+    };
+
+    Box::pin(fut)
 }
 
 #[derive(Clone)]
@@ -373,7 +383,7 @@ impl TryFrom<&Config> for EnterpriseMetadata {
     }
 }
 
-pub(crate) struct EnterpriseReporter<T> {
+pub struct EnterpriseReporter<T> {
     reporting_tx: mpsc::UnboundedSender<T>,
 }
 
