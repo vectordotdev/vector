@@ -106,9 +106,8 @@ impl Default for Options {
     }
 }
 
-/// Pipelines error, relevant to an upstream caller. This abstracts away HTTP-specific error
-/// codes that are implementation details of whether we consider a request successful or not.
-pub enum PipelinesError {
+/// Enterprise error, relevant to an upstream caller.
+pub enum EnterpriseError {
     Disabled,
     MissingApiKey,
     FatalCouldNotReportConfig,
@@ -334,18 +333,18 @@ pub(crate) struct EnterpriseMetadata {
 }
 
 impl TryFrom<&Config> for EnterpriseMetadata {
-    type Error = PipelinesError;
+    type Error = EnterpriseError;
 
     fn try_from(value: &Config) -> Result<Self, Self::Error> {
         // Only valid if a [enterprise] section is present in config.
         let opts = match value.enterprise.clone() {
             Some(opts) => opts,
-            _ => return Err(PipelinesError::Disabled),
+            _ => return Err(EnterpriseError::Disabled),
         };
 
         // Return early if the feature isn't enabled.
         if !opts.enabled {
-            return Err(PipelinesError::Disabled);
+            return Err(EnterpriseError::Disabled);
         }
 
         let api_key = match &opts.api_key {
@@ -354,7 +353,7 @@ impl TryFrom<&Config> for EnterpriseMetadata {
             // No API key; attempt to get it from the environment.
             None => match env::var("DATADOG_API_KEY").or_else(|_| env::var("DD_API_KEY")) {
                 Ok(api_key) => api_key,
-                _ => return Err(PipelinesError::MissingApiKey),
+                _ => return Err(EnterpriseError::MissingApiKey),
             },
         };
 
@@ -418,11 +417,11 @@ pub async fn try_attach(
     config: &mut Config,
     config_paths: &[ConfigPath],
     mut signal_rx: SignalRx,
-) -> Result<(), PipelinesError> {
+) -> Result<(), EnterpriseError> {
     // Only valid if a [enterprise] section is present in config.
     let datadog = match config.enterprise.clone() {
         Some(datadog) => datadog,
-        _ => return Err(PipelinesError::Disabled),
+        _ => return Err(EnterpriseError::Disabled),
     };
 
     // Return early if an API key is missing, or the feature isn't enabled.
@@ -432,9 +431,9 @@ pub async fn try_attach(
         // No API key; attempt to get it from the environment.
         (None, true) => match env::var("DATADOG_API_KEY").or_else(|_| env::var("DD_API_KEY")) {
             Ok(api_key) => api_key,
-            _ => return Err(PipelinesError::MissingApiKey),
+            _ => return Err(EnterpriseError::MissingApiKey),
         },
-        _ => return Err(PipelinesError::MissingApiKey),
+        _ => return Err(EnterpriseError::MissingApiKey),
     };
 
     info!(
@@ -488,7 +487,7 @@ pub async fn try_attach(
 
     select! {
         biased;
-        Ok(SignalTo::Shutdown | SignalTo::Quit) = signal_rx.recv() => return Err(PipelinesError::Interrupt),
+        Ok(SignalTo::Shutdown | SignalTo::Quit) = signal_rx.recv() => return Err(EnterpriseError::Interrupt),
         report = report_serialized_config_to_datadog(&client, &endpoint, &auth, &payload, datadog.max_retries) => {
             match report {
                 Ok(()) => {
@@ -504,9 +503,9 @@ pub async fn try_attach(
                     );
 
                     if datadog.exit_on_fatal_error {
-                        return Err(PipelinesError::FatalCouldNotReportConfig);
+                        return Err(EnterpriseError::FatalCouldNotReportConfig);
                     } else {
-                        return Err(PipelinesError::CouldNotReportConfig);
+                        return Err(EnterpriseError::CouldNotReportConfig);
                     }
                 }
             }

@@ -9,7 +9,7 @@ use tokio::{
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[cfg(feature = "enterprise")]
-use crate::config::enterprise::PipelinesError;
+use crate::config::enterprise::EnterpriseError;
 #[cfg(not(feature = "enterprise-tests"))]
 use crate::metrics;
 #[cfg(windows)]
@@ -46,6 +46,8 @@ pub struct ApplicationConfig {
     pub graceful_crash: mpsc::UnboundedReceiver<()>,
     #[cfg(feature = "api")]
     pub api: config::api::Options,
+    #[cfg(feature = "enterprise")]
+    pub enterprise: EnterpriseReporter,
     pub signal_handler: signal::SignalHandler,
     pub signal_rx: signal::SignalRx,
 }
@@ -206,7 +208,7 @@ impl Application {
                         Some(enterprise)
                     }
                     Err(err) => {
-                        if let PipelinesError::MissingApiKey = err {
+                        if let EnterpriseError::MissingApiKey = err {
                             error!(
                                 message = "Enterprise configuration incomplete: missing API key"
                             );
@@ -233,6 +235,8 @@ impl Application {
                     graceful_crash,
                     #[cfg(feature = "api")]
                     api,
+                    #[cfg(feature = "enterprise")]
+                    enterprise,
                     signal_handler,
                     signal_rx,
                 })
@@ -298,7 +302,7 @@ impl Application {
                                         new_config.healthchecks.set_require_healthy(opts.require_healthy);
 
                                         #[cfg(feature = "enterprise")]
-                                        if let Err(PipelinesError::FatalCouldNotReportConfig) =
+                                        if let Err(EnterpriseError::FatalCouldNotReportConfig) =
                                             config::enterprise::try_attach(&mut new_config, &config_paths, signal_handler.subscribe()).await
                                         {
                                             error!(message = "Shutting down due to configuration reporting failure.");
@@ -347,7 +351,7 @@ impl Application {
 
                                     #[cfg(feature = "enterprise")]
                                     // Augment config to enable observability within Datadog, if applicable.
-                                    if let Err(PipelinesError::FatalCouldNotReportConfig) =
+                                    if let Err(EnterpriseError::FatalCouldNotReportConfig) =
                                         config::enterprise::try_attach(&mut new_config, &config_paths, signal_handler.subscribe()).await
                                     {
                                         error!(message = "Shutting down due to configuration reporting failure.");
