@@ -34,8 +34,8 @@ impl NativeJsonSerializer {
         Self
     }
 
-    /// Encode event as native JSON.
-    pub fn encode_json(&self, event: Event) -> Result<serde_json::Value, serde_json::Error> {
+    /// Encode event and represent it as native JSON value.
+    pub fn to_json_value(&self, event: Event) -> Result<serde_json::Value, serde_json::Error> {
         serde_json::to_value(&event)
     }
 }
@@ -71,7 +71,7 @@ mod tests {
     }
 
     #[test]
-    fn serialize_equals_encode_json() {
+    fn serialize_equals_to_json_value() {
         let event = Event::from(btreemap! {
             "foo" => Value::from("bar")
         });
@@ -80,7 +80,7 @@ mod tests {
 
         serializer.encode(event.clone(), &mut bytes).unwrap();
 
-        let json = serializer.encode_json(event).unwrap();
+        let json = serializer.to_json_value(event).unwrap();
 
         assert_eq!(bytes.freeze(), serde_json::to_string(&json).unwrap());
     }

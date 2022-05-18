@@ -74,7 +74,7 @@ impl Encoder<Vec<HecProcessedEvent>> for HecLogsEncoder {
                 let hec_event = if serializer.supports_json() {
                     HecEvent::Json(
                         serializer
-                            .encode_json(event)
+                            .to_json_value(event)
                             .map_err(|error| emit!(SplunkEventEncodeError { error }))
                             .ok()?,
                     )
