@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 
 use async_trait::async_trait;
 use bytes::BytesMut;
-use codecs::{encoding::SerializerConfig, JsonSerializerConfig, RawMessageSerializerConfig};
+use codecs::{encoding::SerializerConfig, JsonSerializerConfig, TextSerializerConfig};
 use futures::{stream::BoxStream, FutureExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -43,7 +43,7 @@ impl EncodingConfigMigrator for EncodingMigrator {
 
     fn migrate(codec: &Self::Codec) -> SerializerConfig {
         match codec {
-            Encoding::Text => RawMessageSerializerConfig::new().into(),
+            Encoding::Text => TextSerializerConfig::new().into(),
             Encoding::Json => JsonSerializerConfig::new().into(),
         }
     }

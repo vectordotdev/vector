@@ -6,7 +6,7 @@ use bytes::{Bytes, BytesMut};
 use codecs::{
     encoding::{Framer, FramingConfig, SerializerConfig},
     JsonSerializerConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
-    RawMessageSerializerConfig,
+    TextSerializerConfig,
 };
 use futures::{
     future,
@@ -51,7 +51,7 @@ impl EncodingConfigWithFramingMigrator for EncodingMigrator {
 
     fn migrate(codec: &Self::Codec) -> (Option<FramingConfig>, SerializerConfig) {
         match codec {
-            Encoding::Text => (None, RawMessageSerializerConfig::new().into()),
+            Encoding::Text => (None, TextSerializerConfig::new().into()),
             Encoding::Ndjson => (
                 Some(NewlineDelimitedEncoderConfig::new().into()),
                 JsonSerializerConfig::new().into(),
