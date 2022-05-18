@@ -191,19 +191,25 @@ mod tests {
             test_util::get_table_registry_with_tables(vec![("dummy1".to_string(), dummy)]);
 
         let conditions = BTreeMap::from([
-            ("field1", expression::Literal::from("value")),
+            ("field1".into(), (expression::Literal::from("value")).into()),
             (
-                "field2",
-                expression::Container::new(expression::Variant::Object(BTreeMap::from([
-                    (
-                        "from",
-                        expression::Literal::from(Utc.ymd(2015, 5, 15).and_hms(0, 0, 0)),
-                    ),
-                    (
-                        "to",
-                        expression::Literal::from(Utc.ymd(2015, 6, 15).and_hms(0, 0, 0)),
-                    ),
-                ]))),
+                "field2".into(),
+                (expression::Container::new(expression::Variant::Object(
+                    BTreeMap::from([
+                        (
+                            "from".into(),
+                            (expression::Literal::from(Utc.ymd(2015, 5, 15).and_hms(0, 0, 0)))
+                                .into(),
+                        ),
+                        (
+                            "to".into(),
+                            (expression::Literal::from(Utc.ymd(2015, 6, 15).and_hms(0, 0, 0)))
+                                .into(),
+                        ),
+                    ])
+                    .into(),
+                )))
+                .into(),
             ),
         ]);
 
