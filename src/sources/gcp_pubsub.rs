@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::{pin::Pin, sync::Arc, time::Duration};
 
 use chrono::{DateTime, NaiveDateTime, Utc};
 use codecs::decoding::{DeserializerConfig, FramingConfig};
@@ -27,7 +27,8 @@ use crate::{
     },
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
-    sources::util::{self, finalizer::UnorderedFinalizer},
+    sources::util,
+    sources::util::finalizer::{EmptyStream, UnorderedFinalizer},
     tls::{TlsConfig, TlsSettings},
     SourceSender,
 };
@@ -215,15 +216,24 @@ impl PubsubSource {
                 .context(EndpointTlsSnafu)?;
         }
 
-        while self.run_once(&endpoint).await {
-            info!(timeout_secs = 1, "Retrying after timeout");
+        let mut token_generator = match &self.credentials {
+            Some(credentials) => credentials.clone().token_regenerator().boxed(),
+            None => EmptyStream::default().boxed(),
+        };
+
+        while self.run_once(&endpoint, &mut token_generator).await {
+            info!(timeout_secs = 1, "Retrying after timeout.");
             tokio::time::sleep(self.retry_delay).await;
         }
 
         Ok(())
     }
 
-    async fn run_once(&mut self, endpoint: &Endpoint) -> bool {
+    async fn run_once(
+        &mut self,
+        endpoint: &Endpoint,
+        token_generator: &mut Pin<Box<dyn Stream<Item = ()> + Send>>,
+    ) -> bool {
         let connection = match endpoint.connect().await {
             Ok(connection) => connection,
             Err(error) => {
@@ -252,6 +262,7 @@ impl PubsubSource {
         // Handle shutdown during startup, the streaming pull doesn't
         // start if there is no data in the subscription.
         let request_stream = self.request_stream();
+        debug!("Starting streaming pull.");
         let stream = tokio::select! {
             _ = &mut self.shutdown => return false,
             result = client.streaming_pull(request_stream) => match result {
@@ -264,16 +275,16 @@ impl PubsubSource {
         };
         let mut stream = stream.into_inner();
 
-        if let Some(credentials) = self.credentials.take() {
-            credentials.spawn_regenerate_token();
-        }
-
         let (finalizer, mut ack_stream) =
             Finalizer::maybe_new(self.acknowledgements, self.shutdown.clone());
 
         loop {
             tokio::select! {
                 _ = &mut self.shutdown => return false,
+                _ = &mut token_generator.next() => {
+                    debug!("New authentication token generated, restarting stream.");
+                    return true;
+                },
                 receipts = ack_stream.next() => if let Some((status, receipts)) = receipts {
                     if status == BatchStatus::Delivered {
                         self.ack_ids.lock().await.extend(receipts);
@@ -281,7 +292,10 @@ impl PubsubSource {
                 },
                 response = stream.next() => match response {
                     Some(Ok(response)) => self.handle_response(response, &finalizer).await,
-                    Some(Err(error)) => emit!(GcpPubsubReceiveError { error }),
+                    Some(Err(error)) => {
+                        emit!(GcpPubsubReceiveError { error });
+                        break;
+                    }
                     None => break,
                 },
             }

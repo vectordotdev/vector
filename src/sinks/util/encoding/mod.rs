@@ -345,7 +345,7 @@ mod tests {
     use std::collections::BTreeMap;
 
     use codecs::{
-        CharacterDelimitedEncoder, JsonSerializer, NewlineDelimitedEncoder, RawMessageSerializer,
+        CharacterDelimitedEncoder, JsonSerializer, NewlineDelimitedEncoder, TextSerializer,
     };
     use indoc::indoc;
 
@@ -709,7 +709,7 @@ mod tests {
     fn test_encode_event_text() {
         let encoding = (
             Transformer::default(),
-            crate::codecs::Encoder::<()>::new(RawMessageSerializer::new().into()),
+            crate::codecs::Encoder::<()>::new(TextSerializer::new().into()),
         );
 
         let mut writer = Vec::new();

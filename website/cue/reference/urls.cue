@@ -515,6 +515,7 @@ urls: {
 	vector_docs:                                              "/docs/"
 	vector_download:                                          "/releases/latest/download/"
 	vector_download_nightly:                                  "/releases/nightly/download/"
+	vector_encoding_config_improve_error_message:             "\(vector_repo)/issues/12162"
 	vector_enriching_transforms:                              "/components/?functions%5B%5D=enrich"
 	vector_file_source:                                       "/docs/reference/configuration/sources/file/"
 	vector_exec_source:                                       "/docs/reference/configuration/sources/exec"

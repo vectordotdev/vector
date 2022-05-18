@@ -57,6 +57,7 @@ criterion_group!(
               is_empty,
               is_float,
               is_integer,
+              is_json,
               is_null,
               is_nullish,
               is_object,
@@ -748,6 +749,20 @@ bench_function! {
 
     object {
         args: func_args![value: value!({"foo": "bar"})],
+        want: Ok(false),
+    }
+}
+
+bench_function! {
+    is_json => vrl_stdlib::IsJson;
+
+    map {
+        args: func_args![value: r#"{"key": "value"}"#],
+        want: Ok(true),
+    }
+
+    invalid_map {
+        args: func_args![value: r#"{"key": "value""#],
         want: Ok(false),
     }
 }
