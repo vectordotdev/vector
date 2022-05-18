@@ -147,20 +147,20 @@ metrics = { version = "0.17.1", default-features = false, features = ["std"] }
 metrics-tracing-context = { version = "0.9.0", default-features = false }
 
 # AWS - Official SDK
-aws-config = { version = "0.11.0", default-features = false, features = ["rustls"], optional = true }
-aws-types = { version = "0.11.0", default-features = false, features = ["hardcoded-credentials"], optional = true }
-aws-sdk-s3 = { version = "0.11.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-sqs = { version = "0.11.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-cloudwatch = { version = "0.11.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-cloudwatchlogs = { version = "0.11.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-elasticsearch = {version = "0.11.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-firehose = { version = "0.11.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-kinesis = { version = "0.11.0", default-features = false, features = ["rustls"], optional = true }
-aws-sigv4 = { version = "0.11.0", default-features = false, optional = true }
-aws-smithy-async = { version = "0.41.0", default-features = false, optional = true }
-aws-smithy-client = { version = "0.41.0", default-features = false, features = ["client-hyper"], optional = true}
-aws-smithy-http = { version = "0.41.0", default-features = false, optional = true }
-aws-smithy-types = { version = "0.41.0", default-features = false, optional = true }
+aws-config = { version = "0.12.0", default-features = false, features = ["rustls"], optional = true }
+aws-types = { version = "0.12.0", default-features = false, features = ["hardcoded-credentials"], optional = true }
+aws-sdk-s3 = { version = "0.12.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-sqs = { version = "0.12.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-cloudwatch = { version = "0.12.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-cloudwatchlogs = { version = "0.12.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-elasticsearch = {version = "0.12.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-firehose = { version = "0.12.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-kinesis = { version = "0.12.0", default-features = false, features = ["rustls"], optional = true }
+aws-sigv4 = { version = "0.12.0", default-features = false, optional = true }
+aws-smithy-async = { version = "0.42.0", default-features = false, optional = true }
+aws-smithy-client = { version = "0.42.0", default-features = false, features = ["client-hyper"], optional = true}
+aws-smithy-http = { version = "0.42.0", default-features = false, optional = true }
+aws-smithy-types = { version = "0.42.0", default-features = false, optional = true }
 
 # Azure
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "a0ef5e57f9b1d7d3c768d27dd761569db6e1c934", default-features = false, features = ["enable_reqwest"], optional = true }
