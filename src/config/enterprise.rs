@@ -55,9 +55,6 @@ pub struct Options {
     #[serde(default = "default_enable_logs_reporting")]
     pub enable_logs_reporting: bool,
 
-    #[serde(default = "default_exit_on_fatal_error")]
-    pub exit_on_fatal_error: bool,
-
     #[serde(default)]
     site: Option<String>,
     region: Option<Region>,
@@ -89,7 +86,6 @@ impl Default for Options {
         Self {
             enabled: default_enabled(),
             enable_logs_reporting: default_enable_logs_reporting(),
-            exit_on_fatal_error: default_exit_on_fatal_error(),
             site: None,
             region: None,
             endpoint: None,
@@ -112,11 +108,6 @@ const fn default_enabled() -> bool {
 /// By default, internal logs are reported to Datadog.
 const fn default_enable_logs_reporting() -> bool {
     true
-}
-
-/// By default, Vector should not exit when a fatal reporting error is encountered.
-const fn default_exit_on_fatal_error() -> bool {
-    false
 }
 
 /// By default, report to Datadog every 5 seconds.
@@ -707,6 +698,7 @@ mod test {
         cli::{Color, LogFormat, Opts, RootOpts},
         config::enterprise::{convert_tags_to_vrl, default_max_retries},
         http::HttpClient,
+        metrics,
     };
 
     const fn get_pipelines_auth() -> PipelinesAuth<'static> {
@@ -836,16 +828,16 @@ mod test {
         .is_err());
     }
 
-    /// This test asserts that configuration reporting errors, by default, do
-    /// NOT impact the rest of Vector starting and running. To exit on errors,
-    /// an explicit option must be set in the [enterprise] configuration (see
-    /// [`super::Options`]).
+    /// This test asserts that configuration reporting errors do NOT impact the
+    /// rest of Vector starting and running.
     ///
     /// In general, Vector should continue operating even in the event that the
     /// enterprise API is down/having issues. Do not modify this behavior
     /// without prior approval.
     #[tokio::test]
     async fn vector_continues_on_reporting_error() {
+        let _ = metrics::init_test();
+
         let server = build_test_server_error_and_recover(StatusCode::NOT_IMPLEMENTED).await;
         let endpoint = server.uri();
 
@@ -860,8 +852,7 @@ mod test {
             [sources.in]
             type = "demo_logs"
             format = "syslog"
-            count = 1
-            interval = 0.0
+            count = 3
 
             [sinks.out]
             type = "blackhole"
@@ -877,9 +868,8 @@ mod test {
 
         // Spawn a separate thread to avoid nested async runtime errors
         let vector_continued = thread::spawn(|| {
-            // Configuration reporting is guaranteed to fail here. However, the
-            // app should still start up and run since `exit_on_fatal_error =
-            // false` by default
+            // Configuration reporting is guaranteed to fail here due to API
+            // server issues. However, the app should still start up and run.
             Application::prepare_from_opts(opts).map_or(false, |app| {
                 // Finish running the topology to avoid error logs
                 app.run();
@@ -889,21 +879,22 @@ mod test {
         .join()
         .unwrap();
 
+        assert!(!server.received_requests().await.unwrap().is_empty());
         assert!(vector_continued);
     }
 
     #[tokio::test]
-    async fn vector_exits_on_reporting_error_when_configured() {
+    async fn vector_does_not_start_with_enterprise_misconfigured() {
+        let _ = metrics::init_test();
+
         let server = build_test_server_error_and_recover(StatusCode::NOT_IMPLEMENTED).await;
         let endpoint = server.uri();
 
         let vector_config = formatdoc! {r#"
             [enterprise]
             application_key = "application_key"
-            api_key = "api_key"
             configuration_key = "configuration_key"
             endpoint = "{endpoint}"
-            exit_on_fatal_error = true
             max_retries = 1
 
             [sources.in]
@@ -924,17 +915,16 @@ mod test {
             sub_command: None,
         };
 
-        let vector_continued = thread::spawn(|| {
-            // With `exit_on_fatal_error = true`, starting the app should fail
-            Application::prepare_from_opts(opts).map_or(false, |app| {
-                app.run();
-                true
-            })
+        let vector_failed_to_start = thread::spawn(|| {
+            // With [enterprise] configured but no API key, starting the app
+            // should fail
+            Application::prepare_from_opts(opts).is_err()
         })
         .join()
         .unwrap();
 
-        assert!(!vector_continued);
+        assert!(server.received_requests().await.unwrap().is_empty());
+        assert!(vector_failed_to_start);
     }
 
     #[test]
