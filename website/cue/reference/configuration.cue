@@ -467,8 +467,8 @@ configuration: {
 
 						```json
 						{
- 							"dd_api_key": {"value": "A_DATADOG_API_KEY", "error": null},
-  							"another_dd_api_key": {"value": null, "error": "unable to retrieve secret"}
+							"dd_api_key": {"value": "A_DATADOG_API_KEY", "error": null},
+							"another_dd_api_key": {"value": null, "error": "unable to retrieve secret"}
 						}
 						```
 
