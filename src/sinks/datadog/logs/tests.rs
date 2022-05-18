@@ -77,6 +77,7 @@ async fn start_test(
     let config = indoc! {r#"
             default_api_key = "atoken"
             compression = "none"
+            encoding.codec = "json"
         "#};
     let (mut config, cx) = load_sink::<DatadogLogsConfig>(config).unwrap();
 
@@ -196,6 +197,7 @@ async fn api_key_in_metadata_inner(api_status: ApiStatus) {
     let (mut config, cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
             default_api_key = "atoken"
             compression = "none"
+            encoding.codec = "json"
         "#})
     .unwrap();
 
@@ -276,6 +278,7 @@ async fn multiple_api_keys_inner(api_status: ApiStatus) {
     let (mut config, cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
             default_api_key = "atoken"
             compression = "none"
+            encoding.codec = "json"
         "#})
     .unwrap();
 
@@ -336,6 +339,7 @@ async fn enterprise_headers_inner(api_status: ApiStatus) {
     let (mut config, mut cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
             default_api_key = "atoken"
             compression = "none"
+            encoding.codec = "json"
         "#})
     .unwrap();
 
@@ -401,6 +405,7 @@ async fn no_enterprise_headers_inner(api_status: ApiStatus) {
     let (mut config, mut cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
             default_api_key = "atoken"
             compression = "none"
+            encoding.codec = "json"
         "#})
     .unwrap();
 

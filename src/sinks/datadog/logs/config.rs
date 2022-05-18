@@ -6,18 +6,16 @@ use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
 use vector_core::config::proxy::ProxyConfig;
 
-use super::{
-    service::LogApiRetry,
-    sink::{DatadogLogsJsonEncoding, LogSinkBuilder},
-};
+use super::{service::LogApiRetry, sink::LogSinkBuilder};
 use crate::{
+    codecs::EncodingConfig,
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
         datadog::{get_api_validate_endpoint, healthcheck, logs::service::LogApiService, Region},
         util::{
-            encoding::EncodingConfigFixed, service::ServiceBuilderExt, BatchConfig, Compression,
-            SinkBatchSettings, TowerRequestConfig,
+            service::ServiceBuilderExt, BatchConfig, Compression, SinkBatchSettings,
+            TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -45,7 +43,7 @@ impl SinkBatchSettings for DatadogLogsDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = BATCH_DEFAULT_TIMEOUT_SECS;
 }
 
-#[derive(Deserialize, Serialize, Default, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct DatadogLogsConfig {
     pub(crate) endpoint: Option<String>,
@@ -55,11 +53,7 @@ pub(crate) struct DatadogLogsConfig {
     // Deprecated name
     #[serde(alias = "api_key")]
     pub default_api_key: String,
-    #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
-    )]
-    pub encoding: EncodingConfigFixed<DatadogLogsJsonEncoding>,
+    pub encoding: EncodingConfig,
     pub tls: Option<TlsEnableableConfig>,
 
     #[serde(default)]
@@ -83,6 +77,7 @@ impl GenerateConfig for DatadogLogsConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(indoc! {r#"
             default_api_key = "${DATADOG_API_KEY_ENV_VAR}"
+            encoding.codec = "json"
         "#})
         .unwrap()
     }
@@ -135,8 +130,7 @@ impl DatadogLogsConfig {
                 self.get_uri(),
                 cx.globals.enterprise,
             ));
-        let sink = LogSinkBuilder::new(service, cx, default_api_key, batch)
-            .encoding(self.encoding.clone())
+        let sink = LogSinkBuilder::new(self.encoding.clone(), service, cx, default_api_key, batch)
             .compression(self.compression.unwrap_or_default())
             .build();
 

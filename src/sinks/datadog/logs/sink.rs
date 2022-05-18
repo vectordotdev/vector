@@ -6,14 +6,17 @@ use std::{
 };
 
 use async_trait::async_trait;
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
+use codecs::{encoding::Framer, JsonSerializer, NewlineDelimitedEncoder};
 use futures::{stream::BoxStream, StreamExt};
 use snafu::Snafu;
+use tokio_util::codec::Encoder as _;
 use tower::Service;
+use value::Value;
 use vector_core::{
     buffers::Acker,
-    config::{log_schema, LogSchema},
-    event::{Event, EventFinalizers, Finalizable, Value},
+    config::log_schema,
+    event::{Event, EventFinalizers, Finalizable, LogEvent},
     partition::Partitioner,
     sink::StreamSink,
     stream::{BatcherSettings, DriverResponse},
@@ -22,12 +25,14 @@ use vector_core::{
 
 use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};
 use crate::{
+    codecs::{Encoder, EncodingConfig},
     config::SinkContext,
     sinks::util::{
-        encoding::{Encoder, EncodingConfigFixed, StandardEncodings},
+        encoding::{Encoder as _, Transformer},
         Compression, Compressor, RequestBuilder, SinkBuilderExt,
     },
 };
+
 #[derive(Default)]
 struct EventPartitioner;
 
@@ -42,7 +47,7 @@ impl Partitioner for EventPartitioner {
 
 #[derive(Debug)]
 pub struct LogSinkBuilder<S> {
-    encoding: EncodingConfigFixed<DatadogLogsJsonEncoding>,
+    encoding: EncodingConfig,
     service: S,
     context: SinkContext,
     batch_settings: BatcherSettings,
@@ -52,25 +57,20 @@ pub struct LogSinkBuilder<S> {
 
 impl<S> LogSinkBuilder<S> {
     pub fn new(
+        encoding: EncodingConfig,
         service: S,
         context: SinkContext,
         default_api_key: Arc<str>,
         batch_settings: BatcherSettings,
     ) -> Self {
         Self {
-            encoding: Default::default(),
+            encoding,
             service,
             context,
             default_api_key,
             batch_settings,
             compression: None,
         }
-    }
-
-    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
-    pub fn encoding(mut self, encoding: EncodingConfigFixed<DatadogLogsJsonEncoding>) -> Self {
-        self.encoding = encoding;
-        self
     }
 
     pub const fn compression(mut self, compression: Compression) -> Self {
@@ -81,7 +81,8 @@ impl<S> LogSinkBuilder<S> {
     pub fn build(self) -> LogSink<S> {
         LogSink {
             default_api_key: self.default_api_key,
-            encoding: self.encoding,
+            transformer: self.encoding.transformer(),
+            encoder: Encoder::<()>::new(self.encoding.config().build()),
             acker: self.context.acker(),
             service: self.service,
             batch_settings: self.batch_settings,
@@ -91,54 +92,91 @@ impl<S> LogSinkBuilder<S> {
 }
 
 pub struct LogSink<S> {
-    /// The default Datadog API key to use
+    /// The default Datadog API key to use.
     ///
     /// In some instances an `Event` will come in on the stream with an
     /// associated API key. That API key is the one it'll get batched up by but
     /// otherwise we will see `Event` instances with no associated key. In that
     /// case we batch them by this default.
     default_api_key: Arc<str>,
-    /// The ack system for this sink to vector's buffer mechanism
+    /// The ack system for this sink to vector's buffer mechanism.
     acker: Acker,
-    /// The API service
+    /// The API service.
     service: S,
-    /// The encoding of payloads
-    encoding: EncodingConfigFixed<DatadogLogsJsonEncoding>,
-    /// The compression technique to use when building the request body
+    /// The transformer to reshape events before serialization.
+    transformer: Transformer,
+    /// The encoder of payloads.
+    encoder: Encoder<()>,
+    /// The compression technique to use when building the request body.
     compression: Compression,
     /// Batch settings: timeout, max events, max bytes, etc.
     batch_settings: BatcherSettings,
 }
 
-/// Customized encoding specific to the Datadog Logs sink, as the logs API only accepts JSON encoded
-/// log lines, and requires some specific normalization of certain event fields.
-#[derive(Clone, Debug, PartialEq)]
-pub struct DatadogLogsJsonEncoding {
-    log_schema: &'static LogSchema,
-    inner: StandardEncodings,
+struct DatadogEncoder {
+    transformer: Transformer,
+    encoder: Encoder<()>,
 }
 
-impl Default for DatadogLogsJsonEncoding {
-    fn default() -> Self {
-        DatadogLogsJsonEncoding {
-            log_schema: log_schema(),
-            inner: StandardEncodings::Json,
-        }
-    }
-}
+impl crate::sinks::util::encoding::Encoder<Vec<Event>> for DatadogEncoder {
+    fn encode_input(&self, input: Vec<Event>, writer: &mut dyn io::Write) -> io::Result<usize> {
+        let outer_encoder = (
+            Transformer::default(),
+            Encoder::<Framer>::new(
+                NewlineDelimitedEncoder::new().into(),
+                JsonSerializer::new().into(),
+            ),
+        );
+        let mut encoder = self.encoder.clone();
 
-impl Encoder<Vec<Event>> for DatadogLogsJsonEncoding {
-    fn encode_input(&self, mut input: Vec<Event>, writer: &mut dyn io::Write) -> io::Result<usize> {
-        for event in input.iter_mut() {
-            let log = event.as_mut_log();
-            log.rename_key_flat(self.log_schema.message_key(), "message");
-            log.rename_key_flat(self.log_schema.host_key(), "host");
-            if let Some(Value::Timestamp(ts)) = log.remove(self.log_schema.timestamp_key()) {
-                log.insert_flat("timestamp", Value::Integer(ts.timestamp_millis()));
-            }
-        }
+        let input = input
+            .into_iter()
+            .flat_map(|mut event| {
+                let log = event.as_mut_log();
 
-        self.inner.encode_input(input, writer)
+                let ddsource = log.remove("ddsource");
+                let ddtags = log.remove("ddtags");
+                let hostname = log.remove(log_schema().host_key());
+                let timestamp = log
+                    .remove(log_schema().timestamp_key())
+                    .and_then(|timestamp| {
+                        timestamp
+                            .as_timestamp()
+                            .map(|timestamp| timestamp.timestamp_millis())
+                    });
+                let service = log.remove("service");
+                let metadata = std::mem::take(log.metadata_mut());
+
+                self.transformer.transform(&mut event);
+
+                let mut bytes = BytesMut::new();
+                encoder.encode(event, &mut bytes).ok()?;
+
+                let message = Value::Bytes(bytes.freeze());
+
+                let mut outer = LogEvent::new_with_metadata(metadata);
+                if let Some(ddsource) = ddsource {
+                    outer.insert_flat("ddsource", ddsource);
+                }
+                if let Some(ddtags) = ddtags {
+                    outer.insert_flat("ddtags", ddtags);
+                }
+                if let Some(hostname) = hostname {
+                    outer.insert_flat("hostname", hostname);
+                }
+                if let Some(timestamp) = timestamp {
+                    outer.insert_flat("timestamp", timestamp);
+                }
+                if let Some(service) = service {
+                    outer.insert_flat("service", service);
+                }
+                outer.insert_flat("message", message);
+
+                Some(Event::from(outer))
+            })
+            .collect::<Vec<_>>();
+
+        outer_encoder.encode_input(input, writer)
     }
 }
 
@@ -175,14 +213,14 @@ impl From<Bytes> for LogRequestPayload {
 
 struct LogRequestBuilder {
     default_api_key: Arc<str>,
-    encoding: EncodingConfigFixed<DatadogLogsJsonEncoding>,
+    encoding: DatadogEncoder,
     compression: Compression,
 }
 
 impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
     type Metadata = (Arc<str>, usize, EventFinalizers, usize);
     type Events = Vec<Event>;
-    type Encoder = EncodingConfigFixed<DatadogLogsJsonEncoding>;
+    type Encoder = DatadogEncoder;
     type Payload = LogRequestPayload;
     type Request = LogApiRequest;
     type Error = RequestBuildError;
@@ -254,9 +292,13 @@ where
         let partitioner = EventPartitioner::default();
 
         let builder_limit = NonZeroUsize::new(64);
+        let encoding = DatadogEncoder {
+            transformer: self.transformer,
+            encoder: self.encoder,
+        };
         let request_builder = LogRequestBuilder {
             default_api_key,
-            encoding: self.encoding,
+            encoding,
             compression: self.compression,
         };
 
