@@ -111,7 +111,7 @@ fn handle_dd_trace_payload(
         debug!("Older trace payload decoded.");
         handle_dd_trace_payload_v0(decoded_payload, api_key, lang, source)
     } else {
-        debug!("Never trace payload decoded.");
+        debug!("Newer trace payload decoded.");
         handle_dd_trace_payload_v1(decoded_payload, api_key, source)
     }
 }
