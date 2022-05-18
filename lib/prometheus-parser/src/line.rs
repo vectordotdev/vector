@@ -592,12 +592,12 @@ mod test {
         let input = wrap(r#"{name="value"}"#);
         let (left, r) = Metric::parse_labels(&input).unwrap();
         assert_eq!(left, tail);
-        assert_eq!(r, BTreeMap::from([("name", "value")]));
+        assert_eq!(r, BTreeMap::from([("name".into(), "value".into())]));
 
         let input = wrap(r#"{name="value",}"#);
         let (left, r) = Metric::parse_labels(&input).unwrap();
         assert_eq!(left, tail);
-        assert_eq!(r, BTreeMap::from([("name", "value")]));
+        assert_eq!(r, BTreeMap::from([("name".into(), "value".into())]));
 
         let input = wrap(r#"{ name = "" ,b="a=b" , a="},", _c = "\""}"#);
         let (left, r) = Metric::parse_labels(&input).unwrap();

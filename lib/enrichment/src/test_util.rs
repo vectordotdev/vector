@@ -4,7 +4,6 @@ use std::{
 };
 
 use value::Value;
-use vector_common::btreemap;
 
 use crate::{Case, Condition, IndexHandle, Table, TableRegistry};
 

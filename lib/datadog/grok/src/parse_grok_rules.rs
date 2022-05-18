@@ -424,8 +424,6 @@ fn resolves_match_function(
 // test some tricky cases here, more high-level tests are in parse_grok
 #[cfg(test)]
 mod tests {
-    use vector_common::btreemap;
-
     use super::*;
 
     #[test]
