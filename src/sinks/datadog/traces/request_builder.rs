@@ -252,6 +252,10 @@ impl DatadogTracesEncoder {
             priority: trace
                 .get("priority")
                 .and_then(|v| v.as_integer().map(|v| v as i32))
+                // This should not happen for Datadog originated traces, but in case this field is not populated
+                // we default to 1 (https://github.com/DataDog/datadog-agent/blob/eac2327/pkg/trace/sampler/sampler.go#L54-L55),
+                // which is what the Datadog trace-agent is doing for OTLP originated traces, as per
+                // https://github.com/DataDog/datadog-agent/blob/3ea2eb4/pkg/trace/api/otlp.go#L309.
                 .unwrap_or(1i32),
             origin: trace
                 .get("origin")
