@@ -408,6 +408,78 @@ configuration: {
 				},
 			]
 		}
+		secrets_management: {
+			title: "Secrets management"
+			body:  """
+				Vector can retrieve secret like password or token by querying an external system in order to
+				avoid storing sensitive information in Vector configuration files. Secret backends used to retrieve
+				sensitive token are configured in a dedicated section. In the rest of the configuration you should use
+				the `SECRET[<backend_name>.<secret_key>]` notation, secret interpolation will happen immediately after
+				environment variables interpolation. While Vector supports multiple command to retrieve secret, one
+				secret backend cannot use the secret feature for its own configuration. Currently the only suppported
+				kind of backend is the the `exec` one that runs an external command to retrieve secrets.
+
+				The following example shows a simple configuration with two backends defined:
+
+				```toml title="vector.toml"
+				[secret.backend_1]
+				type = "exec"
+				command = ["/path/to/cmd1", "--some-option"]
+				[secret.backend_2]
+				type = "exec"
+				command = ["/path/to/cmd2"]
+
+				[sinks.dd_logs]
+ 				type = "datadog_logs"
+ 				default_api_key = "SECRET[backend_1.dd_api_key]"
+
+				[sinks.splunk]
+ 				type = "splunk_hec"
+ 				default_token = "SECRET[backend_2.splunk_token]"
+				```
+
+				In that example Vector will retrieve the `dd_api_key` from `backen_1` and `splunk_token` from `backend_2`.
+				"""
+
+			sub_sections: [
+				{
+					title: "The `exec` backend"
+					body: """
+						When using the `exec` type for a secret backend Vector and the external command are communicating using
+						the standard input and output. The communication is using plain text JSON. Vector spawns the specified
+						command, writes the secret retrieval query using JSON on the standard input of the child process and
+						reads its standard output expecting a JSON object. Standard error from the child process is read and
+						logged by Vector and can be used for troubleshooting.
+
+						The JSON object used for communication between an `exec` backend and Vector shall comply with the
+						[Datadog Agent executable API](\(urls.datadog_agent_exec_api)).
+
+						For example a query would look like:
+
+						```json
+						{
+							"version": "1.0",
+							"secrets": ["dd_api_key", "another_dd_api_key"]
+						}
+						```
+
+						A possible reply from a backend could then be:
+
+						```json
+						{
+ 							"dd_api_key": {"value": "A_DATADOG_API_KEY", "error": null},
+  							"another_dd_api_key": {"value": null, "error": "unable to retrieve secret"}
+						}
+						```
+
+						If a backend writes a JSON that does not follow the expected structure or reports an error for a
+						given secret Vector will refuse to load the configuration.
+
+						Currently Vector will always query backend with `"version": "1.0"`.
+						"""
+				},
+			]
+		}
 		formats: {
 			title: "Formats"
 			body:  """
