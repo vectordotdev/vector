@@ -210,7 +210,7 @@ struct ReportingRetryBackoff {
 impl ReportingRetryBackoff {
     /// Retry every 2^n seconds with a maximum delay of 60 seconds (and any
     /// additional jitter)
-    fn new() -> Self {
+    const fn new() -> Self {
         let backoff = ExponentialBackoff::from_millis(2)
             .factor(1000)
             .max_delay(Duration::from_secs(60));
@@ -346,9 +346,18 @@ where
     }
 
     pub fn send(&self, reporting_task: T) {
-        if let Err(_) = self.reporting_tx.send(reporting_task) {
+        if self.reporting_tx.send(reporting_task).is_err() {
             error!(message = "Unable to report configuration due to internal Vector issue: could not send through channel");
         }
+    }
+}
+
+impl<T> Default for EnterpriseReporter<T>
+where
+    T: Future<Output = ()> + Send + 'static,
+{
+    fn default() -> Self {
+        Self::new()
     }
 }
 
