@@ -208,15 +208,11 @@ impl Application {
 
                         Some(enterprise)
                     }
-                    Err(err) => {
-                        if let EnterpriseError::MissingApiKey = err {
-                            error!(
-                                message = "Enterprise configuration incomplete: missing API key"
-                            );
-                            return Err(exitcode::CONFIG);
-                        }
-                        None
+                    Err(EnterpriseError::MissingApiKey) => {
+                        error!(message = "Enterprise configuration incomplete: missing API key");
+                        return Err(exitcode::CONFIG);
                     }
+                    Err(_) => None,
                 };
 
                 let diff = config::ConfigDiff::initial(&config);
