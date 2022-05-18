@@ -430,12 +430,12 @@ configuration: {
 				command = ["/path/to/cmd2"]
 
 				[sinks.dd_logs]
- 				type = "datadog_logs"
- 				default_api_key = "SECRET[backend_1.dd_api_key]"
+				type = "datadog_logs"
+				default_api_key = "SECRET[backend_1.dd_api_key]"
 
 				[sinks.splunk]
- 				type = "splunk_hec"
- 				default_token = "SECRET[backend_2.splunk_token]"
+				type = "splunk_hec"
+				default_token = "SECRET[backend_2.splunk_token]"
 				```
 
 				In that example Vector will retrieve the `dd_api_key` from `backen_1` and `splunk_token` from `backend_2`.
