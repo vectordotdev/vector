@@ -5,13 +5,13 @@ use vector_core::partition::Partitioner;
 
 use super::config::AzureBlobSinkConfig;
 use super::request_builder::AzureBlobRequestOptions;
-use crate::codecs::Encoder;
 use crate::event::Event;
 use crate::sinks::util::{
     encoding::{EncodingConfig, StandardEncodings},
     request_builder::RequestBuilder,
     Compression,
 };
+use crate::{codecs::Encoder, sinks::util::request_builder::EncodeResult};
 
 fn default_config(e: StandardEncodings) -> AzureBlobSinkConfig {
     AzureBlobSinkConfig {
@@ -67,7 +67,7 @@ fn azure_blob_build_request_without_compression() {
     };
 
     let (metadata, _events) = request_options.split_input((key, vec![log]));
-    let request = request_options.build_request(metadata, Bytes::new());
+    let request = request_options.build_request(metadata, EncodeResult::uncompressed(Bytes::new()));
 
     assert_eq!(request.metadata.partition_key, "blob.log".to_string());
     assert_eq!(request.content_encoding, None);
@@ -108,7 +108,7 @@ fn azure_blob_build_request_with_compression() {
     };
 
     let (metadata, _events) = request_options.split_input((key, vec![log]));
-    let request = request_options.build_request(metadata, Bytes::new());
+    let request = request_options.build_request(metadata, EncodeResult::uncompressed(Bytes::new()));
 
     assert_eq!(request.metadata.partition_key, "blob.log.gz".to_string());
     assert_eq!(request.content_encoding, Some("gzip"));
@@ -149,7 +149,7 @@ fn azure_blob_build_request_with_time_format() {
     };
 
     let (metadata, _events) = request_options.split_input((key, vec![log]));
-    let request = request_options.build_request(metadata, Bytes::new());
+    let request = request_options.build_request(metadata, EncodeResult::uncompressed(Bytes::new()));
 
     assert_eq!(
         request.metadata.partition_key,
@@ -193,7 +193,7 @@ fn azure_blob_build_request_with_uuid() {
     };
 
     let (metadata, _events) = request_options.split_input((key, vec![log]));
-    let request = request_options.build_request(metadata, Bytes::new());
+    let request = request_options.build_request(metadata, EncodeResult::uncompressed(Bytes::new()));
 
     assert_ne!(request.metadata.partition_key, "blob.log".to_string());
     assert_eq!(request.content_encoding, None);

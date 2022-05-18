@@ -4,12 +4,50 @@ use bytes::Bytes;
 
 use super::{encoding::Encoder, Compression, Compressor};
 
+pub struct EncodeResult<P> {
+    pub payload: P,
+    pub uncompressed_byte_size: usize,
+    pub compressed_byte_size: Option<usize>,
+}
+
+impl<P> EncodeResult<P>
+where
+    P: AsRef<[u8]>,
+{
+    pub fn uncompressed(payload: P) -> Self {
+        let uncompressed_byte_size = payload.as_ref().len();
+        Self {
+            payload,
+            uncompressed_byte_size,
+            compressed_byte_size: None,
+        }
+    }
+
+    pub fn compressed(payload: P, uncompressed_byte_size: usize) -> Self {
+        let compressed_byte_size = payload.as_ref().len();
+        Self {
+            payload,
+            uncompressed_byte_size,
+            compressed_byte_size: Some(compressed_byte_size),
+        }
+    }
+}
+
+impl<P> EncodeResult<P> {
+    // Can't be `const` because you can't (yet?) run deconstructors in a const context, which is what this function does
+    // by dropping the (un)compressed sizes.
+    #[allow(clippy::missing_const_for_fn)]
+    pub fn into_payload(self) -> P {
+        self.payload
+    }
+}
+
 /// Generalized interface for defining how a batch of events will be turned into a request.
 pub trait RequestBuilder<Input> {
     type Metadata;
     type Events;
     type Encoder: Encoder<Self::Events>;
-    type Payload: From<Bytes>;
+    type Payload: From<Bytes> + AsRef<[u8]>;
     type Request;
     type Error: From<io::Error>;
 
@@ -25,16 +63,31 @@ pub trait RequestBuilder<Input> {
     /// as-is, such as event finalizers, while the events are the actual events to process.
     fn split_input(&self, input: Input) -> (Self::Metadata, Self::Events);
 
-    fn encode_events(&self, events: Self::Events) -> Result<Self::Payload, Self::Error> {
+    fn encode_events(
+        &self,
+        events: Self::Events,
+    ) -> Result<EncodeResult<Self::Payload>, Self::Error> {
         let mut compressor = Compressor::from(self.compression());
+        let is_compressed = compressor.is_compressed();
         let _ = self.encoder().encode_input(events, &mut compressor)?;
 
         let payload = compressor.into_inner().freeze();
-        Ok(payload.into())
+        let result = if is_compressed {
+            let compressed_byte_size = payload.len();
+            EncodeResult::compressed(payload.into(), compressed_byte_size)
+        } else {
+            EncodeResult::uncompressed(payload.into())
+        };
+
+        Ok(result)
     }
 
     /// Builds a request for the given metadata and payload.
-    fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request;
+    fn build_request(
+        &self,
+        metadata: Self::Metadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request;
 }
 
 /// Generalized interface for defining how a batch of events will incrementally be turned into requests.
