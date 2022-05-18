@@ -1,11 +1,14 @@
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
+use indoc::indoc;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use tokio_util::codec::Encoder as _;
 
 use crate::{
+    codecs::{Encoder, EncodingConfig},
     config::{
         log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
         SinkDescription,
@@ -13,6 +16,7 @@ use crate::{
     event::{Event, Value},
     http::HttpClient,
     sinks::util::{
+        encoding::Transformer,
         http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
         BatchConfig, BoxedRawValue, JsonArrayBuffer, SinkBatchSettings, TowerRequestConfig,
     },
@@ -21,19 +25,17 @@ use crate::{
 static HOST: Lazy<Uri> = Lazy::new(|| Uri::from_static("https://api.honeycomb.io/1/batch"));
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(super) struct HoneycombConfig {
     api_key: String,
-
     // TODO: we probably want to make this a template
     // but this limits us in how we can do our healthcheck.
     dataset: String,
-
     #[serde(default)]
     batch: BatchConfig<HoneycombDefaultBatchSettings>,
-
     #[serde(default)]
     request: TowerRequestConfig,
-
+    encoding: EncodingConfig,
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -57,12 +59,21 @@ inventory::submit! {
 
 impl GenerateConfig for HoneycombConfig {
     fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"api_key = "${HONEYCOMB_API_KEY}"
-            dataset = "my-honeycomb-dataset""#,
-        )
+        toml::from_str(indoc! {r#"
+            api_key = "${HONEYCOMB_API_KEY}"
+            dataset = "my-honeycomb-dataset"
+            encoding.codec = "json"
+        "#})
         .unwrap()
     }
+}
+
+#[derive(Debug, Clone)]
+struct HoneycombSink {
+    api_key: String,
+    dataset: String,
+    transformer: Transformer,
+    encoder: Encoder<()>,
 }
 
 #[async_trait::async_trait]
@@ -79,23 +90,34 @@ impl SinkConfig for HoneycombConfig {
 
         let client = HttpClient::new(None, cx.proxy())?;
 
+        let transformer = self.encoding.transformer();
+        let serializer = self.encoding.config().build();
+        let encoder = Encoder::<()>::new(serializer);
+
+        let sink = HoneycombSink {
+            api_key: self.api_key.clone(),
+            dataset: self.dataset.clone(),
+            transformer,
+            encoder,
+        };
+
+        let healthcheck = healthcheck(sink.clone(), client.clone()).boxed();
+
         let sink = BatchedHttpSink::new(
-            self.clone(),
+            sink,
             buffer,
             request_settings,
             batch_settings.timeout,
-            client.clone(),
+            client,
             cx.acker(),
         )
         .sink_map_err(|error| error!(message = "Fatal honeycomb sink error.", %error));
-
-        let healthcheck = healthcheck(self.clone(), client).boxed();
 
         Ok((super::VectorSink::from_event_sink(sink), healthcheck))
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(self.encoding.config().input_type())
     }
 
     fn sink_type(&self) -> &'static str {
@@ -107,36 +129,55 @@ impl SinkConfig for HoneycombConfig {
     }
 }
 
-pub struct HoneycombEventEncoder;
+pub struct HoneycombEventEncoder {
+    transformer: Transformer,
+    encoder: Encoder<()>,
+}
 
 impl HttpEventEncoder<serde_json::Value> for HoneycombEventEncoder {
-    fn encode_event(&mut self, event: Event) -> Option<serde_json::Value> {
-        let mut log = event.into_log();
+    fn encode_event(&mut self, mut event: Event) -> Option<serde_json::Value> {
+        self.transformer.transform(&mut event);
 
-        let timestamp = if let Some(Value::Timestamp(ts)) = log.remove(log_schema().timestamp_key())
-        {
-            ts
-        } else {
-            chrono::Utc::now()
+        let timestamp = match &mut event {
+            Event::Log(ref mut log) => {
+                if let Some(Value::Timestamp(ts)) = log.remove(log_schema().timestamp_key()) {
+                    ts
+                } else {
+                    chrono::Utc::now()
+                }
+            }
+            Event::Metric(_) | Event::Trace(_) => chrono::Utc::now(),
         };
 
-        let data = json!({
+        let serializer = self.encoder.serializer();
+        let data = if serializer.supports_json() {
+            serializer.to_json_value(event).ok()?
+        } else {
+            let mut bytes = BytesMut::new();
+            self.encoder.encode(event, &mut bytes).ok()?;
+            String::from_utf8_lossy(&bytes).into()
+        };
+
+        let json = json!({
             "timestamp": timestamp.to_rfc3339_opts(chrono::SecondsFormat::Nanos, true),
-            "data": log.all_fields(),
+            "data": data,
         });
 
-        Some(data)
+        Some(json)
     }
 }
 
 #[async_trait::async_trait]
-impl HttpSink for HoneycombConfig {
+impl HttpSink for HoneycombSink {
     type Input = serde_json::Value;
     type Output = Vec<BoxedRawValue>;
     type Encoder = HoneycombEventEncoder;
 
     fn build_encoder(&self) -> Self::Encoder {
-        HoneycombEventEncoder
+        HoneycombEventEncoder {
+            transformer: self.transformer.clone(),
+            encoder: self.encoder.clone(),
+        }
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Bytes>> {
@@ -148,7 +189,7 @@ impl HttpSink for HoneycombConfig {
     }
 }
 
-impl HoneycombConfig {
+impl HoneycombSink {
     fn build_uri(&self) -> Uri {
         let uri = format!("{}/{}", HOST.clone(), self.dataset);
 
@@ -157,11 +198,8 @@ impl HoneycombConfig {
     }
 }
 
-async fn healthcheck(config: HoneycombConfig, client: HttpClient) -> crate::Result<()> {
-    let req = config
-        .build_request(Vec::new())
-        .await?
-        .map(hyper::Body::from);
+async fn healthcheck(sink: HoneycombSink, client: HttpClient) -> crate::Result<()> {
+    let req = sink.build_request(Vec::new()).await?.map(hyper::Body::from);
 
     let res = client.send(req).await?;
 
@@ -196,8 +234,44 @@ async fn healthcheck(config: HoneycombConfig, client: HttpClient) -> crate::Resu
 }
 #[cfg(test)]
 mod test {
+    use chrono::{DateTime, Utc};
+    use codecs::JsonSerializer;
+    use vector_core::event::LogEvent;
+
+    use super::*;
+
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<super::HoneycombConfig>();
+    }
+
+    #[test]
+    fn encoder_takes_timestamp_from_event() {
+        let mut log = LogEvent::default();
+        log.insert_flat(
+            "timestamp",
+            DateTime::parse_from_rfc3339("2000-01-01T01:02:03.456+00:00")
+                .unwrap()
+                .with_timezone(&Utc),
+        );
+        log.insert_flat("foo", 123);
+        let event = Event::from(log);
+
+        let mut encoder = HoneycombEventEncoder {
+            transformer: Transformer::default(),
+            encoder: Encoder::<()>::new(JsonSerializer::new().into()),
+        };
+
+        let json = encoder.encode_event(event).unwrap();
+
+        assert_eq!(
+            json,
+            json!({
+                "timestamp": "2000-01-01T01:02:03.456000000Z",
+                "data": {
+                    "foo": 123
+                },
+            })
+        )
     }
 }
