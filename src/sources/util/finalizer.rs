@@ -82,7 +82,7 @@ where
             let (finalizer, stream) = Self::new(shutdown);
             (Some(finalizer), stream.boxed())
         } else {
-            (None, EmptyStream(Default::default()).boxed())
+            (None, EmptyStream::default().boxed())
         }
     }
 
@@ -194,8 +194,9 @@ impl<T> Future for FinalizerFuture<T> {
     }
 }
 
-#[derive(Clone, Copy)]
-struct EmptyStream<T>(PhantomData<T>);
+#[derive(Clone, Copy, Derivative)]
+#[derivative(Default(bound = ""))]
+pub struct EmptyStream<T>(PhantomData<T>);
 
 impl<T> Stream for EmptyStream<T> {
     type Item = T;
