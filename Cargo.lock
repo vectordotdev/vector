@@ -8998,8 +8998,10 @@ dependencies = [
  "serde_json",
  "thiserror",
  "value",
+ "vector-vrl-functions",
  "vector_common",
  "vrl",
+ "vrl-core",
  "vrl-stdlib",
  "webbrowser",
 ]

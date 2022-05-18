@@ -151,7 +151,8 @@ impl vrl_lib::Target for VrlTarget {
     fn target_insert(&mut self, path: &LookupBuf, value: ::value::Value) -> Result<(), String> {
         match self {
             VrlTarget::LogEvent(ref mut log, _) | VrlTarget::Trace(ref mut log, _) => {
-                log.target_insert(path, value)
+                log.insert_by_path(path, value);
+                Ok(())
             }
             VrlTarget::Metric {
                 ref mut metric,
@@ -224,14 +225,14 @@ impl vrl_lib::Target for VrlTarget {
     #[allow(clippy::redundant_closure_for_method_calls)] // false positive
     fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
         match self {
-            VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => log.target_get(path),
+            VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => Ok(log.get_by_path(path)),
             VrlTarget::Metric { value, .. } => target_get_metric(path, value),
         }
     }
 
     fn target_get_mut(&mut self, path: &LookupBuf) -> Result<Option<&mut Value>, String> {
         match self {
-            VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => log.target_get_mut(path),
+            VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => Ok(log.get_by_path_mut(path)),
             VrlTarget::Metric { value, .. } => target_get_mut_metric(path, value),
         }
     }
@@ -243,7 +244,7 @@ impl vrl_lib::Target for VrlTarget {
     ) -> Result<Option<::value::Value>, String> {
         match self {
             VrlTarget::LogEvent(ref mut log, _) | VrlTarget::Trace(ref mut log, _) => {
-                log.target_remove(path, compact)
+                Ok(log.remove_by_path(path, compact))
             }
             VrlTarget::Metric {
                 ref mut metric,
@@ -410,7 +411,7 @@ impl<'a> vrl_lib::Target for VrlImmutableTarget<'a> {
     fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
         match self {
             VrlImmutableTarget::LogEvent(log, _) | VrlImmutableTarget::Trace(log, _) => {
-                log.target_get(path)
+                Ok(log.get_by_path(path))
             }
             VrlImmutableTarget::Metric { value, .. } => target_get_metric(path, value),
         }

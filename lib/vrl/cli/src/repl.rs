@@ -1,6 +1,7 @@
 use std::borrow::Cow::{self, Borrowed, Owned};
 
 use ::value::Value;
+use core::{ValueWithMetadata, ValueWithMetadataRef};
 use indoc::indoc;
 use once_cell::sync::Lazy;
 use prettytable::{format, Cell, Row, Table};
@@ -14,6 +15,8 @@ use rustyline::{
     Context, Editor, Helper,
 };
 use vector_common::TimeZone;
+use vector_vrl_functions::vrl_functions;
+use vrl::prelude::BTreeMap;
 use vrl::{
     diagnostic::Formatter,
     state::{self, ExternalEnv},
@@ -46,7 +49,11 @@ const RESERVED_TERMS: &[&str] = &[
     "help docs",
 ];
 
-pub(crate) fn run(mut objects: Vec<Value>, timezone: &TimeZone, vrl_runtime: VrlRuntime) {
+pub(crate) fn run(
+    mut objects: Vec<ValueWithMetadata>,
+    timezone: &TimeZone,
+    vrl_runtime: VrlRuntime,
+) {
     let mut index = 0;
     let func_docs_regex = Regex::new(r"^help\sdocs\s(\w{1,})$").unwrap();
     let error_docs_regex = Regex::new(r"^help\serror\s(\w{1,})$").unwrap();
@@ -81,13 +88,18 @@ pub(crate) fn run(mut objects: Vec<Value>, timezone: &TimeZone, vrl_runtime: Vrl
                 let command = match line {
                     "next" => {
                         // allow adding one new object at a time
-                        if index < objects.len() && objects.last() != Some(&Value::Null) {
+                        if index < objects.len()
+                            && objects.last().map(|x| &x.value) != Some(&Value::Null)
+                        {
                             index = index.saturating_add(1);
                         }
 
                         // add new object
                         if index == objects.len() {
-                            objects.push(Value::Null)
+                            objects.push(ValueWithMetadata {
+                                value: Value::Null,
+                                metadata: Value::Object(BTreeMap::new()),
+                            });
                         }
 
                         "."
@@ -96,7 +108,7 @@ pub(crate) fn run(mut objects: Vec<Value>, timezone: &TimeZone, vrl_runtime: Vrl
                         index = index.saturating_sub(1);
 
                         // remove empty last object
-                        if objects.last() == Some(&Value::Null) {
+                        if objects.last().map(|x| &x.value) == Some(&Value::Null) {
                             let _ = objects.pop();
                         }
 
@@ -107,7 +119,7 @@ pub(crate) fn run(mut objects: Vec<Value>, timezone: &TimeZone, vrl_runtime: Vrl
                 };
 
                 let (local, result) = resolve(
-                    objects.get_mut(index),
+                    objects.get_mut(index).expect("object should exist"),
                     &mut rt,
                     command,
                     &mut external_state,
@@ -142,7 +154,7 @@ pub(crate) fn run(mut objects: Vec<Value>, timezone: &TimeZone, vrl_runtime: Vrl
 }
 
 fn resolve(
-    object: Option<&mut impl Target>,
+    target: &mut ValueWithMetadata,
     runtime: &mut Runtime,
     program: &str,
     external: &mut state::ExternalEnv,
@@ -150,13 +162,9 @@ fn resolve(
     timezone: &TimeZone,
     vrl_runtime: VrlRuntime,
 ) -> (state::LocalEnv, Result<Value, String>) {
-    let mut empty = value!({});
-    let object = match object {
-        None => &mut empty as &mut dyn Target,
-        Some(object) => object,
-    };
-
-    let program = match vrl::compile_for_repl(program, &stdlib::all(), external, local.clone()) {
+    let mut functions = stdlib::all();
+    functions.extend(vector_vrl_functions::vrl_functions());
+    let program = match vrl::compile_for_repl(program, &functions, external, local.clone()) {
         Ok(result) => result,
         Err(diagnostics) => {
             return (
@@ -168,7 +176,7 @@ fn resolve(
 
     (
         program.local_env().clone(),
-        execute(runtime, program, object, timezone, vrl_runtime),
+        execute(runtime, program, target, timezone, vrl_runtime),
     )
 }
 
@@ -215,6 +223,7 @@ impl Repl {
 fn initial_hints() -> Vec<&'static str> {
     stdlib::all()
         .into_iter()
+        .chain(vrl_functions())
         .map(|f| f.identifier())
         .chain(RESERVED_TERMS.iter().copied())
         .collect()
@@ -294,10 +303,13 @@ impl Validator for Repl {
         let local_state = state::LocalEnv::default();
         let mut external_state = state::ExternalEnv::default();
         let mut rt = Runtime::new(state::Runtime::default());
-        let target: Option<&mut Value> = None;
+        let mut target = ValueWithMetadata {
+            value: Value::Null,
+            metadata: Value::Object(BTreeMap::new()),
+        };
 
         let (_, result) = resolve(
-            target,
+            &mut target,
             &mut rt,
             ctx.input(),
             &mut external_state,

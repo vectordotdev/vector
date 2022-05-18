@@ -21,7 +21,9 @@ rustyline = { version = "9", default-features = false, optional = true }
 serde_json = "1"
 thiserror = "1"
 vector_common = { path = "../../vector-common", default-features = false }
+vector-vrl-functions = { path = "../../vector-vrl-functions" }
 vrl = { path = "../vrl", default-features = false }
+core = { package = "vrl-core", path = "../core", default-features = false }
 value = { path = "../../value", default-features = false, features = [] }
 webbrowser = { version = "0.7", default-features = false, optional = true }
 

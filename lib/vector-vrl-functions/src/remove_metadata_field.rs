@@ -1,11 +1,12 @@
 use ::value::Value;
+use lookup::{Lookup, LookupBuf};
 use vrl::prelude::*;
 
 fn remove_metadata_field(
     ctx: &mut Context,
-    key: &str,
+    path: &LookupBuf,
 ) -> std::result::Result<Value, ExpressionError> {
-    ctx.target_mut().remove_metadata_deprecated(key)?;
+    ctx.target_mut().remove_metadata(path)?;
     Ok(Value::Null)
 }
 
@@ -40,12 +41,17 @@ impl Function for RemoveMetadataField {
         mut arguments: ArgumentList,
     ) -> Compiled {
         let key = arguments
-            .required_enum("key", &super::keys())?
-            .try_bytes_utf8_lossy()
-            .expect("key not bytes")
-            .to_string();
+            .required_literal("key")?
+            .to_value()
+            .as_bytes()
+            .cloned()
+            .expect("key not bytes");
+        let key = String::from_utf8_lossy(key.as_ref());
 
-        Ok(Box::new(RemoveMetadataFieldFn { key }))
+        // TODO: fix error handling
+        let path = Lookup::from_str(key.as_ref()).unwrap().into();
+
+        Ok(Box::new(RemoveMetadataFieldFn { path }))
     }
 
     fn compile_argument(
@@ -58,32 +64,35 @@ impl Function for RemoveMetadataField {
         match (name, expr) {
             ("key", Some(expr)) => {
                 let key = expr
-                    .as_enum("key", super::keys())?
+                    .as_literal("key")?
                     .try_bytes_utf8_lossy()
                     .expect("key not bytes")
                     .to_string();
-                Ok(Some(Box::new(key) as _))
+                //TODO: fix error handling
+                let lookup: LookupBuf = Lookup::from_str(&key).unwrap().into();
+                Ok(Some(Box::new(lookup) as _))
             }
             _ => Ok(None),
         }
     }
 
     fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let key = args.required_any("key").downcast_ref::<String>().unwrap();
-        remove_metadata_field(ctx, key)
+        let path = args
+            .required_any("key")
+            .downcast_ref::<LookupBuf>()
+            .unwrap();
+        remove_metadata_field(ctx, path)
     }
 }
 
 #[derive(Debug, Clone)]
 struct RemoveMetadataFieldFn {
-    key: String,
+    path: LookupBuf,
 }
 
 impl Expression for RemoveMetadataFieldFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let key = &self.key;
-
-        remove_metadata_field(ctx, key)
+        remove_metadata_field(ctx, &self.path)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

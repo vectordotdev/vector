@@ -1,15 +1,13 @@
 use ::value::Value;
-use lookup::LookupBuf;
+use lookup::{Lookup, LookupBuf};
 use vrl::prelude::*;
 
 fn set_metadata_field(
     ctx: &mut Context,
-    key: &str,
+    path: &LookupBuf,
     value: Value,
 ) -> std::result::Result<Value, ExpressionError> {
-    // let value = value.try_bytes_utf8_lossy()?.to_string();
-    ctx.target_mut()
-        .set_metadata(&LookupBuf::from(key), value)?;
+    ctx.target_mut().set_metadata(path, value)?;
     Ok(Value::Null)
 }
 
@@ -30,7 +28,7 @@ impl Function for SetMetadataField {
             },
             Parameter {
                 keyword: "value",
-                kind: kind::BYTES,
+                kind: kind::ANY,
                 required: true,
             },
         ]
@@ -51,13 +49,18 @@ impl Function for SetMetadataField {
         mut arguments: ArgumentList,
     ) -> Compiled {
         let key = arguments
-            .required_enum("key", &super::keys())?
-            .try_bytes_utf8_lossy()
-            .expect("key not bytes")
-            .to_string();
+            .required_literal("key")?
+            .to_value()
+            .as_bytes()
+            .cloned()
+            .expect("key not bytes");
+        let key = String::from_utf8_lossy(key.as_ref());
+
+        // TODO: fix error handling
+        let path = Lookup::from_str(key.as_ref()).unwrap().into();
         let value = arguments.required("value");
 
-        Ok(Box::new(SetMetadataFieldFn { key, value }))
+        Ok(Box::new(SetMetadataFieldFn { path, value }))
     }
 
     fn compile_argument(
@@ -70,11 +73,13 @@ impl Function for SetMetadataField {
         match (name, expr) {
             ("key", Some(expr)) => {
                 let key = expr
-                    .as_enum("key", super::keys())?
+                    .as_literal("key")?
                     .try_bytes_utf8_lossy()
                     .expect("key not bytes")
                     .to_string();
-                Ok(Some(Box::new(key) as _))
+                //TODO: fix error handling
+                let lookup: LookupBuf = Lookup::from_str(&key).unwrap().into();
+                Ok(Some(Box::new(lookup) as _))
             }
             _ => Ok(None),
         }
@@ -82,24 +87,25 @@ impl Function for SetMetadataField {
 
     fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
         let value = args.required("value");
-        let key = args.required_any("key").downcast_ref::<String>().unwrap();
+        let path = args
+            .required_any("key")
+            .downcast_ref::<LookupBuf>()
+            .unwrap();
 
-        set_metadata_field(ctx, key, value)
+        set_metadata_field(ctx, path, value)
     }
 }
 
 #[derive(Debug, Clone)]
 struct SetMetadataFieldFn {
-    key: String,
+    path: LookupBuf,
     value: Box<dyn Expression>,
 }
 
 impl Expression for SetMetadataFieldFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let key = &self.key;
-
-        set_metadata_field(ctx, key, value)
+        set_metadata_field(ctx, &self.path, value)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

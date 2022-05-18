@@ -146,11 +146,9 @@ pub fn apply_filter(value: &Value, filter: &KeyValueFilter) -> Result<Value, Gro
                     || matches!(&v, Value::Bytes(b) if b.is_empty())
                     || k.trim().is_empty())
                 {
-
                     let lookup: LookupBuf = Lookup::from(&k).into();
-                    result.target_insert(&lookup, v).unwrap_or_else(
-                        |error| warn!(message = "Error updating field value", field = %lookup, %error)
-                    );
+
+                    result.insert_by_path(&lookup, v);
                 }
             });
             Ok(result)

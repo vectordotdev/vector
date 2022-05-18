@@ -58,37 +58,87 @@ pub trait Target: std::fmt::Debug {
     /// left behind, it should be removed as well, cascading up to the root.
     fn target_remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String>;
 
-    fn get_metadata(&self, _path: &LookupBuf) -> Result<Option<Value>, String> {
-        Err("metadata not available".to_string())
+    fn get_metadata(&self, _path: &LookupBuf) -> Result<Option<Value>, String>;
+
+    fn set_metadata(&mut self, _path: &LookupBuf, _value: Value) -> Result<(), String>;
+
+    fn remove_metadata(&mut self, _path: &LookupBuf) -> Result<(), String>;
+}
+
+//TODO: find a better home for this
+#[derive(Debug)]
+pub struct ValueWithMetadataRef<'a> {
+    pub value: &'a mut Value,
+    pub metadata: &'a mut Value,
+}
+
+impl Target for ValueWithMetadataRef<'_> {
+    fn target_insert(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
+        Ok(self.value.insert_by_path(path, value))
     }
 
-    fn set_metadata(&mut self, _path: &LookupBuf, _value: Value) -> Result<(), String> {
-        Err("metadata not available".to_string())
+    fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
+        Ok(self.value.get_by_path(path))
     }
 
-    fn remove_metadata(&mut self, _path: &LookupBuf) -> Result<(), String> {
-        Err("metadata not available".to_string())
+    fn target_get_mut(&mut self, path: &LookupBuf) -> Result<Option<&mut Value>, String> {
+        Ok(self.value.get_by_path_mut(path))
+    }
+
+    fn target_remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String> {
+        Ok(self.value.remove_by_path(path, compact))
+    }
+
+    fn get_metadata(&self, path: &LookupBuf) -> Result<Option<Value>, String> {
+        Ok(self.metadata.get_by_path(path).cloned())
+    }
+
+    fn set_metadata(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
+        Ok(self.metadata.insert_by_path(path, value))
+    }
+
+    fn remove_metadata(&mut self, path: &LookupBuf) -> Result<(), String> {
+        self.metadata.remove_by_path(path, true);
+        Ok(())
     }
 }
 
-// impl Target for Value {
-//     fn target_insert(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
-//         self.insert_by_path(path, value);
-//         Ok(())
-//     }
-//
-//     fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
-//         Ok(self.get_by_path(path))
-//     }
-//
-//     fn target_get_mut(&mut self, path: &LookupBuf) -> Result<Option<&mut Value>, String> {
-//         Ok(self.get_by_path_mut(path))
-//     }
-//
-//     fn target_remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String> {
-//         Ok(self.remove_by_path(path, compact))
-//     }
-// }
+#[derive(Debug)]
+pub struct ValueWithMetadata {
+    pub value: Value,
+    pub metadata: Value,
+}
+
+impl Target for ValueWithMetadata {
+    fn target_insert(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
+        Ok(self.value.insert_by_path(path, value))
+    }
+
+    fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
+        Ok(self.value.get_by_path(path))
+    }
+
+    fn target_get_mut(&mut self, path: &LookupBuf) -> Result<Option<&mut Value>, String> {
+        Ok(self.value.get_by_path_mut(path))
+    }
+
+    fn target_remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String> {
+        Ok(self.value.remove_by_path(path, compact))
+    }
+
+    fn get_metadata(&self, path: &LookupBuf) -> Result<Option<Value>, String> {
+        Ok(self.metadata.get_by_path(path).cloned())
+    }
+
+    fn set_metadata(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
+        Ok(self.metadata.insert_by_path(path, value))
+    }
+
+    fn remove_metadata(&mut self, path: &LookupBuf) -> Result<(), String> {
+        self.metadata.remove_by_path(path, true);
+        Ok(())
+    }
+}
 
 #[cfg(test)]
 mod tests {

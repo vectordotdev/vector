@@ -99,9 +99,8 @@ impl Expression for Query {
             Container(container) => container.resolve(ctx)?,
         };
 
-        Ok(crate::Target::target_get(&value, &self.path)
-            .ok()
-            .flatten()
+        Ok(value
+            .get_by_path(&self.path)
             .cloned()
             .unwrap_or(Value::Null))
     }
