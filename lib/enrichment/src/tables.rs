@@ -359,9 +359,7 @@ mod tests {
         registry.finish_load();
 
         assert_eq!(
-            Ok(btreemap! {
-                "field" => "result"
-            }),
+            Ok(BTreeMap::from([("field".into(), "result")])),
             tables_search.find_table_row(
                 "dummy1",
                 Case::Sensitive,

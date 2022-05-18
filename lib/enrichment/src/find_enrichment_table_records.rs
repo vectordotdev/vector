@@ -262,9 +262,7 @@ mod tests {
         let registry = get_table_registry();
         let func = FindEnrichmentTableRecordsFn {
             table: "dummy1".to_string(),
-            condition: btreemap! {
-                "field" =>  expression::Literal::from("value"),
-            },
+            condition: BTreeMap::from([("field".into(), expression::Literal::from("value"))]),
             index: Some(IndexHandle(999)),
             select: None,
             case_sensitive: Case::Sensitive,

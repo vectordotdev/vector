@@ -191,13 +191,22 @@ mod tests {
         let mut registry =
             test_util::get_table_registry_with_tables(vec![("dummy1".to_string(), dummy)]);
 
-        let conditions = btreemap! {
-            "field1" =>  expression::Literal::from("value"),
-            "field2" => expression::Container::new(expression::Variant::Object(btreemap! {
-                "from" => expression::Literal::from(Utc.ymd(2015, 5,15).and_hms(0,0,0)),
-                "to" => expression::Literal::from(Utc.ymd(2015, 6,15).and_hms(0,0,0))
-            }.into()))
-        };
+        let conditions = BTreeMap::from([
+            ("field1", expression::Literal::from("value")),
+            (
+                "field2",
+                expression::Container::new(expression::Variant::Object(BTreeMap::from([
+                    (
+                        "from",
+                        expression::Literal::from(Utc.ymd(2015, 5, 15).and_hms(0, 0, 0)),
+                    ),
+                    (
+                        "to",
+                        expression::Literal::from(Utc.ymd(2015, 6, 15).and_hms(0, 0, 0)),
+                    ),
+                ]))),
+            ),
+        ]);
 
         let index = add_index(&mut registry, "dummy1", Case::Sensitive, &conditions).unwrap();
 
