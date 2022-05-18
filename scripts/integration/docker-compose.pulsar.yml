@@ -2,7 +2,7 @@ version: "3"
 
 services:
   pulsar:
-    image: apachepulsar/pulsar
+    image: docker.io/apachepulsar/pulsar
     command: bin/pulsar standalone
     ports:
       - 6650:6650

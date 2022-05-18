@@ -1,7 +1,7 @@
 use bytes::BytesMut;
 use codecs::{
     encoding::{Error, Framer, Serializer},
-    CharacterDelimitedEncoder, NewlineDelimitedEncoder, RawMessageSerializer,
+    CharacterDelimitedEncoder, NewlineDelimitedEncoder, TextSerializer,
 };
 use tokio_util::codec::Encoder as _;
 
@@ -23,8 +23,8 @@ where
 impl Default for Encoder<Framer> {
     fn default() -> Self {
         Self {
-            framer: Framer::NewlineDelimited(NewlineDelimitedEncoder::new()),
-            serializer: Serializer::RawMessage(RawMessageSerializer::new()),
+            framer: NewlineDelimitedEncoder::new().into(),
+            serializer: TextSerializer::new().into(),
         }
     }
 }
@@ -33,7 +33,7 @@ impl Default for Encoder<()> {
     fn default() -> Self {
         Self {
             framer: (),
-            serializer: Serializer::RawMessage(RawMessageSerializer::new()),
+            serializer: TextSerializer::new().into(),
         }
     }
 }
@@ -114,9 +114,13 @@ impl Encoder<Framer> {
                 Framer::CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' }),
             ) => "application/json",
             (Serializer::Native(_), _) => "application/octet-stream",
-            (Serializer::Json(_) | Serializer::NativeJson(_) | Serializer::RawMessage(_), _) => {
-                "text/plain"
-            }
+            (
+                Serializer::Json(_)
+                | Serializer::NativeJson(_)
+                | Serializer::RawMessage(_)
+                | Serializer::Text(_),
+                _,
+            ) => "text/plain",
         }
     }
 }
@@ -176,7 +180,7 @@ impl tokio_util::codec::Encoder<Event> for Encoder<()> {
 #[cfg(test)]
 mod tests {
     use bytes::BufMut;
-    use codecs::{encoding::BoxedFramingError, RawMessageSerializer};
+    use codecs::{encoding::BoxedFramingError, TextSerializer};
     use futures_util::{SinkExt, StreamExt};
     use tokio_util::codec::FramedWrite;
 
@@ -240,7 +244,7 @@ mod tests {
     async fn test_encode_events_sink_empty() {
         let encoder = Encoder::<Framer>::new(
             Framer::Boxed(Box::new(ParenEncoder::new())),
-            Serializer::RawMessage(RawMessageSerializer::new()),
+            TextSerializer::new().into(),
         );
         let source = futures::stream::iter(vec![
             Event::from("foo"),
@@ -259,7 +263,7 @@ mod tests {
     async fn test_encode_events_sink_non_empty() {
         let encoder = Encoder::<Framer>::new(
             Framer::Boxed(Box::new(ParenEncoder::new())),
-            Serializer::RawMessage(RawMessageSerializer::new()),
+            TextSerializer::new().into(),
         );
         let source = futures::stream::iter(vec![
             Event::from("bar"),
@@ -278,7 +282,7 @@ mod tests {
     async fn test_encode_events_sink_empty_handle_framing_error() {
         let encoder = Encoder::<Framer>::new(
             Framer::Boxed(Box::new(ErrorNthEncoder::new(ParenEncoder::new(), 1))),
-            Serializer::RawMessage(RawMessageSerializer::new()),
+            TextSerializer::new().into(),
         );
         let source = futures::stream::iter(vec![
             Event::from("foo"),
@@ -298,7 +302,7 @@ mod tests {
     async fn test_encode_events_sink_non_empty_handle_framing_error() {
         let encoder = Encoder::<Framer>::new(
             Framer::Boxed(Box::new(ErrorNthEncoder::new(ParenEncoder::new(), 1))),
-            Serializer::RawMessage(RawMessageSerializer::new()),
+            TextSerializer::new().into(),
         );
         let source = futures::stream::iter(vec![
             Event::from("bar"),

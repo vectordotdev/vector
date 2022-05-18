@@ -82,10 +82,27 @@ pub struct Config {
     pub sinks: Option<IndexMap<String, SinkOuter>>,
 }
 
-fn generate_example(
+/// Controls how the resulting transform topology is wired up. This is not
+/// user-configurable.
+pub(crate) enum TransformInputsStrategy {
+    /// Default.
+    ///
+    /// The first transform generated will consume from all sources and
+    /// subsequent transforms will consume from their predecessor.
+    Auto,
+    /// Used for property testing `vector config`.
+    ///
+    /// All transforms use a list of all sources as inputs.
+    #[cfg(test)]
+    #[allow(dead_code)]
+    All,
+}
+
+pub(crate) fn generate_example(
     include_globals: bool,
     expression: &str,
     file: &Option<PathBuf>,
+    transform_inputs_strategy: TransformInputsStrategy,
 ) -> Result<String, Vec<String>> {
     let components: Vec<Vec<_>> = expression
         .split(|c| c == '|' || c == '/')
@@ -176,13 +193,19 @@ fn generate_example(
             };
             transform_names.push(name.clone());
 
-            let targets = if i == 0 {
-                source_names.clone()
-            } else {
-                vec![transform_names
-                    .get(i - 1)
-                    .unwrap_or(&"component-id".to_owned())
-                    .to_owned()]
+            let targets = match transform_inputs_strategy {
+                TransformInputsStrategy::Auto => {
+                    if i == 0 {
+                        source_names.clone()
+                    } else {
+                        vec![transform_names
+                            .get(i - 1)
+                            .unwrap_or(&"component-id".to_owned())
+                            .to_owned()]
+                    }
+                }
+                #[cfg(test)]
+                TransformInputsStrategy::All => source_names.clone(),
             };
 
             let mut example = match TransformDescription::example(&transform_type) {
@@ -347,7 +370,12 @@ fn generate_example(
 }
 
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
-    match generate_example(!opts.fragment, &opts.expression, &opts.file) {
+    match generate_example(
+        !opts.fragment,
+        &opts.expression,
+        &opts.file,
+        TransformInputsStrategy::Auto,
+    ) {
         Ok(s) => {
             #[allow(clippy::print_stdout)]
             {
@@ -392,7 +420,7 @@ mod tests {
 
         for name in SourceDescription::types() {
             let param = format!("{}//", name);
-            let cfg = generate_example(true, &param, &None).unwrap();
+            let cfg = generate_example(true, &param, &None, TransformInputsStrategy::Auto).unwrap();
             if let Err(error) = toml::from_str::<crate::config::ConfigBuilder>(&cfg) {
                 errors.push((param, error));
             }
@@ -400,7 +428,7 @@ mod tests {
 
         for name in TransformDescription::types() {
             let param = format!("/{}/", name);
-            let cfg = generate_example(true, &param, &None).unwrap();
+            let cfg = generate_example(true, &param, &None, TransformInputsStrategy::Auto).unwrap();
             if let Err(error) = toml::from_str::<crate::config::ConfigBuilder>(&cfg) {
                 errors.push((param, error));
             }
@@ -408,7 +436,7 @@ mod tests {
 
         for name in SinkDescription::types() {
             let param = format!("//{}", name);
-            let cfg = generate_example(true, &param, &None).unwrap();
+            let cfg = generate_example(true, &param, &None, TransformInputsStrategy::Auto).unwrap();
             if let Err(error) = toml::from_str::<crate::config::ConfigBuilder>(&cfg) {
                 errors.push((param, error));
             }
@@ -436,7 +464,12 @@ mod tests {
 
         let tempdir = tempdir().expect("Unable to create tempdir for config");
         let filepath = tempdir.path().join("./config.example.toml");
-        let cfg = generate_example(true, "stdin/json_parser/console", &Some(filepath.clone()));
+        let cfg = generate_example(
+            true,
+            "stdin/json_parser/console",
+            &Some(filepath.clone()),
+            TransformInputsStrategy::Auto,
+        );
         let filecontents = fs::read_to_string(
             fs::canonicalize(&filepath).expect("Could not return canonicalized filepath"),
         )
@@ -455,7 +488,12 @@ mod tests {
     #[test]
     fn generate_basic() {
         assert_eq!(
-            generate_example(true, "stdin/json_parser/console", &None),
+            generate_example(
+                true,
+                "stdin/json_parser/console",
+                &None,
+                TransformInputsStrategy::Auto
+            ),
             Ok(indoc! {r#"data_dir = "/var/lib/vector/"
 
                 [sources.source0]
@@ -491,7 +529,12 @@ mod tests {
         );
 
         assert_eq!(
-            generate_example(true, "stdin|json_parser|console", &None),
+            generate_example(
+                true,
+                "stdin|json_parser|console",
+                &None,
+                TransformInputsStrategy::Auto
+            ),
             Ok(indoc! {r#"data_dir = "/var/lib/vector/"
 
                 [sources.source0]
@@ -527,7 +570,7 @@ mod tests {
         );
 
         assert_eq!(
-            generate_example(true, "stdin//console", &None),
+            generate_example(true, "stdin//console", &None, TransformInputsStrategy::Auto),
             Ok(indoc! {r#"data_dir = "/var/lib/vector/"
 
                 [sources.source0]
@@ -557,7 +600,7 @@ mod tests {
         );
 
         assert_eq!(
-            generate_example(true, "//console", &None),
+            generate_example(true, "//console", &None, TransformInputsStrategy::Auto),
             Ok(indoc! {r#"data_dir = "/var/lib/vector/"
 
                 [sinks.sink0]
@@ -580,7 +623,12 @@ mod tests {
         );
 
         assert_eq!(
-            generate_example(true, "/add_fields,json_parser,remove_fields", &None),
+            generate_example(
+                true,
+                "/add_fields,json_parser,remove_fields",
+                &None,
+                TransformInputsStrategy::Auto
+            ),
             Ok(indoc! {r#"data_dir = "/var/lib/vector/"
 
                 [transforms.transform0]
@@ -605,7 +653,12 @@ mod tests {
         );
 
         assert_eq!(
-            generate_example(false, "/add_fields,json_parser,remove_fields", &None),
+            generate_example(
+                false,
+                "/add_fields,json_parser,remove_fields",
+                &None,
+                TransformInputsStrategy::Auto
+            ),
             Ok(indoc! {r#"
 
                 [transforms.transform0]

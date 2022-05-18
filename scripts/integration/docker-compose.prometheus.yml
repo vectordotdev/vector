@@ -2,12 +2,12 @@ version: "3"
 
 services:
   influxdb:
-    image: influxdb:${INFLUXDB_VERSION:-1.8}
+    image: docker.io/influxdb:${INFLUXDB_VERSION:-1.8}
     network_mode: host
     environment:
       - INFLUXDB_REPORTING_DISABLED=true
   influxdb-tls:
-    image: influxdb:${INFLUXDB_VERSION:-1.8}
+    image: docker.io/influxdb:${INFLUXDB_VERSION:-1.8}
     network_mode: host
     environment:
       - INFLUXDB_REPORTING_DISABLED=true
@@ -19,7 +19,7 @@ services:
     volumes:
       - ${PWD}/tests/data:/etc/ssl:ro
   prometheus:
-    image: prom/prometheus:${PROMETHEUS_VERSION:-v2.33.4}
+    image: docker.io/prom/prometheus:${PROMETHEUS_VERSION:-v2.33.4}
     command: --config.file=/etc/vector/prometheus.yaml
     network_mode: host
     volumes:

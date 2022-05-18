@@ -36,8 +36,8 @@ use crate::{
         log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext,
         SourceDescription,
     },
-    event::{BatchNotifier, BatchStatusReceiver, LogEvent, Value},
-    internal_events::{BytesReceived, JournaldEventsReceived, JournaldInvalidRecordError},
+    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent, Value},
+    internal_events::{BytesReceived, JournaldInvalidRecordError, OldEventsReceived},
     serde::bool_or_struct,
     shutdown::ShutdownSignal,
     sources::util::finalizer::OrderedFinalizer,
@@ -394,7 +394,7 @@ impl<'a> Batch<'a> {
         }
 
         if !self.events.is_empty() {
-            emit!(JournaldEventsReceived {
+            emit!(OldEventsReceived {
                 count: self.events.len(),
                 byte_size: self.events.size_of(),
             });
@@ -623,12 +623,15 @@ impl Finalizer {
         shutdown: ShutdownSignal,
     ) -> Self {
         if acknowledgements {
-            Self::Async(OrderedFinalizer::new(shutdown, move |cursor| {
-                let checkpointer = checkpointer.clone();
-                async move {
-                    checkpointer.lock().await.set(cursor).await;
+            let (finalizer, mut ack_stream) = OrderedFinalizer::new(shutdown);
+            tokio::spawn(async move {
+                while let Some((status, cursor)) = ack_stream.next().await {
+                    if status == BatchStatus::Delivered {
+                        checkpointer.lock().await.set(cursor).await;
+                    }
                 }
-            }))
+            });
+            Self::Async(finalizer)
         } else {
             Self::Sync(checkpointer)
         }

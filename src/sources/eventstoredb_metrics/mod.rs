@@ -12,8 +12,8 @@ use crate::{
     config::{self, Output, SourceConfig, SourceContext, SourceDescription},
     http::HttpClient,
     internal_events::{
-        BytesReceived, EventStoreDbMetricsEventsReceived, EventStoreDbMetricsHttpError,
-        EventStoreDbStatsParsingError, StreamClosedError,
+        BytesReceived, EventStoreDbMetricsHttpError, EventStoreDbStatsParsingError,
+        OldEventsReceived, StreamClosedError,
     },
     tls::TlsSettings,
 };
@@ -122,7 +122,7 @@ fn eventstoredb(
                                 let count = metrics.len();
                                 let byte_size = metrics.size_of();
 
-                                emit!(EventStoreDbMetricsEventsReceived { count, byte_size });
+                                emit!(OldEventsReceived { count, byte_size });
 
                                 if let Err(error) = cx.out.send_batch(metrics).await {
                                     emit!(StreamClosedError { count, error });

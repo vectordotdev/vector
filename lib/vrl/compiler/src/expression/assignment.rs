@@ -208,8 +208,8 @@ impl fmt::Debug for Assignment {
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Target {
     Noop,
-    Internal(Ident, Option<LookupBuf>),
-    External(Option<LookupBuf>),
+    Internal(Ident, LookupBuf),
+    External(LookupBuf),
 }
 
 impl Target {
@@ -225,11 +225,11 @@ impl Target {
         fn set_type_def(
             current_type_def: &TypeDef,
             new_type_def: TypeDef,
-            path: &Option<LookupBuf>,
+            path: &LookupBuf,
         ) -> TypeDef {
             // If the assignment is onto root or has no path (root variable assignment), use the
             // new type def, otherwise merge the type defs.
-            if path.as_ref().map(|path| path.is_root()).unwrap_or(true) {
+            if path.is_root() {
                 new_type_def
             } else {
                 current_type_def.clone().merge_overwrite(new_type_def)
@@ -239,9 +239,9 @@ impl Target {
         match self {
             Noop => {}
             Internal(ident, path) => {
-                let td = match path {
-                    None => type_def,
-                    Some(path) => type_def.for_path(&path.to_lookup()),
+                let td = match path.is_root() {
+                    true => type_def,
+                    false => type_def.for_path(&path.to_lookup()),
                 };
 
                 let type_def = match local.variable(ident) {
@@ -255,9 +255,9 @@ impl Target {
             }
 
             External(path) => {
-                let td = match path {
-                    None => type_def,
-                    Some(path) => type_def.for_path(&path.to_lookup()),
+                let td = match path.is_root() {
+                    true => type_def,
+                    false => type_def.for_path(&path.to_lookup()),
                 };
 
                 let type_def = match external.target() {
@@ -280,9 +280,9 @@ impl Target {
             Internal(ident, path) => {
                 // Get the provided path, or else insert into the variable
                 // without any path appended and return early.
-                let path = match path {
-                    Some(path) => path,
-                    None => return ctx.state_mut().insert_variable(ident.clone(), value),
+                let path = match path.is_root() {
+                    false => path,
+                    true => return ctx.state_mut().insert_variable(ident.clone(), value),
                 };
 
                 // Update existing variable using the provided path, or create a
@@ -296,9 +296,7 @@ impl Target {
             }
 
             External(path) => {
-                let _ = ctx
-                    .target_mut()
-                    .target_insert(path.as_ref().unwrap_or(&LookupBuf::root()), value);
+                let _ = ctx.target_mut().target_insert(path, value);
             }
         }
     }
@@ -310,10 +308,10 @@ impl fmt::Display for Target {
 
         match self {
             Noop => f.write_str("_"),
-            Internal(ident, Some(path)) => write!(f, "{}{}", ident, path),
-            Internal(ident, None) => ident.fmt(f),
-            External(Some(path)) => write!(f, ".{}", path),
-            External(None) => f.write_str("."),
+            Internal(ident, path) if path.is_root() => ident.fmt(f),
+            Internal(ident, path) => write!(f, "{}{}", ident, path),
+            External(path) if path.is_root() => f.write_str("."),
+            External(path) => write!(f, ".{}", path),
         }
     }
 }
@@ -324,10 +322,10 @@ impl fmt::Debug for Target {
 
         match self {
             Noop => f.write_str("Noop"),
-            Internal(ident, Some(path)) => write!(f, "Internal({}{})", ident, path),
-            Internal(ident, _) => write!(f, "Internal({})", ident),
-            External(Some(path)) => write!(f, "External({})", path),
-            External(_) => f.write_str("External(.)"),
+            Internal(ident, path) if path.is_root() => write!(f, "Internal({})", ident),
+            Internal(ident, path) => write!(f, "Internal({}{})", ident, path),
+            External(path) if path.is_root() => f.write_str("External(.)"),
+            External(path) => write!(f, "External({})", path),
         }
     }
 }
@@ -349,8 +347,8 @@ impl TryFrom<ast::AssignmentTarget> for Target {
                 let span = Span::new(target_span.start(), path_span.end());
 
                 match target {
-                    ast::QueryTarget::Internal(ident) => Internal(ident, Some(path)),
-                    ast::QueryTarget::External => External(Some(path)),
+                    ast::QueryTarget::Internal(ident) => Internal(ident, path),
+                    ast::QueryTarget::External => External(path),
                     _ => {
                         return Err(Error {
                             variant: ErrorVariant::InvalidTarget(span),
@@ -360,8 +358,10 @@ impl TryFrom<ast::AssignmentTarget> for Target {
                     }
                 }
             }
-            ast::AssignmentTarget::Internal(ident, path) => Internal(ident, path.map(Into::into)),
-            ast::AssignmentTarget::External(path) => External(path.map(Into::into)),
+            ast::AssignmentTarget::Internal(ident, path) => {
+                Internal(ident, path.unwrap_or_else(LookupBuf::root))
+            }
+            ast::AssignmentTarget::External(path) => External(path.unwrap_or_else(LookupBuf::root)),
         };
 
         Ok(target)

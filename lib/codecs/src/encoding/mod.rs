@@ -10,6 +10,7 @@ use bytes::BytesMut;
 pub use format::{
     JsonSerializer, JsonSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig,
     NativeSerializer, NativeSerializerConfig, RawMessageSerializer, RawMessageSerializerConfig,
+    TextSerializer, TextSerializerConfig,
 };
 pub use framing::{
     BoxedFramer, BoxedFramingError, BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder,
@@ -49,7 +50,7 @@ impl From<std::io::Error> for Error {
 // Unfortunately, copying options of the nested enum variants is necessary
 // since `serde` doesn't allow `flatten`ing these:
 // https://github.com/serde-rs/serde/issues/1402.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(tag = "method", rename_all = "snake_case")]
 pub enum FramingConfig {
     /// Configures the `BytesEncoder`.
@@ -188,6 +189,8 @@ pub enum SerializerConfig {
     NativeJson,
     /// Configures the `RawMessageSerializer`.
     RawMessage,
+    /// Configures the `TextSerializer`.
+    Text,
 }
 
 impl From<JsonSerializerConfig> for SerializerConfig {
@@ -196,9 +199,27 @@ impl From<JsonSerializerConfig> for SerializerConfig {
     }
 }
 
+impl From<NativeSerializerConfig> for SerializerConfig {
+    fn from(_: NativeSerializerConfig) -> Self {
+        Self::Native
+    }
+}
+
+impl From<NativeJsonSerializerConfig> for SerializerConfig {
+    fn from(_: NativeJsonSerializerConfig) -> Self {
+        Self::NativeJson
+    }
+}
+
 impl From<RawMessageSerializerConfig> for SerializerConfig {
     fn from(_: RawMessageSerializerConfig) -> Self {
         Self::RawMessage
+    }
+}
+
+impl From<TextSerializerConfig> for SerializerConfig {
+    fn from(_: TextSerializerConfig) -> Self {
+        Self::Text
     }
 }
 
@@ -214,6 +235,7 @@ impl SerializerConfig {
             SerializerConfig::RawMessage => {
                 Serializer::RawMessage(RawMessageSerializerConfig.build())
             }
+            SerializerConfig::Text => Serializer::Text(TextSerializerConfig.build()),
         }
     }
 
@@ -224,6 +246,7 @@ impl SerializerConfig {
             SerializerConfig::Native => NativeSerializerConfig.input_type(),
             SerializerConfig::NativeJson => NativeJsonSerializerConfig.input_type(),
             SerializerConfig::RawMessage => RawMessageSerializerConfig.input_type(),
+            SerializerConfig::Text => TextSerializerConfig.input_type(),
         }
     }
 
@@ -234,6 +257,7 @@ impl SerializerConfig {
             SerializerConfig::Native => NativeSerializerConfig.schema_requirement(),
             SerializerConfig::NativeJson => NativeJsonSerializerConfig.schema_requirement(),
             SerializerConfig::RawMessage => RawMessageSerializerConfig.schema_requirement(),
+            SerializerConfig::Text => TextSerializerConfig.schema_requirement(),
         }
     }
 }
@@ -249,6 +273,8 @@ pub enum Serializer {
     NativeJson(NativeJsonSerializer),
     /// Uses a `RawMessageSerializer` for serialization.
     RawMessage(RawMessageSerializer),
+    /// Uses a `TextSerializer` for serialization.
+    Text(TextSerializer),
 }
 
 impl From<JsonSerializer> for Serializer {
@@ -257,9 +283,27 @@ impl From<JsonSerializer> for Serializer {
     }
 }
 
+impl From<NativeSerializer> for Serializer {
+    fn from(serializer: NativeSerializer) -> Self {
+        Self::Native(serializer)
+    }
+}
+
+impl From<NativeJsonSerializer> for Serializer {
+    fn from(serializer: NativeJsonSerializer) -> Self {
+        Self::NativeJson(serializer)
+    }
+}
+
 impl From<RawMessageSerializer> for Serializer {
     fn from(serializer: RawMessageSerializer) -> Self {
         Self::RawMessage(serializer)
+    }
+}
+
+impl From<TextSerializer> for Serializer {
+    fn from(serializer: TextSerializer) -> Self {
+        Self::Text(serializer)
     }
 }
 
@@ -272,6 +316,7 @@ impl tokio_util::codec::Encoder<Event> for Serializer {
             Serializer::Native(serializer) => serializer.encode(event, buffer),
             Serializer::NativeJson(serializer) => serializer.encode(event, buffer),
             Serializer::RawMessage(serializer) => serializer.encode(event, buffer),
+            Serializer::Text(serializer) => serializer.encode(event, buffer),
         }
     }
 }

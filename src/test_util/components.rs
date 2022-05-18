@@ -82,6 +82,19 @@ pub static SOURCE_TESTS: Lazy<ComponentTests> = Lazy::new(|| ComponentTests {
         "component_sent_event_bytes_total",
     ],
 });
+
+/// The component test specification for all transforms
+pub static TRANSFORM_TESTS: Lazy<ComponentTests> = Lazy::new(|| ComponentTests {
+    events: &["EventsReceived", "EventsSent"],
+    tagged_counters: &[],
+    untagged_counters: &[
+        "component_received_events_total",
+        "component_received_event_bytes_total",
+        "component_sent_events_total",
+        "component_sent_event_bytes_total",
+    ],
+});
+
 /// The component test specification for all sinks
 pub static SINK_TESTS: Lazy<ComponentTests> = Lazy::new(|| {
     ComponentTests {
@@ -93,6 +106,7 @@ pub static SINK_TESTS: Lazy<ComponentTests> = Lazy::new(|| {
         ],
     }
 });
+
 /// The component test specification for components with multiple outputs
 pub static COMPONENT_MULTIPLE_OUTPUTS_TESTS: Lazy<ComponentTests> = Lazy::new(|| ComponentTests {
     events: &["EventsSent"],
@@ -313,6 +327,16 @@ where
         events
     })
     .await
+}
+
+pub async fn assert_transform_compliance<T>(f: impl Future<Output = T>) -> T {
+    init_test();
+
+    let result = f.await;
+
+    TRANSFORM_TESTS.assert(&[]);
+
+    result
 }
 
 /// Convenience wrapper for running sink tests

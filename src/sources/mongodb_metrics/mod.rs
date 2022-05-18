@@ -21,7 +21,7 @@ use crate::{
     config::{self, Output, SourceConfig, SourceContext, SourceDescription},
     event::metric::{Metric, MetricKind, MetricValue},
     internal_events::{
-        EndpointBytesReceived, MongoDbMetricsBsonParseError, MongoDbMetricsCollectCompleted,
+        CollectionCompleted, EndpointBytesReceived, MongoDbMetricsBsonParseError,
         MongoDbMetricsEventsReceived, MongoDbMetricsRequestError, StreamClosedError,
     },
 };
@@ -125,7 +125,7 @@ impl SourceConfig for MongoDbMetricsConfig {
                 let start = Instant::now();
                 let metrics = join_all(sources.iter().map(|mongodb| mongodb.collect())).await;
                 let count = metrics.len();
-                emit!(MongoDbMetricsCollectCompleted {
+                emit!(CollectionCompleted {
                     start,
                     end: Instant::now()
                 });

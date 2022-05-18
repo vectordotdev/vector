@@ -9,7 +9,6 @@ build = "build.rs" # LALRPOP preprocessing
 bytes = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4.19", default-features = false }
 chrono-tz = { version = "0.6.1", default-features = false }
-itertools = { version = "0.10.3", default-features = false }
 lalrpop-util = { version = "0.19", default-features = false }
 nom = { version = "7.1.1", default-features = false, features = ["std"] }
 once_cell = { version = "1.10", default-features = false, features = ["std"] }

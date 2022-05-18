@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, convert::TryFrom, sync::Arc};
+use std::{collections::BTreeMap, convert::TryFrom, marker::PhantomData, sync::Arc};
 
 use lookup::{LookupBuf, SegmentBuf};
 use snafu::Snafu;
@@ -29,6 +29,56 @@ pub enum VrlTarget {
     Trace(Value, EventMetadata),
 }
 
+pub enum TargetEvents {
+    One(Event),
+    Logs(TargetIter<LogEvent>),
+    Traces(TargetIter<TraceEvent>),
+}
+
+pub struct TargetIter<T> {
+    iter: std::vec::IntoIter<Value>,
+    metadata: EventMetadata,
+    _marker: PhantomData<T>,
+}
+
+impl Iterator for TargetIter<LogEvent> {
+    type Item = Event;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next().map(|v| {
+            match v {
+                value @ Value::Object(_) => LogEvent::from_value(value, self.metadata.clone()),
+                value => {
+                    let mut log = LogEvent::new_with_metadata(self.metadata.clone());
+                    log.insert(log_schema().message_key(), value);
+                    log
+                }
+            }
+            .into()
+        })
+    }
+}
+
+impl Iterator for TargetIter<TraceEvent> {
+    type Item = Event;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next().map(|v| {
+            match v {
+                value @ Value::Object(_) => {
+                    TraceEvent::from(LogEvent::from_value(value, self.metadata.clone()))
+                }
+                value => {
+                    let mut log = LogEvent::new_with_metadata(self.metadata.clone());
+                    log.insert(log_schema().message_key(), value);
+                    TraceEvent::from(log)
+                }
+            }
+            .into()
+        })
+    }
+}
+
 impl VrlTarget {
     pub fn new(event: Event, info: &ProgramInfo) -> Self {
         match event {
@@ -55,19 +105,44 @@ impl VrlTarget {
     ///
     /// This returns an iterator of events as one event can be turned into multiple by assigning an
     /// array to `.` in VRL.
-    pub fn into_events(self) -> impl Iterator<Item = Event> {
+    pub fn into_events(self) -> TargetEvents {
         match self {
-            VrlTarget::LogEvent(value, metadata) => {
-                Box::new(value_into_logevents(value, metadata).map(Event::Log))
-                    as Box<dyn Iterator<Item = Event>>
-            }
-            VrlTarget::Metric { metric, .. } => {
-                Box::new(std::iter::once(Event::Metric(metric))) as Box<dyn Iterator<Item = Event>>
-            }
-            VrlTarget::Trace(value, metadata) => Box::new(
-                value_into_logevents(value, metadata)
-                    .map(|log| Event::Trace(TraceEvent::from(log))),
-            ) as Box<dyn Iterator<Item = Event>>,
+            VrlTarget::LogEvent(value, metadata) => match value {
+                value @ Value::Object(_) => {
+                    TargetEvents::One(LogEvent::from_value(value, metadata).into())
+                }
+
+                Value::Array(values) => TargetEvents::Logs(TargetIter {
+                    iter: values.into_iter(),
+                    metadata,
+                    _marker: PhantomData,
+                }),
+
+                v => {
+                    let mut log = LogEvent::new_with_metadata(metadata);
+                    log.insert(log_schema().message_key(), v);
+                    TargetEvents::One(log.into())
+                }
+            },
+            VrlTarget::Trace(value, metadata) => match value {
+                value @ Value::Object(_) => {
+                    let log = LogEvent::from_value(value, metadata);
+                    TargetEvents::One(TraceEvent::from(log).into())
+                }
+
+                Value::Array(values) => TargetEvents::Traces(TargetIter {
+                    iter: values.into_iter(),
+                    metadata,
+                    _marker: PhantomData,
+                }),
+
+                v => {
+                    let mut log = LogEvent::new_with_metadata(metadata);
+                    log.insert(log_schema().message_key(), v);
+                    TargetEvents::One(log.into())
+                }
+            },
+            VrlTarget::Metric { metric, .. } => TargetEvents::One(Event::Metric(metric)),
         }
     }
 }
@@ -75,10 +150,9 @@ impl VrlTarget {
 impl vrl_lib::Target for VrlTarget {
     fn target_insert(&mut self, path: &LookupBuf, value: ::value::Value) -> Result<(), String> {
         match self {
-            VrlTarget::LogEvent(ref mut log, _) | VrlTarget::Trace(ref mut log, _) => log
-                .insert(path.clone(), value)
-                .map(|_| ())
-                .map_err(|err| err.to_string()),
+            VrlTarget::LogEvent(ref mut log, _) | VrlTarget::Trace(ref mut log, _) => {
+                log.target_insert(path, value)
+            }
             VrlTarget::Metric {
                 ref mut metric,
                 value: metric_value,
@@ -150,18 +224,14 @@ impl vrl_lib::Target for VrlTarget {
     #[allow(clippy::redundant_closure_for_method_calls)] // false positive
     fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
         match self {
-            VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => {
-                log.get(path).map_err(|err| err.to_string())
-            }
+            VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => log.target_get(path),
             VrlTarget::Metric { value, .. } => target_get_metric(path, value),
         }
     }
 
     fn target_get_mut(&mut self, path: &LookupBuf) -> Result<Option<&mut Value>, String> {
         match self {
-            VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => {
-                log.get_mut(path).map_err(|err| err.to_string())
-            }
+            VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => log.target_get_mut(path),
             VrlTarget::Metric { value, .. } => target_get_mut_metric(path, value),
         }
     }
@@ -173,17 +243,7 @@ impl vrl_lib::Target for VrlTarget {
     ) -> Result<Option<::value::Value>, String> {
         match self {
             VrlTarget::LogEvent(ref mut log, _) | VrlTarget::Trace(ref mut log, _) => {
-                if path.is_root() {
-                    Ok(Some({
-                        let mut map = Value::Object(BTreeMap::new());
-                        std::mem::swap(log, &mut map);
-                        map
-                    }))
-                } else {
-                    log.remove(path, compact)
-                        .map(|val| val.map(Into::into))
-                        .map_err(|err| err.to_string())
-                }
+                log.target_remove(path, compact)
             }
             VrlTarget::Metric {
                 ref mut metric,
@@ -282,15 +342,20 @@ impl vrl_lib::Target for VrlTarget {
 
 #[derive(Debug, Clone)]
 pub enum VrlImmutableTarget<'a> {
-    LogEvent(&'a LogEvent),
+    LogEvent(&'a Value, &'a EventMetadata),
     Metric { metric: &'a Metric, value: Value },
-    Trace(&'a TraceEvent),
+    Trace(&'a Value, &'a EventMetadata),
 }
 
 impl<'a> VrlImmutableTarget<'a> {
     pub fn new(event: &'a Event, info: &ProgramInfo) -> Self {
         match event {
-            Event::Log(event) => VrlImmutableTarget::LogEvent(event),
+            Event::Log(event) => {
+                let value = event.value();
+                let metadata = event.metadata();
+
+                VrlImmutableTarget::LogEvent(value, metadata)
+            }
             Event::Metric(metric) => {
                 // We pre-generate [`Value`] types for the metric fields accessed in
                 // the event. This allows us to then return references to those
@@ -299,7 +364,12 @@ impl<'a> VrlImmutableTarget<'a> {
 
                 VrlImmutableTarget::Metric { metric, value }
             }
-            Event::Trace(event) => VrlImmutableTarget::Trace(event),
+            Event::Trace(event) => {
+                let value = event.value();
+                let metadata = event.metadata();
+
+                VrlImmutableTarget::Trace(value, metadata)
+            }
         }
     }
 }
@@ -312,8 +382,9 @@ impl<'a> vrl_lib::Target for VrlImmutableTarget<'a> {
     #[allow(clippy::redundant_closure_for_method_calls)] // false positive
     fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
         match self {
-            VrlImmutableTarget::LogEvent(log) => Ok(log.lookup(path)),
-            VrlImmutableTarget::Trace(log) => Ok(log.lookup(path)),
+            VrlImmutableTarget::LogEvent(log, _) | VrlImmutableTarget::Trace(log, _) => {
+                log.target_get(path)
+            }
             VrlImmutableTarget::Metric { value, .. } => target_get_metric(path, value),
         }
     }
@@ -332,8 +403,9 @@ impl<'a> vrl_lib::Target for VrlImmutableTarget<'a> {
 
     fn get_metadata(&self, key: &str) -> Result<Option<::value::Value>, String> {
         let metadata = match self {
-            VrlImmutableTarget::LogEvent(event) => event.metadata(),
-            VrlImmutableTarget::Trace(event) => event.metadata(),
+            VrlImmutableTarget::LogEvent(_, metadata) | VrlImmutableTarget::Trace(_, metadata) => {
+                metadata
+            }
             VrlImmutableTarget::Metric { metric, .. } => metric.metadata(),
         };
 
@@ -538,32 +610,6 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
     map.into()
 }
 
-// Turn a `Value` back into `LogEvents`:
-// * In the common case, where `.` is a map, just create an event using it as the event fields.
-// * If `.` is an array, map over all of the values to create log events:
-//   * If an element is an object, create an event using that as fields.
-//   * If an element is anything else, assign to the `message` key.
-// * If `.` is anything else, assign to the `message` key.
-fn value_into_logevents(value: Value, metadata: EventMetadata) -> impl Iterator<Item = LogEvent> {
-    match value {
-        Value::Object(object) => Box::new(std::iter::once(LogEvent::from_parts(object, metadata)))
-            as Box<dyn Iterator<Item = LogEvent>>,
-        Value::Array(values) => Box::new(values.into_iter().map(move |v| match v {
-            Value::Object(object) => LogEvent::from_parts(object, metadata.clone()),
-            v => {
-                let mut log = LogEvent::new_with_metadata(metadata.clone());
-                log.insert(log_schema().message_key(), v);
-                log
-            }
-        })) as Box<dyn Iterator<Item = LogEvent>>,
-        v => {
-            let mut log = LogEvent::new_with_metadata(metadata);
-            log.insert(log_schema().message_key(), v);
-            Box::new(std::iter::once(log)) as Box<dyn Iterator<Item = LogEvent>>
-        }
-    }
-}
-
 #[derive(Debug, Snafu)]
 enum MetricPathError<'a> {
     #[snafu(display("cannot set root path"))]
@@ -761,7 +807,17 @@ mod test {
                 vrl_lib::Target::target_get(&target, &path).map(Option::<&Value>::cloned),
                 Ok(Some(value))
             );
-            assert_eq!(target.into_events().next().unwrap(), Event::Log(expect));
+            assert_eq!(
+                match target.into_events() {
+                    TargetEvents::One(event) => vec![event],
+                    TargetEvents::Logs(events) => events.collect::<Vec<_>>(),
+                    TargetEvents::Traces(events) => events.collect::<Vec<_>>(),
+                }
+                .first()
+                .cloned()
+                .unwrap(),
+                Event::Log(expect)
+            );
         }
     }
 
@@ -919,7 +975,11 @@ mod test {
             ::vrl_lib::Target::target_insert(&mut target, &LookupBuf::root(), value).unwrap();
 
             assert_eq!(
-                target.into_events().collect::<Vec<_>>(),
+                match target.into_events() {
+                    TargetEvents::One(event) => vec![event],
+                    TargetEvents::Logs(events) => events.collect::<Vec<_>>(),
+                    TargetEvents::Traces(events) => events.collect::<Vec<_>>(),
+                },
                 expect
                     .into_iter()
                     .map(|v| Event::Log(LogEvent::from_parts(v, metadata.clone())))
