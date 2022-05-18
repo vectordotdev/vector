@@ -411,13 +411,13 @@ configuration: {
 		secrets_management: {
 			title: "Secrets management"
 			body: """
-				Vector can retrieve secret like password or token by querying an external system in order to
+				Vector can retrieve secrets like a password or token by querying an external system in order to
 				avoid storing sensitive information in Vector configuration files. Secret backends used to retrieve
-				sensitive token are configured in a dedicated section. In the rest of the configuration you should use
-				the `SECRET[<backend_name>.<secret_key>]` notation, secret interpolation will happen immediately after
-				environment variables interpolation. While Vector supports multiple command to retrieve secret, one
-				secret backend cannot use the secret feature for its own configuration. Currently the only suppported
-				kind of backend is the the `exec` one that runs an external command to retrieve secrets.
+				sensitive token are configured in a dedicated section (`secret`). In the rest of the configuration you should use
+				the `SECRET[<backend_name>.<secret_key>]` notation to interpolate the secret. Interpolation will happen immediately after
+				environment variables interpolation. While Vector supports multiple commands to retrieve secrets, a
+				secret backend cannot use the secret interpolation feature for its own configuration. Currently the only supported
+				kind of secret backend is the the `exec` one that runs an external command to retrieve secrets.
 
 				The following example shows a simple configuration with two backends defined:
 
