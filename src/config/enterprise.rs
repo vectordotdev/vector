@@ -125,13 +125,8 @@ const fn default_reporting_interval_secs() -> f64 {
 }
 
 /// By default, keep retrying (recoverable) failed reporting
-///
-/// This is set to 8 attempts which, with the exponential backoff strategy and
-/// maximum of 60 second delay (see [`ReportingRetryBackoff`]), works out to
-/// roughly 3 minutes of retrying before giving up and allowing the rest of
-/// Vector to start.
 const fn default_max_retries() -> u32 {
-    8
+    u32::MAX
 }
 
 /// Enterprise error, relevant to an upstream caller.
