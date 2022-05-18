@@ -410,7 +410,7 @@ configuration: {
 		}
 		secrets_management: {
 			title: "Secrets management"
-			body:  """
+			body: """
 				Vector can retrieve secret like password or token by querying an external system in order to
 				avoid storing sensitive information in Vector configuration files. Secret backends used to retrieve
 				sensitive token are configured in a dedicated section. In the rest of the configuration you should use
@@ -444,7 +444,7 @@ configuration: {
 			sub_sections: [
 				{
 					title: "The `exec` backend"
-					body: """
+					body:  """
 						When using the `exec` type for a secret backend Vector and the external command are communicating using
 						the standard input and output. The communication is using plain text JSON. Vector spawns the specified
 						command, writes the secret retrieval query using JSON on the standard input of the child process and
