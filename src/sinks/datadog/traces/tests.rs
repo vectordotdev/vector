@@ -135,7 +135,7 @@ async fn smoke() {
     );
     assert_eq!(parts.headers.get("DD-API-KEY").unwrap(), "a_key");
 
-    let mut decoded_payload = dd_proto::AgentPayload::decode(body).unwrap();
+    let mut decoded_payload = dd_proto::TracePayload::decode(body).unwrap();
     assert_eq!(decoded_payload.tracer_payloads.len(), 1);
     assert_eq!(decoded_payload.host_name, "a_host");
     assert_eq!(decoded_payload.env, "an_env");
@@ -144,5 +144,4 @@ async fn smoke() {
     let mut chunk = tracer_payload.chunks.pop().unwrap();
     assert_eq!(chunk.spans.len(), 1);
     validate_simple_span(chunk.spans.pop().unwrap());
-    // validate_simple_span(decoded_payload.transactions.pop().unwrap());
 }

@@ -33,7 +33,7 @@ use crate::{
     sources::datadog::agent::{
         logs::{decode_log_body, LogMsg},
         metrics::DatadogSeriesRequest,
-        traces, DatadogAgentConfig, DatadogAgentSource, LOGS, METRICS, TRACES,
+        DatadogAgentConfig, DatadogAgentSource, LOGS, METRICS, TRACES,
     },
     test_util::{
         components::{assert_source_compliance, HTTP_PUSH_SOURCE_TAGS},
@@ -949,6 +949,12 @@ async fn decode_traces() {
             env: "an_environment".to_string(),
             traces: vec![trace],
             transactions: vec![span.clone()],
+            // Other filea
+            tracer_payloads: vec![],
+            tags: BTreeMap::new(),
+            agent_version: "".to_string(),
+            target_tps: 0f64,
+            error_tps: 0f64,
         };
 
         payload_v1.encode(&mut buf_v1).unwrap();
@@ -973,9 +979,11 @@ async fn decode_traces() {
             app_version: "v314".to_string(),
         };
 
-        let payload_v2 = dd_traces_proto::AgentPayload {
+        let payload_v2 = dd_traces_proto::TracePayload {
             host_name: "a_hostname".to_string(),
             env: "env".to_string(),
+            traces: vec![],
+            transactions: vec![],
             tracer_payloads: vec![tracer_payload],
             tags: BTreeMap::new(),
             agent_version: "v1.23456".to_string(),
@@ -1438,7 +1446,6 @@ fn test_config_outputs() {
             disable_logs: false,
             disable_metrics: false,
             disable_traces: false,
-            trace_proto: traces::TraceProto::V1,
         };
 
         let mut outputs = config

@@ -61,12 +61,6 @@ struct DatadogAgentConfig {
     disable_traces: bool,
     #[serde(default = "crate::serde::default_false")]
     multiple_outputs: bool,
-    #[serde(default = "default_trace_proto")]
-    trace_proto: traces::TraceProto,
-}
-
-const fn default_trace_proto() -> traces::TraceProto {
-    traces::TraceProto::V1V2
 }
 
 impl GenerateConfig for DatadogAgentConfig {
@@ -82,7 +76,6 @@ impl GenerateConfig for DatadogAgentConfig {
             disable_metrics: false,
             disable_traces: false,
             multiple_outputs: false,
-            trace_proto: default_trace_proto(),
         })
         .unwrap()
     }
@@ -298,7 +291,6 @@ impl DatadogAgentSource {
             let trace_filter = traces::build_warp_filter(
                 acknowledgements,
                 config.multiple_outputs,
-                config.trace_proto,
                 out.clone(),
                 self.clone(),
             );

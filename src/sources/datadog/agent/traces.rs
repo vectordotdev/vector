@@ -6,7 +6,6 @@ use futures::future;
 use http::StatusCode;
 use ordered_float::NotNan;
 use prost::Message;
-use serde::{Deserialize, Serialize};
 use vector_core::ByteSizeOf;
 use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter, Rejection, Reply};
 
@@ -27,11 +26,10 @@ mod dd_proto {
 pub(crate) fn build_warp_filter(
     acknowledgements: bool,
     multiple_outputs: bool,
-    proto: TraceProto,
     out: SourceSender,
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
-    build_trace_filter(acknowledgements, multiple_outputs, proto, out, source)
+    build_trace_filter(acknowledgements, multiple_outputs, out, source)
         .or(build_stats_filter())
         .unify()
         .boxed()
@@ -40,7 +38,6 @@ pub(crate) fn build_warp_filter(
 fn build_trace_filter(
     acknowledgements: bool,
     multiple_outputs: bool,
-    proto: TraceProto,
     out: SourceSender,
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
@@ -64,23 +61,22 @@ fn build_trace_filter(
                 let events = source
                     .decode(&encoding_header, body, path.as_str())
                     .and_then(|body| {
-                        proto
-                            .handle_dd_trace_payload(
-                                body,
-                                source.api_key_extractor.extract(
-                                    path.as_str(),
-                                    api_token,
-                                    query_params.dd_api_key,
-                                ),
-                                reported_language.as_ref(),
-                                &source,
+                        handle_dd_trace_payload(
+                            body,
+                            source.api_key_extractor.extract(
+                                path.as_str(),
+                                api_token,
+                                query_params.dd_api_key,
+                            ),
+                            reported_language.as_ref(),
+                            &source,
+                        )
+                        .map_err(|error| {
+                            ErrorMessage::new(
+                                StatusCode::UNPROCESSABLE_ENTITY,
+                                format!("Error decoding Datadog traces: {:?}", error),
                             )
-                            .map_err(|error| {
-                                ErrorMessage::new(
-                                    StatusCode::UNPROCESSABLE_ENTITY,
-                                    format!("Error decoding Datadog traces: {:?}", error),
-                                )
-                            })
+                        })
                     });
                 if multiple_outputs {
                     handle_request(events, acknowledgements, out.clone(), Some(agent::TRACES))
@@ -104,58 +100,28 @@ fn build_stats_filter() -> BoxedFilter<(Response,)> {
         .boxed()
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Copy)]
-pub enum TraceProto {
-    #[serde(rename = "v1")]
-    V1,
-    #[serde(rename = "v2")]
-    V2,
-    #[serde(rename = "v1v2")]
-    V1V2,
-}
-
-impl TraceProto {
-    fn handle_dd_trace_payload(
-        self,
-        frame: Bytes,
-        api_key: Option<Arc<str>>,
-        lang: Option<&String>,
-        source: &DatadogAgentSource,
-    ) -> crate::Result<Vec<Event>> {
-        match self {
-            TraceProto::V1 => handle_dd_trace_payload_v1(frame, api_key, lang, source),
-            TraceProto::V2 => handle_dd_trace_payload_v2(frame, api_key, source),
-            TraceProto::V1V2 => handle_dd_trace_payload_v1v2(frame, api_key, lang, source),
-        }
-    }
-}
-
-// Decode Datadog newer protobuf schema
-fn handle_dd_trace_payload_v1v2(
+fn handle_dd_trace_payload(
     frame: Bytes,
     api_key: Option<Arc<str>>,
     lang: Option<&String>,
     source: &DatadogAgentSource,
 ) -> crate::Result<Vec<Event>> {
-    handle_dd_trace_payload_v2(frame.clone(), api_key.clone(), source).and_then(
-        |traces| {
-            (!traces.is_empty())
-                .then(|| traces)
-                .ok_or_else(|| "no traces decoded".into())
-        },
-    ).or_else(|e| {
-        debug!("Failed to decode traces, attempting to decode the received payload with the older format: {}.", e);
-        handle_dd_trace_payload_v1(frame, api_key, lang, source)
-    })
+    let decoded_payload = dd_proto::TracePayload::decode(frame)?;
+    if decoded_payload.tracer_payloads.is_empty() {
+        debug!("Older trace payload decoded.");
+        handle_dd_trace_payload_v0(decoded_payload, api_key, lang, source)
+    } else {
+        debug!("Never trace payload decoded.");
+        handle_dd_trace_payload_v1(decoded_payload, api_key, source)
+    }
 }
 
 /// Decode Datadog newer protobuf schema
-fn handle_dd_trace_payload_v2(
-    frame: Bytes,
+fn handle_dd_trace_payload_v1(
+    decoded_payload: dd_proto::TracePayload,
     api_key: Option<Arc<str>>,
     source: &DatadogAgentSource,
 ) -> crate::Result<Vec<Event>> {
-    let decoded_payload = dd_proto::AgentPayload::decode(frame)?;
     let env = decoded_payload.env;
     let hostname = decoded_payload.host_name;
     let agent_version = decoded_payload.agent_version;
@@ -233,14 +199,12 @@ fn convert_dd_tracer_payload(payload: dd_proto::TracerPayload) -> Vec<TraceEvent
 }
 
 // Decode Datadog older protobuf schema
-fn handle_dd_trace_payload_v1(
-    frame: Bytes,
+fn handle_dd_trace_payload_v0(
+    decoded_payload: dd_proto::TracePayload,
     api_key: Option<Arc<str>>,
     lang: Option<&String>,
     source: &DatadogAgentSource,
 ) -> crate::Result<Vec<Event>> {
-    let decoded_payload = dd_proto::TracePayload::decode(frame)?;
-
     let env = decoded_payload.env;
     let hostname = decoded_payload.host_name;
 

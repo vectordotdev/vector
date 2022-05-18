@@ -213,10 +213,12 @@ impl DatadogTracesEncoder {
         encoded_payloads
     }
 
-    fn trace_into_payload(key: &PartitionKey, events: &[TraceEvent]) -> dd_proto::AgentPayload {
-        dd_proto::AgentPayload {
+    fn trace_into_payload(key: &PartitionKey, events: &[TraceEvent]) -> dd_proto::TracePayload {
+        dd_proto::TracePayload {
             host_name: key.hostname.clone().unwrap_or_default(),
             env: key.env.clone().unwrap_or_default(),
+            traces: vec![],       // Field reserved for the older trace payloads
+            transactions: vec![], // Field reserved for the older trace payloads
             tracer_payloads: events
                 .iter()
                 .map(DatadogTracesEncoder::vector_trace_into_dd_tracer_payload)

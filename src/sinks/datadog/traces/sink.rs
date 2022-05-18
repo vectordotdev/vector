@@ -57,7 +57,7 @@ impl Partitioner for EventPartitioner {
                 target_tps: t.get("target_tps").and_then(|tps| tps.as_integer()),
                 error_tps: t.get("error_tps").and_then(|tps| tps.as_integer()),
             },
-        };
+        }
     }
 }
 
