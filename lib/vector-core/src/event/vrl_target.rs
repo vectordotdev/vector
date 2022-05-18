@@ -283,25 +283,6 @@ impl vrl_lib::Target for VrlTarget {
         }
     }
 
-    // fn get_metadata_deprecated(&self, key: &str) -> Result<Option<::value::Value>, String> {
-    //     let metadata = match self {
-    //         VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
-    //         VrlTarget::Metric { metric, .. } => metric.metadata(),
-    //     };
-    //
-    //     match key {
-    //         "datadog_api_key" => Ok(metadata
-    //             .datadog_api_key()
-    //             .as_ref()
-    //             .map(|api_key| ::value::Value::from(api_key.to_string()))),
-    //         "splunk_hec_token" => Ok(metadata
-    //             .splunk_hec_token()
-    //             .as_ref()
-    //             .map(|token| ::value::Value::from(token.to_string()))),
-    //         _ => Err(format!("key {} not available", key)),
-    //     }
-    // }
-
     fn get_metadata(&self, path: &LookupBuf) -> Result<Option<::value::Value>, String> {
         let metadata = match self {
             VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
@@ -311,25 +292,6 @@ impl vrl_lib::Target for VrlTarget {
         Ok(value)
     }
 
-    // fn set_metadata_deprecated(&mut self, key: &str, value: String) -> Result<(), String> {
-    //     let metadata = match self {
-    //         VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
-    //         VrlTarget::Metric { metric, .. } => metric.metadata_mut(),
-    //     };
-    //
-    //     match key {
-    //         "datadog_api_key" => {
-    //             metadata.set_datadog_api_key(Some(Arc::from(value.as_str())));
-    //             Ok(())
-    //         }
-    //         "splunk_hec_token" => {
-    //             metadata.set_splunk_hec_token(Some(Arc::from(value.as_str())));
-    //             Ok(())
-    //         }
-    //         _ => Err(format!("key {} not available", key)),
-    //     }
-    // }
-
     fn set_metadata(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
         let metadata = match self {
             VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
@@ -338,25 +300,6 @@ impl vrl_lib::Target for VrlTarget {
         metadata.value_mut().insert_by_path(path, value);
         Ok(())
     }
-
-    // fn remove_metadata_deprecated(&mut self, key: &str) -> Result<(), String> {
-    //     let metadata = match self {
-    //         VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
-    //         VrlTarget::Metric { metric, .. } => metric.metadata_mut(),
-    //     };
-    //
-    //     match key {
-    //         "datadog_api_key" => {
-    //             metadata.set_datadog_api_key(None);
-    //             Ok(())
-    //         }
-    //         "splunk_hec_token" => {
-    //             metadata.set_splunk_hec_token(None);
-    //             Ok(())
-    //         }
-    //         _ => Err(format!("key {} not available", key)),
-    //     }
-    // }
 
     fn remove_metadata(&mut self, path: &LookupBuf) -> Result<(), String> {
         let metadata = match self {
@@ -429,26 +372,6 @@ impl<'a> vrl_lib::Target for VrlImmutableTarget<'a> {
         Err("cannot modify immutable target".to_string())
     }
 
-    // fn get_metadata_deprecated(&self, key: &str) -> Result<Option<::value::Value>, String> {
-    //     let metadata = match self {
-    //         VrlImmutableTarget::LogEvent(_, metadata) | VrlImmutableTarget::Trace(_, metadata) => {
-    //             metadata
-    //         }
-    //         VrlImmutableTarget::Metric { metric, .. } => metric.metadata(),
-    //     };
-    //
-    //     match key {
-    //         "datadog_api_key" => Ok(metadata
-    //             .datadog_api_key()
-    //             .as_ref()
-    //             .map(|api_key| ::value::Value::from(api_key.to_string()))),
-    //         "splunk_hec_token" => Ok(metadata
-    //             .splunk_hec_token()
-    //             .as_ref()
-    //             .map(|token| ::value::Value::from(token.to_string()))),
-    //         _ => Err(format!("key {} not available", key)),
-    //     }
-    // }
     fn get_metadata(&self, path: &LookupBuf) -> Result<Option<::value::Value>, String> {
         let metadata = match self {
             Self::LogEvent(_, metadata) | Self::Trace(_, metadata) => metadata,
