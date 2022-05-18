@@ -215,17 +215,17 @@ impl DatadogTracesEncoder {
 
     fn trace_into_payload(key: &PartitionKey, events: &[TraceEvent]) -> dd_proto::AgentPayload {
         dd_proto::AgentPayload {
-            host_name: key.hostname.clone().unwrap_or_else(|| "".to_string()),
-            env: key.env.clone().unwrap_or_else(|| "".into()),
+            host_name: key.hostname.clone().unwrap_or_default(),
+            env: key.env.clone().unwrap_or_default(),
             tracer_payloads: events
                 .iter()
                 .map(DatadogTracesEncoder::vector_trace_into_dd_tracer_payload)
                 .collect(),
             // We only send tags at the Trace level
             tags: BTreeMap::new(),
-            agent_version: key.agent_version.clone().unwrap_or_else(|| "".into()),
-            target_tps: key.target_tps.map(|tps| tps as f64).unwrap_or(0f64),
-            error_tps: key.error_tps.map(|tps| tps as f64).unwrap_or(0f64),
+            agent_version: key.agent_version.clone().unwrap_or_default(),
+            target_tps: key.target_tps.map(|tps| tps as f64).unwrap_or_default(),
+            error_tps: key.error_tps.map(|tps| tps as f64).unwrap_or_default(),
         }
     }
 
@@ -238,7 +238,7 @@ impl DatadogTracesEncoder {
                     .map(|(k, v)| (k.clone(), v.to_string_lossy()))
                     .collect::<BTreeMap<String, String>>()
             })
-            .unwrap_or_else(BTreeMap::new);
+            .unwrap_or_default();
 
         let spans = match trace.get("spans") {
             Some(Value::Array(v)) => v
@@ -256,7 +256,7 @@ impl DatadogTracesEncoder {
             origin: trace
                 .get("origin")
                 .map(|v| v.to_string_lossy())
-                .unwrap_or_else(|| "".into()),
+                .unwrap_or_default(),
             dropped_trace: trace
                 .get("dropped")
                 .and_then(|v| v.as_boolean())
@@ -269,28 +269,28 @@ impl DatadogTracesEncoder {
             container_id: trace
                 .get("container_id")
                 .map(|v| v.to_string_lossy())
-                .unwrap_or_else(|| "".into()),
+                .unwrap_or_default(),
             language_name: trace
                 .get("language_name")
                 .map(|v| v.to_string_lossy())
-                .unwrap_or_else(|| "".into()),
+                .unwrap_or_default(),
             language_version: trace
                 .get("language_version")
                 .map(|v| v.to_string_lossy())
-                .unwrap_or_else(|| "".into()),
+                .unwrap_or_default(),
             tracer_version: trace
                 .get("tracer_version")
                 .map(|v| v.to_string_lossy())
-                .unwrap_or_else(|| "".into()),
+                .unwrap_or_default(),
             runtime_id: trace
                 .get("runtime_id")
                 .map(|v| v.to_string_lossy())
-                .unwrap_or_else(|| "".into()),
+                .unwrap_or_default(),
             chunks: vec![chunk],
             app_version: trace
                 .get("app_version")
                 .map(|v| v.to_string_lossy())
-                .unwrap_or_else(|| "".into()),
+                .unwrap_or_default(),
         }
     }
 
@@ -328,7 +328,7 @@ impl DatadogTracesEncoder {
                     .map(|(k, v)| (k.clone(), v.to_string_lossy()))
                     .collect::<BTreeMap<String, String>>()
             })
-            .unwrap_or_else(BTreeMap::new);
+            .unwrap_or_default();
 
         let meta_struct = span
             .get("meta_struct")
@@ -338,7 +338,7 @@ impl DatadogTracesEncoder {
                     .map(|(k, v)| (k.clone(), v.coerce_to_bytes().into_iter().collect()))
                     .collect::<BTreeMap<String, Vec<u8>>>()
             })
-            .unwrap_or_else(BTreeMap::new);
+            .unwrap_or_default();
 
         let metrics = span
             .get("metrics")
@@ -354,25 +354,25 @@ impl DatadogTracesEncoder {
                     })
                     .collect::<BTreeMap<String, f64>>()
             })
-            .unwrap_or_else(BTreeMap::new);
+            .unwrap_or_default();
 
         dd_proto::Span {
             service: span
                 .get("service")
                 .map(|v| v.to_string_lossy())
-                .unwrap_or_else(|| "".into()),
+                .unwrap_or_default(),
             name: span
                 .get("name")
                 .map(|v| v.to_string_lossy())
-                .unwrap_or_else(|| "".into()),
+                .unwrap_or_default(),
             resource: span
                 .get("resource")
                 .map(|v| v.to_string_lossy())
-                .unwrap_or_else(|| "".into()),
+                .unwrap_or_default(),
             r#type: span
                 .get("type")
                 .map(|v| v.to_string_lossy())
-                .unwrap_or_else(|| "".into()),
+                .unwrap_or_default(),
             trace_id: trace_id as u64,
             span_id: span_id as u64,
             parent_id: parent_id as u64,
