@@ -405,7 +405,6 @@ fn get_apm_stats_request(
     compression: Compression,
     default_api_key: &Arc<str>,
 ) -> Result<(RequestMetadata, Bytes), RequestBuilderError> {
-    // let mut encoded_payloads = Vec::new();
     let payload = stats::compute_apm_stats(key, events);
     let encoded_payload = payload.encode_to_vec();
     let uncompressed_size = encoded_payload.len();

@@ -125,10 +125,15 @@ async fn smoke() {
 
     // We only take 1 elements as the trace & the APM transaction shall be
     // encoded & emitted in the same payload
-    let output = rx.take(1).collect::<Vec<_>>().await.pop();
-    assert!(output.is_some());
+    let mut output = rx.take(2).collect::<Vec<_>>().await;
 
-    let (parts, body) = output.unwrap();
+    let trace = output.pop();
+    let stats = output.pop();
+
+    assert!(trace.is_some());
+    assert!(stats.is_some());
+
+    let (parts, body) = trace.unwrap();
     assert_eq!(
         parts.headers.get("Content-Type").unwrap(),
         "application/x-protobuf"
