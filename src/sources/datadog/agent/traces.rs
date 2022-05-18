@@ -149,7 +149,7 @@ fn handle_dd_trace_payload_v1v2(
     })
 }
 
-// Decode Datadog newer protobuf schema
+/// Decode Datadog newer protobuf schema
 fn handle_dd_trace_payload_v2(
     frame: Bytes,
     api_key: Option<Arc<str>>,
