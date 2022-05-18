@@ -29,9 +29,14 @@ impl NativeJsonSerializerConfig {
 pub struct NativeJsonSerializer;
 
 impl NativeJsonSerializer {
+    /// Creates a new `NativeJsonSerializer`.
+    pub const fn new() -> Self {
+        Self
+    }
+
     /// Encode event as native JSON.
     pub fn encode_json(&self, event: Event) -> Result<serde_json::Value, serde_json::Error> {
-        event.try_into()
+        serde_json::to_value(&event)
     }
 }
 
@@ -41,5 +46,42 @@ impl Encoder<Event> for NativeJsonSerializer {
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let writer = buffer.writer();
         serde_json::to_writer(writer, &event).map_err(Into::into)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use bytes::BytesMut;
+    use vector_common::btreemap;
+    use vector_core::event::Value;
+
+    use super::*;
+
+    #[test]
+    fn serialize_json() {
+        let event = Event::from(btreemap! {
+            "foo" => Value::from("bar")
+        });
+        let mut serializer = NativeJsonSerializer::new();
+        let mut bytes = BytesMut::new();
+
+        serializer.encode(event, &mut bytes).unwrap();
+
+        assert_eq!(bytes.freeze(), r#"{"log":{"foo":"bar"}}"#);
+    }
+
+    #[test]
+    fn serialize_equals_encode_json() {
+        let event = Event::from(btreemap! {
+            "foo" => Value::from("bar")
+        });
+        let mut serializer = NativeJsonSerializer::new();
+        let mut bytes = BytesMut::new();
+
+        serializer.encode(event.clone(), &mut bytes).unwrap();
+
+        let json = serializer.encode_json(event).unwrap();
+
+        assert_eq!(bytes.freeze(), serde_json::to_string(&json).unwrap());
     }
 }
