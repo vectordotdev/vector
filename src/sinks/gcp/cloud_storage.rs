@@ -43,6 +43,7 @@ use crate::{
                 StandardEncodingsWithFramingMigrator, Transformer,
             },
             partitioner::KeyPartitioner,
+            request_builder::EncodeResult,
             BulkSizeBasedDefaultBatchSettings, Compression, RequestBuilder, ServiceBuilderExt,
             TowerRequestConfig,
         },
@@ -247,7 +248,11 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
         (metadata, events)
     }
 
-    fn build_request(&self, mut metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
+    fn build_request(
+        &self,
+        mut metadata: Self::Metadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
         // TODO: pull the seconds from the last event
         let filename = {
             let seconds = Utc::now().format(&self.time_format);
@@ -262,10 +267,12 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
 
         metadata.key = format!("{}{}.{}", metadata.key, filename, self.extension);
 
-        trace!(message = "Sending events.", bytes = ?payload.len(), events_len = ?metadata.count, key = ?metadata.key);
+        let body = payload.into_payload();
+
+        trace!(message = "Sending events.", bytes = ?body.len(), events_len = ?metadata.count, key = ?metadata.key);
 
         GcsRequest {
-            body: payload,
+            body,
             settings: GcsRequestSettings {
                 acl: self.acl.clone(),
                 content_type: self.content_type.clone(),
@@ -400,7 +407,7 @@ mod tests {
             .expect("key wasn't provided");
         let request_settings = request_settings(&sink_config);
         let (metadata, _events) = request_settings.split_input((key, vec![log]));
-        request_settings.build_request(metadata, Bytes::new())
+        request_settings.build_request(metadata, EncodeResult::uncompressed(Bytes::new()))
     }
 
     #[test]
