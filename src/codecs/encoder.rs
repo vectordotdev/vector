@@ -116,6 +116,7 @@ impl Encoder<Framer> {
             (Serializer::Native(_), _) => "application/octet-stream",
             (
                 Serializer::Json(_)
+                | Serializer::Logfmt(_)
                 | Serializer::NativeJson(_)
                 | Serializer::RawMessage(_)
                 | Serializer::Text(_),

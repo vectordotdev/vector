@@ -4,6 +4,7 @@
 #![deny(missing_docs)]
 
 mod json;
+mod logfmt;
 mod native;
 mod native_json;
 mod raw_message;
@@ -13,6 +14,7 @@ use std::fmt::Debug;
 
 use dyn_clone::DynClone;
 pub use json::{JsonSerializer, JsonSerializerConfig};
+pub use logfmt::{LogfmtSerializer, LogfmtSerializerConfig};
 pub use native::{NativeSerializer, NativeSerializerConfig};
 pub use native_json::{NativeJsonSerializer, NativeJsonSerializerConfig};
 pub use raw_message::{RawMessageSerializer, RawMessageSerializerConfig};
