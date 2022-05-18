@@ -44,15 +44,7 @@ determine which namespace is being used.
 
 #### Data
 
-This is the main content of a log.  It will be placed at the root of the event.
-It is not necessarily the "log message" itself. For sources that have a known "schema", such
-as syslog or the datadog agent, the fields from that schema will be placed on the root. Otherwise, it will be
-just the decoded message content placed on the root.
-
-A good example is the "Datadog Agent" source. The root is the fields received by the Datadog agent. The log content is
-nested.
-
-Others such as the "socket" source will have the log content directly at the root.
+This is the main content of a log. The data that is decoded with the configured decoder will be placed on the root of the event.
 
 There is a special case when the codec is "bytes", since the data is just a string in that case. That means
 that the root is a string. Historically this has been forbidden, but it is possible to allow this.
@@ -96,7 +88,7 @@ When these are used in the "Vector" source, the behavior will not change, and ev
 There are 3 sources of information that will be stored in Metadata.
 
 1. Vector "internal" metadata such as `datadog_api_key`, so it can be read/set by users. This data already exists, but will
-be moved to its own "secret" metadata.
+be moved to its own "secret" metadata. VRL functions will be added for accessing "secret" metadata.
 2. Vector metadata such as `ingest_timestamp`, and `source_type` which are set for every source. These will be nested under `vector'
 3. Source metadata which will vary for each source. This will be nested under the source type.
 
@@ -106,11 +98,12 @@ Changes needed immediately:
 
 - Support arbitrarily nested values
 - Functions that access metadata (`get_metadata_field`, `remove_metadata_field`, and `set_metadata_field`) should support full paths as keys, and return
-  the `any` type instead of just `string`. This is technically a breaking change.
+  the `any` type instead of just `string`.
 - Add a separate "secret" metadata.
+- New VRL functions to access "secret" metadata.
 
 With these changes, using metadata can still be a bit annoying since the returned type will always be `any`, even if the
-value is set and read in the same VRL program.
+value is set and read in the same VRL program. Future enhancements will improve this.
 
 ### Future enhancements
 
@@ -135,19 +128,11 @@ event
 
 ```json
 {
-  "message": {
-    "derivative": -2.266778047142367e+125,
-    "integral": "13028769352377685187",
-    "mineral": "H 9 ",
-    "proportional": 3673342615,
-    "vegetable": -30083
-  },
-  "ddsource": "waters",
-  "ddtags": "env:prod",
-  "hostname": "beta",
-  "service": "cernan",
-  "status": "notice",
-  "timestamp": "2066-08-09T04:24:42.1234Z" // This is parsed from a unix timestamp provided by the DD agent
+  "derivative": -2.266778047142367e+125,
+  "integral": "13028769352377685187",
+  "mineral": "H 9 ",
+  "proportional": 3673342615,
+  "vegetable": -30083
 }
 ```
 
@@ -155,6 +140,14 @@ metadata
 
 ```json
 {
+  "datadog_agent": {
+    "ddsource": "waters",
+    "ddtags": "env:prod",
+    "hostname": "beta",
+    "service": "cernan",
+    "status": "notice",
+    "timestamp": "2066-08-09T04:24:42.1234Z" // This is parsed from a unix timestamp provided by the DD agent
+  },
   "vector": {
     "source_type": "datadog_agent",
     "ingest_timestamp": "2022-04-14T19:14:21.899623781Z"
@@ -178,21 +171,22 @@ secrets (this will look similar for all sources, so it is emitted on the remaini
 event
 
 ```json
-{
-  "message": "{\"proportional\":702036423,\"integral\":15089925750456892008,\"derivative\":-6.4676193438086e263,\"vegetable\":20003,\"mineral\":\"vsd5fwYBv\"}",
-  "ddsource": "waters",
-  "ddtags": "env:prod",
-  "hostname": "beta",
-  "service": "cernan",
-  "status": "notice",
-  "timestamp": "2066-08-09T04:24:42.1234Z"
-}
+"{\"proportional\":702036423,\"integral\":15089925750456892008,\"derivative\":-6.4676193438086e263,\"vegetable\":20003,\"mineral\":\"vsd5fwYBv\"}"
 ```
 
 metadata
 
 ```json
 {
+  "datadog_agent": {
+    "message": ,
+    "ddsource": "waters",
+    "ddtags": "env:prod",
+    "hostname": "beta",
+    "service": "cernan",
+    "status": "notice",
+    "timestamp": "2066-08-09T04:24:42.1234Z"
+  },
   "vector": {
     "source_type": "datadog_agent",
     "ingest_timestamp": "2022-04-14T19:14:21.899623781Z"
@@ -246,8 +240,8 @@ metadata
 
 event (a string as the root event element)
 
-```text
-F1015 11:01:46.499073       1 main.go:39] error getting server version: Get \"https://10.96.0.1:443/version?timeout=32s\": dial tcp 10.96.0.1:443: connect: network is unreachable
+```json
+"F1015 11:01:46.499073       1 main.go:39] error getting server version: Get \"https://10.96.0.1:443/version?timeout=32s\": dial tcp 10.96.0.1:443: connect: network is unreachable"
 ```
 
 metadata
@@ -295,8 +289,15 @@ metadata
 event
 
 ```json
+"Hello Vector"
+```
+
+metadata
+
+```json
 {
-    "message": "Hello Vector",
+  "syslog": {
+    "source_ip": "127.0.0.1",
     "hostname": "localhost",
     "severity": "info",
     "facility": "facility",
@@ -307,16 +308,6 @@ event
     "structured_data": {
       "origin": "timber.io"
     }
-}
-```
-
-metadata
-
-```json
-{
-  "syslog": {
-    "source_ip": "127.0.0.1",
-    "hostname": "localhost"
   },
   "vector": {
     "source_type": "syslog",
