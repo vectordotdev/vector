@@ -14,7 +14,7 @@ use crate::{
             config::S3Options,
             service::{S3Metadata, S3Request},
         },
-        util::{encoding::Transformer, Compression, RequestBuilder},
+        util::{encoding::Transformer, request_builder::EncodeResult, Compression, RequestBuilder},
     },
 };
 
@@ -58,7 +58,11 @@ impl RequestBuilder<(String, Vec<Event>)> for S3RequestOptions {
         (metadata, events)
     }
 
-    fn build_request(&self, mut metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
+    fn build_request(
+        &self,
+        mut metadata: Self::Metadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
         let filename = {
             let formatted_ts = Utc::now().format(self.filename_time_format.as_str());
 
@@ -74,17 +78,8 @@ impl RequestBuilder<(String, Vec<Event>)> for S3RequestOptions {
             .unwrap_or_else(|| self.compression.extension().into());
         metadata.partition_key = format!("{}{}.{}", metadata.partition_key, filename, extension);
 
-        // TODO: move this into `.request_builder(...)` closure?
-        trace!(
-            message = "Sending events.",
-            bytes = ?payload.len(),
-            events_len = ?metadata.count,
-            bucket = ?self.bucket,
-            key = ?metadata.partition_key
-        );
-
         S3Request {
-            body: payload,
+            body: payload.into_payload(),
             bucket: self.bucket.clone(),
             metadata,
             content_encoding: self.compression.content_encoding(),

@@ -30,6 +30,7 @@ use crate::{
     sinks::util::{
         builder::SinkBuilderExt,
         encoding::{EncodingConfig, EncodingConfiguration},
+        request_builder::EncodeResult,
         service::{ServiceBuilderExt, Svc},
         Compression, RequestBuilder,
     },
@@ -132,7 +133,11 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
         )
     }
 
-    fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
+    fn build_request(
+        &self,
+        metadata: Self::Metadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
         let (tenant_id, batch_size, finalizers, events_byte_size) = metadata;
         let compression = self.compression();
 
@@ -140,7 +145,7 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
             compression,
             batch_size,
             finalizers,
-            payload,
+            payload: payload.into_payload(),
             tenant_id,
             events_byte_size,
         }

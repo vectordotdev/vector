@@ -9,7 +9,7 @@ use crate::{
     event::{Event, Finalizable},
     sinks::{
         azure_common::config::{AzureBlobMetadata, AzureBlobRequest},
-        util::{encoding::Transformer, Compression, RequestBuilder},
+        util::{encoding::Transformer, request_builder::EncodeResult, Compression, RequestBuilder},
     },
 };
 
@@ -51,7 +51,11 @@ impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
         (metadata, events)
     }
 
-    fn build_request(&self, mut metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
+    fn build_request(
+        &self,
+        mut metadata: Self::Metadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
         let blob_name = {
             let formatted_ts = Utc::now().format(self.blob_time_format.as_str());
 
@@ -62,6 +66,8 @@ impl RequestBuilder<(String, Vec<Event>)> for AzureBlobRequestOptions {
 
         let extension = self.compression.extension();
         metadata.partition_key = format!("{}{}.{}", metadata.partition_key, blob_name, extension);
+
+        let payload = payload.into_payload();
 
         debug!(
             message = "Sending events.",
@@ -85,6 +91,7 @@ impl Compression {
         match self {
             Self::None => "text/plain",
             Self::Gzip(_) => "application/gzip",
+            Self::Zlib(_) => "application/zlib",
         }
     }
 }
