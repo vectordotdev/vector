@@ -381,10 +381,12 @@ fn setup_logs_reporting(
             .version = "{}"
             .configuration_key = "{}"
             .ddsource = "vector"
-            .vector_version = "{}"
-            .arch = "{}"
-            .os = "{}"
-            .vendor = "{}"
+            .vector = {{
+                "version": "{}",
+                "arch": "{}",
+                "os": "{}",
+                "vendor": "{}"
+            }}
             {}
         "#,
             &config_version,
