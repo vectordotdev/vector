@@ -636,7 +636,7 @@ async fn report_serialized_config_to_datadog<'a>(
 
 #[cfg(all(test, feature = "enterprise-tests"))]
 mod test {
-    use std::{io::Write, path::PathBuf, str::FromStr, thread};
+    use std::{collections::BTreeMap, io::Write, path::PathBuf, str::FromStr, thread};
 
     use http::StatusCode;
     use indexmap::IndexMap;
@@ -902,7 +902,7 @@ mod test {
         // .tags is an object and merge() is thus a safe operation (mimicking
         // the environment this code will actually run in).
         let mut state = vrl::state::ExternalEnv::new_with_kind(Kind::object(btreemap! {
-            "tags" => Kind::object(btreemap! {}),
+            "tags" => Kind::object(BTreeMap::new()),
         }));
         assert!(
             vrl::compile_with_state(vrl.as_str(), vrl_stdlib::all().as_ref(), &mut state).is_ok()
