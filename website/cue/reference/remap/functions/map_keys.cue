@@ -47,6 +47,7 @@ remap: functions: map_keys: {
 			name:        "recursive"
 			description: "Whether to recursively iterate the collection."
 			required:    false
+			default:     false
 			type: ["boolean"]
 		},
 	]

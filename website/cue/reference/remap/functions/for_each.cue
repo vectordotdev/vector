@@ -9,7 +9,7 @@ remap: functions: for_each: {
 		If you have a need for recursive iteration using `for_each`,
 		which can't be solved using the `map_keys` or `map_values`
 		enumeration functions (which *do* support recursion), then
-		please let us know!
+		[please let us know](\(urls.new_feature_request))!
 
 		The function uses the "function closure syntax" to allow reading
 		the key/value or index/value combination for each item in the
