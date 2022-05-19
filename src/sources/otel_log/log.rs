@@ -3,7 +3,6 @@ use std::{
 };
 use futures::{FutureExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
-use tokio::net::TcpStream;
 use tonic::{
     transport::{server::Connected, Server},
     Request, Response, Status,
@@ -32,7 +31,8 @@ use opentelemetry::{
 };
 use crate::{
     config::{
-        GenerateConfig, 
+        GenerateConfig,
+        SourceConfig,
         AcknowledgementsConfig,
         SourceContext,
         Output,
@@ -86,7 +86,7 @@ pub struct OpentelemetryLogConfig {
 impl GenerateConfig for OpentelemetryLogConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            address: "0.0.0.0:6000".parse().unwrap(),
+            address: "0.0.0.0:6788".parse().unwrap(),
             tls: None,
             acknowledgements: Default::default(),
         })
@@ -94,8 +94,10 @@ impl GenerateConfig for OpentelemetryLogConfig {
     }
 }
 
-impl OpentelemetryLogConfig {
-    pub(super) async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
+#[async_trait::async_trait]
+#[typetag::serde(name = "otel_log")]
+impl SourceConfig for OpentelemetryLogConfig {
+    async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let tls_settings = MaybeTlsSettings::from_config(&self.tls, true)?;
         let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
 
@@ -106,16 +108,20 @@ impl OpentelemetryLogConfig {
         Ok(Box::pin(source))
     }
 
-    pub(super) fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
-    pub(super) const fn source_type(&self) -> &'static str {
+    fn source_type(&self) -> &'static str {
         "otel_log"
     }
 
-    pub(super) fn resources(&self) -> Vec<Resource> {
+    fn resources(&self) -> Vec<Resource> {
         vec![Resource::tcp(self.address)]
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 
@@ -178,7 +184,7 @@ async fn handle_batch_status(receiver: Option<BatchStatusReceiver>) -> Result<()
 }
 
 #[derive(Serialize, Deserialize)]
-struct ScopeLog<> {
+struct LogEntry<> {
     resource: Option<OtelResource>,
     log_record: LogRecord,
 }
@@ -187,28 +193,27 @@ impl IntoIterator for ResourceLogs {
     type Item = Event;
     type IntoIter = std::vec::IntoIter<Self::Item>;
     fn into_iter(self) -> Self::IntoIter {
-        let resource = self.resource.clone();
-        let mut logs: Vec<Event> = vec![];
-        for scope_log in self.scope_logs{
-            for log_record in scope_log.log_records{
-                let sl = ScopeLog{
-                    resource: resource.clone(),
-                    log_record,
-                };
-                logs.push(serde_json::to_value(sl).unwrap().try_into().unwrap());
-            }
+        let resource = self.resource;
+        if !self.scope_logs.is_empty() {
+            return self.scope_logs
+                .into_iter().map(|scope_log| scope_log.log_records).flatten()
+                .map(|log_record| log_entry_into_event(resource.clone(), log_record))
+                .collect::<Vec<Event>>().into_iter();
         }
-        for library_log in self.instrumentation_library_logs{
-            for log_record in library_log.log_records{
-                let sl = ScopeLog{
-                    resource: resource.clone(),
-                    log_record,
-                };
-                logs.push(serde_json::to_value(sl).unwrap().try_into().unwrap());
-            }
-        }
-        logs.into_iter()
+
+        self.instrumentation_library_logs
+            .into_iter().map(|library_log| library_log.log_records).flatten()
+            .map(|log_record| log_entry_into_event(resource.clone(), log_record))
+            .collect::<Vec<Event>>().into_iter()
     }
+}
+
+fn log_entry_into_event(resource: Option<OtelResource>, log_record: LogRecord) -> Event {
+    let entry = LogEntry{
+        resource,
+        log_record,
+    };
+    serde_json::to_value(entry).unwrap().try_into().unwrap()
 }
 
 async fn run(

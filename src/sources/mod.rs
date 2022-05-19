@@ -70,6 +70,7 @@ pub mod stdin;
 pub mod syslog;
 #[cfg(feature = "sources-vector")]
 pub mod vector;
+#[cfg(feature = "sources-otel_log")]
 pub mod otel_log;
 
 pub(crate) mod util;

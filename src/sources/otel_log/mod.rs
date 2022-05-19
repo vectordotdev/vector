@@ -1,2 +1,2 @@
-mod log;
+pub mod log;
 
