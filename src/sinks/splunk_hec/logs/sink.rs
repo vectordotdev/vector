@@ -21,6 +21,7 @@ use crate::{
     },
     template::Template,
 };
+use lookup::path;
 
 pub struct HecLogsSink<S> {
     pub context: SinkContext,
@@ -155,7 +156,7 @@ pub fn process_log(
     };
 
     if let Some(key) = timestamp_nanos_key {
-        log.try_insert_flat(key, timestamp.timestamp_subsec_nanos() % 1_000_000);
+        log.try_insert(path!(key), timestamp.timestamp_subsec_nanos() % 1_000_000);
     }
 
     let timestamp = (timestamp.timestamp_millis() as f64) / 1000f64;

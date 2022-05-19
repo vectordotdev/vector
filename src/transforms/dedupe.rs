@@ -186,13 +186,15 @@ fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
         FieldMatchConfig::IgnoreFields(fields) => {
             let mut entry = Vec::new();
 
-            for (field_name, value) in event.as_log().all_fields() {
-                if !fields.contains(&field_name) {
-                    entry.push((
-                        field_name,
-                        type_id_for_value(value),
-                        value.coerce_to_bytes(),
-                    ));
+            if let Some(all_fields) = event.as_log().all_fields() {
+                for (field_name, value) in all_fields {
+                    if !fields.contains(&field_name) {
+                        entry.push((
+                            field_name,
+                            type_id_for_value(value),
+                            value.coerce_to_bytes(),
+                        ));
+                    }
                 }
             }
 

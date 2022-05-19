@@ -585,6 +585,7 @@ mod test {
             event
                 .as_log()
                 .all_fields()
+                .unwrap()
                 .find(|(key, _)| (&key[..]).starts_with("empty"))
                 == None
         }
@@ -1017,7 +1018,8 @@ mod test {
 
     impl From<Event> for SyslogMessageRfc5424 {
         fn from(e: Event) -> Self {
-            let (mut fields, _) = e.into_log().into_parts();
+            let (value, _) = e.into_log().into_parts();
+            let mut fields = value.into_object().unwrap();
 
             Self {
                 msgid: fields.remove("msgid").map(value_to_string).unwrap(),

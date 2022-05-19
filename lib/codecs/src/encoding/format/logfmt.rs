@@ -48,7 +48,7 @@ impl Encoder<Event> for LogfmtSerializer {
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let log = event.as_log();
-        let string = encode_logfmt::to_string(log.as_map())?;
+        let string = encode_logfmt::encode_value(log.value())?;
         buffer.extend_from_slice(string.as_bytes());
 
         Ok(())

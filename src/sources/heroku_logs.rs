@@ -29,6 +29,7 @@ use crate::{
     sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     tls::TlsEnableableConfig,
 };
+use lookup::path;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub(crate) struct LogplexConfig {
@@ -247,8 +248,8 @@ fn line_to_events(mut decoder: Decoder, line: String) -> SmallVec<[Event; 1]> {
 
                             log.try_insert(log_schema().host_key(), hostname.to_owned());
 
-                            log.try_insert_flat("app_name", app_name.to_owned());
-                            log.try_insert_flat("proc_id", proc_id.to_owned());
+                            log.try_insert(path!("app_name"), app_name.to_owned());
+                            log.try_insert(path!("proc_id"), proc_id.to_owned());
                         }
 
                         events.push(event);

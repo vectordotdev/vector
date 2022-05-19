@@ -11,6 +11,7 @@ use crate::{
     schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
+use lookup::path;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(deny_unknown_fields, default)]
@@ -127,7 +128,7 @@ impl FunctionTransform for JsonParser {
                     }
 
                     for (key, value) in object {
-                        log.insert_flat(key, value);
+                        log.insert(path!(&key), value);
                     }
                 }
             }
@@ -141,6 +142,7 @@ impl FunctionTransform for JsonParser {
 
 #[cfg(test)]
 mod test {
+    use lookup::path;
     use serde_json::json;
 
     use super::*;
@@ -219,11 +221,11 @@ mod test {
         let event = transform_one(&mut parser, event).unwrap();
 
         assert_eq!(
-            event.as_log().get_flat("field.with.dots"),
+            event.as_log().get(path!("field.with.dots")),
             Some(&crate::event::Value::from("hello")),
         );
         assert_eq!(
-            event.as_log().get_flat("sub.field"),
+            event.as_log().get(path!("sub.field")),
             Some(&crate::event::Value::from(json!({ "another.one": "bob", }))),
         );
         assert_eq!(event.metadata(), &metadata);

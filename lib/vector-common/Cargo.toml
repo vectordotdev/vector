@@ -55,4 +55,4 @@ serde = { version = "1.0.137", optional = true, features = ["derive"] }
 smallvec = { version = "1", default-features = false }
 snafu = { version = "0.7", optional = true }
 tracing = { version = "0.1.34", default-features = false }
-value = { path = "../value" }
+value = { path = "../value", features = ["json"] }

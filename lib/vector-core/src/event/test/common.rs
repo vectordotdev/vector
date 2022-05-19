@@ -81,14 +81,14 @@ impl Arbitrary for LogEvent {
         let mut gen = Gen::new(MAX_MAP_SIZE);
         let map: BTreeMap<String, Value> = BTreeMap::arbitrary(&mut gen);
         let metadata: EventMetadata = EventMetadata::arbitrary(g);
-        LogEvent::from_parts(map, metadata)
+        LogEvent::from_map(map, metadata)
     }
 
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
-        let (fields, metadata) = self.clone().into_parts();
+        let (value, metadata) = self.clone().into_parts();
 
         Box::new(
-            fields
+            value
                 .shrink()
                 .map(move |x| LogEvent::from_parts(x, metadata.clone())),
         )

@@ -5751,6 +5751,7 @@ dependencies = [
  "prost-build 0.10.3",
  "prost-types 0.10.1",
  "snafu",
+ "value",
  "vector_common",
 ]
 
