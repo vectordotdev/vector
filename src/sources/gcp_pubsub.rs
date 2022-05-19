@@ -231,7 +231,10 @@ impl PubsubSource {
             match self.run_once(&endpoint, &mut token_generator).await {
                 State::RetryNow => debug!("Retrying immediately."),
                 State::RetryDelay => {
-                    info!(timeout_secs = 1, "Retrying after timeout.");
+                    info!(
+                        timeout_secs = self.retry_delay.as_secs_f64(),
+                        "Retrying after timeout."
+                    );
                     tokio::time::sleep(self.retry_delay).await;
                 }
                 State::Shutdown => break,
