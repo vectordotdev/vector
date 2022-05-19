@@ -31,6 +31,7 @@ use crate::{
     sinks::util::{
         builder::SinkBuilderExt,
         encoding::Transformer,
+        metadata::BatchRequestMetadata,
         request_builder::EncodeResult,
         service::{ServiceBuilderExt, Svc},
         Compression, RequestBuilder,
@@ -121,12 +122,7 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
         let (key, mut events) = input;
         let batch_size = events.len();
         let events_byte_size = events.size_of();
-        let finalizers = events
-            .iter_mut()
-            .fold(EventFinalizers::default(), |mut acc, x| {
-                acc.merge(x.take_finalizers());
-                acc
-            });
+        let finalizers = events.take_finalizers();
 
         (
             (key.tenant_id, batch_size, finalizers, events_byte_size),
@@ -140,15 +136,15 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
         let (tenant_id, batch_size, finalizers, events_byte_size) = metadata;
+        let metadata = BatchRequestMetadata::new(batch_size, events_byte_size, &payload);
         let compression = self.compression();
 
         LokiRequest {
             compression,
-            batch_size,
             finalizers,
             payload: payload.into_payload(),
             tenant_id,
-            events_byte_size,
+            metadata,
         }
     }
 }
