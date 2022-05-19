@@ -104,9 +104,13 @@ fn main() {
         println!("cargo:rerun-if-changed=proto/ddsketch.proto");
         println!("cargo:rerun-if-changed=proto/google/pubsub/v1/pubsub.proto");
         println!("cargo:rerun-if-changed=proto/vector.proto");
+        println!("cargo:rerun-if-changed=proto/opentelemetry/collector/logs/v1/log_service.proto");
+
 
         let mut prost_build = prost_build::Config::new();
-        prost_build.btree_map(&["."]);
+        prost_build
+            .btree_map(&["."])
+            .type_attribute(".opentelemetry", "#[derive(serde::Serialize, serde::Deserialize)]");
 
         tonic_build::configure()
             .compile_with_config(
@@ -118,6 +122,7 @@ fn main() {
                     "proto/dd_trace.proto",
                     "proto/google/pubsub/v1/pubsub.proto",
                     "proto/vector.proto",
+                    "proto/opentelemetry/collector/logs/v1/log_service.proto",
                 ],
                 &["proto/", "lib/vector-core/proto/"],
             )
