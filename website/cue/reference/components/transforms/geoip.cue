@@ -59,6 +59,15 @@ components: transforms: geoip: {
 				examples: ["geoip", "parent.child"]
 			}
 		}
+		locale: {
+			description: "The locale to use to lookup the country name and region name for the city database. See [Locations Files](https://dev.maxmind.com/geoip/docs/databases/city-and-country?lang=en)"
+			required:    false
+			common:      false
+			type: string: {
+				default: "en"
+				examples: ["de", "en", "es", "fr", "ja", "pt-BR", "ru", "zh-CN"]
+			}
+		}
 	}
 
 	input: {
