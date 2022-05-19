@@ -333,8 +333,11 @@ where
     }
 
     pub fn send(&self, reporting_task: T) {
-        if self.reporting_tx.send(reporting_task).is_err() {
-            error!(message = "Unable to report configuration due to internal Vector issue: could not send through channel");
+        if let Err(err) = self.reporting_tx.send(reporting_task) {
+            error!(
+                %err,
+                "Unable to report configuration due to internal Vector issue.",
+            );
         }
     }
 }

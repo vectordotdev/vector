@@ -209,7 +209,7 @@ impl Application {
                         Some(enterprise)
                     }
                     Err(EnterpriseError::MissingApiKey) => {
-                        error!(message = "Enterprise configuration incomplete: missing API key");
+                        error!("Enterprise configuration incomplete: missing API key.");
                         return Err(exitcode::CONFIG);
                     }
                     Err(_) => None,
