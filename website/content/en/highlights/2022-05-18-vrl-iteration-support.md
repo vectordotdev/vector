@@ -43,7 +43,7 @@ Let’s assume we want to achieve the following results:
 
 1. Upcase all keys in the object.
 2. Change all empty string values to `null`.
-3. Count the number of equal elements in the `qux` array.
+3. Count the frequency of elements in the `qux` array.
 
 Here’s how we would solve these individual tasks:
 
@@ -56,7 +56,7 @@ Here’s how we would solve these individual tasks:
   if value == ”” { null } else { value }
 }
 
-# 3. Count the number of equal elements in the `qux` array.
+# 3. Count the frequency of elements in the `qux` array.
 .qux_tally = {}
 for_each(.qux) -> |_index, value| {
   tally = int(get!(.qux_tally, [value])) ?? 0
@@ -77,8 +77,11 @@ Running this VRL program results in the following output:
     "a": 2,
     "b": 1,
     "c": 1
+  }
 }
 ```
+
+For a longer list of examples, see our [RFC][rfc examples] or [test harness][].
 
 ## Design Details
 
@@ -101,6 +104,9 @@ Take a look at our [existing iteration functions][], and feel free to [file
 a request][] for any special purpose function that would make your program
 easier to maintain and/or more performant to run.
 
+For more details on the design of this feature, you can read our technical
+[RFC][].
+
 We hope you are as happy with this enhancement to VRL as we are. Iteration
 support unlocks one of the last areas for which many of you had to fall back to
 the [LUA runtime transform][]. You can now keep your remapping logic in VRL,
@@ -119,3 +125,6 @@ this, or any other aspect of Vector and VRL.
 [@vectordotdev]: https://twitter.com/vectordotdev
 [existing iteration functions]: https://vrl.dev/functions/#enumerate-functions
 [file a request]: https://github.com/vectordotdev/vector/issues/new?labels=type%3A+feature&template=feature.yml
+[RFC]: https://github.com/vectordotdev/vector/blob/50dd7a7c655cbc3c7903b58213adb34a70cf7ba6/rfcs/2021-08-29-8381-vrl-iteration-support.md
+[rfc examples]: https://github.com/vectordotdev/vector/blob/50dd7a7c655cbc3c7903b58213adb34a70cf7ba6/rfcs/2021-08-29-8381-vrl-iteration-support.md#use-cases
+[test harness]: https://github.com/vectordotdev/vector/tree/cf0864873c03edd937c1e7796468809e0d52e764/lib/vrl/tests/tests/rfcs/8381
