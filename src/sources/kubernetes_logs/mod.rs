@@ -58,12 +58,12 @@ mod pod_metadata_annotator;
 mod transform_utils;
 mod util;
 
-use crate::sources::kubernetes_logs::node_metadata_annotator::NodeMetadataAnnotator;
 use futures::{future::FutureExt, stream::StreamExt};
 use k8s_paths_provider::K8sPathsProvider;
 use lifecycle::Lifecycle;
-use namespace_metadata_annotator::NamespaceMetadataAnnotator;
-use pod_metadata_annotator::PodMetadataAnnotator;
+use self::namespace_metadata_annotator::NamespaceMetadataAnnotator;
+use self::node_metadata_annotator::NodeMetadataAnnotator;
+use self::pod_metadata_annotator::PodMetadataAnnotator;
 
 /// The key we use for `file` field.
 const FILE_KEY: &str = "file";
@@ -399,7 +399,11 @@ impl Source {
         let node_store_w = reflector::store::Writer::default();
         let node_state = node_store_w.as_reader();
 
-        tokio::spawn(custom_reflector(node_store_w, node_watcher, delay_deletion));
+        reflectors.push(tokio::spawn(custom_reflector(
+            node_store_w,
+            node_watcher,
+            delay_deletion,
+        )));
 
         let paths_provider =
             K8sPathsProvider::new(pod_state.clone(), ns_state.clone(), exclude_paths);
