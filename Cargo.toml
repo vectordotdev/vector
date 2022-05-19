@@ -326,7 +326,7 @@ azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev =
 azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "a0ef5e57f9b1d7d3c768d27dd761569db6e1c934", default-features = false, features = ["azurite_workaround"] }
 base64 = "0.13.0"
 criterion = { version = "0.3.5", features = ["html_reports", "async_tokio"] }
-libc = "0.2.125"
+libc = "0.2.126"
 pretty_assertions = "1.2.1"
 proptest = "1.0"
 quickcheck = "1.0.3"
