@@ -236,6 +236,7 @@ futures-util = { version = "0.3.21", default-features = false }
 glob = { version = "0.3.0", default-features = false }
 governor = { version = "0.4.1", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
 grok = { version = "1.2.0", default-features = false, optional = true }
+h2 = { version = "0.3.13", default-features = false, optional = true }
 hash_hasher = { version = "2.0.0", default-features = false, optional  = true }
 headers = { version = "0.3.6", default-features = false }
 hostname = { version = "0.3.1", default-features = false }
@@ -345,6 +346,8 @@ leveldb-sys = { git = "https://github.com/vectordotdev/leveldb-sys.git", branch 
 # Removes dependency on `time` v0.1
 # https://github.com/chronotope/chrono/pull/578
 chrono = { git = "https://github.com/vectordotdev/chrono.git", branch = "no-default-time" }
+# Adds `Status::is_reset` test, remove after the next version is released.
+h2 = { git = "https://github.com/hyperium/h2.git", rev = "f6aa3be6719270cd7b4094ee1940751b5f4ec88e" }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
@@ -477,7 +480,7 @@ sources-eventstoredb_metrics = []
 sources-exec = []
 sources-file = ["file-source"]
 sources-fluent = ["base64", "listenfd", "tokio-util/net", "rmpv", "rmp-serde", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "serde_bytes"]
-sources-gcp_pubsub = ["gcp", "prost-types", "protobuf-build", "tonic"]
+sources-gcp_pubsub = ["gcp", "h2", "prost-types", "protobuf-build", "tonic"]
 sources-heroku_logs = ["sources-utils-http", "sources-utils-http-query", "sources-http"]
 sources-host_metrics = ["heim"]
 sources-http = ["sources-utils-http", "sources-utils-http-query"]

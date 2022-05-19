@@ -3135,8 +3135,7 @@ dependencies = [
 [[package]]
 name = "h2"
 version = "0.3.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37a82c6d637fc9515a4694bbf1cb2457b79d81ce52b3108bdeea58b07dd34a57"
+source = "git+https://github.com/hyperium/h2.git?rev=f6aa3be6719270cd7b4094ee1940751b5f4ec88e#f6aa3be6719270cd7b4094ee1940751b5f4ec88e"
 dependencies = [
  "bytes 1.1.0",
  "fnv",
@@ -8640,6 +8639,7 @@ dependencies = [
  "gouth",
  "governor",
  "grok",
+ "h2",
  "hash_hasher",
  "headers",
  "heim",
