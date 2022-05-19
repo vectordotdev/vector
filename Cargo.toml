@@ -304,7 +304,7 @@ heim = { git = "https://github.com/vectordotdev/heim.git", branch="update-nix", 
 mlua = { version = "0.7.4", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 
 [target.'cfg(windows)'.dependencies]
-schannel = "0.1.19"
+schannel = "0.1.20"
 windows-service = "0.4.0"
 
 [target.'cfg(target_os = "macos")'.dependencies]
