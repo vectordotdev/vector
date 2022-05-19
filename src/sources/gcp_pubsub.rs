@@ -1,4 +1,4 @@
-use std::{pin::Pin, sync::Arc, time::Duration};
+use std::{error::Error as _, pin::Pin, sync::Arc, time::Duration};
 
 use chrono::{DateTime, NaiveDateTime, Utc};
 use codecs::decoding::{DeserializerConfig, FramingConfig};
@@ -207,6 +207,12 @@ struct PubsubSource {
     retry_delay: Duration,
 }
 
+enum State {
+    RetryNow,
+    RetryDelay,
+    Shutdown,
+}
+
 impl PubsubSource {
     async fn run(mut self) -> crate::Result<()> {
         let mut endpoint = Channel::from_shared(self.endpoint.clone()).context(EndpointSnafu)?;
@@ -221,9 +227,18 @@ impl PubsubSource {
             None => EmptyStream::default().boxed(),
         };
 
-        while self.run_once(&endpoint, &mut token_generator).await {
-            info!(timeout_secs = 1, "Retrying after timeout.");
-            tokio::time::sleep(self.retry_delay).await;
+        loop {
+            match self.run_once(&endpoint, &mut token_generator).await {
+                State::RetryNow => debug!("Retrying immediately."),
+                State::RetryDelay => {
+                    info!(
+                        timeout_secs = self.retry_delay.as_secs_f64(),
+                        "Retrying after timeout."
+                    );
+                    tokio::time::sleep(self.retry_delay).await;
+                }
+                State::Shutdown => break,
+            }
         }
 
         Ok(())
@@ -233,12 +248,12 @@ impl PubsubSource {
         &mut self,
         endpoint: &Endpoint,
         token_generator: &mut Pin<Box<dyn Stream<Item = ()> + Send>>,
-    ) -> bool {
+    ) -> State {
         let connection = match endpoint.connect().await {
             Ok(connection) => connection,
             Err(error) => {
                 emit!(GcpPubsubConnectError { error });
-                return true;
+                return State::RetryDelay;
             }
         };
 
@@ -264,12 +279,12 @@ impl PubsubSource {
         let request_stream = self.request_stream();
         debug!("Starting streaming pull.");
         let stream = tokio::select! {
-            _ = &mut self.shutdown => return false,
+            _ = &mut self.shutdown => return State::Shutdown,
             result = client.streaming_pull(request_stream) => match result {
                 Ok(stream) => stream,
                 Err(error) => {
                     emit!(GcpPubsubStreamingPullError { error });
-                    return true;
+                    return State::RetryDelay;
                 }
             }
         };
@@ -280,10 +295,10 @@ impl PubsubSource {
 
         loop {
             tokio::select! {
-                _ = &mut self.shutdown => return false,
+                _ = &mut self.shutdown => return State::Shutdown,
                 _ = &mut token_generator.next() => {
                     debug!("New authentication token generated, restarting stream.");
-                    return true;
+                    break State::RetryNow;
                 },
                 receipts = ack_stream.next() => if let Some((status, receipts)) = receipts {
                     if status == BatchStatus::Delivered {
@@ -292,16 +307,11 @@ impl PubsubSource {
                 },
                 response = stream.next() => match response {
                     Some(Ok(response)) => self.handle_response(response, &finalizer).await,
-                    Some(Err(error)) => {
-                        emit!(GcpPubsubReceiveError { error });
-                        break;
-                    }
-                    None => break,
+                    Some(Err(error)) => break translate_error(error),
+                    None => break State::RetryNow,
                 },
             }
         }
-
-        true
     }
 
     fn make_tls_config(&self) -> ClientTlsConfig {
@@ -417,6 +427,31 @@ impl PubsubSource {
             event
         })
     }
+}
+
+fn translate_error(error: tonic::Status) -> State {
+    // GCP occasionally issues a connection reset
+    // in the middle of the streaming pull. This
+    // reset is not technically an error, so we
+    // want to retry immediately, but it is
+    // reported to us as an error from the
+    // underlying library (`tonic`).
+    if is_reset(&error) {
+        debug!("Stream reset by server.");
+        State::RetryNow
+    } else {
+        emit!(GcpPubsubReceiveError { error });
+        State::RetryDelay
+    }
+}
+
+fn is_reset(error: &Status) -> bool {
+    error
+        .source()
+        .and_then(|source| source.downcast_ref::<hyper::Error>())
+        .and_then(|error| error.source())
+        .and_then(|source| source.downcast_ref::<h2::Error>())
+        .map_or(false, |error| error.is_remote() && error.is_reset())
 }
 
 #[cfg(test)]
