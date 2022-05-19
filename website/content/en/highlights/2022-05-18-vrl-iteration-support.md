@@ -114,6 +114,7 @@ this, or any other aspect of Vector and VRL.
 [performance]: https://vector.dev/highlights/2022-03-15-vrl-vm-beta/
 [event enrichment features]: https://vector.dev/highlights/2021-11-18-csv-enrichment/
 [squashing many bugs]: https://github.com/vectordotdev/vector/issues?q=is%3Aissue+sort%3Aupdated-desc+is%3Aclosed+label%3A%22domain%3A+vrl%22+label%3A%22type%3A+bug%22
+[LUA runtime transform]: https://vector.dev/docs/reference/configuration/transforms/lua
 [join us on Discord]: https://discord.gg/n3CuBAwNCn
 [@vectordotdev]: https://twitter.com/vectordotdev
 [existing iteration functions]: https://vrl.dev/functions/#enumerate-functions
