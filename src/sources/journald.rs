@@ -288,8 +288,12 @@ impl JournaldSource {
         loop {
             let mut batch = Batch::new(self);
 
-            if !batch.handle_next(stream.next().await) {
-                break true;
+            // Start the timeout counter only once we have received a
+            // valid and non-filtered event.
+            while batch.events.is_empty() {
+                if !batch.handle_next(stream.next().await) {
+                    return true;
+                }
             }
 
             let timeout = tokio::time::sleep(BATCH_TIMEOUT);
