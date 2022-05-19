@@ -192,6 +192,50 @@ components: transforms: geoip: {
 							}
 							groups: ["City"]
 						}
+						country_name: {
+							description: """
+								The country name associated with the IP address. Is looked up using
+								the configured locale.
+								"""
+							required: true
+							type: string: {
+								examples: ["United States", "United Kingdom"]
+							}
+							groups: ["City"]
+						}
+						region_code: {
+							description: """
+								The [ISO 3166-2 region code](\(urls.iso3166_2)) associated with
+								the IP address.
+								"""
+							required:    true
+							type: string: {
+								examples: ["WBK"]
+							}
+							groups: ["City"]
+						}
+						region_name: {
+							description: """
+								The region name associated with the IP address. Is looked up using
+								the configured locale.
+								"""
+							required: true
+							type: string: {
+								examples: ["West Berkshire"]
+							}
+							groups: ["City"]
+						}
+						metro_code: {
+							description: """
+								The metro code of the location if the location is in the US.
+								"""
+							required: true
+							type: uint: {
+								unit: null
+								examples: [501]
+							}
+							groups: ["City"]
+						}
 						isp: {
 							description: """
 								The name of the Internet Service Provider (ISP) associated with the
