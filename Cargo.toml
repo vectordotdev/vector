@@ -449,6 +449,7 @@ sources-logs = [
   "sources-stdin",
   "sources-syslog",
   "sources-vector",
+  "sources-otel_log"
 ]
 sources-metrics = [
   "sources-apache_metrics",
@@ -510,6 +511,7 @@ sources-utils-tls = []
 sources-utils-udp = []
 sources-utils-unix = []
 sources-vector = ["listenfd", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "tonic", "protobuf-build"]
+sources-otel_log = ["listenfd", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "tonic", "protobuf-build"]
 
 # Transforms
 transforms = ["transforms-logs", "transforms-metrics"]
