@@ -21,6 +21,7 @@ use super::{
     SourceOuter, TransformOuter,
 };
 use crate::{
+    built_info,
     common::datadog::{get_api_base_endpoint, Region},
     http::{HttpClient, HttpError},
     sinks::{
@@ -388,9 +389,21 @@ fn setup_logs_reporting(
             .version = "{}"
             .configuration_key = "{}"
             .ddsource = "vector"
+            .vector = {{
+                "version": "{}",
+                "arch": "{}",
+                "os": "{}",
+                "vendor": "{}"
+            }}
             {}
         "#,
-            &config_version, &datadog.configuration_key, custom_logs_tags_vrl,
+            &config_version,
+            &datadog.configuration_key,
+            crate::vector_version(),
+            built_info::TARGET_ARCH,
+            built_info::TARGET_OS,
+            built_info::TARGET_VENDOR,
+            custom_logs_tags_vrl,
         )),
         ..Default::default()
     };
