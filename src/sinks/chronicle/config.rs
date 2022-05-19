@@ -2,9 +2,7 @@ use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
 use hyper::Body;
 use serde::{Deserialize, Serialize};
-use serde_json::value::{RawValue, Value};
 use snafu::Snafu;
-use vector_core::partition::Partitioner;
 
 use super::{encoder::Encoding, sink::ChronicleSink};
 use crate::{
@@ -14,19 +12,17 @@ use crate::{
     sinks::{
         gcs_common::config::healthcheck_response,
         util::{
-            encoding::EncodingConfigWithDefault, http::BatchedHttpSink, http::PartitionHttpSink,
-            Batch, BatchConfig, JsonArrayBuffer, PartitionBuffer, PushResult, SinkBatchSettings,
-            TowerRequestConfig,
+            encoding::EncodingConfigWithDefault, http::PartitionHttpSink, BatchConfig,
+            JsonArrayBuffer, PartitionBuffer, SinkBatchSettings, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
+    template::Template,
     tls::{TlsConfig, TlsSettings},
 };
 
 // 10MB maximum message size: https://cloud.google.com/pubsub/quotas#resource_limits
 const MAX_BATCH_PAYLOAD_SIZE: usize = 10_000_000;
-
-pub type BoxedRawValue = Box<RawValue>;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -47,6 +43,7 @@ pub struct ChronicleSinkConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsConfig>,
+    pub log_type: Template,
 }
 
 impl_generate_config_from_default!(ChronicleSinkConfig);
@@ -85,18 +82,6 @@ impl SinkConfig for ChronicleSinkConfig {
         let client = HttpClient::new(tls_settings, cx.proxy())?;
         let healthcheck = healthcheck(client.clone(), sink.uri("")?, sink.creds.clone()).boxed();
 
-
-        /*
-        let sink = BatchedHttpSink::new(
-            sink,
-            JsonArrayBuffer::new(batch_settings.size),
-            request_settings,
-            batch_settings.timeout,
-            client,
-            cx.acker(),
-        )
-        .sink_map_err(|error| error!(message = "Fatal chronicle sink error.", %error));
-        */
         let sink = PartitionHttpSink::new(
             sink,
             PartitionBuffer::new(JsonArrayBuffer::new(batch_settings.size)),

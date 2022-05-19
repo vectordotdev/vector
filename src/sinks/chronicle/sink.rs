@@ -1,24 +1,29 @@
 use bytes::Bytes;
 use http::{Request, Uri};
-use serde_json::{json, Value};
+use serde_json::json;
 use snafu::ResultExt;
 
 use super::{
     config::ChronicleSinkConfig,
-    encoder::{ChronicleSinkEventEncoder, Encoding},
+    encoder::{ChronicleSinkEventEncoder, Encoding, PartitionKey},
 };
 use crate::{
     gcp::{GcpCredentials, Scope},
     sinks::{
-        util::{encoding::EncodingConfigWithDefault, http::HttpSink, BoxedRawValue},
+        util::{
+            encoding::EncodingConfigWithDefault, http::HttpSink, BoxedRawValue,
+            PartitionInnerBuffer,
+        },
         UriParseSnafu,
     },
+    template::Template,
 };
 
 pub(super) struct ChronicleSink {
     api_key: Option<String>,
     pub(super) creds: Option<GcpCredentials>,
     uri_base: String,
+    log_type: Template,
     encoding: EncodingConfigWithDefault<Encoding>,
 }
 
@@ -49,6 +54,7 @@ impl ChronicleSink {
         Ok(Self {
             api_key: config.auth.api_key.clone(),
             encoding: config.encoding.clone(),
+            log_type: config.log_type.clone(),
             creds,
             uri_base,
         })
@@ -67,22 +73,24 @@ impl ChronicleSink {
 
 #[async_trait::async_trait]
 impl HttpSink for ChronicleSink {
-    type Input = Value;
-    type Output = Vec<BoxedRawValue>;
+    type Input = PartitionInnerBuffer<serde_json::Value, PartitionKey>;
+    type Output = PartitionInnerBuffer<Vec<BoxedRawValue>, String>;
     type Encoder = ChronicleSinkEventEncoder;
 
     fn build_encoder(&self) -> Self::Encoder {
         ChronicleSinkEventEncoder {
+            field: self.log_type.clone(),
             encoding: self.encoding.clone(),
         }
     }
 
     /// https://cloud.google.com/chronicle/docs/reference/ingestion-api#unstructuredlogentries
-    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Bytes>> {
-        // TODO We have to somehow batch by log_type...
+    async fn build_request(&self, output: Self::Output) -> crate::Result<Request<Bytes>> {
+        let (events, key) = output.into_parts();
+
         let body = json!({ "customer_id": "zork",
-                            "log_type": "NOOG",
-                            "entries": events });
+                                  "log_type": key,
+                                  "entries": events });
         let body = crate::serde::json::to_bytes(&body)?.freeze();
         let uri = self.uri(":batchCreate")?;
 
