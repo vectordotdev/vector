@@ -4,6 +4,7 @@ pub mod cloud_storage;
 pub mod pubsub;
 pub mod stackdriver_logs;
 pub mod stackdriver_metrics;
+pub mod chronicle_unstructured;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct GcpTypedResource {

@@ -82,6 +82,8 @@ impl SinkConfig for ChronicleSinkConfig {
         let client = HttpClient::new(tls_settings, cx.proxy())?;
         let healthcheck = healthcheck(client.clone(), sink.uri("")?, sink.creds.clone()).boxed();
 
+        /*
+        This is old school
         let sink = PartitionHttpSink::new(
             sink,
             PartitionBuffer::new(JsonArrayBuffer::new(batch_settings.size)),
@@ -91,6 +93,7 @@ impl SinkConfig for ChronicleSinkConfig {
             cx.acker(),
         )
         .sink_map_err(|error| error!(message = "Fatal chronicle sink error.", %error));
+        */
 
         Ok((VectorSink::from_event_sink(sink), healthcheck))
     }

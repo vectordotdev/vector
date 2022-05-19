@@ -1,7 +1,9 @@
+use async_trait::async_trait;
 use bytes::Bytes;
 use http::{Request, Uri};
 use serde_json::json;
 use snafu::ResultExt;
+use vector_core::sink::StreamSink;
 
 use super::{
     config::ChronicleSinkConfig,
@@ -14,17 +16,20 @@ use crate::{
             encoding::EncodingConfigWithDefault, http::HttpSink, BoxedRawValue,
             PartitionInnerBuffer,
         },
-        UriParseSnafu,
+        UriParseSnafu, gcs_common::service::{GcsRequest, GcsResponse},
     },
     template::Template,
 };
 
-pub(super) struct ChronicleSink {
+pub(super) struct ChronicleSink<S> {
     api_key: Option<String>,
     pub(super) creds: Option<GcpCredentials>,
     uri_base: String,
     log_type: Template,
     encoding: EncodingConfigWithDefault<Encoding>,
+
+    /// The API service
+    service: S,
 }
 
 // https://cloud.google.com/chronicle/docs/reference/ingestion-api#ingestion_api_reference
@@ -32,8 +37,8 @@ pub(super) struct ChronicleSink {
 // events or unstructured log entries.
 const CHRONICLE_URL: &str = "https://malachiteingestion-pa.googleapis.com";
 
-impl ChronicleSink {
-    pub(super) async fn from_config(config: &ChronicleSinkConfig) -> crate::Result<Self> {
+impl<S> ChronicleSink<S> {
+    pub(super) async fn from_config(service: S, config: &ChronicleSinkConfig) -> crate::Result<Self> {
         let creds = if config.skip_authentication {
             None
         } else {
@@ -57,6 +62,7 @@ impl ChronicleSink {
             log_type: config.log_type.clone(),
             creds,
             uri_base,
+            service,
         })
     }
 
@@ -71,6 +77,59 @@ impl ChronicleSink {
     }
 }
 
+impl<S> ChronicleSink<S>
+where
+    S: Service<GcsRequest> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: GcsResponse + Send + 'static,
+    S::Error: Debug + Into<crate::Error> + Send,
+{
+    async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        let default_api_key = Arc::clone(&self.default_api_key);
+
+        let partitioner = EventPartitioner::default();
+
+        let builder_limit = NonZeroUsize::new(64);
+        let request_builder = LogRequestBuilder {
+            default_api_key,
+            encoding: self.encoding,
+            compression: self.compression,
+        };
+
+        let sink = input
+            .batched_partitioned(partitioner, self.batch_settings)
+            .request_builder(builder_limit, request_builder)
+            .filter_map(|request| async move {
+                match request {
+                    Err(e) => {
+                        error!("Failed to build Datadog Logs request: {:?}.", e);
+                        None
+                    }
+                    Ok(req) => Some(req),
+                }
+            })
+            .into_driver(self.service, self.acker);
+
+        sink.run().await
+    }
+}
+
+
+
+#[async_trait]
+impl<S> StreamSink<Event> for ChronicleSink<S>
+where
+    S: Service<GcsRequest> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: GcsResponse + Send + 'static,
+    S::Error: Debug + Into<crate::Error> + Send,
+{
+    async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        self.run_inner(input).await
+    }
+}
+
+/*
 #[async_trait::async_trait]
 impl HttpSink for ChronicleSink {
     type Input = PartitionInnerBuffer<serde_json::Value, PartitionKey>;
@@ -104,3 +163,4 @@ impl HttpSink for ChronicleSink {
         Ok(request)
     }
 }
+*/
