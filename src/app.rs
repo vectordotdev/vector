@@ -1,6 +1,7 @@
 use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf};
 
 use futures::StreamExt;
+#[cfg(feature = "enterprise")]
 use futures_util::future::BoxFuture;
 use once_cell::race::OnceNonZeroUsize;
 use tokio::{
@@ -10,7 +11,10 @@ use tokio::{
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[cfg(feature = "enterprise")]
-use crate::config::enterprise::EnterpriseError;
+use crate::config::enterprise::{
+    attach_enterprise_components, report_configuration, EnterpriseError, EnterpriseMetadata,
+    EnterpriseReporter,
+};
 #[cfg(not(feature = "enterprise-tests"))]
 use crate::metrics;
 #[cfg(windows)]
@@ -19,13 +23,7 @@ use crate::service;
 use crate::{api, internal_events::ApiStarted};
 use crate::{
     cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand},
-    config::{
-        self,
-        enterprise::{
-            attach_enterprise_components, report_configuration, EnterpriseMetadata,
-            EnterpriseReporter,
-        },
-    },
+    config::{self},
     generate, graph, heartbeat, list,
     signal::{self, SignalTo},
     topology::{self, RunningTopology},
@@ -247,7 +245,7 @@ impl Application {
         })
     }
 
-    pub fn run(mut self) {
+    pub fn run(self) {
         let rt = self.runtime;
 
         let mut graceful_crash = UnboundedReceiverStream::new(self.config.graceful_crash);
@@ -259,6 +257,9 @@ impl Application {
 
         #[cfg(feature = "api")]
         let api_config = self.config.api;
+
+        #[cfg(feature = "enterprise")]
+        let mut enterprise = self.config.enterprise;
 
         let mut signal_handler = self.config.signal_handler;
         let mut signal_rx = self.config.signal_rx;
@@ -302,16 +303,16 @@ impl Application {
                                         // Augment config to enable observability within Datadog, if applicable.
                                         match EnterpriseMetadata::try_from(&new_config) {
                                             Ok(metadata) => {
-                                                match self.config.enterprise.as_ref() {
+                                                match enterprise.as_ref() {
                                                     Some(enterprise) => {
                                                         attach_enterprise_components(&mut new_config, &metadata);
                                                         enterprise.send(report_configuration(config_paths.clone(), metadata));
                                                     }
                                                     None => {
-                                                        let enterprise = EnterpriseReporter::new();
+                                                        let e = EnterpriseReporter::new();
                                                         attach_enterprise_components(&mut new_config, &metadata);
-                                                        enterprise.send(report_configuration(config_paths.clone(), metadata));
-                                                        self.config.enterprise = Some(enterprise);
+                                                        e.send(report_configuration(config_paths.clone(), metadata));
+                                                        enterprise = Some(e);
                                                     }
                                                 }
                                             },
@@ -366,16 +367,16 @@ impl Application {
                                     #[cfg(feature = "enterprise")]
                                     match EnterpriseMetadata::try_from(&new_config) {
                                         Ok(metadata) => {
-                                            match self.config.enterprise.as_ref() {
+                                            match enterprise.as_ref() {
                                                 Some(enterprise) => {
                                                     attach_enterprise_components(&mut new_config, &metadata);
                                                     enterprise.send(report_configuration(config_paths.clone(), metadata));
                                                 }
                                                 None => {
-                                                    let enterprise = EnterpriseReporter::new();
+                                                    let e = EnterpriseReporter::new();
                                                     attach_enterprise_components(&mut new_config, &metadata);
-                                                    enterprise.send(report_configuration(config_paths.clone(), metadata));
-                                                    self.config.enterprise = Some(enterprise);
+                                                    e.send(report_configuration(config_paths.clone(), metadata));
+                                                    enterprise = Some(e);
                                                 }
                                             }
                                         },
