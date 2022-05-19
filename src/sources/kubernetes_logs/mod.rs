@@ -58,12 +58,12 @@ mod pod_metadata_annotator;
 mod transform_utils;
 mod util;
 
-use futures::{future::FutureExt, stream::StreamExt};
-use k8s_paths_provider::K8sPathsProvider;
-use lifecycle::Lifecycle;
 use self::namespace_metadata_annotator::NamespaceMetadataAnnotator;
 use self::node_metadata_annotator::NodeMetadataAnnotator;
 use self::pod_metadata_annotator::PodMetadataAnnotator;
+use futures::{future::FutureExt, stream::StreamExt};
+use k8s_paths_provider::K8sPathsProvider;
+use lifecycle::Lifecycle;
 
 /// The key we use for `file` field.
 const FILE_KEY: &str = "file";
