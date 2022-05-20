@@ -52,6 +52,8 @@ pub mod mongodb_metrics;
 pub mod nats;
 #[cfg(feature = "sources-nginx_metrics")]
 pub mod nginx_metrics;
+#[cfg(feature = "sources-otel_log")]
+pub mod otel_log;
 #[cfg(feature = "sources-postgresql_metrics")]
 pub mod postgresql_metrics;
 #[cfg(feature = "sources-prometheus")]
@@ -70,8 +72,6 @@ pub mod stdin;
 pub mod syslog;
 #[cfg(feature = "sources-vector")]
 pub mod vector;
-#[cfg(feature = "sources-otel_log")]
-pub mod otel_log;
 
 pub(crate) mod util;
 
