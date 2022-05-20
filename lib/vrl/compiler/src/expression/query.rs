@@ -121,7 +121,6 @@ impl Expression for Query {
 
         match &self.target {
             External => match state.1.target() {
-                None if self.path.is_root() => TypeDef::object(Collection::any()).infallible(),
                 None => TypeDef::any().infallible(),
                 Some(details) => details.clone().type_def.at_path(&self.path.to_lookup()),
             },
