@@ -100,7 +100,7 @@ impl PartialEq<Self> for Value {
             }
             (Value::Integer(a), Value::Integer(b)) => a.eq(b),
             (Value::Object(a), Value::Object(b)) => a.eq(b),
-            (Value::Null, Value::Null) => true,
+            (Self::Null, Self::Null) => true,
             (Value::Timestamp(a), Value::Timestamp(b)) => a.eq(b),
             _ => false,
         }
@@ -143,7 +143,7 @@ impl Hash for Value {
             Value::Object(v) => {
                 v.hash(state);
             }
-            Value::Null => {
+            Self::Null => {
                 //covered by discriminant hash
             }
             Value::Timestamp(v) => {
@@ -164,7 +164,7 @@ impl Value {
             Value::Boolean(_) => "boolean",
             Value::Object(_) => "map",
             Value::Array(_) => "array",
-            Value::Null => "null",
+            Self::Null => "null",
         }
     }
 
@@ -215,7 +215,7 @@ impl Value {
             | Value::Timestamp(_)
             | Value::Float(_)
             | Value::Integer(_) => false,
-            Value::Null => true,
+            Self::Null => true,
             Value::Object(v) => v.is_empty(),
             Value::Array(v) => v.is_empty(),
         }
