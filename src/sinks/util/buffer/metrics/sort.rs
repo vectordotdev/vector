@@ -9,7 +9,6 @@ pub fn sort_for_compression(metrics: &mut [Metric]) {
 
 #[cfg(test)]
 mod test {
-    use crate::event::metric::MetricTags;
     use crate::event::MetricValue;
     use rand::prelude::SliceRandom;
     use rand::thread_rng;
