@@ -103,7 +103,7 @@ impl Function for IsJson {
 
         match variant {
             Some(raw_variant) => {
-                let variant = raw_variant.try_bytes().expect("variant not bytes");
+                let variant = raw_variant.try_bytes()?;
                 Ok(Box::new(IsJsonVariantsFn { value, variant }))
             }
             None => Ok(Box::new(IsJsonFn { value })),
@@ -121,8 +121,7 @@ impl Function for IsJson {
             ("variant", Some(expr)) => {
                 let variant = expr
                     .as_enum("variant", variants())?
-                    .try_bytes()
-                    .expect("variant not bytes");
+                    .try_bytes()?;
 
                 Ok(Some(Box::new(variant) as _))
             }

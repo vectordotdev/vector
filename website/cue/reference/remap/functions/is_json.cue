@@ -15,7 +15,7 @@ remap: functions: is_json: {
 		},
 		{
 			name:        "variant"
-			description: "The variant of the JSON type to explicitly check it."
+			description: "The variant of the JSON type to explicitly check for."
 			enum: {
 				"object": "JSON object - {}"
 				"array":  "JSON array - []"
