@@ -1,8 +1,8 @@
 package metadata
 
 remap: functions: for_each: {
-	category: "Enumerate"
-	description: #"""
+	category:    "Enumerate"
+	description: """
 		Iterate over a collection.
 
 		This function currently *does not* support recursive iteration.
@@ -22,7 +22,7 @@ remap: functions: for_each: {
 		unavailable outside of the block.
 
 		Check out the examples below to learn about the closure syntax.
-		"""#
+		"""
 
 	arguments: [
 		{
