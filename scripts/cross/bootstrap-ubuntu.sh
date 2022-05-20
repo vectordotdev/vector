@@ -9,11 +9,11 @@ apt-get install -y \
 # we need LLVM >= 3.9 for onig_sys/bindgen
 
 cat <<-EOF > /etc/apt/sources.list.d/llvm.list
-deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-9 main
-deb-src http://apt.llvm.org/xenial/ llvm-toolchain-xenial-9 main
+deb http://apt.llvm.org/focal/ llvm-toolchain-focal-9 main
+deb-src http://apt.llvm.org/focal/ llvm-toolchain-focal-9 main
 EOF
 
-wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key| apt-key add -
+wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
 
 apt-get update
 
