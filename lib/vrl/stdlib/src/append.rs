@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn append(value: Value, items: Value) -> Resolved {
@@ -81,8 +82,9 @@ impl Expression for AppendFn {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use vector_common::btreemap;
+
+    use super::*;
 
     test_function![
         append => Append;

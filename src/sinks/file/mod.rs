@@ -6,7 +6,7 @@ use bytes::{Bytes, BytesMut};
 use codecs::{
     encoding::{Framer, FramingConfig, SerializerConfig},
     JsonSerializerConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
-    RawMessageSerializerConfig,
+    TextSerializerConfig,
 };
 use futures::{
     future,
@@ -51,7 +51,7 @@ impl EncodingConfigWithFramingMigrator for EncodingMigrator {
 
     fn migrate(codec: &Self::Codec) -> (Option<FramingConfig>, SerializerConfig) {
         match codec {
-            Encoding::Text => (None, RawMessageSerializerConfig::new().into()),
+            Encoding::Text => (None, TextSerializerConfig::new().into()),
             Encoding::Ndjson => (
                 Some(NewlineDelimitedEncoderConfig::new().into()),
                 JsonSerializerConfig::new().into(),
@@ -61,6 +61,7 @@ impl EncodingConfigWithFramingMigrator for EncodingMigrator {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct FileSinkConfig {
     pub path: Template,
     pub idle_timeout_secs: Option<u64>,
@@ -173,7 +174,7 @@ impl SinkConfig for FileSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(self.encoding.config().1.input_type())
     }
 
     fn sink_type(&self) -> &'static str {
@@ -198,9 +199,8 @@ pub struct FileSink {
 
 impl FileSink {
     pub fn new(config: &FileSinkConfig, acker: Acker) -> Self {
-        let encoding = config.encoding.clone();
-        let transformer = encoding.transformer();
-        let (framer, serializer) = encoding.encoding();
+        let transformer = config.encoding.transformer();
+        let (framer, serializer) = config.encoding.encoding();
         let framer = framer.unwrap_or_else(|| NewlineDelimitedEncoder::new().into());
         let encoder = Encoder::<Framer>::new(framer, serializer);
 

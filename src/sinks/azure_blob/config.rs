@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
 
 use super::request_builder::AzureBlobRequestOptions;
-
 use crate::{
     codecs::Encoder,
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
@@ -32,6 +31,7 @@ use crate::{
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct AzureBlobSinkConfig {
     pub connection_string: String,
     pub(super) container_name: String,
@@ -143,9 +143,13 @@ impl AzureBlobSinkConfig {
                 // TODO: We probably want to use something like octet framing here.
                 return Err("Native encoding is not implemented for this sink yet".into());
             }
-            (None, Serializer::NativeJson(_) | Serializer::RawMessage(_)) => {
-                NewlineDelimitedEncoder::new().into()
-            }
+            (
+                None,
+                Serializer::Logfmt(_)
+                | Serializer::NativeJson(_)
+                | Serializer::RawMessage(_)
+                | Serializer::Text(_),
+            ) => NewlineDelimitedEncoder::new().into(),
         };
         let encoder = Encoder::<Framer>::new(framer, serializer);
 

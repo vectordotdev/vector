@@ -1,7 +1,7 @@
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
-use futures::StreamExt;
+use futures::{Stream, StreamExt};
 pub use goauth::scopes::Scope;
 use goauth::{
     auth::{JwtClaims, Token, TokenErr},
@@ -13,6 +13,7 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use smpl_jwt::Jwt;
 use snafu::{ResultExt, Snafu};
+use tokio::time::Instant;
 use tokio_stream::wrappers::IntervalStream;
 
 use crate::{config::ProxyConfig, http::HttpClient, http::HttpError};
@@ -31,23 +32,23 @@ pub static PUBSUB_ADDRESS: Lazy<String> = Lazy::new(|| {
 pub enum GcpError {
     #[snafu(display("This requires one of api_key or credentials_path to be defined"))]
     MissingAuth,
-    #[snafu(display("Invalid GCP credentials"))]
-    InvalidCredentials0,
-    #[snafu(display("Invalid GCP credentials"))]
-    InvalidCredentials1 { source: GoErr },
-    #[snafu(display("Invalid RSA key in GCP credentials"))]
+    #[snafu(display("Invalid GCP credentials: {}", source))]
+    InvalidCredentials { source: GoErr },
+    #[snafu(display("Healthcheck endpoint forbidden"))]
+    HealthcheckForbidden,
+    #[snafu(display("Invalid RSA key in GCP credentials: {}", source))]
     InvalidRsaKey { source: GoErr },
-    #[snafu(display("Failed to get OAuth token"))]
+    #[snafu(display("Failed to get OAuth token: {}", source))]
     GetToken { source: GoErr },
-    #[snafu(display("Failed to get OAuth token text"))]
+    #[snafu(display("Failed to get OAuth token text: {}", source))]
     GetTokenBytes { source: hyper::Error },
-    #[snafu(display("Failed to get implicit GCP token"))]
+    #[snafu(display("Failed to get implicit GCP token: {}", source))]
     GetImplicitToken { source: HttpError },
-    #[snafu(display("Failed to parse OAuth token JSON"))]
+    #[snafu(display("Failed to parse OAuth token JSON: {}", source))]
     TokenFromJson { source: TokenErr },
-    #[snafu(display("Failed to parse OAuth token JSON text"))]
+    #[snafu(display("Failed to parse OAuth token JSON text: {}", source))]
     TokenJsonFromStr { source: serde_json::Error },
-    #[snafu(display("Failed to build HTTP client"))]
+    #[snafu(display("Failed to build HTTP client: {}", source))]
     BuildHttpClient { source: HttpError },
 }
 
@@ -70,37 +71,40 @@ impl GcpAuthConfig {
 }
 
 #[derive(Clone, Debug)]
-pub struct GcpCredentials {
+pub struct GcpCredentials(Arc<Inner>);
+
+#[derive(Debug)]
+struct Inner {
     creds: Option<Credentials>,
     scope: Scope,
-    token: Arc<RwLock<Token>>,
+    token: RwLock<Token>,
 }
 
 impl GcpCredentials {
     async fn from_file(path: &str, scope: Scope) -> crate::Result<Self> {
-        let creds = Credentials::from_file(path).context(InvalidCredentials1Snafu)?;
+        let creds = Credentials::from_file(path).context(InvalidCredentialsSnafu)?;
         let jwt = make_jwt(&creds, &scope)?;
         let token = goauth::get_token(&jwt, &creds)
             .await
             .context(GetTokenSnafu)?;
-        Ok(Self {
+        Ok(Self(Arc::new(Inner {
             creds: Some(creds),
             scope,
-            token: Arc::new(RwLock::new(token)),
-        })
+            token: RwLock::new(token),
+        })))
     }
 
     async fn new_implicit(scope: Scope) -> crate::Result<Self> {
         let token = get_token_implicit().await?;
-        Ok(Self {
+        Ok(Self(Arc::new(Inner {
             creds: None,
             scope,
-            token: Arc::new(RwLock::new(token)),
-        })
+            token: RwLock::new(token),
+        })))
     }
 
     pub fn make_token(&self) -> String {
-        let token = self.token.read().unwrap();
+        let token = self.0.token.read().unwrap();
         format!("{} {}", token.token_type(), token.access_token())
     }
 
@@ -111,35 +115,39 @@ impl GcpCredentials {
     }
 
     async fn regenerate_token(&self) -> crate::Result<()> {
-        let token = match &self.creds {
+        let token = match &self.0.creds {
             Some(creds) => {
-                let jwt = make_jwt(creds, &self.scope).unwrap(); // Errors caught above
+                let jwt = make_jwt(creds, &self.0.scope).unwrap(); // Errors caught above
                 goauth::get_token(&jwt, creds).await?
             }
             None => get_token_implicit().await?,
         };
-        *self.token.write().unwrap() = token;
+        *self.0.token.write().unwrap() = token;
         Ok(())
     }
 
     pub fn spawn_regenerate_token(&self) {
         let this = self.clone();
+        tokio::spawn(async move { this.token_regenerator().for_each(|_| async {}).await });
+    }
 
-        let period = this.token.read().unwrap().expires_in() as u64 / 2;
-        let interval = IntervalStream::new(tokio::time::interval(Duration::from_secs(period)));
-        let task = interval.for_each(move |_| {
-            let this = this.clone();
-            async move {
-                debug!("Renewing GCP authentication token.");
-                if let Err(error) = this.regenerate_token().await {
-                    error!(
-                        message = "Failed to update GCP authentication token.",
-                        %error
-                    );
+    pub fn token_regenerator(&self) -> impl Stream<Item = ()> + 'static {
+        let period = Duration::from_secs(self.0.token.read().unwrap().expires_in() as u64 / 2);
+        let this = self.clone();
+        IntervalStream::new(tokio::time::interval_at(Instant::now() + period, period)).then(
+            move |_| {
+                let this = this.clone();
+                async move {
+                    debug!("Renewing GCP authentication token.");
+                    if let Err(error) = this.regenerate_token().await {
+                        error!(
+                            message = "Failed to update GCP authentication token.",
+                            %error
+                        );
+                    }
                 }
-            }
-        });
-        tokio::spawn(task);
+            },
+        )
     }
 }
 

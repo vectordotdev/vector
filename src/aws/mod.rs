@@ -1,9 +1,9 @@
 pub mod auth;
 pub mod region;
 
-use crate::config::ProxyConfig;
-use crate::http::{build_proxy_connector, build_tls_connector};
-use crate::tls::{MaybeTlsSettings, TlsConfig};
+use std::sync::Arc;
+use std::time::Duration;
+
 pub use auth::AwsAuthentication;
 use aws_config::meta::region::ProvideRegion;
 use aws_smithy_async::rt::sleep::{AsyncSleep, Sleep};
@@ -16,8 +16,10 @@ use aws_types::region::Region;
 use once_cell::sync::OnceCell;
 use regex::RegexSet;
 pub use region::RegionOrEndpoint;
-use std::sync::Arc;
-use std::time::Duration;
+
+use crate::config::ProxyConfig;
+use crate::http::{build_proxy_connector, build_tls_connector};
+use crate::tls::{MaybeTlsSettings, TlsConfig};
 
 static RETRIABLE_CODES: OnceCell<RegexSet> = OnceCell::new();
 

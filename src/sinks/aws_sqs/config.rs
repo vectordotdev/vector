@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 
 use aws_sdk_sqs::Client as SqsClient;
-use codecs::{encoding::SerializerConfig, JsonSerializerConfig, RawMessageSerializerConfig};
+use codecs::{encoding::SerializerConfig, JsonSerializerConfig, TextSerializerConfig};
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -39,18 +39,18 @@ impl EncodingConfigMigrator for EncodingMigrator {
 
     fn migrate(codec: &Self::Codec) -> SerializerConfig {
         match codec {
-            Encoding::Text => RawMessageSerializerConfig::new().into(),
+            Encoding::Text => TextSerializerConfig::new().into(),
             Encoding::Json => JsonSerializerConfig::new().into(),
         }
     }
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct SqsSinkConfig {
     pub queue_url: String,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    #[serde(flatten)]
     pub encoding: EncodingConfigAdapter<EncodingConfig<Encoding>, EncodingMigrator>,
     pub message_group_id: Option<String>,
     pub message_deduplication_id: Option<String>,
@@ -104,7 +104,7 @@ impl SinkConfig for SqsSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(self.encoding.config().input_type())
     }
 
     fn sink_type(&self) -> &'static str {

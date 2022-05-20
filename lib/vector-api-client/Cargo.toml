@@ -18,7 +18,7 @@ anyhow = { version = "1.0.57", default-features = false, features = ["std"] }
 # Tokio / Futures
 async-trait = { version = "0.1", default-features = false }
 futures = { version = "0.3", default-features = false, features = ["compat", "io-compat"] }
-tokio = { version = "1.18.1", default-features = false, features = ["macros", "rt", "sync"] }
+tokio = { version = "1.18.2", default-features = false, features = ["macros", "rt", "sync"] }
 tokio-stream = { version = "0.1.8", default-features = false, features = ["sync"] }
 
 # GraphQL
@@ -26,10 +26,10 @@ graphql_client = { version = "0.10.0", default-features = false, features = ["gr
 
 # HTTP / WebSockets
 reqwest = { version = "0.11.10", default-features = false, features = ["json"] }
-tokio-tungstenite = { version = "0.15.0", default-features = false, features = ["connect", "rustls"] }
+tokio-tungstenite = { version = "0.17.1", default-features = false, features = ["connect", "rustls"] }
 
 # External libs
 chrono = { version = "0.4.6", default-features = false, features = ["serde"] }
 url = { version = "2.2.2", default-features = false }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
-indoc = { version = "1.0.4", default-features = false }
+indoc = { version = "1.0.6", default-features = false }

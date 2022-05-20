@@ -52,6 +52,9 @@ impl Expression for UuidV4Fn {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
+    use ::value::Value;
     use vector_common::TimeZone;
 
     use super::*;
@@ -64,7 +67,7 @@ mod tests {
     #[test]
     fn uuid_v4() {
         let mut state = vrl::state::Runtime::default();
-        let mut object: Value = map![].into();
+        let mut object: Value = Value::Object(BTreeMap::new());
         let tz = TimeZone::default();
         let mut ctx = Context::new(&mut object, &mut state, &tz);
         let value = UuidV4Fn.resolve(&mut ctx).unwrap();

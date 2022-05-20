@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 
 use async_trait::async_trait;
 use bytes::BytesMut;
-use codecs::{encoding::SerializerConfig, JsonSerializerConfig, RawMessageSerializerConfig};
+use codecs::{encoding::SerializerConfig, JsonSerializerConfig, TextSerializerConfig};
 use futures::{stream::BoxStream, FutureExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -43,7 +43,7 @@ impl EncodingConfigMigrator for EncodingMigrator {
 
     fn migrate(codec: &Self::Codec) -> SerializerConfig {
         match codec {
-            Encoding::Text => RawMessageSerializerConfig::new().into(),
+            Encoding::Text => TextSerializerConfig::new().into(),
             Encoding::Json => JsonSerializerConfig::new().into(),
         }
     }
@@ -54,8 +54,8 @@ impl EncodingConfigMigrator for EncodingMigrator {
  */
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct NatsSinkConfig {
-    #[serde(flatten)]
     encoding: EncodingConfigAdapter<EncodingConfig<Encoding>, EncodingMigrator>,
     #[serde(default = "default_name", alias = "name")]
     connection_name: String,
@@ -106,7 +106,7 @@ impl SinkConfig for NatsSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(self.encoding.config().input_type())
     }
 
     fn sink_type(&self) -> &'static str {
@@ -149,9 +149,8 @@ pub struct NatsSink {
 impl NatsSink {
     async fn new(config: NatsSinkConfig, acker: Acker) -> Result<Self, BuildError> {
         let connection = config.connect().await?;
-        let encoding = config.encoding.clone();
-        let transformer = encoding.transformer();
-        let serializer = encoding.encoding();
+        let transformer = config.encoding.transformer();
+        let serializer = config.encoding.encoding();
         let encoder = Encoder::<()>::new(serializer);
 
         Ok(NatsSink {

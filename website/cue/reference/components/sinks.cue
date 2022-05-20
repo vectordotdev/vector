@@ -167,7 +167,11 @@ components: sinks: [Name=string]: {
 		if features.send != _|_ {
 			if features.send.encoding.enabled {
 				encoding: {
-					description: "Configures the encoding specific sink behavior."
+					description: """
+						Configures the encoding specific sink behavior.
+
+						Note: When data in `encoding` is malformed, currently only a very generic error "data did not match any variant of untagged enum EncodingConfig" is reported. Follow this [issue](\(urls.vector_encoding_config_improve_error_message)) to track progress on improving these error messages.
+						"""
 					required:    features.send.encoding.codec.enabled
 					if !features.send.encoding.codec.enabled {common: true}
 					type: object: {

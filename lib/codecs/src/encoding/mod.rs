@@ -4,19 +4,20 @@
 pub mod format;
 pub mod framing;
 
+use std::fmt::Debug;
+
+use bytes::BytesMut;
 pub use format::{
-    JsonSerializer, JsonSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig,
-    NativeSerializer, NativeSerializerConfig, RawMessageSerializer, RawMessageSerializerConfig,
+    JsonSerializer, JsonSerializerConfig, LogfmtSerializer, LogfmtSerializerConfig,
+    NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer, NativeSerializerConfig,
+    RawMessageSerializer, RawMessageSerializerConfig, TextSerializer, TextSerializerConfig,
 };
 pub use framing::{
     BoxedFramer, BoxedFramingError, BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder,
     CharacterDelimitedEncoderConfig, CharacterDelimitedEncoderOptions, LengthDelimitedEncoder,
     LengthDelimitedEncoderConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
 };
-
-use bytes::BytesMut;
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
 use vector_core::{config::DataType, event::Event, schema};
 
 /// An error that occurred while encoding structured events into byte frames.
@@ -49,7 +50,7 @@ impl From<std::io::Error> for Error {
 // Unfortunately, copying options of the nested enum variants is necessary
 // since `serde` doesn't allow `flatten`ing these:
 // https://github.com/serde-rs/serde/issues/1402.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(tag = "method", rename_all = "snake_case")]
 pub enum FramingConfig {
     /// Configures the `BytesEncoder`.
@@ -182,17 +183,39 @@ impl tokio_util::codec::Encoder<()> for Framer {
 pub enum SerializerConfig {
     /// Configures the `JsonSerializer`.
     Json,
+    /// Configures the `LogfmtSerializer`.
+    Logfmt,
     /// Configures the `NativeSerializer`.
     Native,
     /// Configures the `NativeJsonSerializer`.
     NativeJson,
     /// Configures the `RawMessageSerializer`.
     RawMessage,
+    /// Configures the `TextSerializer`.
+    Text,
 }
 
 impl From<JsonSerializerConfig> for SerializerConfig {
     fn from(_: JsonSerializerConfig) -> Self {
         Self::Json
+    }
+}
+
+impl From<LogfmtSerializerConfig> for SerializerConfig {
+    fn from(_: LogfmtSerializerConfig) -> Self {
+        Self::Logfmt
+    }
+}
+
+impl From<NativeSerializerConfig> for SerializerConfig {
+    fn from(_: NativeSerializerConfig) -> Self {
+        Self::Native
+    }
+}
+
+impl From<NativeJsonSerializerConfig> for SerializerConfig {
+    fn from(_: NativeJsonSerializerConfig) -> Self {
+        Self::NativeJson
     }
 }
 
@@ -202,11 +225,18 @@ impl From<RawMessageSerializerConfig> for SerializerConfig {
     }
 }
 
+impl From<TextSerializerConfig> for SerializerConfig {
+    fn from(_: TextSerializerConfig) -> Self {
+        Self::Text
+    }
+}
+
 impl SerializerConfig {
     /// Build the `Serializer` from this configuration.
     pub const fn build(&self) -> Serializer {
         match self {
             SerializerConfig::Json => Serializer::Json(JsonSerializerConfig.build()),
+            SerializerConfig::Logfmt => Serializer::Logfmt(LogfmtSerializerConfig.build()),
             SerializerConfig::Native => Serializer::Native(NativeSerializerConfig.build()),
             SerializerConfig::NativeJson => {
                 Serializer::NativeJson(NativeJsonSerializerConfig.build())
@@ -214,6 +244,7 @@ impl SerializerConfig {
             SerializerConfig::RawMessage => {
                 Serializer::RawMessage(RawMessageSerializerConfig.build())
             }
+            SerializerConfig::Text => Serializer::Text(TextSerializerConfig.build()),
         }
     }
 
@@ -221,9 +252,11 @@ impl SerializerConfig {
     pub fn input_type(&self) -> DataType {
         match self {
             SerializerConfig::Json => JsonSerializerConfig.input_type(),
+            SerializerConfig::Logfmt => LogfmtSerializerConfig.input_type(),
             SerializerConfig::Native => NativeSerializerConfig.input_type(),
             SerializerConfig::NativeJson => NativeJsonSerializerConfig.input_type(),
             SerializerConfig::RawMessage => RawMessageSerializerConfig.input_type(),
+            SerializerConfig::Text => TextSerializerConfig.input_type(),
         }
     }
 
@@ -231,9 +264,11 @@ impl SerializerConfig {
     pub fn schema_requirement(&self) -> schema::Requirement {
         match self {
             SerializerConfig::Json => JsonSerializerConfig.schema_requirement(),
+            SerializerConfig::Logfmt => LogfmtSerializerConfig.schema_requirement(),
             SerializerConfig::Native => NativeSerializerConfig.schema_requirement(),
             SerializerConfig::NativeJson => NativeJsonSerializerConfig.schema_requirement(),
             SerializerConfig::RawMessage => RawMessageSerializerConfig.schema_requirement(),
+            SerializerConfig::Text => TextSerializerConfig.schema_requirement(),
         }
     }
 }
@@ -243,17 +278,39 @@ impl SerializerConfig {
 pub enum Serializer {
     /// Uses a `JsonSerializer` for serialization.
     Json(JsonSerializer),
+    /// Uses a `LogfmtSerializer` for serialization.
+    Logfmt(LogfmtSerializer),
     /// Uses a `NativeSerializer` for serialization.
     Native(NativeSerializer),
     /// Uses a `NativeJsonSerializer` for serialization.
     NativeJson(NativeJsonSerializer),
     /// Uses a `RawMessageSerializer` for serialization.
     RawMessage(RawMessageSerializer),
+    /// Uses a `TextSerializer` for serialization.
+    Text(TextSerializer),
 }
 
 impl From<JsonSerializer> for Serializer {
     fn from(serializer: JsonSerializer) -> Self {
         Self::Json(serializer)
+    }
+}
+
+impl From<LogfmtSerializer> for Serializer {
+    fn from(serializer: LogfmtSerializer) -> Self {
+        Self::Logfmt(serializer)
+    }
+}
+
+impl From<NativeSerializer> for Serializer {
+    fn from(serializer: NativeSerializer) -> Self {
+        Self::Native(serializer)
+    }
+}
+
+impl From<NativeJsonSerializer> for Serializer {
+    fn from(serializer: NativeJsonSerializer) -> Self {
+        Self::NativeJson(serializer)
     }
 }
 
@@ -263,15 +320,23 @@ impl From<RawMessageSerializer> for Serializer {
     }
 }
 
+impl From<TextSerializer> for Serializer {
+    fn from(serializer: TextSerializer) -> Self {
+        Self::Text(serializer)
+    }
+}
+
 impl tokio_util::codec::Encoder<Event> for Serializer {
     type Error = vector_core::Error;
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         match self {
             Serializer::Json(serializer) => serializer.encode(event, buffer),
+            Serializer::Logfmt(serializer) => serializer.encode(event, buffer),
             Serializer::Native(serializer) => serializer.encode(event, buffer),
             Serializer::NativeJson(serializer) => serializer.encode(event, buffer),
             Serializer::RawMessage(serializer) => serializer.encode(event, buffer),
+            Serializer::Text(serializer) => serializer.encode(event, buffer),
         }
     }
 }

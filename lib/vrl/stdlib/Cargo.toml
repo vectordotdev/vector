@@ -33,6 +33,7 @@ once_cell = { version = "1.10", optional = true }
 rand = { version = "0.8.5", optional = true }
 regex = { version = "1", optional = true }
 rust_decimal = { version = "1", optional = true }
+serde = { version = "1", default-features = false, features = ["derive"], optional = true }
 serde_json = { version = "1", optional = true }
 sha-1 = { version = "0.10", optional = true }
 sha-2 = { package = "sha2", version = "0.10", optional = true }
@@ -44,7 +45,7 @@ url = { version = "2", optional = true }
 uuid = { version = "1", features = ["v4"], optional = true }
 roxmltree = { version = "0.14.1", optional = true }
 woothee = { version = "0.13.0", optional = true }
-uaparser = { version = "0.5.1", optional = true }
+uaparser = { version = "0.6.0", default-features = false, optional = true }
 utf8-width = { version = "0.1.6", optional = true }
 
 # Cryptography
@@ -114,6 +115,7 @@ default = [
     "is_empty",
     "is_float",
     "is_integer",
+    "is_json",
     "is_null",
     "is_nullish",
     "is_object",
@@ -193,6 +195,7 @@ default = [
     "to_timestamp",
     "to_unix_timestamp",
     "truncate",
+    "type_def",
     "unique",
     "unnest",
     "upcase",
@@ -248,6 +251,7 @@ is_boolean = []
 is_empty = []
 is_float = []
 is_integer = []
+is_json = ["serde", "serde_json", "value/json"]
 is_null = []
 is_nullish = []
 is_object = []
@@ -326,6 +330,7 @@ to_syslog_level = []
 to_syslog_severity = []
 to_timestamp = ["vector_common/conversion", "chrono"]
 to_unix_timestamp = ["chrono"]
+type_def = []
 truncate = []
 unique = ["indexmap"]
 unnest = ["lookup_lib"]

@@ -142,10 +142,11 @@ mod tests {
 #[cfg(test)]
 #[cfg(feature = "humio-integration-tests")]
 mod integration_tests {
+    use std::{collections::HashMap, convert::TryFrom};
+
     use chrono::{TimeZone, Utc};
     use indoc::indoc;
     use serde_json::{json, Value as JsonValue};
-    use std::{collections::HashMap, convert::TryFrom};
     use tokio::time::Duration;
 
     use super::*;

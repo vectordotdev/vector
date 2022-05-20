@@ -1,5 +1,6 @@
 use std::{collections::HashMap, io};
 
+use bytes::Bytes;
 use serde::{ser::SerializeSeq, Serialize};
 use vector_core::{
     event::{EventFinalizers, Finalizable},
@@ -52,7 +53,7 @@ impl From<Vec<LokiRecord>> for LokiBatch {
 #[derive(Clone, Debug)]
 pub struct LokiEvent {
     pub timestamp: i64,
-    pub event: String,
+    pub event: Bytes,
 }
 
 impl ByteSizeOf for LokiEvent {
@@ -68,7 +69,8 @@ impl Serialize for LokiEvent {
     {
         let mut seq = serializer.serialize_seq(Some(2))?;
         seq.serialize_element(&self.timestamp.to_string())?;
-        seq.serialize_element(&self.event)?;
+        let event = String::from_utf8_lossy(&self.event);
+        seq.serialize_element(&event)?;
         seq.end()
     }
 }

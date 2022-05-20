@@ -35,6 +35,7 @@ use std::{
 };
 
 use arc_swap::ArcSwap;
+use value::Value;
 
 use super::{Condition, IndexHandle, Table};
 use crate::Case;
@@ -204,7 +205,7 @@ impl TableSearch {
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
         index: Option<IndexHandle>,
-    ) -> Result<BTreeMap<String, vrl::Value>, String> {
+    ) -> Result<BTreeMap<String, Value>, String> {
         let tables = self.0.load();
         if let Some(ref tables) = **tables {
             match tables.get(table) {
@@ -226,7 +227,7 @@ impl TableSearch {
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
         index: Option<IndexHandle>,
-    ) -> Result<Vec<BTreeMap<String, vrl::Value>>, String> {
+    ) -> Result<Vec<BTreeMap<String, Value>>, String> {
         let tables = self.0.load();
         if let Some(ref tables) = **tables {
             match tables.get(table) {
@@ -271,8 +272,7 @@ fn fmt_enrichment_table(
 
 #[cfg(test)]
 mod tests {
-    use vector_common::btreemap;
-    use vrl::Value;
+    use value::Value;
 
     use super::*;
     use crate::test_util::DummyEnrichmentTable;
@@ -358,9 +358,7 @@ mod tests {
         registry.finish_load();
 
         assert_eq!(
-            Ok(btreemap! {
-                "field" => "result"
-            }),
+            Ok(BTreeMap::from([("field".into(), Value::from("result"))])),
             tables_search.find_table_row(
                 "dummy1",
                 Case::Sensitive,

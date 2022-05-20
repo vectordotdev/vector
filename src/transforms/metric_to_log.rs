@@ -1,4 +1,5 @@
 use chrono::Utc;
+use lookup::path;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use vector_common::TimeZone;
@@ -92,7 +93,7 @@ impl MetricToLog {
                     let mut log = LogEvent::new_with_metadata(metric.metadata().clone());
 
                     for (key, value) in object {
-                        log.insert_flat(key, value);
+                        log.insert(path!(&key), value);
                     }
 
                     let timestamp = log
@@ -178,7 +179,7 @@ mod tests {
         let metadata = counter.metadata().clone();
 
         let log = do_transform(counter).unwrap();
-        let collected: Vec<_> = log.all_fields().collect();
+        let collected: Vec<_> = log.all_fields().unwrap().collect();
 
         assert_eq!(
             collected,
@@ -205,7 +206,7 @@ mod tests {
         let metadata = gauge.metadata().clone();
 
         let log = do_transform(gauge).unwrap();
-        let collected: Vec<_> = log.all_fields().collect();
+        let collected: Vec<_> = log.all_fields().unwrap().collect();
 
         assert_eq!(
             collected,
@@ -232,7 +233,7 @@ mod tests {
         let metadata = set.metadata().clone();
 
         let log = do_transform(set).unwrap();
-        let collected: Vec<_> = log.all_fields().collect();
+        let collected: Vec<_> = log.all_fields().unwrap().collect();
 
         assert_eq!(
             collected,
@@ -261,7 +262,7 @@ mod tests {
         let metadata = distro.metadata().clone();
 
         let log = do_transform(distro).unwrap();
-        let collected: Vec<_> = log.all_fields().collect();
+        let collected: Vec<_> = log.all_fields().unwrap().collect();
 
         assert_eq!(
             collected,
@@ -309,7 +310,7 @@ mod tests {
         let metadata = histo.metadata().clone();
 
         let log = do_transform(histo).unwrap();
-        let collected: Vec<_> = log.all_fields().collect();
+        let collected: Vec<_> = log.all_fields().unwrap().collect();
 
         assert_eq!(
             collected,
@@ -355,7 +356,7 @@ mod tests {
         let metadata = summary.metadata().clone();
 
         let log = do_transform(summary).unwrap();
-        let collected: Vec<_> = log.all_fields().collect();
+        let collected: Vec<_> = log.all_fields().unwrap().collect();
 
         assert_eq!(
             collected,

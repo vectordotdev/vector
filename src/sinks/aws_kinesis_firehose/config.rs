@@ -1,9 +1,9 @@
+use std::sync::Arc;
+
 use aws_sdk_firehose::error::{
     DescribeDeliveryStreamError, PutRecordBatchError, PutRecordBatchErrorKind,
 };
 use aws_sdk_firehose::types::SdkError;
-use std::sync::Arc;
-
 use aws_sdk_firehose::{Client as KinesisFirehoseClient, Endpoint, Region};
 use aws_smithy_async::rt::sleep::AsyncSleep;
 use aws_smithy_client::erase::DynConnector;
@@ -51,11 +51,11 @@ impl SinkBatchSettings for KinesisFirehoseDefaultBatchSettings {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct KinesisFirehoseSinkConfig {
     pub stream_name: String,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    #[serde(flatten)]
     pub encoding:
         EncodingConfigAdapter<EncodingConfig<StandardEncodings>, StandardEncodingsMigrator>,
     #[serde(default)]

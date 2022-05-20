@@ -9,7 +9,6 @@ build = "build.rs" # LALRPOP preprocessing
 bytes = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4.19", default-features = false }
 chrono-tz = { version = "0.6.1", default-features = false }
-itertools = { version = "0.10.3", default-features = false }
 lalrpop-util = { version = "0.19", default-features = false }
 nom = { version = "7.1.1", default-features = false, features = ["std"] }
 once_cell = { version = "1.10", default-features = false, features = ["std"] }
@@ -29,12 +28,12 @@ vector_common = { path = "../../vector-common" }
 vrl-compiler = { path = "../../vrl/compiler" }
 
 [dev-dependencies]
-vrl-compiler = { path = "../../vrl/compiler", features = ["test"] }
+vrl-compiler = { path = "../../vrl/compiler" }
 criterion = { version = "0.3.5" }
 tracing-test = { version = "0.2", default-features = false }
 
 [build-dependencies]
-lalrpop = { version = "0.19.7", default-features = false }
+lalrpop = { version = "0.19.8", default-features = false }
 
 [[bench]]
 name = "filters"

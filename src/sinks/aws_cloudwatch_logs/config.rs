@@ -1,9 +1,14 @@
-use aws_sdk_cloudwatchlogs::{Endpoint, Region};
 use std::sync::Arc;
-use tower::ServiceBuilder;
 
+use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
+use aws_sdk_cloudwatchlogs::{Endpoint, Region};
+use aws_smithy_async::rt::sleep::AsyncSleep;
+use aws_smithy_client::erase::DynConnector;
+use aws_smithy_types::retry::RetryConfig;
+use aws_types::credentials::SharedCredentialsProvider;
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
+use tower::ServiceBuilder;
 
 use crate::{
     aws::{create_client, AwsAuthentication, ClientBuilder, RegionOrEndpoint},
@@ -28,11 +33,6 @@ use crate::{
     template::Template,
     tls::TlsConfig,
 };
-use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
-use aws_smithy_async::rt::sleep::AsyncSleep;
-use aws_smithy_client::erase::DynConnector;
-use aws_smithy_types::retry::RetryConfig;
-use aws_types::credentials::SharedCredentialsProvider;
 
 pub struct CloudwatchLogsClientBuilder;
 
@@ -80,12 +80,12 @@ impl ClientBuilder for CloudwatchLogsClientBuilder {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct CloudwatchLogsSinkConfig {
     pub group_name: Template,
     pub stream_name: Template,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    #[serde(flatten)]
     pub encoding:
         EncodingConfigAdapter<EncodingConfig<StandardEncodings>, StandardEncodingsMigrator>,
     pub create_missing_group: Option<bool>,

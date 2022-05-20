@@ -1,10 +1,12 @@
 use std::{collections::BTreeMap, fmt, ops::Deref};
 
+use value::Value;
+
 use crate::{
     expression::{Expr, Resolved},
     state::{ExternalEnv, LocalEnv},
     vm::OpCode,
-    Context, Expression, TypeDef, Value,
+    Context, Expression, TypeDef,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -107,9 +109,10 @@ impl From<Vec<Expr>> for Array {
 
 #[cfg(test)]
 mod tests {
+    use value::kind::Collection;
+
     use super::*;
     use crate::{expr, test_type_def, value::Kind, TypeDef};
-    use value::kind::Collection;
 
     test_type_def![
         empty_array {

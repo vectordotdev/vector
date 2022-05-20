@@ -13,6 +13,7 @@ use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{SecondsFormat, Utc};
 use goauth::scopes::Scope;
 use http::header::{HeaderName, HeaderValue};
+use lookup::path;
 use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -26,6 +27,7 @@ use vector_core::{
 
 use super::util::{
     encoding::{Encoder, StandardEncodings},
+    request_builder::EncodeResult,
     BatchConfig, Compression, RequestBuilder, SinkBatchSettings,
 };
 use crate::{
@@ -435,16 +437,20 @@ impl Encoder<Vec<Event>> for DatadogArchivesEncoding {
                     .unwrap_or_else(chrono::Utc::now)
                     .to_rfc3339_opts(SecondsFormat::Millis, true),
             );
-            log_event.rename_key_flat(self.log_schema.message_key(), "message");
-            log_event.rename_key_flat(self.log_schema.host_key(), "host");
+            log_event.rename_key(self.log_schema.message_key(), path!("message"));
+            log_event.rename_key(self.log_schema.host_key(), path!("host"));
 
             let mut attributes = BTreeMap::new();
-            let custom_attributes: Vec<String> = log_event
-                .as_map()
-                .keys()
-                .filter(|&path| !self.reserved_attributes.contains(path.as_str()))
-                .map(|v| v.to_owned())
-                .collect();
+
+            let custom_attributes = if let Some(map) = log_event.as_map() {
+                map.keys()
+                    .filter(|&path| !self.reserved_attributes.contains(path.as_str()))
+                    .map(|v| v.to_owned())
+                    .collect()
+            } else {
+                vec![]
+            };
+
             for path in custom_attributes {
                 if let Some(value) = log_event.remove(path.as_str()) {
                     attributes.insert(path, value);
@@ -504,13 +510,18 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
         (metadata, events)
     }
 
-    fn build_request(&self, mut metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
+    fn build_request(
+        &self,
+        mut metadata: Self::Metadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
         metadata.partition_key =
             generate_object_key(self.key_prefix.clone(), metadata.partition_key);
 
+        let body = payload.into_payload();
         trace!(
             message = "Sending events.",
-            bytes = ?payload.len(),
+            bytes = ?body.len(),
             events_len = ?metadata.byte_size,
             bucket = ?self.bucket,
             key = ?metadata.partition_key
@@ -518,7 +529,7 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
 
         let s3_options = self.config.options.clone();
         S3Request {
-            body: payload,
+            body,
             bucket: self.bucket.clone(),
             metadata,
             content_encoding: DEFAULT_COMPRESSION.content_encoding(),
@@ -571,12 +582,18 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogGcsRequestBuilder {
         (metadata, events)
     }
 
-    fn build_request(&self, mut metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
+    fn build_request(
+        &self,
+        mut metadata: Self::Metadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
         metadata.key = generate_object_key(self.key_prefix.clone(), metadata.key);
+
+        let body = payload.into_payload();
 
         trace!(
             message = "Sending events.",
-            bytes = ?payload.len(),
+            bytes = ?body.len(),
             events_len = ?metadata.count,
             bucket = ?self.bucket,
             key = ?metadata.key
@@ -588,7 +605,7 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogGcsRequestBuilder {
             .map(|ce| HeaderValue::from_str(&to_string(ce)).unwrap());
 
         GcsRequest {
-            body: payload,
+            body,
             settings: GcsRequestSettings {
                 acl: self.acl.clone(),
                 content_type,
@@ -659,20 +676,26 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogAzureRequestBuilder {
         (metadata, events)
     }
 
-    fn build_request(&self, mut metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
+    fn build_request(
+        &self,
+        mut metadata: Self::Metadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
         metadata.partition_key =
             generate_object_key(self.blob_prefix.clone(), metadata.partition_key);
 
+        let blob_data = payload.into_payload();
+
         trace!(
             message = "Sending events.",
-            bytes = ?payload.len(),
+            bytes = ?blob_data.len(),
             events_len = ?metadata.count,
             container = ?self.container_name,
             blob = ?metadata.partition_key
         );
 
         AzureBlobRequest {
-            blob_data: payload,
+            blob_data,
             content_encoding: DEFAULT_COMPRESSION.content_encoding(),
             content_type: "application/gzip",
             metadata,
@@ -912,7 +935,8 @@ mod tests {
         );
 
         let (metadata, _events) = request_builder.split_input((key, vec![log]));
-        let req = request_builder.build_request(metadata, fake_buf.clone());
+        let req =
+            request_builder.build_request(metadata, EncodeResult::uncompressed(fake_buf.clone()));
         let expected_key_prefix = "audit/dt=20210823/hour=16/";
         let expected_key_ext = ".json.gz";
         println!("{}", req.metadata.partition_key);
@@ -927,9 +951,10 @@ mod tests {
 
         let key = partitioner.partition(&log2).expect("key wasn't provided");
         let (metadata, _events) = request_builder.split_input((key, vec![log2]));
-        let req = request_builder.build_request(metadata, fake_buf);
+        let req = request_builder.build_request(metadata, EncodeResult::uncompressed(fake_buf));
         let uuid2 = &req.metadata.partition_key
             [expected_key_prefix.len()..req.metadata.partition_key.len() - expected_key_ext.len()];
+
         assert_ne!(uuid1, uuid2);
     }
 

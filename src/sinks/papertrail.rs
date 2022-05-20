@@ -1,5 +1,5 @@
 use bytes::{BufMut, BytesMut};
-use codecs::{encoding::SerializerConfig, JsonSerializerConfig, RawMessageSerializerConfig};
+use codecs::{encoding::SerializerConfig, JsonSerializerConfig, TextSerializerConfig};
 use serde::{Deserialize, Serialize};
 use syslog::{Facility, Formatter3164, LogFormat, Severity};
 
@@ -29,16 +29,16 @@ impl EncodingConfigMigrator for EncodingMigrator {
 
     fn migrate(codec: &Self::Codec) -> SerializerConfig {
         match codec {
-            Encoding::Text => RawMessageSerializerConfig::new().into(),
+            Encoding::Text => TextSerializerConfig::new().into(),
             Encoding::Json => JsonSerializerConfig::new().into(),
         }
     }
 }
 
 #[derive(Deserialize, Serialize, Debug)]
+#[serde(deny_unknown_fields)]
 pub(self) struct PapertrailConfig {
     endpoint: UriSerde,
-    #[serde(flatten)]
     encoding: EncodingConfigAdapter<EncodingConfig<Encoding>, EncodingMigrator>,
     keepalive: Option<TcpKeepaliveConfig>,
     tls: Option<TlsEnableableConfig>,
@@ -91,9 +91,8 @@ impl SinkConfig for PapertrailConfig {
 
         let sink_config = TcpSinkConfig::new(address, self.keepalive, tls, self.send_buffer_bytes);
 
-        let encoding = self.encoding.clone();
-        let transformer = encoding.transformer();
-        let serializer = encoding.encoding();
+        let transformer = self.encoding.transformer();
+        let serializer = self.encoding.encoding();
         let encoder = Encoder::<()>::new(serializer);
 
         sink_config.build(
@@ -109,7 +108,7 @@ impl SinkConfig for PapertrailConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(self.encoding.config().input_type())
     }
 
     fn sink_type(&self) -> &'static str {
@@ -184,9 +183,10 @@ impl tokio_util::codec::Encoder<Event> for PapertrailEncoder {
 
 #[cfg(test)]
 mod tests {
+    use std::convert::TryFrom;
+
     use bytes::BytesMut;
     use codecs::JsonSerializer;
-    use std::convert::TryFrom;
     use tokio_util::codec::Encoder as _;
 
     use super::*;

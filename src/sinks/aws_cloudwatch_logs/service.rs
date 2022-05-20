@@ -1,15 +1,15 @@
-use aws_sdk_cloudwatchlogs::error::{
-    CreateLogGroupError, CreateLogStreamError, DescribeLogStreamsError, PutLogEventsError,
-};
-use aws_sdk_cloudwatchlogs::model::InputLogEvent;
-use aws_sdk_cloudwatchlogs::types::SdkError;
-use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 use std::{
     collections::HashMap,
     fmt,
     task::{Context, Poll},
 };
 
+use aws_sdk_cloudwatchlogs::error::{
+    CreateLogGroupError, CreateLogStreamError, DescribeLogStreamsError, PutLogEventsError,
+};
+use aws_sdk_cloudwatchlogs::model::InputLogEvent;
+use aws_sdk_cloudwatchlogs::types::SdkError;
+use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 use chrono::Duration;
 use futures::{future::BoxFuture, ready, FutureExt};
 use futures_util::TryFutureExt;

@@ -1,11 +1,10 @@
-use indexmap::map::IndexMap;
-use serde::{Deserialize, Serialize};
-pub use vector_core::serde::{bool_or_struct, skip_serializing_if_default};
-
 use codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     BytesDecoderConfig, BytesDeserializerConfig,
 };
+use indexmap::map::IndexMap;
+use serde::{Deserialize, Serialize};
+pub use vector_core::serde::{bool_or_struct, skip_serializing_if_default};
 
 pub const fn default_true() -> bool {
     true

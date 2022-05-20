@@ -23,11 +23,11 @@ use crate::{
 pub(crate) const QUEUED_MIN_MESSAGES: u64 = 100000;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct KafkaSinkConfig {
     pub bootstrap_servers: String,
     pub topic: String,
     pub key_field: Option<String>,
-    #[serde(flatten)]
     pub(crate) encoding:
         EncodingConfigAdapter<EncodingConfig<StandardEncodings>, StandardEncodingsMigrator>,
     /// These batching options will **not** override librdkafka_options values.

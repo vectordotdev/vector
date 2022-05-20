@@ -148,10 +148,12 @@ impl Decoder for CharacterDelimitedDecoder {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::collections::HashMap;
+
     use bytes::BufMut;
     use indoc::indoc;
-    use std::collections::HashMap;
+
+    use super::*;
 
     #[test]
     fn decode() {

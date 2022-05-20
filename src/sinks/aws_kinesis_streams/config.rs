@@ -1,7 +1,7 @@
-use aws_sdk_kinesis::error::{DescribeStreamError, PutRecordsError, PutRecordsErrorKind};
-use aws_sdk_kinesis::types::SdkError;
 use std::sync::Arc;
 
+use aws_sdk_kinesis::error::{DescribeStreamError, PutRecordsError, PutRecordsErrorKind};
+use aws_sdk_kinesis::types::SdkError;
 use aws_sdk_kinesis::{Client as KinesisClient, Endpoint, Region};
 use aws_smithy_async::rt::sleep::AsyncSleep;
 use aws_smithy_client::erase::DynConnector;
@@ -104,12 +104,12 @@ impl SinkBatchSettings for KinesisDefaultBatchSettings {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct KinesisSinkConfig {
     pub stream_name: String,
     pub partition_key_field: Option<String>,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    #[serde(flatten)]
     pub encoding:
         EncodingConfigAdapter<EncodingConfig<StandardEncodings>, StandardEncodingsMigrator>,
     #[serde(default)]
@@ -190,7 +190,7 @@ impl SinkConfig for KinesisSinkConfig {
             });
 
         let transformer = self.encoding.transformer();
-        let serializer = self.encoding.clone().encoding();
+        let serializer = self.encoding.encoding();
         let encoder = Encoder::<()>::new(serializer);
 
         let request_builder = KinesisRequestBuilder {

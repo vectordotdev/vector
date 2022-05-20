@@ -39,7 +39,7 @@ regex = { version = "1.5.5", default-features = false, features = ["std", "perf"
 serde = { version = "1.0.137", default-features = false, features = ["derive", "rc"] }
 serde_json = { version = "1.0.81", default-features = false }
 snafu = { version = "0.7.1", default-features = false }
-tokio = { version = "1.18.1", default-features = false }
+tokio = { version = "1.18.2", default-features = false }
 tokio-stream = { version = "0.1", default-features = false, features = ["time"], optional = true }
 tokio-util = { version = "0.7.0", default-features = false, features = ["time"] }
 toml = { version = "0.5.9", default-features = false }
@@ -59,7 +59,7 @@ vector_common = { path = "../vector-common" }
 vrl-lib = { package = "vrl", path = "../vrl/vrl", optional = true }
 
 [build-dependencies]
-prost-build = "0.10.1"
+prost-build = "0.10.3"
 
 [dev-dependencies]
 base64 = "0.13.0"
@@ -77,6 +77,7 @@ rand_distr = "0.4.3"
 tracing-subscriber = { version = "0.3.11", default-features = false, features = ["env-filter", "fmt", "ansi", "registry"] }
 vector_common = { path = "../vector-common", default-features = false, features = ["test"] }
 value = { path = "../value", default-features = false, features = ["lua", "toml", "json", "api", "arbitrary", "test"] }
+vrl-lib = { package = "vrl", path = "../vrl/vrl"}
 
 [features]
 api = ["async-graphql", "value/api"]

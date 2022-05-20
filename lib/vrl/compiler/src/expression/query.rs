@@ -3,15 +3,16 @@ use std::fmt;
 use lookup::LookupBuf;
 use value::{
     kind::{remove, Collection},
-    Kind,
+    Kind, Value,
 };
 
 use crate::{
-    expression::{assignment, Container, FunctionCall, Resolved, Variable},
+    expression::{Container, Resolved, Variable},
     parser::ast::Ident,
     state::{ExternalEnv, LocalEnv},
+    type_def::Details,
     vm::{self, OpCode},
-    Context, Expression, TypeDef, Value,
+    Context, Expression, TypeDef,
 };
 
 #[derive(Clone, PartialEq)]
@@ -70,7 +71,7 @@ impl Query {
                 },
             );
 
-            external.update_target(assignment::Details { type_def, value });
+            external.update_target(Details { type_def, value });
 
             return result;
         }
@@ -152,7 +153,7 @@ impl Expression for Query {
             }
             Target::Internal(variable) => {
                 vm.write_opcode(OpCode::GetPath);
-                vm::Variable::Internal(variable.ident().clone(), Some(self.path.clone()))
+                vm::Variable::Internal(variable.ident().clone(), self.path.clone())
             }
             Target::FunctionCall(call) => {
                 // Write the code to call the function.
@@ -195,7 +196,11 @@ impl fmt::Debug for Query {
 pub enum Target {
     Internal(Variable),
     External,
-    FunctionCall(FunctionCall),
+
+    #[cfg(feature = "expr-function_call")]
+    FunctionCall(crate::expression::FunctionCall),
+    #[cfg(not(feature = "expr-function_call"))]
+    FunctionCall(crate::expression::Noop),
     Container(Container),
 }
 
@@ -227,9 +232,8 @@ impl fmt::Debug for Target {
 
 #[cfg(test)]
 mod tests {
-    use crate::state;
-
     use super::*;
+    use crate::state;
 
     #[test]
     fn test_type_def() {

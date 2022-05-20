@@ -38,5 +38,6 @@
 pub mod kind;
 pub mod value;
 
-pub use self::value::{Value, ValueRegex};
 pub use kind::Kind;
+
+pub use self::value::{Value, ValueRegex};

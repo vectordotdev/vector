@@ -1,10 +1,12 @@
 use std::fmt;
 
+use value::Value;
+
 use crate::{
     expression::{Expr, Resolved},
     state::{ExternalEnv, LocalEnv},
     vm::OpCode,
-    Context, Expression, TypeDef, Value,
+    Context, Expression, TypeDef,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -16,7 +18,7 @@ pub struct Block {
     /// This allows any expressions within the block to mutate the local
     /// environment, but once the block ends, the environment is reset to the
     /// state of the parent expression of the block.
-    local_env: LocalEnv,
+    pub(crate) local_env: LocalEnv,
 }
 
 impl Block {
@@ -42,11 +44,13 @@ impl Expression for Block {
         //
         // This also means we don't need to make any changes to the VM runtime,
         // as it uses the same compiler as this AST runtime.
-        self.inner
+        let (last, other) = self.inner.split_last().expect("at least one expression");
+
+        other
             .iter()
-            .map(|expr| expr.resolve(ctx))
-            .collect::<Result<Vec<_>, _>>()
-            .map(|mut v| v.pop().unwrap_or(Value::Null))
+            .try_for_each(|expr| expr.resolve(ctx).map(|_| ()))?;
+
+        last.resolve(ctx)
     }
 
     fn type_def(&self, (_, external): (&LocalEnv, &ExternalEnv)) -> TypeDef {
