@@ -21,14 +21,16 @@ _have_ been steadily expanding the [standard library][], increasing
 bugs][].
 
 One of the last major pieces missing from the language — and one requested by
-many of you — is support for mapping collections. We are happy to announce that
-as of Vector 0.22.0, this feature is now available.
-
-Let’s take a look at iteration in VRL, and how it works.
+many of you — is support for mapping collections. We needed to introduce this
+feature thoughtfully since mapping can be a common source of performance and
+reliability bugs (i.e., infinite loops). And our design accomplishes this by
+providing opinionated mapping functions that align closely with the use case.
+So, without further ado, we're happy to announce that as of Vector 0.22.0,
+mapping for collections is now available!
 
 ## Usage
 
-Let’s take a simple example:
+To explain how collection mapping in VRL works, we’ll dissect a simple example:
 
 ```json
 {
@@ -81,7 +83,7 @@ Running this VRL program results in the following output:
 }
 ```
 
-For a longer list of examples, see our [RFC][rfc examples] or [test harness][].
+For a longer list of examples, see our [RFC][rfc examples] and [test harness][].
 
 ## Design Details
 
