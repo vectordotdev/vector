@@ -22,6 +22,7 @@ remap: functions: is_json: {
 				"string": "JSON-formatted string values wrapped with quote marks"
 				"number": "Integer or float numbers"
 				"bool":   "True or false"
+				"null":   "Exact null value"
 			}
 			required: false
 			type: ["string"]

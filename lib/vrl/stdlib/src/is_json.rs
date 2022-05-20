@@ -25,6 +25,7 @@ fn is_json_with_variant(value: Value, variant: &Bytes) -> Resolved {
                     b't' | b'f' => Ok(value!(variant.as_ref() == b"bool")),
                     b'-' | b'0'..=b'9' => Ok(value!(variant.as_ref() == b"number")),
                     b'"' => Ok(value!(variant.as_ref() == b"string")),
+                    b'n' => Ok(value!(variant.as_ref() == b"null")),
                     _ => Ok(value!(false)),
                 };
             }
@@ -41,6 +42,7 @@ fn variants() -> Vec<Value> {
         value!("bool"),
         value!("number"),
         value!("string"),
+        value!("null"),
     ]
 }
 
@@ -103,7 +105,9 @@ impl Function for IsJson {
 
         match variant {
             Some(raw_variant) => {
-                let variant = raw_variant.try_bytes()?;
+                let variant = raw_variant
+                    .try_bytes()
+                    .map_err(|e| Box::new(e) as Box<dyn DiagnosticMessage>)?;
                 Ok(Box::new(IsJsonVariantsFn { value, variant }))
             }
             None => Ok(Box::new(IsJsonFn { value })),
@@ -121,7 +125,8 @@ impl Function for IsJson {
             ("variant", Some(expr)) => {
                 let variant = expr
                     .as_enum("variant", variants())?
-                    .try_bytes()?;
+                    .try_bytes()
+                    .map_err(|e| Box::new(e) as Box<dyn DiagnosticMessage>)?;
 
                 Ok(Some(Box::new(variant) as _))
             }
@@ -210,7 +215,7 @@ mod tests {
         }
 
         exact_variant_invalid {
-            args: func_args![value: r#"123"#, variant: "object"],
+            args: func_args![value: r#"123"#, variant: "null"],
             want: Ok(value!(false)),
             tdef: TypeDef::boolean().infallible(),
         }
