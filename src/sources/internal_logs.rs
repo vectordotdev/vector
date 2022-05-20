@@ -125,6 +125,13 @@ mod tests {
         let start = chrono::Utc::now();
         trace::init(false, false, "debug");
         trace::reset_early_buffer();
+        let span = error_span!(
+            "source",
+            component_kind = "source",
+            component_id = "foo",
+            component_type = "internal_logs",
+        );
+        let _enter = span.enter();
         error!(message = "Before source started.", %test_id);
 
         let rx = start_source().await;
@@ -158,6 +165,9 @@ mod tests {
             assert!(timestamp <= end);
             assert_eq!(log["metadata.kind"], "event".into());
             assert_eq!(log["metadata.level"], "ERROR".into());
+            assert_eq!(log["component_id"], "foo".into());
+            assert_eq!(log["component_kind"], "source".into());
+            assert_eq!(log["component_type"], "internal_logs".into());
         }
     }
 

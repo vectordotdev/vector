@@ -19,6 +19,7 @@ use tracing::{Event, Subscriber};
 use tracing_limit::RateLimitedLayer;
 use tracing_subscriber::{
     layer::{Context, SubscriberExt},
+    registry::LookupSpan,
     util::SubscriberInitExt,
     Layer,
 };
@@ -115,10 +116,16 @@ fn get_early_buffer() -> MutexGuard<'static, Option<Vec<LogEvent>>> {
 ///
 /// If early buffering is stopped, `Some(event)` is returned with the original event. Otherwise, the event has been
 /// successfully buffered and `None` is returned.
-fn try_buffer_event(event: &Event<'_>) -> bool {
+fn try_buffer_event(event: &Event<'_>, span_fields: Option<&LogEvent>) -> bool {
     if SHOULD_BUFFER.load(Ordering::Acquire) {
         if let Some(buffer) = get_early_buffer().as_mut() {
-            buffer.push(event.into());
+            let mut log = LogEvent::from(event);
+            if let Some(fields) = span_fields {
+                for (k, v) in fields.all_fields() {
+                    log.insert_flat(k, v.clone());
+                }
+            }
+            buffer.push(log);
             return true;
         }
     }
@@ -129,9 +136,15 @@ fn try_buffer_event(event: &Event<'_>) -> bool {
 /// Attempts to broadcast an event to subscribers.
 ///
 /// If no subscribers are connected, this does nothing.
-fn try_broadcast_event(event: &Event<'_>) {
+fn try_broadcast_event(event: &Event<'_>, span_fields: Option<&LogEvent>) {
     if let Some(sender) = maybe_get_trace_sender() {
-        let _ = sender.send(event.into());
+        let mut log = LogEvent::from(event);
+        if let Some(fields) = span_fields {
+            for (k, v) in fields.all_fields() {
+                log.insert_flat(k, v.clone());
+            }
+        }
+        let _ = sender.send(log);
     }
 }
 
@@ -271,13 +284,34 @@ impl<S> BroadcastLayer<S> {
 
 impl<S> Layer<S> for BroadcastLayer<S>
 where
-    S: Subscriber + 'static,
+    S: Subscriber + 'static + for<'lookup> LookupSpan<'lookup>,
 {
-    fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
-        // Try buffering the event, and if we're not buffering anymore, try to send it along via the
-        // trace sender if it's been established.
-        if !try_buffer_event(event) {
-            try_broadcast_event(event);
+    fn on_event(&self, event: &Event<'_>, ctx: Context<'_, S>) {
+        // Pass along span fields if available
+        if let Some(s) = ctx.event_span(event) {
+            if let Some(fields) = s.extensions().get::<LogEvent>() {
+                // Try buffering the event, and if we're not buffering anymore, try to send it along via the
+                // trace sender if it's been established.
+                if !try_buffer_event(event, Some(fields)) {
+                    try_broadcast_event(event, Some(fields));
+                }
+            }
+        } else {
+            if !try_buffer_event(event, None) {
+                try_broadcast_event(event, None);
+            }
         }
+    }
+
+    fn on_new_span(
+        &self,
+        attrs: &tracing_core::span::Attributes<'_>,
+        id: &tracing_core::span::Id,
+        ctx: Context<'_, S>,
+    ) {
+        let span = ctx.span(id).expect("span must already exist!");
+        let mut fields = LogEvent::default();
+        attrs.values().record(&mut fields);
+        span.extensions_mut().insert(fields);
     }
 }
