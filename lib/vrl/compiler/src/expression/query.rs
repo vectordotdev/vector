@@ -234,10 +234,6 @@ mod tests {
         let type_def = query.type_def(state);
 
         assert!(type_def.is_infallible());
-        assert!(type_def.is_object());
-
-        let object = type_def.as_object().unwrap();
-
-        assert!(object.is_any());
+        assert!(type_def.is_any());
     }
 }
