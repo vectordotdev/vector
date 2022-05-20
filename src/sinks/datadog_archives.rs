@@ -24,7 +24,7 @@ use tower::ServiceBuilder;
 use uuid::Uuid;
 use vector_core::{
     config::{log_schema, AcknowledgementsConfig, LogSchema},
-    event::{Event, Finalizable},
+    event::{Event, EventFinalizers, Finalizable},
     ByteSizeOf,
 };
 
@@ -49,7 +49,7 @@ use crate::{
         gcs_common::{
             self,
             config::{GcsPredefinedAcl, GcsRetryLogic, GcsStorageClass, BASE_URL},
-            service::{GcsMetadata, GcsRequest, GcsRequestSettings, GcsService},
+            service::{GcsRequest, GcsRequestSettings, GcsService},
             sink::GcsSink,
         },
         s3_common::{
@@ -60,7 +60,10 @@ use crate::{
             service::{S3Metadata, S3Request, S3Service},
             sink::S3Sink,
         },
-        util::{partitioner::KeyPartitioner, ServiceBuilderExt, TowerRequestConfig},
+        util::{
+            metadata::BatchRequestMetadata, partitioner::KeyPartitioner, ServiceBuilderExt,
+            TowerRequestConfig,
+        },
         VectorSink,
     },
     template::Template,
@@ -565,7 +568,7 @@ struct DatadogGcsRequestBuilder {
 }
 
 impl RequestBuilder<(String, Vec<Event>)> for DatadogGcsRequestBuilder {
-    type Metadata = GcsMetadata;
+    type Metadata = (String, usize, EventFinalizers, usize);
     type Events = Vec<Event>;
     type Payload = Bytes;
     type Request = GcsRequest;
@@ -573,33 +576,35 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogGcsRequestBuilder {
     type Error = io::Error;
 
     fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
-        let (key, mut events) = input;
+        let (partition_key, mut events) = input;
+        let event_count = events.len();
+        let event_byte_size = events.size_of();
         let finalizers = events.take_finalizers();
-        let metadata = GcsMetadata {
-            key,
-            count: events.len(),
-            byte_size: events.size_of(),
-            finalizers,
-        };
 
-        (metadata, events)
+        (
+            (partition_key, event_count, finalizers, event_byte_size),
+            events,
+        )
     }
 
     fn build_request(
         &self,
-        mut metadata: Self::Metadata,
+        metadata: Self::Metadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        metadata.key = generate_object_key(self.key_prefix.clone(), metadata.key);
+        let (key, event_count, finalizers, event_byte_size) = metadata;
 
+        let key = generate_object_key(self.key_prefix.clone(), key);
+
+        let metadata = BatchRequestMetadata::new(event_count, event_byte_size, &payload);
         let body = payload.into_payload();
 
         trace!(
             message = "Sending events.",
-            bytes = ?body.len(),
-            events_len = ?metadata.count,
-            bucket = ?self.bucket,
-            key = ?metadata.key
+            bytes = body.len(),
+            events_len = event_count,
+            bucket = %self.bucket,
+            ?key
         );
 
         let content_type = HeaderValue::from_str(StandardEncodings::Ndjson.content_type()).unwrap();
@@ -608,7 +613,9 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogGcsRequestBuilder {
             .map(|ce| HeaderValue::from_str(&to_string(ce)).unwrap());
 
         GcsRequest {
+            key,
             body,
+            finalizers,
             settings: GcsRequestSettings {
                 acl: self.acl.clone(),
                 content_type,

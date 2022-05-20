@@ -8,6 +8,7 @@ use vector_core::{
     buffers::Acker,
     event::{EventFinalizers, Finalizable},
     stream::{BatcherSettings, DriverResponse},
+    ByteSizeOf,
 };
 
 use super::{
@@ -17,8 +18,8 @@ use super::{
 use crate::{
     event::Event,
     sinks::util::{
-        builder::SinkBuilderExt, encoding::EncodingConfigFixed, request_builder::EncodeResult,
-        Compression, RequestBuilder, StreamSink,
+        builder::SinkBuilderExt, encoding::EncodingConfigFixed, metadata::BatchRequestMetadata,
+        request_builder::EncodeResult, Compression, RequestBuilder, StreamSink,
     },
 };
 
@@ -72,7 +73,7 @@ struct NewRelicRequestBuilder {
 }
 
 impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
-    type Metadata = (Arc<NewRelicCredentials>, usize, EventFinalizers);
+    type Metadata = (Arc<NewRelicCredentials>, usize, EventFinalizers, usize);
     type Events = Result<NewRelicApiModel, Self::Error>;
     type Encoder = EncodingConfigFixed<Encoding>;
     type Payload = Bytes;
@@ -88,7 +89,9 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
     }
 
     fn split_input(&self, mut input: Vec<Event>) -> (Self::Metadata, Self::Events) {
-        let events_len = input.len();
+        let event_count = input.len();
+        let event_byte_size = input.size_of();
+
         let finalizers = input.take_finalizers();
         let api_model = || -> Result<NewRelicApiModel, Self::Error> {
             match self.credentials.api {
@@ -101,7 +104,12 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
                 NewRelicApi::Logs => Ok(NewRelicApiModel::Logs(LogsApiModel::try_from(input)?)),
             }
         }();
-        let metadata = (Arc::clone(&self.credentials), events_len, finalizers);
+        let metadata = (
+            Arc::clone(&self.credentials),
+            event_count,
+            finalizers,
+            event_byte_size,
+        );
         (metadata, api_model)
     }
 
@@ -110,9 +118,10 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
         metadata: Self::Metadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (_credentials, events_len, finalizers) = metadata;
+        let (_credentials, event_count, finalizers, event_byte_size) = metadata;
+        let metadata = BatchRequestMetadata::new(event_count, event_byte_size, &payload);
         NewRelicApiRequest {
-            batch_size: events_len,
+            metadata,
             finalizers,
             credentials: Arc::clone(&self.credentials),
             payload: payload.into_payload(),

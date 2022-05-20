@@ -312,10 +312,7 @@ async fn cloudwatch_insert_log_event_batched() {
     let timestamp = chrono::Utc::now();
 
     let (input_lines, events) = random_lines_with_stream(100, 11, None);
-    let stream = sink.into_stream();
-    stream.run(events.map(Into::into).boxed()).await.unwrap();
-    // TODO: variant of assert method to run within async block? but also... does this test matter? it would sort of
-    // imply any non-stream-style sink is not batching at all which seems unlikely to actually be the case.
+    run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
     let response = create_client_test()
         .await

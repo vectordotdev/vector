@@ -1,4 +1,3 @@
-// TODO: no integration tests to satisfy `assert_sink_compliance`
 use crate::config::SinkDescription;
 
 mod config;
