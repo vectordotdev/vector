@@ -115,7 +115,7 @@ fn get_early_buffer() -> MutexGuard<'static, Option<Vec<LogEvent>>> {
 fn log_from_trace_event(event: &Event<'_>, span_fields: Option<&LogEvent>) -> LogEvent {
     let mut log = LogEvent::from(event);
     if let Some(fields) = span_fields {
-        for (k, v) in fields.all_fields() {
+        for (k, v) in fields.convert_to_fields() {
             log.insert(format!("metadata.{}", k).as_str(), v.clone());
         }
     }
@@ -294,10 +294,8 @@ where
                     try_broadcast_event(event, Some(fields));
                 }
             }
-        } else {
-            if !try_buffer_event(event, None) {
-                try_broadcast_event(event, None);
-            }
+        } else if !try_buffer_event(event, None) {
+            try_broadcast_event(event, None);
         }
     }
 
