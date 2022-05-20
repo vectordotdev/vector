@@ -1,6 +1,6 @@
 package metadata
 
-remap: functions: map_keys: {
+remap: functions: map_values: {
 	category: "Enumerate"
 	description: #"""
 		Map the values within a collection.
