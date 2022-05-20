@@ -2,7 +2,8 @@ use crate::event::Metric;
 
 /// Sorts metrics in an order that is likely to achieve good compression.
 pub fn sort_for_compression(metrics: &mut [Metric]) {
-    // This just sorts by series today. This tends to compress better than a random ordering by 2-3x (JSON encoded)
+    // This just sorts by series today. This tends to compress better than a random ordering by
+    // 2-3x (JSON encoded, deflate algorithm)
     metrics.sort_by(|a, b| a.series().cmp(b.series()))
 }
 
