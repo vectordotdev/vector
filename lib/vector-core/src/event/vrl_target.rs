@@ -47,7 +47,7 @@ impl Iterator for TargetIter<LogEvent> {
     fn next(&mut self) -> Option<Self::Item> {
         self.iter.next().map(|v| {
             match v {
-                value @ Value::Object(_) => LogEvent::from_value(value, self.metadata.clone()),
+                value @ Value::Object(_) => LogEvent::from_parts(value, self.metadata.clone()),
                 value => {
                     let mut log = LogEvent::new_with_metadata(self.metadata.clone());
                     log.insert(log_schema().message_key(), value);
@@ -66,7 +66,7 @@ impl Iterator for TargetIter<TraceEvent> {
         self.iter.next().map(|v| {
             match v {
                 value @ Value::Object(_) => {
-                    TraceEvent::from(LogEvent::from_value(value, self.metadata.clone()))
+                    TraceEvent::from(LogEvent::from_parts(value, self.metadata.clone()))
                 }
                 value => {
                     let mut log = LogEvent::new_with_metadata(self.metadata.clone());
@@ -83,8 +83,8 @@ impl VrlTarget {
     pub fn new(event: Event, info: &ProgramInfo) -> Self {
         match event {
             Event::Log(event) => {
-                let (fields, metadata) = event.into_parts();
-                VrlTarget::LogEvent(Value::Object(fields), metadata)
+                let (value, metadata) = event.into_parts();
+                VrlTarget::LogEvent(value, metadata)
             }
             Event::Metric(metric) => {
                 // We pre-generate [`Value`] types for the metric fields accessed in
@@ -109,7 +109,7 @@ impl VrlTarget {
         match self {
             VrlTarget::LogEvent(value, metadata) => match value {
                 value @ Value::Object(_) => {
-                    TargetEvents::One(LogEvent::from_value(value, metadata).into())
+                    TargetEvents::One(LogEvent::from_parts(value, metadata).into())
                 }
 
                 Value::Array(values) => TargetEvents::Logs(TargetIter {
@@ -126,7 +126,7 @@ impl VrlTarget {
             },
             VrlTarget::Trace(value, metadata) => match value {
                 value @ Value::Object(_) => {
-                    let log = LogEvent::from_value(value, metadata);
+                    let log = LogEvent::from_parts(value, metadata);
                     TargetEvents::One(TraceEvent::from(log).into())
                 }
 
@@ -637,19 +637,19 @@ mod test {
         use vector_common::btreemap;
 
         let cases = vec![
-            (btreemap! {}, vec![], Ok(Some(btreemap! {}.into()))),
+            (BTreeMap::new(), vec![], Ok(Some(BTreeMap::new().into()))),
             (
-                btreemap! { "foo" => "bar" },
+                BTreeMap::from([("foo".into(), "bar".into())]),
                 vec![],
-                Ok(Some(btreemap! { "foo" => "bar" }.into())),
+                Ok(Some(BTreeMap::from([("foo".into(), "bar".into())]).into())),
             ),
             (
-                btreemap! { "foo" => "bar" },
+                BTreeMap::from([("foo".into(), "bar".into())]),
                 vec![SegmentBuf::from("foo")],
                 Ok(Some("bar".into())),
             ),
             (
-                btreemap! { "foo" => "bar" },
+                BTreeMap::from([("foo".into(), "bar".into())]),
                 vec![SegmentBuf::from("bar")],
                 Ok(None),
             ),
@@ -699,21 +699,21 @@ mod test {
 
         let cases = vec![
             (
-                btreemap! { "foo" => "bar" },
+                BTreeMap::from([("foo".into(), "bar".into())]),
                 vec![],
                 btreemap! { "baz" => "qux" }.into(),
                 btreemap! { "baz" => "qux" },
                 Ok(()),
             ),
             (
-                btreemap! { "foo" => "bar" },
+                BTreeMap::from([("foo".into(), "bar".into())]),
                 vec![SegmentBuf::from("foo")],
                 "baz".into(),
                 btreemap! { "foo" => "baz" },
                 Ok(()),
             ),
             (
-                btreemap! { "foo" => "bar" },
+                BTreeMap::from([("foo".into(), "bar".into())]),
                 vec![
                     SegmentBuf::from("foo"),
                     SegmentBuf::from(2),
@@ -750,7 +750,7 @@ mod test {
                 Ok(()),
             ),
             (
-                btreemap! { "foo" => "bar" },
+                BTreeMap::from([("foo".into(), "bar".into())]),
                 vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
                 "baz".into(),
                 btreemap! { "foo" => vec!["baz"] },
@@ -828,31 +828,31 @@ mod test {
 
         let cases = vec![
             (
-                btreemap! { "foo" => "bar" },
+                BTreeMap::from([("foo".into(), "bar".into())]),
                 vec![SegmentBuf::from("foo")],
                 false,
-                Some(btreemap! {}.into()),
+                Some(BTreeMap::new().into()),
             ),
             (
-                btreemap! { "foo" => "bar" },
+                BTreeMap::from([("foo".into(), "bar".into())]),
                 vec![SegmentBuf::from(vec![
                     FieldBuf::from(r#""foo bar""#),
                     FieldBuf::from("foo"),
                 ])],
                 false,
-                Some(btreemap! {}.into()),
+                Some(BTreeMap::new().into()),
             ),
             (
                 btreemap! { "foo" => "bar", "baz" => "qux" },
                 vec![],
                 false,
-                Some(btreemap! {}.into()),
+                Some(BTreeMap::new().into()),
             ),
             (
                 btreemap! { "foo" => "bar", "baz" => "qux" },
                 vec![],
                 true,
-                Some(btreemap! {}.into()),
+                Some(BTreeMap::new().into()),
             ),
             (
                 btreemap! { "foo" => vec![0] },
@@ -864,7 +864,7 @@ mod test {
                 btreemap! { "foo" => vec![0] },
                 vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
                 true,
-                Some(btreemap! {}.into()),
+                Some(BTreeMap::new().into()),
             ),
             (
                 btreemap! {
@@ -982,7 +982,7 @@ mod test {
                 },
                 expect
                     .into_iter()
-                    .map(|v| Event::Log(LogEvent::from_parts(v, metadata.clone())))
+                    .map(|v| Event::Log(LogEvent::from_map(v, metadata.clone())))
                     .collect::<Vec<_>>()
             );
         }

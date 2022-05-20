@@ -12,8 +12,8 @@ use super::api;
 use super::enterprise;
 use super::{
     compiler, provider, schema, ComponentKey, Config, EnrichmentTableConfig, EnrichmentTableOuter,
-    HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig, SourceOuter, TestDefinition,
-    TransformOuter,
+    HealthcheckOptions, SecretBackend, SinkConfig, SinkOuter, SourceConfig, SourceOuter,
+    TestDefinition, TransformOuter,
 };
 
 #[derive(Deserialize, Serialize, Debug, Default)]
@@ -42,6 +42,8 @@ pub struct ConfigBuilder {
     #[serde(default)]
     pub tests: Vec<TestDefinition<String>>,
     pub provider: Option<Box<dyn provider::ProviderConfig>>,
+    #[serde(default)]
+    pub secret: IndexMap<ComponentKey, Box<dyn SecretBackend>>,
 }
 
 #[cfg(feature = "enterprise")]
@@ -58,6 +60,7 @@ struct ConfigBuilderHash<'a> {
     transforms: BTreeMap<&'a ComponentKey, &'a TransformOuter<String>>,
     tests: &'a Vec<TestDefinition<String>>,
     provider: &'a Option<Box<dyn provider::ProviderConfig>>,
+    secret: BTreeMap<&'a ComponentKey, &'a dyn SecretBackend>,
 }
 
 impl Clone for ConfigBuilder {
@@ -87,6 +90,7 @@ impl From<Config> for ConfigBuilder {
             sinks,
             transforms,
             tests,
+            secret,
             ..
         } = config;
 
@@ -116,6 +120,7 @@ impl From<Config> for ConfigBuilder {
             transforms,
             provider: None,
             tests,
+            secret,
         }
     }
 }
@@ -272,6 +277,11 @@ impl ConfigBuilder {
                 errors.push(format!("duplicate test name found: {}", wt.name));
             }
         });
+        with.secret.keys().for_each(|k| {
+            if self.secret.contains_key(k) {
+                errors.push(format!("duplicate secret id found: {}", k));
+            }
+        });
         if !errors.is_empty() {
             return Err(errors);
         }
@@ -281,6 +291,7 @@ impl ConfigBuilder {
         self.sinks.extend(with.sinks);
         self.transforms.extend(with.transforms);
         self.tests.extend(with.tests);
+        self.secret.extend(with.secret);
 
         Ok(())
     }
@@ -303,9 +314,9 @@ impl ConfigBuilder {
             transforms: self.transforms.iter().collect(),
             tests: &self.tests,
             provider: &self.provider,
+            secret: self.secret.iter().map(|(k, v)| (k, v.as_ref())).collect(),
         })
         .expect("should serialize to JSON");
-
         let output = Sha256::digest(value.as_bytes());
 
         hex::encode(output)
@@ -348,6 +359,7 @@ mod tests {
             "transforms",
             "tests",
             "provider",
+            "secret",
         ];
 
         let builder = ConfigBuilder::default();
@@ -363,6 +375,11 @@ mod tests {
             transforms: builder.transforms.iter().collect(),
             tests: &builder.tests,
             provider: &builder.provider,
+            secret: builder
+                .secret
+                .iter()
+                .map(|(k, v)| (k, v.as_ref()))
+                .collect(),
         });
 
         match value {
@@ -381,7 +398,7 @@ mod tests {
     /// should ideally be able to fix so that the original hash passes!
     fn version_hash_match() {
         assert_eq!(
-            "04f00431541bd23532d6812444872b928058b1553f96a82f8c72f26aa9b00abd",
+            "e71a87b3e4c761176a9f90aa94387e26383113554a119b1cbaaa25d439f25464",
             ConfigBuilder::default().sha256_hash()
         );
     }

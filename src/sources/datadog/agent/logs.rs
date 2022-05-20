@@ -6,7 +6,7 @@ use codecs::StreamDecodingError;
 use http::StatusCode;
 use tokio_util::codec::Decoder;
 use vector_core::ByteSizeOf;
-use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter};
+use warp::{filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response, Filter};
 
 use crate::{
     event::Event,
@@ -17,6 +17,7 @@ use crate::{
     },
     SourceSender,
 };
+use lookup::path;
 
 pub(crate) fn build_warp_filter(
     acknowledgements: bool,
@@ -25,7 +26,7 @@ pub(crate) fn build_warp_filter(
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
     warp::post()
-        .and(path!("v1" / "input" / ..).or(path!("api" / "v2" / "logs" / ..)))
+        .and(warp_path!("v1" / "input" / ..).or(warp_path!("api" / "v2" / "logs" / ..)))
         .and(warp::path::full())
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::header::optional::<String>("dd-api-key"))
@@ -110,11 +111,11 @@ pub(crate) fn decode_log_body(
                             log.try_insert_flat("service", service.clone());
                             log.try_insert_flat("ddsource", ddsource.clone());
                             log.try_insert_flat("ddtags", ddtags.clone());
-                            log.try_insert_flat(
-                                source.log_schema_source_type_key,
+                            log.try_insert(
+                                path!(source.log_schema_source_type_key),
                                 Bytes::from("datadog_agent"),
                             );
-                            log.try_insert_flat(source.log_schema_timestamp_key, now);
+                            log.try_insert(path!(source.log_schema_timestamp_key), now);
                             if let Some(k) = &api_key {
                                 log.metadata_mut().set_datadog_api_key(Some(Arc::clone(k)));
                             }

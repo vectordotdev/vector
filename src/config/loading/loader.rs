@@ -56,11 +56,11 @@ pub(super) mod process {
     pub trait Process {
         /// Prepares input for serialization. This can be a useful step to interpolate
         /// environment variables or perform some other pre-processing on the input.
-        fn prepare<R: Read>(&self, input: R) -> Result<(String, Vec<String>), Vec<String>>;
+        fn prepare<R: Read>(&mut self, input: R) -> Result<(String, Vec<String>), Vec<String>>;
 
         /// Calls into the `prepare` method, and deserializes a `Read` to a `T`.
         fn load<R: std::io::Read, T>(
-            &self,
+            &mut self,
             input: R,
             format: Format,
         ) -> Result<(T, Vec<String>), Vec<String>>
@@ -75,7 +75,7 @@ pub(super) mod process {
         /// Helper method used by other methods to recursively handle file/dir loading, merging
         /// values against a provided TOML `Table`.
         fn load_dir_into(
-            &self,
+            &mut self,
             path: &Path,
             result: &mut Table,
             recurse: bool,
@@ -170,7 +170,7 @@ pub(super) mod process {
 
         /// Loads and deserializes a file into a TOML `Table`.
         fn load_file(
-            &self,
+            &mut self,
             path: &Path,
             format: Format,
         ) -> Result<Option<(String, Table, Vec<String>)>, Vec<String>> {
@@ -185,7 +185,7 @@ pub(super) mod process {
         /// Loads a file, and if the path provided contains a sub-folder by the same name as the
         /// component, descend into it recursively, returning a TOML `Table`.
         fn load_file_recursive(
-            &self,
+            &mut self,
             path: &Path,
             format: Format,
         ) -> Result<Option<(String, Table, Vec<String>)>, Vec<String>> {
@@ -204,7 +204,7 @@ pub(super) mod process {
         /// Loads a directory (optionally, recursively), returning a TOML `Table`. This will
         /// create an initial `Table` and pass it into `load_dir_into` for recursion handling.
         fn load_dir(
-            &self,
+            &mut self,
             path: &Path,
             recurse: bool,
         ) -> Result<(Table, Vec<String>), Vec<String>> {

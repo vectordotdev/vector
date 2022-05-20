@@ -9,6 +9,7 @@ use std::{
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{stream::BoxStream, StreamExt};
+use lookup::path;
 use snafu::Snafu;
 use tower::Service;
 use vector_core::{
@@ -26,6 +27,7 @@ use crate::{
     config::SinkContext,
     sinks::util::{
         encoding::{Encoder, EncodingConfigFixed, StandardEncodings},
+        request_builder::EncodeResult,
         Compression, Compressor, RequestBuilder, SinkBuilderExt,
     },
 };
@@ -139,10 +141,10 @@ impl Encoder<Vec<Event>> for JsonEncoding {
     fn encode_input(&self, mut input: Vec<Event>, writer: &mut dyn io::Write) -> io::Result<usize> {
         for event in input.iter_mut() {
             let log = event.as_mut_log();
-            log.rename_key_flat(self.log_schema.message_key(), "message");
-            log.rename_key_flat(self.log_schema.host_key(), "host");
+            log.rename_key(self.log_schema.message_key(), path!("message"));
+            log.rename_key(self.log_schema.host_key(), path!("host"));
             if let Some(Value::Timestamp(ts)) = log.remove(self.log_schema.timestamp_key()) {
-                log.insert_flat("timestamp", Value::Integer(ts.timestamp_millis()));
+                log.insert(path!("timestamp"), Value::Integer(ts.timestamp_millis()));
             }
         }
 
@@ -198,23 +200,6 @@ impl From<io::Error> for RequestBuildError {
     }
 }
 
-/// The payload for the log request needs to store the length of the uncompressed
-/// data so we can report the metric on successful delivery.
-struct LogRequestPayload {
-    bytes: Bytes,
-    uncompressed_size: usize,
-}
-
-impl From<Bytes> for LogRequestPayload {
-    fn from(bytes: Bytes) -> Self {
-        let uncompressed_size = bytes.len();
-        Self {
-            bytes,
-            uncompressed_size,
-        }
-    }
-}
-
 struct LogRequestBuilder {
     default_api_key: Arc<str>,
     encoding: EncodingConfigFixed<JsonEncoding>,
@@ -225,7 +210,7 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
     type Metadata = (Arc<str>, usize, EventFinalizers, usize);
     type Events = Vec<Event>;
     type Encoder = EncodingConfigFixed<JsonEncoding>;
-    type Payload = LogRequestPayload;
+    type Payload = Bytes;
     type Request = LogApiRequest;
     type Error = RequestBuildError;
 
@@ -247,26 +232,37 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
         ((api_key, events_len, finalizers, events_byte_size), events)
     }
 
-    fn encode_events(&self, events: Self::Events) -> Result<Self::Payload, Self::Error> {
+    fn encode_events(
+        &self,
+        events: Self::Events,
+    ) -> Result<EncodeResult<Self::Payload>, Self::Error> {
         // We need to first serialize the payload separately so that we can figure out how big it is
         // before compression.  The Datadog Logs API has a limit on uncompressed data, so we can't
         // use the default implementation of this method.
+        //
+        // TODO: We should probably make `build_request` fallible itself, because then this override of `encode_events`
+        // wouldn't even need to exist, and we could handle it in `build_request` which is required by all implementors.
+        //
+        // On the flip side, it would mean that we'd potentially be compressing payloads that we would inevitably end up
+        // rejecting anyways, which is meh. This might be a signal that the true "right" fix is to actually switch this
+        // sink to incremental encoding and simply put up with suboptimal batch sizes if we need to end up splitting due
+        // to (un)compressed size limitations.
         let mut buf = Vec::new();
-        let n = self.encoder().encode_input(events, &mut buf)?;
-        if n > MAX_PAYLOAD_BYTES {
+        let uncompressed_size = self.encoder().encode_input(events, &mut buf)?;
+        if uncompressed_size > MAX_PAYLOAD_BYTES {
             return Err(RequestBuildError::PayloadTooBig);
         }
 
         // Now just compress it like normal.
-        let uncompressed_size = buf.len();
         let mut compressor = Compressor::from(self.compression);
         let _ = compressor.write_all(&buf)?;
         let bytes = compressor.into_inner().freeze();
 
-        Ok(LogRequestPayload {
-            bytes,
-            uncompressed_size,
-        })
+        if self.compression.is_compressed() {
+            Ok(EncodeResult::compressed(bytes, uncompressed_size))
+        } else {
+            Ok(EncodeResult::uncompressed(bytes))
+        }
     }
 
     fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
@@ -293,7 +289,7 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for SemanticLogRequestBuilde
     type Metadata = (Arc<str>, usize, EventFinalizers, usize);
     type Events = Vec<Event>;
     type Encoder = EncodingConfigFixed<SemanticJsonEncoding>;
-    type Payload = LogRequestPayload;
+    type Payload = Bytes;
     type Request = LogApiRequest;
     type Error = RequestBuildError;
 
@@ -315,38 +311,54 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for SemanticLogRequestBuilde
         ((api_key, events_len, finalizers, events_byte_size), events)
     }
 
-    fn encode_events(&self, events: Self::Events) -> Result<Self::Payload, Self::Error> {
+    fn encode_events(
+        &self,
+        events: Self::Events,
+    ) -> Result<EncodeResult<Self::Payload>, Self::Error> {
         // We need to first serialize the payload separately so that we can figure out how big it is
         // before compression.  The Datadog Logs API has a limit on uncompressed data, so we can't
         // use the default implementation of this method.
+        //
+        // TODO: We should probably make `build_request` fallible itself, because then this override of `encode_events`
+        // wouldn't even need to exist, and we could handle it in `build_request` which is required by all implementors.
+        //
+        // On the flip side, it would mean that we'd potentially be compressing payloads that we would inevitably end up
+        // rejecting anyways, which is meh. This might be a signal that the true "right" fix is to actually switch this
+        // sink to incremental encoding and simply put up with suboptimal batch sizes if we need to end up splitting due
+        // to (un)compressed size limitations.
         let mut buf = Vec::new();
-        let n = self.encoder().encode_input(events, &mut buf)?;
-        if n > MAX_PAYLOAD_BYTES {
+        let uncompressed_size = self.encoder().encode_input(events, &mut buf)?;
+        if uncompressed_size > MAX_PAYLOAD_BYTES {
             return Err(RequestBuildError::PayloadTooBig);
         }
 
         // Now just compress it like normal.
-        let uncompressed_size = buf.len();
         let mut compressor = Compressor::from(self.compression);
         let _ = compressor.write_all(&buf)?;
         let bytes = compressor.into_inner().freeze();
 
-        Ok(LogRequestPayload {
-            bytes,
-            uncompressed_size,
-        })
+        if self.compression.is_compressed() {
+            Ok(EncodeResult::compressed(bytes, uncompressed_size))
+        } else {
+            Ok(EncodeResult::uncompressed(bytes))
+        }
     }
 
-    fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
+    fn build_request(
+        &self,
+        metadata: Self::Metadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
         let (api_key, batch_size, finalizers, events_byte_size) = metadata;
+        let uncompressed_size = payload.uncompressed_byte_size;
         LogApiRequest {
             batch_size,
             api_key,
             compression: self.compression,
-            body: payload.bytes,
+            body: payload.into_payload(),
             finalizers,
             events_byte_size,
-            uncompressed_size: payload.uncompressed_size,
+            uncompressed_size,
         }
     }
 }

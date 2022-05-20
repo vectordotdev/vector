@@ -16,6 +16,7 @@ prost = "0.10.3"
 prost-types = "0.10.1"
 snafu = { version = "0.7" }
 vector_common = { path = "../vector-common", features = ["btreemap"] }
+value = { path = "../value", features = ["json"] }
 
 [build-dependencies]
 prost-build = "0.10.3"

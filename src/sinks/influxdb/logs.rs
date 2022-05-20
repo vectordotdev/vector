@@ -188,7 +188,7 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
         // Tags + Fields
         let mut tags: BTreeMap<String, String> = BTreeMap::new();
         let mut fields: HashMap<String, Field> = HashMap::new();
-        log.all_fields().for_each(|(key, value)| {
+        log.convert_to_fields().for_each(|(key, value)| {
             if self.tags.contains(&key) {
                 tags.insert(key, value.to_string_lossy());
             } else {

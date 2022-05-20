@@ -313,9 +313,18 @@ test-x86_64-unknown-linux-gnu: cross-test-x86_64-unknown-linux-gnu ## Runs unit 
 test-aarch64-unknown-linux-gnu: cross-test-aarch64-unknown-linux-gnu ## Runs unit tests on the aarch64-unknown-linux-gnu triple
 	${EMPTY}
 
+.PHONY: test-behavior-config
+test-behavior-config: ## Runs configuration related behaviorial tests
+	${MAYBE_ENVIRONMENT_EXEC} cargo build --bin secret-backend-example
+	${MAYBE_ENVIRONMENT_EXEC} cargo run -- test tests/behavior/config/*
+
+.PHONY: test-behavior-%
+test-behavior-%: ## Runs behaviorial test for a given category
+	${MAYBE_ENVIRONMENT_EXEC} cargo run -- test tests/behavior/$*/*
+
 .PHONY: test-behavior
-test-behavior: ## Runs behaviorial test
-	${MAYBE_ENVIRONMENT_EXEC} cargo run -- test tests/behavior/**/*
+test-behavior: ## Runs all behaviorial tests
+test-behavior: test-behavior-transforms test-behavior-formats test-behavior-config
 
 .PHONY: test-integration
 test-integration: ## Runs all integration tests

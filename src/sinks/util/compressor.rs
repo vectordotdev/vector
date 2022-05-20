@@ -27,6 +27,7 @@ impl From<Compression> for Writer {
         match compression {
             Compression::None => Writer::Plain(writer),
             Compression::Gzip(level) => Writer::Gzip(GzEncoder::new(writer, level)),
+            Compression::Zlib(level) => Writer::Zlib(ZlibEncoder::new(writer, level)),
         }
     }
 }
@@ -53,23 +54,26 @@ impl io::Write for Writer {
 ///
 /// Users can acquire a `Compressor` via [`Compressor::from`] based on the desired compression scheme.
 pub struct Compressor {
+    compression: Compression,
     inner: Writer,
 }
 
 impl Compressor {
-    /// Creates a zlib-based compressor with the default compression level.
-    pub fn zlib_default() -> Self {
-        let buf = BytesMut::with_capacity(1_024);
-        Self {
-            inner: Writer::Zlib(ZlibEncoder::new(
-                buf.writer(),
-                flate2::Compression::default(),
-            )),
-        }
-    }
-
+    /// Gets a mutable reference to the underlying buffer.
     pub fn get_ref(&self) -> &BytesMut {
         self.inner.get_ref()
+    }
+
+    /// Gets whether or not this compressor will actually compress the input.
+    ///
+    /// While it may be counterintuitive for "compression" to not compress, this is simply a
+    /// consequence of designing a single type that may or may not compress so that we can avoid
+    /// having to box writers at a higher-level.
+    ///
+    /// Some callers can benefit from knowing whether or not compression is actually taking place,
+    /// as different size limitations may come into play.
+    pub const fn is_compressed(&self) -> bool {
+        self.compression.is_compressed()
     }
 
     /// Consumes the compressor, returning the internal buffer used by the compressor.
@@ -125,6 +129,7 @@ impl io::Write for Compressor {
 impl From<Compression> for Compressor {
     fn from(compression: Compression) -> Self {
         Compressor {
+            compression,
             inner: compression.into(),
         }
     }

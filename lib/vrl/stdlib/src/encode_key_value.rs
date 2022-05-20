@@ -232,6 +232,16 @@ mod tests {
             tdef: TypeDef::bytes().infallible(),
         }
 
+        string_with_quotes {
+            args: func_args![value:
+                btreemap! {
+                    "lvl" => "info",
+                    "msg" => "{\"key\":\"value\"}"
+                }],
+            want: Ok(r#"lvl=info msg="{\"key\":\"value\"}""#),
+            tdef: TypeDef::bytes().infallible(),
+        }
+
         flatten_boolean {
             args: func_args![value:
                 btreemap! {

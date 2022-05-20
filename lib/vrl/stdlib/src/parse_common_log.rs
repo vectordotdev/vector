@@ -157,13 +157,13 @@ mod tests {
 
         log_line_valid_empty {
             args: func_args![value: "- - - - - - -"],
-            want: Ok(btreemap! {}),
+            want: Ok(BTreeMap::new()),
             tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         log_line_valid_empty_variant {
             args: func_args![value: r#"- - - [-] "-" - -"#],
-            want: Ok(btreemap! {}),
+            want: Ok(BTreeMap::new()),
             tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
