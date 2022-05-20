@@ -1,5 +1,5 @@
 use std::{
-    collections::{btree_map::Entry, BTreeMap},
+    collections::{hash_map::Entry, HashMap},
     pin::Pin,
     time::Duration,
 };
@@ -61,14 +61,14 @@ type MetricEntry = (metric::MetricData, EventMetadata);
 #[derive(Debug)]
 pub struct Aggregate {
     interval: Duration,
-    map: BTreeMap<metric::MetricSeries, MetricEntry>,
+    map: HashMap<metric::MetricSeries, MetricEntry>,
 }
 
 impl Aggregate {
     pub fn new(config: &AggregateConfig) -> crate::Result<Self> {
         Ok(Self {
             interval: Duration::from_millis(config.interval_ms),
-            map: BTreeMap::new(),
+            map: HashMap::new(),
         })
     }
 
@@ -101,8 +101,7 @@ impl Aggregate {
     }
 
     fn flush_into(&mut self, output: &mut Vec<Event>) {
-        let map = std::mem::take(&mut self.map);
-        for (series, entry) in map.into_iter() {
+        for (series, entry) in self.map.drain() {
             let metric = metric::Metric::from_parts(series, entry.0, entry.1);
             output.push(Event::Metric(metric));
         }
