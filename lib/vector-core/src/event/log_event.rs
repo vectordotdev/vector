@@ -227,10 +227,6 @@ impl LogEvent {
             .map(std::string::ToString::to_string)
     }
 
-    pub fn get_flat(&self, key: impl AsRef<str>) -> Option<&Value> {
-        self.as_map().get(key.as_ref())
-    }
-
     pub fn get_mut<'a>(&mut self, path: impl Path<'a>) -> Option<&mut Value> {
         self.value_mut().get_mut(path)
     }
