@@ -102,7 +102,6 @@ impl Aggregate {
     }
 
     fn flush_into(&mut self, output: &mut Vec<Event>) {
-        // let mut map = BTreeMap::new();
         let map = std::mem::take(&mut self.map);
         for (series, entry) in map.into_iter() {
             let metric = metric::Metric::from_parts(series, entry.0, entry.1);
