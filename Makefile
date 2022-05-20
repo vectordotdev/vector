@@ -330,7 +330,7 @@ test-behavior: test-behavior-transforms test-behavior-formats test-behavior-conf
 test-integration: ## Runs all integration tests
 #test-integration: test-integration-aws test-integration-azure test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
 test-integration: test-integration-azure test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
-#test-integration: test-integration-eventstoredb test-integration-fluent test-integration-gcp test-integration-humio test-integration-influxdb
+test-integration: test-integration-eventstoredb test-integration-fluent test-integration-gcp test-integration-humio test-integration-influxdb
 test-integration: test-integration-eventstoredb test-integration-fluent test-integration-gcp test-integration-influxdb
 test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb test-integration-nats
 test-integration: test-integration-nginx test-integration-postgres test-integration-prometheus test-integration-pulsar

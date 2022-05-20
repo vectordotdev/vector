@@ -12,6 +12,8 @@ use pulsar::{
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use vector_buffers::Acker;
+use vector_common::internal_event::{BytesSent, EventsSent};
+use vector_core::ByteSizeOf;
 
 use crate::{
     config::{
@@ -20,7 +22,10 @@ use crate::{
     },
     event::Event,
     internal_events::PulsarEncodeEventError,
-    sinks::util::encoding::{EncodingConfig, EncodingConfiguration},
+    sinks::util::{
+        encoding::{EncodingConfig, EncodingConfiguration},
+        metadata::BatchRequestMetadata,
+    },
 };
 
 #[derive(Debug, Snafu)]
@@ -59,15 +64,32 @@ type BoxedPulsarProducer = Box<PulsarProducer>;
 enum PulsarSinkState {
     None,
     Ready(BoxedPulsarProducer),
-    Sending(BoxFuture<'static, (BoxedPulsarProducer, Result<SendFuture, PulsarError>)>),
+    Sending(
+        BoxFuture<
+            'static,
+            (
+                BoxedPulsarProducer,
+                Result<SendFuture, PulsarError>,
+                BatchRequestMetadata,
+            ),
+        >,
+    ),
 }
 
 struct PulsarSink {
     encoding: EncodingConfig<Encoding>,
     avro_schema: Option<avro_rs::Schema>,
     state: PulsarSinkState,
-    in_flight:
-        FuturesUnordered<BoxFuture<'static, (usize, Result<CommandSendReceipt, PulsarError>)>>,
+    in_flight: FuturesUnordered<
+        BoxFuture<
+            'static,
+            (
+                usize,
+                Result<CommandSendReceipt, PulsarError>,
+                BatchRequestMetadata,
+            ),
+        >,
+    >,
 
     acker: Acker,
     seq_head: usize,
@@ -196,7 +218,7 @@ impl PulsarSink {
 
     fn poll_in_flight_prepare(&mut self, cx: &mut Context<'_>) -> Poll<()> {
         if let PulsarSinkState::Sending(fut) = &mut self.state {
-            let (producer, result) = ready!(fut.as_mut().poll(cx));
+            let (producer, result, metadata) = ready!(fut.as_mut().poll(cx));
 
             let seqno = self.seq_head;
             self.seq_head += 1;
@@ -207,7 +229,7 @@ impl PulsarSink {
                     Ok(fut) => fut.await,
                     Err(error) => Err(error),
                 };
-                (seqno, result)
+                (seqno, result, metadata)
             }));
         }
 
@@ -229,8 +251,10 @@ impl Sink<Event> for PulsarSink {
             "Expected `poll_ready` to be called first."
         );
 
+        let event_byte_size = item.size_of();
         let message = encode_event(item, &self.encoding, &self.avro_schema)
             .map_err(|error| emit!(PulsarEncodeEventError { error }))?;
+        let metadata = BatchRequestMetadata::raw(1, event_byte_size, message.len(), None);
 
         let mut producer = match std::mem::replace(&mut self.state, PulsarSinkState::None) {
             PulsarSinkState::Ready(producer) => producer,
@@ -241,7 +265,7 @@ impl Sink<Event> for PulsarSink {
             &mut self.state,
             PulsarSinkState::Sending(Box::pin(async move {
                 let result = producer.send(message).await;
-                (producer, result)
+                (producer, result, metadata)
             })),
         );
 
@@ -254,13 +278,24 @@ impl Sink<Event> for PulsarSink {
         let this = Pin::into_inner(self);
         while !this.in_flight.is_empty() {
             match ready!(Pin::new(&mut this.in_flight).poll_next(cx)) {
-                Some((seqno, Ok(result))) => {
+                Some((seqno, Ok(result), metadata)) => {
                     trace!(
                         message = "Pulsar sink produced message.",
                         message_id = ?result.message_id,
                         producer_id = %result.producer_id,
                         sequence_id = %result.sequence_id,
                     );
+
+                    emit!(EventsSent {
+                        count: metadata.event_count,
+                        byte_size: metadata.event_byte_size,
+                        output: None,
+                    });
+
+                    emit!(BytesSent {
+                        byte_size: metadata.encoded_uncompressed_size,
+                        protocol: "tcp",
+                    });
 
                     this.pending_acks.insert(seqno);
 
@@ -271,7 +306,7 @@ impl Sink<Event> for PulsarSink {
                     }
                     this.acker.ack(num_to_ack);
                 }
-                Some((_, Err(error))) => {
+                Some((_, Err(error), _)) => {
                     error!(message = "Pulsar sink generated an error.", %error);
                     return Poll::Ready(Err(()));
                 }

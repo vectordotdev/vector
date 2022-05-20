@@ -15,7 +15,7 @@ pub struct BatchRequestMetadata {
 
 // TODO: Make this struct the object which emits the actual internal telemetry i.e. events sent, bytes sent, etc.
 impl BatchRequestMetadata {
-    pub fn new<T>(
+    pub const fn new<T>(
         event_count: usize,
         event_byte_size: usize,
         encode_result: &EncodeResult<T>,
@@ -25,6 +25,20 @@ impl BatchRequestMetadata {
             event_byte_size,
             encoded_uncompressed_size: encode_result.uncompressed_byte_size,
             encoded_compressed_size: encode_result.compressed_byte_size,
+        }
+    }
+
+    pub const fn raw(
+        event_count: usize,
+        event_byte_size: usize,
+        encoded_uncompressed_size: usize,
+        encoded_compressed_size: Option<usize>,
+    ) -> Self {
+        Self {
+            event_count,
+            event_byte_size,
+            encoded_uncompressed_size,
+            encoded_compressed_size,
         }
     }
 }
