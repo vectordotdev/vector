@@ -1,10 +1,7 @@
 use std::fmt;
 
 use lookup::LookupBuf;
-use value::{
-    kind::{remove, Collection},
-    Kind, Value,
-};
+use value::{kind::remove, Kind, Value};
 
 use crate::{
     expression::{Container, Resolved, Variable},
