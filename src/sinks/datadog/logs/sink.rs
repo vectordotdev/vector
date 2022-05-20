@@ -163,7 +163,7 @@ impl Encoder<Vec<Event>> for SemanticJsonEncoding {
                 .map(Cow::Owned)
                 .expect("enforced by schema");
             let key: &str = &message_key;
-            log.rename_key_flat(key, "message");
+            log.rename_key(key, path!("message"));
 
             // host
             let host_key = log
@@ -171,7 +171,7 @@ impl Encoder<Vec<Event>> for SemanticJsonEncoding {
                 .map(Cow::Owned)
                 .unwrap_or_else(|| self.log_schema.host_key().into());
             let key: &str = &host_key;
-            log.rename_key_flat(key, "host");
+            log.rename_key(key, path!("host"));
 
             // timestamp
             let ts = log
@@ -179,7 +179,7 @@ impl Encoder<Vec<Event>> for SemanticJsonEncoding {
                 .expect("enforced by schema")
                 .as_timestamp_unwrap();
             let ms = ts.timestamp_millis();
-            log.insert_flat("timestamp", Value::Integer(ms));
+            log.insert(path!("timestamp"), Value::Integer(ms));
         }
 
         self.inner.encode_input(input, writer)
@@ -265,16 +265,21 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
         }
     }
 
-    fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
+    fn build_request(
+        &self,
+        metadata: Self::Metadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
         let (api_key, batch_size, finalizers, events_byte_size) = metadata;
+        let uncompressed_size = payload.uncompressed_byte_size;
         LogApiRequest {
             batch_size,
             api_key,
             compression: self.compression,
-            body: payload.bytes,
+            body: payload.into_payload(),
             finalizers,
             events_byte_size,
-            uncompressed_size: payload.uncompressed_size,
+            uncompressed_size,
         }
     }
 }
