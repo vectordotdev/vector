@@ -1,0 +1,12 @@
+# object: {}
+# result: { "image": "unknown" }
+
+.image = string(.image) ?? "unknown"
+if starts_with(.image, "foo") {
+  . = merge(., {})
+  # null # if used instead of the above line, false positive does not appear
+} else if contains(.image, "bar") {
+  null
+}
+
+.
