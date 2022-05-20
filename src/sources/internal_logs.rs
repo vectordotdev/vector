@@ -165,9 +165,9 @@ mod tests {
             assert!(timestamp <= end);
             assert_eq!(log["metadata.kind"], "event".into());
             assert_eq!(log["metadata.level"], "ERROR".into());
-            assert_eq!(log["component_id"], "foo".into());
-            assert_eq!(log["component_kind"], "source".into());
-            assert_eq!(log["component_type"], "internal_logs".into());
+            assert_eq!(log["metadata.component_id"], "foo".into());
+            assert_eq!(log["metadata.component_kind"], "source".into());
+            assert_eq!(log["metadata.component_type"], "internal_logs".into());
         }
     }
 

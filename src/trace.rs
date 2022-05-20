@@ -112,6 +112,16 @@ fn get_early_buffer() -> MutexGuard<'static, Option<Vec<LogEvent>>> {
         .expect("Couldn't acquire lock on internal logs buffer")
 }
 
+fn log_from_trace_event(event: &Event<'_>, span_fields: Option<&LogEvent>) -> LogEvent {
+    let mut log = LogEvent::from(event);
+    if let Some(fields) = span_fields {
+        for (k, v) in fields.all_fields() {
+            log.insert(format!("metadata.{}", k).as_str(), v.clone());
+        }
+    }
+    log
+}
+
 /// Attempts to buffer an event into the early buffer.
 ///
 /// If early buffering is stopped, `Some(event)` is returned with the original event. Otherwise, the event has been
@@ -119,13 +129,7 @@ fn get_early_buffer() -> MutexGuard<'static, Option<Vec<LogEvent>>> {
 fn try_buffer_event(event: &Event<'_>, span_fields: Option<&LogEvent>) -> bool {
     if SHOULD_BUFFER.load(Ordering::Acquire) {
         if let Some(buffer) = get_early_buffer().as_mut() {
-            let mut log = LogEvent::from(event);
-            if let Some(fields) = span_fields {
-                for (k, v) in fields.all_fields() {
-                    log.insert_flat(k, v.clone());
-                }
-            }
-            buffer.push(log);
+            buffer.push(log_from_trace_event(event, span_fields));
             return true;
         }
     }
@@ -138,13 +142,7 @@ fn try_buffer_event(event: &Event<'_>, span_fields: Option<&LogEvent>) -> bool {
 /// If no subscribers are connected, this does nothing.
 fn try_broadcast_event(event: &Event<'_>, span_fields: Option<&LogEvent>) {
     if let Some(sender) = maybe_get_trace_sender() {
-        let mut log = LogEvent::from(event);
-        if let Some(fields) = span_fields {
-            for (k, v) in fields.all_fields() {
-                log.insert_flat(k, v.clone());
-            }
-        }
-        let _ = sender.send(log);
+        let _ = sender.send(log_from_trace_event(event, span_fields));
     }
 }
 
