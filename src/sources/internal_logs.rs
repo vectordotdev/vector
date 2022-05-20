@@ -125,6 +125,9 @@ mod tests {
         let start = chrono::Utc::now();
         trace::init(false, false, "debug");
         trace::reset_early_buffer();
+
+        error!(message = "Before source started without span.", %test_id);
+
         let span = error_span!(
             "source",
             component_kind = "source",
@@ -132,6 +135,7 @@ mod tests {
             component_type = "internal_logs",
         );
         let _enter = span.enter();
+
         error!(message = "Before source started.", %test_id);
 
         let rx = start_source().await;
@@ -145,18 +149,22 @@ mod tests {
 
         let end = chrono::Utc::now();
 
-        assert_eq!(events.len(), 2);
+        assert_eq!(events.len(), 3);
 
         assert_eq!(
             events[0].as_log()["message"],
-            "Before source started.".into()
+            "Before source started without span.".into()
         );
         assert_eq!(
             events[1].as_log()["message"],
+            "Before source started.".into()
+        );
+        assert_eq!(
+            events[2].as_log()["message"],
             "After source started.".into()
         );
 
-        for event in events {
+        for (i, event) in events.iter().enumerate() {
             let log = event.as_log();
             let timestamp = *log["timestamp"]
                 .as_timestamp()
@@ -165,9 +173,16 @@ mod tests {
             assert!(timestamp <= end);
             assert_eq!(log["metadata.kind"], "event".into());
             assert_eq!(log["metadata.level"], "ERROR".into());
-            assert_eq!(log["metadata.component_id"], "foo".into());
-            assert_eq!(log["metadata.component_kind"], "source".into());
-            assert_eq!(log["metadata.component_type"], "internal_logs".into());
+            // The first log event occurs outside our custom span
+            if i == 0 {
+                assert!(log.get("metadata.component_id").is_none());
+                assert!(log.get("metadata.component_kind").is_none());
+                assert!(log.get("metadata.component_type").is_none());
+            } else {
+                assert_eq!(log["metadata.component_id"], "foo".into());
+                assert_eq!(log["metadata.component_kind"], "source".into());
+                assert_eq!(log["metadata.component_type"], "internal_logs".into());
+            }
         }
     }
 
