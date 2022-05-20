@@ -1,7 +1,10 @@
 use std::fmt;
 
 use lookup::LookupBuf;
-use value::{kind::remove, Kind, Value};
+use value::{
+    kind::{remove, Collection},
+    Kind, Value,
+};
 
 use crate::{
     expression::{Container, Resolved, Variable},
@@ -118,6 +121,7 @@ impl Expression for Query {
 
         match &self.target {
             External => match state.1.target() {
+                None if self.path().is_root() => TypeDef::object(Collection::any()).infallible(),
                 None => TypeDef::any().infallible(),
                 Some(details) => details.clone().type_def.at_path(&self.path.to_lookup()),
             },
@@ -234,6 +238,10 @@ mod tests {
         let type_def = query.type_def(state);
 
         assert!(type_def.is_infallible());
-        assert!(type_def.is_any());
+        assert!(type_def.is_object());
+
+        let object = type_def.as_object().unwrap();
+
+        assert!(object.is_any());
     }
 }
