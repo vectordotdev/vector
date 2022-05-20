@@ -15,7 +15,7 @@ remap: expressions: function_call: {
 
 	grammar: {
 		source: """
-			function ~ abort? ~ "(" ~ arguments? ~ ")"
+			function ~ abort? ~ "(" ~ arguments? ~ ")" ~ closure?
 			"""
 		definitions: {
 			function: {
@@ -94,6 +94,15 @@ remap: expressions: function_call: {
 							"""
 					}
 				}
+			}
+			closure: {
+				description: """
+					The `closure` is an optional piece of code resolved by the function call. It is primarily used in functions that iterate over collections. Its syntax is as follows:
+
+					```coffee
+					for_each([]) -> |index, value| { ... }
+					```
+					"""
 			}
 		}
 	}
