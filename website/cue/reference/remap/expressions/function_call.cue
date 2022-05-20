@@ -95,7 +95,7 @@ remap: expressions: function_call: {
 					}
 				}
 			}
-			arguments: {
+			closure: {
 				description: """
 					The `closure` is an optional piece of code resolved by the function call. It is primarily used in functions that iterate over collections. Its syntax is as follows:
 
