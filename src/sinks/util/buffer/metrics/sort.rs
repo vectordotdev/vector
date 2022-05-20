@@ -20,29 +20,29 @@ mod test {
     fn test_compression_order() {
         let sorted_metrics = vec![
             Metric::new(
-                "matric_1",
+                "metric_1",
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 0.0 },
             ),
             Metric::new(
-                "matric_2",
+                "metric_2",
                 MetricKind::Incremental,
                 MetricValue::Gauge { value: 0.0 },
             ),
             Metric::new(
-                "matric_3",
+                "metric_3",
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 0.0 },
             )
             .with_tags(Some([("z".to_string(), "z".to_string())].into())),
             Metric::new(
-                "matric_4",
+                "metric_4",
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 0.0 },
             )
             .with_tags(Some([("a".to_string(), "a".to_string())].into())),
             Metric::new(
-                "matric_4",
+                "metric_4",
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 0.0 },
             )
@@ -54,7 +54,7 @@ mod test {
                 .into(),
             )),
             Metric::new(
-                "matric_4",
+                "metric_4",
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 0.0 },
             )
