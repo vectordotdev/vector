@@ -46,6 +46,7 @@ enum MeaningPointer {
 impl MeaningPointer {
     fn merge(self, other: Self) -> Self {
         let set = match (self, other) {
+            (Self::Valid(lhs), Self::Valid(rhs)) if lhs == rhs => return Self::Valid(lhs),
             (Self::Valid(lhs), Self::Valid(rhs)) => BTreeSet::from([lhs, rhs]),
             (Self::Valid(lhs), Self::Invalid(mut rhs)) => {
                 rhs.insert(lhs);
@@ -167,7 +168,7 @@ impl Definition {
         self.required_field(path, kind, meaning)
     }
 
-    /// Regiser a semantic meaning for the definition.
+    /// Register a semantic meaning for the definition.
     ///
     /// # Panics
     ///
@@ -241,7 +242,6 @@ impl Definition {
 
         for (other_id, other_meaning) in other.meaning {
             let meaning = match self.meaning.remove(&other_id) {
-                Some(this_meaning) if this_meaning == other_meaning => this_meaning,
                 Some(this_meaning) => this_meaning.merge(other_meaning),
                 None => other_meaning,
             };
@@ -261,8 +261,6 @@ impl Definition {
     }
 
     /// Returns a `Lookup` into an event, based on the provided `meaning`, if the meaning exists.
-    ///
-    /// TODO(Jean): return `Lookup` here, but it requires some changes to `Value`s API first.
     pub fn meaning_path(&self, meaning: &str) -> Option<&LookupBuf> {
         match self.meaning.get(meaning) {
             Some(MeaningPointer::Valid(path)) => Some(path),
@@ -693,6 +691,44 @@ mod tests {
                         meaning: BTreeMap::from([(
                             "foo".into(),
                             MeaningPointer::Invalid(BTreeSet::from(["foo".into(), "bar".into()])),
+                        )]),
+                    },
+                },
+            ),
+            (
+                "same meaning, pointing to same path",
+                TestCase {
+                    this: Definition {
+                        collection: Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean(),
+                        )])),
+                        optional: BTreeSet::default(),
+                        meaning: BTreeMap::from([(
+                            "foo".into(),
+                            MeaningPointer::Valid("foo".into()),
+                        )]),
+                    },
+                    other: Definition {
+                        collection: Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean(),
+                        )])),
+                        optional: BTreeSet::default(),
+                        meaning: BTreeMap::from([(
+                            "foo".into(),
+                            MeaningPointer::Valid("foo".into()),
+                        )]),
+                    },
+                    want: Definition {
+                        collection: Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean(),
+                        )])),
+                        optional: BTreeSet::default(),
+                        meaning: BTreeMap::from([(
+                            "foo".into(),
+                            MeaningPointer::Valid("foo".into()),
                         )]),
                     },
                 },

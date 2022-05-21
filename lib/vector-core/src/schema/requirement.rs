@@ -73,10 +73,6 @@ impl Requirement {
         self.meaning.insert(identifier, meaning);
     }
 
-    // pub fn meanings(&self) -> impl Iterator<Item = (&&str, &SemanticMeaning)> {
-    //     self.meaning.iter()
-    // }
-
     /// Validate the provided [`Definition`] against the current requirement.
     ///
     /// # Errors
@@ -103,8 +99,9 @@ impl Requirement {
 
             match maybe_meaning_path {
                 Some(path) => {
-                    // Get the kind at the path for the given purpose. If no kind is found, we set the
-                    // kind to "any", since we lack any further information.
+                    // Get the kind at the path for the given semantic meaning.
+                    // If no kind is found, we set the kind to "any", since we
+                    // lack any further information.
                     let definition_kind = definition
                         .collection()
                         .find_known_at_path(&mut path.to_lookup())
@@ -113,8 +110,9 @@ impl Requirement {
                         .map_or_else(Kind::any, Cow::into_owned);
 
                     if !req_meaning.kind.is_superset(&definition_kind) {
-                        // We found a field matching the defined "purpose", but its kind does not
-                        // match the expected kind, so we can't use it in the sink.
+                        // We found a field matching the defined semantic
+                        // meaning, but its kind does not match the expected
+                        // kind, so we can't use it in the sink.
                         errors.push(ValidationError::MeaningKind {
                             identifier,
                             want: req_meaning.kind.clone(),
