@@ -1,6 +1,4 @@
-use std::{
-    net::SocketAddr,
-};
+use std::net::SocketAddr;
 use std::collections::BTreeMap;
 use futures::{FutureExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
@@ -9,6 +7,7 @@ use tonic::{
     Request, Response, Status,
 };
 use bytes::Bytes;
+use ordered_float::NotNan;
 use tracing::{Instrument, Span};
 use vector_core::{
     event::{
@@ -31,15 +30,16 @@ use opentelemetry::{
     logs::v1::{ResourceLogs, LogRecord, ScopeLogs, InstrumentationLibraryLogs,},
     resource::v1::Resource as OtelResource,
     common::v1::{
-        InstrumentationLibrary,
         InstrumentationScope,
         any_value::Value as PBValue,
         KeyValue,
     },
 };
 use value::Value;
-use vector_core::config::log_schema;
-use vector_core::event::LogEvent;
+use vector_core::{
+    config::log_schema,
+    event::LogEvent,
+};
 use crate::{
     config::{
         GenerateConfig,
@@ -49,7 +49,6 @@ use crate::{
         Output,
         DataType,
         Resource,
-        SourceDescription,
     },
     internal_events::{EventsReceived, StreamClosedError, TcpBytesReceived},
     serde::bool_or_struct,
@@ -192,12 +191,6 @@ async fn handle_batch_status(receiver: Option<BatchStatusReceiver>) -> Result<()
     }
 }
 
-#[derive(Serialize, Deserialize)]
-struct LogEntry<> {
-    resource: Option<OtelResource>,
-    log_record: LogRecord,
-}
-
 impl From<InstrumentationLibraryLogs> for ScopeLogs {
     fn from(v: InstrumentationLibraryLogs) -> Self {
         Self {
@@ -241,69 +234,55 @@ impl From<PBValue> for Value {
             PBValue::StringValue(v) => Value::Bytes(Bytes::from(v)),
             PBValue::BoolValue(v) => Value::Boolean(v),
             PBValue::IntValue(v) => Value::Integer(v),
-            PBValue::DoubleValue(v) => Value::Float(v.into()),
+            PBValue::DoubleValue(v) => Value::Float(NotNan::new(v).unwrap()),
             PBValue::BytesValue(v) => Value::Bytes(Bytes::from(v)),
             PBValue::ArrayValue(arr) => {
                 Value::Array(arr.values.into_iter()
-                    .filter(|o| o.is_some())
+                    .filter_map(|av| av.value)
                     .map(|v| v.into())
                     .collect::<Vec<Value>>())
             },
             PBValue::KvlistValue(arr) => {
-                Value::Object(
-                    arr.values.into_iter()
-                    .filter_map(|kv| kv.value.map(|v| (kv.key, v)))
-                    .fold(BTreeMap::default(), |mut acc, (k, v)| {
-                        acc.insert(k, v.into::<Value>());
-                        acc
-                    })
-                )
+                kvlist_2_value(arr.values)
             }
         }
     }
 }
 
 struct ResourceLog {
-    resource: OtelResource,
+    resource: Option<OtelResource>,
     log_record: LogRecord,
 }
 
 fn kvlist_2_value(arr: Vec<KeyValue>) -> Value {
-    arr.into_iter()
-        .filter_map(|kv| kv.value.map(|v| (kv.key, v)))
-        .fold(BTreeMap::default(), |mut acc, (k, v)| {
-            acc.insert(k, v.into::<Value>());
+    Value::Object(arr.into_iter()
+        .filter_map(|kv| kv.value.map(|av| (kv.key, av)))
+        .fold(BTreeMap::default(), |mut acc, (k, av)| {
+            av.value.map(|v| {
+                acc.insert(k, v.into());
+            });
             acc
-        })
-        .into()
+        }))
 }
 
 impl From<ResourceLog> for Event {
     fn from(rl: ResourceLog) -> Self {
         let mut le = LogEvent::default();
         // resource
-        if rl.resource.is_some() {
-            le.insert("resources",kvlist_2_value(rl.resource.attributes));
-        }
+        rl.resource.map(|resource| {
+            le.insert("resources",kvlist_2_value(resource.attributes));
+        });
         le.insert("attributes", kvlist_2_value(rl.log_record.attributes));
-        rl.log_record.body.map(|v| {
+        rl.log_record.body.and_then(|av| av.value).map(|v| {
             le.insert(log_schema().message_key(), v);
         });
         le.insert(log_schema().timestamp_key(), rl.log_record.time_unix_nano as i64);
-        le.insert("trace_id", Value::Bytes(Bytes::from(rl.log_record.trace_id)));
-        le.insert("span_id", Value::Bytes(Bytes::from(rl.log_record.span_id)));
+        le.insert("trace_id", Value::Bytes(Bytes::from(hex::encode(rl.log_record.trace_id))));
+        le.insert("span_id", Value::Bytes(Bytes::from(hex::encode(rl.log_record.span_id))));
         le.insert("severity_text", rl.log_record.severity_text);
         le.insert("severity_number", rl.log_record.severity_number as i64);
         le.into()
     }
-}
-
-fn log_entry_into_event(resource: Option<OtelResource>, log_record: LogRecord) -> Event {
-    let entry = LogEntry{
-        resource,
-        log_record,
-    };
-    serde_json::to_value(entry).unwrap().try_into().unwrap()
 }
 
 async fn run(
