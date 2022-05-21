@@ -45,6 +45,7 @@ impl Partitioner for EventPartitioner {
 
 #[derive(Debug)]
 pub struct LogSinkBuilder<S> {
+    encoding: EncodingConfigFixed<JsonEncoding>,
     service: S,
     context: SinkContext,
     batch_settings: BatcherSettings,
@@ -60,6 +61,7 @@ impl<S> LogSinkBuilder<S> {
         batch_settings: BatcherSettings,
     ) -> Self {
         Self {
+            encoding: Default::default(),
             service,
             context,
             default_api_key,
@@ -76,6 +78,7 @@ impl<S> LogSinkBuilder<S> {
     pub fn build(self) -> LogSink<S> {
         LogSink {
             default_api_key: self.default_api_key,
+            encoding: self.encoding,
             schema_enabled: false,
             acker: self.context.acker(),
             service: self.service,
@@ -97,6 +100,8 @@ pub struct LogSink<S> {
     acker: Acker,
     /// The API service
     service: S,
+    /// The encoding of payloads
+    encoding: EncodingConfigFixed<JsonEncoding>,
     /// Whether to enable schema support.
     schema_enabled: bool,
     /// The compression technique to use when building the request body
@@ -388,7 +393,7 @@ where
                     builder_limit,
                     SemanticLogRequestBuilder {
                         default_api_key,
-                        encoding: EncodingConfigFixed::default(),
+                        encoding: self.encoding.map::<SemanticJsonEncoding>(),
                         compression: self.compression,
                     },
                 )
@@ -411,7 +416,7 @@ where
                     builder_limit,
                     LogRequestBuilder {
                         default_api_key,
-                        encoding: EncodingConfigFixed::default(),
+                        encoding: self.encoding,
                         compression: self.compression,
                     },
                 )
