@@ -1,12 +1,14 @@
 use std::{
     net::SocketAddr,
 };
+use std::collections::BTreeMap;
 use futures::{FutureExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use tonic::{
     transport::{server::Connected, Server},
     Request, Response, Status,
 };
+use bytes::Bytes;
 use tracing::{Instrument, Span};
 use vector_core::{
     event::{
@@ -26,9 +28,18 @@ use opentelemetry::{
             LogsServiceServer,
         }
     },
-    logs::v1::{ResourceLogs,LogRecord,},
+    logs::v1::{ResourceLogs, LogRecord, ScopeLogs, InstrumentationLibraryLogs,},
     resource::v1::Resource as OtelResource,
+    common::v1::{
+        InstrumentationLibrary,
+        InstrumentationScope,
+        any_value::Value as PBValue,
+        KeyValue,
+    },
 };
+use value::Value;
+use vector_core::config::log_schema;
+use vector_core::event::LogEvent;
 use crate::{
     config::{
         GenerateConfig,
@@ -125,9 +136,7 @@ impl SourceConfig for OpentelemetryLogConfig {
     }
 }
 
-inventory::submit! {
-    SourceDescription::new::<OpentelemetryLogConfig>("otel_log")
-}
+
 
 
 #[derive(Debug, Clone)]
@@ -189,22 +198,103 @@ struct LogEntry<> {
     log_record: LogRecord,
 }
 
+impl From<InstrumentationLibraryLogs> for ScopeLogs {
+    fn from(v: InstrumentationLibraryLogs) -> Self {
+        Self {
+            scope: v.instrumentation_library.map(|v| InstrumentationScope{
+                name: v.name,
+                version: v.version,
+            }),
+            log_records: v.log_records,
+            schema_url: v.schema_url,
+        }
+    }
+}
+
 impl IntoIterator for ResourceLogs {
     type Item = Event;
     type IntoIter = std::vec::IntoIter<Self::Item>;
     fn into_iter(self) -> Self::IntoIter {
         let resource = self.resource;
-        if !self.scope_logs.is_empty() {
-            return self.scope_logs
-                .into_iter().map(|scope_log| scope_log.log_records).flatten()
-                .map(|log_record| log_entry_into_event(resource.clone(), log_record))
-                .collect::<Vec<Event>>().into_iter();
-        }
+        // convert instrumentation_library_logs(deprecated) into scope_logs
+        let scope_logs: Vec<ScopeLogs> = if !self.scope_logs.is_empty() {
+            self.scope_logs
+        } else {
+            self.instrumentation_library_logs
+                .into_iter().map(ScopeLogs::from)
+                .collect()
+        };
 
-        self.instrumentation_library_logs
-            .into_iter().map(|library_log| library_log.log_records).flatten()
-            .map(|log_record| log_entry_into_event(resource.clone(), log_record))
+        scope_logs.into_iter()
+            .map(|scope_log| scope_log.log_records).flatten()
+            .map(|log_record| ResourceLog{
+                resource: resource.clone(),
+                log_record,
+            }.into())
             .collect::<Vec<Event>>().into_iter()
+    }
+}
+
+impl From<PBValue> for Value {
+    fn from(av: PBValue) -> Self {
+        match av {
+            PBValue::StringValue(v) => Value::Bytes(Bytes::from(v)),
+            PBValue::BoolValue(v) => Value::Boolean(v),
+            PBValue::IntValue(v) => Value::Integer(v),
+            PBValue::DoubleValue(v) => Value::Float(v.into()),
+            PBValue::BytesValue(v) => Value::Bytes(Bytes::from(v)),
+            PBValue::ArrayValue(arr) => {
+                Value::Array(arr.values.into_iter()
+                    .filter(|o| o.is_some())
+                    .map(|v| v.into())
+                    .collect::<Vec<Value>>())
+            },
+            PBValue::KvlistValue(arr) => {
+                Value::Object(
+                    arr.values.into_iter()
+                    .filter_map(|kv| kv.value.map(|v| (kv.key, v)))
+                    .fold(BTreeMap::default(), |mut acc, (k, v)| {
+                        acc.insert(k, v.into::<Value>());
+                        acc
+                    })
+                )
+            }
+        }
+    }
+}
+
+struct ResourceLog {
+    resource: OtelResource,
+    log_record: LogRecord,
+}
+
+fn kvlist_2_value(arr: Vec<KeyValue>) -> Value {
+    arr.into_iter()
+        .filter_map(|kv| kv.value.map(|v| (kv.key, v)))
+        .fold(BTreeMap::default(), |mut acc, (k, v)| {
+            acc.insert(k, v.into::<Value>());
+            acc
+        })
+        .into()
+}
+
+impl From<ResourceLog> for Event {
+    fn from(rl: ResourceLog) -> Self {
+        let mut le = LogEvent::default();
+        // resource
+        if rl.resource.is_some() {
+            le.insert("resources",kvlist_2_value(rl.resource.attributes));
+        }
+        le.insert("attributes", kvlist_2_value(rl.log_record.attributes));
+        rl.log_record.body.map(|v| {
+            le.insert(log_schema().message_key(), v);
+        });
+        le.insert(log_schema().timestamp_key(), rl.log_record.time_unix_nano as i64);
+        le.insert("trace_id", Value::Bytes(Bytes::from(rl.log_record.trace_id)));
+        le.insert("span_id", Value::Bytes(Bytes::from(rl.log_record.span_id)));
+        le.insert("severity_text", rl.log_record.severity_text);
+        le.insert("severity_number", rl.log_record.severity_number as i64);
+        le.into()
     }
 }
 
