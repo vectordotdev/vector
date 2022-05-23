@@ -4,7 +4,7 @@ use crate::{
     config::Config,
     sinks::{
         console::{ConsoleSinkConfig, Target},
-        util::encoding::StandardEncodings,
+        util::encoding::{EncodingConfig, StandardEncodings},
     },
     sources::socket::SocketConfig,
     test_util::{next_addr, start_topology},
@@ -19,7 +19,7 @@ async fn topology_doesnt_reload_new_data_dir() {
         &["in"],
         ConsoleSinkConfig {
             target: Target::Stdout,
-            encoding: StandardEncodings::Text.into(),
+            encoding: EncodingConfig::from(StandardEncodings::Text).into(),
         },
     );
     old_config.global.data_dir = Some(Path::new("/asdf").to_path_buf());
