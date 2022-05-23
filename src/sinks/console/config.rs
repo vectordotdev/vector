@@ -1,12 +1,20 @@
+use codecs::{
+    encoding::{Framer, Serializer},
+    LengthDelimitedEncoder, NewlineDelimitedEncoder,
+};
 use futures::{future, FutureExt};
 use serde::{Deserialize, Serialize};
 use tokio::io;
 
 use crate::{
+    codecs::Encoder,
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::{
         console::sink::WriterSink,
-        util::encoding::{EncodingConfig, StandardEncodings},
+        util::encoding::{
+            EncodingConfig, EncodingConfigWithFramingAdapter, StandardEncodings,
+            StandardEncodingsWithFramingMigrator,
+        },
         Healthcheck, VectorSink,
     },
 };
@@ -25,14 +33,18 @@ pub enum Target {
 pub struct ConsoleSinkConfig {
     #[serde(default)]
     pub target: Target,
-    pub encoding: EncodingConfig<StandardEncodings>,
+    #[serde(flatten)]
+    pub encoding: EncodingConfigWithFramingAdapter<
+        EncodingConfig<StandardEncodings>,
+        StandardEncodingsWithFramingMigrator,
+    >,
 }
 
 impl GenerateConfig for ConsoleSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             target: Target::Stdout,
-            encoding: StandardEncodings::Json.into(),
+            encoding: EncodingConfig::from(StandardEncodings::Json).into(),
         })
         .unwrap()
     }
@@ -42,18 +54,33 @@ impl GenerateConfig for ConsoleSinkConfig {
 #[typetag::serde(name = "console")]
 impl SinkConfig for ConsoleSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let encoding = self.encoding.clone();
+        let transformer = self.encoding.transformer();
+        let (framer, serializer) = self.encoding.encoding();
+        let framer = match (framer, &serializer) {
+            (Some(framer), _) => framer,
+            (
+                None,
+                Serializer::Text(_)
+                | Serializer::Json(_)
+                | Serializer::NativeJson(_)
+                | Serializer::RawMessage(_),
+            ) => NewlineDelimitedEncoder::new().into(),
+            (None, Serializer::Native(_)) => LengthDelimitedEncoder::new().into(),
+        };
+        let encoder = Encoder::<Framer>::new(framer, serializer);
 
         let sink: VectorSink = match self.target {
             Target::Stdout => VectorSink::from_event_streamsink(WriterSink {
                 acker: cx.acker(),
                 output: io::stdout(),
-                encoding,
+                transformer,
+                encoder,
             }),
             Target::Stderr => VectorSink::from_event_streamsink(WriterSink {
                 acker: cx.acker(),
                 output: io::stderr(),
-                encoding,
+                transformer,
+                encoder,
             }),
         };
 
@@ -61,7 +88,7 @@ impl SinkConfig for ConsoleSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::all()
+        Input::new(self.encoding.config().1.input_type())
     }
 
     fn sink_type(&self) -> &'static str {
