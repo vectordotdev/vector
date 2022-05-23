@@ -116,6 +116,15 @@
                   <span class="prose dark:prose-dark">
                     {{ .description | markdownify }}
                   </span>
+                  {{ if gt (len .contributors) 0 }}
+                  <span class="prose dark:prose-dark">
+                    Thanks to
+                    {{ range .contributors}}
+                    <a href="https://github.com/{{ . }}" rel="noopener" target="_blank">{{ . }}</a>
+                    {{ end }}
+                    for contributing this change!
+                  </span>
+                  {{ end }}
                 </li>
               {{ end }}
             </ul>
