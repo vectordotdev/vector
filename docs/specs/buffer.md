@@ -8,7 +8,14 @@ interpreted as described in [RFC 2119].
 
 <!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
 
-1. [Instrumentation](#instrumentation)
+- [Scope](#scope)
+- [Instrumentation](#instrumentation)
+  - [Terms And Definitions](#terms-and-definitions)
+  - [Events](#events)
+    - [BufferCreated](#buffercreated)
+    - [BufferEventsReceived](#buffereventsreceived)
+    - [BufferEventsSent](#buffereventssent)
+    - [EventsDropped](#eventsdropped)
 
 <!-- /MarkdownTOC -->
 
@@ -18,7 +25,10 @@ This specification addresses direct buffer development and does not cover aspect
 
 ## Instrumentation
 
-Vector buffers MUST be instrumented for optimal observability and monitoring. This is required to drive various interfaces that Vector users depend on to manage Vector installations in mission critical production environments. This section extends the [Instrumentation Specification].
+**This section extends the [Instrumentation Specification] and should be read
+first.**
+
+Vector buffers MUST be instrumented for optimal observability and monitoring.
 
 ### Terms And Definitions
 
@@ -27,7 +37,7 @@ Vector buffers MUST be instrumented for optimal observability and monitoring. Th
 
 ### Events
 
-#### `BufferCreated`
+#### BufferCreated
 
 *All buffers* MUST emit a `BufferCreated` event upon creation. To avoid stale metrics, this event MUST be regularly emitted at an interval.
 
@@ -38,7 +48,7 @@ Vector buffers MUST be instrumented for optimal observability and monitoring. Th
   * MUST emit the `buffer_max_event_size` gauge (in-memory buffers) if the defined `max_size_events` value is present
   * MUST emit the `buffer_max_byte_size` gauge (disk buffers) if the defined `max_size_bytes` value is present
 
-#### `BufferEventsReceived`
+#### BufferEventsReceived
 
 *All buffers* MUST emit a `BufferEventsReceived` event after receiving one or more Vector events. *All buffers* MUST emit a `BufferEventsReceived` event upon startup if there are existing events in the buffer.
 
@@ -51,7 +61,7 @@ Vector buffers MUST be instrumented for optimal observability and monitoring. Th
   * MUST increment the `buffer_events` gauge by the defined `count`
   * MUST increment the `buffer_byte_size` gauge by the defined `byte_size`
 
-#### `BufferEventsSent`
+#### BufferEventsSent
 
 *All buffers* MUST emit a `BufferEventsSent` event after sending one or more Vector events.
 
@@ -64,7 +74,7 @@ Vector buffers MUST be instrumented for optimal observability and monitoring. Th
   * MUST decrement the `buffer_events` gauge by the defined `count`
   * MUST decrement the `buffer_byte_size` gauge by the defined `byte_size`
 
-#### `EventsDropped`
+#### EventsDropped
 
 *All buffers* MUST emit an `EventsDropped` event after dropping one or more Vector events.
 
