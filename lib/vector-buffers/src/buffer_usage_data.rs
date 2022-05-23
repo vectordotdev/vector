@@ -11,7 +11,7 @@ use tracing::{Instrument, Span};
 use vector_common::internal_event::emit;
 
 use crate::{
-    internal_events::{BufferCreated, BufferEventsReceived, BufferEventsSent, EventsDropped},
+    internal_events::{BufferCreated, BufferEventsReceived, BufferEventsSent, BufferEventsDropped},
     spawn_named, WhenFull,
 };
 
@@ -230,7 +230,7 @@ impl BufferUsage {
                     });
 
                     if let Some(dropped_event_data) = &stage.dropped_event_data {
-                        emit(EventsDropped {
+                        emit(BufferEventsDropped {
                             idx: stage.idx,
                             count: dropped_event_data.count.swap(0, Ordering::Relaxed),
                             byte_size: dropped_event_data.size.swap(0, Ordering::Relaxed),
