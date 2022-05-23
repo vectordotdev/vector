@@ -62,6 +62,7 @@ impl SinkConfig for ConsoleSinkConfig {
                 None,
                 Serializer::Text(_)
                 | Serializer::Json(_)
+                | Serializer::Logfmt(_)
                 | Serializer::NativeJson(_)
                 | Serializer::RawMessage(_),
             ) => NewlineDelimitedEncoder::new().into(),
