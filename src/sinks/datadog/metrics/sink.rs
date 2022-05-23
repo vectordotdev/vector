@@ -19,11 +19,11 @@ use super::{
     config::DatadogMetricsEndpoint, normalizer::DatadogMetricsNormalizer,
     request_builder::DatadogMetricsRequestBuilder, service::DatadogMetricsRequest,
 };
-use crate::sinks::util::buffer::metrics::sort::sort_for_compression;
 use crate::{
     config::SinkContext,
     internal_events::DatadogMetricsEncodingError,
     sinks::util::{
+        buffer::metrics::sort::sort_for_compression,
         buffer::metrics::{AggregatedSummarySplitter, MetricSplitter},
         SinkBuilderExt,
     },
