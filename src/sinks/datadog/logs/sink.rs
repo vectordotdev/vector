@@ -1,5 +1,4 @@
 use std::{
-    borrow::Cow,
     fmt::Debug,
     io::{self, Write},
     num::NonZeroUsize,
@@ -165,18 +164,14 @@ impl Encoder<Vec<Event>> for SemanticJsonEncoding {
             // message
             let message_key = log
                 .find_key_by_meaning("message")
-                .map(Cow::Owned)
                 .expect("enforced by schema");
-            let key: &str = &message_key;
-            log.rename_key(key, path!("message"));
+            log.rename_key(message_key.as_str(), path!("message"));
 
             // host
             let host_key = log
                 .find_key_by_meaning("host")
-                .map(Cow::Owned)
                 .unwrap_or_else(|| self.log_schema.host_key().into());
-            let key: &str = &host_key;
-            log.rename_key(key, path!("host"));
+            log.rename_key(host_key.as_str(), path!("host"));
 
             // timestamp
             let ts = log

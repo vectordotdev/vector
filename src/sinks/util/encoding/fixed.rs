@@ -32,7 +32,7 @@ pub struct EncodingConfigFixed<E: Default + PartialEq> {
 }
 
 impl<E: Default + PartialEq> EncodingConfigFixed<E> {
-    pub(crate) fn map<F: Default + PartialEq>(self) -> EncodingConfigFixed<F> {
+    pub fn map<F: Default + PartialEq>(self) -> EncodingConfigFixed<F> {
         EncodingConfigFixed {
             codec: F::default(),
             schema: self.schema,
