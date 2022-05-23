@@ -76,7 +76,7 @@ Vector buffers MUST be instrumented for optimal observability and monitoring.
 
 #### BufferEventsDropped
 
-*All buffers* MUST emit an `EventsDropped` event after dropping one or more Vector events.
+*All buffers* MUST emit an `BufferEventsDropped` event after dropping one or more Vector events.
 
 * Properties
   * `count` - the number of dropped events
