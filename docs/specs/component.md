@@ -234,8 +234,7 @@ implement since errors are specific to the component.
     logs and metrics, as specified below, as if they were present.
 * Metrics
   * If `recoverable` is `false`, MUST increment the `component_errors_total`
-    counter by 1. It should include the defined properties as tags, except for
-    `message` and `recoverable`.
+    counter by 1.
   * MUST increment the `component_discarded_events_total` counter by the number
     of Vector events discarded if the error resulted in discarding (dropping)
     acknowledged events.
@@ -245,6 +244,8 @@ implement since errors are specific to the component.
     * For sinks, this means only incrementing this metric if the error resulted
       in the sink dropping the events, and thus acknowledging them. Retried
       events MUST not be included in the metric.
+  * MUST include the defined properties as tags, except for `message` and
+    `recoverable`.
 * Logs
   * If `recoverable` is `false`, MUST log a message at the `error` level.
     Otherwise, if `recoverable` is `true`, MUST log a message at the `warn`
