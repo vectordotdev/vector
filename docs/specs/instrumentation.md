@@ -66,12 +66,13 @@ instrumentation SHOULD be batched whenever possible:
 
 ### Errors
 
-Errors MUST only emit when they are not recoverable and require user
-attention. This reduces error noise and provides a clean signal for operators
+Errors MUST emit when they require user attention. If an error does not require
+user attention, usually because it will resolve itself, then it should emit as
+a warning. This reduces error noise and provides a clean signal for operators
 to understand if Vector is healthy and operating properly:
 
-* Transmission errors MUST emit as warnings if the transmission will be retried
-  and errors if not.
+*  Retryable errors MUST emit as an error when the retry count is >= 3, the
+   first and second retry MUST emit as warnings.
 
 ### Events
 
