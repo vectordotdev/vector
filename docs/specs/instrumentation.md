@@ -74,7 +74,7 @@ MUST meet different requirements:
   be retried and recovered. For example, a failed HTTP request can be retired
   and recovered.
   * MUST log a message at the `warning` level
-  * MUST NOT increment the any error-related metrics
+  * MUST NOT increment any error-related metrics
 * An error MUST NOT be marked as recoverable if the operation that produced can
   not be retried. For example, a failed HTTP request that will *not* be retried.
   * MUST log a message at the `error` level
