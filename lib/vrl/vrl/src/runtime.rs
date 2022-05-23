@@ -77,22 +77,9 @@ impl Runtime {
         program: &Program,
         timezone: &TimeZone,
     ) -> RuntimeResult {
-        // Validate that the path is an object.
-        //
-        // VRL technically supports any `Value` object as the root, but the
-        // assumption is people are expected to use it to query objects.
+        // Validate that the path is a value.
         match target.target_get(&self.root_lookup) {
-            Ok(Some(&Value::Object(_))) => {}
-            Ok(Some(value)) => {
-                return Err(Terminate::Error(
-                    format!(
-                        "target must be a valid object, got {}: {}",
-                        value.kind(),
-                        value
-                    )
-                    .into(),
-                ))
-            }
+            Ok(Some(_)) => {}
             Ok(None) => {
                 return Err(Terminate::Error(
                     "expected target object, got nothing".to_owned().into(),

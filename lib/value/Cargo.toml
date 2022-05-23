@@ -32,6 +32,11 @@ test = []
 arbitrary = ["quickcheck"]
 
 [dev-dependencies]
+async-graphql = { version = "3.0.38", default-features = false }
 indoc = { version = "1.0.6", default-features = false }
 quickcheck = "1.0.3"
 lookup = { path = "../lookup", default-features = false, features = ["arbitrary"] }
+serde = { version = "1.0.137", default-features = false, features = ["derive", "rc"]}
+serde_json = { version = "1.0.81"}
+toml = { version = "0.5.9", default-features = false }
+mlua = { version = "0.7.4", default-features = false, features = ["lua54", "send", "vendored"]}

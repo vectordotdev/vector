@@ -1,33 +1,19 @@
 use mlua::prelude::*;
 
-use crate::event::{LogEvent, Value};
+use crate::event::{EventMetadata, LogEvent, Value};
 
 impl<'a> ToLua<'a> for LogEvent {
     #![allow(clippy::wrong_self_convention)] // this trait is defined by mlua
     fn to_lua(self, lua: &'a Lua) -> LuaResult<LuaValue> {
-        let (fields, _metadata) = self.into_parts();
-        // The metadata is handled when converting the enclosing `Event`.
-        lua.create_table_from(fields).map(LuaValue::Table)
+        let (value, _metadata) = self.into_parts();
+        value.to_lua(lua)
     }
 }
 
 impl<'a> FromLua<'a> for LogEvent {
-    fn from_lua(value: LuaValue<'a>, _: &'a Lua) -> LuaResult<Self> {
-        match value {
-            LuaValue::Table(t) => {
-                let mut log = LogEvent::default();
-                for pair in t.pairs() {
-                    let (key, value): (String, Value) = pair?;
-                    log.insert_flat(key, value);
-                }
-                Ok(log)
-            }
-            _ => Err(mlua::Error::FromLuaConversionError {
-                from: value.type_name(),
-                to: "LogEvent",
-                message: Some("LogEvent should ba a Lua table".to_string()),
-            }),
-        }
+    fn from_lua(lua_value: LuaValue<'a>, lua: &'a Lua) -> LuaResult<Self> {
+        let value = Value::from_lua(lua_value, lua)?;
+        Ok(LogEvent::from_parts(value, EventMetadata::default()))
     }
 }
 

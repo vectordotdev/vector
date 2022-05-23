@@ -317,6 +317,8 @@ impl Source {
             delay_deletion,
         } = self;
 
+        let mut reflectors = Vec::new();
+
         let pods = Api::<Pod>::all(client.clone());
         let pod_watcher = watcher(
             pods,
@@ -329,7 +331,11 @@ impl Source {
         let pod_store_w = reflector::store::Writer::default();
         let pod_state = pod_store_w.as_reader();
 
-        tokio::spawn(custom_reflector(pod_store_w, pod_watcher, delay_deletion));
+        reflectors.push(tokio::spawn(custom_reflector(
+            pod_store_w,
+            pod_watcher,
+            delay_deletion,
+        )));
 
         // -----------------------------------------------------------------
 
@@ -344,7 +350,11 @@ impl Source {
         let ns_store_w = reflector::store::Writer::default();
         let ns_state = ns_store_w.as_reader();
 
-        tokio::spawn(custom_reflector(ns_store_w, ns_watcher, delay_deletion));
+        reflectors.push(tokio::spawn(custom_reflector(
+            ns_store_w,
+            ns_watcher,
+            delay_deletion,
+        )));
 
         let paths_provider =
             K8sPathsProvider::new(pod_state.clone(), ns_state.clone(), exclude_paths);
@@ -502,6 +512,10 @@ impl Source {
         }
 
         lifecycle.run(global_shutdown).await;
+        // Stop Kubernetes object reflectors to avoid their leak on vector reload.
+        for reflector in reflectors {
+            reflector.abort();
+        }
         info!(message = "Done.");
         Ok(())
     }

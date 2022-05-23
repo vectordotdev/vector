@@ -113,6 +113,7 @@ urls: {
 	datadog:                                                  "https://www.datadoghq.com"
 	datadog_agent:                                            "https://docs.datadoghq.com/agent/"
 	datadog_agent_doc:                                        "\(datadog_docs)/agent/vector_aggregation/"
+	datadog_agent_exec_api:                                   "\(datadog_agent)/guide/secrets-management/#the-executable-api"
 	datadog_distribution:                                     "\(datadog_docs)/developers/metrics/types/?tab=distribution#definition"
 	datadog_docs:                                             "https://docs.datadoghq.com"
 	datadog_events:                                           "\(datadog_docs)/events/"

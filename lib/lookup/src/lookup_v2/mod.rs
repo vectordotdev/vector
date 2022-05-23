@@ -1,5 +1,4 @@
 mod jit;
-
 use std::borrow::Cow;
 use std::iter::Cloned;
 use std::slice::Iter;
@@ -230,6 +229,12 @@ impl<'a> From<&'a str> for BorrowedSegment<'a> {
     }
 }
 
+impl<'a> From<&'a String> for BorrowedSegment<'a> {
+    fn from(field: &'a String) -> Self {
+        BorrowedSegment::field(field.as_str())
+    }
+}
+
 impl From<usize> for BorrowedSegment<'_> {
     fn from(index: usize) -> Self {
         BorrowedSegment::index(index)
@@ -302,6 +307,29 @@ impl<'a> From<BorrowedSegment<'a>> for OwnedSegment {
             BorrowedSegment::Field(value) => OwnedSegment::Field((*value).to_owned()),
             BorrowedSegment::Index(value) => OwnedSegment::Index(value),
             BorrowedSegment::Invalid => OwnedSegment::Invalid,
+        }
+    }
+}
+
+#[cfg(any(test, feature = "arbitrary"))]
+impl quickcheck::Arbitrary for BorrowedSegment<'static> {
+    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+        match usize::arbitrary(g) % 2 {
+            0 => BorrowedSegment::Index(usize::arbitrary(g) % 20),
+            _ => BorrowedSegment::Field(String::arbitrary(g).into()),
+        }
+    }
+
+    fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
+        match self {
+            BorrowedSegment::Invalid => Box::new(std::iter::empty()),
+            BorrowedSegment::Index(index) => Box::new(index.shrink().map(BorrowedSegment::Index)),
+            BorrowedSegment::Field(field) => Box::new(
+                field
+                    .to_string()
+                    .shrink()
+                    .map(|f| BorrowedSegment::Field(f.into())),
+            ),
         }
     }
 }

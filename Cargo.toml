@@ -17,6 +17,10 @@ name = "graphql-schema"
 path = "src/api/schema/gen.rs"
 required-features = ["default-no-api-client"]
 
+[[bin]]
+name = "secret-backend-example"
+path = "src/config/loading/secret_backend_example.rs"
+
 [profile.dev]
 split-debuginfo = "unpacked" # Faster debug builds on macOS
 
@@ -143,20 +147,20 @@ metrics = { version = "0.17.1", default-features = false, features = ["std"] }
 metrics-tracing-context = { version = "0.9.0", default-features = false }
 
 # AWS - Official SDK
-aws-config = { version = "0.11.0", default-features = false, features = ["rustls"], optional = true }
-aws-types = { version = "0.11.0", default-features = false, features = ["hardcoded-credentials"], optional = true }
-aws-sdk-s3 = { version = "0.11.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-sqs = { version = "0.11.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-cloudwatch = { version = "0.11.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-cloudwatchlogs = { version = "0.11.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-elasticsearch = {version = "0.11.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-firehose = { version = "0.11.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-kinesis = { version = "0.11.0", default-features = false, features = ["rustls"], optional = true }
-aws-sigv4 = { version = "0.11.0", default-features = false, optional = true }
-aws-smithy-async = { version = "0.41.0", default-features = false, optional = true }
-aws-smithy-client = { version = "0.41.0", default-features = false, features = ["client-hyper"], optional = true}
-aws-smithy-http = { version = "0.41.0", default-features = false, optional = true }
-aws-smithy-types = { version = "0.41.0", default-features = false, optional = true }
+aws-config = { version = "0.12.0", default-features = false, features = ["rustls"], optional = true }
+aws-types = { version = "0.12.0", default-features = false, features = ["hardcoded-credentials"], optional = true }
+aws-sdk-s3 = { version = "0.12.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-sqs = { version = "0.12.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-cloudwatch = { version = "0.12.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-cloudwatchlogs = { version = "0.12.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-elasticsearch = {version = "0.12.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-firehose = { version = "0.12.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-kinesis = { version = "0.12.0", default-features = false, features = ["rustls"], optional = true }
+aws-sigv4 = { version = "0.12.0", default-features = false, optional = true }
+aws-smithy-async = { version = "0.42.0", default-features = false, optional = true }
+aws-smithy-client = { version = "0.42.0", default-features = false, features = ["client-hyper"], optional = true}
+aws-smithy-http = { version = "0.42.0", default-features = false, optional = true }
+aws-smithy-types = { version = "0.42.0", default-features = false, optional = true }
 
 # Azure
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "a0ef5e57f9b1d7d3c768d27dd761569db6e1c934", default-features = false, features = ["enable_reqwest"], optional = true }
@@ -218,7 +222,7 @@ bollard = { version = "0.12.0", default-features = false, features = ["ssl"] }
 bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
-cidr-utils = { version = "0.5.6", default-features = false }
+cidr-utils = { version = "0.5.7", default-features = false }
 clap = { version = "3.1.18", default-features = false, features = ["derive", "env", "std"] }
 colored = { version = "2.0.0", default-features = false }
 csv = { version = "1.1", default-features = false, optional = true }
@@ -232,6 +236,7 @@ futures-util = { version = "0.3.21", default-features = false }
 glob = { version = "0.3.0", default-features = false }
 governor = { version = "0.4.1", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
 grok = { version = "1.2.0", default-features = false, optional = true }
+h2 = { version = "0.3.13", default-features = false, optional = true }
 hash_hasher = { version = "2.0.0", default-features = false, optional  = true }
 headers = { version = "0.3.6", default-features = false }
 hostname = { version = "0.3.1", default-features = false }
@@ -240,7 +245,7 @@ hyper = { version = "0.14.18", default-features = false, features = ["client", "
 hyper-openssl = { version = "0.9.2", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
 indexmap = { version = "~1.8.1", default-features = false, features = ["serde"] }
-infer = { version = "0.7.0", default-features = false, optional = true}
+infer = { version = "0.8.0", default-features = false, optional = true}
 indoc = { version = "1.0.6", default-features = false }
 inventory = { version = "0.1.10", default-features = false }
 k8s-openapi = { version = "0.14.0", default-features = false, features = ["api", "v1_16"], optional = true }
@@ -256,7 +261,7 @@ nkeys = { version = "0.2.0", default-features = false, optional = true }
 nom = { version = "7.1.1", default-features = false, optional = true }
 notify = { version = "4.0.17", default-features = false }
 num_cpus = { version = "1.13.1", default-features = false }
-once_cell = { version = "1.10", default-features = false }
+once_cell = { version = "1.11", default-features = false }
 openssl = { version = "0.10.40", default-features = false, features = ["vendored"] }
 openssl-probe = { version = "0.1.5", default-features = false }
 ordered-float = { version = "3.0.0", default-features = false }
@@ -300,7 +305,7 @@ heim = { git = "https://github.com/vectordotdev/heim.git", branch="update-nix", 
 mlua = { version = "0.7.4", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 
 [target.'cfg(windows)'.dependencies]
-schannel = "0.1.19"
+schannel = "0.1.20"
 windows-service = "0.4.0"
 
 [target.'cfg(target_os = "macos")'.dependencies]
@@ -322,7 +327,7 @@ azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev =
 azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "a0ef5e57f9b1d7d3c768d27dd761569db6e1c934", default-features = false, features = ["azurite_workaround"] }
 base64 = "0.13.0"
 criterion = { version = "0.3.5", features = ["html_reports", "async_tokio"] }
-libc = "0.2.125"
+libc = "0.2.126"
 pretty_assertions = "1.2.1"
 proptest = "1.0"
 quickcheck = "1.0.3"
@@ -341,6 +346,8 @@ leveldb-sys = { git = "https://github.com/vectordotdev/leveldb-sys.git", branch 
 # Removes dependency on `time` v0.1
 # https://github.com/chronotope/chrono/pull/578
 chrono = { git = "https://github.com/vectordotdev/chrono.git", branch = "no-default-time" }
+# Adds `Status::is_reset` test, remove after the next version is released.
+h2 = { git = "https://github.com/hyperium/h2.git", rev = "f6aa3be6719270cd7b4094ee1940751b5f4ec88e" }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
@@ -473,7 +480,7 @@ sources-eventstoredb_metrics = []
 sources-exec = []
 sources-file = ["file-source"]
 sources-fluent = ["base64", "listenfd", "tokio-util/net", "rmpv", "rmp-serde", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "serde_bytes"]
-sources-gcp_pubsub = ["gcp", "prost-types", "protobuf-build", "tonic"]
+sources-gcp_pubsub = ["gcp", "h2", "prost-types", "protobuf-build", "tonic"]
 sources-heroku_logs = ["sources-utils-http", "sources-utils-http-query", "sources-http"]
 sources-host_metrics = ["heim"]
 sources-http = ["sources-utils-http", "sources-utils-http-query"]

@@ -252,7 +252,7 @@ impl Expression for FindEnrichmentTableRecordsFn {
 
 #[cfg(test)]
 mod tests {
-    use vector_common::{btreemap, TimeZone};
+    use vector_common::TimeZone;
 
     use super::*;
     use crate::test_util::get_table_registry;
@@ -262,9 +262,10 @@ mod tests {
         let registry = get_table_registry();
         let func = FindEnrichmentTableRecordsFn {
             table: "dummy1".to_string(),
-            condition: btreemap! {
-                "field" =>  expression::Literal::from("value"),
-            },
+            condition: BTreeMap::from([(
+                "field".into(),
+                expression::Literal::from("value").into(),
+            )]),
             index: Some(IndexHandle(999)),
             select: None,
             case_sensitive: Case::Sensitive,
