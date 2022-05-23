@@ -209,6 +209,8 @@ implement since errors are specific to the component.
 
 * Properties
   * `message` - A human readable error message.
+  * `recoverable` - If the error is recoverable or not. This dictates the log
+    level and which metrics get incremented.
   * `error_code` - An error code for the failure, if applicable.
     * SHOULD only be specified if it adds additional information beyond
       `error_type`.
@@ -227,8 +229,9 @@ implement since errors are specific to the component.
     event fields. However, they MUST still be included in the emitted
     logs and metrics, as specified below, as if they were present.
 * Metrics
-  * MUST increment the `component_errors_total` counter by 1 with the defined
-    properties, except `message` as metric tags.
+  * MUST increment the `component_errors_total` counter by 1 if `recoverable`
+    is `false`. It should include the defined properties as tags, except for
+    `message` and `recoverable`.
   * MUST increment the `component_discarded_events_total` counter by the number
     of Vector events discarded if the error resulted in discarding (dropping)
     acknowledged events.
@@ -239,8 +242,9 @@ implement since errors are specific to the component.
       in the sink dropping the events, and thus acknowledging them. Retried
       events MUST not be included in the metric.
 * Logs
-  * MUST log a message at the `error` level with the defined properties
-    as key-value pairs. It SHOULD be rate limited to 10 seconds.
+  * MUST log a message at the `error` if `recoverable` is `false`, otherwise
+    it should log at the `warn` level. It MUST include the defined properties
+    as key-value pairs and it SHOULD be rate limited to 10 seconds.
 
 #### ComponentEventsDropped
 

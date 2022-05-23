@@ -15,8 +15,6 @@ interpreted as described in [RFC 2119].
 - [Emission](#emission)
   - [Batching](#batching)
   - [Errors](#errors)
-    - [Warning level](#warning-level)
-    - [Error level](#error-level)
   - [Events](#events)
 
 <!-- /MarkdownTOC -->
@@ -69,31 +67,17 @@ instrumentation SHOULD be batched whenever possible:
 ### Errors
 
 As described in the [events](#events) section, all errors must emit as events
-to drive log and metric emission. Because errors can be transient and
-recoverable, errors MUST be able to log at warning and error levels to
-distinguish these types of errors:
+to drive log and metric emission. Errors that are transient and recoverable
+MUST meet different requirements:
 
-* MUST emit at the [error level](#error-level) if the error requires user
-  attention, otherwise the error MUST emit at the [warning level](#warning-level)
-  * Retryable errors, such a HTTP request errors, MUST emit at the warning
-    level if the request will be retried, otherwise it MUST emit at the error
-    level.
-
-#### Warning level
-
-When an error event emits at the warning level it does not require user
-attention and, therefore, MUST do the following:
-
-* MUST log a message at the `warning` level
-* MUST NOT increment the any error-related metrics
-
-#### Error level
-
-When an error event emits at the error level it requires user attention and,
-therefore, MUST do the following:
-
-* MUST log a message at the `error` level
-* MUST increment error-related metrics
+* An error MUST be marked as recoverable if the operation that produced it can
+  be retried. For example, a failed HTTP request that will be retried.
+  * MUST log a message at the `warning` level
+  * MUST NOT increment the any error-related metrics
+* An error MUST NOT be marked as recoverable if the operation that produced can
+  not be retried. For example, a failed HTTP request that will *not* be retried.
+  * MUST log a message at the `error` level
+  * MUST increment error-related metrics to alert the user
 
 ### Events
 
