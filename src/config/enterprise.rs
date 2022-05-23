@@ -458,11 +458,15 @@ fn setup_metrics_reporting(
     let tag_metrics = RemapConfig {
         source: Some(format!(
             r#"
-            .tags.version = "{}"
+            .tags.vector_version_hash = "{}"
             .tags.configuration_key = "{}"
+            .tags.vector_version = "{}"
             {}
         "#,
-            &config_version, &datadog.configuration_key, custom_metric_tags_vrl
+            &config_version,
+            &datadog.configuration_key,
+            crate::vector_version(),
+            custom_metric_tags_vrl
         )),
         ..Default::default()
     };
