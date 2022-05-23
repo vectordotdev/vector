@@ -24,7 +24,7 @@ interpreted as described in [RFC 2119].
     - [ComponentEventsReceived](#componenteventsreceived)
     - [ComponentEventsSent](#componenteventssent)
     - [ComponentBytesSent](#componentbytessent)
-    - [Error](#error)
+    - [ComponentError](#componenterror)
 - [Health checks](#health-checks)
 
 <!-- /MarkdownTOC -->
@@ -198,7 +198,7 @@ sending it, like the `prometheus_exporter` sink, SHOULD NOT publish this metric.
   * MUST log a `Bytes sent.` message at the `trace` level with the
     defined properties as key-value pairs. It MUST NOT be rate limited.
 
-#### Error
+#### ComponentError
 
 *All components* MUST emit error events in accordance with the
 [Instrumentation Specification].

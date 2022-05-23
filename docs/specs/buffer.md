@@ -15,7 +15,7 @@ interpreted as described in [RFC 2119].
     - [BufferCreated](#buffercreated)
     - [BufferEventsReceived](#buffereventsreceived)
     - [BufferEventsSent](#buffereventssent)
-    - [EventsDropped](#eventsdropped)
+    - [BufferEventsDropped](#buffereventsdropped)
 
 <!-- /MarkdownTOC -->
 
@@ -74,7 +74,7 @@ Vector buffers MUST be instrumented for optimal observability and monitoring.
   * MUST decrement the `buffer_events` gauge by the defined `count`
   * MUST decrement the `buffer_byte_size` gauge by the defined `byte_size`
 
-#### EventsDropped
+#### BufferEventsDropped
 
 *All buffers* MUST emit an `EventsDropped` event after dropping one or more Vector events.
 
