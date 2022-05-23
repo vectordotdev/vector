@@ -77,6 +77,7 @@ jobs:
           - test: 'logstash'
           - test: 'loki'
           - test: 'mongo'
+          - test: 'nats'
           - test: 'nginx'
           - test: 'postgres'
           - test: 'prometheus'
