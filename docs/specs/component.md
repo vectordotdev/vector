@@ -25,6 +25,7 @@ interpreted as described in [RFC 2119].
     - [ComponentEventsSent](#componenteventssent)
     - [ComponentBytesSent](#componentbytessent)
     - [ComponentError](#componenterror)
+    - [ComponentEventsDropped](#componenteventsdropped)
 - [Health checks](#health-checks)
 
 <!-- /MarkdownTOC -->
@@ -209,20 +210,18 @@ implement since errors are specific to the component.
 * Properties
   * `message` - A human readable error message.
   * `error_code` - An error code for the failure, if applicable.
-
-    `error_code` SHOULD only be specified if it adds additional information
-    beyond `error_type`.
-
-    The values for `error_code` for a given error event MUST be a bounded set
-    with relatively low cardinality because it will be used as a metric tag.
-    Examples would be syscall error code. Examples of values that should not be
-    used are raw error messages from `serde` as these are highly variable
-    depending on the input. Instead, these errors should be converted to an
-    error code like `invalid_json`.
-  * `error_type` - The type of error condition. This MUST be one of the types
-    listed in the `error_type` enum list in the cue docs.
-  * `stage` - The stage at which the error occurred. This MUST be one of
-    `receiving`, `processing`, or `sending`.
+    * SHOULD only be specified if it adds additional information beyond
+      `error_type`.
+    * The values for `error_code` for a given error event MUST be a bounded set
+      with relatively low cardinality because it will be used as a metric tag.
+      Examples would be syscall error code. Examples of values that should not
+      be used are raw error messages from `serde` as these are highly variable
+      depending on the input. Instead, these errors should be converted to an
+      error code like `invalid_json`.
+  * `error_type` - The type of error condition. MUST be one of the types listed
+    in the `error_type` enum list in the cue docs.
+  * `stage` - The stage at which the error occurred. MUST be one of `receiving`,
+    `processing`, or `sending`.
   * If any of the above properties are implicit to the specific error
     type, they MAY be omitted from being represented explicitly in the
     event fields. However, they MUST still be included in the emitted
@@ -232,15 +231,30 @@ implement since errors are specific to the component.
     properties, except `message` as metric tags.
   * MUST increment the `component_discarded_events_total` counter by the number
     of Vector events discarded if the error resulted in discarding (dropping)
-    acknowledged events. For sources, only increment this metric if incoming
-    events were consumed (and acknowledged if applicable) and discarded. The
-    metric MUST not include events that will be re-ingested. For sinks, this
-    means only incrementing this metric if the error resulted in the sink
-    dropping the events, and thus acknowledging them. Retried events MUST not be
-    included in the metric.
+    acknowledged events.
+    * For sources, only increment this metric if incoming events were consumed
+      (and acknowledged if applicable) and discarded. The metric MUST not
+      include events that will be re-ingested.
+    * For sinks, this means only incrementing this metric if the error resulted
+      in the sink dropping the events, and thus acknowledging them. Retried
+      events MUST not be included in the metric.
 * Logs
   * MUST log a message at the `error` level with the defined properties
     as key-value pairs. It SHOULD be rate limited to 10 seconds.
+
+#### ComponentEventsDropped
+
+*All components* that can drop events, **unrelated to an error**, MUST emit a
+`ComponentEventsDropped` event. Otherwise, if an event is dropped due to an
+error, then the error event itself MUST emit the appropriate logs and metrics
+as described in the [ComponentError](#ComponentError) section.
+
+* Metrics
+  * MUST increment the `component_discarded_events_total` counter by the number
+    of Vector events discarded.
+* Logs
+  * MUST log a `Bytes sent.` message at the `trace` level with the
+    defined properties as key-value pairs. It MUST NOT be rate limited.
 
 ## Health checks
 
