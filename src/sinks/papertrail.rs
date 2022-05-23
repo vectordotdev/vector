@@ -193,7 +193,6 @@ mod tests {
     use crate::test_util::{
         components::{run_and_assert_sink_compliance, SINK_TAGS},
         http::{always_200_response, spawn_blackhole_http_server},
-        next_addr, wait_for_tcp,
     };
 
     use super::*;
@@ -205,11 +204,7 @@ mod tests {
 
     #[tokio::test]
     async fn component_spec_compliance() {
-        let mock_endpoint_addr = next_addr();
-        let mock_endpoint =
-            spawn_blackhole_http_server(mock_endpoint_addr, always_200_response).await;
-
-        wait_for_tcp(mock_endpoint_addr).await;
+        let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
 
         let config = PapertrailConfig::generate_config().to_string();
         let mut config =

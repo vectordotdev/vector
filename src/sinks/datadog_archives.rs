@@ -1,5 +1,7 @@
-// TODO: no integration tests so no good place to test `assert_sink_compliance` but technically it would be happening at
-// the impl level i.e. azure blob vs s3 sink, etc, so as long as those are good, the datalog_archives sink is also good
+// NOTE: We intentionally do not assert/verify that `datadog_archives` meets the component specification because it
+// derives all of its capabilities from existing sink implementations which themselves are tested. We probably _should_
+// also verify it here, but for now, this is a punt to avoid having to add a bunch of specific integration tests that
+// exercise all possible configurations of the sink.
 
 use std::{
     collections::{BTreeMap, HashMap, HashSet},

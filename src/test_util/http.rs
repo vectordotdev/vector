@@ -1,4 +1,4 @@
-use std::{convert::Infallible, future::Future, net::SocketAddr};
+use std::{convert::Infallible, future::Future};
 
 use http::{uri::Scheme, Request, Response, Uri};
 use hyper::{
@@ -6,11 +6,19 @@ use hyper::{
     Body, Server,
 };
 
-pub async fn spawn_blackhole_http_server<H, F>(address: SocketAddr, handler: H) -> Uri
+use super::{next_addr, wait_for_tcp};
+
+/// Spawns an HTTP server that uses the given `handler` to respond to requests.
+///
+/// A random local address is chosen for the HTTP server to listen on, and the function does not return until the server
+/// is up and ready for requests. The returned `Uri` is configured for the appropriate address.
+pub async fn spawn_blackhole_http_server<H, F>(handler: H) -> Uri
 where
     H: Fn(Request<Body>) -> F + Clone + Send + 'static,
     F: Future<Output = std::result::Result<Response<Body>, Infallible>> + Send + 'static,
 {
+    let address = next_addr();
+
     let uri = Uri::builder()
         .scheme(Scheme::HTTP)
         .authority(address.to_string())
@@ -33,9 +41,12 @@ where
         }
     });
 
+    wait_for_tcp(address).await;
+
     uri
 }
 
+/// Responds to every request with a 200 OK response.
 pub async fn always_200_response(_: Request<Body>) -> Result<Response<Body>, Infallible> {
     Ok(Response::new(Body::empty()))
 }
