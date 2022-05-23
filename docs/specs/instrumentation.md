@@ -71,7 +71,8 @@ to drive log and metric emission. Errors that are transient and recoverable
 MUST meet different requirements:
 
 * An error MUST be marked as recoverable if the operation that produced it can
-  be retried. For example, a failed HTTP request that will be retried.
+  be retried and recovered. For example, a failed HTTP request can be retired
+  and recovered.
   * MUST log a message at the `warning` level
   * MUST NOT increment the any error-related metrics
 * An error MUST NOT be marked as recoverable if the operation that produced can
