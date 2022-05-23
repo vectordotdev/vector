@@ -8,7 +8,9 @@ use vector_core::{buffers::Ackable, ByteSizeOf};
 use crate::{
     codecs::Encoder,
     event::{Event, EventFinalizers, Finalizable, LogEvent},
-    sinks::util::{encoding::Transformer, Compression, RequestBuilder},
+    sinks::util::{
+        encoding::Transformer, request_builder::EncodeResult, Compression, RequestBuilder,
+    },
 };
 
 pub struct KinesisRequestBuilder {
@@ -90,9 +92,14 @@ impl RequestBuilder<LogEvent> for KinesisRequestBuilder {
         (metadata, Event::from(event))
     }
 
-    fn build_request(&self, metadata: Self::Metadata, data: Bytes) -> Self::Request {
+    fn build_request(
+        &self,
+        metadata: Self::Metadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
+        let payload = payload.into_payload();
         KinesisRequest {
-            record: Record::builder().data(Blob::new(data.as_ref())).build(),
+            record: Record::builder().data(Blob::new(&payload[..])).build(),
             finalizers: metadata.finalizers,
             event_byte_size: metadata.event_byte_size,
         }

@@ -43,8 +43,9 @@ pub use diff::ConfigDiff;
 pub use format::{Format, FormatHint};
 pub use id::{ComponentKey, OutputId};
 pub use loading::{
-    load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider, load_from_str,
-    load_source_from_paths, merge_path_lists, process_paths, CONFIG_PATHS,
+    load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider_and_secrets,
+    load_from_str, load_source_from_paths, merge_path_lists, process_paths, SecretBackend,
+    CONFIG_PATHS,
 };
 pub use sink::{SinkConfig, SinkContext, SinkDescription, SinkHealthcheckOptions, SinkOuter};
 pub use source::{SourceConfig, SourceContext, SourceDescription, SourceOuter};
@@ -107,6 +108,7 @@ pub struct Config {
     pub enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
     tests: Vec<TestDefinition>,
     expansions: IndexMap<ComponentKey, Vec<ComponentKey>>,
+    secret: IndexMap<ComponentKey, Box<dyn SecretBackend>>,
 }
 
 impl Config {

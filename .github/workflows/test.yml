@@ -7,8 +7,12 @@ on:
       - master
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+  # For pull requests, cancel running workflows, for master, run all
+  #
+  # `github.event.number` exists for pull requests, otherwise fall back to SHA
+  # for master
+  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
+  cancel-in-progress: true
 
 env:
   AUTOINSTALL: true
@@ -332,12 +336,12 @@ jobs:
         run: make check-events
       - name: Check cargo deny advisories
         if: needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.deny == 'true'
-        uses: EmbarkStudios/cargo-deny-action@v1.2.17
+        uses: EmbarkStudios/cargo-deny-action@v1.3.1
         with:
           command: check advisories
       - name: Check cargo deny licenses
         if: needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.deny == 'true'
-        uses: EmbarkStudios/cargo-deny-action@v1.2.17
+        uses: EmbarkStudios/cargo-deny-action@v1.3.1
         with:
           command: check licenses
       - name: Check Cue docs
