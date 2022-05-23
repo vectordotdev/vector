@@ -765,6 +765,11 @@ bench_function! {
         args: func_args![value: r#"{"key": "value""#],
         want: Ok(false),
     }
+
+    exact_variant {
+        args: func_args![value: r#"{"key": "value""#, variant: "object"],
+        want: Ok(true),
+    }
 }
 
 bench_function! {

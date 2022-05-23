@@ -13,6 +13,20 @@ remap: functions: is_json: {
 			required:    true
 			type: ["string"]
 		},
+		{
+			name:        "variant"
+			description: "The variant of the JSON type to explicitly check for."
+			enum: {
+				"object": "JSON object - {}"
+				"array":  "JSON array - []"
+				"string": "JSON-formatted string values wrapped with quote marks"
+				"number": "Integer or float numbers"
+				"bool":   "True or false"
+				"null":   "Exact null value"
+			}
+			required: false
+			type: ["string"]
+		},
 	]
 	internal_failure_reasons: []
 	return: {
@@ -35,6 +49,20 @@ remap: functions: is_json: {
 			title: "Non-valid value"
 			source: """
 				is_json("{")
+				"""
+			return: false
+		},
+		{
+			title: "Exact variant"
+			source: """
+				is_json("{}", variant: "object")
+				"""
+			return: true
+		},
+		{
+			title: "Non-valid exact variant"
+			source: """
+				is_json("{}", variant: "array")
 				"""
 			return: false
 		},
