@@ -121,6 +121,9 @@ mod tests {
 
     #[tokio::test]
     async fn receives_logs() {
+        // This test is somewhat overloaded with cases to avoid panics when
+        // calling `consume_early_buffer` within the `start_source` helper
+        // multiple times across separate test cases.
         let test_id: u8 = rand::random();
         let start = chrono::Utc::now();
         trace::init(false, false, "debug");
@@ -142,6 +145,17 @@ mod tests {
 
         error!(message = "After source started.", %test_id);
 
+        {
+            let nested_span = error_span!(
+                "nested span",
+                component_kind = "bar",
+                component_new_field = "baz",
+                ignored_field = "foobarbaz"
+            );
+            let _enter = nested_span.enter();
+            error!(message = "In a nested span.", %test_id);
+        }
+
         sleep(Duration::from_millis(1)).await;
         let mut events = collect_ready(rx).await;
         let test_id = Value::from(test_id.to_string());
@@ -149,7 +163,7 @@ mod tests {
 
         let end = chrono::Utc::now();
 
-        assert_eq!(events.len(), 3);
+        assert_eq!(events.len(), 4);
 
         assert_eq!(
             events[0].as_log()["message"],
@@ -163,6 +177,7 @@ mod tests {
             events[2].as_log()["message"],
             "After source started.".into()
         );
+        assert_eq!(events[3].as_log()["message"], "In a nested span.".into());
 
         for (i, event) in events.iter().enumerate() {
             let log = event.as_log();
@@ -178,10 +193,19 @@ mod tests {
                 assert!(log.get("metadata.component_id").is_none());
                 assert!(log.get("metadata.component_kind").is_none());
                 assert!(log.get("metadata.component_type").is_none());
-            } else {
+            } else if i < 3 {
                 assert_eq!(log["metadata.component_id"], "foo".into());
                 assert_eq!(log["metadata.component_kind"], "source".into());
                 assert_eq!(log["metadata.component_type"], "internal_logs".into());
+            } else {
+                // The last event occurs in a nested span. Here, we expect
+                // parent fields to be preservered (unless overwritten), new
+                // fields to be added, and filtered fields to not exist.
+                assert_eq!(log["metadata.component_id"], "foo".into());
+                assert_eq!(log["metadata.component_kind"], "bar".into());
+                assert_eq!(log["metadata.component_type"], "internal_logs".into());
+                assert_eq!(log["metadata.component_new_field"], "baz".into());
+                assert!(log.get("metadata.ignored_field").is_none());
             }
         }
     }

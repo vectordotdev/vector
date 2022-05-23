@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     marker::PhantomData,
     str::FromStr,
     sync::{
@@ -24,6 +25,7 @@ use tracing_subscriber::{
     Layer,
 };
 pub use tracing_tower::{InstrumentableService, InstrumentedService};
+use value::Value;
 
 use crate::event::LogEvent;
 
@@ -112,24 +114,11 @@ fn get_early_buffer() -> MutexGuard<'static, Option<Vec<LogEvent>>> {
         .expect("Couldn't acquire lock on internal logs buffer")
 }
 
-fn log_from_trace_event(event: &Event<'_>, span_fields: Option<&LogEvent>) -> LogEvent {
-    let mut log = LogEvent::from(event);
-    if let Some(fields) = span_fields {
-        for (k, v) in fields.convert_to_fields() {
-            log.insert(format!("metadata.{}", k).as_str(), v.clone());
-        }
-    }
-    log
-}
-
 /// Attempts to buffer an event into the early buffer.
-///
-/// If early buffering is stopped, `Some(event)` is returned with the original event. Otherwise, the event has been
-/// successfully buffered and `None` is returned.
-fn try_buffer_event(event: &Event<'_>, span_fields: Option<&LogEvent>) -> bool {
+fn try_buffer_event(log: &LogEvent) -> bool {
     if SHOULD_BUFFER.load(Ordering::Acquire) {
         if let Some(buffer) = get_early_buffer().as_mut() {
-            buffer.push(log_from_trace_event(event, span_fields));
+            buffer.push(log.clone());
             return true;
         }
     }
@@ -140,9 +129,9 @@ fn try_buffer_event(event: &Event<'_>, span_fields: Option<&LogEvent>) -> bool {
 /// Attempts to broadcast an event to subscribers.
 ///
 /// If no subscribers are connected, this does nothing.
-fn try_broadcast_event(event: &Event<'_>, span_fields: Option<&LogEvent>) {
+fn try_broadcast_event(log: LogEvent) {
     if let Some(sender) = maybe_get_trace_sender() {
-        let _ = sender.send(log_from_trace_event(event, span_fields));
+        let _ = sender.send(log);
     }
 }
 
@@ -285,17 +274,21 @@ where
     S: Subscriber + 'static + for<'lookup> LookupSpan<'lookup>,
 {
     fn on_event(&self, event: &Event<'_>, ctx: Context<'_, S>) {
-        // Pass along span fields if available
-        if let Some(s) = ctx.event_span(event) {
-            if let Some(fields) = s.extensions().get::<LogEvent>() {
-                // Try buffering the event, and if we're not buffering anymore, try to send it along via the
-                // trace sender if it's been established.
-                if !try_buffer_event(event, Some(fields)) {
-                    try_broadcast_event(event, Some(fields));
+        let mut log = LogEvent::from(event);
+        // Add span fields if available
+        if let Some(parent_span) = ctx.event_span(event) {
+            for span in parent_span.scope().from_root() {
+                if let Some(fields) = span.extensions().get::<SpanFields>() {
+                    for (k, v) in &fields.0 {
+                        log.insert(format!("metadata.{}", k).as_str(), v.clone());
+                    }
                 }
             }
-        } else if !try_buffer_event(event, None) {
-            try_broadcast_event(event, None);
+        }
+        // Try buffering the event, and if we're not buffering anymore, try to
+        // send it along via the trace sender if it's been established.
+        if !try_buffer_event(&log) {
+            try_broadcast_event(log);
         }
     }
 
@@ -306,8 +299,48 @@ where
         ctx: Context<'_, S>,
     ) {
         let span = ctx.span(id).expect("span must already exist!");
-        let mut fields = LogEvent::default();
+        let mut fields = SpanFields::default();
         attrs.values().record(&mut fields);
         span.extensions_mut().insert(fields);
+    }
+}
+
+#[derive(Default, Debug)]
+struct SpanFields(HashMap<&'static str, Value>);
+
+impl tracing::field::Visit for SpanFields {
+    fn record_i64(&mut self, field: &tracing_core::Field, value: i64) {
+        let name = field.name();
+        if name.starts_with("component_") {
+            self.0.insert(name, value.into());
+        }
+    }
+
+    fn record_u64(&mut self, field: &tracing_core::Field, value: u64) {
+        let name = field.name();
+        if name.starts_with("component_") {
+            self.0.insert(name, value.into());
+        }
+    }
+
+    fn record_bool(&mut self, field: &tracing_core::Field, value: bool) {
+        let name = field.name();
+        if name.starts_with("component_") {
+            self.0.insert(name, value.into());
+        }
+    }
+
+    fn record_str(&mut self, field: &tracing_core::Field, value: &str) {
+        let name = field.name();
+        if name.starts_with("component_") {
+            self.0.insert(name, value.to_string().into());
+        }
+    }
+
+    fn record_debug(&mut self, field: &tracing_core::Field, value: &dyn std::fmt::Debug) {
+        let name = field.name();
+        if name.starts_with("component_") {
+            self.0.insert(name, format!("{:?}", value).into());
+        }
     }
 }
