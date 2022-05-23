@@ -70,11 +70,14 @@ instrumentation SHOULD be batched whenever possible:
 
 As described in the [events](#events) section, all errors must emit as events
 to drive log and metric emission. Because errors can be transient and
-recoverable, errors MUST be able to log at warning and error levels:
+recoverable, errors MUST be able to log at warning and error levels to
+distinguish these types of errors:
 
 * MUST emit at the [error level](#error-level) if the error requires user
   attention, otherwise the error MUST emit at the [warning level](#warning-level)
-  * Retryable errors only require user attention when the retry count is >= 3
+  * Retryable errors, such a retryable HTTP requests, MUST emit at the warning
+    level since these errors could recover. Secondary signals, such as back
+    pressure will alert the user.
 
 #### Warning level
 
@@ -82,7 +85,7 @@ When an error event emits at the warning level it does not require user
 attention and, therefore, MUST do the following:
 
 * MUST log a message at the `warning` level
-* MUST NOT increment the `component_errors_total`
+* MUST NOT increment the any error-related metrics
 
 #### Error level
 
@@ -90,7 +93,7 @@ When an error event emits at the error level it requires user attention and,
 therefore, MUST do the following:
 
 * MUST log a message at the `error` level
-* MUST increment the `component_errors_total` by 1
+* MUST increment error-related metrics
 
 ### Events
 
