@@ -107,7 +107,7 @@ of these events:
 
 #### ComponentBytesReceived
 
-*Sources* MUST emit a `BytesReceived` event immediately after receiving, decompressing
+*Sources* MUST emit a `ComponentBytesReceived` event immediately after receiving, decompressing
 and filtering bytes from the upstream source and before the creation of a Vector event.
 
 * Properties
