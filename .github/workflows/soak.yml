@@ -295,12 +295,12 @@ jobs:
           rm -rf /tmp/${{ github.run_id }}-${{ github.run_attempt }}/
           mkdir -p /tmp/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.target }}/
 
-      - name: Run baseline experiment
+      - name: Run comparison experiment
         run: |
           ./soaks/bin/soak_one.sh --soak ${{ matrix.target }} \
                                   --build-image "false" \
-                                  --variant "baseline" \
-                                  --tag ${{ needs.compute-soak-meta.outputs.baseline-tag }} \
+                                  --variant "comparison" \
+                                  --tag ${{ needs.compute-soak-meta.outputs.comparison-tag }} \
                                   --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
                                   --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
                                   --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \
@@ -309,13 +309,12 @@ jobs:
                                   --replicas ${{ needs.compute-soak-meta.outputs.runner-node-replicas }} \
                                   --capture-dir /tmp/${{ github.run_id }}-${{ github.run_attempt }}
 
-
-      - name: Run comparison experiment
+      - name: Run baseline experiment
         run: |
           ./soaks/bin/soak_one.sh --soak ${{ matrix.target }} \
                                   --build-image "false" \
-                                  --variant "comparison" \
-                                  --tag ${{ needs.compute-soak-meta.outputs.comparison-tag }} \
+                                  --variant "baseline" \
+                                  --tag ${{ needs.compute-soak-meta.outputs.baseline-tag }} \
                                   --cpus ${{ needs.compute-soak-meta.outputs.soak-cpus }} \
                                   --memory ${{ needs.compute-soak-meta.outputs.soak-memory }} \
                                   --vector-cpus ${{ needs.compute-soak-meta.outputs.vector-cpus }} \

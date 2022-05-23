@@ -336,12 +336,12 @@ jobs:
         run: make check-events
       - name: Check cargo deny advisories
         if: needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.deny == 'true'
-        uses: EmbarkStudios/cargo-deny-action@v1.3.0
+        uses: EmbarkStudios/cargo-deny-action@v1.3.1
         with:
           command: check advisories
       - name: Check cargo deny licenses
         if: needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.deny == 'true'
-        uses: EmbarkStudios/cargo-deny-action@v1.3.0
+        uses: EmbarkStudios/cargo-deny-action@v1.3.1
         with:
           command: check licenses
       - name: Check Cue docs

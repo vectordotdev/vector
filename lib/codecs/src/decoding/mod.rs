@@ -138,14 +138,14 @@ impl From<OctetCountingDecoderConfig> for FramingConfig {
 
 impl FramingConfig {
     /// Build the `Framer` from this configuration.
-    pub fn build(self) -> Framer {
+    pub fn build(&self) -> Framer {
         match self {
             FramingConfig::Bytes => Framer::Bytes(BytesDecoderConfig.build()),
             FramingConfig::CharacterDelimited {
                 character_delimited,
             } => Framer::CharacterDelimited(
                 CharacterDelimitedDecoderConfig {
-                    character_delimited,
+                    character_delimited: character_delimited.clone(),
                 }
                 .build(),
             ),
@@ -153,11 +153,17 @@ impl FramingConfig {
                 Framer::LengthDelimited(LengthDelimitedDecoderConfig.build())
             }
             FramingConfig::NewlineDelimited { newline_delimited } => Framer::NewlineDelimited(
-                NewlineDelimitedDecoderConfig { newline_delimited }.build(),
+                NewlineDelimitedDecoderConfig {
+                    newline_delimited: newline_delimited.clone(),
+                }
+                .build(),
             ),
-            FramingConfig::OctetCounting { octet_counting } => {
-                Framer::OctetCounting(OctetCountingDecoderConfig { octet_counting }.build())
-            }
+            FramingConfig::OctetCounting { octet_counting } => Framer::OctetCounting(
+                OctetCountingDecoderConfig {
+                    octet_counting: octet_counting.clone(),
+                }
+                .build(),
+            ),
         }
     }
 }
