@@ -338,5 +338,25 @@ mod tests {
             }),
             tdef: TypeDef::object(kind_error()).fallible(),
         }
+
+        error_line_with_upstream {
+            args: func_args![
+                value: r#"2022/04/15 08:16:13 [error] 7164#7164: *20 connect() failed (113: No route to host) while connecting to upstream, client: 10.244.0.0, server: test.local, request: "GET / HTTP/2.0", upstream: "http://127.0.0.1:80/""#,
+                format: "error"
+            ],
+            want: Ok(btreemap! {
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2022-04-15T08:16:13Z").unwrap().into()),
+                "severity" => "error",
+                "pid" => 7164,
+                "tid" => 7164,
+                "cid" => 20,
+                "message" => "connect() failed (113: No route to host) while connecting to upstream",
+                "client" => "10.244.0.0",
+                "server" => "test.local",
+                "request" => "GET / HTTP/2.0",
+                "upstream" => "http://127.0.0.1:80/",
+            }),
+            tdef: TypeDef::object(kind_error()).fallible(),
+        }
     ];
 }
