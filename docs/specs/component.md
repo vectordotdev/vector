@@ -9,24 +9,23 @@ interpreted as described in [RFC 2119].
 
 <!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
 
-1. [Introduction](#introduction)
-1. [Scope](#scope)
-1. [How to read this document](#how-to-read-this-document)
-1. [Naming](#naming)
-   1. [Source and sink naming](#source-and-sink-naming)
-   1. [Transform naming](#transform-naming)
-1. [Configuration](#configuration)
-   1. [Options](#options)
-      1. [`endpoint(s)`](#endpoints)
-1. [Instrumentation](#instrumentation)
-   1. [Batching](#batching)
-   1. [Events](#events)
-      1. [BytesReceived](#bytesreceived)
-      1. [EventsReceived](#eventsrecevied)
-      1. [EventsSent](#eventssent)
-      1. [BytesSent](#bytessent)
-      1. [Error](#error)
-1. [Health checks](#health-checks)
+- [Introduction](#introduction)
+- [Scope](#scope)
+- [How to read this document](#how-to-read-this-document)
+- [Naming](#naming)
+  - [Source and sink naming](#source-and-sink-naming)
+  - [Transform naming](#transform-naming)
+- [Configuration](#configuration)
+  - [Options](#options)
+    - [`endpoint(s)`](#endpoints)
+- [Instrumentation](#instrumentation)
+  - [Events](#events)
+    - [BytesReceived](#bytesreceived)
+    - [EventsReceived](#eventsreceived)
+    - [EventsSent](#eventssent)
+    - [BytesSent](#bytessent)
+    - [Error](#error)
+- [Health checks](#health-checks)
 
 <!-- /MarkdownTOC -->
 
@@ -83,25 +82,17 @@ representing multiple endpoints.
 
 ## Instrumentation
 
+**This section extends the [Instrumentation Specification] and should be read
+first.**
+
 Vector components MUST be instrumented for optimal observability and monitoring.
-This is required to drive various interfaces that Vector users depend on to
-manage Vector installations in mission critical production environments. This
-section extends the [Instrumentation Specification].
-
-### Batching
-
-For performance reasons, components SHOULD instrument batches of Vector events
-as opposed to individual Vector events. [Pull request #8383] demonstrated
-meaningful performance improvements as a result of this strategy.
 
 ### Events
 
-Vector implements an event driven pattern ([RFC 2064]) for internal
-instrumentation. This section lists all required and optional events that a
-component must emit. It is expected that components will emit custom events
-beyond those listed here that reflect component specific behavior.
-
-There is leeway in the implementation of these events:
+This section lists all required and optional events that a component MUST emit.
+It is expected that components will emit custom events beyond those listed here
+that reflect component specific behavior. There is leeway in the implementation
+of these events:
 
 * Events MAY be augmented with additional component-specific context. For
   example, the `socket` source adds a `mode` attribute as additional context.
@@ -209,10 +200,8 @@ sending it, like the `prometheus_exporter` sink, SHOULD NOT publish this metric.
 
 #### Error
 
-*All components* MUST emit error events when an error occurs, and errors MUST be
-named with an `Error` suffix. For example, the `socket` source emits a
-`SocketReceiveError` representing any error that occurs while receiving data off
-of the socket.
+*All components* MUST emit error events in accordance with the
+[Instrumentation Specification].
 
 This specification does not list a standard set of errors that components must
 implement since errors are specific to the component.
@@ -272,6 +261,4 @@ See the [development documentation][health checks] for more context guidance.
 [health checks]: ../DEVELOPING.md#sink-healthchecks
 [Instrumentation Specification]: instrumentation.md
 [logical boundaries of components]: ../USER_EXPERIENCE_DESIGN.md#logical-boundaries
-[Pull request #8383]: https://github.com/vectordotdev/vector/pull/8383/
-[RFC 2064]: https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 [RFC 2119]: https://datatracker.ietf.org/doc/html/rfc2119
