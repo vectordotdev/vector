@@ -20,10 +20,10 @@ interpreted as described in [RFC 2119].
     - [`endpoint(s)`](#endpoints)
 - [Instrumentation](#instrumentation)
   - [Events](#events)
-    - [BytesReceived](#bytesreceived)
-    - [EventsReceived](#eventsreceived)
-    - [EventsSent](#eventssent)
-    - [BytesSent](#bytessent)
+    - [ComponentBytesReceived](#componentbytesreceived)
+    - [ComponentEventsReceived](#componenteventsreceived)
+    - [ComponentEventsSent](#componenteventssent)
+    - [ComponentBytesSent](#componentbytessent)
     - [Error](#error)
 - [Health checks](#health-checks)
 
@@ -104,7 +104,7 @@ of these events:
   individual events. For example, emitting the `EventsReceived` event for 10
   events MUST increment the `component_received_events_total` counter by 10.
 
-#### BytesReceived
+#### ComponentBytesReceived
 
 *Sources* MUST emit a `BytesReceived` event immediately after receiving, decompressing
 and filtering bytes from the upstream source and before the creation of a Vector event.
@@ -128,7 +128,7 @@ and filtering bytes from the upstream source and before the creation of a Vector
   * MUST log a `Bytes received.` message at the `trace` level with the
     defined properties as key-value pairs. It MUST NOT be rate limited.
 
-#### EventsReceived
+#### ComponentEventsReceived
 
 *All components* MUST emit an `EventsReceived` event immediately after creating
 or receiving one or more Vector events.
@@ -145,7 +145,7 @@ or receiving one or more Vector events.
   * MUST log a `Events received.` message at the `trace` level with the
     defined properties as key-value pairs. It MUST NOT be rate limited.
 
-#### EventsSent
+#### ComponentEventsSent
 
 *All components* that send events down stream, and delete them in Vector, MUST
 emit an `EventsSent` event immediately after sending, if the transmission was
@@ -169,7 +169,7 @@ sending it, like the `prometheus_exporter` sink, SHOULD NOT publish this metric.
   * MUST log a `Events sent.` message at the `trace` level with the
     defined properties as key-value pairs. It MUST NOT be rate limited.
 
-#### BytesSent
+#### ComponentBytesSent
 
 *Sinks* that send events down stream, and delete them in Vector, MUST emit
 a `BytesSent` event immediately after sending bytes to the downstream target, if
