@@ -15,6 +15,8 @@ interpreted as described in [RFC 2119].
 - [Emission](#emission)
   - [Batching](#batching)
   - [Errors](#errors)
+    - [Warning level](#warning-level)
+    - [Error level](#error-level)
   - [Events](#events)
 
 <!-- /MarkdownTOC -->
@@ -66,13 +68,29 @@ instrumentation SHOULD be batched whenever possible:
 
 ### Errors
 
-Errors MUST emit when they require user attention. If an error does not require
-user attention, usually because it will resolve itself, then it should emit as
-a warning. This reduces error noise and provides a clean signal for operators
-to understand if Vector is healthy and operating properly:
+As described in the [events](#events) section, all errors must emit as events
+to drive log and metric emission. Because errors can be transient and
+recoverable, errors MUST be able to log at warning and error levels:
 
-*  Retryable errors MUST emit as an error when the retry count is >= 3, the
-   first and second retry MUST emit as warnings.
+* MUST emit at the [error level](#error-level) if the error requires user
+  attention, otherwise the error MUST emit at the [warning level](#warning-level)
+  * Retryable errors only require user attention when the retry count is >= 3
+
+#### Warning level
+
+When an error event emits at the warning level it does not require user
+attention and, therefore, MUST do the following:
+
+* MUST log a message at the `warning` level
+* MUST NOT increment the `component_errors_total`
+
+#### Error level
+
+When an error event emits at the error level it requires user attention and,
+therefore, MUST do the following:
+
+* MUST log a message at the `error` level
+* MUST increment the `component_errors_total` by 1
 
 ### Events
 
