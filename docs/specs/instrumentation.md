@@ -75,9 +75,9 @@ distinguish these types of errors:
 
 * MUST emit at the [error level](#error-level) if the error requires user
   attention, otherwise the error MUST emit at the [warning level](#warning-level)
-  * Retryable errors, such a retryable HTTP requests, MUST emit at the warning
-    level since these errors could recover. Secondary signals, such as back
-    pressure will alert the user.
+  * Retryable errors, such a HTTP request errors, MUST emit at the warning
+    level if the request will be retried, otherwise it MUST emit at the error
+    level.
 
 #### Warning level
 
