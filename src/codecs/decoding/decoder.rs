@@ -1,9 +1,8 @@
 use bytes::{Bytes, BytesMut};
 use codecs::decoding::{
-    format::Deserializer as _, BoxedFramingError, BytesDeserializer, Deserializer,
-    DeserializerConfig, Error, Framer, FramingConfig, NewlineDelimitedDecoder,
+    format::Deserializer as _, BoxedFramingError, BytesDeserializer, Deserializer, Error, Framer,
+    NewlineDelimitedDecoder,
 };
-use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 
 use crate::{
@@ -82,33 +81,5 @@ impl tokio_util::codec::Decoder for Decoder {
     fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         let frame = self.framer.decode_eof(buf);
         self.handle_framing_result(frame)
-    }
-}
-
-/// Config used to build a `Decoder`.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct DecodingConfig {
-    /// The framing config.
-    framing: FramingConfig,
-    /// The decoding config.
-    decoding: DeserializerConfig,
-}
-
-impl DecodingConfig {
-    /// Creates a new `DecodingConfig` with the provided `FramingConfig` and
-    /// `DeserializerConfig`.
-    pub const fn new(framing: FramingConfig, decoding: DeserializerConfig) -> Self {
-        Self { framing, decoding }
-    }
-
-    /// Builds a `Decoder` from the provided configuration.
-    pub fn build(self) -> Decoder {
-        // Build the framer.
-        let framer = self.framing.build();
-
-        // Build the deserializer.
-        let deserializer = self.decoding.build();
-
-        Decoder::new(framer, deserializer)
     }
 }
