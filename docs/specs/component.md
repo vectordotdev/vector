@@ -127,7 +127,8 @@ and filtering bytes from the upstream source and before the creation of a Vector
     the defined properties as metric tags.
 * Logs
   * MUST log a `Bytes received.` message at the `trace` level with the
-    defined properties as key-value pairs. It MUST NOT be rate limited.
+    defined properties as key-value pairs.
+  * MUST NOT be rate limited.
 
 #### ComponentEventsReceived
 
@@ -144,7 +145,8 @@ or receiving one or more Vector events.
     `byte_size` property with the other properties as metric tags.
 * Logs
   * MUST log a `Events received.` message at the `trace` level with the
-    defined properties as key-value pairs. It MUST NOT be rate limited.
+    defined properties as key-value pairs.
+  * MUST NOT be rate limited.
 
 #### ComponentEventsSent
 
@@ -168,7 +170,8 @@ sending it, like the `prometheus_exporter` sink, SHOULD NOT publish this metric.
     in JSON representation.
 * Logs
   * MUST log a `Events sent.` message at the `trace` level with the
-    defined properties as key-value pairs. It MUST NOT be rate limited.
+    defined properties as key-value pairs.
+  * MUST NOT be rate limited.
 
 #### ComponentBytesSent
 
@@ -197,7 +200,8 @@ sending it, like the `prometheus_exporter` sink, SHOULD NOT publish this metric.
     defined properties as metric tags.
 * Logs
   * MUST log a `Bytes sent.` message at the `trace` level with the
-    defined properties as key-value pairs. It MUST NOT be rate limited.
+    defined properties as key-value pairs.
+  * MUST NOT be rate limited.
 
 #### ComponentError
 
@@ -260,7 +264,8 @@ as described in the [ComponentError](#ComponentError) section.
     of Vector events discarded.
 * Logs
   * MUST log a `Bytes sent.` message at the `trace` level with the
-    defined properties as key-value pairs. It MUST NOT be rate limited.
+    defined properties as key-value pairs.
+  * MUST NOT be rate limited.
 
 ## Health checks
 
