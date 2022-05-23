@@ -60,7 +60,7 @@ Vector broadly follows the [Prometheus metric naming standards]:
 
 ### Batching
 
-For performance reasons, as demonstrated in ppull request #8383],
+For performance reasons, as demonstrated in pull request #8383],
 instrumentation SHOULD be batched whenever possible:
 
 * Vector process batches of events ([RFC 9480]) and telemtry SHOULD emit for
