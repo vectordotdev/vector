@@ -151,7 +151,7 @@ or receiving one or more Vector events.
 #### ComponentEventsSent
 
 *All components* that send events down stream, and delete them in Vector, MUST
-emit an `EventsSent` event immediately after sending, if the transmission was
+emit an `ComponentEventsSent` event immediately after sending, if the transmission was
 successful.
 
 Note that for sinks that simply expose data, but don't delete the data after
