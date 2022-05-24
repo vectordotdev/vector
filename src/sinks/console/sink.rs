@@ -64,12 +64,9 @@ where
 #[cfg(test)]
 mod test {
     use chrono::{offset::TimeZone, Utc};
-<<<<<<< HEAD
     use codecs::{BytesEncoder, NewlineDelimitedEncoder};
-=======
     use futures::future::ready;
     use futures_util::stream;
->>>>>>> a45b670cf (get unit tests passing first)
     use pretty_assertions::assert_eq;
     use vector_core::sink::VectorSink;
 
@@ -79,16 +76,11 @@ mod test {
             metric::{Metric, MetricKind, MetricValue, StatisticKind},
             Event, Value,
         },
-<<<<<<< HEAD
         sinks::util::encoding::{
             EncodingConfig, EncodingConfigWithFramingAdapter, StandardEncodings,
             StandardEncodingsWithFramingMigrator,
         },
-        test_util::components::{assert_sink_compliance_with_event, SINK_TAGS},
-=======
-        sinks::util::encoding::StandardEncodings,
         test_util::components::{run_and_assert_sink_compliance, SINK_TAGS},
->>>>>>> a45b670cf (get unit tests passing first)
     };
 
     fn encode_event(
