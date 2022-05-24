@@ -230,9 +230,8 @@ components: transforms: geoip: {
 								The metro code of the location if the location is in the US.
 								"""
 							required: true
-							type: uint: {
-								unit: null
-								examples: [501]
+							type: string: {
+								examples: ["501"]
 							}
 							groups: ["City"]
 						}
