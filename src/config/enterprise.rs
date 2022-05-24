@@ -378,14 +378,14 @@ fn setup_logs_reporting(
     let tag_logs = RemapConfig {
         source: Some(format!(
             r#"
-            .version = "{}"
-            .configuration_key = "{}"
             .ddsource = "vector"
             .vector = {{
+                "configuration_key" = "{}",
+                "version_hash" = "{}"
                 "version": "{}",
                 "arch": "{}",
                 "os": "{}",
-                "vendor": "{}"
+                "vendor": "{}",
             }}
             {}
         "#,
@@ -458,7 +458,7 @@ fn setup_metrics_reporting(
     let tag_metrics = RemapConfig {
         source: Some(format!(
             r#"
-            .tags.vector_version_hash = "{}"
+            .tags.version_hash = "{}"
             .tags.configuration_key = "{}"
             .tags.vector_version = "{}"
             {}
