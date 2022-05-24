@@ -10,13 +10,15 @@ use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[cfg(feature = "enterprise")]
 use crate::config::enterprise::PipelinesError;
+#[cfg(not(feature = "enterprise-tests"))]
+use crate::metrics;
 #[cfg(windows)]
 use crate::service;
 #[cfg(feature = "api")]
 use crate::{api, internal_events::ApiStarted};
 use crate::{
     cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand},
-    config, generate, graph, heartbeat, list, metrics,
+    config, generate, graph, heartbeat, list,
     signal::{self, SignalTo},
     topology::{self, RunningTopology},
     trace, unit_test, validate,
@@ -99,6 +101,7 @@ impl Application {
             LogFormat::Json => true,
         };
 
+        #[cfg(not(feature = "enterprise-tests"))]
         metrics::init_global().expect("metrics initialization failed");
 
         let mut rt_builder = runtime::Builder::new_multi_thread();
@@ -135,7 +138,7 @@ impl Application {
                         SubCommand::Graph(g) => graph::cmd(&g),
                         SubCommand::Config(c) => config::cmd(&c),
                         SubCommand::List(l) => list::cmd(&l),
-                        SubCommand::Test(t) => unit_test::cmd(&t).await,
+                        SubCommand::Test(t) => unit_test::cmd(&t, &mut signal_handler).await,
                         #[cfg(windows)]
                         SubCommand::Service(s) => service::cmd(&s),
                         #[cfg(feature = "api-client")]
@@ -169,12 +172,15 @@ impl Application {
                     paths = ?config_paths.iter().map(<&PathBuf>::from).collect::<Vec<_>>()
                 );
 
+                #[cfg(not(feature = "enterprise-tests"))]
                 config::init_log_schema(&config_paths, true).map_err(handle_config_errors)?;
 
-                let mut config =
-                    config::load_from_paths_with_provider(&config_paths, &mut signal_handler)
-                        .await
-                        .map_err(handle_config_errors)?;
+                let mut config = config::load_from_paths_with_provider_and_secrets(
+                    &config_paths,
+                    &mut signal_handler,
+                )
+                .await
+                .map_err(handle_config_errors)?;
 
                 if !config.healthchecks.enabled {
                     info!("Health checks are disabled.");
@@ -191,6 +197,7 @@ impl Application {
                     )
                     .await
                 {
+                    error!(message = "Exiting due to configuration reporting failure.");
                     return Err(exitcode::UNAVAILABLE);
                 }
 
@@ -279,6 +286,7 @@ impl Application {
                                         if let Err(PipelinesError::FatalCouldNotReportConfig) =
                                             config::enterprise::try_attach(&mut new_config, &config_paths, signal_handler.subscribe()).await
                                         {
+                                            error!(message = "Shutting down due to configuration reporting failure.");
                                             break SignalTo::Shutdown;
                                         }
 
@@ -315,7 +323,7 @@ impl Application {
                                 config_paths = config::process_paths(&opts.config_paths_with_formats()).unwrap_or(config_paths);
 
                                 // Reload config
-                                let new_config = config::load_from_paths_with_provider(&config_paths, &mut signal_handler)
+                                let new_config = config::load_from_paths_with_provider_and_secrets(&config_paths, &mut signal_handler)
                                     .await
                                     .map_err(handle_config_errors).ok();
 
@@ -327,6 +335,7 @@ impl Application {
                                     if let Err(PipelinesError::FatalCouldNotReportConfig) =
                                         config::enterprise::try_attach(&mut new_config, &config_paths, signal_handler.subscribe()).await
                                     {
+                                        error!(message = "Shutting down due to configuration reporting failure.");
                                         break SignalTo::Shutdown;
                                     }
 

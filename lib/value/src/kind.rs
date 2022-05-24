@@ -4,16 +4,19 @@ mod builder;
 mod collection;
 mod comparison;
 mod conversion;
+mod debug;
 pub mod find;
 pub mod insert;
 pub mod merge;
 pub mod nest;
 pub mod remove;
 
-use crate::Value;
+use std::collections::BTreeMap;
+
 pub use builder::EmptyKindError;
 pub use collection::{Collection, Field, Index, Unknown};
-use std::collections::BTreeMap;
+
+use crate::Value;
 
 /// The type (kind) of a given value.
 ///

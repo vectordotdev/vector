@@ -36,8 +36,8 @@ use crate::{
         log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext,
         SourceDescription,
     },
-    event::{BatchNotifier, BatchStatusReceiver, LogEvent, Value},
-    internal_events::{BytesReceived, JournaldEventsReceived, JournaldInvalidRecordError},
+    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent, Value},
+    internal_events::{BytesReceived, JournaldInvalidRecordError, OldEventsReceived},
     serde::bool_or_struct,
     shutdown::ShutdownSignal,
     sources::util::finalizer::OrderedFinalizer,
@@ -394,7 +394,7 @@ impl<'a> Batch<'a> {
         }
 
         if !self.events.is_empty() {
-            emit!(JournaldEventsReceived {
+            emit!(OldEventsReceived {
                 count: self.events.len(),
                 byte_size: self.events.size_of(),
             });
@@ -623,12 +623,15 @@ impl Finalizer {
         shutdown: ShutdownSignal,
     ) -> Self {
         if acknowledgements {
-            Self::Async(OrderedFinalizer::new(shutdown, move |cursor| {
-                let checkpointer = checkpointer.clone();
-                async move {
-                    checkpointer.lock().await.set(cursor).await;
+            let (finalizer, mut ack_stream) = OrderedFinalizer::new(shutdown);
+            tokio::spawn(async move {
+                while let Some((status, cursor)) = ack_stream.next().await {
+                    if status == BatchStatus::Delivered {
+                        checkpointer.lock().await.set(cursor).await;
+                    }
                 }
-            }))
+            });
+            Self::Async(finalizer)
         } else {
             Self::Sync(checkpointer)
         }
@@ -785,7 +788,9 @@ mod tests {
     use tokio::time::{sleep, timeout, Duration};
 
     use super::*;
-    use crate::{event::Event, event::EventStatus, test_util::components};
+    use crate::{
+        event::Event, event::EventStatus, test_util::components::assert_source_compliance,
+    };
 
     const FAKE_JOURNAL: &str = r#"{"_SYSTEMD_UNIT":"sysinit.target","MESSAGE":"System Initialization","__CURSOR":"1","_SOURCE_REALTIME_TIMESTAMP":"1578529839140001","PRIORITY":"6"}
 {"_SYSTEMD_UNIT":"unit.service","MESSAGE":"unit message","__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140002","PRIORITY":"7"}
@@ -852,46 +857,46 @@ mod tests {
         exclude_matches: Matches,
         cursor: Option<&str>,
     ) -> Vec<Event> {
-        components::init_test();
-        let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
-        let (trigger, shutdown, _) = ShutdownSignal::new_wired();
+        assert_source_compliance(&["protocol"], async move {
+            let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+            let (trigger, shutdown, _) = ShutdownSignal::new_wired();
 
-        let tempdir = tempdir().unwrap();
-        let mut checkpoint_path = tempdir.path().to_path_buf();
-        checkpoint_path.push(CHECKPOINT_FILENAME);
+            let tempdir = tempdir().unwrap();
+            let mut checkpoint_path = tempdir.path().to_path_buf();
+            checkpoint_path.push(CHECKPOINT_FILENAME);
 
-        let mut checkpointer = Checkpointer::new(checkpoint_path.clone())
-            .await
-            .expect("Creating checkpointer failed!");
-
-        if let Some(cursor) = cursor {
-            checkpointer
-                .set(cursor)
+            let mut checkpointer = Checkpointer::new(checkpoint_path.clone())
                 .await
-                .expect("Could not set checkpoint");
-        }
+                .expect("Creating checkpointer failed!");
 
-        let source = JournaldSource {
-            include_matches,
-            exclude_matches,
-            checkpoint_path,
-            batch_size: DEFAULT_BATCH_SIZE,
-            remap_priority: true,
-            out: tx,
-            acknowledgements: false,
-        }
-        .run_shutdown(
-            shutdown,
-            Box::new(|checkpoint| Ok(FakeJournal::new(checkpoint))),
-        );
-        tokio::spawn(source);
+            if let Some(cursor) = cursor {
+                checkpointer
+                    .set(cursor)
+                    .await
+                    .expect("Could not set checkpoint");
+            }
 
-        sleep(Duration::from_millis(100)).await;
-        drop(trigger);
+            let source = JournaldSource {
+                include_matches,
+                exclude_matches,
+                checkpoint_path,
+                batch_size: DEFAULT_BATCH_SIZE,
+                remap_priority: true,
+                out: tx,
+                acknowledgements: false,
+            }
+            .run_shutdown(
+                shutdown,
+                Box::new(|checkpoint| Ok(FakeJournal::new(checkpoint))),
+            );
+            tokio::spawn(source);
 
-        let result = timeout(Duration::from_secs(1), rx.collect()).await.unwrap();
-        components::SOURCE_TESTS.assert(&["protocol"]);
-        result
+            sleep(Duration::from_millis(100)).await;
+            drop(trigger);
+
+            timeout(Duration::from_secs(1), rx.collect()).await.unwrap()
+        })
+        .await
     }
 
     fn create_unit_matches<S: Into<String>>(units: Vec<S>) -> Matches {

@@ -1,3 +1,15 @@
+use std::{convert::TryFrom, fmt::Debug, num::NonZeroUsize, sync::Arc};
+
+use async_trait::async_trait;
+use bytes::Bytes;
+use futures::stream::{BoxStream, StreamExt};
+use tower::Service;
+use vector_core::{
+    buffers::Acker,
+    event::{EventFinalizers, Finalizable},
+    stream::{BatcherSettings, DriverResponse},
+};
+
 use super::{
     Encoding, EventsApiModel, LogsApiModel, MetricsApiModel, NewRelicApi, NewRelicApiModel,
     NewRelicApiRequest, NewRelicCredentials,
@@ -5,19 +17,9 @@ use super::{
 use crate::{
     event::Event,
     sinks::util::{
-        builder::SinkBuilderExt, encoding::EncodingConfigFixed, Compression, RequestBuilder,
-        StreamSink,
+        builder::SinkBuilderExt, encoding::EncodingConfigFixed, request_builder::EncodeResult,
+        Compression, RequestBuilder, StreamSink,
     },
-};
-use async_trait::async_trait;
-use bytes::Bytes;
-use futures::stream::{BoxStream, StreamExt};
-use std::{convert::TryFrom, fmt::Debug, num::NonZeroUsize, sync::Arc};
-use tower::Service;
-use vector_core::{
-    buffers::Acker,
-    event::{EventFinalizers, Finalizable},
-    stream::{BatcherSettings, DriverResponse},
 };
 
 #[derive(Debug)]
@@ -103,13 +105,17 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
         (metadata, api_model)
     }
 
-    fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
+    fn build_request(
+        &self,
+        metadata: Self::Metadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
         let (_credentials, events_len, finalizers) = metadata;
         NewRelicApiRequest {
             batch_size: events_len,
             finalizers,
             credentials: Arc::clone(&self.credentials),
-            payload,
+            payload: payload.into_payload(),
             compression: self.compression,
         }
     }

@@ -284,13 +284,14 @@ impl FunctionTransform for RegexParser {
 
 #[cfg(test)]
 mod tests {
+    use ordered_float::NotNan;
+
     use super::RegexParserConfig;
     use crate::{
         config::{TransformConfig, TransformContext},
         event::{Event, LogEvent, Value},
         transforms::OutputBuffer,
     };
-    use ordered_float::NotNan;
 
     #[test]
     fn generate_config() {
@@ -408,7 +409,7 @@ mod tests {
 
         // timestamp is unpredictable, don't compare it
         log.remove("timestamp");
-        let log = serde_json::to_value(log.all_fields()).unwrap();
+        let log = serde_json::to_value(log.all_fields().unwrap()).unwrap();
         assert_eq!(
             log,
             serde_json::json!({
@@ -453,7 +454,7 @@ mod tests {
 
         // timestamp is unpredictable, don't compare it
         log.remove("timestamp");
-        let log = serde_json::to_value(log.all_fields()).unwrap();
+        let log = serde_json::to_value(log.all_fields().unwrap()).unwrap();
         assert_eq!(
             log,
             serde_json::json!({

@@ -1,5 +1,6 @@
 use std::num::ParseIntError;
 
+use ::value::Value;
 use nom::{
     branch::alt,
     bytes::complete::{escaped, tag, take_while, take_while1},
@@ -11,7 +12,7 @@ use nom::{
     sequence::{preceded, separated_pair, terminated, tuple},
     AsChar, IResult, InputTakeAtPosition,
 };
-use vrl::{prelude::*, Value};
+use vrl::prelude::*;
 
 fn parse_ruby_hash(value: Value) -> Resolved {
     let input = value.try_bytes_utf8_lossy()?;
@@ -252,6 +253,7 @@ fn parse_value<'a, E: HashParseError<&'a str>>(input: &'a str) -> IResult<&'a st
             parse_nil,
             parse_hash,
             parse_array,
+            map(parse_colon_key, Value::from),
             map(parse_bytes, Value::Bytes),
             map(double, |value| Value::Float(NotNan::new(value).unwrap())),
             map(parse_boolean, Value::Boolean),
@@ -291,6 +293,16 @@ mod tests {
     #[test]
     fn test_parse_arrow_empty_array() {
         parse("{ :array => [] }").unwrap();
+    }
+
+    #[test]
+    fn test_parse_symbol_value() {
+        let result = parse(r#"{ "key" => :foo }"#).unwrap();
+        assert!(result.is_object());
+        let result = result.as_object().unwrap();
+        let value = result.get("key").unwrap();
+        assert!(value.is_bytes());
+        assert_eq!(value.as_bytes().unwrap(), ":foo");
     }
 
     #[test]

@@ -6,7 +6,7 @@ use file_source::{
 };
 use futures::{
     future::{select, Either},
-    pin_mut, Sink,
+    pin_mut, FutureExt, Sink,
 };
 use tokio::task::spawn_blocking;
 
@@ -28,8 +28,12 @@ where
 {
     let span = info_span!("file_server");
     let join_handle = spawn_blocking(move || {
+        // These will need to be separated when this source is updated
+        // to support end-to-end acknowledgements.
+        let shutdown = shutdown.shared();
+        let shutdown2 = shutdown.clone();
         let _enter = span.enter();
-        let result = file_server.run(chans, shutdown, checkpointer);
+        let result = file_server.run(chans, shutdown, shutdown2, checkpointer);
         result.expect("file server exited with an error")
     });
     join_handle.await

@@ -6,43 +6,59 @@ use std::{
 
 use bytes::Bytes;
 use chrono::Utc;
+use codecs::{
+    encoding::{Framer, Serializer},
+    CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder,
+};
 use http::header::{HeaderName, HeaderValue};
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
+use snafu::Snafu;
 use tower::ServiceBuilder;
 use uuid::Uuid;
 use vector_core::{event::Finalizable, ByteSizeOf};
 
-use super::{GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
+    codecs::Encoder,
     config::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
     },
     event::Event,
+    gcp::{GcpAuthConfig, GcpCredentials, Scope},
     http::HttpClient,
     serde::json::to_string,
     sinks::{
         gcs_common::{
             config::{
-                build_healthcheck, GcsPredefinedAcl, GcsRetryLogic, GcsStorageClass,
-                KeyPrefixTemplateSnafu, BASE_URL,
+                build_healthcheck, GcsPredefinedAcl, GcsRetryLogic, GcsStorageClass, BASE_URL,
             },
             service::{GcsMetadata, GcsRequest, GcsRequestSettings, GcsService},
             sink::GcsSink,
         },
         util::{
             batch::BatchConfig,
-            encoding::{EncodingConfig, EncodingConfiguration, StandardEncodings},
+            encoding::{
+                EncodingConfig, EncodingConfigWithFramingAdapter, StandardEncodings,
+                StandardEncodingsWithFramingMigrator, Transformer,
+            },
             partitioner::KeyPartitioner,
+            request_builder::EncodeResult,
             BulkSizeBasedDefaultBatchSettings, Compression, RequestBuilder, ServiceBuilderExt,
             TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
-    template::Template,
+    template::{Template, TemplateParseError},
     tls::{TlsConfig, TlsSettings},
 };
+
+#[derive(Debug, Snafu)]
+#[snafu(visibility(pub))]
+pub enum GcsHealthcheckError {
+    #[snafu(display("key_prefix template parse error: {}", source))]
+    KeyPrefixTemplate { source: TemplateParseError },
+}
 
 const NAME: &str = "gcp_cloud_storage";
 
@@ -57,7 +73,11 @@ pub struct GcsSinkConfig {
     filename_time_format: Option<String>,
     filename_append_uuid: Option<bool>,
     filename_extension: Option<String>,
-    encoding: EncodingConfig<StandardEncodings>,
+    #[serde(flatten)]
+    encoding: EncodingConfigWithFramingAdapter<
+        EncodingConfig<StandardEncodings>,
+        StandardEncodingsWithFramingMigrator,
+    >,
     #[serde(default)]
     compression: Compression,
     #[serde(default)]
@@ -86,7 +106,7 @@ fn default_config(e: StandardEncodings) -> GcsSinkConfig {
         filename_time_format: Default::default(),
         filename_append_uuid: Default::default(),
         filename_extension: Default::default(),
-        encoding: e.into(),
+        encoding: EncodingConfig::from(e).into(),
         compression: Compression::gzip_default(),
         batch: Default::default(),
         request: Default::default(),
@@ -134,7 +154,7 @@ impl SinkConfig for GcsSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(self.encoding.config().1.input_type())
     }
 
     fn sink_type(&self) -> &'static str {
@@ -195,14 +215,14 @@ struct RequestSettings {
     extension: String,
     time_format: String,
     append_uuid: bool,
-    encoding: EncodingConfig<StandardEncodings>,
+    encoder: (Transformer, Encoder<Framer>),
     compression: Compression,
 }
 
 impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
     type Metadata = GcsMetadata;
     type Events = Vec<Event>;
-    type Encoder = EncodingConfig<StandardEncodings>;
+    type Encoder = (Transformer, Encoder<Framer>);
     type Payload = Bytes;
     type Request = GcsRequest;
     type Error = io::Error; // TODO: this is ugly.
@@ -212,7 +232,7 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
     }
 
     fn encoder(&self) -> &Self::Encoder {
-        &self.encoding
+        &self.encoder
     }
 
     fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
@@ -228,14 +248,18 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
         (metadata, events)
     }
 
-    fn build_request(&self, mut metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
+    fn build_request(
+        &self,
+        mut metadata: Self::Metadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
         // TODO: pull the seconds from the last event
         let filename = {
             let seconds = Utc::now().format(&self.time_format);
 
             if self.append_uuid {
                 let uuid = Uuid::new_v4();
-                format!("{}-{}", seconds, uuid.to_hyphenated())
+                format!("{}-{}", seconds, uuid.hyphenated())
             } else {
                 seconds.to_string()
             }
@@ -243,10 +267,12 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
 
         metadata.key = format!("{}{}.{}", metadata.key, filename, self.extension);
 
-        trace!(message = "Sending events.", bytes = ?payload.len(), events_len = ?metadata.count, key = ?metadata.key);
+        let body = payload.into_payload();
+
+        trace!(message = "Sending events.", bytes = ?body.len(), events_len = ?metadata.count, key = ?metadata.key);
 
         GcsRequest {
-            body: payload,
+            body,
             settings: GcsRequestSettings {
                 acl: self.acl.clone(),
                 content_type: self.content_type.clone(),
@@ -261,10 +287,25 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
 
 impl RequestSettings {
     fn new(config: &GcsSinkConfig) -> crate::Result<Self> {
+        let transformer = config.encoding.transformer();
+        let (framer, serializer) = config.encoding.encoding();
+        let framer = match (framer, &serializer) {
+            (Some(framer), _) => framer,
+            (None, Serializer::Json(_)) => CharacterDelimitedEncoder::new(b',').into(),
+            (None, Serializer::Native(_)) => LengthDelimitedEncoder::new().into(),
+            (
+                None,
+                Serializer::Logfmt(_)
+                | Serializer::NativeJson(_)
+                | Serializer::RawMessage(_)
+                | Serializer::Text(_),
+            ) => NewlineDelimitedEncoder::new().into(),
+        };
+        let encoder = Encoder::<Framer>::new(framer, serializer);
         let acl = config
             .acl
             .map(|acl| HeaderValue::from_str(&to_string(acl)).unwrap());
-        let content_type = HeaderValue::from_str(config.encoding.codec().content_type()).unwrap();
+        let content_type = HeaderValue::from_str(encoder.content_type()).unwrap();
         let content_encoding = config
             .compression
             .content_encoding()
@@ -300,7 +341,7 @@ impl RequestSettings {
             time_format,
             append_uuid,
             compression: config.compression,
-            encoding: config.encoding.clone(),
+            encoder: (transformer, encoder),
         })
     }
 }
@@ -366,7 +407,7 @@ mod tests {
             .expect("key wasn't provided");
         let request_settings = request_settings(&sink_config);
         let (metadata, _events) = request_settings.split_input((key, vec![log]));
-        request_settings.build_request(metadata, Bytes::new())
+        request_settings.build_request(metadata, EncodeResult::uncompressed(Bytes::new()))
     }
 
     #[test]

@@ -76,11 +76,11 @@ impl DriverResponse for S3Response {
 #[derive(Clone)]
 pub struct S3Service {
     client: S3Client,
-    region: Region,
+    region: Option<Region>,
 }
 
 impl S3Service {
-    pub const fn new(client: S3Client, region: Region) -> S3Service {
+    pub const fn new(client: S3Client, region: Option<Region>) -> S3Service {
         S3Service { client, region }
     }
 

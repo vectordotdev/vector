@@ -1,7 +1,7 @@
 use bytes::{BufMut, BytesMut};
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder;
-use vector_core::{event::Event, schema};
+use vector_core::{config::DataType, event::Event, schema};
 
 /// Config used to build a `NativeJsonSerializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -11,6 +11,11 @@ impl NativeJsonSerializerConfig {
     /// Build the `NativeJsonSerializer` from this configuration.
     pub const fn build(&self) -> NativeJsonSerializer {
         NativeJsonSerializer
+    }
+
+    /// The data type of events that are accepted by `NativeJsonSerializer`.
+    pub fn input_type(&self) -> DataType {
+        DataType::all()
     }
 
     /// The schema required by the serializer.

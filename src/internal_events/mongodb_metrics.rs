@@ -1,15 +1,14 @@
-use std::time::Instant;
-
-use super::prelude::{error_stage, error_type};
-use metrics::{counter, histogram};
+use metrics::counter;
 use mongodb::{bson, error::Error as MongoError};
 use vector_core::internal_event::InternalEvent;
+
+use super::prelude::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct MongoDbMetricsEventsReceived<'a> {
     pub count: usize,
     pub byte_size: usize,
-    pub uri: &'a str,
+    pub endpoint: &'a str,
 }
 
 impl<'a> InternalEvent for MongoDbMetricsEventsReceived<'a> {
@@ -18,35 +17,21 @@ impl<'a> InternalEvent for MongoDbMetricsEventsReceived<'a> {
             message = "Events received.",
             count = self.count,
             byte_size = self.byte_size,
-            uri = self.uri,
+            endpoint = self.endpoint,
         );
         counter!(
             "component_received_events_total", self.count as u64,
-            "uri" => self.uri.to_owned(),
+            "endpoint" => self.endpoint.to_owned(),
         );
         counter!(
             "component_received_event_bytes_total", self.byte_size as u64,
-            "uri" => self.uri.to_owned(),
+            "endpoint" => self.endpoint.to_owned(),
         );
         // deprecated
         counter!(
             "events_in_total", self.count as u64,
-            "uri" => self.uri.to_owned(),
+            "endpoint" => self.endpoint.to_owned(),
         );
-    }
-}
-
-#[derive(Debug)]
-pub struct MongoDbMetricsCollectCompleted {
-    pub start: Instant,
-    pub end: Instant,
-}
-
-impl InternalEvent for MongoDbMetricsCollectCompleted {
-    fn emit(self) {
-        debug!(message = "Collection completed.");
-        counter!("collect_completed_total", 1);
-        histogram!("collect_duration_seconds", self.end - self.start);
     }
 }
 

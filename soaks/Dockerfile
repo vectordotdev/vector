@@ -13,7 +13,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 #
 # LADING
 #
-FROM ghcr.io/blt/lading@sha256:1d2f7d3145c06df976bb9c06ad04c70de5b603598b3c4a85eaa565fa33f63343 as lading
+FROM ghcr.io/blt/lading@sha256:084ea90217d72d15174b6822890124f0c330a3aeef19195805dab625798323a3 as lading
 
 #
 # TARGET

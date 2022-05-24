@@ -1,5 +1,6 @@
 use std::ops::{Deref, DerefMut};
 
+use ::value::Value;
 use lookup::LookupBuf;
 use vrl::prelude::*;
 

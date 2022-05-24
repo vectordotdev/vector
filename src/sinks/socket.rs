@@ -1,6 +1,6 @@
 use codecs::{
     encoding::{Framer, FramingConfig, SerializerConfig},
-    BytesEncoder, JsonSerializerConfig, NewlineDelimitedEncoder, RawMessageSerializerConfig,
+    BytesEncoder, JsonSerializerConfig, NewlineDelimitedEncoder, TextSerializerConfig,
 };
 use serde::{Deserialize, Serialize};
 
@@ -30,7 +30,7 @@ impl EncodingConfigWithFramingMigrator for Migrator {
     fn migrate(codec: &Self::Codec) -> (Option<FramingConfig>, SerializerConfig) {
         let framing = None;
         let serializer = match codec {
-            Encoding::Text => RawMessageSerializerConfig::new().into(),
+            Encoding::Text => TextSerializerConfig::new().into(),
             Encoding::Json => JsonSerializerConfig::new().into(),
         };
         (framing, serializer)
@@ -38,6 +38,8 @@ impl EncodingConfigWithFramingMigrator for Migrator {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
+// `#[serde(deny_unknown_fields)]` doesn't work when flattening internally tagged enums, see
+// https://github.com/serde-rs/serde/issues/1358.
 pub struct SocketSinkConfig {
     #[serde(flatten)]
     pub mode: Mode,
@@ -92,9 +94,8 @@ impl SinkConfig for SocketSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let encoding = self.encoding.clone();
-        let transformer = encoding.transformer();
-        let (framer, serializer) = encoding.encoding();
+        let transformer = self.encoding.transformer();
+        let (framer, serializer) = self.encoding.encoding();
         let framer = framer.unwrap_or_else(|| match self.mode {
             Mode::Tcp(_) => NewlineDelimitedEncoder::new().into(),
             Mode::Udp(_) => BytesEncoder::new().into(),
@@ -111,7 +112,7 @@ impl SinkConfig for SocketSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(self.encoding.config().1.input_type())
     }
 
     fn sink_type(&self) -> &'static str {
@@ -283,7 +284,7 @@ mod test {
             )),
             encoding: EncodingConfigWithFramingAdapter::new(
                 None,
-                RawMessageSerializerConfig::new().into(),
+                TextSerializerConfig::new().into(),
             ),
         };
         let context = SinkContext::new_test();
@@ -402,7 +403,7 @@ mod test {
             mode: Mode::Tcp(TcpSinkConfig::from_address(addr.to_string())),
             encoding: EncodingConfigWithFramingAdapter::new(
                 None,
-                RawMessageSerializerConfig::new().into(),
+                TextSerializerConfig::new().into(),
             ),
         };
 

@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn get_metadata_field(ctx: &mut Context, key: &str) -> std::result::Result<Value, ExpressionError> {

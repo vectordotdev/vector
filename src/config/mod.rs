@@ -43,8 +43,9 @@ pub use diff::ConfigDiff;
 pub use format::{Format, FormatHint};
 pub use id::{ComponentKey, OutputId};
 pub use loading::{
-    load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider, load_from_str,
-    load_source_from_paths, merge_path_lists, process_paths, CONFIG_PATHS,
+    load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider_and_secrets,
+    load_from_str, load_source_from_paths, merge_path_lists, process_paths, SecretBackend,
+    CONFIG_PATHS,
 };
 pub use sink::{SinkConfig, SinkContext, SinkDescription, SinkHealthcheckOptions, SinkOuter};
 pub use source::{SourceConfig, SourceContext, SourceDescription, SourceOuter};
@@ -107,6 +108,7 @@ pub struct Config {
     pub enrichment_tables: IndexMap<ComponentKey, EnrichmentTableOuter>,
     tests: Vec<TestDefinition>,
     expansions: IndexMap<ComponentKey, Vec<ComponentKey>>,
+    secret: IndexMap<ComponentKey, Box<dyn SecretBackend>>,
 }
 
 impl Config {
@@ -864,6 +866,56 @@ mod tests {
 
                 [api]
                     enabled = true
+            "#},
+            Format::Toml,
+        )
+        .unwrap();
+
+        assert_eq!(config1.sha256_hash(), config2.sha256_hash())
+    }
+
+    #[test]
+    #[cfg(feature = "enterprise")]
+    fn enterprise_tags_ignored_sha256_hashes() {
+        let config1: ConfigBuilder = format::deserialize(
+            indoc! {r#"
+                [enterprise]
+                api_key = "api_key"
+                application_key = "application_key"
+                configuration_key = "configuration_key"
+
+                [enterprise.tags]
+                tag = "value"
+
+                [sources.internal_metrics]
+                type = "internal_metrics"
+
+                [sinks.datadog_metrics]
+                type = "datadog_metrics"
+                inputs = ["*"]
+                default_api_key = "default_api_key"
+            "#},
+            Format::Toml,
+        )
+        .unwrap();
+
+        let config2: ConfigBuilder = format::deserialize(
+            indoc! {r#"
+                [enterprise]
+                api_key = "api_key"
+                application_key = "application_key"
+                configuration_key = "configuration_key"
+
+                [enterprise.tags]
+                another_tag = "another value"
+
+                [sources.internal_metrics]
+                type = "internal_metrics"
+
+                [sinks.datadog_metrics]
+                type = "datadog_metrics"
+                inputs = ["*"]
+                default_api_key = "default_api_key"
             "#},
             Format::Toml,
         )

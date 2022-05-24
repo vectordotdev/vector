@@ -1,3 +1,4 @@
+use ::value::Value;
 use vector_common::conversion::Conversion;
 use vrl::prelude::*;
 

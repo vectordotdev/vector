@@ -1,10 +1,11 @@
-use aws_sdk_kinesis::error::{DescribeStreamError, PutRecordsError, PutRecordsErrorKind};
-use aws_sdk_kinesis::types::SdkError;
 use std::sync::Arc;
 
+use aws_sdk_kinesis::error::{DescribeStreamError, PutRecordsError, PutRecordsErrorKind};
+use aws_sdk_kinesis::types::SdkError;
 use aws_sdk_kinesis::{Client as KinesisClient, Endpoint, Region};
 use aws_smithy_async::rt::sleep::AsyncSleep;
 use aws_smithy_client::erase::DynConnector;
+use aws_smithy_types::retry::RetryConfig;
 use aws_types::credentials::SharedCredentialsProvider;
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
@@ -78,6 +79,13 @@ impl ClientBuilder for KinesisClientBuilder {
         builder.sleep_impl(sleep_impl)
     }
 
+    fn with_retry_config(
+        builder: Self::ConfigBuilder,
+        retry_config: RetryConfig,
+    ) -> Self::ConfigBuilder {
+        builder.retry_config(retry_config)
+    }
+
     fn client_from_conf_conn(
         builder: Self::ConfigBuilder,
         connector: DynConnector,
@@ -96,12 +104,12 @@ impl SinkBatchSettings for KinesisDefaultBatchSettings {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct KinesisSinkConfig {
     pub stream_name: String,
     pub partition_key_field: Option<String>,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    #[serde(flatten)]
     pub encoding:
         EncodingConfigAdapter<EncodingConfig<StandardEncodings>, StandardEncodingsMigrator>,
     #[serde(default)]
@@ -182,7 +190,7 @@ impl SinkConfig for KinesisSinkConfig {
             });
 
         let transformer = self.encoding.transformer();
-        let serializer = self.encoding.clone().encoding();
+        let serializer = self.encoding.encoding();
         let encoder = Encoder::<()>::new(serializer);
 
         let request_builder = KinesisRequestBuilder {
@@ -201,7 +209,7 @@ impl SinkConfig for KinesisSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(self.encoding.config().input_type())
     }
 
     fn sink_type(&self) -> &'static str {

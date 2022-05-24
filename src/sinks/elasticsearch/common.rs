@@ -1,11 +1,11 @@
+use std::collections::HashMap;
+use std::time::SystemTime;
+
 use aws_sigv4::http_request::{SignableRequest, SigningSettings};
 use aws_sigv4::SigningParams;
 use aws_types::credentials::{ProvideCredentials, SharedCredentialsProvider};
 use aws_types::region::Region;
 use bytes::Bytes;
-use std::collections::HashMap;
-use std::time::SystemTime;
-
 use http::{StatusCode, Uri};
 use snafu::ResultExt;
 
@@ -77,6 +77,7 @@ impl ElasticsearchCommon {
                     .aws
                     .as_ref()
                     .map(|config| config.region())
+                    .ok_or(ParseError::RegionRequired)?
                     .ok_or(ParseError::RegionRequired)?;
 
                 Some(aws.credentials_provider(region).await?)
@@ -120,7 +121,7 @@ impl ElasticsearchCommon {
             metric_config.timezone.unwrap_or_default(),
         );
 
-        let region = config.aws.as_ref().map(|config| config.region());
+        let region = config.aws.as_ref().and_then(|config| config.region());
 
         Ok(Self {
             http_auth,

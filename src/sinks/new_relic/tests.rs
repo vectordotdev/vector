@@ -1,7 +1,9 @@
+use std::{collections::HashMap, convert::TryFrom, time::SystemTime};
+
+use chrono::{DateTime, Utc};
+
 use super::*;
 use crate::event::{Event, LogEvent, Metric, MetricKind, MetricValue, Value};
-use chrono::{DateTime, Utc};
-use std::{collections::HashMap, convert::TryFrom, time::SystemTime};
 
 #[test]
 fn generate_config() {

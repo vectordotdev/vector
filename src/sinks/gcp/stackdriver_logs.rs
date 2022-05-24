@@ -8,10 +8,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, map};
 use snafu::Snafu;
 
-use super::{GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     config::{log_schema, AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
+    gcp::{GcpAuthConfig, GcpCredentials, Scope},
     http::HttpClient,
     sinks::{
         gcs_common::config::healthcheck_response,
@@ -311,7 +311,11 @@ async fn healthcheck(client: HttpClient, sink: StackdriverSink) -> crate::Result
     let request = sink.build_request(vec![]).await?.map(Body::from);
 
     let response = client.send(request).await?;
-    healthcheck_response(sink.creds.clone(), HealthcheckError::NotFound.into())(response)
+    healthcheck_response(
+        response,
+        sink.creds.clone(),
+        HealthcheckError::NotFound.into(),
+    )
 }
 
 impl StackdriverConfig {

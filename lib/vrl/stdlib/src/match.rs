@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn match_(value: Value, pattern: Value) -> Resolved {

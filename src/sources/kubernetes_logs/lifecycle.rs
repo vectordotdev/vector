@@ -8,7 +8,7 @@ use futures::{
     channel::oneshot,
     future::{select, BoxFuture, Either},
     pin_mut, ready,
-    stream::FuturesUnordered,
+    stream::FuturesOrdered,
     FutureExt, StreamExt,
 };
 
@@ -22,7 +22,7 @@ use crate::shutdown::{ShutdownSignal, ShutdownSignalToken};
 /// completing their work.
 #[derive(Debug)]
 pub struct Lifecycle<'bound> {
-    futs: FuturesUnordered<BoxFuture<'bound, ()>>,
+    futs: FuturesOrdered<BoxFuture<'bound, ()>>,
     fut_shutdowns: Vec<oneshot::Sender<()>>,
 }
 
@@ -43,7 +43,7 @@ impl<'bound> Lifecycle<'bound> {
     /// Create a new [`Lifecycle`].
     pub fn new() -> Self {
         Self {
-            futs: FuturesUnordered::new(),
+            futs: FuturesOrdered::new(),
             fut_shutdowns: Vec::new(),
         }
     }

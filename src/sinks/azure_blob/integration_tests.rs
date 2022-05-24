@@ -101,7 +101,7 @@ async fn azure_blob_insert_json_into_blob() {
     assert_eq!(blob.properties.content_type, String::from("text/plain"));
     let expected = events
         .iter()
-        .map(|event| serde_json::to_string(&event.as_log().all_fields()).unwrap())
+        .map(|event| serde_json::to_string(&event.as_log().all_fields().unwrap()).unwrap())
         .collect::<Vec<_>>();
     assert_eq!(expected, blob_lines);
 }
@@ -162,7 +162,7 @@ async fn azure_blob_insert_json_into_blob_gzip() {
     );
     let expected = events
         .iter()
-        .map(|event| serde_json::to_string(&event.as_log().all_fields()).unwrap())
+        .map(|event| serde_json::to_string(&event.as_log().all_fields().unwrap()).unwrap())
         .collect::<Vec<_>>();
     assert_eq!(expected, blob_lines);
 }

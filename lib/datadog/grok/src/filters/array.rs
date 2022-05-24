@@ -1,8 +1,5 @@
-use crate::{
-    ast::{Function, FunctionArgument},
-    grok_filter::GrokFilter,
-    parse_grok_rules::Error as GrokStaticError,
-};
+use std::convert::TryFrom;
+
 use bytes::Bytes;
 use nom::{
     branch::alt,
@@ -12,8 +9,13 @@ use nom::{
     sequence::{preceded, terminated},
     IResult,
 };
-use std::convert::TryFrom;
 use value::Value;
+
+use crate::{
+    ast::{Function, FunctionArgument},
+    grok_filter::GrokFilter,
+    parse_grok_rules::Error as GrokStaticError,
+};
 
 pub fn filter_from_function(f: &Function) -> Result<GrokFilter, GrokStaticError> {
     let args = f.args.as_ref();

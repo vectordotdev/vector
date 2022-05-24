@@ -145,12 +145,13 @@ pub fn split(input: &str, separator: Option<String>) -> Vec<&str> {
 
 #[cfg(test)]
 mod tests {
+    use ordered_float::NotNan;
+
     use super::*;
     use crate::{
         config::TransformConfig,
         event::{Event, LogEvent, Value},
     };
-    use ordered_float::NotNan;
 
     #[test]
     fn generate_config() {

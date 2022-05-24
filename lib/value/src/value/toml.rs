@@ -1,8 +1,10 @@
-use crate::value::{StdError, Value};
+use std::collections::BTreeMap;
+
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
-use std::collections::BTreeMap;
 use toml::value::Value as TomlValue;
+
+use crate::value::{StdError, Value};
 
 impl TryFrom<TomlValue> for Value {
     type Error = StdError;

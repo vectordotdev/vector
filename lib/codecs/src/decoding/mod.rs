@@ -5,6 +5,9 @@ mod error;
 pub mod format;
 pub mod framing;
 
+use std::fmt::Debug;
+
+use bytes::{Bytes, BytesMut};
 pub use error::StreamDecodingError;
 pub use format::{
     BoxedDeserializer, BytesDeserializer, BytesDeserializerConfig, JsonDeserializer,
@@ -20,11 +23,8 @@ pub use framing::{
     NewlineDelimitedDecoderConfig, NewlineDelimitedDecoderOptions, OctetCountingDecoder,
     OctetCountingDecoderConfig, OctetCountingDecoderOptions,
 };
-
-use bytes::{Bytes, BytesMut};
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
-use std::fmt::Debug;
 use vector_core::{config::DataType, event::Event, schema};
 
 /// An error that occurred while decoding structured events from a byte stream /
@@ -138,14 +138,14 @@ impl From<OctetCountingDecoderConfig> for FramingConfig {
 
 impl FramingConfig {
     /// Build the `Framer` from this configuration.
-    pub fn build(self) -> Framer {
+    pub fn build(&self) -> Framer {
         match self {
             FramingConfig::Bytes => Framer::Bytes(BytesDecoderConfig.build()),
             FramingConfig::CharacterDelimited {
                 character_delimited,
             } => Framer::CharacterDelimited(
                 CharacterDelimitedDecoderConfig {
-                    character_delimited,
+                    character_delimited: character_delimited.clone(),
                 }
                 .build(),
             ),
@@ -153,11 +153,17 @@ impl FramingConfig {
                 Framer::LengthDelimited(LengthDelimitedDecoderConfig.build())
             }
             FramingConfig::NewlineDelimited { newline_delimited } => Framer::NewlineDelimited(
-                NewlineDelimitedDecoderConfig { newline_delimited }.build(),
+                NewlineDelimitedDecoderConfig {
+                    newline_delimited: newline_delimited.clone(),
+                }
+                .build(),
             ),
-            FramingConfig::OctetCounting { octet_counting } => {
-                Framer::OctetCounting(OctetCountingDecoderConfig { octet_counting }.build())
-            }
+            FramingConfig::OctetCounting { octet_counting } => Framer::OctetCounting(
+                OctetCountingDecoderConfig {
+                    octet_counting: octet_counting.clone(),
+                }
+                .build(),
+            ),
         }
     }
 }

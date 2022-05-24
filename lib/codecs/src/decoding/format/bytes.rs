@@ -74,8 +74,9 @@ impl Deserializer for BytesDeserializer {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use vector_core::config::log_schema;
+
+    use super::*;
 
     #[test]
     fn deserialize_bytes() {
