@@ -144,8 +144,15 @@ pub fn build_client(
             .as_storage_client()
             .as_container_client(container_name);
         }
-        (None, None) => return Err("Either `connection_string` or `storage_account` has to be provided".into()),
-        (Some(_), Some(_)) => return Err("`connection_string` and `storage_account` can't be provided at the same time".into()),
+        (None, None) => {
+            return Err("Either `connection_string` or `storage_account` has to be provided".into())
+        }
+        (Some(_), Some(_)) => {
+            return Err(
+                "`connection_string` and `storage_account` can't be provided at the same time"
+                    .into(),
+            )
+        }
     }
     Ok(client)
 }
