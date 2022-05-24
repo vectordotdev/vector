@@ -432,8 +432,8 @@ mod test {
 
             wait_for_tcp(addr).await;
             send_lines_tls(
-                addr, "localhost".into(), 
-                lines.into_iter(), 
+                addr, "localhost".into(),
+                lines.into_iter(),
                 std::path::Path::new(tls::TEST_PEM_CA_PATH),
                 std::path::Path::new("tests/data/tls_meta_client.crt"),
                 std::path::Path::new("tests/data/tls_meta_client.key"),
@@ -445,7 +445,6 @@ mod test {
             assert_eq!(
                 event.as_log()[log_schema().message_key()],
                 "one line".into()
-            
             );
 
             let tls_meta: BTreeMap<String, value::Value> = btreemap!(
@@ -466,7 +465,6 @@ mod test {
             assert_eq!(
                 event.as_log()["tls_peer"],
                 tls_meta.clone().into(),
-    
             );
         })
         .await;

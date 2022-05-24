@@ -428,7 +428,7 @@ mod test {
             state_or_province_name: Some("state".to_owned())
         };
 
-        let expected = format!("CN={},OU={},O={},L={},ST={},C={}", 
+        let expected = format!("CN={},OU={},O={},L={},ST={},C={}",
             example_meta.common_name.as_ref().unwrap(),
             example_meta.organizational_unit_name.as_ref().unwrap(),
             example_meta.organization_name.as_ref().unwrap(),
@@ -449,7 +449,7 @@ mod test {
             state_or_province_name: None
         };
 
-        let expected = format!("CN={},OU={},O={},C={}", 
+        let expected = format!("CN={},OU={},O={},C={}",
             example_meta.common_name.as_ref().unwrap(),
             example_meta.organizational_unit_name.as_ref().unwrap(),
             example_meta.organization_name.as_ref().unwrap(),
