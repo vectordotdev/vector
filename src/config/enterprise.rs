@@ -678,8 +678,13 @@ async fn report_serialized_config_to_datadog<'a>(
         let req = build_request(&endpoint, auth, payload);
         let res = client.send(req).await;
         if let Err(HttpError::CallRequest { source: error }) = &res {
+            // Retry on request timeouts and network issues
             if error.is_timeout() {
                 info!(message = "Configuration reporting request timed out.", error = %error);
+                backoff.wait().await;
+                continue;
+            } else if error.is_connect() {
+                warn!(error = %error, "Configuration reporting connection issue.");
                 backoff.wait().await;
                 continue;
             }
@@ -721,11 +726,15 @@ async fn report_serialized_config_to_datadog<'a>(
 
 #[cfg(all(test, feature = "enterprise-tests"))]
 mod test {
-    use std::{collections::BTreeMap, io::Write, path::PathBuf, str::FromStr, thread};
+    use std::{
+        collections::BTreeMap, io::Write, net::TcpListener, path::PathBuf, str::FromStr, thread,
+        time::Duration,
+    };
 
     use http::StatusCode;
     use indexmap::IndexMap;
     use indoc::formatdoc;
+    use tokio::time::sleep;
     use value::Kind;
     use vector_common::btreemap;
     use vector_core::config::proxy::ProxyConfig;
@@ -741,6 +750,7 @@ mod test {
         config::enterprise::{convert_tags_to_vrl, default_max_retries},
         http::HttpClient,
         metrics,
+        test_util::next_addr,
     };
 
     const fn get_pipelines_auth() -> PipelinesAuth<'static> {
@@ -849,25 +859,39 @@ mod test {
 
     #[tokio::test]
     async fn retry_on_loss_of_network_connection() {
-        // let server = build_test_server_error_and_recover(StatusCode::INTERNAL_SERVER_ERROR).await;
+        let addr = next_addr();
+        let endpoint = format!("http://{}:{}", addr.ip(), addr.port());
 
-        let endpoint = "127.0.0.1:8012";
-        let client =
-            HttpClient::new(None, &ProxyConfig::default()).expect("Failed to create http client");
-        let auth = get_pipelines_auth();
-        let fields = get_pipelines_fields();
-        let config = toml::map::Map::new();
-        let payload = PipelinesVersionPayload::new(&config, &fields);
+        let report = tokio::spawn(async move {
+            let client = HttpClient::new(None, &ProxyConfig::default())
+                .expect("Failed to create http client");
+            let auth = get_pipelines_auth();
+            let fields = get_pipelines_fields();
+            let config = toml::map::Map::new();
+            let payload = PipelinesVersionPayload::new(&config, &fields);
 
-        assert!(report_serialized_config_to_datadog(
-            &client,
-            endpoint.as_ref(),
-            &auth,
-            &payload,
-            default_max_retries()
-        )
-        .await
-        .is_ok());
+            report_serialized_config_to_datadog(
+                &client,
+                endpoint.as_ref(),
+                &auth,
+                &payload,
+                default_max_retries(),
+            )
+            .await
+        });
+        sleep(Duration::from_secs(2)).await;
+
+        // The server is completely unavailable when initially reporting to
+        // simulate a network/connection failure
+        let listener = TcpListener::bind(addr).unwrap();
+        let server = MockServer::builder().listener(listener).start().await;
+        Mock::given(matchers::method("POST"))
+            .respond_with(ResponseTemplate::new(StatusCode::OK))
+            .mount(&server)
+            .await;
+
+        let res = report.await.unwrap();
+        assert!(res.is_ok());
     }
 
     #[tokio::test]
