@@ -12,8 +12,8 @@ use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[cfg(feature = "enterprise")]
 use crate::config::enterprise::{
-    attach_enterprise_components, report_configuration, EnterpriseError, EnterpriseMetadata,
-    EnterpriseReporter,
+    attach_enterprise_components, report_configuration, report_on_reload, EnterpriseError,
+    EnterpriseMetadata, EnterpriseReporter,
 };
 #[cfg(not(feature = "enterprise-tests"))]
 use crate::metrics;
@@ -23,7 +23,7 @@ use crate::service;
 use crate::{api, internal_events::ApiStarted};
 use crate::{
     cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand},
-    config::{self, enterprise::report_on_reload},
+    config::{self},
     generate, graph, heartbeat, list,
     signal::{self, SignalTo},
     topology::{self, RunningTopology},
