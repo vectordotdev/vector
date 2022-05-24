@@ -2,7 +2,7 @@ use lookup::LookupBuf;
 use value::Value;
 
 /// Any target object you want to remap using VRL has to implement this trait.
-pub trait Target: std::fmt::Debug {
+pub trait Target: std::fmt::Debug + MetadataTarget {
     /// Insert a given [`Value`] in the provided [`Target`].
     ///
     /// The `path` parameter determines _where_ in the given target the value
@@ -57,7 +57,9 @@ pub trait Target: std::fmt::Debug {
     /// If `compact` is true, after deletion, if an empty object or array is
     /// left behind, it should be removed as well, cascading up to the root.
     fn target_remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String>;
+}
 
+pub trait MetadataTarget {
     fn get_metadata(&self, _path: &LookupBuf) -> Result<Option<Value>, String>;
 
     fn set_metadata(&mut self, _path: &LookupBuf, _value: Value) -> Result<(), String>;
@@ -88,7 +90,9 @@ impl Target for ValueWithMetadataRef<'_> {
     fn target_remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String> {
         Ok(self.value.remove_by_path(path, compact))
     }
+}
 
+impl MetadataTarget for ValueWithMetadataRef<'_> {
     fn get_metadata(&self, path: &LookupBuf) -> Result<Option<Value>, String> {
         Ok(self.metadata.get_by_path(path).cloned())
     }
@@ -125,7 +129,9 @@ impl Target for ValueWithMetadata {
     fn target_remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String> {
         Ok(self.value.remove_by_path(path, compact))
     }
+}
 
+impl MetadataTarget for ValueWithMetadata {
     fn get_metadata(&self, path: &LookupBuf) -> Result<Option<Value>, String> {
         Ok(self.metadata.get_by_path(path).cloned())
     }

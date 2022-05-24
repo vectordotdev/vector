@@ -1,7 +1,7 @@
 use std::borrow::Cow::{self, Borrowed, Owned};
 
 use ::value::Value;
-use core::{ValueWithMetadata, ValueWithMetadataRef};
+use core::ValueWithMetadata;
 use indoc::indoc;
 use once_cell::sync::Lazy;
 use prettytable::{format, Cell, Row, Table};
@@ -20,7 +20,7 @@ use vrl::prelude::BTreeMap;
 use vrl::{
     diagnostic::Formatter,
     state::{self, ExternalEnv},
-    value, Runtime, Target, VrlRuntime,
+    Runtime, Target, VrlRuntime,
 };
 
 // Create a list of all possible error values for potential docs lookup

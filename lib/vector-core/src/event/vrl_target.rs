@@ -1,8 +1,8 @@
-use std::{collections::BTreeMap, convert::TryFrom, marker::PhantomData, sync::Arc};
+use std::{collections::BTreeMap, convert::TryFrom, marker::PhantomData};
 
 use lookup::{LookupBuf, SegmentBuf};
 use snafu::Snafu;
-use vrl_lib::{prelude::VrlValueConvert, ProgramInfo};
+use vrl_lib::{prelude::VrlValueConvert, MetadataTarget, ProgramInfo};
 
 use super::{Event, EventMetadata, LogEvent, Metric, MetricKind, TraceEvent, Value};
 use crate::config::log_schema;
@@ -282,7 +282,9 @@ impl vrl_lib::Target for VrlTarget {
             }
         }
     }
+}
 
+impl MetadataTarget for VrlTarget {
     fn get_metadata(&self, path: &LookupBuf) -> Result<Option<::value::Value>, String> {
         let metadata = match self {
             VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
@@ -371,7 +373,9 @@ impl<'a> vrl_lib::Target for VrlImmutableTarget<'a> {
     ) -> Result<Option<::value::Value>, String> {
         Err("cannot modify immutable target".to_string())
     }
+}
 
+impl vrl_lib::MetadataTarget for VrlImmutableTarget<'_> {
     fn get_metadata(&self, path: &LookupBuf) -> Result<Option<::value::Value>, String> {
         let metadata = match self {
             Self::LogEvent(_, metadata) | Self::Trace(_, metadata) => metadata,
@@ -385,7 +389,7 @@ impl<'a> vrl_lib::Target for VrlImmutableTarget<'a> {
         Err("cannot modify immutable target".to_string())
     }
 
-    fn remove_metadata(&mut self, path: &LookupBuf) -> Result<(), String> {
+    fn remove_metadata(&mut self, _path: &LookupBuf) -> Result<(), String> {
         Err("cannot modify immutable target".to_string())
     }
 }

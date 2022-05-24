@@ -1,5 +1,6 @@
+use crate::compile_path_arg;
 use ::value::Value;
-use lookup::{Look, Lookup, LookupBuf};
+use lookup::{Look, Lookup, LookupBuf, SegmentBuf};
 use vrl::prelude::*;
 
 fn get_metadata_field(
@@ -41,26 +42,14 @@ impl Function for GetMetadataField {
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
-        let key = arguments
+        let key_bytes = arguments
             .required_literal("key")?
             .to_value()
             .as_bytes()
             .cloned()
             .expect("key not bytes");
-        let key = String::from_utf8_lossy(key.as_ref());
-
-        // TODO: fix error handling
-        let lookup = Lookup::from_str(key.as_ref()).unwrap().into();
-
-        /*
-        return Err(vrl::function::Error::InvalidArgument {
-                    keyword: "algorithm",
-                    value: algorithm,
-                    error: "Invalid algorithm",
-                }
-                .into());
-
-         */
+        let key = String::from_utf8_lossy(key_bytes.as_ref());
+        let lookup = compile_path_arg(key.as_ref())?;
 
         Ok(Box::new(GetMetadataFieldFn { path: lookup }))
     }
@@ -79,8 +68,7 @@ impl Function for GetMetadataField {
                     .try_bytes_utf8_lossy()
                     .expect("key not bytes")
                     .to_string();
-                //TODO: fix error handling
-                let lookup: LookupBuf = Lookup::from_str(&key).unwrap().into();
+                let lookup: LookupBuf = compile_path_arg(&key)?;
                 Ok(Some(Box::new(lookup) as _))
             }
             _ => Ok(None),
@@ -107,8 +95,14 @@ impl Expression for GetMetadataFieldFn {
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
-        // TODO: special case existing keys to a String for backwards compat
+        if let Some(SegmentBuf::Field(field)) = self.path.segments.front() {
+            if ["datadog_api_key", "splunk_hec_token"].contains(&field.name.as_str()) {
+                // keep these as a string for backwards compatibility
+                return TypeDef::bytes().add_null().infallible();
+            }
+        }
+
         // TODO: use metadata schema when it exists to return a better value here
-        TypeDef::bytes().add_null().infallible()
+        TypeDef::any().add_null().infallible()
     }
 }

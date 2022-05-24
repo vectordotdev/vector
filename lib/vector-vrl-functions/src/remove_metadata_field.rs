@@ -1,3 +1,4 @@
+use crate::compile_path_arg;
 use ::value::Value;
 use lookup::{Lookup, LookupBuf};
 use vrl::prelude::*;
@@ -40,16 +41,14 @@ impl Function for RemoveMetadataField {
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
-        let key = arguments
+        let key_bytes = arguments
             .required_literal("key")?
             .to_value()
             .as_bytes()
             .cloned()
             .expect("key not bytes");
-        let key = String::from_utf8_lossy(key.as_ref());
-
-        // TODO: fix error handling
-        let path = Lookup::from_str(key.as_ref()).unwrap().into();
+        let key = String::from_utf8_lossy(key_bytes.as_ref());
+        let path = compile_path_arg(key.as_ref())?;
 
         Ok(Box::new(RemoveMetadataFieldFn { path }))
     }
@@ -68,8 +67,7 @@ impl Function for RemoveMetadataField {
                     .try_bytes_utf8_lossy()
                     .expect("key not bytes")
                     .to_string();
-                //TODO: fix error handling
-                let lookup: LookupBuf = Lookup::from_str(&key).unwrap().into();
+                let lookup = compile_path_arg(&key)?;
                 Ok(Some(Box::new(lookup) as _))
             }
             _ => Ok(None),

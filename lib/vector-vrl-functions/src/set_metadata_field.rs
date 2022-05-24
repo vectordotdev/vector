@@ -1,3 +1,4 @@
+use crate::compile_path_arg;
 use ::value::Value;
 use lookup::{Lookup, LookupBuf};
 use vrl::prelude::*;
@@ -55,9 +56,7 @@ impl Function for SetMetadataField {
             .cloned()
             .expect("key not bytes");
         let key = String::from_utf8_lossy(key.as_ref());
-
-        // TODO: fix error handling
-        let path = Lookup::from_str(key.as_ref()).unwrap().into();
+        let path = compile_path_arg(key.as_ref())?;
         let value = arguments.required("value");
 
         Ok(Box::new(SetMetadataFieldFn { path, value }))
@@ -77,8 +76,7 @@ impl Function for SetMetadataField {
                     .try_bytes_utf8_lossy()
                     .expect("key not bytes")
                     .to_string();
-                //TODO: fix error handling
-                let lookup: LookupBuf = Lookup::from_str(&key).unwrap().into();
+                let lookup = compile_path_arg(&key)?;
                 Ok(Some(Box::new(lookup) as _))
             }
             _ => Ok(None),
