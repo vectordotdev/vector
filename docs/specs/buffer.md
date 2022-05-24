@@ -90,9 +90,7 @@ implement since errors are specific to the buffer and operation.
 **Extends the [EventsDropped event].**
 
 *All buffers* that can drop events MUST emit a `BufferEventsDropped` event in
-accordance with the [EventsDropped event] requirements. Because buffers cannot
-unintentionally drop data, the `intentional` properly is not requiers and all
-dropped data should be considered unintentional.
+accordance with the [EventsDropped event] requirements.
 
 [Error event]: instrumentation.md#Error
 [EventsDropped event]: instrumentation.md#EventsDropped
