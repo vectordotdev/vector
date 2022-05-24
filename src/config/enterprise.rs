@@ -123,7 +123,7 @@ struct PipelinesAuth<'a> {
 
 /// Holds the relevant fields for reporting a configuration to Datadog Observability Pipelines.
 struct PipelinesStrFields<'a> {
-    config_version: &'a str,
+    config_version_hash: &'a str,
     vector_version: &'a str,
 }
 
@@ -230,7 +230,7 @@ impl<'a> PipelinesVersionPayload<'a> {
         Self {
             data: PipelinesData {
                 attributes: PipelinesAttributes {
-                    config_hash: fields.config_version,
+                    config_hash: fields.config_version_hash,
                     vector_version: fields.vector_version,
                     config,
                 },
@@ -276,8 +276,8 @@ pub async fn try_attach(
         DATADOG_REPORTING_PRODUCT
     );
 
-    // Get the configuration version. In DD Pipelines, this is referred to as the 'config hash'.
-    let config_version = config.version.clone().expect("Config should be versioned");
+    // Get the configuration version hash.
+    let version_hash = config.version.clone().expect("Config should be versioned");
 
     // Get the Vector version. This is reported to Pipelines along with a config hash.
     let vector_version = crate::get_version();
@@ -293,7 +293,7 @@ pub async fn try_attach(
     // Set the relevant fields needed to report a config to Datadog. This is a struct rather than
     // exploding as func arguments to avoid confusion with multiple &str fields.
     let fields = PipelinesStrFields {
-        config_version: config_version.as_ref(),
+        config_version_hash: version_hash.as_ref(),
         vector_version: &vector_version,
     };
 
@@ -328,7 +328,7 @@ pub async fn try_attach(
                 Ok(()) => {
                     info!(
                         "Vector config {} successfully reported to {}.",
-                        &config_version, DATADOG_REPORTING_PRODUCT
+                        &version_hash, DATADOG_REPORTING_PRODUCT
                     );
                 }
                 Err(err) => {
@@ -347,10 +347,10 @@ pub async fn try_attach(
         }
     }
 
-    setup_metrics_reporting(config, &datadog, api_key.clone(), config_version.clone());
+    setup_metrics_reporting(config, &datadog, api_key.clone(), version_hash.clone());
 
     if datadog.enable_logs_reporting {
-        setup_logs_reporting(config, &datadog, api_key, config_version);
+        setup_logs_reporting(config, &datadog, api_key, version_hash);
     }
 
     Ok(())
@@ -385,12 +385,12 @@ fn setup_logs_reporting(
             r#"
             .ddsource = "vector"
             .vector = {{
-                "configuration_key" = "{configuration_key}",
-                "version_hash" = "{version_hash}"
+                "configuration_key": "{configuration_key}",
+                "version_hash": "{version_hash}",
                 "version": "{vector_version}",
                 "arch": "{build_arch}",
                 "os": "{build_os}",
-                "vendor": "{build_vendor}",
+                "vendor": "{build_vendor}"
             }}
             {}
         "#,
@@ -668,7 +668,7 @@ mod test {
 
     const fn get_pipelines_fields() -> PipelinesStrFields<'static> {
         PipelinesStrFields {
-            config_version: "config_version",
+            config_version_hash: "config_version",
             vector_version: "vector_version",
         }
     }
