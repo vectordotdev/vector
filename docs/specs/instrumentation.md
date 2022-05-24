@@ -59,11 +59,13 @@ Vector broadly follows the [Prometheus metric naming standards]:
 
 ### Batching
 
-For performance reasons, as demonstrated in pull request #8383],
+For performance reasons, as demonstrated in [pull request #8383],
 instrumentation SHOULD be batched whenever possible:
 
-* Vector process batches of events ([RFC 9480]) and telemtry SHOULD emit for
-  the entire batch, not each individual event.
+* Telemtry SHOULD emit for entire event batches, not each individual event.
+  [RFC 9480] describes Vector's batching strategy.
+* Benchmarking SHOULD prove that batching produces performance benefits.
+  [Issue 10658] could eliminate the need to batch for performance improvements.
 
 ### Events
 
@@ -144,8 +146,9 @@ emission of this event, meeting the following requirements:
 
 [camelcase]: https://en.wikipedia.org/wiki/Camel_case
 [`EventsDropped`]: #EventsDropped
+[Issue 10658]: https://github.com/vectordotdev/vector/issues/10658
 [Prometheus metric naming standards]: https://prometheus.io/docs/practices/naming/
-[Pull request #8383]: https://github.com/vectordotdev/vector/pull/8383/
+[pull request #8383]: https://github.com/vectordotdev/vector/pull/8383/
 [RFC 2064]: https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 [RFC 9480]: https://github.com/vectordotdev/vector/blob/master/rfcs/2021-10-22-9480-processing-arrays-of-events.md
 [single base unit]: https://en.wikipedia.org/wiki/SI_base_unit
