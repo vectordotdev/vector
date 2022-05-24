@@ -48,13 +48,11 @@ encrypted_message = encrypt!(plaintext, "AES-128-CBC-PKCS7", key, iv: iv);
 del(.plaintext)
 ```
 
-
 The result will be:
 
 ```json
 { "encrypted_message": "jYn3wFE2ajfd/VpDE/SrLO5+DknxB3hqgjH5+hpnSu4=" }
 ```
-
 
 ## Decrypting data
 
@@ -81,14 +79,11 @@ del(.iv)
 del(.encrypted_message)
 ```
 
-
 The result will be:
 
 ```json
 { "message": "super secret message" }
 ```
-
-
 
 ## Let us know what you think!
 
