@@ -196,7 +196,8 @@ impl DatadogArchivesSinkConfig {
                     .as_ref()
                     .expect("azire blob config wasn't provided");
                 let client = azure_common::config::build_client(
-                    azure_config.connection_string.clone(),
+                    Some(azure_config.connection_string.clone()),
+                    None,
                     self.bucket.clone(),
                 )?;
                 let svc = self
