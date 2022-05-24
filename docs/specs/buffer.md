@@ -15,6 +15,7 @@ interpreted as described in [RFC 2119].
     - [BufferCreated](#buffercreated)
     - [BufferEventsReceived](#buffereventsreceived)
     - [BufferEventsSent](#buffereventssent)
+    - [BufferError](#buffererror)
     - [BufferEventsDropped](#buffereventsdropped)
 
 <!-- /MarkdownTOC -->
@@ -74,12 +75,25 @@ Vector buffers MUST be instrumented for optimal observability and monitoring.
   * MUST decrement the `buffer_events` gauge by the defined `count`
   * MUST decrement the `buffer_byte_size` gauge by the defined `byte_size`
 
+#### BufferError
+
+**Extends the [Error event].**
+
+*All buffers* MUST emit error events in accordance with the [Error event]
+requirements.
+
+This specification does not list a standard set of errors that components must
+implement since errors are specific to the buffer and operation.
+
 #### BufferEventsDropped
 
 **Extends the [EventsDropped event].**
 
-*All buffers* that can drop events MUST emit a `BufferEventsDropped`
-event in accordance with the [EventsDropped event] requirements.
+*All buffers* that can drop events MUST emit a `BufferEventsDropped` event in
+accordance with the [EventsDropped event] requirements. Because buffers cannot
+unintentionally drop data, the `intentional` properly is not requiers and all
+dropped data should be considered unintentional.
 
+[Error event]: instrumentation.md#Error
 [EventsDropped event]: instrumentation.md#EventsDropped
 [Instrumentation Specification]: instrumentation.md
