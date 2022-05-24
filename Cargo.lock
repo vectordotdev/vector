@@ -1676,7 +1676,7 @@ dependencies = [
  "indoc",
  "memchr",
  "pretty_assertions",
- "prost 0.10.3",
+ "prost 0.10.4",
  "serde",
  "serde_json",
  "smallvec",
@@ -1752,7 +1752,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06c5fd425783d81668ed68ec98408a80498fb4ae2fd607797539e1a9dfa3618f"
 dependencies = [
- "prost 0.10.3",
+ "prost 0.10.4",
  "prost-types 0.10.1",
  "tonic",
  "tracing-core 0.1.26",
@@ -5781,7 +5781,7 @@ dependencies = [
  "indexmap",
  "nom 7.1.1",
  "num_enum",
- "prost 0.10.3",
+ "prost 0.10.4",
  "prost-build 0.10.4",
  "prost-types 0.10.1",
  "snafu",
@@ -5833,9 +5833,9 @@ dependencies = [
 
 [[package]]
 name = "prost"
-version = "0.10.3"
+version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc03e116981ff7d8da8e5c220e374587b98d294af7ba7dd7fda761158f00086f"
+checksum = "71adf41db68aa0daaefc69bb30bcd68ded9b9abaad5d1fbb6304c4fb390e083e"
 dependencies = [
  "bytes 1.1.0",
  "prost-derive 0.10.1",
@@ -5874,7 +5874,7 @@ dependencies = [
  "log",
  "multimap",
  "petgraph 0.6.0",
- "prost 0.10.3",
+ "prost 0.10.4",
  "prost-types 0.10.1",
  "regex",
  "tempfile",
@@ -5924,7 +5924,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2d0a014229361011dc8e69c8a1ec6c2e8d0f2af7c91e3ea3f5b2170298461e68"
 dependencies = [
  "bytes 1.1.0",
- "prost 0.10.3",
+ "prost 0.10.4",
 ]
 
 [[package]]
@@ -7909,7 +7909,7 @@ dependencies = [
  "hyper-timeout",
  "percent-encoding",
  "pin-project",
- "prost 0.10.3",
+ "prost 0.10.4",
  "prost-derive 0.10.1",
  "rustls-native-certs 0.6.2",
  "rustls-pemfile 1.0.0",
@@ -8356,7 +8356,7 @@ version = "1.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97fee6b57c6a41524a810daee9286c02d7752c4253064d0b05472833a438f675"
 dependencies = [
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
  "static_assertions",
 ]
 
@@ -8722,7 +8722,7 @@ dependencies = [
  "pretty_assertions",
  "prometheus-parser",
  "proptest",
- "prost 0.10.3",
+ "prost 0.10.4",
  "prost-build 0.10.4",
  "prost-types 0.10.1",
  "pulsar",
@@ -8963,7 +8963,7 @@ dependencies = [
  "pin-project",
  "pretty_assertions",
  "proptest",
- "prost 0.10.3",
+ "prost 0.10.4",
  "prost-build 0.10.4",
  "prost-types 0.10.1",
  "quickcheck",
