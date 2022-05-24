@@ -36,7 +36,7 @@ fn fork_test<T: std::future::Future<Output = ()>>(test_name: &'static str, fut: 
             // Since we are spawning the runtime from within a forked process, use one worker less
             // to account for the additional process.
             // This adjustment mainly serves to not overload CI workers with low resources.
-            let rt = runtime_constrained(std::cmp::max(1, num_cpus::get() - 1));
+            let rt = runtime_constrained(std::cmp::max(1, crate::num_threads() - 1));
             rt.block_on(fut);
         },
     )
