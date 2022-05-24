@@ -13,6 +13,7 @@ use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{SecondsFormat, Utc};
 use goauth::scopes::Scope;
 use http::header::{HeaderName, HeaderValue};
+use lookup::path;
 use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -436,16 +437,20 @@ impl Encoder<Vec<Event>> for DatadogArchivesEncoding {
                     .unwrap_or_else(chrono::Utc::now)
                     .to_rfc3339_opts(SecondsFormat::Millis, true),
             );
-            log_event.rename_key_flat(self.log_schema.message_key(), "message");
-            log_event.rename_key_flat(self.log_schema.host_key(), "host");
+            log_event.rename_key(self.log_schema.message_key(), path!("message"));
+            log_event.rename_key(self.log_schema.host_key(), path!("host"));
 
             let mut attributes = BTreeMap::new();
-            let custom_attributes: Vec<String> = log_event
-                .as_map()
-                .keys()
-                .filter(|&path| !self.reserved_attributes.contains(path.as_str()))
-                .map(|v| v.to_owned())
-                .collect();
+
+            let custom_attributes = if let Some(map) = log_event.as_map() {
+                map.keys()
+                    .filter(|&path| !self.reserved_attributes.contains(path.as_str()))
+                    .map(|v| v.to_owned())
+                    .collect()
+            } else {
+                vec![]
+            };
+
             for path in custom_attributes {
                 if let Some(value) = log_event.remove(path.as_str()) {
                     attributes.insert(path, value);

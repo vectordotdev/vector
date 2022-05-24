@@ -8,6 +8,7 @@ use std::{
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{stream::BoxStream, StreamExt};
+use lookup::path;
 use snafu::Snafu;
 use tower::Service;
 use vector_core::{
@@ -132,10 +133,10 @@ impl Encoder<Vec<Event>> for DatadogLogsJsonEncoding {
     fn encode_input(&self, mut input: Vec<Event>, writer: &mut dyn io::Write) -> io::Result<usize> {
         for event in input.iter_mut() {
             let log = event.as_mut_log();
-            log.rename_key_flat(self.log_schema.message_key(), "message");
-            log.rename_key_flat(self.log_schema.host_key(), "host");
+            log.rename_key(self.log_schema.message_key(), path!("message"));
+            log.rename_key(self.log_schema.host_key(), path!("host"));
             if let Some(Value::Timestamp(ts)) = log.remove(self.log_schema.timestamp_key()) {
-                log.insert_flat("timestamp", Value::Integer(ts.timestamp_millis()));
+                log.insert(path!("timestamp"), Value::Integer(ts.timestamp_millis()));
             }
         }
 

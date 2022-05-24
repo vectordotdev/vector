@@ -220,7 +220,7 @@ impl HttpEventEncoder<PartitionInnerBuffer<serde_json::Value, PartitionKey>>
             }
         }
 
-        if !log.is_empty() {
+        if !log.is_empty_object() {
             map.insert("meta".into(), json!(&log));
         }
 

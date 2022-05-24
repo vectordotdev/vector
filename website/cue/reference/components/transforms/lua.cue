@@ -316,31 +316,31 @@ components: transforms: lua: {
 			configuration: {
 				version: "2"
 				hooks: {
-					source: """
-						  timestamp_pattern = "(%d%d%d%d)[-](%d%d)[-](%d%d) (%d%d):(%d%d):(%d%d).?(%d*)"
-						  function parse_timestamp(str)
-							local year, month, day, hour, min, sec, millis = string.match(str, timestamp_pattern)
-							local ms = 0
-							if millis and millis ~= "" then
-								ms = tonumber(millis)
-							end
-							return {
-								year    = tonumber(year),
-								month   = tonumber(month),
-								day     = tonumber(day),
-								hour    = tonumber(hour),
-								min     = tonumber(min),
-								sec     = tonumber(sec),
-								nanosec = ms * 1000000
-							}
-						  end
-						  function process(event, emit)
-							event.log.timestamp = parse_timestamp(event.log.timestamp_string)
-							emit(event)
-						  end
-						"""
 					process: "process"
 				}
+				source: """
+					  timestamp_pattern = "(%d%d%d%d)[-](%d%d)[-](%d%d) (%d%d):(%d%d):(%d%d).?(%d*)"
+					  function parse_timestamp(str)
+						local year, month, day, hour, min, sec, millis = string.match(str, timestamp_pattern)
+						local ms = 0
+						if millis and millis ~= "" then
+							ms = tonumber(millis)
+						end
+						return {
+							year    = tonumber(year),
+							month   = tonumber(month),
+							day     = tonumber(day),
+							hour    = tonumber(hour),
+							min     = tonumber(min),
+							sec     = tonumber(sec),
+							nanosec = ms * 1000000
+						}
+					  end
+					  function process(event, emit)
+						event.log.timestamp = parse_timestamp(event.log.timestamp_string)
+						emit(event)
+					  end
+					"""
 			}
 			input: log: {
 				timestamp_string: "2020-04-07 06:26:02.643"

@@ -996,7 +996,7 @@ mod tests {
 
             assert_eq!(received.len(), 1);
             assert_eq!(
-                received[0].as_log().keys().collect::<HashSet<_>>(),
+                received[0].as_log().keys().unwrap().collect::<HashSet<_>>(),
                 vec![
                     log_schema().host_key().to_string(),
                     log_schema().message_key().to_string(),

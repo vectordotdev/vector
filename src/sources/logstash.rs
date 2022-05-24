@@ -8,6 +8,7 @@ use std::{
 use bytes::{Buf, Bytes, BytesMut};
 use codecs::StreamDecodingError;
 use flate2::read::ZlibDecoder;
+use lookup::path;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use snafu::{ResultExt, Snafu};
@@ -116,7 +117,7 @@ impl TcpSource for LogstashSource {
             if log.get(log_schema().timestamp_key()).is_none() {
                 // Attempt to parse @timestamp if it exists; otherwise set to receipt time.
                 let timestamp = log
-                    .get_flat("@timestamp")
+                    .get(path!("@timestamp"))
                     .and_then(|timestamp| {
                         self.timestamp_converter
                             .convert::<Value>(timestamp.coerce_to_bytes())

@@ -340,7 +340,7 @@ mod tests {
             args: func_args![value: "- - - - - - -",
                              format: "common",
             ],
-            want: Ok(btreemap! {}),
+            want: Ok(BTreeMap::new()),
             tdef: TypeDef::object(kind_common()).fallible(),
             tz: vector_common::TimeZone::default(),
         }
@@ -349,7 +349,7 @@ mod tests {
             args: func_args![value: r#"- - - [-] "-" - -"#,
                              format: "common",
             ],
-            want: Ok(btreemap! {}),
+            want: Ok(BTreeMap::new()),
             tdef: TypeDef::object(kind_common()).fallible(),
             tz: vector_common::TimeZone::default(),
         }

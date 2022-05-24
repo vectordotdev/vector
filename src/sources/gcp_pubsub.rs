@@ -491,7 +491,7 @@ mod integration_tests {
     async fn oneshot() {
         assert_source_compliance(&SOURCE_TAGS, async {
             let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
-            let test_data = tester.send_test_events(99, btreemap![]).await;
+            let test_data = tester.send_test_events(99, BTreeMap::new()).await;
             receive_events(&mut rx, test_data).await;
             tester.shutdown_check(shutdown).await;
         })
@@ -505,7 +505,7 @@ mod integration_tests {
         tester.shutdown(shutdown).await; // Not shutdown_check because this emits nothing
 
         assert!(rx.next().await.is_none());
-        tester.send_test_events(1, btreemap![]).await;
+        tester.send_test_events(1, BTreeMap::new()).await;
         assert!(rx.next().await.is_none());
         assert_eq!(tester.pull_count(1).await, 1);
     }
@@ -515,13 +515,13 @@ mod integration_tests {
         assert_source_compliance(&SOURCE_TAGS, async {
             let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
 
-            let test_data = tester.send_test_events(1, btreemap![]).await;
+            let test_data = tester.send_test_events(1, BTreeMap::new()).await;
             receive_events(&mut rx, test_data).await;
 
             tester.shutdown_check(shutdown).await;
 
             assert!(rx.next().await.is_none());
-            tester.send_test_events(1, btreemap![]).await;
+            tester.send_test_events(1, BTreeMap::new()).await;
             assert!(rx.next().await.is_none());
             // The following assert is there to test that the source isn't
             // pulling anything out of the subscription after it reports
@@ -538,7 +538,7 @@ mod integration_tests {
         assert_source_compliance(&SOURCE_TAGS, async {
             let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
             for _ in 0..10 {
-                let test_data = tester.send_test_events(9, btreemap![]).await;
+                let test_data = tester.send_test_events(9, BTreeMap::new()).await;
                 receive_events(&mut rx, test_data).await;
             }
             tester.shutdown_check(shutdown).await;
@@ -567,7 +567,7 @@ mod integration_tests {
         assert_source_compliance(&SOURCE_TAGS, async {
             let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
 
-            let test_data = tester.send_test_events(1, btreemap![]).await;
+            let test_data = tester.send_test_events(1, BTreeMap::new()).await;
             receive_events(&mut rx, test_data).await;
 
             tester.shutdown_check(shutdown).await;
@@ -593,7 +593,7 @@ mod integration_tests {
         assert_source_compliance(&SOURCE_TAGS, async {
             let (tester, mut rx, shutdown) = setup(EventStatus::Rejected).await;
 
-            let test_data = tester.send_test_events(1, btreemap![]).await;
+            let test_data = tester.send_test_events(1, BTreeMap::new()).await;
             receive_events(&mut rx, test_data).await;
 
             tester.shutdown(shutdown).await;

@@ -1524,9 +1524,9 @@ dependencies = [
 
 [[package]]
 name = "cidr-utils"
-version = "0.5.6"
+version = "0.5.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aee37eff22e119e0acb33e6e81f85d87a9abf612b82efbcb5fba31b6a74554fb"
+checksum = "9a0c49d94395dc29876e75966ca2176e6c7c2ab117ca99d06937faae6ca89c7b"
 dependencies = [
  "debug-helper",
  "num-bigint 0.4.3",
@@ -1714,9 +1714,9 @@ dependencies = [
 
 [[package]]
 name = "console-api"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "24cb05777feccbb2642d4f2df44d0505601a2cd88ca517d8c913f263a5a8dc8b"
+checksum = "06c5fd425783d81668ed68ec98408a80498fb4ae2fd607797539e1a9dfa3618f"
 dependencies = [
  "prost 0.10.3",
  "prost-types 0.10.1",
@@ -1726,9 +1726,9 @@ dependencies = [
 
 [[package]]
 name = "console-subscriber"
-version = "0.1.5"
+version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f21a16ee925aa9d2bad2e296beffd6c5b1bfaad50af509d305b8e7f23af20fb"
+checksum = "31432bc31ff8883bf6a693a79371862f73087822470c82d6a1ec778781ee3978"
 dependencies = [
  "console-api",
  "crossbeam-channel",
@@ -4642,9 +4642,9 @@ dependencies = [
 
 [[package]]
 name = "nats"
-version = "0.20.0"
+version = "0.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "525288e8564683290f40b79d6bfc05bbfcca157178b76ba0d240bb1eedef0c89"
+checksum = "25a916657662da9799246f1ac8dda022c48c4d1c97a9208121ffecc658cef20f"
 dependencies = [
  "base64 0.13.0",
  "base64-url",
@@ -5078,9 +5078,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.10.0"
+version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87f3e037eac156d1775da914196f0f37741a274155e34a0b7e427c35d2a2ecb9"
+checksum = "7b10983b38c53aebdf33f542c6275b0f58a238129d00c4ae0e6fb59738d783ca"
 
 [[package]]
 name = "onig"
@@ -5751,6 +5751,7 @@ dependencies = [
  "prost-build 0.10.3",
  "prost-types 0.10.1",
  "snafu",
+ "value",
  "vector_common",
 ]
 
