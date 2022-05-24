@@ -552,6 +552,42 @@ components: sources: internal_metrics: {
 				mode: _mode
 			}
 		}
+		component_received_events_count: {
+			description: """
+				A histogram of Vector's internal batch sizes passed around in Vector's internal topology. Note that this
+				is different than sink-level batching. It is mostly useful for debugging performance issues in Vector
+				due to low internal batching.
+				"""
+			type:              "histogram"
+			default_namespace: "vector"
+			tags:              _component_tags & {
+				file: {
+					description: "The file from which the data originated."
+					required:    false
+				}
+				uri: {
+					description: "The sanitized URI from which the data originated."
+					required:    false
+				}
+				container_name: {
+					description: "The name of the container from which the data originated."
+					required:    false
+				}
+				pod_name: {
+					description: "The name of the pod from which the data originated."
+					required:    false
+				}
+				peer_addr: {
+					description: "The IP from which the data originated."
+					required:    false
+				}
+				peer_path: {
+					description: "The pathname from which the data originated."
+					required:    false
+				}
+				mode: _mode
+			}
+		}
 		component_received_event_bytes_total: {
 			description: """
 				The number of event bytes accepted by this component either from
