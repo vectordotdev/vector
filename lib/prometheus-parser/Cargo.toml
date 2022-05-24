@@ -19,4 +19,4 @@ vector_common = { path = "../vector-common", features = ["btreemap"] }
 value = { path = "../value", features = ["json"] }
 
 [build-dependencies]
-prost-build = "0.10.3"
+prost-build = "0.10.4"

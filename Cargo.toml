@@ -319,7 +319,7 @@ atty = { version = "0.2.14", default-features = false }
 nix = { version = "0.24.1", default-features = false, features = ["socket", "signal"] }
 
 [build-dependencies]
-prost-build = { version = "0.10.3", default-features = false, optional = true }
+prost-build = { version = "0.10.4", default-features = false, optional = true }
 tonic-build = { version = "0.7", default-features = false, features = ["transport", "prost", "compression"], optional = true }
 
 [dev-dependencies]
