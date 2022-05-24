@@ -678,13 +678,14 @@ mod tests {
 
     fn get_simple_counter() -> Metric {
         let value = MetricValue::Counter { value: 3.14 };
-        Metric::new("basic_counter", MetricKind::Incremental, value)
+        Metric::new("basic_counter", MetricKind::Incremental, value).with_timestamp(Some(ts()))
     }
 
     fn get_simple_sketch() -> Metric {
         let mut ddsketch = AgentDDSketch::with_agent_defaults();
         ddsketch.insert(3.14);
         Metric::new("basic_counter", MetricKind::Incremental, ddsketch.into())
+            .with_timestamp(Some(ts()))
     }
 
     fn get_compressed_empty_series_payload() -> Bytes {
