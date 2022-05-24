@@ -9,14 +9,19 @@ doing it this way" into "we always do X this way: <link to style guide>".
 
 # Formatting
 
-At a high-level, code formatting is straightforward: we use the native `rustfmt` exclusively.
+At a high-level, code formatting is straightforward: we use the native `rustfmt` exclusively, and comprehensively.  All
+Rust source code within the repository should be formatted using `rustfmt`.
 
 You can acquire `rustfmt` -- which is invoked as `cargo fmt` -- by following the directions listed out [in the rustfmt
 repository](https://github.com/rust-lang/rustfmt#on-the-stable-toolchain).
 
 Vector has its own formatting rules (`.rustfmt.toml`) that will automatically be used when you run `cargo fmt` within
-the repository.  If you're ever in doubt, you can also run `make check-fmt` which will invoke `cargo fmt` and ensure all
-code follows our formatting rules.
+the repository.  If you're ever in doubt, you can also run `make check-fmt` which will invoke `cargo fmt` in a dry-run
+mode, checking to see if any changed files are not currently formatted correctly.
+
+As an additional note, `rustfmt` sometimes can fail to format code within macros, so if you happen to see such code that
+doesn't look like it's formatted correctly, you may need to manually tweak it if `rustfmt` cannot be persuaded to format
+it correctly for you. :)
 
 # Code Organization
 
@@ -32,10 +37,10 @@ getting informed about errors, warnings, and so on.
 
 ## `src/`: main binary and all related functionality
 
-The bulk of code resides in the `src/` directory/crate, and within that, is almost entirely related to the
-implementation of the various components -- sources, transforms, and sinks -- that Vector offers. There is also, of
-course, the requisite glue code such as parsing command-line arguments, reading the configuration, constructing and
-configuring components, and wiring them together.
+The bulk of functional code resides in the `src/` directory/crate.  When we refer to functional code, we're talking
+about code that powers user-visible aspects of Vector, such as the sources, transforms, and sinks themselves. There is
+also, of course, the requisite glue code such as parsing command-line arguments, reading the configuration, constructing
+and configuring components, and wiring them together.
 
 # Internal telemetry: logging, metrics, traces
 
@@ -44,8 +49,8 @@ its own internal telemetry. This telemetry is primarily logging and metrics, but
 
 ## Logging
 
-For logging, we use **[`tracing`](https://docs.rs/tracing/latest/tracing)**, which doubles as both a way to emit
-logs but also a way to use distributed tracing techniques to add nested and contextual metadata by utilizing
+For logging, we use **[`tracing`](https://docs.rs/tracing/latest/tracing)**, which doubles as both a way to emit logs
+but also a way to use distributed tracing techniques to add nested and contextual metadata by utilizing
 [spans](https://docs.rs/tracing/latest/tracing/#spans).
 
 ### Basic Usage
@@ -139,10 +144,10 @@ emitting counters, gauges, and histograms.
 ### Basic Usage
 
 There are three basic metric types: counters, gauges, and histograms. **Counters** are meant for counting things, such
-as the total number of requests processed. Additionally, counters are monotonic, which means they can only be
-incremented (but not decremented) or reset to zero. **Gauges** are for tracking a single value
-that changes over time, such as the number of current connections. **Histograms** are for tracking multiple observations
-of the same logical event, such as the time it takes to serve a request.
+as the total number of requests processed, where the count only grows over time. This is also sometimes called a
+*monotonic counter*, or a *monotonically increasing* counter. **Gauges** are for tracking a single value that changes
+over time, and can go up and down, such as the number of current connections. **Histograms** are for tracking multiple
+observations of the same logical event, such as the time it takes to serve a request.
 
 Emitting metrics always involves a metric name and a value being measured. They can optionally accept descriptive
 labels:
@@ -170,22 +175,22 @@ histogram!("request_duration_ns", 742_130, "endpoint" => "frontend");
 
 ### Avoiding pitfalls with gauges
 
-Many values can appear, at first, to be best tracked as a gauge: current connection count, in-flight request
-count, and so on. However, in some cases, the value being measured may change too frequently to be reliably tracked.
-Metrics are typically collected on an interval, which is fine for counters and histograms: they're purely additive.
-However, since a gauge is simply the _latest_ value, you cannot know _how_ it's changed since the last time you've
-observed it.
+Many values can appear, at first, to be best tracked as a gauge: current connection count, in-flight request count, and
+so on. However, in some cases, the value being measured may change too frequently to be reliably tracked.  Metrics are
+typically collected on an interval, which is fine for counters and histograms: they're purely additive.  However, since
+a gauge is simply the _latest_ value, you cannot know _how_ it's changed since the last time you've observed it.
 
 This is a common problem where a gauge tracks something like a queue size. If there's an event where the queue grows
-rapidly but drains back down quickly, you may not ever observe the gauge having changed if your collection interval is greater
-than the duration of such events.
+rapidly but drains back down quickly, you may not ever observe the gauge having changed if your collection interval is
+greater than the duration of such events.
 
 A simple pattern to follow to handle these scenarios is to use two counters -- one for the increments, one for the
 decrements -- so that you can graph the difference between them, giving you the equivalent of the "current" value. In
 our example above, we might have `queue_items_pushed` and `queued_items_popped`, and if `queue_items_pushed` equals 100,
 and `queued_items_popped` equals 80, we know our queue size is 20. More importantly, if we queried both of them at the
-same time, and they were both zero, and then queried them both a second later, and saw that both were 100,000, we would know
-that the queue size was _currently_ zero but we'd also know that we just processed 100,000 items in the past second.
+same time, and they were both zero, and then queried them both a second later, and saw that both were 100,000, we would
+know that the queue size was _currently_ zero but we'd also know that we just processed 100,000 items in the past
+second.
 
 ### Best Practices
 
@@ -199,9 +204,9 @@ that the queue size was _currently_ zero but we'd also know that we just process
   counter every time a loop iteration occurs, you might consider incrementing a local variable instead, and then
   emitting that sum after the loop is over.
 - **Don't** update a counter to measure the total number of operations/events/etc if you're already tracking a histogram
-  of those operations/events/etc. Histograms have a `count` property that counts how many samples the histogram has recorded, as well as
-  a `sum` property that is a sum of the value of all samples the histogram has recorded. This means you can potentially
-  get three metrics for the cost of emitting one.
+  of those operations/events/etc. Histograms have a `count` property that counts how many samples the histogram has
+  recorded, as well as a `sum` property that is a sum of the value of all samples the histogram has recorded. This means
+  you can potentially get three metrics for the cost of emitting one.
 
 # Dependencies
 
@@ -209,9 +214,10 @@ that the queue size was _currently_ zero but we'd also know that we just process
 
 For error handling, there are two parts: _creating errors_ and _working with errors_.
 
-For **creating errors**, we prefer **[`snafu`](https://docs.rs/snafu)**. The `snafu` crate provides a derive for generating the
-boilerplate `std::error::Error` implementation on your custom error struct or enum. It additionally provides helpers for
-defining the `Display` output for your error (potentially on a per-variant basis when working with enums).
+For **creating errors**, we prefer **[`snafu`](https://docs.rs/snafu)**. The `snafu` crate provides a derive for
+generating the boilerplate `std::error::Error` implementation on your custom error struct or enum. It additionally
+provides helpers for defining the `Display` output for your error (potentially on a per-variant basis when working with
+enums).
 
 While there are popular alternatives such as [`failure`](https://docs.rs/failure) and
 [`thiserror`](https://docs.rs/thiserror), they generally lack either the thoroughness in documentation or the
@@ -232,31 +238,59 @@ library](https://doc.rust-lang.org/stable/std/sync/atomic/index.html) when possi
 well-tested. In cases where the standard library atomics cannot be used, such as when using a 64-bit atomic but wanting
 to support a 32-bit platform, or support a platform without atomic instructions at all, we prefer to use
 **[`crossbeam-utils`](https://docs.rs/crossbeam-utils)** and its `AtomicCell` helper. This type will automatically
-handle either using native atomic support or wrapping access in a mutex, and handle it in a transparent way. It uses a
-fixed acquire/release ordering that generally provides the expected behavior when using atomics, but may not be suitable
-for usages which require stronger ordering.
+handle either using native atomic support or ensuring mutally exclusive access, and handle it in a transparent way. It
+uses a fixed acquire/release ordering that generally provides the expected behavior when using atomics, but may not be
+suitable for usages which require stronger ordering.
 
 ### Global state
 
 When there is a need or desire to share global state, there are a few options depending on the required constraints.
 
-If you're working with data that is lazily initialized but never changes after initialization, we prefer
+If you're working with data that is _lazily initialized_ but _never changes after initialization_, we prefer
 **[`once_cell`](https://docs.rs/once_cell)**. It is slightly faster than [`lazy_static`], and additionally provides a
 richer API than both `lazy_static` and the standard library variants, such as `std::sync::Once`. Additionally, there is
 [active work happening](https://github.com/rust-lang/rust/issues/74465) to migrate the types in `once_cell` into
 `std::sync` directly, which will be easier to switch to if we're already using `once_cell`.
 
-If you're working with data that changes over time, but has a very high read-to-write ratio, such as many readers, but
-one writer and infrequent writes, we prefer **[`arc-swap`](https://docs.rs/arc-swap)**.  The main feature of this crate
-is allowing a piece of data to be atomically updated while being shared concurrently. It does this by wrapping all data
-in `Arc<T>` to provide the safe, concurrent access, while adding the ability to atomically swap the `Arc<T>` itself. As
-it cannot be constructed in a const fashion, `arc-swap` pairs well with `once_cell` for actually storing it in a global
-static variable.
+If you're working with data that _changes over time_, but has a very high read-to-write ratio, such as _many readers_,
+but _one writer_ and infrequent writes, we prefer **[`arc-swap`](https://docs.rs/arc-swap)**.  The main feature of this
+crate is allowing a piece of data to be atomically updated while being shared concurrently. It does this by wrapping all
+data in `Arc<T>` to provide the safe, concurrent access, while adding the ability to atomically swap the `Arc<T>`
+itself. As it cannot be constructed in a const fashion, `arc-swap` pairs well with `once_cell` for actually storing it
+in a global static variable.
 
 ### Concurrent data structures
 
-When there is a need for a concurrent and indexable storage, we prefer **[`sharded-slab`](https://docs.rs/sharded-slab)**.
-This crate provides a means to insert items such that the caller gets back to the index by which it can access the item
-again in the future. Additionally, when an item is removed, its storage can be reused by future inserts, making
-`sharded-slab` a good choice for long-running processes where memory allocation reduction is paramount. There is also a
-pool data structure based on the same underlying design of the slab itself for use cases where pooling is desired.
+When there is a need for a concurrent and _indexable_ storage, we prefer
+**[`sharded-slab`](https://docs.rs/sharded-slab)**.  This crate provides a means to insert items such that the caller
+gets back to the index by which it can access the item again in the future. Additionally, when an item is removed, its
+storage can be reused by future inserts, making `sharded-slab` a good choice for long-running processes where memory
+allocation reduction is paramount. There is also a pool data structure based on the same underlying design of the slab
+itself for use cases where pooling is desired.
+
+### Synchronization
+
+Synchronization can be a very common sight when writing multi-threaded code in any language, and this document does not
+aim to familiarize you with all of the common synchronization primitives and their intended usage. Instesd, however,
+there are some caveats that you must be aware of when using synchronization primitives in synchronous versus
+asynchronous code.
+
+Generally speaking, developers will lean on the synchronization primitives in `std::sync`, such as `Mutex`, `RwLock`,
+and so on. These are typically the right choice -- in terms of using the ones provided by `std`, vs alternative
+implementations of the same primitives -- as they're well-tested, and have been improving over time in terms of
+performance. However, developers must be careful when using these primitives in asynchronous code, as their behavior can
+sometimes adversely affect the performance and correctness of Vector.
+
+To wit, developers must exercise caution when using synchronous (i.e. `std::sync`, `parking_lot`, etc) synchronization
+primitives in asynchronous code, as they can be used in a way that deadlocks the asynchronous runtime even though the
+code compiles and appears to be correct. In some cases, you'll need to use an asynchronous-specific synchronization
+primitives, namely the ones from `tokio` itself. The `tokio` documentation on their
+[`Mutex`](https://docs.rs/tokio/latest/tokio/sync/struct.Mutex.html), for example, calls out the specifics of when and
+where you might need to use it vs the one from `std::sync`.
+
+As well, and hinted at above, the synchronization primitives in the standard library (`std::sync`) have improved
+considerably over time in terms of their performance. However, we prefer to use synchronization primitives from the
+[`parking_lot`](https://docs.rs/parking_lot) crate, which provide
+[non-poisonable](https://doc.rust-lang.org/stable/std/sync/struct.Mutex.html#poisoning) versions of the primitives in
+`std::sync`, and have other benefits such as being suitable for static initialization. This may change in the future as
+the APIs in `std` evolve.
