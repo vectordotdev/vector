@@ -2,7 +2,7 @@ version: "3"
 
 services:
   datadog-agent:
-    image: datadog/agent:7
+    image: docker.io/datadog/agent:7
     network_mode: host
     environment:
       - DD_API_KEY=${TEST_DATADOG_API_KEY}
@@ -18,7 +18,7 @@ services:
       - ${PWD}/tests/data/datadog-agent/conf.yaml:/etc/datadog-agent/conf.d/test.d/conf.yaml
   datadog-trace-agent:
     # Using 7.31.0 image to have the ability mimic tracing lib using json
-    image: datadog/agent:7.31.0
+    image: docker.io/datadog/agent:7.31.0
     network_mode: host
     environment:
       - DD_API_KEY=${TEST_DATADOG_API_KEY}

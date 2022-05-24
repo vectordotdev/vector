@@ -1,5 +1,6 @@
 mod config_builder;
 mod loader;
+mod secret;
 mod source;
 
 use std::{
@@ -16,6 +17,7 @@ use glob::glob;
 use loader::process::Process;
 pub use loader::*;
 use once_cell::sync::Lazy;
+pub use secret::*;
 pub use source::*;
 
 use super::{
@@ -127,13 +129,28 @@ pub fn load_from_paths(config_paths: &[ConfigPath]) -> Result<Config, Vec<String
     Ok(config)
 }
 
-/// Loads a configuration from paths. If a provider is present in the builder, the config is
-/// used as bootstrapping for a remote source. Otherwise, provider instantiation is skipped.
-pub async fn load_from_paths_with_provider(
+/// Loads a configuration from paths. Handle secret replacement and if a provider is present
+/// in the builder, the config is used as bootstrapping for a remote source. Otherwise,
+/// provider instantiation is skipped.
+pub async fn load_from_paths_with_provider_and_secrets(
     config_paths: &[ConfigPath],
     signal_handler: &mut signal::SignalHandler,
 ) -> Result<Config, Vec<String>> {
-    let (mut builder, load_warnings) = load_builder_from_paths(config_paths)?;
+    // Load secret backends first
+    let (mut secrets_backends_loader, secrets_warning) =
+        load_secret_backends_from_paths(config_paths)?;
+    // And then, if needed, retrieve secrets from configured backends
+    let (mut builder, load_warnings) = if secrets_backends_loader.has_secrets_to_retrieve() {
+        debug!(message = "Secret placeholders found, retrieving secrets from configured backends.");
+        let resolved_secrets = secrets_backends_loader
+            .retrieve(&mut signal_handler.subscribe())
+            .map_err(|e| vec![e])?;
+        load_builder_from_paths_with_secrets(config_paths, resolved_secrets)?
+    } else {
+        debug!(message = "No secret placeholder found, skipping secret resolution.");
+        load_builder_from_paths(config_paths)?
+    };
+
     validation::check_provider(&builder)?;
     signal_handler.clear();
 
@@ -145,7 +162,11 @@ pub async fn load_from_paths_with_provider(
 
     let (new_config, build_warnings) = builder.build_with_warnings()?;
 
-    for warning in load_warnings.into_iter().chain(build_warnings) {
+    for warning in secrets_warning
+        .into_iter()
+        .chain(load_warnings)
+        .chain(build_warnings)
+    {
         warn!("{}", warning);
     }
 
@@ -200,11 +221,26 @@ pub fn load_builder_from_paths(
     loader_from_paths(ConfigBuilderLoader::new(), config_paths)
 }
 
+/// Uses `ConfigBuilderLoader` to process `ConfigPaths`, performing secret replacement and deserializing to a `ConfigBuilder`
+pub fn load_builder_from_paths_with_secrets(
+    config_paths: &[ConfigPath],
+    secrets: HashMap<String, String>,
+) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {
+    loader_from_paths(ConfigBuilderLoader::with_secrets(secrets), config_paths)
+}
+
 /// Uses `SourceLoader` to process `ConfigPaths`, deserializing to a toml `SourceMap`.
 pub fn load_source_from_paths(
     config_paths: &[ConfigPath],
 ) -> Result<(toml::value::Table, Vec<String>), Vec<String>> {
     loader_from_paths(SourceLoader::new(), config_paths)
+}
+
+/// Uses `SecretBackendLoader` to process `ConfigPaths`, deserializing to a `SecretBackends`.
+pub fn load_secret_backends_from_paths(
+    config_paths: &[ConfigPath],
+) -> Result<(SecretBackendLoader, Vec<String>), Vec<String>> {
+    loader_from_paths(SecretBackendLoader::new(), config_paths)
 }
 
 pub fn load_from_str(input: &str, format: Format) -> Result<Config, Vec<String>> {

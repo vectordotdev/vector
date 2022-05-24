@@ -1,21 +1,10 @@
 use std::{collections::BTreeMap, iter::Peekable};
 
-use lookup::lookup_v2::{BorrowedSegment, Path};
+use lookup::lookup_v2::BorrowedSegment;
 
 use super::Value;
 
-/// Inserts field value using a path specified using `a.b[1].c` notation.
-#[allow(clippy::needless_pass_by_value)] // impl Path is always a reference
-pub fn insert<'a>(
-    fields: &mut BTreeMap<String, Value>,
-    path: impl Path<'a>,
-    value: Value,
-) -> Option<Value> {
-    let path_iter = path.segment_iter().peekable();
-    map_insert(fields, path_iter, value)
-}
-
-fn map_insert<'a>(
+pub fn map_insert<'a>(
     fields: &mut BTreeMap<String, Value>,
     mut path_iter: Peekable<impl Iterator<Item = BorrowedSegment<'a>>>,
     value: Value,
@@ -44,31 +33,20 @@ fn map_insert<'a>(
     }
 }
 
-fn array_insert<'a>(
+pub fn array_insert<'a>(
     values: &mut Vec<Value>,
     mut path_iter: Peekable<impl Iterator<Item = BorrowedSegment<'a>>>,
     value: Value,
 ) -> Option<Value> {
     match (path_iter.next(), path_iter.peek()) {
-        (Some(BorrowedSegment::Index(current)), None) => {
-            while values.len() <= (current as usize) {
-                values.push(Value::Null);
-            }
-            Some(std::mem::replace(&mut values[current as usize], value))
-        }
+        (Some(BorrowedSegment::Index(current)), None) => set_array_index(values, current, value),
         (Some(BorrowedSegment::Index(current)), Some(BorrowedSegment::Field(_))) => {
             if let Some(Value::Object(map)) = values.get_mut(current as usize) {
                 map_insert(map, path_iter, value)
             } else {
                 let mut map = BTreeMap::new();
                 map_insert(&mut map, path_iter, value);
-                while values.len() <= (current as usize) {
-                    values.push(Value::Null);
-                }
-                Some(std::mem::replace(
-                    &mut values[current as usize],
-                    Value::Object(map),
-                ))
+                set_array_index(values, current, Value::Object(map))
             }
         }
         (Some(BorrowedSegment::Index(current)), Some(BorrowedSegment::Index(next))) => {
@@ -77,16 +55,22 @@ fn array_insert<'a>(
             } else {
                 let mut array = Vec::with_capacity((*next as usize) + 1);
                 array_insert(&mut array, path_iter, value);
-                while values.len() <= (current as usize) {
-                    values.push(Value::Null);
-                }
-                Some(std::mem::replace(
-                    &mut values[current as usize],
-                    Value::Array(array),
-                ))
+                set_array_index(values, current, Value::Array(array))
             }
         }
         _ => None,
+    }
+}
+
+fn set_array_index(values: &mut Vec<Value>, index: usize, insert_value: Value) -> Option<Value> {
+    if values.len() <= (index as usize) {
+        while values.len() <= (index as usize) {
+            values.push(Value::Null);
+        }
+        values[index as usize] = insert_value;
+        None
+    } else {
+        Some(std::mem::replace(&mut values[index as usize], insert_value))
     }
 }
 
@@ -94,38 +78,57 @@ fn array_insert<'a>(
 mod test {
     use std::collections::BTreeMap;
 
+    use lookup::lookup_v2::Path;
     use serde_json::json;
 
-    use super::{super::test::fields_from_json, *};
+    use super::*;
 
     #[test]
     fn test_insert_nested() {
         let mut fields = BTreeMap::new();
-        insert(&mut fields, "a.b.c", Value::Integer(3));
+        map_insert(
+            &mut fields,
+            "a.b.c".segment_iter().peekable(),
+            Value::Integer(3),
+        );
 
-        let expected = fields_from_json(json!({
+        let expected = Value::from(json!({
             "a": {
                 "b":{
                     "c": 3
                 }
             }
-        }));
+        }))
+        .as_object()
+        .unwrap()
+        .clone();
         assert_eq!(fields, expected);
     }
 
     #[test]
     fn test_insert_array() {
         let mut fields = BTreeMap::new();
-        insert(&mut fields, "a.b[0].c[2]", Value::Integer(10));
-        insert(&mut fields, "a.b[0].c[0]", Value::Integer(5));
+        map_insert(
+            &mut fields,
+            "a.b[0].c[2]".segment_iter().peekable(),
+            Value::Integer(10),
+        );
+        map_insert(
+            &mut fields,
+            "a.b[0].c[0]".segment_iter().peekable(),
+            Value::Integer(5),
+        );
 
-        let expected = fields_from_json(json!({
+        let expected = Value::from(json!({
             "a": {
                 "b": [{
                     "c": [5, null, 10]
                 }]
             }
-        }));
+        }))
+        .as_object()
+        .unwrap()
+        .clone();
         assert_eq!(fields, expected);
     }
 }

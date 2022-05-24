@@ -37,6 +37,7 @@ use crate::{
     shutdown::ShutdownSignal,
     SourceSender,
 };
+use lookup::path;
 
 pub mod sized_bytes_codec;
 
@@ -493,12 +494,12 @@ fn handle_event(
 
         // Add data stream of stdin or stderr (if needed)
         if let Some(data_stream) = data_stream {
-            log.try_insert_flat(STREAM_KEY, data_stream.clone());
+            log.try_insert(path!(STREAM_KEY), data_stream.clone());
         }
 
         // Add pid (if needed)
         if let Some(pid) = pid {
-            log.try_insert_flat(PID_KEY, pid as i64);
+            log.try_insert(path!(PID_KEY), pid as i64);
         }
 
         // Add hostname (if needed)
@@ -507,7 +508,7 @@ fn handle_event(
         }
 
         // Add command
-        log.try_insert_flat(COMMAND_KEY, config.command.clone());
+        log.try_insert(path!(COMMAND_KEY), config.command.clone());
     }
 }
 
@@ -704,7 +705,7 @@ mod tests {
             assert!(log.get(PID_KEY).is_some());
             assert!(log.get(log_schema().timestamp_key()).is_some());
 
-            assert_eq!(8, log.all_fields().count());
+            assert_eq!(8, log.all_fields().unwrap().count());
         } else {
             panic!("Expected to receive a linux event");
         }

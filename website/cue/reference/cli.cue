@@ -167,25 +167,6 @@ cli: {
 	options: _core_options
 
 	commands: {
-		"config": {
-			description: """
-				(experimental) Output a provided Vector configuration file/directory as a single JSON object. Useful for checking configurations into version control.
-				"""
-			flags: _default_flags & {
-				"pretty": {
-					_short:      "p"
-					description: "Pretty print JSON"
-				}
-				"include-defaults": {
-					_short:      "i"
-					description: "Include default values where missing from config"
-				}
-			}
-
-			options: _core_config_options
-
-			example: "vector config --config /etc/vector/vector.toml"
-		}
 		"graph": {
 			description: """
 				Generate a visual representation of topologies. The output is in the [DOT format](\(urls.dot_format)),

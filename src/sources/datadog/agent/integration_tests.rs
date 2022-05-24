@@ -127,19 +127,13 @@ async fn wait_for_traces() {
     let spans = trace.get("spans").unwrap().as_array().unwrap();
     assert_eq!(spans.len(), 1);
     let span = spans.get(0).unwrap();
-    assert_eq!(span.get("name").unwrap(), Some(&Value::from("a_name")));
-    assert_eq!(
-        span.get("service").unwrap(),
-        Some(&Value::from("a_service"))
-    );
-    assert_eq!(
-        span.get("resource").unwrap(),
-        Some(&Value::from("a_resource"))
-    );
-    assert_eq!(span.get("name").unwrap(), Some(&Value::from("a_name")));
-    assert_eq!(span.get("trace_id").unwrap(), Some(&Value::Integer(123)));
-    assert_eq!(span.get("span_id").unwrap(), Some(&Value::Integer(456)));
-    assert_eq!(span.get("parent_id").unwrap(), Some(&Value::Integer(789)));
+    assert_eq!(span.get("name"), Some(&Value::from("a_name")));
+    assert_eq!(span.get("service"), Some(&Value::from("a_service")));
+    assert_eq!(span.get("resource"), Some(&Value::from("a_resource")));
+    assert_eq!(span.get("name"), Some(&Value::from("a_name")));
+    assert_eq!(span.get("trace_id"), Some(&Value::Integer(123)));
+    assert_eq!(span.get("span_id"), Some(&Value::Integer(456)));
+    assert_eq!(span.get("parent_id"), Some(&Value::Integer(789)));
 }
 
 fn get_simple_trace() -> String {

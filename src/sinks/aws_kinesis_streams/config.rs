@@ -104,12 +104,12 @@ impl SinkBatchSettings for KinesisDefaultBatchSettings {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct KinesisSinkConfig {
     pub stream_name: String,
     pub partition_key_field: Option<String>,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    #[serde(flatten)]
     pub encoding:
         EncodingConfigAdapter<EncodingConfig<StandardEncodings>, StandardEncodingsMigrator>,
     #[serde(default)]

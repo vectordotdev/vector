@@ -2,7 +2,7 @@ version: "3"
 
 services:
   eventstoredb:
-    image: eventstore/eventstore
+    image: docker.io/eventstore/eventstore
     command: --insecure --stats-period-sec=1
     network_mode: host
     volumes:

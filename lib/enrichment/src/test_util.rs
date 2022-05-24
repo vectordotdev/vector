@@ -4,7 +4,6 @@ use std::{
 };
 
 use value::Value;
-use vector_common::btreemap;
 
 use crate::{Case, Condition, IndexHandle, Table, TableRegistry};
 
@@ -21,9 +20,7 @@ impl DummyEnrichmentTable {
 
     pub(crate) fn new_with_index(indexes: Arc<Mutex<Vec<Vec<String>>>>) -> Self {
         Self {
-            data: btreemap! {
-                "field".to_string() => Value::from("result"),
-            },
+            data: BTreeMap::from([("field".to_string(), Value::from("result"))]),
             indexes,
         }
     }

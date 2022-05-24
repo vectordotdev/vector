@@ -2,7 +2,7 @@ use std::io;
 
 use codecs::{
     encoding::{FramingConfig, SerializerConfig},
-    JsonSerializerConfig, NewlineDelimitedEncoderConfig, RawMessageSerializerConfig,
+    JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
 };
 use serde::{Deserialize, Serialize};
 use vector_core::config::log_schema;
@@ -168,7 +168,7 @@ impl EncodingConfigMigrator for StandardEncodingsMigrator {
 
     fn migrate(codec: &Self::Codec) -> SerializerConfig {
         match codec {
-            StandardEncodings::Text => RawMessageSerializerConfig::new().into(),
+            StandardEncodings::Text => TextSerializerConfig::new().into(),
             StandardEncodings::Json | StandardEncodings::Ndjson => {
                 JsonSerializerConfig::new().into()
             }
@@ -186,7 +186,7 @@ impl EncodingConfigWithFramingMigrator for StandardEncodingsWithFramingMigrator 
 
     fn migrate(codec: &Self::Codec) -> (Option<FramingConfig>, SerializerConfig) {
         match codec {
-            StandardEncodings::Text => (None, RawMessageSerializerConfig::new().into()),
+            StandardEncodings::Text => (None, TextSerializerConfig::new().into()),
             StandardEncodings::Json => (None, JsonSerializerConfig::new().into()),
             StandardEncodings::Ndjson => (
                 Some(NewlineDelimitedEncoderConfig::new().into()),

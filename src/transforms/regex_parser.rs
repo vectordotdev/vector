@@ -409,7 +409,7 @@ mod tests {
 
         // timestamp is unpredictable, don't compare it
         log.remove("timestamp");
-        let log = serde_json::to_value(log.all_fields()).unwrap();
+        let log = serde_json::to_value(log.all_fields().unwrap()).unwrap();
         assert_eq!(
             log,
             serde_json::json!({
@@ -454,7 +454,7 @@ mod tests {
 
         // timestamp is unpredictable, don't compare it
         log.remove("timestamp");
-        let log = serde_json::to_value(log.all_fields()).unwrap();
+        let log = serde_json::to_value(log.all_fields().unwrap()).unwrap();
         assert_eq!(
             log,
             serde_json::json!({

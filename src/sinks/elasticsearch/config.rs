@@ -34,6 +34,7 @@ use crate::{
     tls::TlsConfig,
     transforms::metric_to_log::MetricToLogConfig,
 };
+use lookup::path;
 
 /// The field name for the timestamp required by data stream mode
 pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
@@ -193,9 +194,9 @@ impl DataStreamConfig {
         if timestamp_key == DATA_STREAM_TIMESTAMP_KEY {
             return;
         }
-        let map = log.as_map_mut();
-        if let Some(value) = map.remove(timestamp_key) {
-            map.insert(DATA_STREAM_TIMESTAMP_KEY.into(), value);
+
+        if let Some(value) = log.remove(timestamp_key) {
+            log.insert(path!(DATA_STREAM_TIMESTAMP_KEY), value);
         }
     }
 
@@ -247,11 +248,16 @@ impl DataStreamConfig {
         let dataset = self.dataset(&*log);
         let namespace = self.namespace(&*log);
 
+        if log.as_map().is_none() {
+            *log.value_mut() = Value::Object(BTreeMap::new());
+        }
         let existing = log
             .as_map_mut()
+            .expect("must be a map")
             .entry("data_stream".into())
             .or_insert_with(|| Value::Object(BTreeMap::new()))
             .as_object_mut_unwrap();
+
         if let Some(dtype) = dtype {
             existing
                 .entry("type".into())

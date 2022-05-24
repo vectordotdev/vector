@@ -17,8 +17,8 @@ use super::{
 use crate::{
     event::Event,
     sinks::util::{
-        builder::SinkBuilderExt, encoding::EncodingConfigFixed, Compression, RequestBuilder,
-        StreamSink,
+        builder::SinkBuilderExt, encoding::EncodingConfigFixed, request_builder::EncodeResult,
+        Compression, RequestBuilder, StreamSink,
     },
 };
 
@@ -105,13 +105,17 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
         (metadata, api_model)
     }
 
-    fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
+    fn build_request(
+        &self,
+        metadata: Self::Metadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
         let (_credentials, events_len, finalizers) = metadata;
         NewRelicApiRequest {
             batch_size: events_len,
             finalizers,
             credentials: Arc::clone(&self.credentials),
-            payload,
+            payload: payload.into_payload(),
             compression: self.compression,
         }
     }

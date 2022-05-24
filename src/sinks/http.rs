@@ -3,10 +3,10 @@ use std::io::Write;
 use bytes::{BufMut, Bytes, BytesMut};
 use codecs::encoding::{
     CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig, Framer, FramingConfig,
-    JsonSerializerConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
-    RawMessageSerializerConfig, Serializer, SerializerConfig,
+    JsonSerializerConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig, Serializer,
+    SerializerConfig, TextSerializerConfig,
 };
-use flate2::write::GzEncoder;
+use flate2::write::{GzEncoder, ZlibEncoder};
 use futures::{future, FutureExt, SinkExt};
 use http::{
     header::{self, HeaderName, HeaderValue},
@@ -60,7 +60,7 @@ impl EncodingConfigWithFramingMigrator for Migrator {
 
     fn migrate(codec: &Self::Codec) -> (Option<FramingConfig>, SerializerConfig) {
         match codec {
-            Encoding::Text => (None, RawMessageSerializerConfig::new().into()),
+            Encoding::Text => (None, TextSerializerConfig::new().into()),
             Encoding::Ndjson => (
                 Some(NewlineDelimitedEncoderConfig::new().into()),
                 JsonSerializerConfig::new().into(),
@@ -74,6 +74,7 @@ impl EncodingConfigWithFramingMigrator for Migrator {
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct HttpSinkConfig {
     pub uri: UriSerde,
     pub method: Option<HttpMethod>,
@@ -294,7 +295,7 @@ impl util::http::HttpSink for HttpSink {
             use Framer::*;
             use Serializer::*;
             match (self.encoder.serializer(), self.encoder.framer()) {
-                (RawMessage(_), _) => Some("text/plain"),
+                (RawMessage(_) | Text(_), _) => Some("text/plain"),
                 (Json(_), NewlineDelimited(_)) => {
                     if !body.is_empty() {
                         // Remove trailing newline for backwards-compatibility
@@ -334,6 +335,14 @@ impl util::http::HttpSink for HttpSink {
 
                 let buffer = BytesMut::new();
                 let mut w = GzEncoder::new(buffer.writer(), level);
+                w.write_all(&body).expect("Writing to Vec can't fail");
+                body = w.finish().expect("Writing to Vec can't fail").into_inner();
+            }
+            Compression::Zlib(level) => {
+                builder = builder.header("Content-Encoding", "deflate");
+
+                let buffer = BytesMut::new();
+                let mut w = ZlibEncoder::new(buffer.writer(), level);
                 w.write_all(&body).expect("Writing to Vec can't fail");
                 body = w.finish().expect("Writing to Vec can't fail").into_inner();
             }

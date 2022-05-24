@@ -138,7 +138,7 @@ impl Application {
                         SubCommand::Graph(g) => graph::cmd(&g),
                         SubCommand::Config(c) => config::cmd(&c),
                         SubCommand::List(l) => list::cmd(&l),
-                        SubCommand::Test(t) => unit_test::cmd(&t).await,
+                        SubCommand::Test(t) => unit_test::cmd(&t, &mut signal_handler).await,
                         #[cfg(windows)]
                         SubCommand::Service(s) => service::cmd(&s),
                         #[cfg(feature = "api-client")]
@@ -175,10 +175,12 @@ impl Application {
                 #[cfg(not(feature = "enterprise-tests"))]
                 config::init_log_schema(&config_paths, true).map_err(handle_config_errors)?;
 
-                let mut config =
-                    config::load_from_paths_with_provider(&config_paths, &mut signal_handler)
-                        .await
-                        .map_err(handle_config_errors)?;
+                let mut config = config::load_from_paths_with_provider_and_secrets(
+                    &config_paths,
+                    &mut signal_handler,
+                )
+                .await
+                .map_err(handle_config_errors)?;
 
                 if !config.healthchecks.enabled {
                     info!("Health checks are disabled.");
@@ -321,7 +323,7 @@ impl Application {
                                 config_paths = config::process_paths(&opts.config_paths_with_formats()).unwrap_or(config_paths);
 
                                 // Reload config
-                                let new_config = config::load_from_paths_with_provider(&config_paths, &mut signal_handler)
+                                let new_config = config::load_from_paths_with_provider_and_secrets(&config_paths, &mut signal_handler)
                                     .await
                                     .map_err(handle_config_errors).ok();
 

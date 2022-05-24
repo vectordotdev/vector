@@ -329,34 +329,18 @@ mod tests {
                 .keys()
                 .map(|key| key.to_string())
                 .collect::<Vec<String>>(),
-            vec![
-                "foo.logs.0.filter",
-                "foo.logs.0.0",
-                "foo.logs.0.1",
-                "foo.logs.1.0",
-                "foo.type_router",
-            ],
+            vec!["foo.logs.0", "foo.logs.1", "foo.type_router",],
         );
+
         assert_eq!(routes["foo.type_router"], vec!["source".to_string()]);
         assert_eq!(
-            routes["foo.logs.0.filter"],
+            routes["foo.logs.0"],
             vec!["foo.type_router.logs".to_string()]
         );
-        assert_eq!(
-            routes["foo.logs.0.0"],
-            vec!["foo.logs.0.filter.success".to_string()]
-        );
-        assert_eq!(routes["foo.logs.0.1"], vec!["foo.logs.0.0".to_string()]);
-        assert_eq!(
-            routes["foo.logs.1.0"],
-            vec![
-                "foo.logs.0.1".to_string(),
-                "foo.logs.0.filter._unmatched".to_string(),
-            ],
-        );
+        assert_eq!(routes["foo.logs.1"], vec!["foo.logs.0".to_string()]);
         assert_eq!(
             expansions["foo"],
-            vec!["foo.type_router._unmatched", "foo.logs.1.0"]
+            vec!["foo.type_router._unmatched", "foo.logs.1"]
         );
     }
 }
