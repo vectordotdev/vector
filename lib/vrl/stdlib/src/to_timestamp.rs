@@ -328,11 +328,14 @@ mod tests {
         let tz = TimeZone::default();
         let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
         let f = ToTimestampFn {
-            value: Box::new(Literal::from(9999999999999)),
+            value: Box::new(Literal::from(i64::MAX)),
             unit: Unit::default(),
         };
         let string = f.resolve(&mut ctx).err().unwrap().message();
-        assert_eq!(string, r#"unable to coerce 9999999999999 into timestamp"#)
+        assert_eq!(
+            string,
+            r#"unable to coerce 9223372036854775807 into timestamp"#
+        )
     }
 
     #[test]

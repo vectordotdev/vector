@@ -1,36 +1,30 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn is_json(value: Value) -> Resolved {
-    let bytes = value.try_bytes()?;
-
-    match serde_json::from_slice::<'_, serde::de::IgnoredAny>(&bytes) {
-        Ok(_) => Ok(value!(true)),
-        Err(_) => Ok(value!(false)),
-    }
+fn is_json(bytes: &Bytes) -> bool {
+    serde_json::from_slice::<'_, serde::de::IgnoredAny>(bytes).is_ok()
 }
 
-fn is_json_with_variant(value: Value, variant: &Bytes) -> Resolved {
-    let bytes = value.try_bytes()?;
-
+fn is_json_with_variant(bytes: &Bytes, variant: &Bytes) -> bool {
     match serde_json::from_slice::<'_, serde::de::IgnoredAny>(&bytes) {
-        Err(_) => Ok(value!(false)),
+        Err(_) => false,
         Ok(_) => {
             for c in bytes {
                 return match c {
                     // Search for the first non whitespace char
                     b' ' | b'\n' | b'\t' | b'\r' => continue,
-                    b'{' => Ok(value!(variant.as_ref() == b"object")),
-                    b'[' => Ok(value!(variant.as_ref() == b"array")),
-                    b't' | b'f' => Ok(value!(variant.as_ref() == b"bool")),
-                    b'-' | b'0'..=b'9' => Ok(value!(variant.as_ref() == b"number")),
-                    b'"' => Ok(value!(variant.as_ref() == b"string")),
-                    b'n' => Ok(value!(variant.as_ref() == b"null")),
-                    _ => Ok(value!(false)),
+                    b'{' => variant.as_ref() == b"object",
+                    b'[' => variant.as_ref() == b"array",
+                    b't' | b'f' => variant.as_ref() == b"bool",
+                    b'-' | b'0'..=b'9' => variant.as_ref() == b"number",
+                    b'"' => variant.as_ref() == b"string",
+                    b'n' => variant.as_ref() == b"null",
+                    _ => false,
                 };
             }
+
             // Empty input value cannot be any type, not a specific variant
-            Ok(value!(false))
+            false
         }
     }
 }
@@ -134,16 +128,17 @@ impl Function for IsJson {
         }
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
+    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
         let value = args.required("value");
         let variant = args.optional_any("variant");
+        let bytes = value.try_as_bytes()?;
 
         match variant {
             Some(variant) => {
                 let variant = variant.downcast_ref::<Bytes>().unwrap();
-                is_json_with_variant(value, variant)
+                Ok(is_json_with_variant(bytes, variant).into())
             }
-            None => is_json(value),
+            None => Ok(is_json(bytes).into()),
         }
     }
 }
@@ -154,9 +149,14 @@ struct IsJsonFn {
 }
 
 impl Expression for IsJsonFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
         let value = self.value.resolve(ctx)?;
-        is_json(value)
+        let bytes = value.try_as_bytes()?;
+
+        Ok(Cow::Owned(is_json(bytes).into()))
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
@@ -171,11 +171,15 @@ struct IsJsonVariantsFn {
 }
 
 impl Expression for IsJsonVariantsFn {
-    fn resolve(&self, ctx: &mut Context) -> Resolved {
+    fn resolve<'value, 'ctx: 'value, 'rt: 'ctx>(
+        &'rt self,
+        ctx: &'ctx mut Context,
+    ) -> Resolved<'value> {
         let value = self.value.resolve(ctx)?;
         let variant = &self.variant;
+        let bytes = value.try_as_bytes()?;
 
-        is_json_with_variant(value, variant)
+        Ok(Cow::Owned(is_json_with_variant(bytes, variant).into()))
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

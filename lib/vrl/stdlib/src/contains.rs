@@ -9,11 +9,10 @@ fn contains(value: &Bytes, substring: &Bytes, case_sensitive: bool) -> bool {
     match case_sensitive {
         true => value
             .windows(substring.len())
-            .position(|window| window == substring)
-            .is_some(),
+            .any(|window| window == substring),
         false => {
-            let value = String::from_utf8_lossy(&value).to_lowercase();
-            let substring = String::from_utf8_lossy(&substring).to_lowercase();
+            let value = String::from_utf8_lossy(value).to_lowercase();
+            let substring = String::from_utf8_lossy(substring).to_lowercase();
 
             value.contains(&substring)
         }

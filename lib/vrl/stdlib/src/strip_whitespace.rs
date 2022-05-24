@@ -72,7 +72,7 @@ impl Expression for StripWhitespaceFn {
             .next()
             .and_then(|ch| ch.ok().map(char::is_whitespace))
             .unwrap_or(false)
-            && chars
+            && !chars
                 .last()
                 .and_then(|ch| ch.ok().map(char::is_whitespace))
                 .unwrap_or(false)
