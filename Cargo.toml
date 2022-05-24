@@ -50,6 +50,8 @@ extended-description-file = "target/debian-extended-description.txt"
 
 [package.metadata.deb.systemd-units]
 unit-scripts = "distribution/systemd/"
+enable = false
+start = false
 
 # libc requirements are defined by `cross`
 # https://github.com/rust-embedded/cross#supported-targets
@@ -222,7 +224,7 @@ bollard = { version = "0.12.0", default-features = false, features = ["ssl"] }
 bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
-cidr-utils = { version = "0.5.6", default-features = false }
+cidr-utils = { version = "0.5.7", default-features = false }
 clap = { version = "3.1.18", default-features = false, features = ["derive", "env", "std"] }
 colored = { version = "2.0.0", default-features = false }
 csv = { version = "1.1", default-features = false, optional = true }
@@ -261,7 +263,7 @@ nkeys = { version = "0.2.0", default-features = false, optional = true }
 nom = { version = "7.1.1", default-features = false, optional = true }
 notify = { version = "4.0.17", default-features = false }
 num_cpus = { version = "1.13.1", default-features = false }
-once_cell = { version = "1.10", default-features = false }
+once_cell = { version = "1.11", default-features = false }
 openssl = { version = "0.10.40", default-features = false, features = ["vendored"] }
 openssl-probe = { version = "0.1.5", default-features = false }
 ordered-float = { version = "3.0.0", default-features = false }
