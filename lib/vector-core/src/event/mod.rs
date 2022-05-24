@@ -21,7 +21,7 @@ pub use trace::TraceEvent;
 use vector_buffers::EventCount;
 use vector_common::EventDataEq;
 #[cfg(feature = "vrl")]
-pub use vrl_target::{TargetEvents, VrlImmutableTarget, VrlTarget};
+pub use vrl_target::{TargetEvents, VrlTarget};
 
 use crate::ByteSizeOf;
 
