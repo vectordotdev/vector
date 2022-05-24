@@ -138,7 +138,7 @@ struct City<'a> {
     postal_code: &'a str,
     region_code: &'a str,
     region_name: &'a str,
-    metro_code: Option<u16>,
+    metro_code: String, // converted from u16 for consistency
 }
 
 impl FunctionTransform for Geoip {
@@ -204,7 +204,9 @@ impl FunctionTransform for Geoip {
                                 city.longitude = longitude.to_string();
                             }
 
-                            city.metro_code = location.metro_code
+                            if let Some(metro_code) = location.metro_code {
+                                city.metro_code = metro_code.to_string();
+                            }
                         }
 
                         // last subdivision is most specific per https://github.com/maxmind/GeoIP2-java/blob/39385c6ce645374039450f57208b886cf87ade47/src/main/java/com/maxmind/geoip2/model/AbstractCityResponse.java#L96-L107
@@ -291,7 +293,7 @@ mod tests {
         exp_geoip_attr.insert("latitude", "51.75");
         exp_geoip_attr.insert("longitude", "-1.25");
         exp_geoip_attr.insert("postal_code", "OX1");
-        exp_geoip_attr.insert("metro_code", "<null>");
+        exp_geoip_attr.insert("metro_code", "");
 
         for field in exp_geoip_attr.keys() {
             let k = format!("geo.{}", field).to_string();
@@ -322,9 +324,7 @@ mod tests {
         exp_geoip_attr.insert("latitude", "27.5");
         exp_geoip_attr.insert("longitude", "90.5");
         exp_geoip_attr.insert("postal_code", "");
-        exp_geoip_attr.insert("metro_code", "<null>");
-
-        dbg!(&new_event);
+        exp_geoip_attr.insert("metro_code", "");
 
         for field in exp_geoip_attr.keys() {
             let k = format!("geo.{}", field).to_string();
@@ -348,7 +348,6 @@ mod tests {
         exp_geoip_attr.insert("city_name", "");
         exp_geoip_attr.insert("country_code", "");
         exp_geoip_attr.insert("country_name", "");
-        exp_geoip_attr.insert("continent_code", "");
         exp_geoip_attr.insert("region_code", "");
         exp_geoip_attr.insert("region_name", "");
         exp_geoip_attr.insert("continent_code", "");
@@ -356,7 +355,7 @@ mod tests {
         exp_geoip_attr.insert("latitude", "");
         exp_geoip_attr.insert("longitude", "");
         exp_geoip_attr.insert("postal_code", "");
-        exp_geoip_attr.insert("metro_code", "<null>");
+        exp_geoip_attr.insert("metro_code", "");
 
         for field in exp_geoip_attr.keys() {
             let k = format!("geo.{}", field).to_string();
