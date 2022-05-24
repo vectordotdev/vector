@@ -186,7 +186,7 @@ rmp-serde = { version = "1.1.0", default-features = false, optional = true }
 rmpv = { version = "1.0.0", default-features = false, features = ["with-serde"], optional = true }
 
 # Prost
-prost = { version = "0.10.3", default-features = false, features = ["std"] }
+prost = { version = "0.10.4", default-features = false, features = ["std"] }
 prost-types = { version = "0.10.1", default-features = false, optional = true }
 
 # GCP
