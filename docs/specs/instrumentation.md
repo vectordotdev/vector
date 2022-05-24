@@ -124,10 +124,10 @@ If events are dropped due to an error, then the error event should drive the
 emission of this event, meeting the following requirements:
 
 * Properties
-  * MUST include the `intentional` property to distinguish if the events were
-    dropped intentionally. For example, events dropped in the `filter` transform
-    are intentionally dropped, while events dropped due to an error in the `remap`
-    transform are unintentionally dropped.
+  * `intentional` - Distinguishes if the events were dropped intentionally. For
+    example, events dropped in the `filter` transform are intentionally dropped,
+    while events dropped due to an error in the `remap` transform are
+    unintentionally dropped.
 * Metrics
   * MUST increment the `<namespace>_discarded_events_total` counter by the
     number of events discarded.
@@ -135,7 +135,9 @@ emission of this event, meeting the following requirements:
     event, such as retrying delivery in sinks.
   * MUST include the `intentional` property as a tag.
 * Logs
-  * MUST log a `<count> events [un]intentionally dropped.` message.
+  * MUST log a `<count> events [un]intentionally dropped due to <reason>`
+    message. `<reason>` MUST be a descriptive, user-friendly message that helps
+    the user understand why their data was dropped.
   * If `intentional` is `true`, MUST log at the `debug` level.
   * If `intentional` is `false`, MUST log at the `error` level.
 
