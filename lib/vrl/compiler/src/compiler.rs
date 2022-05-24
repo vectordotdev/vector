@@ -310,11 +310,7 @@ impl<'a> Compiler<'a> {
             Many(nodes) => self.compile_exprs(nodes, external),
         };
 
-        Predicate::new(
-            Node::new(span, exprs),
-            (&self.local, external),
-            &mut self.diagnostics,
-        )
+        Predicate::new(Node::new(span, exprs), (&self.local, external))
     }
 
     #[cfg(feature = "expr-op")]
