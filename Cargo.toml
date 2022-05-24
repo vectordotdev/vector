@@ -165,9 +165,10 @@ aws-smithy-http = { version = "0.42.0", default-features = false, optional = tru
 aws-smithy-types = { version = "0.42.0", default-features = false, optional = true }
 
 # Azure
-azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "a0ef5e57f9b1d7d3c768d27dd761569db6e1c934", default-features = false, features = ["enable_reqwest"], optional = true }
-azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "a0ef5e57f9b1d7d3c768d27dd761569db6e1c934", default-features = false, optional = true }
-azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "a0ef5e57f9b1d7d3c768d27dd761569db6e1c934", default-features = false, optional = true }
+azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "df7d7faecd4c8ae00284eaaa55bf4269eaf21a2a", default-features = false, features = ["enable_reqwest"], optional = true }
+azure_identity = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "df7d7faecd4c8ae00284eaaa55bf4269eaf21a2a", default-features = false, features = ["enable_reqwest"], optional = true }
+azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "df7d7faecd4c8ae00284eaaa55bf4269eaf21a2a", default-features = false, optional = true }
+azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "df7d7faecd4c8ae00284eaaa55bf4269eaf21a2a", default-features = false, optional = true }
 
 # Tower
 tower = { version = "0.4.12", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util"] }
@@ -324,9 +325,10 @@ tonic-build = { version = "0.7", default-features = false, features = ["transpor
 [dev-dependencies]
 approx = "0.5.1"
 assert_cmd = { version = "2.0.4", default-features = false }
-azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "a0ef5e57f9b1d7d3c768d27dd761569db6e1c934", default-features = false, features = ["enable_reqwest", "azurite_workaround"] }
-azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "a0ef5e57f9b1d7d3c768d27dd761569db6e1c934", default-features = false, features = ["azurite_workaround"] }
-azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "a0ef5e57f9b1d7d3c768d27dd761569db6e1c934", default-features = false, features = ["azurite_workaround"] }
+azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "df7d7faecd4c8ae00284eaaa55bf4269eaf21a2a", default-features = false, features = ["enable_reqwest", "azurite_workaround"] }
+azure_identity = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "df7d7faecd4c8ae00284eaaa55bf4269eaf21a2a", default-features = false, features = ["enable_reqwest"] }
+azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "df7d7faecd4c8ae00284eaaa55bf4269eaf21a2a", default-features = false, features = ["azurite_workaround"] }
+azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "df7d7faecd4c8ae00284eaaa55bf4269eaf21a2a", default-features = false, features = ["azurite_workaround"] }
 base64 = "0.13.0"
 criterion = { version = "0.3.5", features = ["html_reports", "async_tokio"] }
 libc = "0.2.126"
@@ -657,7 +659,7 @@ sinks-aws_kinesis_firehose = ["aws-core", "aws-sdk-firehose"]
 sinks-aws_kinesis_streams = ["aws-core", "aws-sdk-kinesis"]
 sinks-aws_s3 = ["base64", "md-5", "aws-core", "aws-sdk-s3"]
 sinks-aws_sqs = ["aws-core", "aws-sdk-sqs"]
-sinks-azure_blob = ["azure_core", "azure_storage", "azure_storage_blobs"]
+sinks-azure_blob = ["azure_core", "azure_identity", "azure_storage", "azure_storage_blobs"]
 sinks-azure_monitor_logs = []
 sinks-blackhole = []
 sinks-clickhouse = []

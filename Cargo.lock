@@ -417,6 +417,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "30696a84d817107fc028e049980e09d5e140e8da8f1caeb17e8e950658a3cea9"
 
 [[package]]
+name = "async-timer"
+version = "1.0.0-beta.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "faacdfdccd10db54656717fddcd1a2ab6cd1ab16c0d6e7d89ec365b885fc9844"
+dependencies = [
+ "error-code",
+ "libc",
+ "wasm-bindgen",
+ "winapi 0.3.9",
+]
+
+[[package]]
 name = "async-trait"
 version = "0.1.53"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -985,8 +997,8 @@ dependencies = [
 
 [[package]]
 name = "azure_core"
-version = "0.2.1"
-source = "git+https://github.com/Azure/azure-sdk-for-rust.git?rev=a0ef5e57f9b1d7d3c768d27dd761569db6e1c934#a0ef5e57f9b1d7d3c768d27dd761569db6e1c934"
+version = "0.2.2"
+source = "git+https://github.com/Azure/azure-sdk-for-rust.git?rev=df7d7faecd4c8ae00284eaaa55bf4269eaf21a2a#df7d7faecd4c8ae00284eaaa55bf4269eaf21a2a"
 dependencies = [
  "async-trait",
  "base64 0.13.0",
@@ -1011,9 +1023,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "azure_identity"
+version = "0.3.0"
+source = "git+https://github.com/Azure/azure-sdk-for-rust.git?rev=df7d7faecd4c8ae00284eaaa55bf4269eaf21a2a#df7d7faecd4c8ae00284eaaa55bf4269eaf21a2a"
+dependencies = [
+ "async-lock",
+ "async-timer",
+ "async-trait",
+ "azure_core",
+ "base64 0.13.0",
+ "chrono",
+ "futures 0.3.21",
+ "log",
+ "oauth2",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "url",
+ "uuid 1.0.0",
+]
+
+[[package]]
 name = "azure_storage"
-version = "0.1.0"
-source = "git+https://github.com/Azure/azure-sdk-for-rust.git?rev=a0ef5e57f9b1d7d3c768d27dd761569db6e1c934#a0ef5e57f9b1d7d3c768d27dd761569db6e1c934"
+version = "0.2.0"
+source = "git+https://github.com/Azure/azure-sdk-for-rust.git?rev=df7d7faecd4c8ae00284eaaa55bf4269eaf21a2a#df7d7faecd4c8ae00284eaaa55bf4269eaf21a2a"
 dependencies = [
  "RustyXML",
  "async-trait",
@@ -1038,8 +1072,8 @@ dependencies = [
 
 [[package]]
 name = "azure_storage_blobs"
-version = "0.1.0"
-source = "git+https://github.com/Azure/azure-sdk-for-rust.git?rev=a0ef5e57f9b1d7d3c768d27dd761569db6e1c934#a0ef5e57f9b1d7d3c768d27dd761569db6e1c934"
+version = "0.2.0"
+source = "git+https://github.com/Azure/azure-sdk-for-rust.git?rev=df7d7faecd4c8ae00284eaaa55bf4269eaf21a2a#df7d7faecd4c8ae00284eaaa55bf4269eaf21a2a"
 dependencies = [
  "RustyXML",
  "azure_core",
@@ -8322,7 +8356,7 @@ version = "1.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97fee6b57c6a41524a810daee9286c02d7752c4253064d0b05472833a438f675"
 dependencies = [
- "cfg-if 1.0.0",
+ "cfg-if 0.1.10",
  "static_assertions",
 ]
 
@@ -8605,6 +8639,7 @@ dependencies = [
  "aws-smithy-types",
  "aws-types",
  "azure_core",
+ "azure_identity",
  "azure_storage",
  "azure_storage_blobs",
  "base64 0.13.0",

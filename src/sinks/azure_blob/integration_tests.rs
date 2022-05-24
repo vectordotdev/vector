@@ -29,9 +29,12 @@ use crate::{
 #[tokio::test]
 async fn azure_blob_healthcheck_passed() {
     let config = AzureBlobSinkConfig::new_emulator().await;
-    let client =
-        azure_common::config::build_client(config.connection_string, config.container_name.clone())
-            .expect("Failed to create client");
+    let client = azure_common::config::build_client(
+        config.connection_string,
+        None,
+        config.container_name.clone(),
+    )
+    .expect("Failed to create client");
 
     let response = azure_common::config::build_healthcheck(config.container_name, client);
 
@@ -45,9 +48,12 @@ async fn azure_blob_healthcheck_unknown_container() {
         container_name: String::from("other-container-name"),
         ..config
     };
-    let client =
-        azure_common::config::build_client(config.connection_string, config.container_name.clone())
-            .expect("Failed to create client");
+    let client = azure_common::config::build_client(
+        config.connection_string,
+        config.storage_account,
+        config.container_name.clone(),
+    )
+    .expect("Failed to create client");
 
     assert_eq!(
         azure_common::config::build_healthcheck(config.container_name, client)
@@ -206,7 +212,8 @@ impl AzureBlobSinkConfig {
     pub async fn new_emulator() -> AzureBlobSinkConfig {
         let address = std::env::var("AZURE_ADDRESS").unwrap_or_else(|_| "localhost".into());
         let config = AzureBlobSinkConfig {
-                connection_string: format!("UseDevelopmentStorage=true;DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://{}:10000/devstoreaccount1;QueueEndpoint=http://{}:10001/devstoreaccount1;TableEndpoint=http://{}:10002/devstoreaccount1;", address, address, address),
+                connection_string: Some(format!("UseDevelopmentStorage=true;DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://{}:10000/devstoreaccount1;QueueEndpoint=http://{}:10001/devstoreaccount1;TableEndpoint=http://{}:10002/devstoreaccount1;", address, address, address)),
+                storage_account: None,
                 container_name: "logs".to_string(),
                 blob_prefix: None,
                 blob_time_format: None,
@@ -227,6 +234,7 @@ impl AzureBlobSinkConfig {
         let cx = SinkContext::new_test();
         let client = azure_common::config::build_client(
             self.connection_string.clone(),
+            self.storage_account.clone(),
             self.container_name.clone(),
         )
         .expect("Failed to create client");
@@ -238,6 +246,7 @@ impl AzureBlobSinkConfig {
     pub async fn list_blobs(&self, prefix: &str) -> Vec<String> {
         let client = azure_common::config::build_client(
             self.connection_string.clone(),
+            self.storage_account.clone(),
             self.container_name.clone(),
         )
         .unwrap();
@@ -264,6 +273,7 @@ impl AzureBlobSinkConfig {
     pub async fn get_blob(&self, blob: String) -> (Blob, Vec<String>) {
         let client = azure_common::config::build_client(
             self.connection_string.clone(),
+            self.storage_account.clone(),
             self.container_name.clone(),
         )
         .unwrap();
@@ -294,6 +304,7 @@ impl AzureBlobSinkConfig {
     async fn ensure_container(&self) {
         let client = azure_common::config::build_client(
             self.connection_string.clone(),
+            self.storage_account.clone(),
             self.container_name.clone(),
         )
         .unwrap();
