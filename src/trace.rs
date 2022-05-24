@@ -114,6 +114,14 @@ fn get_early_buffer() -> MutexGuard<'static, Option<Vec<LogEvent>>> {
         .expect("Couldn't acquire lock on internal logs buffer")
 }
 
+/// Determines whether tracing events should be processed (e.g. converted to log
+/// events) to avoid unnecessary performance overhead.
+///
+/// Checks if [`BUFFER`] is set or if a trace sender exists
+fn should_process_tracing_event() -> bool {
+    BUFFER.get().is_some() || maybe_get_trace_sender().is_some()
+}
+
 /// Attempts to buffer an event into the early buffer.
 fn try_buffer_event(log: &LogEvent) -> bool {
     if SHOULD_BUFFER.load(Ordering::Acquire) {
@@ -274,21 +282,23 @@ where
     S: Subscriber + 'static + for<'lookup> LookupSpan<'lookup>,
 {
     fn on_event(&self, event: &Event<'_>, ctx: Context<'_, S>) {
-        let mut log = LogEvent::from(event);
-        // Add span fields if available
-        if let Some(parent_span) = ctx.event_span(event) {
-            for span in parent_span.scope().from_root() {
-                if let Some(fields) = span.extensions().get::<SpanFields>() {
-                    for (k, v) in &fields.0 {
-                        log.insert(format!("vector.{}", k).as_str(), v.clone());
+        if should_process_tracing_event() {
+            let mut log = LogEvent::from(event);
+            // Add span fields if available
+            if let Some(parent_span) = ctx.event_span(event) {
+                for span in parent_span.scope().from_root() {
+                    if let Some(fields) = span.extensions().get::<SpanFields>() {
+                        for (k, v) in &fields.0 {
+                            log.insert(format!("vector.{}", k).as_str(), v.clone());
+                        }
                     }
                 }
             }
-        }
-        // Try buffering the event, and if we're not buffering anymore, try to
-        // send it along via the trace sender if it's been established.
-        if !try_buffer_event(&log) {
-            try_broadcast_event(log);
+            // Try buffering the event, and if we're not buffering anymore, try to
+            // send it along via the trace sender if it's been established.
+            if !try_buffer_event(&log) {
+                try_broadcast_event(log);
+            }
         }
     }
 
