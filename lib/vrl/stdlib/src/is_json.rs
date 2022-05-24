@@ -6,7 +6,7 @@ fn is_json(bytes: &Bytes) -> bool {
 }
 
 fn is_json_with_variant(bytes: &Bytes, variant: &Bytes) -> bool {
-    match serde_json::from_slice::<'_, serde::de::IgnoredAny>(&bytes) {
+    match serde_json::from_slice::<'_, serde::de::IgnoredAny>(bytes) {
         Err(_) => false,
         Ok(_) => {
             for c in bytes {
