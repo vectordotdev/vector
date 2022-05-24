@@ -280,7 +280,7 @@ where
             for span in parent_span.scope().from_root() {
                 if let Some(fields) = span.extensions().get::<SpanFields>() {
                     for (k, v) in &fields.0 {
-                        log.insert(format!("metadata.{}", k).as_str(), v.clone());
+                        log.insert(format!("vector.{}", k).as_str(), v.clone());
                     }
                 }
             }

@@ -190,22 +190,22 @@ mod tests {
             assert_eq!(log["metadata.level"], "ERROR".into());
             // The first log event occurs outside our custom span
             if i == 0 {
-                assert!(log.get("metadata.component_id").is_none());
-                assert!(log.get("metadata.component_kind").is_none());
-                assert!(log.get("metadata.component_type").is_none());
+                assert!(log.get("vector.component_id").is_none());
+                assert!(log.get("vector.component_kind").is_none());
+                assert!(log.get("vector.component_type").is_none());
             } else if i < 3 {
-                assert_eq!(log["metadata.component_id"], "foo".into());
-                assert_eq!(log["metadata.component_kind"], "source".into());
-                assert_eq!(log["metadata.component_type"], "internal_logs".into());
+                assert_eq!(log["vector.component_id"], "foo".into());
+                assert_eq!(log["vector.component_kind"], "source".into());
+                assert_eq!(log["vector.component_type"], "internal_logs".into());
             } else {
                 // The last event occurs in a nested span. Here, we expect
                 // parent fields to be preservered (unless overwritten), new
                 // fields to be added, and filtered fields to not exist.
-                assert_eq!(log["metadata.component_id"], "foo".into());
-                assert_eq!(log["metadata.component_kind"], "bar".into());
-                assert_eq!(log["metadata.component_type"], "internal_logs".into());
-                assert_eq!(log["metadata.component_new_field"], "baz".into());
-                assert!(log.get("metadata.ignored_field").is_none());
+                assert_eq!(log["vector.component_id"], "foo".into());
+                assert_eq!(log["vector.component_kind"], "bar".into());
+                assert_eq!(log["vector.component_type"], "internal_logs".into());
+                assert_eq!(log["vector.component_new_field"], "baz".into());
+                assert!(log.get("vector.ignored_field").is_none());
             }
         }
     }
