@@ -321,6 +321,12 @@ struct SpanFields(HashMap<&'static str, Value>);
 impl SpanFields {
     fn record(&mut self, field: &tracing_core::Field, value: impl Into<Value>) {
         let name = field.name();
+        // Filter for span fields such as component_id, component_type, etc.
+        //
+        // This captures all the basic component information provided in the
+        // span that each component is spawned with. We don't capture all fields
+        // to avoid adding unintentional noise and to prevent accidental
+        // security/privacy issues (e.g. leaking sensitive data).
         if name.starts_with("component_") {
             self.0.insert(name, value.into());
         }

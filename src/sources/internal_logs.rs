@@ -121,9 +121,11 @@ mod tests {
 
     #[tokio::test]
     async fn receives_logs() {
-        // This test is somewhat overloaded with cases to avoid panics when
-        // calling `consume_early_buffer` within the `start_source` helper
-        // multiple times across separate test cases.
+        // This test is fairly overloaded with different cases.
+        //
+        // Unfortunately, this can't be easily split out into separate test
+        // cases because `consume_early_buffer` (called within the
+        // `start_source` helper) panics when called more than once.
         let test_id: u8 = rand::random();
         let start = chrono::Utc::now();
         trace::init(false, false, "debug");
