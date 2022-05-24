@@ -14,8 +14,9 @@ interpreted as described in [RFC 2119].
   - [Metric naming](#metric-naming)
 - [Emission](#emission)
   - [Batching](#batching)
-  - [Errors](#errors)
   - [Events](#events)
+    - [Error](#error)
+    - [EventsDropped](#eventsdropped)
 
 <!-- /MarkdownTOC -->
 
@@ -64,22 +65,6 @@ instrumentation SHOULD be batched whenever possible:
 * Vector process batches of events ([RFC 9480]) and telemtry SHOULD emit for
   the entire batch, not each individual event.
 
-### Errors
-
-As described in the [events](#events) section, all errors must emit as events
-to drive log and metric emission. Errors that are transient and recoverable
-MUST meet different requirements:
-
-* An error MUST be marked as recoverable if the operation that produced it can
-  be retried and recovered. For example, a failed HTTP request can be retired
-  and recovered.
-  * MUST log a message at the `warning` level
-  * MUST NOT increment any error-related metrics
-* An error MUST NOT be marked as recoverable if the operation that produced can
-  not be retried. For example, a failed HTTP request that will *not* be retried.
-  * MUST log a message at the `error` level
-  * MUST increment error-related metrics to alert the user
-
 ### Events
 
 Instrumentation SHOULD be event-driven ([RFC 2064]), where individual events
@@ -89,7 +74,74 @@ catalogue. On rare occassions, metrics and logs can emit directly but MUST be
 reserved for ocassions where it is impossible to emit Vector's events. For
 example, emitting metrics in a library that cannot import Vector's events.
 
+#### Error
+
+An `<Name>Error` event MUST be emitted when an error occurs. Errors that are
+retriable and possible recoverable MUST be distinguished from errors that are
+not:
+
+* Properties
+  * `retriable` - If the operation that produced the error is retriable. This
+    indicates that the error operation might recover and determines if this
+    error should be a warning or an error when emitting logs and metrics. For
+    example, a failed HTTP request that will be retried.
+  * `error_code` - An error code for the failure, if applicable.
+    * SHOULD only be specified if it adds additional information beyond
+      `error_type`.
+    * The values for `error_code` for a given error event MUST be a bounded set
+      with relatively low cardinality because it will be used as a metric tag.
+      Examples would be syscall error code. Examples of values that should not
+      be used are raw error messages from `serde` as these are highly variable
+      depending on the input. Instead, these errors should be converted to an
+      error code like `invalid_json`.
+  * `error_type` - The type of error condition. MUST be one of the types listed
+    in the `error_type` enum list in the cue docs.
+  * `stage` - The stage at which the error occurred. MUST be one of `receiving`,
+    `processing`, or `sending`.
+  * If any of the above properties are implicit to the specific error
+    type, they MAY be omitted from being represented explicitly in the
+    event fields. However, they MUST still be included in the emitted
+    logs and metrics, as specified below, as if they were present.
+* Metrics
+  * MUST include the defined properties as tags.
+  * If `retriable` is `true`, MUST increment `<namespace>_warnings_total` metric.
+  * If `retriable` is `false`, MUST increment `<namespace>_errors_total` metric.
+* Logs
+  * MUST log a descriptive, user friendly error message that sufficiently
+    describes the error.
+  * MUST include the defined properties as key-value pairs, except `message`.
+  * If `retriable` is `true`, MUST log a message at the `warning` level.
+  * If `retriable` is `false`, MUST log a message at the `error` level.
+  * SHOULD be rate limited to 10 seconds.
+* Events
+  * MUST emit an [`EventsDropped`] event if the error results in dropping events,
+    or the error itself MUST meeting the `EventsDropped` requirements.
+
+#### EventsDropped
+
+An `<Namespace>EventsDropped` event must be emitted when events are dropped.
+If events are dropped due to an error, then the error event should drive the
+emission of this event, meeting the following requirements:
+
+* Properties
+  * MUST include the `intentional` property to distinguish if the events were
+    dropped intentionally. For example, events dropped in the `filter` transform
+    are intentionally dropped, while events dropped due to an error in the `remap`
+    transform are unintentionally dropped.
+* Metrics
+  * MUST increment the `<namespace>_discarded_events_total` counter by the
+    number of events discarded.
+  * MUST NOT increment this metric if retrying the operation will preserve the
+    event, such as retrying delivery in sinks.
+  * MUST include the `intentional` property as a tag.
+* Logs
+  * MUST log a `<count> events [un]intentionally dropped.` message.
+  * If `intentional` is `true`, MUST log at the `debug` level.
+  * If `intentional` is `false`, MUST log at the `error` level.
+
+
 [camelcase]: https://en.wikipedia.org/wiki/Camel_case
+[`EventsDropped`]: #EventsDropped
 [Prometheus metric naming standards]: https://prometheus.io/docs/practices/naming/
 [Pull request #8383]: https://github.com/vectordotdev/vector/pull/8383/
 [RFC 2064]: https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md

@@ -83,8 +83,7 @@ representing multiple endpoints.
 
 ## Instrumentation
 
-**This section extends the [Instrumentation Specification] and should be read
-first.**
+**Extends the [Instrumentation Specification].**
 
 Vector components MUST be instrumented for optimal observability and monitoring.
 
@@ -205,68 +204,20 @@ sending it, like the `prometheus_exporter` sink, SHOULD NOT publish this metric.
 
 #### ComponentError
 
-*All components* MUST emit error events in accordance with the
-[Instrumentation Specification].
+**Extends the [Error event].**
+
+*All components* MUST emit error events in accordance with the [Error event]
+requirements.
 
 This specification does not list a standard set of errors that components must
 implement since errors are specific to the component.
 
-* Properties
-  * `message` - A human readable error message.
-  * `recoverable` - If the error is recoverable or not. This dictates the log
-    level and which metrics get incremented.
-  * `error_code` - An error code for the failure, if applicable.
-    * SHOULD only be specified if it adds additional information beyond
-      `error_type`.
-    * The values for `error_code` for a given error event MUST be a bounded set
-      with relatively low cardinality because it will be used as a metric tag.
-      Examples would be syscall error code. Examples of values that should not
-      be used are raw error messages from `serde` as these are highly variable
-      depending on the input. Instead, these errors should be converted to an
-      error code like `invalid_json`.
-  * `error_type` - The type of error condition. MUST be one of the types listed
-    in the `error_type` enum list in the cue docs.
-  * `stage` - The stage at which the error occurred. MUST be one of `receiving`,
-    `processing`, or `sending`.
-  * If any of the above properties are implicit to the specific error
-    type, they MAY be omitted from being represented explicitly in the
-    event fields. However, they MUST still be included in the emitted
-    logs and metrics, as specified below, as if they were present.
-* Metrics
-  * If `recoverable` is `false`, MUST increment the `component_errors_total`
-    counter by 1.
-  * MUST increment the `component_discarded_events_total` counter by the number
-    of Vector events discarded if the error resulted in discarding (dropping)
-    acknowledged events.
-    * For sources, only increment this metric if incoming events were consumed
-      (and acknowledged if applicable) and discarded. The metric MUST not
-      include events that will be re-ingested.
-    * For sinks, this means only incrementing this metric if the error resulted
-      in the sink dropping the events, and thus acknowledging them. Retried
-      events MUST not be included in the metric.
-  * MUST include the defined properties as tags, except for `message` and
-    `recoverable`.
-* Logs
-  * If `recoverable` is `false`, MUST log a message at the `error` level.
-    Otherwise, if `recoverable` is `true`, MUST log a message at the `warn`
-    level.
-  * MUST include the defined properties as key-value pairs.
-  * SHOULD be rate limited to 10 seconds.
-
 #### ComponentEventsDropped
 
-*All components* that can drop events, **unrelated to an error**, MUST emit a
-`ComponentEventsDropped` event. Otherwise, if an event is dropped due to an
-error, then the error event itself MUST emit the appropriate logs and metrics
-as described in the [ComponentError](#ComponentError) section.
+**Extends the [EventsDropped event].**
 
-* Metrics
-  * MUST increment the `component_discarded_events_total` counter by the number
-    of Vector events discarded.
-* Logs
-  * MUST log a `Bytes sent.` message at the `trace` level with the
-    defined properties as key-value pairs.
-  * MUST NOT be rate limited.
+*All components* that can drop events MUST emit a `ComponentEventsDropped`
+event in accordance with the [EventsDropped event] requirements.
 
 ## Health checks
 
@@ -283,6 +234,8 @@ AWS's status.
 See the [development documentation][health checks] for more context guidance.
 
 [Configuration Specification]: configuration.md
+[Error event]: instrumentation.md#Error
+[EventsDropped event]: instrumentation.md#EventsDropped
 [high user experience expectations]: https://github.com/vectordotdev/vector/blob/master/docs/USER_EXPERIENCE_DESIGN.md
 [health checks]: ../DEVELOPING.md#sink-healthchecks
 [Instrumentation Specification]: instrumentation.md
