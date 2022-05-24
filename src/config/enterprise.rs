@@ -351,6 +351,32 @@ where
     }
 }
 
+/// Report a configuration in a reloading context.
+///
+/// Returns an [`EnterpriseReporter`] if one was not provided.
+pub(crate) fn report_on_reload(
+    config: &mut Config,
+    metadata: EnterpriseMetadata,
+    config_paths: Vec<ConfigPath>,
+    enterprise: Option<&EnterpriseReporter<BoxFuture<'static, ()>>>,
+) -> Option<EnterpriseReporter<BoxFuture<'static, ()>>> {
+    attach_enterprise_components(config, &metadata);
+
+    let enterprise = match enterprise {
+        Some(enterprise) => {
+            enterprise.send(report_configuration(config_paths, metadata));
+            None
+        }
+        None => {
+            let enterprise = EnterpriseReporter::new();
+            enterprise.send(report_configuration(config_paths, metadata));
+            Some(enterprise)
+        }
+    };
+
+    enterprise
+}
+
 pub(crate) fn attach_enterprise_components(config: &mut Config, metadata: &EnterpriseMetadata) {
     let api_key = metadata.api_key.clone();
     let config_version = metadata.config_version.clone();

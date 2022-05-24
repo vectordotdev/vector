@@ -23,7 +23,7 @@ use crate::service;
 use crate::{api, internal_events::ApiStarted};
 use crate::{
     cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand},
-    config::{self},
+    config::{self, enterprise::report_on_reload},
     generate, graph, heartbeat, list,
     signal::{self, SignalTo},
     topology::{self, RunningTopology},
@@ -303,17 +303,8 @@ impl Application {
                                         // Augment config to enable observability within Datadog, if applicable.
                                         match EnterpriseMetadata::try_from(&new_config) {
                                             Ok(metadata) => {
-                                                match enterprise.as_ref() {
-                                                    Some(enterprise) => {
-                                                        attach_enterprise_components(&mut new_config, &metadata);
-                                                        enterprise.send(report_configuration(config_paths.clone(), metadata));
-                                                    }
-                                                    None => {
-                                                        let e = EnterpriseReporter::new();
-                                                        attach_enterprise_components(&mut new_config, &metadata);
-                                                        e.send(report_configuration(config_paths.clone(), metadata));
-                                                        enterprise = Some(e);
-                                                    }
+                                                if let Some(e) = report_on_reload(&mut new_config, metadata, config_paths.clone(), enterprise.as_ref()) {
+                                                    enterprise = Some(e);
                                                 }
                                             },
                                             Err(err) => {
@@ -367,17 +358,8 @@ impl Application {
                                     #[cfg(feature = "enterprise")]
                                     match EnterpriseMetadata::try_from(&new_config) {
                                         Ok(metadata) => {
-                                            match enterprise.as_ref() {
-                                                Some(enterprise) => {
-                                                    attach_enterprise_components(&mut new_config, &metadata);
-                                                    enterprise.send(report_configuration(config_paths.clone(), metadata));
-                                                }
-                                                None => {
-                                                    let e = EnterpriseReporter::new();
-                                                    attach_enterprise_components(&mut new_config, &metadata);
-                                                    e.send(report_configuration(config_paths.clone(), metadata));
-                                                    enterprise = Some(e);
-                                                }
+                                            if let Some(e) = report_on_reload(&mut new_config, metadata, config_paths.clone(), enterprise.as_ref()) {
+                                                enterprise = Some(e);
                                             }
                                         },
                                         Err(err) => {
