@@ -131,7 +131,7 @@ and filtering bytes from the upstream source and before the creation of a Vector
 
 #### ComponentEventsReceived
 
-*All components* MUST emit an `EventsReceived` event immediately after creating
+*All components* MUST emit an `ComponentEventsReceived` event immediately after creating
 or receiving one or more Vector events.
 
 * Properties
