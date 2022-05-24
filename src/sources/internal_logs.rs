@@ -150,7 +150,8 @@ mod tests {
                 "nested span",
                 component_kind = "bar",
                 component_new_field = "baz",
-                ignored_field = "foobarbaz"
+                component_numerical_field = 1,
+                ignored_field = "foobarbaz",
             );
             let _enter = nested_span.enter();
             error!(message = "In a nested span.", %test_id);
@@ -205,6 +206,7 @@ mod tests {
                 assert_eq!(log["vector.component_kind"], "bar".into());
                 assert_eq!(log["vector.component_type"], "internal_logs".into());
                 assert_eq!(log["vector.component_new_field"], "baz".into());
+                assert_eq!(log["vector.component_numerical_field"], 1.into());
                 assert!(log.get("vector.ignored_field").is_none());
             }
         }

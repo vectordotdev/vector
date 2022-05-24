@@ -308,39 +308,33 @@ where
 #[derive(Default, Debug)]
 struct SpanFields(HashMap<&'static str, Value>);
 
-impl tracing::field::Visit for SpanFields {
-    fn record_i64(&mut self, field: &tracing_core::Field, value: i64) {
+impl SpanFields {
+    fn record(&mut self, field: &tracing_core::Field, value: impl Into<Value>) {
         let name = field.name();
         if name.starts_with("component_") {
             self.0.insert(name, value.into());
         }
+    }
+}
+
+impl tracing::field::Visit for SpanFields {
+    fn record_i64(&mut self, field: &tracing_core::Field, value: i64) {
+        self.record(field, value);
     }
 
     fn record_u64(&mut self, field: &tracing_core::Field, value: u64) {
-        let name = field.name();
-        if name.starts_with("component_") {
-            self.0.insert(name, value.into());
-        }
+        self.record(field, value);
     }
 
     fn record_bool(&mut self, field: &tracing_core::Field, value: bool) {
-        let name = field.name();
-        if name.starts_with("component_") {
-            self.0.insert(name, value.into());
-        }
+        self.record(field, value);
     }
 
     fn record_str(&mut self, field: &tracing_core::Field, value: &str) {
-        let name = field.name();
-        if name.starts_with("component_") {
-            self.0.insert(name, value.to_string().into());
-        }
+        self.record(field, value);
     }
 
     fn record_debug(&mut self, field: &tracing_core::Field, value: &dyn std::fmt::Debug) {
-        let name = field.name();
-        if name.starts_with("component_") {
-            self.0.insert(name, format!("{:?}", value).into());
-        }
+        self.record(field, format!("{:?}", value));
     }
 }
