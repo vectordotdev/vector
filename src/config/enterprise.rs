@@ -848,6 +848,29 @@ mod test {
     }
 
     #[tokio::test]
+    async fn retry_on_loss_of_network_connection() {
+        // let server = build_test_server_error_and_recover(StatusCode::INTERNAL_SERVER_ERROR).await;
+
+        let endpoint = "127.0.0.1:8012";
+        let client =
+            HttpClient::new(None, &ProxyConfig::default()).expect("Failed to create http client");
+        let auth = get_pipelines_auth();
+        let fields = get_pipelines_fields();
+        let config = toml::map::Map::new();
+        let payload = PipelinesVersionPayload::new(&config, &fields);
+
+        assert!(report_serialized_config_to_datadog(
+            &client,
+            endpoint.as_ref(),
+            &auth,
+            &payload,
+            default_max_retries()
+        )
+        .await
+        .is_ok());
+    }
+
+    #[tokio::test]
     async fn error_exceed_max_retries() {
         let server = build_test_server_error_and_recover(StatusCode::INTERNAL_SERVER_ERROR).await;
 
