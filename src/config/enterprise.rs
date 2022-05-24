@@ -360,7 +360,7 @@ fn setup_logs_reporting(
     config: &mut Config,
     datadog: &Options,
     api_key: String,
-    config_version: String,
+    version_hash: String,
 ) {
     let tag_logs_id = OutputId::from(ComponentKey::from(TAG_LOGS_KEY));
     let internal_logs_id = OutputId::from(ComponentKey::from(INTERNAL_LOGS_KEY));
@@ -375,26 +375,25 @@ fn setup_logs_reporting(
         .as_ref()
         .map_or("".to_string(), |tags| convert_tags_to_vrl(tags, false));
 
+    let configuration_key = &datadog.configuration_key;
+    let vector_version = crate::vector_version();
+    let build_arch = built_info::TARGET_ARCH;
+    let build_os = built_info::TARGET_OS;
+    let build_vendor = built_info::TARGET_VENDOR;
     let tag_logs = RemapConfig {
         source: Some(format!(
             r#"
             .ddsource = "vector"
             .vector = {{
-                "configuration_key" = "{}",
-                "version_hash" = "{}"
-                "version": "{}",
-                "arch": "{}",
-                "os": "{}",
-                "vendor": "{}",
+                "configuration_key" = "{configuration_key}",
+                "version_hash" = "{version_hash}"
+                "version": "{vector_version}",
+                "arch": "{build_arch}",
+                "os": "{build_os}",
+                "vendor": "{build_vendor}",
             }}
             {}
         "#,
-            &config_version,
-            &datadog.configuration_key,
-            crate::vector_version(),
-            built_info::TARGET_ARCH,
-            built_info::TARGET_OS,
-            built_info::TARGET_VENDOR,
             custom_logs_tags_vrl,
         )),
         ..Default::default()
@@ -429,7 +428,7 @@ fn setup_metrics_reporting(
     config: &mut Config,
     datadog: &Options,
     api_key: String,
-    config_version: String,
+    version_hash: String,
 ) {
     let host_metrics_id = OutputId::from(ComponentKey::from(HOST_METRICS_KEY));
     let tag_metrics_id = OutputId::from(ComponentKey::from(TAG_METRICS_KEY));
@@ -455,17 +454,16 @@ fn setup_metrics_reporting(
         .as_ref()
         .map_or("".to_string(), |tags| convert_tags_to_vrl(tags, true));
 
+    let configuration_key = &datadog.configuration_key;
+    let vector_version = crate::vector_version();
     let tag_metrics = RemapConfig {
         source: Some(format!(
             r#"
-            .tags.version_hash = "{}"
-            .tags.configuration_key = "{}"
-            .tags.vector_version = "{}"
+            .tags.version_hash = "{version_hash}"
+            .tags.configuration_key = "{configuration_key}"
+            .tags.vector_version = "{vector_version}"
             {}
         "#,
-            &config_version,
-            &datadog.configuration_key,
-            crate::vector_version(),
             custom_metric_tags_vrl
         )),
         ..Default::default()
