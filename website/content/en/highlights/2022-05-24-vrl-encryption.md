@@ -37,7 +37,7 @@ An example with input:
 key = decode_base64!(get_env_var!("KEY")); // with $KEY set to "c2VjcmV0X19faHVudGVyMg==" in this example
 
 // we store the iv on the event to use as-needed for decryption
-.iv = "1234567890123456"; // typically you would call random_bytes(<num bytes expected by algorithm)
+.iv = "1234567890123456"; // typically you would call random_bytes(<num bytes expected by algorithm>)
 
 encrypted_message = encrypt!(plaintext, "AES-128-CBC-PKCS7", key, iv: iv);
 
