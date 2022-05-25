@@ -5,6 +5,7 @@ pub mod builder;
 pub mod compressor;
 pub mod encoding;
 pub mod http;
+pub mod metadata;
 pub mod normalizer;
 pub mod partitioner;
 pub mod processed_event;

@@ -48,10 +48,8 @@ services:
       - "shutdown-tests"
       - "--test"
       - "shutdown"
-      - "--"
       - "--test-threads"
       - "4"
-      - "--nocapture"
     depends_on:
       - kafka
     environment:

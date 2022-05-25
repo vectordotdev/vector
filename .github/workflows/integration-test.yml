@@ -76,12 +76,14 @@ jobs:
           - test: 'kafka'
           - test: 'logstash'
           - test: 'loki'
-          - test: 'mongo'
+          - test: 'mongodb'
+          - test: 'nats'
           - test: 'nginx'
           - test: 'postgres'
           - test: 'prometheus'
           - test: 'pulsar'
           - test: 'redis'
+          - test: 'shutdown'
           - test: 'splunk'
             env:
               SPLUNK_VERSION: 7.3.9
