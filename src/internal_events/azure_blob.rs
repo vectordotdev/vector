@@ -1,5 +1,4 @@
 use metrics::counter;
-use uuid::Uuid;
 use vector_core::internal_event::InternalEvent;
 
 use super::prelude::{error_stage, error_type};
@@ -57,18 +56,5 @@ impl InternalEvent for AzureBlobHttpError {
         );
         // deprecated
         counter!("http_request_errors_total", 1);
-    }
-}
-
-pub struct AzureBlobEventsSent {
-    pub request_id: Uuid,
-    pub byte_size: usize,
-}
-
-impl InternalEvent for AzureBlobEventsSent {
-    fn emit(self) {
-        trace!(message = "Events sent.", request_id = %self.request_id, count = 1, byte_size = %self.byte_size);
-        counter!("component_sent_events_total", 1);
-        counter!("component_sent_event_bytes_total", self.byte_size as u64);
     }
 }

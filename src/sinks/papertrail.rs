@@ -187,13 +187,36 @@ mod tests {
 
     use bytes::BytesMut;
     use codecs::JsonSerializer;
+    use futures::{future::ready, stream};
     use tokio_util::codec::Encoder as _;
+
+    use crate::test_util::{
+        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        http::{always_200_response, spawn_blackhole_http_server},
+    };
 
     use super::*;
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<PapertrailConfig>();
+    }
+
+    #[tokio::test]
+    async fn component_spec_compliance() {
+        let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
+
+        let config = PapertrailConfig::generate_config().to_string();
+        let mut config =
+            toml::from_str::<PapertrailConfig>(&config).expect("config should be valid");
+        config.endpoint = mock_endpoint.into();
+        config.tls = Some(TlsEnableableConfig::default());
+
+        let context = SinkContext::new_test();
+        let (sink, _healthcheck) = config.build(context).await.unwrap();
+
+        let event = Event::from("simple message");
+        run_and_assert_sink_compliance(sink, stream::once(ready(event)), &SINK_TAGS).await;
     }
 
     #[test]

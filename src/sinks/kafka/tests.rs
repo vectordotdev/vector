@@ -37,7 +37,10 @@ mod integration_test {
             },
             VectorSink,
         },
-        test_util::{components, random_lines_with_stream, random_string, wait_for},
+        test_util::{
+            components::{run_and_assert_sink_compliance, SINK_TAGS},
+            random_lines_with_stream, random_string, wait_for,
+        },
         tls::TlsConfig,
     };
 
@@ -291,9 +294,7 @@ mod integration_test {
             });
             events
         });
-        components::init_test();
-        sink.run(input_events).await.unwrap();
-        components::SINK_TESTS.assert(&["protocol"]);
+        run_and_assert_sink_compliance(sink, input_events, &SINK_TAGS).await;
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         // read back everything from the beginning

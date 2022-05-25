@@ -8,10 +8,7 @@ use hyper::service::Service;
 use tracing::Instrument;
 use vector_core::{internal_event::EventsSent, stream::DriverResponse};
 
-use crate::{
-    event::EventStatus, internal_events::AwsBytesSent,
-    sinks::aws_kinesis_firehose::request_builder::KinesisRequest,
-};
+use crate::{event::EventStatus, sinks::aws_kinesis_firehose::request_builder::KinesisRequest};
 
 #[derive(Clone)]
 pub struct KinesisService {
@@ -54,19 +51,8 @@ impl Service<Vec<KinesisRequest>> for KinesisService {
             events = %requests.len(),
         );
 
-        let processed_bytes_total = requests
-            .iter()
-            .map(|req| {
-                req.record
-                    .data
-                    .as_ref()
-                    .map(|x| x.as_ref().len())
-                    .unwrap_or(0)
-            })
-            .sum();
         let events_byte_size = requests.iter().map(|req| req.event_byte_size).sum();
         let count = requests.len();
-        let region = self.region.clone();
 
         let records = requests.into_iter().map(|req| req.record).collect();
 
@@ -81,11 +67,6 @@ impl Service<Vec<KinesisRequest>> for KinesisService {
                 .send()
                 .instrument(info_span!("request").or_current())
                 .await?;
-
-            emit!(AwsBytesSent {
-                byte_size: processed_bytes_total,
-                region
-            });
 
             Ok(KinesisResponse {
                 events_byte_size,

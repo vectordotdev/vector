@@ -21,7 +21,7 @@ pub use trace::TraceEvent;
 use vector_buffers::EventCount;
 use vector_common::EventDataEq;
 #[cfg(feature = "vrl")]
-pub use vrl_target::{TargetEvents, VrlImmutableTarget, VrlTarget};
+pub use vrl_target::{TargetEvents, VrlTarget};
 
 use crate::ByteSizeOf;
 
@@ -65,7 +65,23 @@ impl ByteSizeOf for Event {
     }
 }
 
+impl ByteSizeOf for &Event {
+    fn allocated_bytes(&self) -> usize {
+        match self {
+            Event::Log(log_event) => log_event.allocated_bytes(),
+            Event::Metric(metric_event) => metric_event.allocated_bytes(),
+            Event::Trace(trace_event) => trace_event.allocated_bytes(),
+        }
+    }
+}
+
 impl EventCount for Event {
+    fn event_count(&self) -> usize {
+        1
+    }
+}
+
+impl EventCount for &Event {
     fn event_count(&self) -> usize {
         1
     }

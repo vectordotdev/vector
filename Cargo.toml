@@ -50,6 +50,8 @@ extended-description-file = "target/debian-extended-description.txt"
 
 [package.metadata.deb.systemd-units]
 unit-scripts = "distribution/systemd/"
+enable = false
+start = false
 
 # libc requirements are defined by `cross`
 # https://github.com/rust-embedded/cross#supported-targets
@@ -133,7 +135,7 @@ tokio = { version = "1.18.2", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1.8", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io", "time"] }
-console-subscriber = { version = "0.1.5", default-features = false, optional = true }
+console-subscriber = { version = "0.1.6", default-features = false, optional = true }
 
 # Tracing
 tracing = { version = "0.1.34", default-features = false }
@@ -159,13 +161,15 @@ aws-sdk-kinesis = { version = "0.12.0", default-features = false, features = ["r
 aws-sigv4 = { version = "0.12.0", default-features = false, optional = true }
 aws-smithy-async = { version = "0.42.0", default-features = false, optional = true }
 aws-smithy-client = { version = "0.42.0", default-features = false, features = ["client-hyper"], optional = true}
-aws-smithy-http = { version = "0.42.0", default-features = false, optional = true }
+aws-smithy-http = { version = "0.42.0", default-features = false, features = ["event-stream"], optional = true }
+aws-smithy-http-tower = { version = "0.42.0", default-features = false, optional = true }
 aws-smithy-types = { version = "0.42.0", default-features = false, optional = true }
 
 # Azure
-azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "a0ef5e57f9b1d7d3c768d27dd761569db6e1c934", default-features = false, features = ["enable_reqwest"], optional = true }
-azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "a0ef5e57f9b1d7d3c768d27dd761569db6e1c934", default-features = false, optional = true }
-azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "a0ef5e57f9b1d7d3c768d27dd761569db6e1c934", default-features = false, optional = true }
+azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "df7d7faecd4c8ae00284eaaa55bf4269eaf21a2a", default-features = false, features = ["enable_reqwest"], optional = true }
+azure_identity = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "df7d7faecd4c8ae00284eaaa55bf4269eaf21a2a", default-features = false, features = ["enable_reqwest"], optional = true }
+azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "df7d7faecd4c8ae00284eaaa55bf4269eaf21a2a", default-features = false, optional = true }
+azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "df7d7faecd4c8ae00284eaaa55bf4269eaf21a2a", default-features = false, optional = true }
 
 # Tower
 tower = { version = "0.4.12", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util"] }
@@ -183,13 +187,13 @@ rmp-serde = { version = "1.1.0", default-features = false, optional = true }
 rmpv = { version = "1.0.0", default-features = false, features = ["with-serde"], optional = true }
 
 # Prost
-prost = { version = "0.10.3", default-features = false, features = ["std"] }
+prost = { version = "0.10.4", default-features = false, features = ["std"] }
 prost-types = { version = "0.10.1", default-features = false, optional = true }
 
 # GCP
-goauth = { version = "0.12.0", default-features = false, optional = true }
+goauth = { version = "0.13.0", default-features = false, optional = true }
 gouth = { version = "0.2.1", default-features = false, optional = true }
-smpl_jwt = { version = "0.7.0", default-features = false, optional = true }
+smpl_jwt = { version = "0.7.1", default-features = false, optional = true }
 
 # API
 async-graphql = { version = "3.0.38", default-features = false, optional = true, features = ["chrono"] }
@@ -256,12 +260,12 @@ lru = { version = "0.7.5", default-features = false, optional = true }
 maxminddb = { version = "0.23.0", default-features = false, optional = true }
 md-5 = { version = "0.10", default-features = false, optional = true }
 mongodb = { version = "2.2.1", default-features = false, features = ["tokio-runtime"], optional = true }
-nats = { version = "0.20.0", default-features = false, optional = true }
+nats = { version = "0.20.1", default-features = false, optional = true }
 nkeys = { version = "0.2.0", default-features = false, optional = true }
 nom = { version = "7.1.1", default-features = false, optional = true }
 notify = { version = "4.0.17", default-features = false }
 num_cpus = { version = "1.13.1", default-features = false }
-once_cell = { version = "1.11", default-features = false }
+once_cell = { version = "1.12", default-features = false }
 openssl = { version = "0.10.40", default-features = false, features = ["vendored"] }
 openssl-probe = { version = "0.1.5", default-features = false }
 ordered-float = { version = "3.0.0", default-features = false }
@@ -273,7 +277,7 @@ rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.3", default-features = false }
 rdkafka = { version = "0.27.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
 redis = { version = "0.21.5", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
-regex = { version = "1.5.5", default-features = false, features = ["std", "perf"] }
+regex = { version = "1.5.6", default-features = false, features = ["std", "perf"] }
 roaring = { version = "0.9.0", default-features = false, optional = true }
 seahash = { version = "4.1.0", default-features = false, optional = true }
 semver = { version = "1.0.9", default-features = false, features = ["serde", "std"], optional = true }
@@ -286,7 +290,7 @@ strip-ansi-escapes = { version = "0.1.1", default-features = false }
 strum = { version = "0.24", default-features = false }
 strum_macros = { version = "0.24", default-features = false }
 syslog = { version = "6.0.1", default-features = false, optional = true }
-tikv-jemallocator = { version = "0.4.3", default-features = false, optional = true }
+tikv-jemallocator = { version = "0.5.0", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.6", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 tokio-tungstenite = {version = "0.17.1", default-features = false, features = ["connect"], optional = true}
 toml = { version = "0.5.9", default-features = false }
@@ -316,15 +320,16 @@ atty = { version = "0.2.14", default-features = false }
 nix = { version = "0.24.1", default-features = false, features = ["socket", "signal"] }
 
 [build-dependencies]
-prost-build = { version = "0.10.3", default-features = false, optional = true }
+prost-build = { version = "0.10.4", default-features = false, optional = true }
 tonic-build = { version = "0.7", default-features = false, features = ["transport", "prost", "compression"], optional = true }
 
 [dev-dependencies]
 approx = "0.5.1"
 assert_cmd = { version = "2.0.4", default-features = false }
-azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "a0ef5e57f9b1d7d3c768d27dd761569db6e1c934", default-features = false, features = ["enable_reqwest", "azurite_workaround"] }
-azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "a0ef5e57f9b1d7d3c768d27dd761569db6e1c934", default-features = false, features = ["azurite_workaround"] }
-azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "a0ef5e57f9b1d7d3c768d27dd761569db6e1c934", default-features = false, features = ["azurite_workaround"] }
+azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "df7d7faecd4c8ae00284eaaa55bf4269eaf21a2a", default-features = false, features = ["enable_reqwest", "azurite_workaround"] }
+azure_identity = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "df7d7faecd4c8ae00284eaaa55bf4269eaf21a2a", default-features = false, features = ["enable_reqwest"] }
+azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "df7d7faecd4c8ae00284eaaa55bf4269eaf21a2a", default-features = false, features = ["azurite_workaround"] }
+azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "df7d7faecd4c8ae00284eaaa55bf4269eaf21a2a", default-features = false, features = ["azurite_workaround"] }
 base64 = "0.13.0"
 criterion = { version = "0.3.5", features = ["html_reports", "async_tokio"] }
 libc = "0.2.126"
@@ -413,6 +418,7 @@ aws-core = [
   "aws-smithy-async",
   "aws-smithy-client",
   "aws-smithy-http",
+  "aws-smithy-http-tower",
   "aws-smithy-types"
 ]
 
@@ -655,7 +661,7 @@ sinks-aws_kinesis_firehose = ["aws-core", "aws-sdk-firehose"]
 sinks-aws_kinesis_streams = ["aws-core", "aws-sdk-kinesis"]
 sinks-aws_s3 = ["base64", "md-5", "aws-core", "aws-sdk-s3"]
 sinks-aws_sqs = ["aws-core", "aws-sdk-sqs"]
-sinks-azure_blob = ["azure_core", "azure_storage", "azure_storage_blobs"]
+sinks-azure_blob = ["azure_core", "azure_identity", "azure_storage", "azure_storage_blobs"]
 sinks-azure_monitor_logs = []
 sinks-blackhole = []
 sinks-clickhouse = []
@@ -809,6 +815,7 @@ vector-unit-test-tests = [
   "sinks-console"
 ]
 enterprise-tests = [
+  "enterprise",
   "sources-demo_logs",
   "sinks-blackhole",
 ]

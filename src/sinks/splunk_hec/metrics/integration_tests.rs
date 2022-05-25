@@ -1,6 +1,6 @@
 use std::{convert::TryFrom, sync::Arc};
 
-use futures_util::stream;
+use futures::{future::ready, stream};
 use serde_json::Value as JsonValue;
 use vector_common::btreemap;
 use vector_core::event::{BatchNotifier, BatchStatus, Event, MetricValue};
@@ -16,7 +16,7 @@ use crate::{
         util::{BatchConfig, Compression, TowerRequestConfig},
     },
     template::Template,
-    test_util::components::{self, HTTP_SINK_TAGS},
+    test_util::components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
 };
 
 const USERNAME: &str = "admin";
@@ -79,7 +79,7 @@ async fn splunk_insert_counter_metric() {
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
     let event = get_counter(Arc::clone(&batch));
     drop(batch);
-    components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
+    run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
     assert!(
@@ -102,7 +102,7 @@ async fn splunk_insert_gauge_metric() {
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
     let event = get_gauge(Arc::clone(&batch));
     drop(batch);
-    components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
+    run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
     assert!(
@@ -128,8 +128,8 @@ async fn splunk_insert_multiple_counter_metrics() {
         events.push(get_counter(Arc::clone(&batch)))
     }
     drop(batch);
-    let events = events.into_iter().map(Into::into);
-    components::run_sink(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
+
+    run_and_assert_sink_compliance(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
     assert!(
@@ -155,8 +155,8 @@ async fn splunk_insert_multiple_gauge_metrics() {
         events.push(get_gauge(Arc::clone(&batch)))
     }
     drop(batch);
-    let events = events.into_iter().map(Into::into);
-    components::run_sink(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
+
+    run_and_assert_sink_compliance(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
     assert!(

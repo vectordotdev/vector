@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};
-use vector_common::internal_event::EventsSent;
+use vector_common::internal_event::BytesSent;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -226,6 +226,7 @@ impl RedisSinkConfig {
         trace!("Get Redis connection success.");
         conn
     }
+
     async fn healthcheck(mut conn: ConnectionManager) -> crate::Result<()> {
         redis::cmd("PING")
             .query_async(&mut conn)
@@ -269,7 +270,7 @@ fn encode_event(
         })
         .ok()?;
 
-    let byte_size = event.size_of();
+    let event_byte_size = event.size_of();
 
     transformer.transform(&mut event);
 
@@ -277,7 +278,7 @@ fn encode_event(
     encoder.encode(event, &mut bytes).ok()?;
     let value = bytes.freeze();
 
-    let event = EncodedEvent::new(RedisKvEntry { key, value }, byte_size);
+    let event = EncodedEvent::new(RedisKvEntry { key, value }, event_byte_size);
     Some(event)
 }
 
@@ -364,10 +365,9 @@ impl Service<Vec<RedisKvEntry>> for RedisSink {
             match &result {
                 Ok(res) => {
                     if res.is_successful() {
-                        emit!(EventsSent {
-                            count,
+                        emit!(BytesSent {
                             byte_size,
-                            output: None
+                            protocol: "tcp",
                         });
                     } else {
                         warn!("Batch sending was not all successful and will be retried.")
@@ -452,11 +452,15 @@ mod tests {
 #[cfg(feature = "redis-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
+    use futures::stream;
     use rand::Rng;
     use redis::AsyncCommands;
 
     use super::*;
-    use crate::test_util::{random_lines_with_stream, random_string, trace_init};
+    use crate::test_util::{
+        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        random_lines_with_stream, random_string, trace_init,
+    };
 
     fn redis_server() -> String {
         std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379/0".to_owned())
@@ -501,7 +505,7 @@ mod integration_tests {
             events.push(e);
         }
 
-        sink.run_events(events.clone()).await.unwrap();
+        run_and_assert_sink_compliance(sink, stream::iter(events.clone()), &SINK_TAGS).await;
 
         let mut conn = cnf.build_client().await.unwrap();
 

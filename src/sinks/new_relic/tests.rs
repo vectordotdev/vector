@@ -1,13 +1,36 @@
 use std::{collections::HashMap, convert::TryFrom, time::SystemTime};
 
 use chrono::{DateTime, Utc};
+use futures::{future::ready, stream};
 
 use super::*;
-use crate::event::{Event, LogEvent, Metric, MetricKind, MetricValue, Value};
+use crate::{
+    config::{GenerateConfig, SinkConfig, SinkContext},
+    event::{Event, LogEvent, Metric, MetricKind, MetricValue, Value},
+    test_util::{
+        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        http::{always_200_response, spawn_blackhole_http_server},
+    },
+};
 
 #[test]
 fn generate_config() {
     crate::test_util::test_generate_config::<NewRelicConfig>();
+}
+
+#[tokio::test]
+async fn component_spec_compliance() {
+    let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
+
+    let config = NewRelicConfig::generate_config().to_string();
+    let mut config = toml::from_str::<NewRelicConfig>(&config).expect("config should be valid");
+    config.override_uri = Some(mock_endpoint);
+
+    let context = SinkContext::new_test();
+    let (sink, _healthcheck) = config.build(context).await.unwrap();
+
+    let event = Event::from("simple message");
+    run_and_assert_sink_compliance(sink, stream::once(ready(event)), &SINK_TAGS).await;
 }
 
 #[test]
