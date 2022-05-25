@@ -53,7 +53,7 @@ Vector broadly follows the [Prometheus metric naming standards]:
   * `name` - is one or more words that describes the measurement (e.g., `memory_rss`, `requests`)
   * `unit` - MUST be a single [base unit] in plural form, if applicable (e.g., `seconds`, `bytes`)
   * Counters MUST end with `total` (e.g., `disk_written_bytes_total`, `http_requests_total`)
-* SHOULD be broad in purpose and use use tags to differentiate characteristics of the measurement (e.g., `host_cpu_seconds_total{cpu="0",mode="idle"}`)
+* SHOULD be broad in purpose and use tags to differentiate characteristics of the measurement (e.g., `host_cpu_seconds_total{cpu="0",mode="idle"}`)
 
 ## Emission
 
