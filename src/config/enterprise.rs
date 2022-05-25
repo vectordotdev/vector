@@ -379,17 +379,17 @@ pub(crate) fn report_on_reload(
 
 pub(crate) fn attach_enterprise_components(config: &mut Config, metadata: &EnterpriseMetadata) {
     let api_key = metadata.api_key.clone();
-    let version_hash = metadata.config_version_hash.clone();
+    let configuration_version_hash = metadata.config_version_hash.clone();
 
     setup_metrics_reporting(
         config,
         &metadata.opts,
         api_key.clone(),
-        version_hash.clone(),
+        configuration_version_hash.clone(),
     );
 
     if metadata.opts.enable_logs_reporting {
-        setup_logs_reporting(config, &metadata.opts, api_key, version_hash);
+        setup_logs_reporting(config, &metadata.opts, api_key, configuration_version_hash);
     }
 }
 
@@ -397,7 +397,7 @@ fn setup_logs_reporting(
     config: &mut Config,
     datadog: &Options,
     api_key: String,
-    version_hash: String,
+    configuration_version_hash: String,
 ) {
     let tag_logs_id = OutputId::from(ComponentKey::from(TAG_LOGS_KEY));
     let internal_logs_id = OutputId::from(ComponentKey::from(INTERNAL_LOGS_KEY));
@@ -423,7 +423,7 @@ fn setup_logs_reporting(
             .ddsource = "vector"
             .vector = {{
                 "configuration_key": "{configuration_key}",
-                "version_hash": "{version_hash}",
+                "configuration_version_hash": "{configuration_version_hash}",
                 "version": "{vector_version}",
                 "arch": "{build_arch}",
                 "os": "{build_os}",
@@ -466,7 +466,7 @@ fn setup_metrics_reporting(
     config: &mut Config,
     datadog: &Options,
     api_key: String,
-    version_hash: String,
+    configuration_version_hash: String,
 ) {
     let host_metrics_id = OutputId::from(ComponentKey::from(HOST_METRICS_KEY));
     let tag_metrics_id = OutputId::from(ComponentKey::from(TAG_METRICS_KEY));
@@ -497,7 +497,7 @@ fn setup_metrics_reporting(
     let tag_metrics = RemapConfig {
         source: Some(format!(
             r#"
-            .tags.version_hash = "{version_hash}"
+            .tags.configuration_version_hash = "{configuration_version_hash}"
             .tags.configuration_key = "{configuration_key}"
             .tags.vector_version = "{vector_version}"
             {}
