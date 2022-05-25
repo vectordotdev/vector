@@ -91,7 +91,7 @@ We hope users will find these new encryption functions useful for dealing with s
 feedback for us, whether it's related to the new disk buffers or anything else, let us know on [Discord] or on
 [Twitter].
 
-[aes]: https://en.wikipedia.org/wiki/Advanced_Encryption_Standard
+[AES]: https://en.wikipedia.org/wiki/Advanced_Encryption_Standard
 [encrypt]: /docs/reference/vrl/functions/#encrypt
 [decrypt]: /docs/reference/vrl/functions/#decrypt
 [random_bytes]: /docs/reference/vrl/functions/#random_bytes
