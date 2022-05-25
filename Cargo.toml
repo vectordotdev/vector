@@ -156,6 +156,7 @@ aws-sigv4 = { version = "0.11.0", default-features = false, optional = true }
 aws-smithy-async = { version = "0.41.0", default-features = false, optional = true }
 aws-smithy-client = { version = "0.41.0", default-features = false, features = ["client-hyper"], optional = true}
 aws-smithy-http = { version = "0.41.0", default-features = false, optional = true }
+aws-smithy-http-tower = { version = "0.41.0", default-features = false, optional = true }
 aws-smithy-types = { version = "0.41.0", default-features = false, optional = true }
 
 # Azure
@@ -409,6 +410,7 @@ aws-core = [
   "aws-smithy-async",
   "aws-smithy-client",
   "aws-smithy-http",
+  "aws-smithy-http-tower",
   "aws-smithy-types"
 ]
 

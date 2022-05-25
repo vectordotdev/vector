@@ -1,19 +1,18 @@
 use std::{
     collections::HashMap,
-    io::prelude::*,
-    net::TcpStream,
     time::{Duration, SystemTime},
 };
 
 use chrono::Utc;
 use indoc::indoc;
+use tokio::{io::AsyncWriteExt, net::TcpStream};
 
 use super::{DatadogAgentConfig, LOGS, METRICS};
 use crate::{
     config::{GenerateConfig, SourceConfig, SourceContext},
     event::{EventStatus, Value},
     schema,
-    test_util::spawn_collect_n,
+    test_util::{spawn_collect_n, wait_for_tcp},
     SourceSender,
 };
 
@@ -26,16 +25,18 @@ fn trace_agent_url() -> String {
         .unwrap_or_else(|_| "http://127.0.0.1:8126/v0.4/traces".to_owned())
 }
 
-fn agent_health_address(port: Option<u16>) -> String {
-    std::env::var("AGENT_HEALTH_ADDRESS")
-        .unwrap_or_else(|_| format!("http://0.0.0.0:{}", port.unwrap_or(8182)))
+fn agent_health_address() -> String {
+    std::env::var("AGENT_HEALTH_ADDRESS").unwrap_or_else(|_| "http://0.0.0.0:8182".to_owned())
+}
+
+fn trace_agent_health_address() -> String {
+    std::env::var("TRACE_AGENT_HEALTH_ADDRESS").unwrap_or_else(|_| "http://0.0.0.0:8183".to_owned())
 }
 
 const AGENT_TIMEOUT: u64 = 60; // timeout in seconds
 
-async fn wait_for_agent(port: Option<u16>) {
+async fn wait_for_healthy(address: String) {
     let start = SystemTime::now();
-    let address = agent_health_address(port);
     while start
         .elapsed()
         .map(|value| value.as_secs() < AGENT_TIMEOUT)
@@ -51,12 +52,21 @@ async fn wait_for_agent(port: Option<u16>) {
         // wait a second before retry...
         tokio::time::sleep(Duration::new(1, 0)).await;
     }
-    panic!("unable to reach the datadog agent, check that it's started");
+    panic!("Unable to reach the Datadog Agent. Check that it's started and that the health endpoint is available at {}.", address);
+}
+
+async fn wait_for_healthy_agent() {
+    wait_for_healthy(agent_health_address()).await
+}
+
+async fn wait_for_healthy_trace_agent() {
+    wait_for_healthy(trace_agent_health_address()).await
 }
 
 #[tokio::test]
 async fn wait_for_message() {
-    wait_for_agent(Some(8182)).await;
+    wait_for_healthy_agent().await;
+
     let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
     let schema_definitions = HashMap::from([
         (Some(LOGS.to_owned()), schema::Definition::empty()),
@@ -69,10 +79,12 @@ async fn wait_for_message() {
     });
     let events = spawn_collect_n(
         async move {
-            let address = agent_address();
-            let mut stream = TcpStream::connect(&address).unwrap();
+            let agent_logs_address = agent_address();
+            wait_for_tcp(agent_logs_address.clone()).await;
+
+            let mut stream = TcpStream::connect(&agent_logs_address).await.unwrap();
             let data = "hello world\nit's vector speaking\n";
-            stream.write_all(data.as_bytes()).unwrap();
+            stream.write_all(data.as_bytes()).await.unwrap();
         },
         recv,
         2,
@@ -89,7 +101,8 @@ async fn wait_for_message() {
 
 #[tokio::test]
 async fn wait_for_traces() {
-    wait_for_agent(Some(8183)).await;
+    wait_for_healthy_trace_agent().await;
+
     let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
     let schema_definitions = HashMap::from([
         (Some(LOGS.to_owned()), schema::Definition::empty()),
@@ -97,10 +110,8 @@ async fn wait_for_traces() {
     ]);
     let context = SourceContext::new_test(sender, Some(schema_definitions));
     tokio::spawn(async move {
-        let config = toml::from_str::<DatadogAgentConfig>(indoc! { r#"
-                address = "0.0.0.0:8081"
-            "#})
-        .unwrap();
+        let config_raw = "address = \"0.0.0.0:8081\"".to_string();
+        let config = toml::from_str::<DatadogAgentConfig>(config_raw.as_str()).unwrap();
         config.build(context).await.unwrap().await.unwrap()
     });
     let events = spawn_collect_n(

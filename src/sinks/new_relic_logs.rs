@@ -190,7 +190,10 @@ mod tests {
         config::SinkConfig,
         event::Event,
         sinks::util::{service::RATE_LIMIT_NUM_DEFAULT, test::build_test_server, Concurrency},
-        test_util::{components, components::HTTP_SINK_TAGS, next_addr},
+        test_util::{
+            components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+            next_addr,
+        },
     };
 
     #[test]
@@ -355,7 +358,7 @@ mod tests {
         let input_lines = (0..100).map(|i| format!("msg {}", i)).collect::<Vec<_>>();
         let events = stream::iter(input_lines.clone()).map(Event::from);
 
-        components::run_sink_events(sink, events, &HTTP_SINK_TAGS).await;
+        run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
         drop(trigger);
 
         let output_lines = rx
