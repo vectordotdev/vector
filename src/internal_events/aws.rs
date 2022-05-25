@@ -12,8 +12,7 @@ impl<'a> InternalEvent for AwsBytesSent<'a> {
         let region = self
             .region
             .as_ref()
-            .map(|r| r.as_ref().to_string())
-            .unwrap_or_default();
+            .map_or(String::new(), |r| r.as_ref().to_string());
         trace!(
             message = "Bytes sent.",
             protocol = "https",

@@ -102,6 +102,15 @@ where
     }
 }
 
+impl<T> ByteSizeOf for &Vec<T>
+where
+    T: ByteSizeOf,
+{
+    fn allocated_bytes(&self) -> usize {
+        self.iter().map(ByteSizeOf::size_of).sum()
+    }
+}
+
 impl<T, const N: usize> ByteSizeOf for [T; N]
 where
     T: ByteSizeOf,

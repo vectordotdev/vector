@@ -15,7 +15,7 @@ use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
     gcp::GcpCredentials,
     http::{get_http_scheme_from_uri, HttpClient, HttpError},
-    sinks::util::metadata::BatchRequestMetadata,
+    sinks::util::metadata::RequestMetadata,
 };
 
 #[derive(Debug, Clone)]
@@ -45,12 +45,12 @@ pub struct GcsRequest {
     pub body: Bytes,
     pub settings: GcsRequestSettings,
     pub finalizers: EventFinalizers,
-    pub metadata: BatchRequestMetadata,
+    pub metadata: RequestMetadata,
 }
 
 impl Ackable for GcsRequest {
     fn ack_size(&self) -> usize {
-        self.metadata.event_count
+        self.metadata.event_count()
     }
 }
 
@@ -76,7 +76,7 @@ pub struct GcsRequestSettings {
 pub struct GcsResponse {
     pub inner: http::Response<Body>,
     pub protocol: &'static str,
-    pub metadata: BatchRequestMetadata,
+    pub metadata: RequestMetadata,
 }
 
 impl DriverResponse for GcsResponse {
@@ -86,15 +86,15 @@ impl DriverResponse for GcsResponse {
 
     fn events_sent(&self) -> EventsSent {
         EventsSent {
-            count: self.metadata.event_count,
-            byte_size: self.metadata.event_byte_size,
+            count: self.metadata.event_count(),
+            byte_size: self.metadata.events_byte_size(),
             output: None,
         }
     }
 
     fn bytes_sent(&self) -> Option<BytesSent> {
         Some(BytesSent {
-            byte_size: self.metadata.encoded_uncompressed_size,
+            byte_size: self.metadata.request_encoded_size(),
             protocol: self.protocol,
         })
     }

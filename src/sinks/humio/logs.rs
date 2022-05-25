@@ -153,7 +153,7 @@ mod integration_tests {
     use super::*;
     use crate::{
         config::{log_schema, SinkConfig, SinkContext},
-        event::Event,
+        event::LogEvent,
         sinks::util::Compression,
         test_util::{
             components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
@@ -179,12 +179,11 @@ mod integration_tests {
 
         let message = random_string(100);
         let host = "192.168.1.1".to_string();
-        let mut event = Event::from(message.clone());
-        let log = event.as_mut_log();
-        log.insert(log_schema().host_key(), host.clone());
+        let mut event = LogEvent::from(message.clone());
+        event.insert(log_schema().host_key(), host.clone());
 
         let ts = Utc.timestamp_nanos(Utc::now().timestamp_millis() * 1_000_000 + 132_456);
-        log.insert(log_schema().timestamp_key(), ts);
+        event.insert(log_schema().timestamp_key(), ts);
 
         run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
@@ -224,7 +223,7 @@ mod integration_tests {
         let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
-        let event = Event::from(message.clone());
+        let event = LogEvent::from(message.clone());
         run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
         let entry = find_entry(repo.name.as_str(), message.as_str()).await;
@@ -253,12 +252,10 @@ mod integration_tests {
             let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
 
             let message = random_string(100);
-            let mut event = Event::from(message.clone());
+            let mut event = LogEvent::from(message.clone());
             // Humio expects to find an @timestamp field for JSON lines
             // https://docs.humio.com/ingesting-data/parsers/built-in-parsers/#json
-            event
-                .as_mut_log()
-                .insert("@timestamp", Utc::now().to_rfc3339());
+            event.insert("@timestamp", Utc::now().to_rfc3339());
 
             run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
@@ -281,7 +278,7 @@ mod integration_tests {
             let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
 
             let message = random_string(100);
-            let event = Event::from(message.clone());
+            let event = LogEvent::from(message.clone());
 
             run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 

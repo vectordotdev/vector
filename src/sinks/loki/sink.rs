@@ -31,7 +31,7 @@ use crate::{
     sinks::util::{
         builder::SinkBuilderExt,
         encoding::Transformer,
-        metadata::BatchRequestMetadata,
+        metadata::{RequestMetadata, RequestMetadataBuilder},
         request_builder::EncodeResult,
         service::{ServiceBuilderExt, Svc},
         Compression, RequestBuilder,
@@ -100,7 +100,7 @@ impl From<std::io::Error> for RequestBuildError {
 }
 
 impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
-    type Metadata = (Option<String>, usize, EventFinalizers, usize);
+    type Metadata = (Option<String>, EventFinalizers, RequestMetadataBuilder);
     type Events = Vec<LokiRecord>;
     type Encoder = LokiBatchEncoder;
     type Payload = Bytes;
@@ -120,14 +120,10 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
         input: (PartitionKey, Vec<LokiRecord>),
     ) -> (Self::Metadata, Self::Events) {
         let (key, mut events) = input;
-        let batch_size = events.len();
-        let events_byte_size = events.size_of();
+        let metadata_builder = RequestMetadata::builder(&events);
         let finalizers = events.take_finalizers();
 
-        (
-            (key.tenant_id, batch_size, finalizers, events_byte_size),
-            events,
-        )
+        ((key.tenant_id, finalizers, metadata_builder), events)
     }
 
     fn build_request(
@@ -135,8 +131,8 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
         metadata: Self::Metadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (tenant_id, batch_size, finalizers, events_byte_size) = metadata;
-        let metadata = BatchRequestMetadata::new(batch_size, events_byte_size, &payload);
+        let (tenant_id, finalizers, metadata_builder) = metadata;
+        let metadata = metadata_builder.build(&payload);
         let compression = self.compression();
 
         LokiRequest {

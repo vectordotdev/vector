@@ -13,10 +13,7 @@ use snafu::ResultExt;
 use snafu::Snafu;
 use tower::ServiceBuilder;
 use uuid::Uuid;
-use vector_core::{
-    event::{EventFinalizers, Finalizable},
-    ByteSizeOf,
-};
+use vector_core::event::{EventFinalizers, Finalizable};
 
 use crate::{
     codecs::Encoder,
@@ -41,7 +38,7 @@ use crate::{
                 EncodingConfig, EncodingConfigWithFramingAdapter, StandardEncodings,
                 StandardEncodingsWithFramingMigrator, Transformer,
             },
-            metadata::BatchRequestMetadata,
+            metadata::{RequestMetadata, RequestMetadataBuilder},
             partitioner::KeyPartitioner,
             request_builder::EncodeResult,
             BulkSizeBasedDefaultBatchSettings, Compression, RequestBuilder, ServiceBuilderExt,
@@ -220,12 +217,12 @@ struct RequestSettings {
 }
 
 impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
-    type Metadata = (String, usize, EventFinalizers, usize);
+    type Metadata = (String, EventFinalizers, RequestMetadataBuilder);
     type Events = Vec<Event>;
     type Encoder = (Transformer, Encoder<Framer>);
     type Payload = Bytes;
     type Request = GcsRequest;
-    type Error = io::Error; // TODO: this is ugly.
+    type Error = io::Error;
 
     fn compression(&self) -> Compression {
         self.compression
@@ -237,14 +234,10 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
 
     fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
         let (partition_key, mut events) = input;
-        let event_count = events.len();
-        let event_byte_size = events.size_of();
+        let metadata_builder = RequestMetadata::builder(&events);
         let finalizers = events.take_finalizers();
 
-        (
-            (partition_key, event_count, finalizers, event_byte_size),
-            events,
-        )
+        ((partition_key, finalizers, metadata_builder), events)
     }
 
     fn build_request(
@@ -252,7 +245,7 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
         metadata: Self::Metadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (key, event_count, finalizers, event_byte_size) = metadata;
+        let (key, finalizers, metadata_builder) = metadata;
         // TODO: pull the seconds from the last event
         let filename = {
             let seconds = Utc::now().format(&self.time_format);
@@ -267,7 +260,7 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
 
         let key = format!("{}{}.{}", key, filename, self.extension);
 
-        let metadata = BatchRequestMetadata::new(event_count, event_byte_size, &payload);
+        let metadata = metadata_builder.build(&payload);
         let body = payload.into_payload();
 
         GcsRequest {

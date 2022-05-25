@@ -1,5 +1,6 @@
 use std::{
     collections::HashSet,
+    num::NonZeroUsize,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -13,7 +14,6 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use vector_buffers::Acker;
 use vector_common::internal_event::{BytesSent, EventsSent};
-use vector_core::ByteSizeOf;
 
 use crate::{
     config::{
@@ -24,7 +24,7 @@ use crate::{
     internal_events::PulsarEncodeEventError,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
-        metadata::BatchRequestMetadata,
+        metadata::RequestMetadata,
     },
 };
 
@@ -70,7 +70,7 @@ enum PulsarSinkState {
             (
                 BoxedPulsarProducer,
                 Result<SendFuture, PulsarError>,
-                BatchRequestMetadata,
+                RequestMetadata,
             ),
         >,
     ),
@@ -86,7 +86,7 @@ struct PulsarSink {
             (
                 usize,
                 Result<CommandSendReceipt, PulsarError>,
-                BatchRequestMetadata,
+                RequestMetadata,
             ),
         >,
     >,
@@ -251,10 +251,13 @@ impl Sink<Event> for PulsarSink {
             "Expected `poll_ready` to be called first."
         );
 
-        let event_byte_size = item.size_of();
+        let metadata_builder = RequestMetadata::builder(&item);
         let message = encode_event(item, &self.encoding, &self.avro_schema)
             .map_err(|error| emit!(PulsarEncodeEventError { error }))?;
-        let metadata = BatchRequestMetadata::raw(1, event_byte_size, message.len(), None);
+
+        let message_len =
+            NonZeroUsize::new(message.len()).expect("payload should never be zero length");
+        let metadata = metadata_builder.with_request_size(message_len);
 
         let mut producer = match std::mem::replace(&mut self.state, PulsarSinkState::None) {
             PulsarSinkState::Ready(producer) => producer,
@@ -287,13 +290,13 @@ impl Sink<Event> for PulsarSink {
                     );
 
                     emit!(EventsSent {
-                        count: metadata.event_count,
-                        byte_size: metadata.event_byte_size,
+                        count: metadata.event_count(),
+                        byte_size: metadata.events_byte_size(),
                         output: None,
                     });
 
                     emit!(BytesSent {
-                        byte_size: metadata.encoded_uncompressed_size,
+                        byte_size: metadata.request_encoded_size(),
                         protocol: "tcp",
                     });
 

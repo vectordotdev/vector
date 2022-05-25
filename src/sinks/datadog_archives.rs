@@ -32,6 +32,7 @@ use vector_core::{
 
 use super::util::{
     encoding::{Encoder, StandardEncodings},
+    metadata::RequestMetadataBuilder,
     request_builder::EncodeResult,
     BatchConfig, Compression, RequestBuilder, SinkBatchSettings,
 };
@@ -63,7 +64,7 @@ use crate::{
             sink::S3Sink,
         },
         util::{
-            metadata::BatchRequestMetadata, partitioner::KeyPartitioner, ServiceBuilderExt,
+            metadata::RequestMetadata, partitioner::KeyPartitioner, ServiceBuilderExt,
             TowerRequestConfig,
         },
         VectorSink,
@@ -570,7 +571,7 @@ struct DatadogGcsRequestBuilder {
 }
 
 impl RequestBuilder<(String, Vec<Event>)> for DatadogGcsRequestBuilder {
-    type Metadata = (String, usize, EventFinalizers, usize);
+    type Metadata = (String, EventFinalizers, RequestMetadataBuilder);
     type Events = Vec<Event>;
     type Payload = Bytes;
     type Request = GcsRequest;
@@ -579,14 +580,10 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogGcsRequestBuilder {
 
     fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
         let (partition_key, mut events) = input;
-        let event_count = events.len();
-        let event_byte_size = events.size_of();
+        let metadata_builder = RequestMetadata::builder(&events);
         let finalizers = events.take_finalizers();
 
-        (
-            (partition_key, event_count, finalizers, event_byte_size),
-            events,
-        )
+        ((partition_key, finalizers, metadata_builder), events)
     }
 
     fn build_request(
@@ -594,17 +591,17 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogGcsRequestBuilder {
         metadata: Self::Metadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        let (key, event_count, finalizers, event_byte_size) = metadata;
+        let (key, finalizers, metadata_builder) = metadata;
 
         let key = generate_object_key(self.key_prefix.clone(), key);
 
-        let metadata = BatchRequestMetadata::new(event_count, event_byte_size, &payload);
+        let metadata = metadata_builder.build(&payload);
         let body = payload.into_payload();
 
         trace!(
             message = "Sending events.",
             bytes = body.len(),
-            events_len = event_count,
+            events_len = metadata.event_count(),
             bucket = %self.bucket,
             ?key
         );

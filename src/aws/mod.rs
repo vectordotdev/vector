@@ -203,14 +203,12 @@ where
         // Attach a body callback that will capture the bytes sent by interrogating the body chunks that get read as it
         // sends the request out over the wire. We'll read the shared atomic counter, which will contain the number of
         // bytes "read", aka the bytes it actually sent, if and only if we get back a successful response.
-        let maybe_bytes_sent = if self.enabled {
+        let maybe_bytes_sent = self.enabled.then(|| {
             let (callback, shared_bytes_sent) = BodyCaptureCallback::new();
             req.http_mut().body_mut().with_callback(Box::new(callback));
 
-            Some(shared_bytes_sent)
-        } else {
-            None
-        };
+            shared_bytes_sent
+        });
 
         let region = self.region.clone();
         let endpoint = req.http().uri().to_string();

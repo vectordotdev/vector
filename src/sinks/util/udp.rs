@@ -228,7 +228,7 @@ impl tower::Service<BytesMut> for UdpService {
             let _ = sender.send(socket);
 
             if result.is_ok() {
-                // TODO: This is obviously not happening before things like compression, etc, so it's currently a
+                // NOTE: This is obviously not happening before things like compression, etc, so it's currently a
                 // stopgap for the `socket` and `statsd` sinks, and potentially others, to ensure that we're at least
                 // emitting the `BytesSent` event, and related metrics... and practically, those sinks don't compress
                 // anyways, so the metrics are correct as-is... they just may not be correct in the future if

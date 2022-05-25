@@ -24,12 +24,12 @@ use vector_core::{
 use super::{NewRelicCredentials, NewRelicSinkError};
 use crate::{
     http::{get_http_scheme_from_uri, HttpClient},
-    sinks::util::{metadata::BatchRequestMetadata, Compression},
+    sinks::util::{metadata::RequestMetadata, Compression},
 };
 
 #[derive(Debug, Clone)]
 pub struct NewRelicApiRequest {
-    pub metadata: BatchRequestMetadata,
+    pub metadata: RequestMetadata,
     pub finalizers: EventFinalizers,
     pub credentials: Arc<NewRelicCredentials>,
     pub payload: Bytes,
@@ -38,7 +38,7 @@ pub struct NewRelicApiRequest {
 
 impl Ackable for NewRelicApiRequest {
     fn ack_size(&self) -> usize {
-        self.metadata.event_count
+        self.metadata.event_count()
     }
 }
 
@@ -52,7 +52,7 @@ impl Finalizable for NewRelicApiRequest {
 pub struct NewRelicApiResponse {
     event_status: EventStatus,
     protocol: &'static str,
-    metadata: BatchRequestMetadata,
+    metadata: RequestMetadata,
 }
 
 impl DriverResponse for NewRelicApiResponse {
@@ -62,15 +62,15 @@ impl DriverResponse for NewRelicApiResponse {
 
     fn events_sent(&self) -> EventsSent {
         EventsSent {
-            count: self.metadata.event_count,
-            byte_size: self.metadata.event_byte_size,
+            count: self.metadata.event_count(),
+            byte_size: self.metadata.events_byte_size(),
             output: None,
         }
     }
 
     fn bytes_sent(&self) -> Option<BytesSent> {
         Some(BytesSent {
-            byte_size: self.metadata.encoded_uncompressed_size,
+            byte_size: self.metadata.request_encoded_size(),
             protocol: self.protocol,
         })
     }
