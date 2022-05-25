@@ -1,14 +1,8 @@
 use std::convert::TryInto;
 use std::io::ErrorKind;
-use std::sync::Arc;
 
 use async_compression::tokio::bufread;
 use aws_sdk_s3::types::ByteStream;
-use aws_sdk_s3::{Endpoint, Region};
-use aws_smithy_async::rt::sleep::AsyncSleep;
-use aws_smithy_client::erase::DynConnector;
-use aws_smithy_types::retry::RetryConfig;
-use aws_types::credentials::SharedCredentialsProvider;
 use futures::stream;
 use futures::{stream::StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
@@ -16,8 +10,9 @@ use snafu::Snafu;
 use tokio_util::io::StreamReader;
 
 use super::util::MultilineConfig;
+use crate::aws::create_client;
 use crate::aws::RegionOrEndpoint;
-use crate::aws::{create_client, ClientBuilder};
+use crate::common::s3::S3ClientBuilder;
 use crate::common::sqs::SqsClientBuilder;
 use crate::tls::TlsConfig;
 use crate::{
@@ -82,51 +77,6 @@ inventory::submit! {
 
 impl_generate_config_from_default!(AwsS3Config);
 
-struct S3ClientBuilder {}
-
-impl ClientBuilder for S3ClientBuilder {
-    type ConfigBuilder = aws_sdk_s3::config::Builder;
-    type Client = aws_sdk_s3::Client;
-
-    fn create_config_builder(
-        credentials_provider: SharedCredentialsProvider,
-    ) -> Self::ConfigBuilder {
-        aws_sdk_s3::Config::builder().credentials_provider(credentials_provider)
-    }
-
-    fn with_endpoint_resolver(
-        builder: Self::ConfigBuilder,
-        endpoint: Endpoint,
-    ) -> Self::ConfigBuilder {
-        builder.endpoint_resolver(endpoint)
-    }
-
-    fn with_region(builder: Self::ConfigBuilder, region: Region) -> Self::ConfigBuilder {
-        builder.region(region)
-    }
-
-    fn with_sleep_impl(
-        builder: Self::ConfigBuilder,
-        sleep_impl: Arc<dyn AsyncSleep>,
-    ) -> Self::ConfigBuilder {
-        builder.sleep_impl(sleep_impl)
-    }
-
-    fn with_retry_config(
-        builder: Self::ConfigBuilder,
-        retry_config: RetryConfig,
-    ) -> Self::ConfigBuilder {
-        builder.retry_config(retry_config)
-    }
-
-    fn client_from_conf_conn(
-        builder: Self::ConfigBuilder,
-        connector: DynConnector,
-    ) -> Self::Client {
-        Self::Client::from_conf_conn(builder.build(), connector)
-    }
-}
-
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_s3")]
 impl SourceConfig for AwsS3Config {
@@ -181,6 +131,7 @@ impl AwsS3Config {
             endpoint.clone(),
             proxy,
             &self.tls_options,
+            false,
         )
         .await?;
 
@@ -192,6 +143,7 @@ impl AwsS3Config {
                     endpoint,
                     proxy,
                     &sqs.tls_options,
+                    false,
                 )
                 .await?;
 
@@ -794,6 +746,7 @@ mod integration_tests {
             region_endpoint.endpoint().unwrap(),
             &proxy_config,
             &None,
+            false,
         )
         .await
         .unwrap()
@@ -812,6 +765,7 @@ mod integration_tests {
             region_endpoint.endpoint().unwrap(),
             &proxy_config,
             &None,
+            false,
         )
         .await
         .unwrap()

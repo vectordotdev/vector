@@ -319,14 +319,70 @@ async fn healthcheck(sink: AzureMonitorLogsSink, client: HttpClient) -> crate::R
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
+    use futures::{future::ready, stream};
     use serde_json::value::RawValue;
 
     use super::*;
-    use crate::event::LogEvent;
+    use crate::{
+        event::LogEvent,
+        sinks::util::BatchSize,
+        test_util::{
+            components::{run_and_assert_sink_compliance, SINK_TAGS},
+            http::{always_200_response, spawn_blackhole_http_server},
+        },
+    };
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<AzureMonitorLogsConfig>();
+    }
+
+    #[tokio::test]
+    async fn component_spec_compliance() {
+        let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
+
+        // This is just a dummy shared key.
+        let shared_key_bytes = base64::decode_block(
+            "ZnNkO2Zhc2RrbGZqYXNkaixmaG5tZXF3dWlsamtmYXNjZmouYXNkbmZrbHFhc2ZtYXNrbA==",
+        )
+        .expect("should not fail to decode base64");
+        let shared_key =
+            pkey::PKey::hmac(&shared_key_bytes).expect("should not fail to create HMAC key");
+
+        let sink = AzureMonitorLogsSink {
+            uri: mock_endpoint,
+            customer_id: "weee".to_string(),
+            encoding: EncodingConfigWithDefault::from(Encoding::Default),
+            shared_key,
+            default_headers: HeaderMap::new(),
+        };
+
+        let context = SinkContext::new_test();
+        let client =
+            HttpClient::new(None, &context.proxy).expect("should not fail to create HTTP client");
+
+        let request_settings =
+            TowerRequestConfig::default().unwrap_with(&TowerRequestConfig::default());
+
+        let sink = BatchedHttpSink::new(
+            sink,
+            JsonArrayBuffer::new(BatchSize::const_default()),
+            request_settings,
+            Duration::from_secs(1),
+            client,
+            context.acker(),
+        )
+        .sink_map_err(|error| error!(message = "Fatal azure_monitor_logs sink error.", %error));
+
+        let event = Event::from("simple message");
+        run_and_assert_sink_compliance(
+            VectorSink::from_event_sink(sink),
+            stream::once(ready(event)),
+            &SINK_TAGS,
+        )
+        .await;
     }
 
     fn insert_timestamp_kv(log: &mut LogEvent) -> (String, String) {

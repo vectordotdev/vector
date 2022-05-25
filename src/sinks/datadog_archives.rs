@@ -1,3 +1,8 @@
+// NOTE: We intentionally do not assert/verify that `datadog_archives` meets the component specification because it
+// derives all of its capabilities from existing sink implementations which themselves are tested. We probably _should_
+// also verify it here, but for now, this is a punt to avoid having to add a bunch of specific integration tests that
+// exercise all possible configurations of the sink.
+
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     convert::TryFrom,
@@ -21,12 +26,13 @@ use tower::ServiceBuilder;
 use uuid::Uuid;
 use vector_core::{
     config::{log_schema, AcknowledgementsConfig, LogSchema},
-    event::{Event, Finalizable},
+    event::{Event, EventFinalizers, Finalizable},
     ByteSizeOf,
 };
 
 use super::util::{
     encoding::{Encoder, StandardEncodings},
+    metadata::RequestMetadataBuilder,
     request_builder::EncodeResult,
     BatchConfig, Compression, RequestBuilder, SinkBatchSettings,
 };
@@ -46,7 +52,7 @@ use crate::{
         gcs_common::{
             self,
             config::{GcsPredefinedAcl, GcsRetryLogic, GcsStorageClass, BASE_URL},
-            service::{GcsMetadata, GcsRequest, GcsRequestSettings, GcsService},
+            service::{GcsRequest, GcsRequestSettings, GcsService},
             sink::GcsSink,
         },
         s3_common::{
@@ -57,7 +63,10 @@ use crate::{
             service::{S3Metadata, S3Request, S3Service},
             sink::S3Sink,
         },
-        util::{partitioner::KeyPartitioner, ServiceBuilderExt, TowerRequestConfig},
+        util::{
+            metadata::RequestMetadata, partitioner::KeyPartitioner, ServiceBuilderExt,
+            TowerRequestConfig,
+        },
         VectorSink,
     },
     template::Template,
@@ -563,7 +572,7 @@ struct DatadogGcsRequestBuilder {
 }
 
 impl RequestBuilder<(String, Vec<Event>)> for DatadogGcsRequestBuilder {
-    type Metadata = GcsMetadata;
+    type Metadata = (String, EventFinalizers, RequestMetadataBuilder);
     type Events = Vec<Event>;
     type Payload = Bytes;
     type Request = GcsRequest;
@@ -571,33 +580,31 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogGcsRequestBuilder {
     type Error = io::Error;
 
     fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
-        let (key, mut events) = input;
+        let (partition_key, mut events) = input;
+        let metadata_builder = RequestMetadata::builder(&events);
         let finalizers = events.take_finalizers();
-        let metadata = GcsMetadata {
-            key,
-            count: events.len(),
-            byte_size: events.size_of(),
-            finalizers,
-        };
 
-        (metadata, events)
+        ((partition_key, finalizers, metadata_builder), events)
     }
 
     fn build_request(
         &self,
-        mut metadata: Self::Metadata,
+        metadata: Self::Metadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
-        metadata.key = generate_object_key(self.key_prefix.clone(), metadata.key);
+        let (key, finalizers, metadata_builder) = metadata;
 
+        let key = generate_object_key(self.key_prefix.clone(), key);
+
+        let metadata = metadata_builder.build(&payload);
         let body = payload.into_payload();
 
         trace!(
             message = "Sending events.",
-            bytes = ?body.len(),
-            events_len = ?metadata.count,
-            bucket = ?self.bucket,
-            key = ?metadata.key
+            bytes = body.len(),
+            events_len = metadata.event_count(),
+            bucket = %self.bucket,
+            ?key
         );
 
         let content_type = HeaderValue::from_str(StandardEncodings::Ndjson.content_type()).unwrap();
@@ -606,7 +613,9 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogGcsRequestBuilder {
             .map(|ce| HeaderValue::from_str(&to_string(ce)).unwrap());
 
         GcsRequest {
+            key,
             body,
+            finalizers,
             settings: GcsRequestSettings {
                 acl: self.acl.clone(),
                 content_type,
