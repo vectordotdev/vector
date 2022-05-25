@@ -637,6 +637,17 @@ mod test {
     }
 
     #[test]
+    fn handles_dots_in_sdata() {
+        let raw =
+            r#"<190>Feb 13 21:31:56 74794bfb6795 liblogging-stdlog:  [origin foo.bar="baz"] hello"#;
+        let event = event_from_bytes("host", None, raw.to_owned().into()).unwrap();
+        assert_eq!(
+            event.as_log().get(r#"origin."foo.bar""#),
+            Some(&Value::from("baz"))
+        );
+    }
+
+    #[test]
     fn syslog_ng_default_network() {
         let msg = "i am foobar";
         let raw = format!(r#"<13>Feb 13 20:07:26 74794bfb6795 root[8539]: {}"#, msg);
