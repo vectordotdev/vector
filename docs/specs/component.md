@@ -89,10 +89,11 @@ Vector components MUST be instrumented for optimal observability and monitoring.
 
 ### Events
 
-This section lists all required events that a component MUST emit. Additional events are
-It is expected that components will emit custom events beyond those listed here
-that reflect component specific behavior. There is leeway in the implementation
-of these events:
+This section lists all required events that a component MUST emit. Additional events
+are listed that a component is RECOMMENDED to emit, but remain OPTIONAL. It is
+expected that components will emit custom events beyond those listed here that
+reflect component specific behavior. There is leeway in the implementation of these
+events:
 
 * Events MAY be augmented with additional component-specific context. For
   example, the `socket` source adds a `mode` attribute as additional context.
