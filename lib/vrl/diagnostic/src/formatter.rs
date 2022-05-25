@@ -39,6 +39,10 @@ impl<'a> fmt::Display for Formatter<'a> {
         use codespan_reporting::{files::SimpleFile, term};
         use termcolor::Buffer;
 
+        if self.diagnostics.is_empty() {
+            return Ok(());
+        }
+
         let file = SimpleFile::new("", self.source);
         let config = term::Config::default();
         let mut buffer = if self.color {

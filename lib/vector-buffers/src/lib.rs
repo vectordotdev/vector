@@ -84,6 +84,18 @@ pub trait EventCount {
     fn event_count(&self) -> usize;
 }
 
+impl<T> EventCount for Vec<T> {
+    fn event_count(&self) -> usize {
+        self.len()
+    }
+}
+
+impl<T> EventCount for &Vec<T> {
+    fn event_count(&self) -> usize {
+        self.len()
+    }
+}
+
 #[track_caller]
 pub(crate) fn spawn_named<T>(
     task: impl std::future::Future<Output = T> + Send + 'static,

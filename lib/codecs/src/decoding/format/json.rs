@@ -1,15 +1,17 @@
-use super::Deserializer;
+use std::convert::TryInto;
+
 use bytes::Bytes;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
-use std::convert::TryInto;
 use value::Kind;
 use vector_core::{
     config::{log_schema, DataType},
     event::Event,
     schema,
 };
+
+use super::Deserializer;
 
 /// Config used to build a `JsonDeserializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -21,7 +23,7 @@ impl JsonDeserializerConfig {
         Into::<JsonDeserializer>::into(self)
     }
 
-    /// The data type of returned events
+    /// Return the type of event build by this deserializer.
     pub fn output_type(&self) -> DataType {
         DataType::Log
     }
@@ -100,8 +102,9 @@ impl From<&JsonDeserializerConfig> for JsonDeserializer {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use vector_core::config::log_schema;
+
+    use super::*;
 
     #[test]
     fn deserialize_json() {

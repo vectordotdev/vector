@@ -1,14 +1,14 @@
-use anymap::AnyMap;
 use std::collections::{hash_map::Entry, HashMap};
 
-use value::Kind;
+use anymap::AnyMap;
+use value::{Kind, Value};
 
-use crate::{expression::assignment, parser::ast::Ident, Value};
+use crate::{parser::ast::Ident, type_def::Details};
 
 /// Local environment, limited to a given scope.
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct LocalEnv {
-    pub(crate) bindings: HashMap<Ident, assignment::Details>,
+    pub(crate) bindings: HashMap<Ident, Details>,
 }
 
 impl LocalEnv {
@@ -16,12 +16,18 @@ impl LocalEnv {
         self.bindings.keys()
     }
 
-    pub(crate) fn variable(&self, ident: &Ident) -> Option<&assignment::Details> {
+    pub(crate) fn variable(&self, ident: &Ident) -> Option<&Details> {
         self.bindings.get(ident)
     }
 
-    pub(crate) fn insert_variable(&mut self, ident: Ident, details: assignment::Details) {
+    #[cfg(any(feature = "expr-assignment", feature = "expr-function_call"))]
+    pub(crate) fn insert_variable(&mut self, ident: Ident, details: Details) {
         self.bindings.insert(ident, details);
+    }
+
+    #[cfg(feature = "expr-function_call")]
+    pub(crate) fn remove_variable(&mut self, ident: &Ident) -> Option<Details> {
+        self.bindings.remove(ident)
     }
 
     /// Merge state present in both `self` and `other`.
@@ -40,7 +46,7 @@ impl LocalEnv {
 #[derive(Debug)]
 pub struct ExternalEnv {
     /// The external target of the program.
-    target: Option<assignment::Details>,
+    target: Option<Details>,
 
     /// Custom context injected by the external environment
     custom: AnyMap,
@@ -60,7 +66,7 @@ impl ExternalEnv {
     /// [`Kind`].
     pub fn new_with_kind(kind: Kind) -> Self {
         Self {
-            target: Some(assignment::Details {
+            target: Some(Details {
                 type_def: kind.into(),
                 value: None,
             }),
@@ -68,7 +74,7 @@ impl ExternalEnv {
         }
     }
 
-    pub(crate) fn target(&self) -> Option<&assignment::Details> {
+    pub(crate) fn target(&self) -> Option<&Details> {
         self.target.as_ref()
     }
 
@@ -76,7 +82,8 @@ impl ExternalEnv {
         self.target().map(|details| details.type_def.kind())
     }
 
-    pub(crate) fn update_target(&mut self, details: assignment::Details) {
+    #[cfg(any(feature = "expr-assignment", feature = "expr-query"))]
+    pub(crate) fn update_target(&mut self, details: Details) {
         self.target = Some(details);
     }
 
@@ -87,6 +94,7 @@ impl ExternalEnv {
 
     /// Swap the existing external contexts with new ones, returning the old ones.
     #[must_use]
+    #[cfg(feature = "expr-function_call")]
     pub(crate) fn swap_external_context(&mut self, ctx: AnyMap) -> AnyMap {
         std::mem::replace(&mut self.custom, ctx)
     }

@@ -7,9 +7,9 @@ services:
     container_name: vector_dnstap
     hostname: ns.example.com
     volumes:
-      - ${PWD}/tests/data/dnstap/socket:/bind1/etc/bind/socket
-      - ${PWD}/tests/data/dnstap/socket:/bind2/etc/bind/socket
-      - ${PWD}/tests/data/dnstap/socket:/bind3/etc/bind/socket
+      - dnstap-sockets:/bind1/etc/bind/socket
+      - dnstap-sockets:/bind2/etc/bind/socket
+      - dnstap-sockets:/bind3/etc/bind/socket
   runner:
     build:
       context: ${PWD}
@@ -33,17 +33,15 @@ services:
       - dnstap
     environment:
       - BIND_SOCKET=/run/bind/socket
+      - RUST_BACKTRACE=1
     volumes:
       - ${PWD}:/code
-      - ${PWD}/tests/data/dnstap/socket:/run/bind/socket
       - /var/run/docker.sock:/var/run/docker.sock
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
-
-networks:
-  public: {}
-  proxy: {}
+      - dnstap-sockets:/run/bind/socket
 
 volumes:
   cargogit: {}
   cargoregistry: {}
+  dnstap-sockets: {}

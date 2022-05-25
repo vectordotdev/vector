@@ -10,9 +10,7 @@ use crate::{
         TransformDescription,
     },
     event::{Event, Value},
-    internal_events::{
-        AddFieldsFieldNotOverwritten, AddFieldsFieldOverwritten, TemplateRenderingError,
-    },
+    internal_events::{AddFieldsFieldNotOverwritten, FieldOverwritten, TemplateRenderingError},
     schema,
     serde::Fields,
     template::Template,
@@ -132,7 +130,7 @@ impl FunctionTransform for AddFields {
                     .insert(key_string.as_str(), value)
                     .is_some()
                 {
-                    emit!(AddFieldsFieldOverwritten { field: &key });
+                    emit!(FieldOverwritten { field: &key });
                 }
             } else if event.as_mut_log().contains(key_string.as_str()) {
                 emit!(AddFieldsFieldNotOverwritten { field: &key });

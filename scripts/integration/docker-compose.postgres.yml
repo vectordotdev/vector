@@ -2,7 +2,7 @@ version: "3"
 
 services:
   postgres:
-    image: postgres:13.1
+    image: docker.io/postgres:13.1
     command: /postgres-init.sh
     environment:
       - POSTGRES_USER=vector

@@ -19,7 +19,7 @@ components: sources: http: {
 		multiline: enabled: false
 		codecs: {
 			enabled:         true
-			default_framing: "newline_delimited"
+			default_framing: "`newline_delimited` for codecs other than `native`, which defaults to `length_delimited`"
 		}
 		receive: {
 			from: {
@@ -126,6 +126,22 @@ components: sources: http: {
 			type: string: {
 				default: "path"
 				examples: ["vector_http_path"]
+			}
+		}
+		method: {
+			common:      false
+			description: "Specifies the action of the HTTP request."
+			required:    false
+			type: string: {
+				default: "POST"
+				enum: {
+					"HEAD":   "HTTP HEAD method."
+					"GET":    "HTTP GET method."
+					"PUT":    "HTTP PUT method."
+					"POST":   "HTTP POST method."
+					"PATCH":  "HTTP PATCH method."
+					"DELETE": "HTTP DELETE method."
+				}
 			}
 		}
 	}

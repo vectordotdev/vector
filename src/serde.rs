@@ -1,11 +1,10 @@
+use codecs::{
+    decoding::{DeserializerConfig, FramingConfig},
+    BytesDecoderConfig, BytesDeserializerConfig,
+};
 use indexmap::map::IndexMap;
 use serde::{Deserialize, Serialize};
 pub use vector_core::serde::{bool_or_struct, skip_serializing_if_default};
-
-use codecs::{
-    decoding::{DeserializerConfig, FramingConfig},
-    BytesDecoderConfig, BytesDeserializerConfig, NewlineDelimitedDecoderConfig,
-};
 
 pub const fn default_true() -> bool {
     true
@@ -24,10 +23,6 @@ pub fn default_max_length() -> usize {
 
 pub fn default_framing_message_based() -> FramingConfig {
     BytesDecoderConfig::new().into()
-}
-
-pub fn default_framing_stream_based() -> FramingConfig {
-    NewlineDelimitedDecoderConfig::new().into()
 }
 
 pub fn default_decoding() -> DeserializerConfig {

@@ -2,17 +2,17 @@ use std::fmt;
 
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 use parser::ast::Node;
+use value::Value;
 
+use super::Expr;
 use crate::{
     expression::{ExpressionError, Resolved},
     state::{ExternalEnv, LocalEnv},
     value::Kind,
     value::VrlValueConvert,
     vm::OpCode,
-    Context, Expression, Span, TypeDef, Value,
+    Context, Expression, Span, TypeDef,
 };
-
-use super::Expr;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Abort {

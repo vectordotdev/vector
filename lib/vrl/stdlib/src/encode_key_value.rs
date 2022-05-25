@@ -1,5 +1,6 @@
 use std::result::Result;
 
+use ::value::Value;
 use vector_common::encode_key_value;
 use vrl::prelude::*;
 
@@ -228,6 +229,16 @@ mod tests {
                     "msg" => "This is a log message"
                 }],
             want: Ok(r#"lvl=info msg="This is a log message""#),
+            tdef: TypeDef::bytes().infallible(),
+        }
+
+        string_with_quotes {
+            args: func_args![value:
+                btreemap! {
+                    "lvl" => "info",
+                    "msg" => "{\"key\":\"value\"}"
+                }],
+            want: Ok(r#"lvl=info msg="{\"key\":\"value\"}""#),
             tdef: TypeDef::bytes().infallible(),
         }
 

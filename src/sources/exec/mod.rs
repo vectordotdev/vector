@@ -30,13 +30,14 @@ use crate::{
     config::{log_schema, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{
-        ExecCommandExecuted, ExecEventsReceived, ExecFailedError, ExecTimeoutError,
+        BytesReceived, ExecCommandExecuted, ExecEventsReceived, ExecFailedError, ExecTimeoutError,
         StreamClosedError,
     },
-    serde::{default_decoding, default_framing_stream_based},
+    serde::default_decoding,
     shutdown::ShutdownSignal,
     SourceSender,
 };
+use lookup::path;
 
 pub mod sized_bytes_codec;
 
@@ -52,8 +53,7 @@ pub struct ExecConfig {
     pub include_stderr: bool,
     #[serde(default = "default_maximum_buffer_size")]
     pub maximum_buffer_size_bytes: usize,
-    #[serde(default = "default_framing_stream_based")]
-    framing: FramingConfig,
+    framing: Option<FramingConfig>,
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
 }
@@ -103,7 +103,7 @@ impl Default for ExecConfig {
             working_directory: None,
             include_stderr: default_include_stderr(),
             maximum_buffer_size_bytes: default_maximum_buffer_size(),
-            framing: default_framing_stream_based(),
+            framing: None,
             decoding: default_decoding(),
         }
     }
@@ -190,7 +190,13 @@ impl SourceConfig for ExecConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         self.validate()?;
         let hostname = get_hostname();
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
+
+        let framing = self
+            .framing
+            .clone()
+            .unwrap_or_else(|| self.decoding.default_stream_framing());
+        let decoder = DecodingConfig::new(framing, self.decoding.clone()).build();
+
         match &self.mode {
             Mode::Scheduled => {
                 let exec_interval_secs = self.exec_interval_secs_or_default();
@@ -386,7 +392,12 @@ async fn run_command(
 
     spawn_reader_thread(stdout_reader, decoder.clone(), STDOUT, sender);
 
-    while let Some(((mut events, _byte_size), stream)) = receiver.recv().await {
+    while let Some(((mut events, byte_size), stream)) = receiver.recv().await {
+        emit!(BytesReceived {
+            byte_size,
+            protocol: "exec",
+        });
+
         let count = events.len();
         emit!(ExecEventsReceived {
             count,
@@ -483,12 +494,12 @@ fn handle_event(
 
         // Add data stream of stdin or stderr (if needed)
         if let Some(data_stream) = data_stream {
-            log.try_insert_flat(STREAM_KEY, data_stream.clone());
+            log.try_insert(path!(STREAM_KEY), data_stream.clone());
         }
 
         // Add pid (if needed)
         if let Some(pid) = pid {
-            log.try_insert_flat(PID_KEY, pid as i64);
+            log.try_insert(path!(PID_KEY), pid as i64);
         }
 
         // Add hostname (if needed)
@@ -497,7 +508,7 @@ fn handle_event(
         }
 
         // Add command
-        log.try_insert_flat(COMMAND_KEY, config.command.clone());
+        log.try_insert(path!(COMMAND_KEY), config.command.clone());
     }
 }
 
@@ -604,7 +615,7 @@ mod tests {
             working_directory: Some(PathBuf::from("/tmp")),
             include_stderr: default_include_stderr(),
             maximum_buffer_size_bytes: default_maximum_buffer_size(),
-            framing: default_framing_stream_based(),
+            framing: None,
             decoding: default_decoding(),
         };
 
@@ -664,7 +675,6 @@ mod tests {
     #[tokio::test]
     #[cfg(not(target_os = "windows"))]
     async fn test_run_command_linux() {
-        trace_init();
         let config = standard_scheduled_test_config();
         let hostname = Some("Some.Machine".to_string());
         let decoder = Default::default();
@@ -677,7 +687,8 @@ mod tests {
             run_command(config.clone(), hostname, decoder, shutdown, tx),
         );
 
-        let timeout_result = timeout.await;
+        let timeout_result =
+            crate::test_util::components::assert_source_compliance(&[], timeout).await;
 
         let exit_status = timeout_result
             .expect("command timed out")
@@ -694,7 +705,7 @@ mod tests {
             assert!(log.get(PID_KEY).is_some());
             assert!(log.get(log_schema().timestamp_key()).is_some());
 
-            assert_eq!(8, log.all_fields().count());
+            assert_eq!(8, log.all_fields().unwrap().count());
         } else {
             panic!("Expected to receive a linux event");
         }
@@ -716,7 +727,7 @@ mod tests {
             working_directory: None,
             include_stderr: default_include_stderr(),
             maximum_buffer_size_bytes: default_maximum_buffer_size(),
-            framing: default_framing_stream_based(),
+            framing: None,
             decoding: default_decoding(),
         }
     }

@@ -1,12 +1,18 @@
-use super::{state::VmState, Variable, VmArgumentList};
-use crate::value::{VrlValueArithmetic, VrlValueConvert};
-use crate::{vm::argument_list::VmArgument, Context, ExpressionError, Function, Value};
-use diagnostic::Span;
-use std::{collections::BTreeMap, ops::Deref};
+use std::{collections::BTreeMap, ops::Deref, sync::Arc};
+
+use value::Value;
+
+use super::VmFunctionClosure;
+use super::{state::VmState, Variable};
+#[cfg(feature = "expr-op")]
+use crate::value::VrlValueArithmetic;
+use crate::value::VrlValueConvert;
+use crate::{vm::argument_list::VmArgument, Context, ExpressionError, Function};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum OpCode {
     /// Aborts the process, returning `Err(ExpressionError::Abort)`.
+    #[cfg(feature = "expr-abort")]
     Abort,
 
     /// Ends the process, returning the top value from the stack.
@@ -16,45 +22,59 @@ pub enum OpCode {
     Constant,
 
     /// Adds the two values at the top of the stack, placing the result back on the stack.
+    #[cfg(feature = "expr-op")]
     Add,
 
     /// Subtracts the two values at the top of the stack, placing the result back on the stack.
+    #[cfg(feature = "expr-op")]
     Subtract,
 
     /// Multiplies the two values at the top of the stack, placing the result back on the stack.
+    #[cfg(feature = "expr-op")]
     Multiply,
 
     /// Divides the two values at the top of the stack, placing the result back on the stack.
+    #[cfg(feature = "expr-op")]
     Divide,
 
     /// Divides the two values at the top of the stack, placing the remainder back on the stack.
+    #[cfg(feature = "expr-op")]
     Rem,
 
     /// Merges the two objects at the top of the stack, placing the result back on the stack.
+    #[cfg(feature = "expr-op")]
     Merge,
 
     /// Ands the two objects at the top of the stack, placing the result back on the stack.
+    #[cfg(feature = "expr-op")]
     And,
 
     /// Pops the boolean at the top of the stack, negates it, placing the result back on the stack.
+    #[cfg(feature = "expr-unary")]
     Not,
 
     /// Pops the top two elements from the stack, pushes a boolean if the second element is greater than the first.
+    #[cfg(feature = "expr-op")]
     Greater,
 
     /// Pops the top two elements from the stack, pushes a boolean if the second element is greater or equal than the first.
+    #[cfg(feature = "expr-op")]
     GreaterEqual,
 
     /// Pops the top two elements from the stack, pushes a boolean if the second element is less than the first.
+    #[cfg(feature = "expr-op")]
     Less,
 
     /// Pops the top two elements from the stack, pushes a boolean if the second element is less than or equal the first.
+    #[cfg(feature = "expr-op")]
     LessEqual,
 
     /// Pops the top two elements from the stack, pushes a boolean if the two elements are not equal.
+    #[cfg(feature = "expr-op")]
     NotEqual,
 
     /// Pops the top two elements from the stack, pushes a boolean if the two elements are equal.
+    #[cfg(feature = "expr-op")]
     Equal,
 
     /// Pops the top element from the stack, discarding it.
@@ -95,11 +115,13 @@ pub enum OpCode {
     /// Takes the path indicated by the ensuing primitive and sets this path with the value
     /// at the top of the stack. The value is not removed from the stack so it can continue
     /// to be used.
+    #[cfg(feature = "expr-assignment")]
     SetPath,
 
     /// Sets either a success or error path. The next primitive is the index to the target for
     /// the success path, the one after is the error path. After that is a pointer to a
     /// constant indicating the default value to set to the success path should there be an error.
+    #[cfg(feature = "expr-assignment")]
     SetPathInfallible,
 
     /// Takes the ensuing primitive as a pointer to a path. Retrieves this value from the state
@@ -107,6 +129,7 @@ pub enum OpCode {
     GetPath,
 
     /// Calls the function indicated by the ensuing primitive.
+    #[cfg(feature = "expr-function_call")]
     Call,
 
     /// Creates an array. The ensuing primitive indicates the number of elements in the array.
@@ -131,6 +154,9 @@ pub enum OpCode {
     /// at compile time. (Used, for example, to precompile and store regexes at compile time.)
     MoveStaticParameter,
 
+    /// Moves a closure onto the closure stack.
+    MoveClosure,
+
     /// After each statement (with the exception of the last one) within a block we need to pop the
     /// stack, and if we are in an error state jump to the end of the block.
     EndStatement,
@@ -154,15 +180,16 @@ pub enum Instruction {
 
 #[derive(Debug, Default)]
 pub struct Vm {
-    fns: Vec<Box<dyn Function>>,
+    fns: Arc<Vec<Box<dyn Function>>>,
     instructions: Vec<Instruction>,
     values: Vec<Value>,
     targets: Vec<Variable>,
+    closures: Vec<VmFunctionClosure>,
     static_params: Vec<Box<dyn std::any::Any + Send + Sync>>,
 }
 
 impl Vm {
-    pub fn new(fns: Vec<Box<dyn Function>>) -> Self {
+    pub fn new(fns: Arc<Vec<Box<dyn Function>>>) -> Self {
         Self {
             fns,
             ..Default::default()
@@ -211,6 +238,15 @@ impl Vm {
 
     pub fn function(&self, function_id: usize) -> Option<&(dyn Function)> {
         self.fns.get(function_id).map(|fun| fun.deref())
+    }
+
+    pub fn write_closure(&mut self, closure: VmFunctionClosure) -> usize {
+        self.closures.push(closure);
+        self.closures.len() - 1
+    }
+
+    pub fn functions(&self) -> Arc<Vec<Box<dyn Function>>> {
+        Arc::clone(&self.fns)
     }
 
     /// Gets a target from the list of targets used, if it hasn't already been added then add it.
@@ -273,6 +309,7 @@ impl Vm {
             let next = state.next_opcode()?;
 
             match next {
+                #[cfg(feature = "expr-abort")]
                 OpCode::Abort => {
                     // Aborts the process.
                     let start = state.next_primitive()?;
@@ -282,7 +319,7 @@ impl Vm {
                         value => Some(value.try_bytes_utf8_lossy()?.to_string()),
                     };
                     return Err(ExpressionError::Abort {
-                        span: Span::new(start, end),
+                        span: diagnostic::Span::new(start, end),
                         message,
                     });
                 }
@@ -297,21 +334,34 @@ impl Vm {
                     let value = state.read_constant()?;
                     state.stack.push(value);
                 }
+                #[cfg(feature = "expr-unary")]
                 OpCode::Not => match state.pop_stack()? {
                     Value::Boolean(value) => state.stack.push(Value::Boolean(!value)),
                     _ => return Err("Negating non boolean".into()),
                 },
+                #[cfg(feature = "expr-op")]
                 OpCode::Add => binary_op(&mut state, Value::try_add)?,
+                #[cfg(feature = "expr-op")]
                 OpCode::Subtract => binary_op(&mut state, Value::try_sub)?,
+                #[cfg(feature = "expr-op")]
                 OpCode::Multiply => binary_op(&mut state, Value::try_mul)?,
+                #[cfg(feature = "expr-op")]
                 OpCode::Divide => binary_op(&mut state, Value::try_div)?,
+                #[cfg(feature = "expr-op")]
                 OpCode::Rem => binary_op(&mut state, Value::try_rem)?,
+                #[cfg(feature = "expr-op")]
                 OpCode::And => binary_op(&mut state, Value::try_and)?,
+                #[cfg(feature = "expr-op")]
                 OpCode::Merge => binary_op(&mut state, Value::try_merge)?,
+                #[cfg(feature = "expr-op")]
                 OpCode::Greater => binary_op(&mut state, Value::try_gt)?,
+                #[cfg(feature = "expr-op")]
                 OpCode::GreaterEqual => binary_op(&mut state, Value::try_ge)?,
+                #[cfg(feature = "expr-op")]
                 OpCode::Less => binary_op(&mut state, Value::try_lt)?,
+                #[cfg(feature = "expr-op")]
                 OpCode::LessEqual => binary_op(&mut state, Value::try_le)?,
+                #[cfg(feature = "expr-op")]
                 OpCode::NotEqual => {
                     if state.error.is_none() {
                         let rhs = state.pop_stack()?;
@@ -321,6 +371,7 @@ impl Vm {
                         state.pop_stack()?;
                     }
                 }
+                #[cfg(feature = "expr-op")]
                 OpCode::Equal => {
                     if state.error.is_none() {
                         let rhs = state.pop_stack()?;
@@ -398,6 +449,7 @@ impl Vm {
                     let jump = state.next_primitive()?;
                     state.instruction_pointer += jump;
                 }
+                #[cfg(feature = "expr-assignment")]
                 OpCode::SetPath => {
                     // Sets the path specified by the target to the value at the top of the stack.
                     // The value is then pushed back onto the stack since the assignment expression
@@ -410,6 +462,7 @@ impl Vm {
                     set_variable(ctx, variable, value.clone())?;
                     state.push_stack(value);
                 }
+                #[cfg(feature = "expr-assignment")]
                 OpCode::SetPathInfallible => {
                     // Sets the path for an infallible assignment statement ie.
                     // `thing, err = fallible_call()`
@@ -448,16 +501,20 @@ impl Vm {
 
                     match &variable {
                         Variable::External(path) => {
-                            let value = ctx.target().target_get(path)?.unwrap_or(Value::Null);
+                            let value = ctx
+                                .target()
+                                .target_get(path)?
+                                .cloned()
+                                .unwrap_or(Value::Null);
                             state.stack.push(value);
                         }
                         Variable::Internal(ident, path) => {
                             let value = match ctx.state().variable(ident) {
-                                Some(value) => match path {
-                                    Some(path) => {
+                                Some(value) => match path.is_root() {
+                                    false => {
                                         value.get_by_path(path).cloned().unwrap_or(Value::Null)
                                     }
-                                    None => value.clone(),
+                                    true => value.clone(),
                                 },
                                 None => Value::Null,
                             };
@@ -504,7 +561,10 @@ impl Vm {
 
                     state.stack.push(Value::Object(object));
                 }
+                #[cfg(feature = "expr-function_call")]
                 OpCode::Call => {
+                    use super::VmArgumentList;
+
                     // Calls a function in the stdlib.
                     let function_id = state.next_primitive()?;
                     let span_start = state.next_primitive()?;
@@ -518,7 +578,12 @@ impl Vm {
                         .collect();
 
                     let mut argumentlist = VmArgumentList::new(parameters, args);
+
                     let function = &self.fns[function_id];
+
+                    if function.closure().is_some() {
+                        argumentlist.set_closure(state.pop_closure()?);
+                    }
 
                     let result = argumentlist
                         .check_arguments()
@@ -527,6 +592,7 @@ impl Vm {
                     match result {
                         Ok(result) => state.stack.push(result),
                         Err(err) => match err {
+                            #[cfg(feature = "expr-abort")]
                             ExpressionError::Abort { .. } => {
                                 panic!("abort errors must only be defined by `abort` statement")
                             }
@@ -569,12 +635,17 @@ impl Vm {
                         .parameter_stack
                         .push(Some(VmArgument::Any(&self.static_params[idx])));
                 }
+                OpCode::MoveClosure => {
+                    let idx = state.next_primitive()?;
+                    state.closure_stack.push(&self.closures[idx]);
+                }
             }
         }
     }
 }
 
 /// Op that applies a function to the top two elements on the stack.
+#[cfg(feature = "expr-op")]
 fn binary_op<F, E>(state: &mut VmState, fun: F) -> Result<(), ExpressionError>
 where
     E: Into<ExpressionError>,
@@ -601,6 +672,7 @@ where
 }
 
 /// Sets the value of the given variable to the provided value.
+#[cfg(feature = "expr-assignment")]
 fn set_variable<'a>(
     ctx: &mut Context<'a>,
     variable: &Variable,
@@ -608,9 +680,9 @@ fn set_variable<'a>(
 ) -> Result<(), ExpressionError> {
     match variable {
         Variable::Internal(ident, path) => {
-            let path = match path {
-                Some(path) => path,
-                None => {
+            let path = match path.is_root() {
+                false => path,
+                true => {
                     ctx.state_mut().insert_variable(ident.clone(), value);
                     return Ok(());
                 }

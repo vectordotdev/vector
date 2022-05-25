@@ -1,7 +1,9 @@
-use bytes::{BufMut, Bytes, BytesMut};
 use std::collections::BTreeMap;
 
-use super::{Error, Value};
+use bytes::{BufMut, Bytes, BytesMut};
+use value::Value;
+
+use super::Error;
 use crate::value::{Kind, VrlValueConvert};
 use crate::ExpressionError;
 

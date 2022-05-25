@@ -3,21 +3,20 @@ use std::{fmt, sync::Arc};
 use anymap::AnyMap;
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 
+use super::Block;
 use crate::{
-    expression::assignment::Details,
-    expression::{levenstein, ExpressionError, FunctionArgument, FunctionClosure, Noop},
+    expression::{levenstein, ExpressionError, FunctionArgument, Noop},
     function::{
         closure::{self, VariableKind},
-        ArgumentList, Example, FunctionCompileContext, Parameter,
+        ArgumentList, Example, FunctionClosure, FunctionCompileContext, Parameter,
     },
     parser::{Ident, Node},
     state::{ExternalEnv, LocalEnv},
+    type_def::Details,
     value::Kind,
-    vm::OpCode,
+    vm::{OpCode, VmFunctionClosure},
     Context, Expression, Function, Resolved, Span, TypeDef,
 };
-
-use super::Block;
 
 pub(crate) struct Builder<'a> {
     abort_on_error: bool,
@@ -26,7 +25,7 @@ pub(crate) struct Builder<'a> {
     ident_span: Span,
     function_id: usize,
     arguments: Arc<Vec<Node<FunctionArgument>>>,
-    closure: Option<(Vec<Node<Ident>>, closure::Input)>,
+    closure: Option<(Vec<Ident>, closure::Input)>,
     list: ArgumentList,
     function: &'a dyn Function,
 }
@@ -192,7 +191,7 @@ impl<'a> Builder<'a> {
                 let mut matched = None;
                 let mut err_found_type_def = None;
 
-                'outer: for input in definition.inputs {
+                for input in definition.inputs {
                     // Check type definition for linked parameter.
                     match list.arguments.get(input.parameter_keyword) {
                         // No argument provided for the given parameter keyword.
@@ -221,7 +220,7 @@ impl<'a> Builder<'a> {
                             }
 
                             matched = Some((input.clone(), expr));
-                            break 'outer;
+                            break;
                         }
                     };
                 }
@@ -338,7 +337,13 @@ impl<'a> Builder<'a> {
                             local.insert_variable(call_ident.to_owned().into_inner(), details);
                         }
 
-                        Some((variables.into_inner(), input))
+                        let variables = variables
+                            .into_inner()
+                            .into_iter()
+                            .map(Node::into_inner)
+                            .collect();
+
+                        Some((variables, input))
                     }
                 }
             }
@@ -364,12 +369,26 @@ impl<'a> Builder<'a> {
         local: &mut LocalEnv,
         external: &mut ExternalEnv,
         closure_block: Option<Node<Block>>,
+        mut local_snapshot: LocalEnv,
     ) -> Result<FunctionCall, Error> {
         let mut closure_fallible = false;
+        let mut closure = None;
 
         // Check if we have a closure we need to compile.
         if let Some((variables, input)) = self.closure.clone() {
             let block = closure_block.expect("closure must contain block");
+
+            // At this point, we've compiled the block, so we can remove the
+            // closure variables from the compiler's local environment.
+            variables
+                .iter()
+                .for_each(|ident| match local_snapshot.remove_variable(ident) {
+                    Some(details) => local.insert_variable(ident.clone(), details),
+                    None => {
+                        local.remove_variable(ident);
+                    }
+                });
+
             closure_fallible = block.type_def((local, external)).is_fallible();
 
             let (block_span, block) = block.take();
@@ -386,9 +405,10 @@ impl<'a> Builder<'a> {
                 });
             }
 
-            let variables = variables.into_iter().map(Node::into_inner).collect();
-            let closure = FunctionClosure::new(variables, block);
-            self.list.set_closure(closure);
+            let fnclosure = FunctionClosure::new(variables, block);
+            self.list.set_closure(fnclosure.clone());
+
+            closure = Some(fnclosure);
         };
 
         let call_span = self.call_span;
@@ -435,6 +455,7 @@ impl<'a> Builder<'a> {
             expr,
             maybe_fallible_arguments: self.maybe_fallible_arguments,
             closure_fallible,
+            closure,
             span: call_span,
             ident: self.function.identifier(),
             function_id: self.function_id,
@@ -449,6 +470,7 @@ pub struct FunctionCall {
     expr: Box<dyn Expression>,
     maybe_fallible_arguments: bool,
     closure_fallible: bool,
+    closure: Option<FunctionClosure>,
 
     // used for enhancing runtime error messages (using abort-instruction).
     //
@@ -524,6 +546,7 @@ impl FunctionCall {
             expr,
             maybe_fallible_arguments: false,
             closure_fallible: false,
+            closure: None,
             span: Span::default(),
             ident: "noop",
             arguments: Arc::new(Vec::new()),
@@ -549,6 +572,7 @@ impl FunctionCall {
 impl Expression for FunctionCall {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         self.expr.resolve(ctx).map_err(|err| match err {
+            #[cfg(feature = "expr-abort")]
             ExpressionError::Abort { .. } => {
                 panic!("abort errors must only be defined by `abort` statement")
             }
@@ -709,6 +733,20 @@ impl Expression for FunctionCall {
                     }
                 },
             }
+        }
+
+        if let Some(FunctionClosure { variables, block }) = self.closure.as_ref().cloned() {
+            let mut closure_vm = crate::vm::Vm::new(vm.functions());
+            block.compile_to_vm(&mut closure_vm, (local, external))?;
+            closure_vm.write_opcode(OpCode::Return);
+
+            let closure = vm.write_closure(VmFunctionClosure {
+                vm: closure_vm,
+                variables,
+            });
+
+            vm.write_opcode(OpCode::MoveClosure);
+            vm.write_primitive(closure);
         }
 
         // Re-insert the external context into the compiler state.
@@ -1152,13 +1190,8 @@ impl DiagnosticMessage for Error {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        expression::{Expr, Literal},
-        state::ExternalEnv,
-        value::kind,
-    };
-
     use super::*;
+    use crate::{state::ExternalEnv, value::kind};
 
     #[derive(Clone, Debug)]
     struct Fn;
@@ -1223,17 +1256,22 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "expr-literal")]
     fn create_node<T>(inner: T) -> Node<T> {
         Node::new(Span::new(0, 0), inner)
     }
 
+    #[cfg(feature = "expr-literal")]
     fn create_argument(ident: Option<&str>, value: i64) -> FunctionArgument {
+        use crate::expression::{Expr, Literal};
+
         FunctionArgument::new(
             ident.map(|ident| create_node(Ident::new(ident))),
             create_node(Expr::Literal(Literal::Integer(value))),
         )
     }
 
+    #[cfg(feature = "expr-literal")]
     fn create_function_call(arguments: Vec<Node<FunctionArgument>>) -> FunctionCall {
         let mut local = LocalEnv::default();
         let mut external = ExternalEnv::default();
@@ -1249,11 +1287,12 @@ mod tests {
             None,
         )
         .unwrap()
-        .compile(&mut local, &mut external, None)
+        .compile(&mut local, &mut external, None, LocalEnv::default())
         .unwrap()
     }
 
     #[test]
+    #[cfg(feature = "expr-literal")]
     fn resolve_arguments_simple() {
         let call = create_function_call(vec![
             create_node(create_argument(None, 1)),
@@ -1272,6 +1311,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "expr-literal")]
     fn resolve_arguments_named() {
         let call = create_function_call(vec![
             create_node(create_argument(Some("one"), 1)),
@@ -1290,6 +1330,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "expr-literal")]
     fn resolve_arguments_named_unordered() {
         let call = create_function_call(vec![
             create_node(create_argument(Some("three"), 3)),
@@ -1308,6 +1349,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "expr-literal")]
     fn resolve_arguments_unnamed_unordered_one() {
         let call = create_function_call(vec![
             create_node(create_argument(Some("three"), 3)),
@@ -1326,6 +1368,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "expr-literal")]
     fn resolve_arguments_unnamed_unordered_two() {
         let call = create_function_call(vec![
             create_node(create_argument(Some("three"), 3)),

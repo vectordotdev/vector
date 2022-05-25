@@ -8,14 +8,13 @@ use azure_core::HttpError;
 use azure_storage_blobs::prelude::*;
 use futures::{future::BoxFuture, TryFutureExt};
 use tower::Service;
-use tracing_futures::Instrument;
+use tracing::Instrument;
 
 use crate::{
-    internal_events::azure_blob::{
-        AzureBlobEventsSent, AzureBlobHttpError, AzureBlobResponseError,
-    },
+    internal_events::azure_blob::{AzureBlobHttpError, AzureBlobResponseError},
     sinks::azure_common::config::{AzureBlobRequest, AzureBlobResponse},
 };
+use vector_common::internal_event::BytesSent;
 
 #[derive(Clone)]
 pub(crate) struct AzureBlobService {
@@ -63,11 +62,11 @@ impl Service<AzureBlobRequest> for AzureBlobService {
                         }),
                     };
                 })
-                .inspect_ok(|result| {
-                    emit!(AzureBlobEventsSent {
-                        request_id: result.request_id,
-                        byte_size
-                    })
+                .inspect_ok(|_| {
+                    emit!(BytesSent {
+                        byte_size,
+                        protocol: "https",
+                    });
                 })
                 .instrument(info_span!("request").or_current())
                 .await;

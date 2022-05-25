@@ -1,3 +1,4 @@
+use ::value::Value;
 use chrono::{DateTime, Datelike, TimeZone, Utc};
 use criterion::{criterion_group, criterion_main, Criterion};
 use regex::Regex;
@@ -56,6 +57,7 @@ criterion_group!(
               is_empty,
               is_float,
               is_integer,
+              is_json,
               is_null,
               is_nullish,
               is_object,
@@ -752,6 +754,25 @@ bench_function! {
 }
 
 bench_function! {
+    is_json => vrl_stdlib::IsJson;
+
+    map {
+        args: func_args![value: r#"{"key": "value"}"#],
+        want: Ok(true),
+    }
+
+    invalid_map {
+        args: func_args![value: r#"{"key": "value""#],
+        want: Ok(false),
+    }
+
+    exact_variant {
+        args: func_args![value: r#"{"key": "value""#, variant: "object"],
+        want: Ok(true),
+    }
+}
+
+bench_function! {
     is_null => vrl_stdlib::IsNull;
 
     string {
@@ -1417,6 +1438,26 @@ bench_function! {
     map {
         args: func_args![value: r#"{"key": "value"}"#],
         want: Ok(value!({key: "value"})),
+    }
+
+    map_max_depth {
+        args: func_args![value: r#"{"key": "value"}"#, max_depth: 10],
+        want: Ok(value!({key: "value"})),
+    }
+
+    nested {
+        args: func_args![value: r#"{"1":{"2":{"3":{"4":{"5":{"6":"end"}}}}}}"#],
+        want: Ok(value!({"1":{"2":{"3":{"4":{"5":{"6":"end"}}}}}})),
+    }
+
+    nested_max_depth_1 {
+        args: func_args![value: r#"{"1":{"2":{"3":{"4":{"5":{"6":"end"}}}}}}"#, max_depth: 1],
+        want: Ok(value!({"1":"{\"2\":{\"3\":{\"4\":{\"5\":{\"6\":\"end\"}}}}}"})),
+    }
+
+    nested_max_depth_10 {
+        args: func_args![value: r#"{"1":{"2":{"3":{"4":{"5":{"6":"end"}}}}}}"#, max_depth: 10],
+        want: Ok(value!({"1":{"2":{"3":{"4":{"5":{"6":"end"}}}}}})),
     }
 }
 

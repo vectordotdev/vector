@@ -1,17 +1,19 @@
 use bytes::Bytes;
 use chrono::{DateTime, Datelike, Utc};
+use lookup::path;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use std::collections::BTreeMap;
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
 use value::{kind::Collection, Kind};
 
-use super::Deserializer;
 use vector_core::{
     config::{log_schema, DataType},
     event::{Event, Value},
     schema,
 };
+
+use super::Deserializer;
 
 /// Config used to build a `SyslogDeserializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -23,7 +25,7 @@ impl SyslogDeserializerConfig {
         SyslogDeserializer
     }
 
-    /// The data type of returned events
+    /// Return the type of event build by this deserializer.
     pub fn output_type(&self) -> DataType {
         DataType::Log
     }
@@ -127,6 +129,6 @@ fn insert_fields_from_syslog(event: &mut Event, parsed: Message<&str>) {
         for (name, value) in element.params() {
             sdata.insert(name.to_string(), value.into());
         }
-        log.insert_flat(element.id, sdata);
+        log.insert(path!(element.id), sdata);
     }
 }

@@ -493,6 +493,9 @@ async fn metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
+    // Set label on all nodes to check it later.
+    framework.label_nodes("label5=foobazbar").await?;
+
     let test_namespace = framework
         .namespace(namespace::Config::from_namespace(
             &namespace::make_namespace(
@@ -574,6 +577,7 @@ async fn metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
         assert_eq!(val["kubernetes"]["pod_labels"]["label2"], "world");
         assert_eq!(val["kubernetes"]["namespace_labels"]["label3"], "foobar");
         assert_eq!(val["kubernetes"]["namespace_labels"]["label4"], "fizzbuzz");
+        assert_eq!(val["kubernetes"]["node_labels"]["label5"], "foobazbar");
 
         if minor < 16 {
             assert!(val["kubernetes"]["pod_ip"].is_string());
@@ -830,6 +834,7 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
             kubernetes_logs:
               type: kubernetes_logs
               extra_label_selector: "my_custom_negative_label_selector!=my_val"
+              extra_namespace_label_selector: "my_custom_negative_label_selector!=my_val"
               extra_field_selector: "metadata.name!=test-pod-excluded-by-name"
           sinks:
             stdout:

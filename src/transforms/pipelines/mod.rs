@@ -105,6 +105,18 @@
 //! ```
 mod config;
 
+use std::{collections::HashSet, fmt::Debug};
+
+use config::EventTypeConfig;
+use indexmap::IndexMap;
+use serde::{Deserialize, Serialize};
+use vector_core::{
+    config::{ComponentKey, DataType, Input, Output},
+    transform::{
+        InnerTopology, InnerTopologyTransform, Transform, TransformConfig, TransformContext,
+    },
+};
+
 use crate::{
     conditions::is_log::IsLogConfig,
     conditions::is_metric::IsMetricConfig,
@@ -112,16 +124,6 @@ use crate::{
     config::{GenerateConfig, TransformDescription},
     schema,
     transforms::route::{RouteConfig, UNMATCHED_ROUTE},
-};
-use config::EventTypeConfig;
-use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, fmt::Debug};
-use vector_core::{
-    config::{ComponentKey, DataType, Input, Output},
-    transform::{
-        InnerTopology, InnerTopologyTransform, Transform, TransformConfig, TransformContext,
-    },
 };
 
 //------------------------------------------------------------------------------
@@ -180,7 +182,7 @@ impl TransformConfig for PipelinesConfig {
             // the default route of the type router should always be redirected
             outputs: vec![(
                 router_name.clone(),
-                vec![Output::from((UNMATCHED_ROUTE, DataType::all()))],
+                vec![Output::default(DataType::all()).with_port(UNMATCHED_ROUTE)],
             )],
         };
         let mut conditions = IndexMap::new();
@@ -327,34 +329,18 @@ mod tests {
                 .keys()
                 .map(|key| key.to_string())
                 .collect::<Vec<String>>(),
-            vec![
-                "foo.logs.0.filter",
-                "foo.logs.0.0",
-                "foo.logs.0.1",
-                "foo.logs.1.0",
-                "foo.type_router",
-            ],
+            vec!["foo.logs.0", "foo.logs.1", "foo.type_router",],
         );
+
         assert_eq!(routes["foo.type_router"], vec!["source".to_string()]);
         assert_eq!(
-            routes["foo.logs.0.filter"],
+            routes["foo.logs.0"],
             vec!["foo.type_router.logs".to_string()]
         );
-        assert_eq!(
-            routes["foo.logs.0.0"],
-            vec!["foo.logs.0.filter.success".to_string()]
-        );
-        assert_eq!(routes["foo.logs.0.1"], vec!["foo.logs.0.0".to_string()]);
-        assert_eq!(
-            routes["foo.logs.1.0"],
-            vec![
-                "foo.logs.0.1".to_string(),
-                "foo.logs.0.filter._unmatched".to_string(),
-            ],
-        );
+        assert_eq!(routes["foo.logs.1"], vec!["foo.logs.0".to_string()]);
         assert_eq!(
             expansions["foo"],
-            vec!["foo.type_router._unmatched", "foo.logs.1.0"]
+            vec!["foo.type_router._unmatched", "foo.logs.1"]
         );
     }
 }

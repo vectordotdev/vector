@@ -1,3 +1,4 @@
+use ::value::Value;
 use rust_decimal::{prelude::FromPrimitive, Decimal};
 use vrl::prelude::*;
 

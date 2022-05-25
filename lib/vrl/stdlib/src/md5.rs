@@ -1,3 +1,4 @@
+use ::value::Value;
 use md5::Digest;
 use vrl::prelude::*;
 

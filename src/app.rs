@@ -1,6 +1,8 @@
 use std::{collections::HashMap, num::NonZeroUsize, path::PathBuf};
 
 use futures::StreamExt;
+#[cfg(feature = "enterprise")]
+use futures_util::future::BoxFuture;
 use once_cell::race::OnceNonZeroUsize;
 use tokio::{
     runtime::{self, Runtime},
@@ -9,14 +11,20 @@ use tokio::{
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[cfg(feature = "enterprise")]
-use crate::config::enterprise::PipelinesError;
+use crate::config::enterprise::{
+    attach_enterprise_components, report_configuration, report_on_reload, EnterpriseError,
+    EnterpriseMetadata, EnterpriseReporter,
+};
+#[cfg(not(feature = "enterprise-tests"))]
+use crate::metrics;
 #[cfg(windows)]
 use crate::service;
 #[cfg(feature = "api")]
 use crate::{api, internal_events::ApiStarted};
 use crate::{
     cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand},
-    config, generate, graph, heartbeat, list, metrics,
+    config::{self},
+    generate, graph, heartbeat, list,
     signal::{self, SignalTo},
     topology::{self, RunningTopology},
     trace, unit_test, validate,
@@ -37,6 +45,8 @@ pub struct ApplicationConfig {
     pub graceful_crash: mpsc::UnboundedReceiver<()>,
     #[cfg(feature = "api")]
     pub api: config::api::Options,
+    #[cfg(feature = "enterprise")]
+    pub enterprise: Option<EnterpriseReporter<BoxFuture<'static, ()>>>,
     pub signal_handler: signal::SignalHandler,
     pub signal_rx: signal::SignalRx,
 }
@@ -99,6 +109,7 @@ impl Application {
             LogFormat::Json => true,
         };
 
+        #[cfg(not(feature = "enterprise-tests"))]
         metrics::init_global().expect("metrics initialization failed");
 
         let mut rt_builder = runtime::Builder::new_multi_thread();
@@ -135,7 +146,7 @@ impl Application {
                         SubCommand::Graph(g) => graph::cmd(&g),
                         SubCommand::Config(c) => config::cmd(&c),
                         SubCommand::List(l) => list::cmd(&l),
-                        SubCommand::Test(t) => unit_test::cmd(&t).await,
+                        SubCommand::Test(t) => unit_test::cmd(&t, &mut signal_handler).await,
                         #[cfg(windows)]
                         SubCommand::Service(s) => service::cmd(&s),
                         #[cfg(feature = "api-client")]
@@ -169,12 +180,15 @@ impl Application {
                     paths = ?config_paths.iter().map(<&PathBuf>::from).collect::<Vec<_>>()
                 );
 
+                #[cfg(not(feature = "enterprise-tests"))]
                 config::init_log_schema(&config_paths, true).map_err(handle_config_errors)?;
 
-                let mut config =
-                    config::load_from_paths_with_provider(&config_paths, &mut signal_handler)
-                        .await
-                        .map_err(handle_config_errors)?;
+                let mut config = config::load_from_paths_with_provider_and_secrets(
+                    &config_paths,
+                    &mut signal_handler,
+                )
+                .await
+                .map_err(handle_config_errors)?;
 
                 if !config.healthchecks.enabled {
                     info!("Health checks are disabled.");
@@ -182,17 +196,22 @@ impl Application {
                 config.healthchecks.set_require_healthy(require_healthy);
 
                 #[cfg(feature = "enterprise")]
-                // Augment config to enable observability within Datadog, if applicable.
-                if let Err(PipelinesError::FatalCouldNotReportConfig) =
-                    config::enterprise::try_attach(
-                        &mut config,
-                        &config_paths,
-                        signal_handler.subscribe(),
-                    )
-                    .await
-                {
-                    return Err(exitcode::UNAVAILABLE);
-                }
+                // Enable enterprise features, if applicable.
+                let enterprise = match EnterpriseMetadata::try_from(&config) {
+                    Ok(metadata) => {
+                        let enterprise = EnterpriseReporter::new();
+
+                        attach_enterprise_components(&mut config, &metadata);
+                        enterprise.send(report_configuration(config_paths.clone(), metadata));
+
+                        Some(enterprise)
+                    }
+                    Err(EnterpriseError::MissingApiKey) => {
+                        error!("Enterprise configuration incomplete: missing API key.");
+                        return Err(exitcode::CONFIG);
+                    }
+                    Err(_) => None,
+                };
 
                 let diff = config::ConfigDiff::initial(&config);
                 let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
@@ -211,6 +230,8 @@ impl Application {
                     graceful_crash,
                     #[cfg(feature = "api")]
                     api,
+                    #[cfg(feature = "enterprise")]
+                    enterprise,
                     signal_handler,
                     signal_rx,
                 })
@@ -237,12 +258,15 @@ impl Application {
         #[cfg(feature = "api")]
         let api_config = self.config.api;
 
+        #[cfg(feature = "enterprise")]
+        let mut enterprise = self.config.enterprise;
+
         let mut signal_handler = self.config.signal_handler;
         let mut signal_rx = self.config.signal_rx;
 
         // Any internal_logs sources will have grabbed a copy of the
         // early buffer by this point and set up a subscriber.
-        crate::trace::stop_buffering();
+        crate::trace::stop_early_buffering();
 
         rt.block_on(async move {
             emit!(VectorStarted);
@@ -276,10 +300,19 @@ impl Application {
                                         new_config.healthchecks.set_require_healthy(opts.require_healthy);
 
                                         #[cfg(feature = "enterprise")]
-                                        if let Err(PipelinesError::FatalCouldNotReportConfig) =
-                                            config::enterprise::try_attach(&mut new_config, &config_paths, signal_handler.subscribe()).await
-                                        {
-                                            break SignalTo::Shutdown;
+                                        // Augment config to enable observability within Datadog, if applicable.
+                                        match EnterpriseMetadata::try_from(&new_config) {
+                                            Ok(metadata) => {
+                                                if let Some(e) = report_on_reload(&mut new_config, metadata, config_paths.clone(), enterprise.as_ref()) {
+                                                    enterprise = Some(e);
+                                                }
+                                            },
+                                            Err(err) => {
+                                                if let EnterpriseError::MissingApiKey = err {
+                                                    emit!(VectorReloadError);
+                                                    continue;
+                                                }
+                                            },
                                         }
 
                                         match topology
@@ -315,7 +348,7 @@ impl Application {
                                 config_paths = config::process_paths(&opts.config_paths_with_formats()).unwrap_or(config_paths);
 
                                 // Reload config
-                                let new_config = config::load_from_paths_with_provider(&config_paths, &mut signal_handler)
+                                let new_config = config::load_from_paths_with_provider_and_secrets(&config_paths, &mut signal_handler)
                                     .await
                                     .map_err(handle_config_errors).ok();
 
@@ -323,11 +356,18 @@ impl Application {
                                     new_config.healthchecks.set_require_healthy(opts.require_healthy);
 
                                     #[cfg(feature = "enterprise")]
-                                    // Augment config to enable observability within Datadog, if applicable.
-                                    if let Err(PipelinesError::FatalCouldNotReportConfig) =
-                                        config::enterprise::try_attach(&mut new_config, &config_paths, signal_handler.subscribe()).await
-                                    {
-                                        break SignalTo::Shutdown;
+                                    match EnterpriseMetadata::try_from(&new_config) {
+                                        Ok(metadata) => {
+                                            if let Some(e) = report_on_reload(&mut new_config, metadata, config_paths.clone(), enterprise.as_ref()) {
+                                                enterprise = Some(e);
+                                            }
+                                        },
+                                        Err(err) => {
+                                            if let EnterpriseError::MissingApiKey = err {
+                                                emit!(VectorReloadError);
+                                                continue;
+                                            }
+                                        },
                                     }
 
                                     match topology

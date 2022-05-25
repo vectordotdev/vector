@@ -39,6 +39,17 @@ components: _aws: {
 							examples: ["arn:aws:iam::123456789098:role/my_role"]
 						}
 					}
+					load_timeout_secs: {
+						category:    "Auth"
+						common:      false
+						description: "The timeout for loading credentials. Relevant when the default credentials chain is used or `assume_role`."
+						required:    false
+						type: uint: {
+							unit:    "seconds"
+							default: 5
+							examples: [30]
+						}
+					}
 					profile: {
 						category:    "Auth"
 						common:      false

@@ -1,3 +1,8 @@
+// NOTE: We intentionally do not assert/verify that `datadog_archives` meets the component specification because it
+// derives all of its capabilities from existing sink implementations which themselves are tested. We probably _should_
+// also verify it here, but for now, this is a punt to avoid having to add a bunch of specific integration tests that
+// exercise all possible configurations of the sink.
+
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     convert::TryFrom,
@@ -13,6 +18,7 @@ use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{SecondsFormat, Utc};
 use goauth::scopes::Scope;
 use http::header::{HeaderName, HeaderValue};
+use lookup::path;
 use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -20,17 +26,20 @@ use tower::ServiceBuilder;
 use uuid::Uuid;
 use vector_core::{
     config::{log_schema, AcknowledgementsConfig, LogSchema},
-    event::{Event, Finalizable},
+    event::{Event, EventFinalizers, Finalizable},
     ByteSizeOf,
 };
 
 use super::util::{
     encoding::{Encoder, StandardEncodings},
+    metadata::RequestMetadataBuilder,
+    request_builder::EncodeResult,
     BatchConfig, Compression, RequestBuilder, SinkBatchSettings,
 };
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
     config::{GenerateConfig, Input, SinkConfig, SinkContext},
+    gcp::{GcpAuthConfig, GcpCredentials},
     http::HttpClient,
     serde::json::to_string,
     sinks::{
@@ -40,11 +49,10 @@ use crate::{
             service::AzureBlobService,
             sink::AzureBlobSink,
         },
-        gcp::{GcpAuthConfig, GcpCredentials},
         gcs_common::{
             self,
             config::{GcsPredefinedAcl, GcsRetryLogic, GcsStorageClass, BASE_URL},
-            service::{GcsMetadata, GcsRequest, GcsRequestSettings, GcsService},
+            service::{GcsRequest, GcsRequestSettings, GcsService},
             sink::GcsSink,
         },
         s3_common::{
@@ -55,7 +63,10 @@ use crate::{
             service::{S3Metadata, S3Request, S3Service},
             sink::S3Sink,
         },
-        util::{partitioner::KeyPartitioner, ServiceBuilderExt, TowerRequestConfig},
+        util::{
+            metadata::RequestMetadata, partitioner::KeyPartitioner, ServiceBuilderExt,
+            TowerRequestConfig,
+        },
         VectorSink,
     },
     template::Template,
@@ -194,7 +205,8 @@ impl DatadogArchivesSinkConfig {
                     .as_ref()
                     .expect("azire blob config wasn't provided");
                 let client = azure_common::config::build_client(
-                    azure_config.connection_string.clone(),
+                    Some(azure_config.connection_string.clone()),
+                    None,
                     self.bucket.clone(),
                 )?;
                 let svc = self
@@ -435,16 +447,20 @@ impl Encoder<Vec<Event>> for DatadogArchivesEncoding {
                     .unwrap_or_else(chrono::Utc::now)
                     .to_rfc3339_opts(SecondsFormat::Millis, true),
             );
-            log_event.rename_key_flat(self.log_schema.message_key(), "message");
-            log_event.rename_key_flat(self.log_schema.host_key(), "host");
+            log_event.rename_key(self.log_schema.message_key(), path!("message"));
+            log_event.rename_key(self.log_schema.host_key(), path!("host"));
 
             let mut attributes = BTreeMap::new();
-            let custom_attributes: Vec<String> = log_event
-                .as_map()
-                .keys()
-                .filter(|&path| !self.reserved_attributes.contains(path.as_str()))
-                .map(|v| v.to_owned())
-                .collect();
+
+            let custom_attributes = if let Some(map) = log_event.as_map() {
+                map.keys()
+                    .filter(|&path| !self.reserved_attributes.contains(path.as_str()))
+                    .map(|v| v.to_owned())
+                    .collect()
+            } else {
+                vec![]
+            };
+
             for path in custom_attributes {
                 if let Some(value) = log_event.remove(path.as_str()) {
                     attributes.insert(path, value);
@@ -504,13 +520,18 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
         (metadata, events)
     }
 
-    fn build_request(&self, mut metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
+    fn build_request(
+        &self,
+        mut metadata: Self::Metadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
         metadata.partition_key =
             generate_object_key(self.key_prefix.clone(), metadata.partition_key);
 
+        let body = payload.into_payload();
         trace!(
             message = "Sending events.",
-            bytes = ?payload.len(),
+            bytes = ?body.len(),
             events_len = ?metadata.byte_size,
             bucket = ?self.bucket,
             key = ?metadata.partition_key
@@ -518,7 +539,7 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogS3RequestBuilder {
 
         let s3_options = self.config.options.clone();
         S3Request {
-            body: payload,
+            body,
             bucket: self.bucket.clone(),
             metadata,
             content_encoding: DEFAULT_COMPRESSION.content_encoding(),
@@ -551,7 +572,7 @@ struct DatadogGcsRequestBuilder {
 }
 
 impl RequestBuilder<(String, Vec<Event>)> for DatadogGcsRequestBuilder {
-    type Metadata = GcsMetadata;
+    type Metadata = (String, EventFinalizers, RequestMetadataBuilder);
     type Events = Vec<Event>;
     type Payload = Bytes;
     type Request = GcsRequest;
@@ -559,27 +580,31 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogGcsRequestBuilder {
     type Error = io::Error;
 
     fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
-        let (key, mut events) = input;
+        let (partition_key, mut events) = input;
+        let metadata_builder = RequestMetadata::builder(&events);
         let finalizers = events.take_finalizers();
-        let metadata = GcsMetadata {
-            key,
-            count: events.len(),
-            byte_size: events.size_of(),
-            finalizers,
-        };
 
-        (metadata, events)
+        ((partition_key, finalizers, metadata_builder), events)
     }
 
-    fn build_request(&self, mut metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
-        metadata.key = generate_object_key(self.key_prefix.clone(), metadata.key);
+    fn build_request(
+        &self,
+        metadata: Self::Metadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
+        let (key, finalizers, metadata_builder) = metadata;
+
+        let key = generate_object_key(self.key_prefix.clone(), key);
+
+        let metadata = metadata_builder.build(&payload);
+        let body = payload.into_payload();
 
         trace!(
             message = "Sending events.",
-            bytes = ?payload.len(),
-            events_len = ?metadata.count,
-            bucket = ?self.bucket,
-            key = ?metadata.key
+            bytes = body.len(),
+            events_len = metadata.event_count(),
+            bucket = %self.bucket,
+            ?key
         );
 
         let content_type = HeaderValue::from_str(StandardEncodings::Ndjson.content_type()).unwrap();
@@ -588,7 +613,9 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogGcsRequestBuilder {
             .map(|ce| HeaderValue::from_str(&to_string(ce)).unwrap());
 
         GcsRequest {
-            body: payload,
+            key,
+            body,
+            finalizers,
             settings: GcsRequestSettings {
                 acl: self.acl.clone(),
                 content_type,
@@ -659,20 +686,26 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogAzureRequestBuilder {
         (metadata, events)
     }
 
-    fn build_request(&self, mut metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
+    fn build_request(
+        &self,
+        mut metadata: Self::Metadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
         metadata.partition_key =
             generate_object_key(self.blob_prefix.clone(), metadata.partition_key);
 
+        let blob_data = payload.into_payload();
+
         trace!(
             message = "Sending events.",
-            bytes = ?payload.len(),
+            bytes = ?blob_data.len(),
             events_len = ?metadata.count,
             container = ?self.container_name,
             blob = ?metadata.partition_key
         );
 
         AzureBlobRequest {
-            blob_data: payload,
+            blob_data,
             content_encoding: DEFAULT_COMPRESSION.content_encoding(),
             content_type: "application/gzip",
             metadata,
@@ -912,7 +945,8 @@ mod tests {
         );
 
         let (metadata, _events) = request_builder.split_input((key, vec![log]));
-        let req = request_builder.build_request(metadata, fake_buf.clone());
+        let req =
+            request_builder.build_request(metadata, EncodeResult::uncompressed(fake_buf.clone()));
         let expected_key_prefix = "audit/dt=20210823/hour=16/";
         let expected_key_ext = ".json.gz";
         println!("{}", req.metadata.partition_key);
@@ -927,9 +961,10 @@ mod tests {
 
         let key = partitioner.partition(&log2).expect("key wasn't provided");
         let (metadata, _events) = request_builder.split_input((key, vec![log2]));
-        let req = request_builder.build_request(metadata, fake_buf);
+        let req = request_builder.build_request(metadata, EncodeResult::uncompressed(fake_buf));
         let uuid2 = &req.metadata.partition_key
             [expected_key_prefix.len()..req.metadata.partition_key.len() - expected_key_ext.len()];
+
         assert_ne!(uuid1, uuid2);
     }
 

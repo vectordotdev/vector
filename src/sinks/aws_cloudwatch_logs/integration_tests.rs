@@ -4,11 +4,17 @@
 use std::convert::TryFrom;
 use std::str::FromStr;
 
+use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
+use aws_sdk_cloudwatchlogs::{Endpoint, Region};
 use chrono::Duration;
-use futures::StreamExt;
+use futures::{stream, StreamExt};
+use http::Uri;
 use pretty_assertions::assert_eq;
 
 use super::*;
+use crate::aws::create_client;
+use crate::aws::{AwsAuthentication, RegionOrEndpoint};
+use crate::sinks::aws_cloudwatch_logs::config::CloudwatchLogsClientBuilder;
 use crate::{
     config::{log_schema, ProxyConfig, SinkConfig, SinkContext},
     event::{Event, Value},
@@ -17,15 +23,11 @@ use crate::{
         BatchConfig,
     },
     template::Template,
-    test_util::{random_lines, random_lines_with_stream, random_string, trace_init},
+    test_util::{
+        components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
+        random_lines, random_lines_with_stream, random_string, trace_init,
+    },
 };
-
-use crate::aws::create_client;
-use crate::aws::{AwsAuthentication, RegionOrEndpoint};
-use crate::sinks::aws_cloudwatch_logs::config::CloudwatchLogsClientBuilder;
-use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
-use aws_sdk_cloudwatchlogs::{Endpoint, Region};
-use http::Uri;
 
 const GROUP_NAME: &str = "vector-cw";
 
@@ -61,7 +63,7 @@ async fn cloudwatch_insert_log_event() {
     let timestamp = chrono::Utc::now();
 
     let (input_lines, events) = random_lines_with_stream(100, 11, None);
-    sink.run(events).await.unwrap();
+    run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
     let response = create_client_test()
         .await
@@ -127,7 +129,7 @@ async fn cloudwatch_insert_log_events_sorted() {
 
         events
     });
-    let _ = sink.run(events).await.unwrap();
+    run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
     let response = create_client_test()
         .await
@@ -205,7 +207,7 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
     lines.push(add_event(Duration::days(-1)));
     lines.push(add_event(Duration::days(-13)));
 
-    sink.run_events(events).await.unwrap();
+    run_and_assert_sink_compliance(sink, stream::iter(events), &AWS_SINK_TAGS).await;
 
     let response = create_client_test()
         .await
@@ -255,7 +257,7 @@ async fn cloudwatch_dynamic_group_and_stream_creation() {
     let timestamp = chrono::Utc::now();
 
     let (input_lines, events) = random_lines_with_stream(100, 11, None);
-    sink.run(events).await.unwrap();
+    run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
     let response = create_client_test()
         .await
@@ -310,8 +312,7 @@ async fn cloudwatch_insert_log_event_batched() {
     let timestamp = chrono::Utc::now();
 
     let (input_lines, events) = random_lines_with_stream(100, 11, None);
-    let stream = sink.into_stream(); //.send_all(&mut events).await.unwrap();
-    stream.run(events.map(Into::into).boxed()).await.unwrap();
+    run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
     let response = create_client_test()
         .await
@@ -373,7 +374,7 @@ async fn cloudwatch_insert_log_event_partitioned() {
             event
         })
         .collect::<Vec<_>>();
-    sink.run_events(events).await.unwrap();
+    run_and_assert_sink_compliance(sink, stream::iter(events), &AWS_SINK_TAGS).await;
 
     let response = create_client_test()
         .await
@@ -454,14 +455,14 @@ async fn cloudwatch_healthcheck() {
 
 async fn create_client_test() -> CloudwatchLogsClient {
     let auth = AwsAuthentication::test_auth();
-    let region = Region::new("localstack");
+    let region = Some(Region::new("localstack"));
     let watchlogs_address = watchlogs_address();
     let endpoint = Some(Endpoint::immutable(
         Uri::from_str(&watchlogs_address).unwrap(),
     ));
     let proxy = ProxyConfig::default();
 
-    create_client::<CloudwatchLogsClientBuilder>(&auth, region, endpoint, &proxy, &None)
+    create_client::<CloudwatchLogsClientBuilder>(&auth, region, endpoint, &proxy, &None, true)
         .await
         .unwrap()
 }

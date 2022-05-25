@@ -25,9 +25,11 @@ use crate::{
     event::Event,
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
+    sources::http::HttpMethod,
     sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     tls::TlsEnableableConfig,
 };
+use lookup::path;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub(crate) struct LogplexConfig {
@@ -99,6 +101,7 @@ impl SourceConfig for LogplexConfig {
         source.run(
             self.address,
             "events",
+            HttpMethod::Post,
             true,
             &self.tls,
             &self.auth,
@@ -245,8 +248,8 @@ fn line_to_events(mut decoder: Decoder, line: String) -> SmallVec<[Event; 1]> {
 
                             log.try_insert(log_schema().host_key(), hostname.to_owned());
 
-                            log.try_insert_flat("app_name", app_name.to_owned());
-                            log.try_insert_flat("proc_id", proc_id.to_owned());
+                            log.try_insert(path!("app_name"), app_name.to_owned());
+                            log.try_insert(path!("proc_id"), proc_id.to_owned());
                         }
 
                         events.push(event);
@@ -295,7 +298,10 @@ mod tests {
     use crate::{
         config::{log_schema, SourceConfig, SourceContext},
         serde::{default_decoding, default_framing_message_based},
-        test_util::{components, next_addr, random_string, spawn_collect_n, wait_for_tcp},
+        test_util::{
+            components::{assert_source_compliance, HTTP_PUSH_SOURCE_TAGS},
+            next_addr, random_string, spawn_collect_n, wait_for_tcp,
+        },
         SourceSender,
     };
 
@@ -310,7 +316,6 @@ mod tests {
         status: EventStatus,
         acknowledgements: bool,
     ) -> (impl Stream<Item = Event>, SocketAddr) {
-        components::init_test();
         let (sender, recv) = SourceSender::new_test_finalize(status);
         let address = next_addr();
         let context = SourceContext::new_test(sender, None);
@@ -367,69 +372,72 @@ mod tests {
 
     #[tokio::test]
     async fn logplex_handles_router_log() {
-        let auth = make_auth();
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let auth = make_auth();
 
-        let (rx, addr) = source(
-            Some(auth.clone()),
-            vec!["appname".to_string(), "absent".to_string()],
-            EventStatus::Delivered,
-            true,
-        )
-        .await;
+            let (rx, addr) = source(
+                Some(auth.clone()),
+                vec!["appname".to_string(), "absent".to_string()],
+                EventStatus::Delivered,
+                true,
+            )
+            .await;
 
-        let mut events = spawn_collect_n(
-            async move {
-                assert_eq!(
-                    200,
-                    send(addr, SAMPLE_BODY, Some(auth), "appname=lumberjack-store").await
-                )
-            },
-            rx,
-            SAMPLE_BODY.lines().count(),
-        )
-        .await;
-        components::SOURCE_TESTS.assert(&["http_path"]);
+            let mut events = spawn_collect_n(
+                async move {
+                    assert_eq!(
+                        200,
+                        send(addr, SAMPLE_BODY, Some(auth), "appname=lumberjack-store").await
+                    )
+                },
+                rx,
+                SAMPLE_BODY.lines().count(),
+            )
+            .await;
 
-        let event = events.remove(0);
-        let log = event.as_log();
+            let event = events.remove(0);
+            let log = event.as_log();
 
-        assert_eq!(
-            log[log_schema().message_key()],
-            r#"at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_id=05726858-c44e-4f94-9a20-37df73be9006 fwd="73.75.38.87" dyno=web.1 connect=1ms service=22ms status=304 bytes=656 protocol=http"#.into()
-        );
-        assert_eq!(
-            log[log_schema().timestamp_key()],
-            "2020-01-08T22:33:57.353034+00:00"
-                .parse::<DateTime<Utc>>()
-                .unwrap()
-                .into()
-        );
-        assert_eq!(log[&log_schema().host_key()], "host".into());
-        assert_eq!(log[log_schema().source_type_key()], "heroku_logs".into());
-        assert_eq!(log["appname"], "lumberjack-store".into());
-        assert_eq!(log["absent"], Value::Null);
+            assert_eq!(
+                log[log_schema().message_key()],
+                r#"at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_id=05726858-c44e-4f94-9a20-37df73be9006 fwd="73.75.38.87" dyno=web.1 connect=1ms service=22ms status=304 bytes=656 protocol=http"#.into()
+            );
+            assert_eq!(
+                log[log_schema().timestamp_key()],
+                "2020-01-08T22:33:57.353034+00:00"
+                    .parse::<DateTime<Utc>>()
+                    .unwrap()
+                    .into()
+            );
+            assert_eq!(log[&log_schema().host_key()], "host".into());
+            assert_eq!(log[log_schema().source_type_key()], "heroku_logs".into());
+            assert_eq!(log["appname"], "lumberjack-store".into());
+            assert_eq!(log["absent"], Value::Null);
+        }).await;
     }
 
     #[tokio::test]
     async fn logplex_handles_failures() {
-        let auth = make_auth();
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let auth = make_auth();
 
-        let (rx, addr) = source(Some(auth.clone()), vec![], EventStatus::Rejected, true).await;
+            let (rx, addr) = source(Some(auth.clone()), vec![], EventStatus::Rejected, true).await;
 
-        let events = spawn_collect_n(
-            async move {
-                assert_eq!(
-                    400,
-                    send(addr, SAMPLE_BODY, Some(auth), "appname=lumberjack-store").await
-                )
-            },
-            rx,
-            SAMPLE_BODY.lines().count(),
-        )
+            let events = spawn_collect_n(
+                async move {
+                    assert_eq!(
+                        400,
+                        send(addr, SAMPLE_BODY, Some(auth), "appname=lumberjack-store").await
+                    )
+                },
+                rx,
+                SAMPLE_BODY.lines().count(),
+            )
+            .await;
+
+            assert_eq!(events.len(), SAMPLE_BODY.lines().count());
+        })
         .await;
-        components::SOURCE_TESTS.assert(&["http_path"]);
-
-        assert_eq!(events.len(), SAMPLE_BODY.lines().count());
     }
 
     #[tokio::test]

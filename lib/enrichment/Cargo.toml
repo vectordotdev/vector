@@ -11,3 +11,4 @@ dyn-clone = { version = "1.0.5", default-features = false }
 chrono = { version = "0.4.19", default-features = false }
 vector_common = { path = "../vector-common", default-features = false, features = [ "btreemap", "conversion" ] }
 vrl = { package = "vrl", path = "../vrl/vrl" }
+value = { package = "value", path = "../value" }

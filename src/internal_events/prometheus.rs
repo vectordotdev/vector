@@ -1,13 +1,13 @@
 #[cfg(feature = "sources-prometheus")]
 use std::borrow::Cow;
-use std::time::Instant;
 
-use super::prelude::{error_stage, error_type, http_error_code};
 use hyper::StatusCode;
-use metrics::{counter, histogram};
+use metrics::counter;
 #[cfg(feature = "sources-prometheus")]
 use prometheus_parser::ParserError;
 use vector_core::internal_event::InternalEvent;
+
+use super::prelude::{error_stage, error_type, http_error_code};
 
 #[derive(Debug)]
 pub struct PrometheusEventsReceived {
@@ -37,20 +37,6 @@ impl InternalEvent for PrometheusEventsReceived {
             "events_in_total", self.count as u64,
             "uri" => self.uri.to_string(),
         );
-    }
-}
-
-#[derive(Debug)]
-pub struct PrometheusRequestCompleted {
-    pub start: Instant,
-    pub(crate) end: Instant,
-}
-
-impl InternalEvent for PrometheusRequestCompleted {
-    fn emit(self) {
-        debug!(message = "Request completed.");
-        counter!("requests_completed_total", 1);
-        histogram!("request_duration_seconds", self.end - self.start);
     }
 }
 
@@ -160,30 +146,6 @@ impl InternalEvent for PrometheusRemoteWriteParseError {
         );
         counter!(
             "component_errors_total", 1,
-            "error_type" => error_type::PARSER_FAILED,
-            "stage" => error_stage::PROCESSING,
-        );
-        // deprecated
-        counter!("parse_errors_total", 1);
-    }
-}
-
-#[derive(Debug)]
-pub struct PrometheusNoNameError;
-
-impl InternalEvent for PrometheusNoNameError {
-    fn emit(self) {
-        error!(
-            message = "Could not decode timeseries.",
-            error = "Decoded timeseries is missing the __name__ field.",
-            error_code = "missing_name_field",
-            error_type = error_type::PARSER_FAILED,
-            stage = error_stage::PROCESSING,
-            internal_log_rate_secs = 10,
-        );
-        counter!(
-            "component_errors_total", 1,
-            "error_code" => "missing_name_field",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
         );

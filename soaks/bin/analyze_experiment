@@ -196,25 +196,3 @@ results['comparison stdev'] = results['comparison stdev'].apply(common.human_byt
 results['comparison stderr'] = results['comparison stderr'].apply(common.human_bytes)
 print(results.to_markdown(index=False, tablefmt='github'))
 print("</details>")
-
-print("<details>")
-print("<summary>Fine details of each soak run.</summary>")
-print()
-describe = bytes_written.groupby(['experiment', 'variant', 'run_id']).throughput.describe(percentiles=[0.90, 0.95, 0.99])
-describe = describe.rename(columns={'50%': 'median', '95%': 'p95', '90%': 'p90', '99%': 'p99'})
-describe = describe.sort_values('mean', ascending=False)
-describe['skewness'] = bytes_written.groupby(['experiment', 'variant', 'run_id']).throughput.skew()
-describe['mean'] = describe['mean'].apply(common.human_bytes)
-describe['std'] = describe['std'].apply(common.human_bytes)
-describe['min'] = describe['min'].apply(common.human_bytes)
-describe['median'] = describe['median'].apply(common.human_bytes)
-describe['p90'] = describe['p90'].apply(common.human_bytes)
-describe['p95'] = describe['p95'].apply(common.human_bytes)
-describe['p99'] = describe['p99'].apply(common.human_bytes)
-describe['max'] = describe['max'].apply(common.human_bytes)
-print(describe.to_markdown(index=True,
-                           tablefmt='github',
-                           headers=['(experiment, variant, run_id)', 'total samples',
-                                    'mean', 'std', 'min', 'median',
-                                    'p90', 'p95', 'p99', 'max', 'skewness']))
-print("</details>")

@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use ::value::Value;
 use vrl::{function::Error, prelude::*};
 
 fn to_unix_timestamp(value: Value, unit: Unit) -> Resolved {

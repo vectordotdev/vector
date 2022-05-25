@@ -1,13 +1,14 @@
 use std::fmt;
 
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
+use value::Value;
 
 use crate::{
     expression::{Expr, Resolved},
     parser::Node,
     state::{ExternalEnv, LocalEnv},
     value::Kind,
-    Context, Expression, Span, TypeDef, Value,
+    Context, Expression, Span, TypeDef,
 };
 
 pub(crate) type Result = std::result::Result<Predicate, Error>;
@@ -53,7 +54,7 @@ impl Expression for Predicate {
             .iter()
             .map(|expr| expr.resolve(ctx))
             .collect::<std::result::Result<Vec<_>, _>>()
-            .map(|mut v| v.pop().unwrap_or(Value::Null))
+            .map(|mut v| v.pop().unwrap_or(Value::Boolean(false)))
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
@@ -68,7 +69,7 @@ impl Expression for Predicate {
         let fallible = type_defs.iter().any(TypeDef::is_fallible);
 
         // The last expression determines the resulting value of the predicate.
-        let type_def = type_defs.pop().unwrap_or_else(TypeDef::null);
+        let type_def = type_defs.pop().unwrap_or_else(TypeDef::boolean);
 
         type_def.with_fallibility(fallible)
     }

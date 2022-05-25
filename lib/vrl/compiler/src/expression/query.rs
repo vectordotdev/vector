@@ -3,15 +3,16 @@ use std::fmt;
 use lookup::LookupBuf;
 use value::{
     kind::{remove, Collection},
-    Kind,
+    Kind, Value,
 };
 
 use crate::{
-    expression::{assignment, Container, FunctionCall, Resolved, Variable},
+    expression::{Container, Resolved, Variable},
     parser::ast::Ident,
     state::{ExternalEnv, LocalEnv},
+    type_def::Details,
     vm::{self, OpCode},
-    Context, Expression, TypeDef, Value,
+    Context, Expression, TypeDef,
 };
 
 #[derive(Clone, PartialEq)]
@@ -70,7 +71,7 @@ impl Query {
                 },
             );
 
-            external.update_target(assignment::Details { type_def, value });
+            external.update_target(Details { type_def, value });
 
             return result;
         }
@@ -90,6 +91,7 @@ impl Expression for Query {
                     .target_get(&self.path)
                     .ok()
                     .flatten()
+                    .cloned()
                     .unwrap_or(Value::Null))
             }
             Internal(variable) => variable.resolve(ctx)?,
@@ -100,6 +102,7 @@ impl Expression for Query {
         Ok(crate::Target::target_get(&value, &self.path)
             .ok()
             .flatten()
+            .cloned()
             .unwrap_or(Value::Null))
     }
 
@@ -117,19 +120,11 @@ impl Expression for Query {
         use Target::*;
 
         match &self.target {
-            External => {
-                // `.` path must be an object
-                //
-                // TODO: make sure to enforce this
-                if self.path.is_root() {
-                    return TypeDef::object(Collection::any()).infallible();
-                }
-
-                match state.1.target() {
-                    None => TypeDef::any().infallible(),
-                    Some(details) => details.clone().type_def.at_path(&self.path.to_lookup()),
-                }
-            }
+            External => match state.1.target() {
+                None if self.path().is_root() => TypeDef::object(Collection::any()).infallible(),
+                None => TypeDef::any().infallible(),
+                Some(details) => details.clone().type_def.at_path(&self.path.to_lookup()),
+            },
 
             Internal(variable) => variable.type_def(state).at_path(&self.path.to_lookup()),
             FunctionCall(call) => call.type_def(state).at_path(&self.path.to_lookup()),
@@ -150,7 +145,7 @@ impl Expression for Query {
             }
             Target::Internal(variable) => {
                 vm.write_opcode(OpCode::GetPath);
-                vm::Variable::Internal(variable.ident().clone(), Some(self.path.clone()))
+                vm::Variable::Internal(variable.ident().clone(), self.path.clone())
             }
             Target::FunctionCall(call) => {
                 // Write the code to call the function.
@@ -193,7 +188,11 @@ impl fmt::Debug for Query {
 pub enum Target {
     Internal(Variable),
     External,
-    FunctionCall(FunctionCall),
+
+    #[cfg(feature = "expr-function_call")]
+    FunctionCall(crate::expression::FunctionCall),
+    #[cfg(not(feature = "expr-function_call"))]
+    FunctionCall(crate::expression::Noop),
     Container(Container),
 }
 
@@ -225,9 +224,8 @@ impl fmt::Debug for Target {
 
 #[cfg(test)]
 mod tests {
-    use crate::state;
-
     use super::*;
+    use crate::state;
 
     #[test]
     fn test_type_def() {
