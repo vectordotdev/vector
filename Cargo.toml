@@ -805,6 +805,7 @@ vector-unit-test-tests = [
   "sinks-console"
 ]
 enterprise-tests = [
+  "enterprise",
   "sources-demo_logs",
   "sinks-blackhole",
 ]
