@@ -26,7 +26,7 @@ This specification addresses direct buffer development and does not cover aspect
 
 ## Instrumentation
 
-**This section extends the [Instrumentation Specification] and should be read
+**This section extends the [Instrumentation Specification], which should be read
 first.**
 
 Vector buffers MUST be instrumented for optimal observability and monitoring.
