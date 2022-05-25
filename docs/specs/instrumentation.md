@@ -24,8 +24,8 @@ interpreted as described in [RFC 2119].
 
 Vector's telemetry drives various interfaces that operators depend on to manage
 mission critical Vector deployments. Therefore, Vector's telemetry should be
-high quality and treated as a first class feautre in the development of Vector.
-This document strives to guide developers into achieving this.
+high quality and treated as a first class feature in the development of Vector.
+This document strives to guide developers towards achieving this.
 
 ## Naming
 
