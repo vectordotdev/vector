@@ -14,7 +14,7 @@ use crate::{
             acknowledgements::HecClientAcknowledgementsConfig,
             build_healthcheck, build_http_batch_service, create_client, host_key,
             service::{HecService, HttpRequestBuilder},
-            SplunkHecDefaultBatchSettings,
+            SplunkHecDefaultBatchSettings, Data,
         },
         util::{
             encoding::EncodingConfig, http::HttpRetryLogic, BatchConfig, Compression,
@@ -52,6 +52,12 @@ pub struct HecLogsSinkConfig {
     pub acknowledgements: HecClientAcknowledgementsConfig,
     // This settings is relevant only for the `humio_logs` sink and should be left to None everywhere else
     pub timestamp_nanos_key: Option<String>,
+    #[serde(default = "default_data")]
+    pub data: Data,
+}
+
+const fn default_data() -> Data {
+    Data::Event
 }
 
 impl GenerateConfig for HecLogsSinkConfig {
@@ -71,6 +77,7 @@ impl GenerateConfig for HecLogsSinkConfig {
             tls: None,
             acknowledgements: Default::default(),
             timestamp_nanos_key: None,
+            data: Data::Event,
         })
         .unwrap()
     }
@@ -133,6 +140,7 @@ impl HecLogsSinkConfig {
             .service(build_http_batch_service(
                 client,
                 Arc::clone(&http_request_builder),
+                self.data,
             ));
 
         let service = HecService::new(

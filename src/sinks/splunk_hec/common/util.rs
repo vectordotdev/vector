@@ -7,7 +7,7 @@ use hyper::Body;
 use snafu::{ResultExt, Snafu};
 use vector_core::{config::proxy::ProxyConfig, event::EventRef};
 
-use super::{request::HecRequest, service::HttpRequestBuilder};
+use super::{request::HecRequest, service::HttpRequestBuilder, Data};
 use crate::{
     http::HttpClient,
     internal_events::TemplateRenderingError,
@@ -48,6 +48,7 @@ pub fn create_client(
 pub fn build_http_batch_service(
     client: HttpClient,
     http_request_builder: Arc<HttpRequestBuilder>,
+    data: Data,
 ) -> HttpBatchService<BoxFuture<'static, Result<Request<Bytes>, crate::Error>>, HecRequest> {
     HttpBatchService::new(client, move |req: HecRequest| {
         let request_builder = Arc::clone(&http_request_builder);
@@ -55,7 +56,10 @@ pub fn build_http_batch_service(
             Box::pin(async move {
                 request_builder.build_request(
                     req.body,
-                    "/services/collector/event",
+                    match data {
+                        Data::Event => "/services/collector/event",
+                        Data::Raw => "/services/collector/raw",
+                    },
                     req.passthrough_token,
                 )
             });
