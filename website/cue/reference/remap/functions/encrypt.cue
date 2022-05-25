@@ -71,7 +71,7 @@ remap: functions: encrypt: {
 			title: "Encrypt value"
 			source: #"""
 				plaintext = "super secret message"
-				iv = "1234567890123456" // typically you would call random_bytes(16)
+				iv = "1234567890123456" # typically you would call random_bytes(16)
 				key = "16_byte_keyxxxxx"
 				encrypted_message = encrypt!(plaintext, "AES-128-CBC-PKCS7", key, iv: iv)
 				encode_base64(encrypted_message)

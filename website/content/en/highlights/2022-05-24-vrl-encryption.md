@@ -31,20 +31,20 @@ An example with input:
 { "plaintext": "super secret message" }
 ```
 
-```text
-// The `key` is typically a raw set of bytes matching the expected length for the algorithm so it is common to base64
-// encode it for injection and decode in VRL
-key = decode_base64!(get_env_var!("KEY")) // with $KEY set to "c2VjcmV0X19faHVudGVyMg==" in this example
+```coffeescript
+# The `key` is typically a raw set of bytes matching the expected length for the algorithm so it is common to base64
+# encode it for injection and decode in VRL
+key = decode_base64!(get_env_var!("KEY")) # with $KEY set to "c2VjcmV0X19faHVudGVyMg==" in this example
 
-// we store the iv on the event to use as-needed for decryption
-.iv = "1234567890123456" // typically you would call random_bytes(<num bytes expected by algorithm>)
+# we store the iv on the event to use as-needed for decryption
+.iv = "1234567890123456" # typically you would call random_bytes(<num bytes expected by algorithm>)
 
 encrypted_message = encrypt!(plaintext, "AES-128-CBC-PKCS7", key, iv: iv)
 
-// Often you will want to encode the result of the encryption as base64 so it can be represented as a string
+# Often you will want to encode the result of the encryption as base64 so it can be represented as a string
 .encrypted_message = encode_base64(encrypted_message)
 
-// delete original
+# delete original
 del(.plaintext)
 ```
 
@@ -66,15 +66,15 @@ An example with input (from above encryption example):
 ```
 
 ```text
-// The `key` is typically a raw set of bytes matching the expected length for the algorithm so it is common to base64
-// encode it for injection and decode in VRL
-key = decode_base64!(get_env_var!("KEY")) // with $KEY set to "c2VjcmV0X19faHVudGVyMg=="
+# The `key` is typically a raw set of bytes matching the expected length for the algorithm so it is common to base64
+# encode it for injection and decode in VRL
+key = decode_base64!(get_env_var!("KEY")) # with $KEY set to "c2VjcmV0X19faHVudGVyMg=="
 
 
-// encrypted message was stored as base64 encoded data
+# encrypted message was stored as base64 encoded data
 .message = decrypt!(decode_base64!(.encrypted_message), "AES-128-CBC-PKCS7", key, iv: .iv)
 
-// delete originals
+# delete originals
 del(.iv)
 del(.encrypted_message)
 ```
