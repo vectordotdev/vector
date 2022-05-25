@@ -257,7 +257,7 @@ impl<'a> PipelinesVersionPayload<'a> {
 pub(crate) struct EnterpriseMetadata {
     pub opts: Options,
     pub api_key: String,
-    pub config_version: String,
+    pub config_version_hash: String,
 }
 
 impl TryFrom<&Config> for EnterpriseMetadata {
@@ -290,13 +290,13 @@ impl TryFrom<&Config> for EnterpriseMetadata {
             DATADOG_REPORTING_PRODUCT
         );
 
-        // Get the configuration version. In DD Pipelines, this is referred to as the 'config hash'.
-        let config_version = value.version.clone().expect("Config should be versioned");
+        // Get the configuration version hash. In DD Pipelines, this is referred to as the 'config hash'.
+        let config_version_hash = value.version.clone().expect("Config should be versioned");
 
         Ok(Self {
             opts,
             api_key,
-            config_version,
+            config_version_hash,
         })
     }
 }
@@ -379,17 +379,17 @@ pub(crate) fn report_on_reload(
 
 pub(crate) fn attach_enterprise_components(config: &mut Config, metadata: &EnterpriseMetadata) {
     let api_key = metadata.api_key.clone();
-    let config_version = metadata.config_version.clone();
+    let version_hash = metadata.config_version_hash.clone();
 
     setup_metrics_reporting(
         config,
         &metadata.opts,
         api_key.clone(),
-        config_version.clone(),
+        version_hash.clone(),
     );
 
     if metadata.opts.enable_logs_reporting {
-        setup_logs_reporting(config, &metadata.opts, api_key, config_version);
+        setup_logs_reporting(config, &metadata.opts, api_key, version_hash);
     }
 }
 
@@ -555,7 +555,7 @@ pub(crate) fn report_configuration(
     let fut = async move {
         let EnterpriseMetadata {
             api_key,
-            config_version,
+            config_version_hash: config_version,
             opts,
         } = metadata;
 
