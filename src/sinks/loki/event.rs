@@ -2,6 +2,7 @@ use std::{collections::HashMap, io};
 
 use bytes::Bytes;
 use serde::{ser::SerializeSeq, Serialize};
+use vector_buffers::EventCount;
 use vector_core::{
     event::{EventFinalizers, Finalizable},
     ByteSizeOf,
@@ -90,6 +91,13 @@ impl ByteSizeOf for LokiRecord {
                 res + item.0.allocated_bytes() + item.1.allocated_bytes()
             })
             + self.event.allocated_bytes()
+    }
+}
+
+impl EventCount for LokiRecord {
+    fn event_count(&self) -> usize {
+        // A Loki record is mapped one-to-one with an event.
+        1
     }
 }
 
