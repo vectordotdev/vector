@@ -1,6 +1,7 @@
-use crate::compile_path_arg;
+use crate::{compile_path_arg, is_legacy_metadata_path};
 use ::value::Value;
-use lookup::{Lookup, LookupBuf};
+use lookup::LookupBuf;
+use std::collections::VecDeque;
 use vrl::prelude::*;
 
 fn set_metadata_field(
@@ -45,7 +46,7 @@ impl Function for SetMetadataField {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -57,9 +58,41 @@ impl Function for SetMetadataField {
             .expect("key not bytes");
         let key = String::from_utf8_lossy(key.as_ref());
         let path = compile_path_arg(key.as_ref())?;
-        let value = arguments.required("value");
+        let value = arguments.required_expr("value");
 
-        Ok(Box::new(SetMetadataFieldFn { path, value }))
+        // backwards compat until schemas are supported for metadata. Make sure the "legacy"
+        // fields stay as string or null
+        if is_legacy_metadata_path(&path) {
+            let type_def = value.type_def((&state.0, &state.1));
+            if !TypeDef::bytes().add_null().is_superset(&type_def) {
+                return Err(vrl::function::Error::UnexpectedExpression {
+                    keyword: "key",
+                    expected: "string or null",
+                    expr: value,
+                }
+                .into());
+            }
+        }
+        if path.len() > 1 {
+            if is_legacy_metadata_path(&LookupBuf::from(VecDeque::from([path
+                .segments
+                .front()
+                .unwrap()
+                .clone()])))
+            {
+                return Err(vrl::function::Error::InvalidArgument {
+                    keyword: "key",
+                    value: Value::Bytes(Bytes::from(key.as_bytes().to_vec())),
+                    error: "Cannot write to this path.",
+                }
+                .into());
+            }
+        }
+
+        Ok(Box::new(SetMetadataFieldFn {
+            path,
+            value: Box::new(value),
+        }))
     }
 
     fn compile_argument(
@@ -77,6 +110,7 @@ impl Function for SetMetadataField {
                     .expect("key not bytes")
                     .to_string();
                 let lookup = compile_path_arg(&key)?;
+
                 Ok(Some(Box::new(lookup) as _))
             }
             _ => Ok(None),

@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 
 use tracing::warn;
 use value::Value;
-use vrl_compiler::Target;
 
 use crate::{
     grok_filter::apply_filter,

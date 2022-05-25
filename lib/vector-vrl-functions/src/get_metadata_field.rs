@@ -1,6 +1,6 @@
-use crate::compile_path_arg;
+use crate::{compile_path_arg, is_legacy_metadata_path};
 use ::value::Value;
-use lookup::{Look, Lookup, LookupBuf, SegmentBuf};
+use lookup::LookupBuf;
 use vrl::prelude::*;
 
 fn get_metadata_field(
@@ -95,11 +95,9 @@ impl Expression for GetMetadataFieldFn {
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
-        if let Some(SegmentBuf::Field(field)) = self.path.segments.front() {
-            if ["datadog_api_key", "splunk_hec_token"].contains(&field.name.as_str()) {
-                // keep these as a string for backwards compatibility
-                return TypeDef::bytes().add_null().infallible();
-            }
+        if is_legacy_metadata_path(&self.path) {
+            // keep these as a string for backwards compatibility
+            return TypeDef::bytes().add_null().infallible();
         }
 
         // TODO: use metadata schema when it exists to return a better value here

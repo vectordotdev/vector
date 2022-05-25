@@ -4,11 +4,21 @@ pub mod set_metadata_field;
 pub mod set_semantic_meaning;
 
 use ::value::Value;
-use lookup::{Lookup, LookupBuf};
+use lookup::{Lookup, LookupBuf, SegmentBuf};
 use vrl::prelude::*;
 
-pub(crate) fn keys() -> Vec<Value> {
-    vec![value!("datadog_api_key"), value!("splunk_hec_token")]
+pub const LEGACY_METADATA_KEYS: [&'static str; 2] = ["datadog_api_key", "splunk_hec_token"];
+
+pub fn is_legacy_metadata_path(path: &LookupBuf) -> bool {
+    if path.segments.len() != 1 {
+        return false;
+    }
+    if let Some(SegmentBuf::Field(field)) = path.segments.front() {
+        if LEGACY_METADATA_KEYS.contains(&field.name.as_str()) {
+            return true;
+        }
+    }
+    false
 }
 
 pub fn vrl_functions() -> Vec<Box<dyn vrl::Function>> {

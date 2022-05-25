@@ -1,6 +1,6 @@
 use crate::compile_path_arg;
 use ::value::Value;
-use lookup::{Lookup, LookupBuf};
+use lookup::LookupBuf;
 use vrl::prelude::*;
 
 fn remove_metadata_field(

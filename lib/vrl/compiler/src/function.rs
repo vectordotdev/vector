@@ -448,7 +448,7 @@ impl ArgumentList {
         self.arguments.remove(keyword)
     }
 
-    fn required_expr(&mut self, keyword: &'static str) -> Expr {
+    pub fn required_expr(&mut self, keyword: &'static str) -> Expr {
         required(self.optional_expr(keyword))
     }
 }

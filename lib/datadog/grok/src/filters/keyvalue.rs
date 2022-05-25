@@ -17,9 +17,7 @@ use nom::{
 use once_cell::sync::Lazy;
 use ordered_float::NotNan;
 use regex::Regex;
-use tracing::warn;
 use value::Value;
-use vrl_compiler::Target;
 
 use crate::{
     ast::{Function, FunctionArgument},
