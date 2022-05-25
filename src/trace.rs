@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     marker::PhantomData,
     str::FromStr,
     sync::{
@@ -8,6 +9,7 @@ use std::{
 };
 
 use futures_util::{future::ready, Stream, StreamExt};
+use lookup::path;
 use metrics_tracing_context::MetricsLayer;
 use once_cell::sync::OnceCell;
 use tokio::sync::{
@@ -19,10 +21,12 @@ use tracing::{Event, Subscriber};
 use tracing_limit::RateLimitedLayer;
 use tracing_subscriber::{
     layer::{Context, SubscriberExt},
+    registry::LookupSpan,
     util::SubscriberInitExt,
     Layer,
 };
 pub use tracing_tower::{InstrumentableService, InstrumentedService};
+use value::Value;
 
 use crate::event::LogEvent;
 
@@ -111,14 +115,19 @@ fn get_early_buffer() -> MutexGuard<'static, Option<Vec<LogEvent>>> {
         .expect("Couldn't acquire lock on internal logs buffer")
 }
 
-/// Attempts to buffer an event into the early buffer.
+/// Determines whether tracing events should be processed (e.g. converted to log
+/// events) to avoid unnecessary performance overhead.
 ///
-/// If early buffering is stopped, `Some(event)` is returned with the original event. Otherwise, the event has been
-/// successfully buffered and `None` is returned.
-fn try_buffer_event(event: &Event<'_>) -> bool {
+/// Checks if [`BUFFER`] is set or if a trace sender exists
+fn should_process_tracing_event() -> bool {
+    BUFFER.get().is_some() || maybe_get_trace_sender().is_some()
+}
+
+/// Attempts to buffer an event into the early buffer.
+fn try_buffer_event(log: &LogEvent) -> bool {
     if SHOULD_BUFFER.load(Ordering::Acquire) {
         if let Some(buffer) = get_early_buffer().as_mut() {
-            buffer.push(event.into());
+            buffer.push(log.clone());
             return true;
         }
     }
@@ -129,9 +138,9 @@ fn try_buffer_event(event: &Event<'_>) -> bool {
 /// Attempts to broadcast an event to subscribers.
 ///
 /// If no subscribers are connected, this does nothing.
-fn try_broadcast_event(event: &Event<'_>) {
+fn try_broadcast_event(log: LogEvent) {
     if let Some(sender) = maybe_get_trace_sender() {
-        let _ = sender.send(event.into());
+        let _ = sender.send(log);
     }
 }
 
@@ -271,13 +280,78 @@ impl<S> BroadcastLayer<S> {
 
 impl<S> Layer<S> for BroadcastLayer<S>
 where
-    S: Subscriber + 'static,
+    S: Subscriber + 'static + for<'lookup> LookupSpan<'lookup>,
 {
-    fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
-        // Try buffering the event, and if we're not buffering anymore, try to send it along via the
-        // trace sender if it's been established.
-        if !try_buffer_event(event) {
-            try_broadcast_event(event);
+    fn on_event(&self, event: &Event<'_>, ctx: Context<'_, S>) {
+        if should_process_tracing_event() {
+            let mut log = LogEvent::from(event);
+            // Add span fields if available
+            if let Some(parent_span) = ctx.event_span(event) {
+                for span in parent_span.scope().from_root() {
+                    if let Some(fields) = span.extensions().get::<SpanFields>() {
+                        for (k, v) in &fields.0 {
+                            log.insert(path!("vector", *k), v.clone());
+                        }
+                    }
+                }
+            }
+            // Try buffering the event, and if we're not buffering anymore, try to
+            // send it along via the trace sender if it's been established.
+            if !try_buffer_event(&log) {
+                try_broadcast_event(log);
+            }
         }
+    }
+
+    fn on_new_span(
+        &self,
+        attrs: &tracing_core::span::Attributes<'_>,
+        id: &tracing_core::span::Id,
+        ctx: Context<'_, S>,
+    ) {
+        let span = ctx.span(id).expect("span must already exist!");
+        let mut fields = SpanFields::default();
+        attrs.values().record(&mut fields);
+        span.extensions_mut().insert(fields);
+    }
+}
+
+#[derive(Default, Debug)]
+struct SpanFields(HashMap<&'static str, Value>);
+
+impl SpanFields {
+    fn record(&mut self, field: &tracing_core::Field, value: impl Into<Value>) {
+        let name = field.name();
+        // Filter for span fields such as component_id, component_type, etc.
+        //
+        // This captures all the basic component information provided in the
+        // span that each component is spawned with. We don't capture all fields
+        // to avoid adding unintentional noise and to prevent accidental
+        // security/privacy issues (e.g. leaking sensitive data).
+        if name.starts_with("component_") {
+            self.0.insert(name, value.into());
+        }
+    }
+}
+
+impl tracing::field::Visit for SpanFields {
+    fn record_i64(&mut self, field: &tracing_core::Field, value: i64) {
+        self.record(field, value);
+    }
+
+    fn record_u64(&mut self, field: &tracing_core::Field, value: u64) {
+        self.record(field, value);
+    }
+
+    fn record_bool(&mut self, field: &tracing_core::Field, value: bool) {
+        self.record(field, value);
+    }
+
+    fn record_str(&mut self, field: &tracing_core::Field, value: &str) {
+        self.record(field, value);
+    }
+
+    fn record_debug(&mut self, field: &tracing_core::Field, value: &dyn std::fmt::Debug) {
+        self.record(field, format!("{:?}", value));
     }
 }
