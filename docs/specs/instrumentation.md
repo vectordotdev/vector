@@ -70,7 +70,7 @@ instrumentation SHOULD be batched whenever possible:
 ### Events
 
 Instrumentation SHOULD be event-driven ([RFC 2064]), where individual events
-serve as the vehicle for internal telemtry, driving the emission of metrics
+serve as the vehicle for internal telemetry, driving the emission of metrics
 and logs. This organizes Vector's telemetry, making it easier to manage and 
 catalogue. On rare occassions, metrics and logs can emit directly but MUST be
 reserved for ocassions where it is impossible to emit Vector's events. For
