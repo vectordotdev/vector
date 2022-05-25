@@ -587,10 +587,6 @@ mod test {
                 .get("empty")
                 .expect("empty exists")
                 .is_object()
-            //.all_fields()
-            //.unwrap()
-            //.find(|(key, _)| (&key[..]).starts_with("empty"))
-            //== None
         }
 
         let msg = format!(
