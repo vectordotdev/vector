@@ -19,7 +19,7 @@ use crate::{
     proto::vector as proto,
     serde::bool_or_struct,
     shutdown::ShutdownSignalToken,
-    sources::{util::AfterReadExt as _, Source},
+    sources::{util::{AfterReadExt as _, grpc::GrpcGzipDecompressionLayer}, Source},
     tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsEnableableConfig},
     SourceSender,
 };
@@ -192,6 +192,7 @@ async fn run(
 
     Server::builder()
         .trace_fn(move |_| span.clone())
+        .layer(GrpcGzipDecompressionLayer::default())
         .add_service(service)
         .serve_with_incoming_shutdown(stream, cx.shutdown.map(|token| tx.send(token).unwrap()))
         .in_current_span()
