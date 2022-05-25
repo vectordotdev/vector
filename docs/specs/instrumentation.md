@@ -117,7 +117,7 @@ not:
   * SHOULD be rate limited to 10 seconds.
 * Events
   * MUST emit an [`EventsDropped`] event if the error results in dropping events,
-    or the error itself MUST meeting the `EventsDropped` requirements.
+or the error itself MUST meet the `EventsDropped` requirements.
 
 #### EventsDropped
 
