@@ -3,7 +3,7 @@ use std::fmt;
 use value::Value;
 
 use crate::{
-    expression::{Block, Expr, Noop, Predicate, Resolved},
+    expression::{Block, Predicate, Resolved},
     state::{ExternalEnv, LocalEnv},
     value::VrlValueConvert,
     vm::OpCode,
@@ -15,20 +15,6 @@ pub struct IfStatement {
     pub predicate: Predicate,
     pub consequent: Block,
     pub alternative: Option<Block>,
-}
-
-impl IfStatement {
-    pub(crate) fn noop() -> Self {
-        let predicate = Predicate::new_unchecked(vec![]);
-
-        let consequent = Block::new(vec![Expr::Noop(Noop)], LocalEnv::default());
-
-        Self {
-            predicate,
-            consequent,
-            alternative: None,
-        }
-    }
 }
 
 impl Expression for IfStatement {

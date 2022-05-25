@@ -42,10 +42,6 @@ impl Variable {
     pub fn value(&self) -> Option<&Value> {
         self.value.as_ref()
     }
-
-    pub fn noop(ident: Ident) -> Self {
-        Self { ident, value: None }
-    }
 }
 
 impl Expression for Variable {

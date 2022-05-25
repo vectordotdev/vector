@@ -4,7 +4,7 @@ use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 
 use crate::value::VrlValueConvert;
 use crate::{
-    expression::{Expr, Noop, Resolved},
+    expression::{Expr, Resolved},
     parser::Node,
     state::{ExternalEnv, LocalEnv},
     value::Kind,
@@ -35,12 +35,6 @@ impl Not {
         Ok(Self {
             inner: Box::new(expr),
         })
-    }
-
-    pub fn noop() -> Self {
-        Not {
-            inner: Box::new(Noop.into()),
-        }
     }
 }
 
