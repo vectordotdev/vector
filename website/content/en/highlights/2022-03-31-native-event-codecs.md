@@ -16,9 +16,12 @@ simpler, more efficient configuration of some often-requested use cases.
 
 ## Sending metrics to generic sources
 
-Generic event sources like the `http` source or `exec` source can now directly inject metrics rather than needing to pass them through
-a `log_to_metric` transform. For example, an `exec` source can now be configured to directly receieve events in Vector's
-native representation via the `native_json` codec:
+Generic event sources like the `http` source or `exec` source can now directly
+receive metrics rather than needing to pass them through a `log_to_metric`
+transform.
+
+For example, an `exec` source can now be configured to receieve events via the
+`native_json` codec:
 
 ```toml
 [sources.in]
@@ -28,7 +31,7 @@ command = ["./scrape.sh"]
 decoding.codec = "native_json"
 ```
 
-Running this configuration like:
+If `scrape.sh` contained:
 
 ```bash
 #!/usr/bin/env bash
@@ -45,8 +48,10 @@ echo $RANDOM | jq --raw-input --compact-output \
 }'
 ```
 
-will send counters into Vector with random values. Logs are just simple JSON
-objects, but it is typical to include a `message` and a `timestamp` key like:
+Vector would read in counters with random values.
+
+Logs are just simple JSON objects, but it is typical to include a `message` and
+a `timestamp` key like:
 
 ```json
 {
