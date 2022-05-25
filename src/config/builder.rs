@@ -207,12 +207,6 @@ impl ConfigBuilder {
         #[cfg(feature = "enterprise")]
         {
             self.enterprise = with.enterprise;
-            if let Some(datadog) = &self.enterprise {
-                if datadog.enabled {
-                    // enable other enterprise features
-                    self.global.enterprise = true;
-                }
-            }
         }
 
         self.provider = with.provider;

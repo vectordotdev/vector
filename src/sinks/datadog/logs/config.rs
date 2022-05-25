@@ -77,6 +77,9 @@ pub(crate) struct DatadogLogsConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    #[serde(skip)]
+    pub enterprise: bool,
 }
 
 impl GenerateConfig for DatadogLogsConfig {
@@ -130,11 +133,7 @@ impl DatadogLogsConfig {
 
         let service = ServiceBuilder::new()
             .settings(request_limits, LogApiRetry)
-            .service(LogApiService::new(
-                client,
-                self.get_uri(),
-                cx.globals.enterprise,
-            ));
+            .service(LogApiService::new(client, self.get_uri(), self.enterprise));
         let sink = LogSinkBuilder::new(service, cx, default_api_key, batch)
             .encoding(self.encoding.clone())
             .compression(self.compression.unwrap_or_default())
