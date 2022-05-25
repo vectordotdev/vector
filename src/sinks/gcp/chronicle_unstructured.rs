@@ -5,13 +5,11 @@ use codecs::{
 };
 use futures_util::{future::BoxFuture, task::Poll};
 use goauth::scopes::Scope;
-use http::{
-    header::{HeaderName, HeaderValue},
-    Request, Uri,
-};
+use http::{header::HeaderValue, Request, Uri};
 use hyper::Body;
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use snafu::Snafu;
 use std::io;
 use tower::{Service, ServiceBuilder};
@@ -23,7 +21,6 @@ use vector_core::{
 };
 
 use crate::{
-    codecs::Encoder,
     config::{GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     gcp::{GcpAuthConfig, GcpCredentials},
     http::{HttpClient, HttpError},
@@ -35,7 +32,7 @@ use crate::{
         },
         util::{
             encoding::{
-                EncodingConfig, EncodingConfigWithFramingAdapter, StandardEncodings,
+                Encoder, EncodingConfig, EncodingConfigWithFramingAdapter, StandardEncodings,
                 StandardEncodingsWithFramingMigrator, Transformer,
             },
             partitioner::KeyPartitioner,
@@ -147,7 +144,6 @@ impl SinkConfig for GcsChronicleUnstructuredConfig {
                 .await?
         };
 
-        //let base_url = format!("{}{}/", CHRONICLE_URL, self.bucket);
         let tls = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls, cx.proxy())?;
 
@@ -156,8 +152,7 @@ impl SinkConfig for GcsChronicleUnstructuredConfig {
             .clone()
             .unwrap_or_else(|| format!("{}/v2/unstructuredlogentries:batchCreate", CHRONICLE_URL));
 
-        let healthcheck =
-            build_healthcheck(client.clone(), &endpoint, creds.clone())?;
+        let healthcheck = build_healthcheck(client.clone(), &endpoint, creds.clone())?;
         let sink = self.build_sink(client, endpoint, creds, cx)?;
 
         Ok((sink, healthcheck))
@@ -229,13 +224,42 @@ impl Finalizable for ChronicleRequest {
     }
 }
 
+#[derive(Clone, Debug)]
+struct ChronicleEncoder;
+
+impl Encoder<(String, Vec<Event>)> for ChronicleEncoder {
+    fn encode_input(
+        &self,
+        input: (String, Vec<Event>),
+        writer: &mut dyn io::Write,
+    ) -> io::Result<usize> {
+        let (partition_key, mut events) = input;
+        let events = events
+            .into_iter()
+            .filter_map(|event| {
+                let log = event.into_log();
+                let value: Option<serde_json::Value> = log.try_into().ok();
+                value
+            })
+            .collect::<Vec<_>>();
+
+        let json = json!({
+            "customer_id": "zork",
+            "log_type": partition_key,
+            "entries": events,
+        });
+
+        let body = crate::serde::json::to_bytes(&json)?.freeze();
+        writer.write(&body)
+    }
+}
+
 // Settings required to produce a request that do not change per
 // request. All possible values are pre-computed for direct use in
 // producing a request.
 #[derive(Clone, Debug)]
 struct RequestSettings {
-    headers: Vec<(HeaderName, HeaderValue)>,
-    encoder: (Transformer, Encoder<Framer>),
+    encoder: ChronicleEncoder, //(Transformer, Encoder<Framer>),
 
     // TODO Does chronicle handle compression?
     compression: Compression,
@@ -243,8 +267,8 @@ struct RequestSettings {
 
 impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
     type Metadata = GcsMetadata;
-    type Events = Vec<Event>;
-    type Encoder = (Transformer, Encoder<Framer>);
+    type Events = (String, Vec<Event>);
+    type Encoder = ChronicleEncoder;
     type Payload = Bytes;
     type Request = ChronicleRequest;
     type Error = io::Error; // TODO: this is ugly.
@@ -264,15 +288,15 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
         let finalizers = events.take_finalizers();
 
         let metadata = GcsMetadata {
-            key: partition_key,
+            key: partition_key.clone(),
             count: events.len(),
             byte_size: events.size_of(),
             finalizers,
         };
-        (metadata, events)
+        (metadata, (partition_key, events))
     }
 
-    fn build_request(&self, mut metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
+    fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
         trace!(message = "Sending events.", bytes = ?payload.len(), events_len = ?metadata.count, key = ?metadata.key);
 
         ChronicleRequest {
@@ -284,7 +308,7 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
 
 impl RequestSettings {
     fn new(config: &GcsChronicleUnstructuredConfig) -> crate::Result<Self> {
-        let transformer = config.encoding.transformer();
+        /*let transformer = config.encoding.transformer();
         let (framer, serializer) = config.encoding.clone().encoding();
         let framer = match (framer, &serializer) {
             (Some(framer), _) => framer,
@@ -293,13 +317,12 @@ impl RequestSettings {
             (None, Serializer::NativeJson(_) | Serializer::RawMessage(_)) => {
                 NewlineDelimitedEncoder::new().into()
             }
-        };
-        let encoder = Encoder::<Framer>::new(framer, serializer);
+        };*/
+        //let encoder = ChronicleEncoder; // Encoder::<Framer>::new(framer, serializer);
 
         Ok(Self {
-            headers: Vec::new(),
             compression: config.compression,
-            encoder: (transformer, encoder),
+            encoder: ChronicleEncoder,
         })
     }
 }
@@ -331,7 +354,7 @@ impl Service<ChronicleRequest> for ChronicleService {
     }
 
     fn call(&mut self, request: ChronicleRequest) -> Self::Future {
-        let mut builder = Request::put(self.base_url);
+        let mut builder = Request::put(&self.base_url);
         let headers = builder.headers_mut().unwrap();
         headers.insert(
             "content-length",
