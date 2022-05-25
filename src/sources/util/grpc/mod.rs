@@ -1,23 +1,19 @@
-use std::{
-    net::SocketAddr,
-    convert::Infallible,
-};
 use crate::{
-    tls::MaybeTlsSettings,
-    shutdown::{ShutdownSignal, ShutdownSignalToken,},
     internal_events::TcpBytesReceived,
+    shutdown::{ShutdownSignal, ShutdownSignalToken},
     sources::util::AfterReadExt as _,
+    tls::MaybeTlsSettings,
 };
 use futures::{FutureExt, StreamExt};
-use tracing::{Instrument, Span};
-use tower::Service;
-use hyper::Body;
-use tonic::{
-    transport::server::{NamedService, Connected, Server},
-    body::BoxBody,
-};
 use http::{Request, Response};
-
+use hyper::Body;
+use std::{convert::Infallible, net::SocketAddr};
+use tonic::{
+    body::BoxBody,
+    transport::server::{Connected, NamedService, Server},
+};
+use tower::Service;
+use tracing::{Instrument, Span};
 
 pub async fn run_grpc_server<S>(
     address: SocketAddr,
@@ -25,7 +21,7 @@ pub async fn run_grpc_server<S>(
     service: S,
     shutdown: ShutdownSignal,
 ) -> crate::Result<()>
-where 
+where
     S: Service<Request<Body>, Response = Response<BoxBody>, Error = Infallible>
         + NamedService
         + Clone

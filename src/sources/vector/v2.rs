@@ -1,6 +1,6 @@
-use std::net::SocketAddr;
 use futures::TryFutureExt;
 use serde::{Deserialize, Serialize};
+use std::net::SocketAddr;
 use tokio::net::TcpStream;
 use tonic::{
     transport::{server::Connected, Certificate},
@@ -16,10 +16,7 @@ use crate::{
     internal_events::{EventsReceived, StreamClosedError},
     proto::vector as proto,
     serde::bool_or_struct,
-    sources::{
-        util::grpc::run_grpc_server,
-        Source,
-    },
+    sources::{util::grpc::run_grpc_server, Source},
     tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsEnableableConfig},
     SourceSender,
 };
@@ -126,9 +123,10 @@ impl VectorConfig {
             acknowledgements,
         })
         .accept_gzip();
-        let source = run_grpc_server(self.address, tls_settings, service, cx.shutdown).map_err(|error| {
-            error!(message = "Source future failed.", %error);
-        });
+        let source =
+            run_grpc_server(self.address, tls_settings, service, cx.shutdown).map_err(|error| {
+                error!(message = "Source future failed.", %error);
+            });
 
         Ok(Box::pin(source))
     }
