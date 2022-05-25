@@ -31,6 +31,15 @@ pub trait ByteSizeOf {
     fn allocated_bytes(&self) -> usize;
 }
 
+impl<'a, T> ByteSizeOf for &'a T
+where
+    T: ByteSizeOf,
+{
+    fn allocated_bytes(&self) -> usize {
+        (*self).size_of()
+    }
+}
+
 impl ByteSizeOf for Bytes {
     fn allocated_bytes(&self) -> usize {
         self.len()
@@ -94,15 +103,6 @@ where
 }
 
 impl<T> ByteSizeOf for &[T]
-where
-    T: ByteSizeOf,
-{
-    fn allocated_bytes(&self) -> usize {
-        self.iter().map(ByteSizeOf::size_of).sum()
-    }
-}
-
-impl<T> ByteSizeOf for &Vec<T>
 where
     T: ByteSizeOf,
 {

@@ -84,15 +84,21 @@ pub trait EventCount {
     fn event_count(&self) -> usize;
 }
 
-impl<T> EventCount for Vec<T> {
+impl<T> EventCount for Vec<T>
+where
+    T: EventCount,
+{
     fn event_count(&self) -> usize {
-        self.len()
+        self.iter().map(EventCount::event_count).sum()
     }
 }
 
-impl<T> EventCount for &Vec<T> {
+impl<'a, T> EventCount for &'a T
+where
+    T: EventCount,
+{
     fn event_count(&self) -> usize {
-        self.len()
+        (*self).event_count()
     }
 }
 
