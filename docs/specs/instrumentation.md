@@ -71,7 +71,7 @@ instrumentation SHOULD be batched whenever possible:
 
 Instrumentation SHOULD be event-driven ([RFC 2064]), where individual events
 serve as the vehicle for internal telemetry, driving the emission of metrics
-and logs. This organizes Vector's telemetry, making it easier to manage and 
+and logs. This organizes Vector's telemetry, making it easier to manage and
 catalogue. Metrics and logs SHOULD NOT be emitted directly except for where it
 is otherwise impossible to emit Vector's events, such as in an external crate
 that cannot import Vector's events.
@@ -118,7 +118,7 @@ emission of this event, meeting the below requirements.
 
 **You MUST NOT emit this event for retriable operations that can recover and
 prevent data loss. For example, a failed HTTP request that will be retried does
-not result in data loss if the retry succeeds.** 
+not result in data loss if the retry succeeds.**
 
 * Properties
   * `count` - The number of events dropped
