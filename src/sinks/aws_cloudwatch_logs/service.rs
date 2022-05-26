@@ -13,6 +13,7 @@ use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 use chrono::Duration;
 use futures::{future::BoxFuture, ready, FutureExt};
 use futures_util::TryFutureExt;
+use indexmap::IndexMap;
 use tokio::sync::oneshot;
 use tower::{
     buffer::Buffer,
@@ -119,14 +120,17 @@ impl DriverResponse for CloudwatchResponse {
 }
 
 impl CloudwatchLogsPartitionSvc {
-    pub fn new(config: CloudwatchLogsSinkConfig, client: CloudwatchLogsClient) -> Self {
-        let request_settings = config.request.unwrap_with(&TowerRequestConfig::default());
+    pub fn new(config: CloudwatchLogsSinkConfig, client: CloudwatchLogsClient,
+    smithy_client: std::sync::Arc<aws_smithy_client::Client<aws_smithy_client::erase::DynConnector,
+    aws_smithy_client::erase::DynMiddleware<aws_smithy_client::erase::DynConnector>>>) -> Self {
+        let request_settings = config.request.tower.unwrap_with(&TowerRequestConfig::default());
 
         Self {
             config,
             clients: HashMap::new(),
             request_settings,
             client,
+            smithy_client,
         }
     }
 }
@@ -172,9 +176,10 @@ impl Service<BatchCloudwatchRequest> for CloudwatchLogsPartitionSvc {
                 .buffer(1)
                 .timeout(self.request_settings.timeout)
                 .service(CloudwatchLogsSvc::new(
-                    &self.config,
+                    self.config.clone(),
                     &key,
                     self.client.clone(),
+                    self.smithy_client.clone(),
                 ));
 
             self.clients.insert(key, svc.clone());
@@ -193,9 +198,11 @@ impl Service<BatchCloudwatchRequest> for CloudwatchLogsPartitionSvc {
 
 impl CloudwatchLogsSvc {
     pub fn new(
-        config: &CloudwatchLogsSinkConfig,
+        config: CloudwatchLogsSinkConfig,
         key: &CloudwatchKey,
         client: CloudwatchLogsClient,
+        smithy_client: std::sync::Arc<aws_smithy_client::Client<aws_smithy_client::erase::DynConnector,
+        aws_smithy_client::erase::DynMiddleware<aws_smithy_client::erase::DynConnector>>>,
     ) -> Self {
         let group_name = key.group.clone();
         let stream_name = key.stream.clone();
@@ -204,7 +211,9 @@ impl CloudwatchLogsSvc {
         let create_missing_stream = config.create_missing_stream.unwrap_or(true);
 
         CloudwatchLogsSvc {
+            headers: config.request.headers,
             client,
+            smithy_client,
             stream_name,
             group_name,
             create_missing_group,
@@ -284,6 +293,8 @@ impl Service<Vec<InputLogEvent>> for CloudwatchLogsSvc {
 
             request::CloudwatchFuture::new(
                 self.client.clone(),
+                self.smithy_client.clone(),
+                self.headers.clone(),
                 self.stream_name.clone(),
                 self.group_name.clone(),
                 self.create_missing_group,
@@ -300,6 +311,9 @@ impl Service<Vec<InputLogEvent>> for CloudwatchLogsSvc {
 
 pub struct CloudwatchLogsSvc {
     client: CloudwatchLogsClient,
+    smithy_client: std::sync::Arc<aws_smithy_client::Client<aws_smithy_client::erase::DynConnector,
+    aws_smithy_client::erase::DynMiddleware<aws_smithy_client::erase::DynConnector>>>,
+    headers: IndexMap<String, String>,
     stream_name: String,
     group_name: String,
     create_missing_group: bool,
@@ -320,4 +334,6 @@ pub struct CloudwatchLogsPartitionSvc {
     clients: HashMap<CloudwatchKey, Svc>,
     request_settings: TowerRequestSettings,
     client: CloudwatchLogsClient,
+    smithy_client: std::sync::Arc<aws_smithy_client::Client<aws_smithy_client::erase::DynConnector,
+    aws_smithy_client::erase::DynMiddleware<aws_smithy_client::erase::DynConnector>>>,
 }

@@ -82,6 +82,40 @@ pub trait ClientBuilder {
     fn build(client: aws_smithy_client::Client, config: &aws_types::SdkConfig) -> Self::Client;
 }
 
+pub async fn create_smithy_client<T: ClientBuilder>(
+    region: Region, 
+    proxy: &ProxyConfig,
+    tls_options: &Option<TlsConfig>,
+    is_sink: bool,
+    retry_config: RetryConfig,
+) -> crate::Result<aws_smithy_client::Client> {
+    // Now build the client.
+    let tls_settings = MaybeTlsSettings::tls_client(tls_options)?;
+
+    let connector = if proxy.enabled {
+        let proxy = build_proxy_connector(tls_settings, proxy)?;
+        let hyper_client = aws_smithy_client::hyper_ext::Adapter::builder().build(proxy);
+        aws_smithy_client::erase::DynConnector::new(hyper_client)
+    } else {
+        let tls_connector = build_tls_connector(tls_settings)?;
+        let hyper_client = aws_smithy_client::hyper_ext::Adapter::builder().build(tls_connector);
+        aws_smithy_client::erase::DynConnector::new(hyper_client)
+    };
+
+    let middleware_builder = ServiceBuilder::new()
+        .layer(CaptureRequestSize::new(is_sink, region))
+        .layer(T::default_middleware());
+    let middleware = DynMiddleware::new(middleware_builder);
+
+    let mut client_builder = Builder::new()
+        .connector(connector)
+        .middleware(middleware)
+        .sleep_impl(Some(Arc::new(TokioSleep)));
+    client_builder.set_retry_config(retry_config.into());
+
+    Ok(client_builder.build())
+}
+
 pub async fn create_client<T: ClientBuilder>(
     auth: &AwsAuthentication,
     region: Option<Region>,
@@ -114,31 +148,8 @@ pub async fn create_client<T: ClientBuilder>(
 
     let config = config_builder.build();
 
-    // Now build the client.
-    let tls_settings = MaybeTlsSettings::tls_client(tls_options)?;
-
-    let connector = if proxy.enabled {
-        let proxy = build_proxy_connector(tls_settings, proxy)?;
-        let hyper_client = aws_smithy_client::hyper_ext::Adapter::builder().build(proxy);
-        aws_smithy_client::erase::DynConnector::new(hyper_client)
-    } else {
-        let tls_connector = build_tls_connector(tls_settings)?;
-        let hyper_client = aws_smithy_client::hyper_ext::Adapter::builder().build(tls_connector);
-        aws_smithy_client::erase::DynConnector::new(hyper_client)
-    };
-
-    let middleware_builder = ServiceBuilder::new()
-        .layer(CaptureRequestSize::new(is_sink, region))
-        .layer(T::default_middleware());
-    let middleware = DynMiddleware::new(middleware_builder);
-
-    let mut client_builder = Builder::new()
-        .connector(connector)
-        .middleware(middleware)
-        .sleep_impl(Some(Arc::new(TokioSleep)));
-    client_builder.set_retry_config(retry_config.into());
-
-    let client = client_builder.build();
+    let client = create_smithy_client::<T>(
+        region, proxy, tls_options, is_sink, retry_config).await?;
 
     Ok(T::build(client, &config))
 }
