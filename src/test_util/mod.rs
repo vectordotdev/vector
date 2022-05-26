@@ -19,7 +19,7 @@ use flate2::read::MultiGzDecoder;
 use futures::{
     ready, stream, task::noop_waker_ref, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt,
 };
-use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode, SslFiletype};
+use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode};
 use portpicker::pick_unused_port;
 use rand::{thread_rng, Rng};
 use rand_distr::Alphanumeric;
@@ -169,11 +169,15 @@ pub async fn send_lines_tls(
     }
 
     if let Some(cert_file) = client_cert.into() {
-        connector.set_certificate_file(cert_file, SslFiletype::PEM).unwrap();
+        connector
+            .set_certificate_file(cert_file, SslFiletype::PEM)
+            .unwrap();
     }
 
     if let Some(key_file) = client_key.into() {
-        connector.set_private_key_file(key_file, SslFiletype::PEM).unwrap();
+        connector
+            .set_private_key_file(key_file, SslFiletype::PEM)
+            .unwrap();
     }
 
     let ssl = connector

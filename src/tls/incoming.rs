@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::{
     future::Future,
@@ -5,7 +6,6 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
-use std::collections::HashMap;
 
 use futures::{future::BoxFuture, stream, FutureExt, Stream};
 use openssl::ssl::{Ssl, SslAcceptor, SslMethod};
@@ -386,7 +386,7 @@ impl CertificateMetadata {
             organization_name: subject_metadata.get("organizationName").cloned(),
             organizational_unit_name: subject_metadata.get("organizationalUnitName").cloned(),
             common_name: subject_metadata.get("commonName").cloned(),
-        }
+        };
     }
 
     pub(crate) fn subject(&self) -> String {
@@ -425,16 +425,18 @@ mod test {
             locality_name: Some("locality".to_owned()),
             organization_name: Some("organization".to_owned()),
             organizational_unit_name: Some("org_unit".to_owned()),
-            state_or_province_name: Some("state".to_owned())
+            state_or_province_name: Some("state".to_owned()),
         };
 
-        let expected = format!("CN={},OU={},O={},L={},ST={},C={}",
+        let expected = format!(
+            "CN={},OU={},O={},L={},ST={},C={}",
             example_meta.common_name.as_ref().unwrap(),
             example_meta.organizational_unit_name.as_ref().unwrap(),
             example_meta.organization_name.as_ref().unwrap(),
             example_meta.locality_name.as_ref().unwrap(),
             example_meta.state_or_province_name.as_ref().unwrap(),
-            example_meta.country_name.as_ref().unwrap());
+            example_meta.country_name.as_ref().unwrap()
+        );
         assert_eq!(expected, example_meta.subject())
     }
 
@@ -446,14 +448,16 @@ mod test {
             locality_name: None,
             organization_name: Some("organization".to_owned()),
             organizational_unit_name: Some("org_unit".to_owned()),
-            state_or_province_name: None
+            state_or_province_name: None,
         };
 
-        let expected = format!("CN={},OU={},O={},C={}",
+        let expected = format!(
+            "CN={},OU={},O={},C={}",
             example_meta.common_name.as_ref().unwrap(),
             example_meta.organizational_unit_name.as_ref().unwrap(),
             example_meta.organization_name.as_ref().unwrap(),
-            example_meta.country_name.as_ref().unwrap());
+            example_meta.country_name.as_ref().unwrap()
+        );
         assert_eq!(expected, example_meta.subject())
     }
 }

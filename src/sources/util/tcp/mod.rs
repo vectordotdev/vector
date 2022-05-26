@@ -32,7 +32,7 @@ use crate::{
     },
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings, CertificateMetadata},
+    tls::{CertificateMetadata, MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
     SourceSender,
 };
 

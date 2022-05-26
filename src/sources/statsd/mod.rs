@@ -115,12 +115,8 @@ impl SourceConfig for StatsdConfig {
                 Ok(Box::pin(statsd_udp(config.clone(), cx.shutdown, cx.out)))
             }
             StatsdConfig::Tcp(config) => {
-                let tls_config = config.tls
-                    .as_ref()
-                    .map(|tls| tls.tls_config.clone());
-                let tls_peer_key = config.tls
-                    .as_ref()
-                    .and_then(|tls| tls.peer_key.clone());
+                let tls_config = config.tls.as_ref().map(|tls| tls.tls_config.clone());
+                let tls_peer_key = config.tls.as_ref().and_then(|tls| tls.peer_key.clone());
                 let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
                 StatsdTcpSource.run(
                     config.address,

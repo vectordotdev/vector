@@ -120,12 +120,8 @@ impl SourceConfig for SocketConfig {
                 let decoder = DecodingConfig::new(framing, decoding).build();
 
                 let tcp = tcp::RawTcpSource::new(config.clone(), decoder);
-                let tls_config = config.tls()
-                    .as_ref()
-                    .map(|tls| tls.tls_config.clone());
-                let tls_peer_key = config.tls()
-                    .as_ref()
-                    .and_then(|tls| tls.peer_key.clone());
+                let tls_config = config.tls().as_ref().map(|tls| tls.tls_config.clone());
+                let tls_peer_key = config.tls().as_ref().and_then(|tls| tls.peer_key.clone());
                 let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
                 tcp.run(
                     config.address(),
@@ -238,7 +234,7 @@ impl SourceConfig for SocketConfig {
 #[cfg(test)]
 mod test {
     use std::{
-        collections::{HashMap, BTreeMap},
+        collections::{BTreeMap, HashMap},
         net::{SocketAddr, UdpSocket},
         sync::{
             atomic::{AtomicBool, Ordering},
@@ -432,14 +428,15 @@ mod test {
 
             wait_for_tcp(addr).await;
             send_lines_tls(
-                addr, "localhost".into(),
+                addr,
+                "localhost".into(),
                 lines.into_iter(),
                 std::path::Path::new(tls::TEST_PEM_CA_PATH),
                 std::path::Path::new("tests/data/tls_meta_client.crt"),
                 std::path::Path::new("tests/data/tls_meta_client.key"),
             )
-                .await
-                .unwrap();
+            .await
+            .unwrap();
 
             let event = rx.next().await.unwrap();
             assert_eq!(
@@ -451,10 +448,7 @@ mod test {
                 "subject" => "CN=localhost,OU=TLS Tests,O=Timber.io,L=Brooklyn,ST=New York,C=US"
             );
 
-            assert_eq!(
-                event.as_log()["tls_peer"],
-                tls_meta.clone().into(),
-            );
+            assert_eq!(event.as_log()["tls_peer"], tls_meta.clone().into(),);
 
             let event = rx.next().await.unwrap();
             assert_eq!(
@@ -462,10 +456,7 @@ mod test {
                 "another line".into()
             );
 
-            assert_eq!(
-                event.as_log()["tls_peer"],
-                tls_meta.clone().into(),
-            );
+            assert_eq!(event.as_log()["tls_peer"], tls_meta.clone().into(),);
         })
         .await;
     }
