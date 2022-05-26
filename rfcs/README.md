@@ -20,30 +20,30 @@ Vector uses the RFC process to formalize discussion around _substantial_ changes
 
 ## Goals
 
-* Properly spec and plan features to prevent re-work
-* Formalize discussion to optimize everyone's time
-* Obtain consensus upfront, before implementation time is invested
-* Incorporate project-wide context and leverage our shared brain
-* Share responsibility for the outcome of the change
-* Benefit posterity and facilitate new Vector team member onboarding
+- Properly spec and plan features to prevent re-work
+- Formalize discussion to optimize everyone's time
+- Obtain consensus upfront, before implementation time is invested
+- Incorporate project-wide context and leverage our shared brain
+- Share responsibility for the outcome of the change
+- Benefit posterity and facilitate new Vector team member onboarding
 
 ## Logical boundary
 
 Examples of changes that require a RFC:
 
-* An architectural change
-* A data model change
-* A new component that introduces new behavior
-* Removing a feature
-* Complicated tech-debt projects
-* A substantial user-visible change
-* A change that is questionably outside of the scope of Vector
+- An architectural change
+- A data model change
+- A new component that introduces new behavior
+- Removing a feature
+- Complicated tech-debt projects
+- A substantial user-visible change
+- A change that is questionably outside of the scope of Vector
 
 Examples of changes that do not require a RFC:
 
-* Reorganizing code that otherwise does not change its functional behavior
-* Quantitative improvements. Such as performance improvements
-* Simple improvements to existing features
+- Reorganizing code that otherwise does not change its functional behavior
+- Quantitative improvements. Such as performance improvements
+- Simple improvements to existing features
 
 ## Tenets of good RFCs
 
@@ -80,9 +80,9 @@ more info navigating your solution.
    [RFCs](https://github.com/vectordotdev/vector/tree/master/rfcs) on this topic.
 1. If an RFC issue does not exist, [open one](https://github.com/vectordotdev/vector/issues/new/choose).
 1. Use the issue to obtain consensus that an RFC is necessary.
-   * The change might be quickly rejected.
-   * The change might be on our long term roadmap and get deferred.
-   * The change might be blocked by other work.
+   - The change might be quickly rejected.
+   - The change might be on our long term roadmap and get deferred.
+   - The change might be blocked by other work.
 
 ### Creating an RFC
 
