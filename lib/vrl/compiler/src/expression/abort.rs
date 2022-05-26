@@ -105,7 +105,7 @@ impl Expression for Abort {
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,
-        state: (&LocalEnv, &ExternalEnv),
+        state: (&mut LocalEnv, &mut ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
         let function = ctx.function();

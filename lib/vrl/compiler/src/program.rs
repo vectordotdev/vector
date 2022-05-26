@@ -40,7 +40,7 @@ impl Program {
     /// Emit LLVM IR for the program.
     pub fn emit_llvm<'ctx>(
         &self,
-        state: (&LocalEnv, &ExternalEnv),
+        state: (&mut LocalEnv, &mut ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
         self.expressions.emit_llvm(state, ctx)

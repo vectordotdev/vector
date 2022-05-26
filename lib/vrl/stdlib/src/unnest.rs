@@ -103,7 +103,7 @@ impl Function for Unnest {
 
     fn compile_argument(
         &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
+        _args: &[(&'static str, Option<ResolvedArgument>)],
         _ctx: &mut FunctionCompileContext,
         name: &str,
         expr: Option<&expression::Expr>,

@@ -5,10 +5,11 @@ use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 
 use super::Block;
 use crate::{
-    expression::{levenstein, Expr, ExpressionError, FunctionArgument, Noop},
+    expression::{levenstein, ExpressionError, FunctionArgument, Noop},
     function::{
         closure::{self, VariableKind},
         ArgumentList, Example, FunctionClosure, FunctionCompileContext, Parameter,
+        ResolvedArgument,
     },
     parser::{Ident, Node},
     state::{ExternalEnv, LocalEnv},
@@ -487,64 +488,19 @@ pub struct FunctionCall {
 }
 
 impl FunctionCall {
-    /// Takes the arguments passed and resolves them into the order they are defined
-    /// in the function
-    /// The error path in this function should never really be hit as the compiler should
-    /// catch these whilst creating the AST.
-    fn resolve_arguments(
-        &self,
-        function: &(dyn Function),
-    ) -> Result<Vec<(&'static str, Option<FunctionArgument>)>, String> {
-        let params = function.parameters().to_vec();
-        let mut result = params
-            .iter()
-            .map(|param| (param.keyword, None))
-            .collect::<Vec<_>>();
-
-        let mut unnamed = Vec::new();
-
-        // Position all the named parameters, keeping track of all the unnamed for later.
-        for param in self.arguments.iter() {
-            match param.keyword() {
-                None => unnamed.push(param.clone().take().1),
-                Some(keyword) => {
-                    match params.iter().position(|param| param.keyword == keyword) {
-                        None => {
-                            // The parameter was not found in the list.
-                            return Err(format!("parameter {} not found.", keyword));
-                        }
-                        Some(pos) => {
-                            result[pos].1 = Some(param.clone().take().1);
-                        }
-                    }
-                }
-            }
-        }
-
-        // Position all the remaining unnamed parameters
-        let mut pos = 0;
-        for param in unnamed {
-            while result[pos].1.is_some() {
-                pos += 1;
-            }
-
-            if pos > result.len() {
-                return Err("Too many parameters".to_string());
-            }
-
-            result[pos].1 = Some(param);
-        }
-
-        Ok(result)
-    }
-
     fn compile_arguments(
         &self,
         function: &dyn Function,
         external_env: &mut ExternalEnv,
-    ) -> Result<Vec<Option<CompiledArgument>>, String> {
+    ) -> Result<Vec<(&'static str, Option<CompiledArgument>)>, String> {
+        let function_arguments = self
+            .arguments
+            .iter()
+            .map(|argument| argument.clone().into_inner())
+            .collect::<Vec<_>>();
+
         // Resolve the arguments so they are in the order defined in the function.
-        let arguments = self.resolve_arguments(function)?;
+        let arguments = function.resolve_arguments(function_arguments);
 
         // We take the external context, and pass it to the function compile context, this allows
         // functions mutable access to external state, but keeps the internal compiler state behind
@@ -557,22 +513,22 @@ impl FunctionCall {
         let compiled_arguments = arguments
             .iter()
             .map(|(keyword, argument)| -> Result<_, String> {
-                let argument = argument.as_ref().map(|argument| argument.inner());
+                let expression = argument.as_ref().map(|argument| &argument.expression);
 
                 // Call `compile_argument` for functions that need to perform any compile time processing
                 // on the argument.
                 let compiled_argument = function
-                    .compile_argument(&arguments, &mut compile_ctx, keyword, argument)
+                    .compile_argument(&arguments, &mut compile_ctx, keyword, expression)
                     .map_err(|error| error.to_string())?;
 
                 let argument = match compiled_argument {
                     Some(argument) => Some(CompiledArgument::Static(argument)),
-                    None => {
-                        argument.map(|expression| CompiledArgument::Dynamic(expression.clone()))
-                    }
+                    None => argument
+                        .as_ref()
+                        .map(|argument| CompiledArgument::Dynamic(argument.clone())),
                 };
 
-                Ok(argument)
+                Ok((*keyword, argument))
             })
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -613,9 +569,10 @@ impl FunctionCall {
     }
 }
 
+#[derive(Debug)]
 enum CompiledArgument {
     Static(Box<dyn Any + Send + Sync>),
-    Dynamic(Expr),
+    Dynamic(ResolvedArgument),
 }
 
 impl Expression for FunctionCall {
@@ -744,7 +701,7 @@ impl Expression for FunctionCall {
 
         let compiled_arguments = self.compile_arguments(function, external)?;
 
-        for argument in compiled_arguments {
+        for (_, argument) in compiled_arguments {
             match argument {
                 Some(CompiledArgument::Static(argument)) => {
                     // The function has compiled this argument as a static.
@@ -755,7 +712,7 @@ impl Expression for FunctionCall {
                 Some(CompiledArgument::Dynamic(argument)) => {
                     // Compile the argument, `MoveParameter` will move the result of the expression onto the
                     // parameter stack to be passed into the function.
-                    argument.compile_to_vm(vm, (local, external))?;
+                    argument.expression.compile_to_vm(vm, (local, external))?;
                     vm.write_opcode(OpCode::MoveParameter);
                 }
                 None => {
@@ -794,19 +751,35 @@ impl Expression for FunctionCall {
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,
-        state: (&LocalEnv, &ExternalEnv),
+        state: (&mut LocalEnv, &mut ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
-        let argument_type = ctx.result_ref().get_type();
+        let stdlib_function = ctx.stdlib(self.function_id);
+        let compiled_arguments = self.compile_arguments(stdlib_function, state.1)?;
+
+        let resolved_type = ctx.result_ref().get_type();
 
         let function_name = format!("vrl_fn_{}", self.ident);
         let function = ctx
             .module()
             .get_function(&function_name)
             .unwrap_or_else(|| {
-                let mut arguments = Vec::new();
-                arguments.resize(self.arguments.len() + 1, argument_type.into());
-                let function_type = ctx.context().void_type().fn_type(&arguments, false);
+                let mut argument_refs = compiled_arguments
+                    .iter()
+                    .map(|(_, argument)| match argument {
+                        Some(CompiledArgument::Static(_)) => ctx.static_ref_type(),
+                        Some(CompiledArgument::Dynamic(argument)) if argument.argument.required => {
+                            ctx.value_ref_type()
+                        }
+                        Some(CompiledArgument::Dynamic(_)) | None => ctx.optional_value_ref_type(),
+                    })
+                    .collect::<Vec<_>>();
+                argument_refs.push(resolved_type);
+                let argument_refs = argument_refs
+                    .into_iter()
+                    .map(Into::into)
+                    .collect::<Vec<_>>();
+                let function_type = ctx.context().void_type().fn_type(&argument_refs, false);
 
                 ctx.module()
                     .add_function(&function_name, function_type, None)
@@ -814,38 +787,155 @@ impl Expression for FunctionCall {
 
         let result_ref = ctx.result_ref();
 
-        let mut argument_refs = self
-            .arguments
-            .iter()
-            .map(|argument| -> Result<_, String> {
-                let argument_ref = ctx.builder().build_alloca(
-                    argument_type.get_element_type().into_struct_type(),
-                    &format!(
-                        "argument_{}",
-                        argument
-                            .parameter()
-                            .map(|parameter| parameter.keyword)
-                            .unwrap_or("<unnamed>")
-                    ),
-                );
+        let mut argument_refs = Vec::new();
+        let mut drop_calls = Vec::new();
 
-                {
-                    let fn_ident = "vrl_resolved_initialize";
-                    let fn_impl = ctx
-                        .module()
-                        .get_function(fn_ident)
-                        .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
-                    ctx.builder()
-                        .build_call(fn_impl, &[argument_ref.into()], fn_ident)
-                };
+        for (keyword, argument) in compiled_arguments {
+            let argument_name = format!("argument_{}", keyword);
+            match argument {
+                Some(CompiledArgument::Static(argument)) => {
+                    let static_ref = ctx
+                        .into_const(argument, &argument_name)
+                        .as_pointer_value()
+                        .into();
 
-                ctx.set_result_ref(argument_ref);
-                argument.inner().emit_llvm(state, ctx)?;
-                ctx.set_result_ref(result_ref);
+                    argument_refs.push(static_ref);
+                    drop_calls.push(vec![]);
+                }
+                Some(CompiledArgument::Dynamic(argument)) if argument.argument.required => {
+                    let resolved_ref = ctx.builder().build_alloca(
+                        ctx.resolved_ref_type()
+                            .get_element_type()
+                            .into_struct_type(),
+                        &argument_name,
+                    );
 
-                Ok(argument_ref.into())
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+                    {
+                        let fn_ident = "vrl_resolved_initialize";
+                        let fn_impl = ctx
+                            .module()
+                            .get_function(fn_ident)
+                            .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+                        ctx.builder()
+                            .build_call(fn_impl, &[resolved_ref.into()], fn_ident);
+                    }
+
+                    ctx.set_result_ref(resolved_ref);
+                    argument.expression.emit_llvm((state.0, state.1), ctx)?;
+                    ctx.set_result_ref(result_ref);
+
+                    let value_ref = {
+                        let fn_ident = "vrl_resolved_as_value";
+                        let fn_impl = ctx
+                            .module()
+                            .get_function(fn_ident)
+                            .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+                        ctx.builder()
+                            .build_call(fn_impl, &[resolved_ref.into()], fn_ident)
+                            .try_as_basic_value()
+                            .left()
+                            .ok_or(format!(r#"result of "{}" is not a basic value"#, fn_ident))?
+                    };
+
+                    argument_refs.push(value_ref.into());
+                    drop_calls.push(vec![(
+                        resolved_ref,
+                        ctx.module().get_function("vrl_resolved_drop").unwrap(),
+                    )]);
+                }
+                Some(CompiledArgument::Dynamic(argument)) => {
+                    let resolved_ref = ctx.builder().build_alloca(
+                        ctx.resolved_ref_type()
+                            .get_element_type()
+                            .into_struct_type(),
+                        &argument_name,
+                    );
+                    let optional_value_ref = ctx.builder().build_alloca(
+                        ctx.optional_value_ref_type()
+                            .get_element_type()
+                            .into_struct_type(),
+                        &argument_name,
+                    );
+
+                    {
+                        let fn_ident = "vrl_resolved_initialize";
+                        let fn_impl = ctx
+                            .module()
+                            .get_function(fn_ident)
+                            .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+                        ctx.builder()
+                            .build_call(fn_impl, &[resolved_ref.into()], fn_ident);
+                    }
+
+                    ctx.set_result_ref(resolved_ref);
+                    argument.expression.emit_llvm((state.0, state.1), ctx)?;
+                    ctx.set_result_ref(result_ref);
+
+                    {
+                        let fn_ident = "vrl_optional_value_initialize";
+                        let fn_impl = ctx
+                            .module()
+                            .get_function(fn_ident)
+                            .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+                        ctx.builder()
+                            .build_call(fn_impl, &[optional_value_ref.into()], fn_ident);
+                    }
+
+                    {
+                        let fn_ident = "vrl_resolved_as_value_to_optional_value";
+                        let fn_impl = ctx
+                            .module()
+                            .get_function(fn_ident)
+                            .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+                        ctx.builder().build_call(
+                            fn_impl,
+                            &[resolved_ref.into(), optional_value_ref.into()],
+                            fn_ident,
+                        );
+                    }
+
+                    argument_refs.push(optional_value_ref.into());
+                    drop_calls.push(vec![
+                        (
+                            optional_value_ref,
+                            ctx.module()
+                                .get_function("vrl_optional_value_drop")
+                                .unwrap(),
+                        ),
+                        (
+                            resolved_ref,
+                            ctx.module().get_function("vrl_resolved_drop").unwrap(),
+                        ),
+                    ]);
+                }
+                None => {
+                    let optional_value_ref = ctx.builder().build_alloca(
+                        ctx.optional_value_ref_type()
+                            .get_element_type()
+                            .into_struct_type(),
+                        &argument_name,
+                    );
+
+                    {
+                        let fn_ident = "vrl_optional_value_initialize";
+                        let fn_impl = ctx
+                            .module()
+                            .get_function(fn_ident)
+                            .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+                        ctx.builder()
+                            .build_call(fn_impl, &[optional_value_ref.into()], fn_ident);
+                    }
+
+                    argument_refs.push(optional_value_ref.into());
+                    drop_calls.push(vec![(
+                        optional_value_ref,
+                        ctx.module()
+                            .get_function("vrl_optional_value_drop")
+                            .unwrap(),
+                    )]);
+                }
+            }
+        }
 
         argument_refs.push(ctx.result_ref().into());
 
@@ -854,13 +944,15 @@ impl Expression for FunctionCall {
 
         argument_refs.pop();
 
-        for argument_ref in argument_refs {
-            let fn_ident = "vrl_resolved_drop";
-            let fn_impl = ctx
-                .module()
-                .get_function(fn_ident)
-                .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
-            ctx.builder().build_call(fn_impl, &[argument_ref], fn_ident);
+        for drop_calls in drop_calls {
+            for (value_ref, drop_fn) in drop_calls {
+                let drop_fn_ident = drop_fn.get_name();
+                ctx.builder().build_call(
+                    drop_fn,
+                    &[value_ref.into()],
+                    &drop_fn_ident.to_string_lossy(),
+                );
+            }
         }
 
         Ok(())
@@ -1375,6 +1467,14 @@ mod tests {
     }
 
     #[cfg(feature = "expr-literal")]
+    fn create_resolved_argument(parameter: Parameter, value: i64) -> ResolvedArgument {
+        ResolvedArgument {
+            argument: parameter,
+            expression: Expr::Literal(Literal::Integer(value)),
+        }
+    }
+
+    #[cfg(feature = "expr-literal")]
     fn create_function_call(arguments: Vec<Node<FunctionArgument>>) -> FunctionCall {
         let mut local = LocalEnv::default();
         let mut external = ExternalEnv::default();
@@ -1403,14 +1503,15 @@ mod tests {
             create_node(create_argument(None, 3)),
         ]);
 
-        let params = call.resolve_arguments(&TestFn);
-        let expected: Vec<(&'static str, Option<FunctionArgument>)> = vec![
-            ("one", Some(create_argument(None, 1))),
-            ("two", Some(create_argument(None, 2))),
-            ("three", Some(create_argument(None, 3))),
+        let parameters = TestFn.parameters();
+        let arguments = call.resolve_arguments(&TestFn);
+        let expected: Vec<(&'static str, Option<ResolvedArgument>)> = vec![
+            ("one", Some(create_resolved_argument(parameters[1], 1))),
+            ("two", Some(create_resolved_argument(parameters[2], 2))),
+            ("three", Some(create_resolved_argument(parameters[3], 3))),
         ];
 
-        assert_eq!(Ok(expected), params);
+        assert_eq!(Ok(expected), arguments);
     }
 
     #[test]
@@ -1422,14 +1523,15 @@ mod tests {
             create_node(create_argument(Some("three"), 3)),
         ]);
 
-        let params = call.resolve_arguments(&TestFn);
-        let expected: Vec<(&'static str, Option<FunctionArgument>)> = vec![
-            ("one", Some(create_argument(Some("one"), 1))),
-            ("two", Some(create_argument(Some("two"), 2))),
-            ("three", Some(create_argument(Some("three"), 3))),
+        let parameters = TestFn.parameters();
+        let arguments = TestFn.resolve_arguments(&TestFn);
+        let expected: Vec<(&'static str, Option<ResolvedArgument>)> = vec![
+            ("one", Some(create_resolved_argument(parameters[1], 1))),
+            ("two", Some(create_resolved_argument(parameters[2], 2))),
+            ("three", Some(create_resolved_argument(parameters[3], 3))),
         ];
 
-        assert_eq!(Ok(expected), params);
+        assert_eq!(Ok(expected), arguments);
     }
 
     #[test]
@@ -1441,14 +1543,15 @@ mod tests {
             create_node(create_argument(Some("one"), 1)),
         ]);
 
-        let params = call.resolve_arguments(&TestFn);
-        let expected: Vec<(&'static str, Option<FunctionArgument>)> = vec![
-            ("one", Some(create_argument(Some("one"), 1))),
-            ("two", Some(create_argument(Some("two"), 2))),
-            ("three", Some(create_argument(Some("three"), 3))),
+        let parameters = TestFn.parameters();
+        let arguments = call.resolve_arguments(&TestFn);
+        let expected: Vec<(&'static str, Option<ResolvedArgument>)> = vec![
+            ("one", Some(create_resolved_argument(parameters[1], 1))),
+            ("two", Some(create_resolved_argument(parameters[2], 2))),
+            ("three", Some(create_resolved_argument(parameters[3], 3))),
         ];
 
-        assert_eq!(Ok(expected), params);
+        assert_eq!(Ok(expected), arguments);
     }
 
     #[test]
@@ -1460,14 +1563,15 @@ mod tests {
             create_node(create_argument(Some("one"), 1)),
         ]);
 
-        let params = call.resolve_arguments(&TestFn);
-        let expected: Vec<(&'static str, Option<FunctionArgument>)> = vec![
-            ("one", Some(create_argument(Some("one"), 1))),
-            ("two", Some(create_argument(None, 2))),
-            ("three", Some(create_argument(Some("three"), 3))),
+        let parameters = TestFn.parameters();
+        let arguments = call.resolve_arguments(&TestFn);
+        let expected: Vec<(&'static str, Option<ResolvedArgument>)> = vec![
+            ("one", Some(create_resolved_argument(parameters[1], 1))),
+            ("two", Some(create_resolved_argument(parameters[2], 2))),
+            ("three", Some(create_resolved_argument(parameters[3], 3))),
         ];
 
-        assert_eq!(Ok(expected), params);
+        assert_eq!(Ok(expected), arguments);
     }
 
     #[test]
@@ -1479,13 +1583,14 @@ mod tests {
             create_node(create_argument(None, 2)),
         ]);
 
-        let params = call.resolve_arguments(&TestFn);
-        let expected: Vec<(&'static str, Option<FunctionArgument>)> = vec![
-            ("one", Some(create_argument(None, 1))),
-            ("two", Some(create_argument(None, 2))),
-            ("three", Some(create_argument(Some("three"), 3))),
+        let parameters = TestFn.parameters();
+        let arguments = call.resolve_arguments(&TestFn);
+        let expected: Vec<(&'static str, Option<ResolvedArgument>)> = vec![
+            ("one", Some(create_resolved_argument(parameters[1], 1))),
+            ("two", Some(create_resolved_argument(parameters[2], 2))),
+            ("three", Some(create_resolved_argument(parameters[3], 3))),
         ];
 
-        assert_eq!(Ok(expected), params);
+        assert_eq!(Ok(expected), arguments);
     }
 }

@@ -32,7 +32,6 @@ compiler = { package = "vrl-compiler", path = "../compiler" }
 core = { package = "vrl-core", path = "../core" }
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 indoc = "1"
-inkwell = { git = "https://github.com/TheDan64/inkwell", branch = "master", features = ["llvm13-0"] }
 lookup = { path = "../../lookup" }
 ordered-float = "3"
 parser = { package = "vrl-parser", path = "../parser" }

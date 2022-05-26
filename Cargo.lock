@@ -5729,6 +5729,7 @@ dependencies = [
 name = "precompiled-sys"
 version = "0.0.0"
 dependencies = [
+ "bytes 1.1.0",
  "vrl-core",
 ]
 
@@ -9111,7 +9112,6 @@ dependencies = [
  "bytes 1.1.0",
  "criterion",
  "indoc",
- "inkwell 0.1.0 (git+https://github.com/TheDan64/inkwell?branch=master)",
  "lookup",
  "ordered-float 3.0.0",
  "serde_json",

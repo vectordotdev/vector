@@ -9,12 +9,11 @@
 pub mod prelude;
 mod runtime;
 
-#[cfg(feature = "llvm")]
-pub use compiler::llvm;
 pub use compiler::{
-    function, state, value, vm::Vm, Context, Expression, Function, Program, ProgramInfo, Target,
-    VrlRuntime,
+    function, llvm, state, value, vm::Vm, Context, Expression, Function, Program, ProgramInfo,
+    Target, VrlRuntime,
 };
+pub use core;
 pub use diagnostic;
 use diagnostic::DiagnosticList;
 pub use runtime::{Runtime, RuntimeResult, Terminate};

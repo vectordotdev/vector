@@ -51,22 +51,6 @@ struct UpcaseFn {
     value: Box<dyn Expression>,
 }
 
-#[inline(never)]
-#[no_mangle]
-pub extern "C" fn vrl_fn_upcase(value: &mut Resolved, resolved: &mut Resolved) {
-    let value = {
-        let mut moved = Ok(Value::Null);
-        std::mem::swap(value, &mut moved);
-        moved
-    };
-
-    *resolved = (|| {
-        let value = value?;
-
-        Ok(value.try_bytes_utf8_lossy()?.to_uppercase().into())
-    })();
-}
-
 impl Expression for UpcaseFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
@@ -76,6 +60,18 @@ impl Expression for UpcaseFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().infallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_upcase(value: &mut Value, resolved: &mut Resolved) {
+    let value = {
+        let mut moved = Value::Null;
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+
+    *resolved = (|| Ok(value.try_bytes_utf8_lossy()?.to_uppercase().into()))();
 }
 
 #[cfg(test)]

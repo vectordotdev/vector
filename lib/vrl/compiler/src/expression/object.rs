@@ -93,7 +93,7 @@ impl Expression for Object {
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,
-        state: (&LocalEnv, &ExternalEnv),
+        state: (&mut LocalEnv, &mut ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
         let function = ctx.function();
@@ -138,9 +138,9 @@ impl Expression for Object {
         ctx.builder().position_at_end(insert_block);
 
         for (key, expr) in &self.inner {
-            expr.emit_llvm(state, ctx)?;
+            expr.emit_llvm((state.0, state.1), ctx)?;
 
-            let type_def = expr.type_def(state);
+            let type_def = expr.type_def((state.0, state.1));
             if type_def.is_abortable() {
                 let is_err = {
                     let fn_ident = "vrl_resolved_is_err";
@@ -163,7 +163,7 @@ impl Expression for Object {
                 ctx.builder().position_at_end(insert_block);
             }
 
-            let key_ref = ctx.into_const(key, key.as_str()).as_pointer_value();
+            let key_ref = ctx.into_const(key.to_owned(), key).as_pointer_value();
 
             {
                 let fn_ident = "vrl_btree_map_insert";
@@ -214,16 +214,6 @@ impl Expression for Object {
 
         ctx.builder().build_unconditional_branch(end_block);
         ctx.builder().position_at_end(end_block);
-
-        {
-            let fn_ident = "vrl_btree_map_drop";
-            let fn_impl = ctx
-                .module()
-                .get_function(fn_ident)
-                .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
-            ctx.builder()
-                .build_call(fn_impl, &[btree_map_ref.into()], fn_ident)
-        };
 
         Ok(())
     }

@@ -6,7 +6,7 @@ use vrl::{
         ArgumentList, Compiled, CompiledArgument, Example, FunctionCompileContext, Parameter,
     },
     prelude::{
-        expression, DiagnosticMessage, FunctionArgument, Resolved, Result, TypeDef, VmArgumentList,
+        expression, DiagnosticMessage, Resolved, ResolvedArgument, Result, TypeDef, VmArgumentList,
         VrlValueConvert,
     },
     state,
@@ -147,7 +147,7 @@ impl Function for GetEnrichmentTableRecord {
 
     fn compile_argument(
         &self,
-        args: &[(&'static str, Option<FunctionArgument>)],
+        args: &[(&'static str, Option<ResolvedArgument>)],
         ctx: &mut FunctionCompileContext,
         name: &str,
         expr: Option<&expression::Expr>,

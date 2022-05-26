@@ -1,6 +1,6 @@
 use crate::{
     state::{ExternalEnv, LocalEnv},
-    Program, Resolved,
+    Function as StdlibFunction, Program, Resolved,
 };
 use inkwell::{
     error::LLVMError,
@@ -14,6 +14,7 @@ use inkwell::{
     },
     passes::{PassManager, PassManagerBuilder},
     targets::{InitializationConfig, Target},
+    types::PointerType,
     values::{FunctionValue, GlobalValue, PointerValue},
     OptimizationLevel,
 };
@@ -34,8 +35,9 @@ impl Compiler {
 
     pub fn compile<'a>(
         self,
-        state: (&LocalEnv, &ExternalEnv),
+        state: (&mut LocalEnv, &mut ExternalEnv),
         program: &Program,
+        stdlib: Vec<Box<dyn StdlibFunction>>,
         mut symbols: HashMap<&'static str, usize>,
     ) -> Result<Library<'a>, String> {
         let context = self.0.context();
@@ -60,6 +62,7 @@ impl Compiler {
         builder.position_at_end(start);
 
         let mut context = Context {
+            stdlib,
             context,
             module,
             builder,
@@ -131,6 +134,7 @@ impl Compiler {
 }
 
 pub struct Context<'ctx> {
+    stdlib: Vec<Box<dyn StdlibFunction>>,
     context: &'ctx inkwell::context::Context,
     module: Module<'ctx>,
     builder: inkwell::builder::Builder<'ctx>,
@@ -146,6 +150,10 @@ pub struct Context<'ctx> {
 }
 
 impl<'ctx> Context<'ctx> {
+    pub fn stdlib(&self, function_id: usize) -> &dyn StdlibFunction {
+        self.stdlib[function_id].deref()
+    }
+
     pub fn context(&self) -> &'ctx inkwell::context::Context {
         self.context
     }
@@ -305,6 +313,58 @@ impl<'ctx> Context<'ctx> {
         self.builder.build_alloca(resolved_type, name)
     }
 
+    pub fn resolved_ref_type(&self) -> PointerType<'ctx> {
+        let fn_ident = "vrl_resolved_initialize";
+        let fn_impl = self
+            .module()
+            .get_function(fn_ident)
+            .expect(&format!(r#"failed to get "{}" function"#, fn_ident));
+        fn_impl
+            .get_nth_param(0)
+            .unwrap()
+            .into_pointer_value()
+            .get_type()
+    }
+
+    pub fn value_ref_type(&self) -> PointerType<'ctx> {
+        let fn_ident = "vrl_value_initialize";
+        let fn_impl = self
+            .module()
+            .get_function(fn_ident)
+            .expect(&format!(r#"failed to get "{}" function"#, fn_ident));
+        fn_impl
+            .get_nth_param(0)
+            .unwrap()
+            .into_pointer_value()
+            .get_type()
+    }
+
+    pub fn optional_value_ref_type(&self) -> PointerType<'ctx> {
+        let fn_ident = "vrl_optional_value_initialize";
+        let fn_impl = self
+            .module()
+            .get_function(fn_ident)
+            .expect(&format!(r#"failed to get "{}" function"#, fn_ident));
+        fn_impl
+            .get_nth_param(0)
+            .unwrap()
+            .into_pointer_value()
+            .get_type()
+    }
+
+    pub fn static_ref_type(&self) -> PointerType<'ctx> {
+        let fn_ident = "vrl_static_initialize";
+        let fn_impl = self
+            .module()
+            .get_function(fn_ident)
+            .expect(&format!(r#"failed to get "{}" function"#, fn_ident));
+        fn_impl
+            .get_nth_param(0)
+            .unwrap()
+            .into_pointer_value()
+            .get_type()
+    }
+
     pub fn optimize(&self) -> Result<(), String> {
         let pass_manager = PassManager::create(());
         let pass_manager_builder = PassManagerBuilder::create();
@@ -337,6 +397,7 @@ impl<'ctx> Context<'ctx> {
     }
 }
 
+#[derive(Debug)]
 struct DefinitionGenerator {
     symbols: HashMap<&'static str, usize>,
 }
@@ -398,6 +459,7 @@ impl CustomDefinitionGenerator for DefinitionGenerator {
     }
 }
 
+#[derive(Debug)]
 pub struct Library<'jit>(ThreadSafeContext, LLJIT<'jit>, Box<DefinitionGenerator>);
 
 impl<'jit> Library<'jit> {
@@ -421,5 +483,9 @@ impl<'jit> Library<'jit> {
         unsafe { self.1.get_function(VRL_EXECUTE_SYMBOL) }.map(
             |function: Function<unsafe extern "C" fn()>| unsafe { std::mem::transmute(function) },
         )
+    }
+
+    pub fn get_function_address(&self) -> Result<usize, LLVMError> {
+        Ok(self.1.get_function_address(VRL_EXECUTE_SYMBOL)? as usize)
     }
 }

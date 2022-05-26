@@ -24,6 +24,12 @@ pub type Compiled = Result<Box<dyn Expression>, Box<dyn DiagnosticMessage>>;
 pub type CompiledArgument =
     Result<Option<Box<dyn std::any::Any + Send + Sync>>, Box<dyn DiagnosticMessage>>;
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct ResolvedArgument {
+    pub argument: Parameter,
+    pub expression: Expr,
+}
+
 pub trait Function: Send + Sync + fmt::Debug {
     /// The identifier by which the function can be called.
     fn identifier(&self) -> &'static str;
@@ -72,12 +78,71 @@ pub trait Function: Send + Sync + fmt::Debug {
     /// at compile time.
     fn compile_argument(
         &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
+        _args: &[(&'static str, Option<ResolvedArgument>)],
         _ctx: &mut FunctionCompileContext,
         _name: &str,
         _expr: Option<&Expr>,
     ) -> Result<Option<Box<dyn Any + Send + Sync>>, Box<dyn DiagnosticMessage>> {
         Ok(None)
+    }
+
+    /// Takes the arguments passed and resolves them into the order they are defined
+    /// in the function
+    /// The error path in this function should never really be hit as the compiler should
+    /// catch these whilst creating the AST.
+    fn resolve_arguments(
+        &self,
+        function_arguments: Vec<FunctionArgument>,
+    ) -> Vec<(&'static str, Option<ResolvedArgument>)> {
+        let mut params = self.parameters().to_vec();
+        let mut arguments = params
+            .iter()
+            .map(|parameter| (parameter.keyword, None))
+            .collect::<Vec<_>>();
+
+        let mut unnamed = Vec::new();
+
+        // Position all the named parameters, keeping track of all the unnamed for later.
+        for param in function_arguments {
+            match param.keyword() {
+                None => unnamed.push(param.into_inner()),
+                Some(keyword) => {
+                    match params.iter().position(|param| param.keyword == keyword) {
+                        None => {
+                            // The parameter was not found in the list.
+                            panic!("parameter {} not found.", keyword);
+                        }
+                        Some(pos) => {
+                            arguments[pos].1 = Some(ResolvedArgument {
+                                argument: params.remove(pos),
+                                expression: param.into_inner(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        // Position all the remaining unnamed parameters
+        let mut pos = 0;
+        for expression in unnamed {
+            while arguments[pos].1.is_some() {
+                pos += 1;
+            }
+
+            if pos > arguments.len() || params.is_empty() {
+                panic!("Too many parameters");
+            }
+
+            let argument = params.remove(0);
+
+            arguments[pos].1 = Some(ResolvedArgument {
+                argument,
+                expression,
+            });
+        }
+
+        arguments
     }
 
     /// This function is called by the VM.
@@ -491,19 +556,11 @@ impl From<Vec<Node<FunctionArgument>>> for ArgumentList {
     }
 }
 
-impl From<ArgumentList> for Vec<(&'static str, Option<FunctionArgument>)> {
+impl From<ArgumentList> for Vec<FunctionArgument> {
     fn from(args: ArgumentList) -> Self {
         args.arguments
             .iter()
-            .map(|(key, expr)| {
-                (
-                    *key,
-                    Some(FunctionArgument::new(
-                        None,
-                        Node::new(Span::default(), expr.clone()),
-                    )),
-                )
-            })
+            .map(|(_, expr)| FunctionArgument::new(None, Node::new(Span::default(), expr.clone())))
             .collect()
     }
 }

@@ -193,6 +193,56 @@ impl Expression for StartsWithFn {
     }
 }
 
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_starts_with(
+    value: &mut Value,
+    substring: &mut Value,
+    case_sensitive: &mut Option<Value>,
+    result: &mut Resolved,
+) {
+    let value = {
+        let mut moved = Value::Null;
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+    let substring = {
+        let mut moved = Value::Null;
+        std::mem::swap(substring, &mut moved);
+        moved
+    };
+    let case_sensitive = {
+        let mut moved = None;
+        std::mem::swap(case_sensitive, &mut moved);
+        moved
+    };
+
+    *result = (|| {
+        let case_sensitive = case_sensitive
+            .and_then(|value| value.try_boolean().ok())
+            .unwrap_or(true);
+        let substring = {
+            let string = substring.try_bytes_utf8_lossy()?;
+
+            match case_sensitive {
+                true => string.into_owned(),
+                false => string.to_lowercase(),
+            }
+        };
+
+        let value = {
+            let string = value.try_bytes_utf8_lossy()?;
+
+            match case_sensitive {
+                true => string.into_owned(),
+                false => string.to_lowercase(),
+            }
+        };
+
+        Ok(value.starts_with(&substring).into())
+    })();
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

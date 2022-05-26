@@ -7,4 +7,5 @@ edition = "2021"
 crate-type = ["staticlib"]
 
 [dependencies]
+bytes = "1.1.0"
 vrl-core = { path = "../../../core" }

@@ -74,3 +74,14 @@ impl Expression for StringFn {
         TypeDef::bytes().with_fallibility(non_bytes)
     }
 }
+
+#[no_mangle]
+pub extern "C" fn vrl_fn_string(value: &mut Value, result: &mut Resolved) {
+    let value = {
+        let mut moved = Value::Null;
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+
+    *result = string(value);
+}

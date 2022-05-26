@@ -18,6 +18,7 @@ pub enum Condition {
     IsMetric(is_metric::IsMetric),
     Vrl(vrl::Vrl),
     VrlVm(vrl::VrlVm),
+    VrlLlvm(vrl::VrlLlvm),
     CheckFields(check_fields::CheckFields),
     DatadogSearch(datadog_search::DatadogSearchRunner),
 
@@ -46,6 +47,7 @@ impl Condition {
             Condition::DatadogSearch(x) => x.check(e),
             Condition::Vrl(x) => x.check(e),
             Condition::VrlVm(x) => x.check(e),
+            Condition::VrlLlvm(x) => x.check(e),
             Condition::AlwaysPass => true,
             Condition::AlwaysFail => false,
         }
@@ -62,6 +64,7 @@ impl Condition {
             Condition::DatadogSearch(x) => x.check_with_context(e),
             Condition::Vrl(x) => x.check_with_context(e),
             Condition::VrlVm(x) => x.check_with_context(e),
+            Condition::VrlLlvm(x) => x.check_with_context(e),
             Condition::AlwaysPass => Ok(()),
             Condition::AlwaysFail => Ok(()),
         }

@@ -246,10 +246,10 @@ pub extern "C" fn derp() {
 
 fn benchmark_vrl_runtimes(c: &mut Criterion) {
     derp();
-    downcase(&mut Ok(Value::Null), &mut Ok(Value::Null));
+    downcase(&mut Value::Null, &mut Ok(Value::Null));
     unsafe { vrl_fn_uuid_v4(&mut Ok(Value::Null)) };
     unsafe { vrl_fn_upcase(&mut Ok(Value::Null), &mut Ok(Value::Null)) };
-    upcase(&mut Ok(Value::Null), &mut Ok(Value::Null));
+    upcase(&mut Value::Null, &mut Ok(Value::Null));
 
     /*
     {
@@ -309,12 +309,11 @@ fn benchmark_vrl_runtimes(c: &mut Criterion) {
         let state = state::Runtime::default();
         let runtime = Runtime::new(state);
         let tz = TimeZone::default();
-        let functions = vrl_stdlib::all();
         let mut external_env = state::ExternalEnv::default();
-        let (program, local_env, _) =
-            vrl::compile_with_state(source.program, &functions, &mut external_env).unwrap();
+        let (program, mut local_env, _) =
+            vrl::compile_with_state(source.program, &vrl_stdlib::all(), &mut external_env).unwrap();
         let vm = runtime
-            .compile(functions, &program, &mut external_env)
+            .compile(vrl_stdlib::all(), &program, &mut external_env)
             .unwrap();
         let builder = compiler::llvm::Compiler::new().unwrap();
         println!("bench 1");
@@ -322,7 +321,12 @@ fn benchmark_vrl_runtimes(c: &mut Criterion) {
         symbols.insert("vrl_fn_upcase", upcase as usize);
         symbols.insert("vrl_fn_downcase", downcase as usize);
         let library = builder
-            .compile((&local_env, &external_env), &program, symbols)
+            .compile(
+                (&mut local_env, &mut external_env),
+                &program,
+                vrl_stdlib::all(),
+                symbols,
+            )
             .unwrap();
         println!("bench 2");
         let execute = library.get_function().unwrap();

@@ -99,7 +99,7 @@ impl Expression for IfStatement {
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,
-        state: (&LocalEnv, &ExternalEnv),
+        state: (&mut LocalEnv, &mut ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
         let function = ctx.function();
@@ -110,7 +110,7 @@ impl Expression for IfStatement {
             .build_unconditional_branch(if_statement_begin_block);
         ctx.builder().position_at_end(if_statement_begin_block);
 
-        self.predicate.emit_llvm(state, ctx)?;
+        self.predicate.emit_llvm((state.0, state.1), ctx)?;
 
         let is_true = {
             let fn_ident = "vrl_value_boolean_is_true";
@@ -142,12 +142,12 @@ impl Expression for IfStatement {
             .build_conditional_branch(is_true, if_branch_block, else_branch_block);
 
         ctx.builder().position_at_end(if_branch_block);
-        self.consequent.emit_llvm(state, ctx)?;
+        self.consequent.emit_llvm((state.0, state.1), ctx)?;
         ctx.builder().build_unconditional_branch(end_block);
 
         ctx.builder().position_at_end(else_branch_block);
         if let Some(alternative) = &self.alternative {
-            alternative.emit_llvm(state, ctx)?;
+            alternative.emit_llvm((state.0, state.1), ctx)?;
         }
         ctx.builder().build_unconditional_branch(end_block);
 

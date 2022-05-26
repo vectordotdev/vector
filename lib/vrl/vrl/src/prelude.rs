@@ -4,7 +4,7 @@ pub use compiler::{expression, state, value::kind};
 
 // commonly used top-level crate types
 pub use compiler::{
-    function::{closure, FunctionClosure},
+    function::{closure, FunctionClosure, ResolvedArgument},
     value::{Collection, Field, Index, IterItem, Kind},
     Context, Expression, ExpressionError, Function, Resolved, Target, TypeDef,
 };
@@ -14,6 +14,7 @@ pub type Result<T> = std::result::Result<T, ExpressionError>;
 pub use std::collections::BTreeMap;
 pub use std::fmt;
 
+pub use ::value::Value;
 pub use bytes::Bytes;
 // pub use crate::{Error, Expr, Expression, Function, Object, Result, TypeDef, Value};
 
@@ -28,9 +29,7 @@ pub use compiler::function::{
 pub use compiler::value::{VrlValueArithmetic, VrlValueConvert};
 // commonly used macros
 pub use compiler::{
-    bench_function, expr,
-    expression::FunctionArgument,
-    func_args, test_function, test_type_def, type_def, value,
+    bench_function, expr, func_args, test_function, test_type_def, type_def, value,
     vm::{VmArgumentList, VmFunctionClosure},
 };
 pub use diagnostic::DiagnosticMessage;

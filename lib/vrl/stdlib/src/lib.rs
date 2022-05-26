@@ -493,9 +493,9 @@ pub use slice::Slice;
 #[cfg(feature = "split")]
 pub use split::Split;
 #[cfg(feature = "starts_with")]
-pub use starts_with::StartsWith;
+pub use starts_with::{vrl_fn_starts_with, StartsWith};
 #[cfg(feature = "string")]
-pub use string::String;
+pub use string::{vrl_fn_string, String};
 #[cfg(feature = "strip_ansi_escape_codes")]
 pub use strip_ansi_escape_codes::StripAnsiEscapeCodes;
 #[cfg(feature = "strip_whitespace")]

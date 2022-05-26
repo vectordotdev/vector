@@ -110,7 +110,7 @@ impl Expression for Block {
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,
-        state: (&LocalEnv, &ExternalEnv),
+        state: (&mut LocalEnv, &mut ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
         let function = ctx.function();
@@ -122,7 +122,7 @@ impl Expression for Block {
         let block_error_block = ctx.context().append_basic_block(function, "block_error");
 
         for expr in &self.inner {
-            expr.emit_llvm(state, ctx)?;
+            expr.emit_llvm((state.0, state.1), ctx)?;
             let is_err = {
                 let fn_ident = "vrl_resolved_is_err";
                 let fn_impl = ctx

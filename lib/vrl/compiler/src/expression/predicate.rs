@@ -91,11 +91,11 @@ impl Expression for Predicate {
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,
-        state: (&LocalEnv, &ExternalEnv),
+        state: (&mut LocalEnv, &mut ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
     ) -> std::result::Result<(), String> {
         for inner in &self.inner {
-            inner.emit_llvm(state, ctx)?;
+            inner.emit_llvm((state.0, state.1), ctx)?;
         }
         Ok(())
     }

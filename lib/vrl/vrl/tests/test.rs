@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
+use value::Value;
 use vector_common::TimeZone;
-use vrl::Value;
 
 #[test]
 fn test() {
@@ -15,8 +15,8 @@ fn test() {
     let mut external_env = vrl::state::ExternalEnv::default();
     let (program, local_env, _) =
         vrl::compile_with_state(source, &functions, &mut external_env).unwrap();
-    let builder = vrl::llvm::Builder::new().unwrap();
-    let context = builder
+    let builder = compiler::llvm::Compiler::new().unwrap();
+    let context = compiler
         .compile((&local_env, &external_env), &program)
         .unwrap();
     // context.optimize();

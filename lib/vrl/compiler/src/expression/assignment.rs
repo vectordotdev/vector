@@ -181,7 +181,7 @@ impl Expression for Assignment {
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,
-        state: (&LocalEnv, &ExternalEnv),
+        state: (&mut LocalEnv, &mut ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
         self.variant.emit_llvm(state, ctx)
@@ -376,7 +376,17 @@ impl Target {
                 ctx.builder().build_call(
                     fn_impl,
                     &[
-                        ctx.result_ref().into(),
+                        ctx.builder()
+                            .build_bitcast(
+                                ctx.result_ref(),
+                                fn_impl
+                                    .get_nth_param(0)
+                                    .unwrap()
+                                    .get_type()
+                                    .into_pointer_type(),
+                                "cast",
+                            )
+                            .into(),
                         ctx.builder()
                             .build_bitcast(
                                 path_ref,
@@ -573,7 +583,7 @@ where
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,
-        state: (&LocalEnv, &ExternalEnv),
+        state: (&mut LocalEnv, &mut ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
         match self {
@@ -590,9 +600,9 @@ where
                     .context()
                     .append_basic_block(function, "assignment_single_end");
 
-                expr.emit_llvm(state, ctx)?;
+                expr.emit_llvm((state.0, state.1), ctx)?;
 
-                if expr.type_def(state).is_abortable() {
+                if expr.type_def((state.0, state.1)).is_abortable() {
                     let is_err = {
                         let fn_ident = "vrl_resolved_is_err";
                         let fn_impl = ctx

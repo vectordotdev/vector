@@ -51,21 +51,6 @@ struct DowncaseFn {
     value: Box<dyn Expression>,
 }
 
-#[inline(never)]
-#[no_mangle]
-pub extern "C" fn vrl_fn_downcase(value: &mut Resolved, resolved: &mut Resolved) {
-    let value = {
-        let mut moved = Ok(Value::Null);
-        std::mem::swap(value, &mut moved);
-        moved
-    };
-
-    *resolved = (|| {
-        let bytes = value?.try_bytes()?;
-        Ok(String::from_utf8_lossy(&bytes).to_lowercase().into())
-    })();
-}
-
 impl Expression for DowncaseFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
@@ -75,6 +60,21 @@ impl Expression for DowncaseFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().infallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_downcase(value: &mut Value, resolved: &mut Resolved) {
+    let value = {
+        let mut moved = Value::Null;
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+
+    *resolved = (|| {
+        let bytes = value.try_bytes()?;
+        Ok(String::from_utf8_lossy(&bytes).to_lowercase().into())
+    })();
 }
 
 #[cfg(test)]

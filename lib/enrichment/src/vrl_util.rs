@@ -85,8 +85,8 @@ pub(crate) fn add_index(
 }
 
 /// Takes a static boolean argument and return the value it resolves to.
-fn arg_to_bool(arg: &FunctionArgument) -> std::result::Result<bool, Box<dyn DiagnosticMessage>> {
-    arg.expr()
+fn arg_to_bool(arg: &ResolvedArgument) -> std::result::Result<bool, Box<dyn DiagnosticMessage>> {
+    arg.expression
         .as_value()
         .as_ref()
         .and_then(|value| match value {
@@ -97,13 +97,13 @@ fn arg_to_bool(arg: &FunctionArgument) -> std::result::Result<bool, Box<dyn Diag
         .ok_or_else(|| {
             Box::new(vrl::function::Error::ExpectedStaticExpression {
                 keyword: "case_sensitive",
-                expr: arg.expr().clone(),
+                expr: arg.expression.clone(),
             }) as _
         })
 }
 
 /// Takes a function argument (expected to be a static boolean) and returns a `Case`.
-fn arg_to_case(arg: &FunctionArgument) -> std::result::Result<Case, Box<dyn DiagnosticMessage>> {
+fn arg_to_case(arg: &ResolvedArgument) -> std::result::Result<Case, Box<dyn DiagnosticMessage>> {
     if arg_to_bool(arg)? {
         Ok(Case::Sensitive)
     } else {
@@ -123,7 +123,7 @@ pub(crate) struct EnrichmentTableRecord {
 pub(crate) fn index_from_args(
     table: String,
     registry: &mut TableRegistry,
-    args: &[(&'static str, Option<FunctionArgument>)],
+    args: &[(&'static str, Option<ResolvedArgument>)],
 ) -> std::result::Result<EnrichmentTableRecord, Box<dyn DiagnosticMessage>> {
     let case_sensitive = args
         .iter()
@@ -137,7 +137,7 @@ pub(crate) fn index_from_args(
         .iter()
         .find(|(name, _)| *name == "condition")
         .and_then(|(_, arg)| {
-            arg.as_ref().and_then(|arg| match arg.inner() {
+            arg.as_ref().and_then(|arg| match &arg.expression {
                 expression::Expr::Container(expression::Container {
                     variant: expression::Variant::Object(object),
                 }) => Some(object.deref()),

@@ -36,7 +36,7 @@ impl Expression for Noop {
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,
-        _: (&LocalEnv, &ExternalEnv),
+        _: (&mut LocalEnv, &mut ExternalEnv),
         _: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
         Ok(())

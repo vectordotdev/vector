@@ -92,7 +92,7 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     /// Emit LLVM IR that computes the `Value` for this expression.
     fn emit_llvm<'ctx>(
         &self,
-        _: (&LocalEnv, &ExternalEnv),
+        _: (&mut LocalEnv, &mut ExternalEnv),
         _: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
         Err("Called `emit_llvm` on an expression which is not supposed to emit LLVM IR".into())
@@ -358,7 +358,7 @@ impl Expression for Expr {
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,
-        state: (&LocalEnv, &ExternalEnv),
+        state: (&mut LocalEnv, &mut ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
         use Expr::*;

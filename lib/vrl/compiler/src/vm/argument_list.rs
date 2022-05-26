@@ -174,7 +174,8 @@ where
     let mut result = BTreeMap::new();
     let mut context = FunctionCompileContext::new(Default::default());
     let params = function.parameters();
-    let function_arguments: Vec<(&'static str, Option<FunctionArgument>)> = args.clone().into();
+    let function_arguments: Vec<FunctionArgument> = args.clone().into();
+    let resolved_arguments = function.resolve_arguments(function_arguments);
 
     for param in params {
         let arg = args
@@ -183,7 +184,7 @@ where
             .map(Expr::from);
 
         if let Some(arg) = function.compile_argument(
-            &function_arguments,
+            &resolved_arguments,
             &mut context,
             param.keyword,
             arg.as_ref(),
