@@ -11,7 +11,7 @@ mod runtime;
 
 pub use compiler::{
     function, state, value, vm::Vm, Context, Expression, Function, MetadataTarget, Program,
-    ProgramInfo, Target, TargetValue, TargetValueRef, VrlRuntime,
+    ProgramInfo, SecretTarget, Target, TargetValue, TargetValueRef, VrlRuntime,
 };
 pub use diagnostic;
 pub use runtime::{Runtime, RuntimeResult, Terminate};

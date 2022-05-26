@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, convert::TryFrom, marker::PhantomData};
 
 use lookup::{LookupBuf, SegmentBuf};
 use snafu::Snafu;
-use vrl_lib::{prelude::VrlValueConvert, MetadataTarget, ProgramInfo};
+use vrl_lib::{prelude::VrlValueConvert, MetadataTarget, ProgramInfo, SecretTarget};
 
 use super::{Event, EventMetadata, LogEvent, Metric, MetricKind, TraceEvent, Value};
 use crate::config::log_schema;
@@ -143,6 +143,20 @@ impl VrlTarget {
                 }
             },
             VrlTarget::Metric { metric, .. } => TargetEvents::One(Event::Metric(metric)),
+        }
+    }
+
+    fn metadata(&self) -> &EventMetadata {
+        match self {
+            VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
+            VrlTarget::Metric { metric, .. } => metric.metadata(),
+        }
+    }
+
+    fn metadata_mut(&mut self) -> &mut EventMetadata {
+        match self {
+            VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
+            VrlTarget::Metric { metric, .. } => metric.metadata_mut(),
         }
     }
 }
@@ -286,30 +300,32 @@ impl vrl_lib::Target for VrlTarget {
 
 impl MetadataTarget for VrlTarget {
     fn get_metadata(&self, path: &LookupBuf) -> Result<Option<::value::Value>, String> {
-        let metadata = match self {
-            VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
-            VrlTarget::Metric { metric, .. } => metric.metadata(),
-        };
-        let value = metadata.value().get_by_path(path).cloned();
+        let value = self.metadata().value().get_by_path(path).cloned();
         Ok(value)
     }
 
     fn set_metadata(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
-        let metadata = match self {
-            VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
-            VrlTarget::Metric { metric, .. } => metric.metadata_mut(),
-        };
-        metadata.value_mut().insert_by_path(path, value);
+        self.metadata_mut().value_mut().insert_by_path(path, value);
         Ok(())
     }
 
     fn remove_metadata(&mut self, path: &LookupBuf) -> Result<(), String> {
-        let metadata = match self {
-            VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
-            VrlTarget::Metric { metric, .. } => metric.metadata_mut(),
-        };
-        metadata.value_mut().remove_by_path(path, true);
+        self.metadata_mut().value_mut().remove_by_path(path, true);
         Ok(())
+    }
+}
+
+impl SecretTarget for VrlTarget {
+    fn get_secret(&self, key: &str) -> Option<&str> {
+        self.metadata().secrets().get_secret(key)
+    }
+
+    fn insert_secret(&mut self, key: &str, value: &str) {
+        self.metadata_mut().secrets_mut().insert_secret(key, value)
+    }
+
+    fn remove_secret(&mut self, key: &str) {
+        self.metadata_mut().secrets_mut().remove_secret(key)
     }
 }
 

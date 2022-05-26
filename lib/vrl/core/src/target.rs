@@ -72,7 +72,7 @@ pub trait MetadataTarget {
 pub trait SecretTarget {
     fn get_secret(&self, key: &str) -> Option<&str>;
 
-    fn set_secret(&mut self, key: &str, value: &str);
+    fn insert_secret(&mut self, key: &str, value: &str);
 
     fn remove_secret(&mut self, key: &str);
 }
@@ -124,8 +124,8 @@ impl SecretTarget for TargetValueRef<'_> {
         self.secrets.get_secret(key)
     }
 
-    fn set_secret(&mut self, key: &str, value: &str) {
-        self.secrets.set_secret(key, value);
+    fn insert_secret(&mut self, key: &str, value: &str) {
+        self.secrets.insert_secret(key, value);
     }
 
     fn remove_secret(&mut self, key: &str) {
@@ -180,8 +180,8 @@ impl SecretTarget for TargetValue {
         self.secrets.get_secret(key)
     }
 
-    fn set_secret(&mut self, key: &str, value: &str) {
-        self.secrets.set_secret(key, value);
+    fn insert_secret(&mut self, key: &str, value: &str) {
+        self.secrets.insert_secret(key, value);
     }
 
     fn remove_secret(&mut self, key: &str) {

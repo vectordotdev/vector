@@ -1,7 +1,7 @@
 use std::borrow::Cow::{self, Borrowed, Owned};
 
 use ::value::Value;
-use core::TargetValue;
+use core::{Secrets, TargetValue};
 use indoc::indoc;
 use once_cell::sync::Lazy;
 use prettytable::{format, Cell, Row, Table};
@@ -95,6 +95,7 @@ pub(crate) fn run(mut objects: Vec<TargetValue>, timezone: &TimeZone, vrl_runtim
                             objects.push(TargetValue {
                                 value: Value::Null,
                                 metadata: Value::Object(BTreeMap::new()),
+                                secrets: Secrets::new(),
                             });
                         }
 
@@ -302,6 +303,7 @@ impl Validator for Repl {
         let mut target = TargetValue {
             value: Value::Null,
             metadata: Value::Object(BTreeMap::new()),
+            secrets: Secrets::new(),
         };
 
         let (_, result) = resolve(

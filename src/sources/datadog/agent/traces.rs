@@ -135,7 +135,7 @@ fn handle_dd_trace_payload(
             if let Some(k) = &api_key {
                 trace_event
                     .metadata_mut()
-                    .set_datadog_api_key(Some(Arc::clone(k)));
+                    .set_datadog_api_key(Arc::clone(k));
             }
             if let Some(lang) = lang {
                 trace_event.insert("language", lang.clone());

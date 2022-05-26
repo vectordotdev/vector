@@ -57,7 +57,7 @@ fn event_with_api_key(msg: &str, key: &str) -> Event {
     let mut e = Event::from(msg);
     e.as_mut_log()
         .metadata_mut()
-        .set_datadog_api_key(Some(Arc::from(key)));
+        .set_datadog_api_key(Arc::from(key));
     e
 }
 
