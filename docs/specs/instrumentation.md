@@ -78,15 +78,9 @@ that cannot import Vector's events.
 
 #### Error
 
-An `<Name>Error` event MUST be emitted when an error occurs. Errors that are
-retriable and possible recoverable MUST be distinguished from errors that are
-not:
+An `<Name>Error` event MUST be emitted when an error occurs.
 
 * Properties
-  * `retriable` - If the operation that produced the error is retriable. This
-    indicates that the error operation might recover and determines if this
-    error should be a warning or an error when emitting logs and metrics. For
-    example, a failed HTTP request that will be retried.
   * `error_code` - An error code for the failure, if applicable.
     * SHOULD only be specified if it adds additional information beyond
       `error_type`.
@@ -104,24 +98,27 @@ not:
     logs and metrics, as specified below, as if they were present.
 * Metrics
   * MUST include the defined properties as tags.
-  * If `retriable` is `true`, MUST increment `<namespace>_warnings_total` metric.
-  * If `retriable` is `false`, MUST increment `<namespace>_errors_total` metric.
+  * MUST increment `<namespace>_errors_total` metric.
 * Logs
   * MUST log a descriptive, user friendly error message that sufficiently
     describes the error.
-  * MUST include the defined properties as key-value pairs, except `message`.
-  * If `retriable` is `true`, MUST log a message at the `warning` level.
-  * If `retriable` is `false`, MUST log a message at the `error` level.
+  * MUST include the defined properties as key-value pairs.
+  * MUST log a message at the `error` level.
   * SHOULD be rate limited to 10 seconds.
 * Events
-  * MUST emit an [`EventsDropped`] event if the error results in dropping events,
-or the error itself MUST meet the `EventsDropped` requirements.
+  * MUST emit an [`EventsDropped`] event if the error results in dropping
+    events, or the error event itself MUST meet the `EventsDropped`
+    requirements.
 
 #### EventsDropped
 
-An `<Namespace>EventsDropped` event must be emitted when events are dropped.
+An `<Namespace>EventsDropped` event MUST be emitted when events are dropped.
 If events are dropped due to an error, then the error event should drive the
-emission of this event, meeting the following requirements:
+emission of this event, meeting the below requirements.
+
+**You MUST NOT emit this event for retriable operations that can recover and
+do not result in data loss. For example, a failed HTTP request in a sink that
+will be retried does not result in data loss if the retry succeeds.** 
 
 * Properties
   * `intentional` - Distinguishes if the events were dropped intentionally. For
