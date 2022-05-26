@@ -117,24 +117,23 @@ If events are dropped due to an error, then the error event should drive the
 emission of this event, meeting the below requirements.
 
 **You MUST NOT emit this event for retriable operations that can recover and
-do not result in data loss. For example, a failed HTTP request in a sink that
-will be retried does not result in data loss if the retry succeeds.** 
+prevent data loss. For example, a failed HTTP request that will be retried does
+not result in data loss if the retry succeeds.** 
 
 * Properties
+  * `count` - The number of events dropped
   * `intentional` - Distinguishes if the events were dropped intentionally. For
     example, events dropped in the `filter` transform are intentionally dropped,
     while events dropped due to an error in the `remap` transform are
     unintentionally dropped.
+  * `reason` - A short, user-friendly reason that describes why the events were
+    dropped.
 * Metrics
   * MUST increment the `<namespace>_discarded_events_total` counter by the
     number of events discarded.
-  * MUST NOT increment this metric if retrying the operation will preserve the
-    event, such as retrying delivery in sinks.
-  * MUST include the `intentional` property as a tag.
+  * MUST include the listed properties as tags except the `reason` property.
 * Logs
-  * MUST log a `<count> events [un]intentionally dropped due to <reason>`
-    message. `<reason>` MUST be a descriptive, user-friendly message that helps
-    the user understand why their data was dropped.
+  * MUST log a `<count> events <intentional> dropped: <reason>` message.
   * If `intentional` is `true`, MUST log at the `debug` level.
   * If `intentional` is `false`, MUST log at the `error` level.
 
