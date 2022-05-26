@@ -1,4 +1,4 @@
-use core::{TargetValue, TargetValueRef};
+use core::{Secrets, TargetValue, TargetValueRef};
 use std::{
     collections::BTreeMap,
     fs::File,
@@ -135,9 +135,11 @@ fn run(opts: &Opts) -> Result<(), Error> {
 
         for mut object in objects {
             let mut metadata = Value::Object(BTreeMap::new());
+            let mut secrets = Secrets::new();
             let mut target = TargetValueRef {
                 value: &mut object,
                 metadata: &mut metadata,
+                secrets: &mut secrets,
             };
             let state = state::Runtime::default();
             let runtime = Runtime::new(state);
@@ -176,6 +178,7 @@ fn repl(objects: Vec<Value>, timezone: &TimeZone, vrl_runtime: VrlRuntime) -> Re
         .map(|value| TargetValue {
             value,
             metadata: Value::Object(BTreeMap::new()),
+            secrets: Secrets::new(),
         })
         .collect();
 

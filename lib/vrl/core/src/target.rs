@@ -1,8 +1,10 @@
+use crate::Secrets;
 use lookup::LookupBuf;
+use std::collections::HashMap;
 use value::Value;
 
 /// Any target object you want to remap using VRL has to implement this trait.
-pub trait Target: std::fmt::Debug + MetadataTarget {
+pub trait Target: std::fmt::Debug + MetadataTarget + SecretTarget {
     /// Insert a given [`Value`] in the provided [`Target`].
     ///
     /// The `path` parameter determines _where_ in the given target the value
@@ -67,10 +69,19 @@ pub trait MetadataTarget {
     fn remove_metadata(&mut self, _path: &LookupBuf) -> Result<(), String>;
 }
 
+pub trait SecretTarget {
+    fn get_secret(&self, key: &str) -> Option<&str>;
+
+    fn set_secret(&mut self, key: &str, value: &str);
+
+    fn remove_secret(&mut self, key: &str);
+}
+
 #[derive(Debug)]
 pub struct TargetValueRef<'a> {
     pub value: &'a mut Value,
     pub metadata: &'a mut Value,
+    pub secrets: &'a mut Secrets,
 }
 
 impl Target for TargetValueRef<'_> {
@@ -108,10 +119,25 @@ impl MetadataTarget for TargetValueRef<'_> {
     }
 }
 
+impl SecretTarget for TargetValueRef<'_> {
+    fn get_secret(&self, key: &str) -> Option<&str> {
+        self.secrets.get_secret(key)
+    }
+
+    fn set_secret(&mut self, key: &str, value: &str) {
+        self.secrets.set_secret(key, value);
+    }
+
+    fn remove_secret(&mut self, key: &str) {
+        self.secrets.remove_secret(key);
+    }
+}
+
 #[derive(Debug)]
 pub struct TargetValue {
     pub value: Value,
     pub metadata: Value,
+    pub secrets: Secrets,
 }
 
 impl Target for TargetValue {
@@ -149,38 +175,73 @@ impl MetadataTarget for TargetValue {
     }
 }
 
-#[cfg(any(test, feature = "test"))]
-impl Target for Value {
-    fn target_insert(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
-        self.insert_by_path(path, value);
-        Ok(())
+impl SecretTarget for TargetValue {
+    fn get_secret(&self, key: &str) -> Option<&str> {
+        self.secrets.get_secret(key)
     }
 
-    fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
-        Ok(self.get_by_path(path))
+    fn set_secret(&mut self, key: &str, value: &str) {
+        self.secrets.set_secret(key, value);
     }
 
-    fn target_get_mut(&mut self, path: &LookupBuf) -> Result<Option<&mut Value>, String> {
-        Ok(self.get_by_path_mut(path))
-    }
-
-    fn target_remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String> {
-        Ok(self.remove_by_path(path, compact))
+    fn remove_secret(&mut self, key: &str) {
+        self.secrets.remove_secret(key);
     }
 }
 
 #[cfg(any(test, feature = "test"))]
-impl MetadataTarget for Value {
-    fn get_metadata(&self, _path: &LookupBuf) -> Result<Option<Value>, String> {
-        panic!("Value has no metadata. Use `TargetValue` instead.")
+mod value_target_impl {
+    use super::*;
+
+    impl Target for Value {
+        fn target_insert(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
+            self.insert_by_path(path, value);
+            Ok(())
+        }
+
+        fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
+            Ok(self.get_by_path(path))
+        }
+
+        fn target_get_mut(&mut self, path: &LookupBuf) -> Result<Option<&mut Value>, String> {
+            Ok(self.get_by_path_mut(path))
+        }
+
+        fn target_remove(
+            &mut self,
+            path: &LookupBuf,
+            compact: bool,
+        ) -> Result<Option<Value>, String> {
+            Ok(self.remove_by_path(path, compact))
+        }
     }
 
-    fn set_metadata(&mut self, _path: &LookupBuf, _value: Value) -> Result<(), String> {
-        panic!("Value has no metadata. Use `TargetValue` instead.")
+    impl MetadataTarget for Value {
+        fn get_metadata(&self, _path: &LookupBuf) -> Result<Option<Value>, String> {
+            panic!("Value has no metadata. Use `TargetValue` instead.")
+        }
+
+        fn set_metadata(&mut self, _path: &LookupBuf, _value: Value) -> Result<(), String> {
+            panic!("Value has no metadata. Use `TargetValue` instead.")
+        }
+
+        fn remove_metadata(&mut self, _path: &LookupBuf) -> Result<(), String> {
+            panic!("Value has no metadata. Use `TargetValue` instead.")
+        }
     }
 
-    fn remove_metadata(&mut self, _path: &LookupBuf) -> Result<(), String> {
-        panic!("Value has no metadata. Use `TargetValue` instead.")
+    impl SecretTarget for Value {
+        fn get_secret(&self, key: &str) -> Option<String> {
+            panic!("Value has no secrets. Use `TargetValue` instead.")
+        }
+
+        fn set_metadata(&mut self, key: &str, value: &str) {
+            panic!("Value has no secrets. Use `TargetValue` instead.")
+        }
+
+        fn remove_metadata(&mut self, key: &str) {
+            panic!("Value has no secrets. Use `TargetValue` instead.")
+        }
     }
 }
 
