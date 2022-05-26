@@ -1,13 +1,11 @@
-use std::net::SocketAddr;
-
-use futures::{FutureExt, StreamExt, TryFutureExt};
+use futures::TryFutureExt;
 use serde::{Deserialize, Serialize};
+use std::net::SocketAddr;
 use tokio::net::TcpStream;
 use tonic::{
-    transport::{server::Connected, Certificate, Server},
+    transport::{server::Connected, Certificate},
     Request, Response, Status,
 };
-use tracing::{Instrument, Span};
 use vector_core::{
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
     ByteSizeOf,
@@ -15,11 +13,10 @@ use vector_core::{
 
 use crate::{
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource, SourceContext},
-    internal_events::{EventsReceived, StreamClosedError, TcpBytesReceived},
+    internal_events::{EventsReceived, StreamClosedError},
     proto::vector as proto,
     serde::bool_or_struct,
-    shutdown::ShutdownSignalToken,
-    sources::{util::AfterReadExt as _, Source},
+    sources::{util::grpc::run_grpc_server, Source},
     tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsEnableableConfig},
     SourceSender,
 };
@@ -121,10 +118,15 @@ impl VectorConfig {
     pub(super) async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let tls_settings = MaybeTlsSettings::from_config(&self.tls, true)?;
         let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
-
-        let source = run(self.address, tls_settings, cx, acknowledgements).map_err(|error| {
-            error!(message = "Source future failed.", %error);
-        });
+        let service = proto::Server::new(Service {
+            pipeline: cx.out,
+            acknowledgements,
+        })
+        .accept_gzip();
+        let source =
+            run_grpc_server(self.address, tls_settings, service, cx.shutdown).map_err(|error| {
+                error!(message = "Source future failed.", %error);
+            });
 
         Ok(Box::pin(source))
     }
@@ -140,66 +142,6 @@ impl VectorConfig {
     pub(super) fn resources(&self) -> Vec<Resource> {
         vec![Resource::tcp(self.address)]
     }
-}
-
-async fn run(
-    address: SocketAddr,
-    tls_settings: MaybeTlsSettings,
-    cx: SourceContext,
-    acknowledgements: bool,
-) -> crate::Result<()> {
-    let span = Span::current();
-
-    let service = proto::Server::new(Service {
-        pipeline: cx.out,
-        acknowledgements,
-    })
-    .accept_gzip();
-
-    let (tx, rx) = tokio::sync::oneshot::channel::<ShutdownSignalToken>();
-
-    let listener = tls_settings.bind(&address).await?;
-    let stream = listener.accept_stream().map(|result| {
-        result.map(|socket| {
-            let peer_addr = socket.connect_info().remote_addr;
-            // TODO: Primary downside to this approach is that it's counting the raw bytes on the wire, which
-            // will almost certainly be a much smaller number than the actual number of bytes when
-            // accounting for compression.
-            //
-            // Possible solutions:
-            // - write our own codec that works with `tonic::codec::Codec`, and write our own
-            //   `prost_build::ServiceGenerator` that codegens using it, so that we can capture the size of the body
-            //   after `tonic` decompresses it
-            // - fork `tonic-build` to support overriding `Service::CODEC_PATH` in the builder config (see
-            //   https://github.com/bmwill/tonic/commit/c409121811844494728a9ea8345ed2189855c870 for an example of doing
-            //   this) and try and upstream it; we would still need to write the aforementioned codec, though
-            // - switch to using the compression layer from `tower-http` to handle compression _before_ it hits `tonic`,
-            //   which would then let us insert a layer right after it that would have access to the raw body before it
-            //   gets decoded
-            //
-            // Number #3 is _probably_ easiest because it's "just" normal Tower middleware/layers, and there's already
-            // the layer for handling compression, and it would give us more flexibility around only tracking the bytes
-            // of specific service methods -- i.e. `push_events` -- rather than tracking all bytes that flow over the
-            // gRPC connection, like health checks or any future enhancements that we/tonic adds.
-            socket.after_read(move |byte_size| {
-                emit!(TcpBytesReceived {
-                    byte_size,
-                    peer_addr,
-                })
-            })
-        })
-    });
-
-    Server::builder()
-        .trace_fn(move |_| span.clone())
-        .add_service(service)
-        .serve_with_incoming_shutdown(stream, cx.shutdown.map(|token| tx.send(token).unwrap()))
-        .in_current_span()
-        .await?;
-
-    drop(rx.await);
-
-    Ok(())
 }
 
 #[derive(Clone)]
