@@ -98,8 +98,6 @@ not:
       error code like `invalid_json`.
   * `error_type` - The type of error condition. MUST be one of the types listed
     in the `error_type` enum list in the cue docs.
-  * `stage` - The stage at which the error occurred. MUST be one of `receiving`,
-    `processing`, or `sending`.
   * If any of the above properties are implicit to the specific error
     type, they MAY be omitted from being represented explicitly in the
     event fields. However, they MUST still be included in the emitted
