@@ -36,6 +36,34 @@ impl EncodingConfigMigrator for EncodingMigrator {
     }
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub enum ExtendedCompression {
+    #[serde(rename = "snappy")]
+    Snappy,
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum CompressionConfigAdapter {
+    Original(Compression),
+    Extended(ExtendedCompression),
+}
+
+impl CompressionConfigAdapter {
+    pub fn content_encoding(&self) -> Option<&'static str> {
+        match self {
+            CompressionConfigAdapter::Original(compression) => compression.content_encoding(),
+            CompressionConfigAdapter::Extended(_) => None,
+        }
+    }
+}
+
+impl Default for CompressionConfigAdapter {
+    fn default() -> Self {
+        CompressionConfigAdapter::Original(Compression::None)
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct LokiConfig {
@@ -48,7 +76,7 @@ pub struct LokiConfig {
     #[serde(default = "crate::serde::default_true")]
     pub remove_timestamp: bool,
     #[serde(default)]
-    pub compression: Compression,
+    pub compression: CompressionConfigAdapter,
     #[serde(default)]
     pub out_of_order_action: OutOfOrderAction,
     pub auth: Option<Auth>,

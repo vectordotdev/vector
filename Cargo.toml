@@ -106,6 +106,7 @@ members = [
   "lib/datadog/grok",
   "lib/datadog/search-syntax",
   "lib/datadog/filter",
+  "lib/loki-logproto",
 ]
 
 [dependencies]
@@ -126,6 +127,7 @@ vector_core = { path = "lib/vector-core", default-features = false, features = [
 vector-api-client = { path = "lib/vector-api-client", optional = true }
 vector-vrl-functions = { path = "lib/vector-vrl-functions" }
 vrl-cli = { path = "lib/vrl/cli", optional = true }
+loki-logproto = { path = "lib/loki-logproto", optional = true }
 
 # Tokio / Futures
 async-stream = { version = "0.3.3", default-features = false }
@@ -680,7 +682,7 @@ sinks-humio = ["sinks-splunk_hec", "transforms-metric_to_log"]
 sinks-influxdb = []
 sinks-kafka = ["rdkafka"]
 sinks-logdna = []
-sinks-loki = []
+sinks-loki = ["loki-logproto"]
 sinks-nats = ["nats", "nkeys"]
 sinks-new_relic_logs = ["sinks-http"]
 sinks-new_relic = []

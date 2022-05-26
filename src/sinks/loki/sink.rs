@@ -20,6 +20,8 @@ use super::{
     event::{LokiBatchEncoder, LokiEvent, LokiRecord, PartitionKey},
     service::{LokiRequest, LokiRetryLogic, LokiService},
 };
+use crate::sinks::loki::config::{CompressionConfigAdapter, ExtendedCompression};
+use crate::sinks::loki::event::LokiBatchEncoding;
 use crate::{
     codecs::Encoder,
     config::{log_schema, SinkContext},
@@ -81,7 +83,7 @@ impl Partitioner for RecordPartitioner {
 
 #[derive(Clone)]
 pub struct LokiRequestBuilder {
-    compression: Compression,
+    compression: CompressionConfigAdapter,
     encoder: LokiBatchEncoder,
 }
 
@@ -108,7 +110,10 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
     type Error = RequestBuildError;
 
     fn compression(&self) -> Compression {
-        self.compression
+        match self.compression {
+            CompressionConfigAdapter::Original(compression) => compression,
+            CompressionConfigAdapter::Extended(_) => Compression::None,
+        }
     }
 
     fn encoder(&self) -> &Self::Encoder {
@@ -133,7 +138,7 @@ impl RequestBuilder<(PartitionKey, Vec<LokiRecord>)> for LokiRequestBuilder {
     ) -> Self::Request {
         let (tenant_id, finalizers, metadata_builder) = metadata;
         let metadata = metadata_builder.build(&payload);
-        let compression = self.compression();
+        let compression = self.compression;
 
         LokiRequest {
             compression,
@@ -351,12 +356,18 @@ impl LokiSink {
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.encoding();
         let encoder = Encoder::<()>::new(serializer);
+        let batch_encoder = match config.compression {
+            CompressionConfigAdapter::Original(_) => LokiBatchEncoder(LokiBatchEncoding::Json),
+            CompressionConfigAdapter::Extended(ExtendedCompression::Snappy) => {
+                LokiBatchEncoder(LokiBatchEncoding::Protobuf)
+            }
+        };
 
         Ok(Self {
             acker: cx.acker(),
             request_builder: LokiRequestBuilder {
                 compression,
-                encoder: Default::default(),
+                encoder: batch_encoder,
             },
             encoder: EventEncoder {
                 key_partitioner: KeyPartitioner::new(config.tenant_id),
