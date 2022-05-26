@@ -135,7 +135,7 @@ struct PipelinesAuth<'a> {
 
 /// Holds the relevant fields for reporting a configuration to Datadog Observability Pipelines.
 struct PipelinesStrFields<'a> {
-    config_version_hash: &'a str,
+    configuration_version_hash: &'a str,
     vector_version: &'a str,
 }
 
@@ -237,7 +237,7 @@ impl<'a> PipelinesVersionPayload<'a> {
         Self {
             data: PipelinesData {
                 attributes: PipelinesAttributes {
-                    config_hash: fields.config_version_hash,
+                    config_hash: fields.configuration_version_hash,
                     vector_version: fields.vector_version,
                     config,
                 },
@@ -257,7 +257,7 @@ impl<'a> PipelinesVersionPayload<'a> {
 pub(crate) struct EnterpriseMetadata {
     pub opts: Options,
     pub api_key: String,
-    pub config_version_hash: String,
+    pub configuration_version_hash: String,
 }
 
 impl TryFrom<&Config> for EnterpriseMetadata {
@@ -291,12 +291,12 @@ impl TryFrom<&Config> for EnterpriseMetadata {
         );
 
         // Get the configuration version hash. In DD Pipelines, this is referred to as the 'config hash'.
-        let config_version_hash = value.version.clone().expect("Config should be versioned");
+        let configuration_version_hash = value.version.clone().expect("Config should be versioned");
 
         Ok(Self {
             opts,
             api_key,
-            config_version_hash,
+            configuration_version_hash,
         })
     }
 }
@@ -379,7 +379,7 @@ pub(crate) fn report_on_reload(
 
 pub(crate) fn attach_enterprise_components(config: &mut Config, metadata: &EnterpriseMetadata) {
     let api_key = metadata.api_key.clone();
-    let configuration_version_hash = metadata.config_version_hash.clone();
+    let configuration_version_hash = metadata.configuration_version_hash.clone();
 
     setup_metrics_reporting(
         config,
@@ -555,7 +555,7 @@ pub(crate) fn report_configuration(
     let fut = async move {
         let EnterpriseMetadata {
             api_key,
-            config_version_hash: config_version,
+            configuration_version_hash,
             opts,
         } = metadata;
 
@@ -572,7 +572,7 @@ pub(crate) fn report_configuration(
         // Set the relevant fields needed to report a config to Datadog. This is a struct rather than
         // exploding as func arguments to avoid confusion with multiple &str fields.
         let fields = PipelinesStrFields {
-            config_version_hash: config_version.as_ref(),
+            configuration_version_hash: &configuration_version_hash,
             vector_version: &vector_version,
         };
 
@@ -610,7 +610,7 @@ pub(crate) fn report_configuration(
             Ok(()) => {
                 info!(
                     "Vector config {} successfully reported to {}.",
-                    &config_version, DATADOG_REPORTING_PRODUCT
+                    &configuration_version_hash, DATADOG_REPORTING_PRODUCT
                 );
             }
             Err(err) => {
@@ -765,7 +765,7 @@ mod test {
 
     const fn get_pipelines_fields() -> PipelinesStrFields<'static> {
         PipelinesStrFields {
-            config_version_hash: "config_version",
+            configuration_version_hash: "configuration_version_hash",
             vector_version: "vector_version",
         }
     }
