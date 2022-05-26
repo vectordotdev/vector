@@ -13,9 +13,9 @@ use chrono_tz::Tz;
 use clap::Parser;
 use glob::glob;
 use vector_common::TimeZone;
-use vrl::prelude::VrlValueConvert;
-use vrl::VrlRuntime;
+use vrl::prelude::{BTreeMap, VrlValueConvert};
 use vrl::{diagnostic::Formatter, state, Runtime, Terminate};
+use vrl::{TargetValueRef, VrlRuntime};
 use vrl_tests::{docs, Test};
 
 #[cfg(not(target_env = "msvc"))]
@@ -400,15 +400,21 @@ fn run_vrl(
     mut state: vrl::state::ExternalEnv,
     test_enrichment: enrichment::TableRegistry,
 ) -> Result<Value, Terminate> {
+    let mut metadata = Value::from(BTreeMap::new());
+    let mut target = TargetValueRef {
+        value: &mut test.object,
+        metadata: &mut metadata,
+    };
     match vrl_runtime {
         VrlRuntime::Vm => {
             let vm = runtime.compile(functions, &program, &mut state).unwrap();
             test_enrichment.finish_load();
-            runtime.run_vm(&vm, &mut test.object, &timezone)
+
+            runtime.run_vm(&vm, &mut target, &timezone)
         }
         VrlRuntime::Ast => {
             test_enrichment.finish_load();
-            runtime.resolve(&mut test.object, &program, &timezone)
+            runtime.resolve(&mut target, &program, &timezone)
         }
     }
 }
