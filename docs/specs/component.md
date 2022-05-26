@@ -76,10 +76,12 @@ configuration.
 
 #### `endpoint(s)`
 
-When a component makes a connection to a downstream target, it MUST
+When a component makes a connection to a downstream target, it SHOULD
 expose either an `endpoint` option that takes a `string` representing a
 single endpoint, or an `endpoints` option that takes an array of strings
-representing multiple endpoints.
+representing multiple endpoints. If a component uses multuiple options to
+automatically build the endpoint, then the `endpoint(s)` option MUST
+override that process.
 
 ## Instrumentation
 
