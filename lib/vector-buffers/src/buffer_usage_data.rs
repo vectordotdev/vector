@@ -11,7 +11,7 @@ use tracing::{Instrument, Span};
 use vector_common::internal_event::emit;
 
 use crate::{
-    internal_events::{BufferCreated, BufferEventsReceived, BufferEventsSent, BufferEventsDropped},
+    internal_events::{BufferCreated, BufferEventsDropped, BufferEventsReceived, BufferEventsSent},
     spawn_named, WhenFull,
 };
 
