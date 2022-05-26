@@ -133,9 +133,11 @@ not result in data loss if the retry succeeds.**
     number of events discarded.
   * MUST include the listed properties as tags except the `reason` property.
 * Logs
-  * MUST log a `<count> events <intentional> dropped: <reason>` message.
+  * MUST log a `Events dropped` message.
+  * MUST include the defined properties as key-value pairs.
   * If `intentional` is `true`, MUST log at the `debug` level.
   * If `intentional` is `false`, MUST log at the `error` level.
+  * SHOULD NOT be rate limited.
 
 
 [camelcase]: https://en.wikipedia.org/wiki/Camel_case
