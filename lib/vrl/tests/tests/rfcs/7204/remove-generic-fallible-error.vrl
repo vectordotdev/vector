@@ -1,0 +1,50 @@
+# result:
+#
+# error[E100]: unhandled error
+#   ┌─ :2:1
+#   │
+# 2 │ to_string(.foo)
+#   │ ^^^^^^^^^^^^^^^
+#   │ │
+#   │ expression can result in runtime error
+#   │ handle the error case to ensure runtime success
+#   │
+#   = see documentation about error handling at https://errors.vrl.dev/#handling
+#   = learn more about error code 100 at https://errors.vrl.dev/100
+#   = see language documentation at https://vrl.dev
+#
+# error[E103]: unhandled fallible assignment
+#   ┌─ :4:15
+#   │
+# 4 │ if (parsed  = parse_grok(.message, "%{GREEDYDATA:parsed}"); parsed != null) {
+#   │     --------- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#   │     │         │
+#   │     │         this expression is fallible
+#   │     │         update the expression to be infallible
+#   │     or change this to an infallible assignment:
+#   │     parsed, err = parse_grok(.message, "%{GREEDYDATA:parsed}")
+#   │
+#   = see documentation about error handling at https://errors.vrl.dev/#handling
+#   = learn more about error code 103 at https://errors.vrl.dev/103
+#   = see language documentation at https://vrl.dev
+#
+# error[E100]: unhandled error
+#   ┌─ :8:1
+#   │
+# 8 │ "foo" + .bar + .baz[1]
+#   │ ^^^^^^^^^^^^^^^^^^^^^^
+#   │ │
+#   │ expression can result in runtime error
+#   │ handle the error case to ensure runtime success
+#   │
+#   = see documentation about error handling at https://errors.vrl.dev/#handling
+#   = learn more about error code 100 at https://errors.vrl.dev/100
+#   = see language documentation at https://vrl.dev
+
+to_string(.foo)
+
+if (parsed  = parse_grok(.message, "%{GREEDYDATA:parsed}"); parsed != null) {
+  merge(., parsed)
+}
+
+"foo" + .bar + .baz[1]
