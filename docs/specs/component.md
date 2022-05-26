@@ -7,8 +7,6 @@ The key words “MUST”, “MUST NOT”, “REQUIRED”, “SHALL”, “SHALL 
 “SHOULD NOT”, “RECOMMENDED”, “MAY”, and “OPTIONAL” in this document are to be
 interpreted as described in [RFC 2119].
 
-<!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
-
 - [Introduction](#introduction)
 - [Scope](#scope)
 - [How to read this document](#how-to-read-this-document)
@@ -27,8 +25,6 @@ interpreted as described in [RFC 2119].
     - [ComponentError](#componenterror)
     - [ComponentEventsDropped](#componenteventsdropped)
 - [Health checks](#health-checks)
-
-<!-- /MarkdownTOC -->
 
 ## Introduction
 
@@ -58,14 +54,14 @@ follow the following guidelines.
 
 ### Source and sink naming
 
-* MUST only contain ASCII alphanumeric, lowercase, and underscores.
-* MUST be a noun named after the protocol or service that the component integrates with.
-* MAY be suffixed with the event type, `logs`, `metrics`, or `traces` (e.g., `kubernetes_logs`, `apache_metrics`).
+- MUST only contain ASCII alphanumeric, lowercase, and underscores.
+- MUST be a noun named after the protocol or service that the component integrates with.
+- MAY be suffixed with the event type, `logs`, `metrics`, or `traces` (e.g., `kubernetes_logs`, `apache_metrics`).
 
 ### Transform naming
 
-* MUST only contain ASCII alphanumeric, lowercase, and underscores.
-* MUST be a verb describing the broad purpose of the transform (e.g., `route`, `sample`, `delegate`).
+- MUST only contain ASCII alphanumeric, lowercase, and underscores.
+- MUST be a verb describing the broad purpose of the transform (e.g., `route`, `sample`, `delegate`).
 
 ## Configuration
 
@@ -97,119 +93,119 @@ expected that components will emit custom events beyond those listed here that
 reflect component specific behavior. There is leeway in the implementation of these
 events:
 
-* Events MAY be augmented with additional component-specific context. For
+- Events MAY be augmented with additional component-specific context. For
   example, the `socket` source adds a `mode` attribute as additional context.
-* The naming of the events MAY deviate to satisfy implementation. For example,
+- The naming of the events MAY deviate to satisfy implementation. For example,
   the `socket` source may rename the `EventReceived` event to
   `SocketEventReceived` to add additional socket specific context.
-* Components MAY emit events for batches of Vector events for performance
+- Components MAY emit events for batches of Vector events for performance
   reasons, but the resulting telemetry state MUST be equivalent to emitting
   individual events. For example, emitting the `EventsReceived` event for 10
   events MUST increment the `component_received_events_total` counter by 10.
 
 #### ComponentBytesReceived
 
-*Sources* MUST emit a `ComponentBytesReceived` event immediately after receiving, decompressing
+*Sources- MUST emit a `ComponentBytesReceived` event immediately after receiving, decompressing
 and filtering bytes from the upstream source and before the creation of a Vector event.
 
-* Properties
-  * `byte_size`
-    * For UDP, TCP, and Unix protocols, the total number of bytes received from
+- Properties
+  - `byte_size`
+    - For UDP, TCP, and Unix protocols, the total number of bytes received from
       the socket excluding the delimiter.
-    * For HTTP-based protocols, the total number of bytes in the HTTP body, as
+    - For HTTP-based protocols, the total number of bytes in the HTTP body, as
       represented by the `Content-Length` header.
-    * For files, the total number of bytes read from the file excluding the
+    - For files, the total number of bytes read from the file excluding the
       delimiter.
-  * `protocol` - The protocol used to send the bytes (i.e., `tcp`, `udp`,
+  - `protocol` - The protocol used to send the bytes (i.e., `tcp`, `udp`,
     `unix`, `http`, `https`, `file`, etc.)
-  * `http_path` - If relevant, the HTTP path, excluding query strings.
-  * `socket` - If relevant, the socket number that bytes were received from.
-* Metrics
-  * MUST increment the `component_received_bytes_total` counter by the defined value with
+  - `http_path` - If relevant, the HTTP path, excluding query strings.
+  - `socket` - If relevant, the socket number that bytes were received from.
+- Metrics
+  - MUST increment the `component_received_bytes_total` counter by the defined value with
     the defined properties as metric tags.
-* Logs
-  * MUST log a `Bytes received.` message at the `trace` level with the
+- Logs
+  - MUST log a `Bytes received.` message at the `trace` level with the
     defined properties as key-value pairs.
-  * MUST NOT be rate limited.
+  - MUST NOT be rate limited.
 
 #### ComponentEventsReceived
 
-*All components* MUST emit an `ComponentEventsReceived` event immediately after creating
+*All components- MUST emit an `ComponentEventsReceived` event immediately after creating
 or receiving one or more Vector events.
 
-* Properties
-  * `count` - The count of Vector events.
-  * `byte_size` - The cumulative in-memory byte size of all events received.
-* Metrics
-  * MUST increment the `component_received_events_total` counter by the defined `quantity`
+- Properties
+  - `count` - The count of Vector events.
+  - `byte_size` - The cumulative in-memory byte size of all events received.
+- Metrics
+  - MUST increment the `component_received_events_total` counter by the defined `quantity`
     property with the other properties as metric tags.
-  * MUST increment the `component_received_event_bytes_total` counter by the defined
+  - MUST increment the `component_received_event_bytes_total` counter by the defined
     `byte_size` property with the other properties as metric tags.
-* Logs
-  * MUST log a `Events received.` message at the `trace` level with the
+- Logs
+  - MUST log a `Events received.` message at the `trace` level with the
     defined properties as key-value pairs.
-  * MUST NOT be rate limited.
+  - MUST NOT be rate limited.
 
 #### ComponentEventsSent
 
-*All components* that send events down stream, and delete them in Vector, MUST
+*All components- that send events down stream, and delete them in Vector, MUST
 emit an `ComponentEventsSent` event immediately after sending, if the transmission was
 successful.
 
 Note that for sinks that simply expose data, but don't delete the data after
 sending it, like the `prometheus_exporter` sink, SHOULD NOT publish this metric.
 
-* Properties
-  * `count` - The count of Vector events.
-  * `byte_size` - The cumulative in-memory byte size of all events sent.
-  * `output` - For components that can use multiple outputs, the name of the
+- Properties
+  - `count` - The count of Vector events.
+  - `byte_size` - The cumulative in-memory byte size of all events sent.
+  - `output` - For components that can use multiple outputs, the name of the
     output that events were sent to. For events sent to the default output, this
     value MUST be `_default`.
-* Metrics
-  * MUST increment the `component_sent_events_total` counter by the defined value with the
+- Metrics
+  - MUST increment the `component_sent_events_total` counter by the defined value with the
     defined properties as metric tags.
-  * MUST increment the `component_sent_event_bytes_total` counter by the event's byte size
+  - MUST increment the `component_sent_event_bytes_total` counter by the event's byte size
     in JSON representation.
-* Logs
-  * MUST log a `Events sent.` message at the `trace` level with the
+- Logs
+  - MUST log a `Events sent.` message at the `trace` level with the
     defined properties as key-value pairs.
-  * MUST NOT be rate limited.
+  - MUST NOT be rate limited.
 
 #### ComponentBytesSent
 
-*Sinks* that send events down stream, and delete them in Vector, MUST emit
+*Sinks- that send events down stream, and delete them in Vector, MUST emit
 a `ComponentBytesSent` event immediately after sending bytes to the downstream target, if
 the transmission was successful. The reported bytes MUST be before compression.
 
 Note that for sinks that simply expose data, but don't delete the data after
 sending it, like the `prometheus_exporter` sink, SHOULD NOT publish this metric.
 
-* Properties
-  * `byte_size`
-    * For UDP, TCP, and Unix protocols, the total number of bytes placed on the
+- Properties
+  - `byte_size`
+    - For UDP, TCP, and Unix protocols, the total number of bytes placed on the
       socket excluding the delimiter.
-    * For HTTP-based protocols, the total number of bytes in the HTTP body, as
+    - For HTTP-based protocols, the total number of bytes in the HTTP body, as
       represented by the `Content-Length` header.
-    * For files, the total number of bytes written to the file excluding the
+    - For files, the total number of bytes written to the file excluding the
       delimiter.
-  * `protocol` - The protocol used to send the bytes (i.e., `tcp`, `udp`,
+  - `protocol` - The protocol used to send the bytes (i.e., `tcp`, `udp`,
     `unix`, `http`, `https`, `file`, etc.)
-  * `endpoint` - If relevant, the endpoint that the bytes were sent to. For
+  - `endpoint` - If relevant, the endpoint that the bytes were sent to. For
     HTTP, this MUST be the host and path only, excluding the query string.
-  * `file` - If relevant, the absolute path of the file.
-* Metrics
-  * MUST increment the `component_sent_bytes_total` counter by the defined value with the
+  - `file` - If relevant, the absolute path of the file.
+- Metrics
+  - MUST increment the `component_sent_bytes_total` counter by the defined value with the
     defined properties as metric tags.
-* Logs
-  * MUST log a `Bytes sent.` message at the `trace` level with the
+- Logs
+  - MUST log a `Bytes sent.` message at the `trace` level with the
     defined properties as key-value pairs.
-  * MUST NOT be rate limited.
+  - MUST NOT be rate limited.
 
 #### ComponentError
 
 **Extends the [Error event].**
 
-*All components* MUST emit error events in accordance with the [Error event]
+*All components- MUST emit error events in accordance with the [Error event]
 requirements.
 
 This specification does not list a standard set of errors that components must
@@ -219,7 +215,7 @@ implement since errors are specific to the component.
 
 **Extends the [EventsDropped event].**
 
-*All components* that can drop events MUST emit a `ComponentEventsDropped`
+*All components- that can drop events MUST emit a `ComponentEventsDropped`
 event in accordance with the [EventsDropped event] requirements.
 
 ## Health checks

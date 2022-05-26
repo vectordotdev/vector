@@ -2,26 +2,21 @@
 
 Vector uses the RFC process to formalize discussion around _substantial_ changes to Vector.
 
-<!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
-
-1. [Goals](#goals)
-1. [Logical boundary](#logical-boundary)
-1. [Tenets of good RFCs](#tenets-of-good-rfcs)
-   1. [Use good technical grammar](#use-good-technical-grammar)
-   1. [Keep the scope small](#keep-the-scope-small)
-   1. [Be opinionated and propose a single solution](#be-opinionated-and-propose-a-single-solution)
-1. [Process](#process)
-   1. [Before creating an RFC](#before-creating-an-rfc)
-   1. [Creating an RFC](#creating-an-rfc)
-   1. [Getting an RFC accepted](#getting-an-rfc-accepted)
-   1. [Implementing an RFC](#implementing-an-rfc)
-1. [FAQ](#faq)
-   1. [What if I'm unsure about the solution?](#what-if-im-unsure-about-the-solution)
-   1. [What if I need to investigate and feel out solutions?](#what-if-i-need-to-investigate-and-feel-out-solutions)
-   1. [How long should it take to obtain consensus?](#how-long-should-it-take-to-obtain-consensus)
-
-<!-- /MarkdownTOC -->
-
+- [Goals](#goals)
+- [Logical boundary](#logical-boundary)
+- [Tenets of good RFCs](#tenets-of-good-rfcs)
+  - [Use good technical grammar](#use-good-technical-grammar)
+  - [Keep the scope small](#keep-the-scope-small)
+  - [Be opinionated and propose a single solution](#be-opinionated-and-propose-a-single-solution)
+- [Process](#process)
+  - [Before creating an RFC](#before-creating-an-rfc)
+  - [Creating an RFC](#creating-an-rfc)
+  - [Getting an RFC accepted](#getting-an-rfc-accepted)
+  - [Implementing an RFC](#implementing-an-rfc)
+- [FAQ](#faq)
+  - [What if I'm unsure about the solution?](#what-if-im-unsure-about-the-solution)
+  - [What if I need to investigate and feel out solutions?](#what-if-i-need-to-investigate-and-feel-out-solutions)
+  - [How long should it take to obtain consensus?](#how-long-should-it-take-to-obtain-consensus)
 
 ## Goals
 
