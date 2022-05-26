@@ -9,24 +9,24 @@ interpreted as described in [RFC 2119].
 
 <!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
 
-1. [Introduction](#introduction)
-1. [Scope](#scope)
-1. [How to read this document](#how-to-read-this-document)
-1. [Naming](#naming)
-   1. [Source and sink naming](#source-and-sink-naming)
-   1. [Transform naming](#transform-naming)
-1. [Configuration](#configuration)
-   1. [Options](#options)
-      1. [`endpoint(s)`](#endpoints)
-1. [Instrumentation](#instrumentation)
-   1. [Batching](#batching)
-   1. [Events](#events)
-      1. [BytesReceived](#bytesreceived)
-      1. [EventsReceived](#eventsrecevied)
-      1. [EventsSent](#eventssent)
-      1. [BytesSent](#bytessent)
-      1. [Error](#error)
-1. [Health checks](#health-checks)
+- [Introduction](#introduction)
+- [Scope](#scope)
+- [How to read this document](#how-to-read-this-document)
+- [Naming](#naming)
+  - [Source and sink naming](#source-and-sink-naming)
+  - [Transform naming](#transform-naming)
+- [Configuration](#configuration)
+  - [Options](#options)
+    - [`endpoint(s)`](#endpoints)
+- [Instrumentation](#instrumentation)
+  - [Events](#events)
+    - [ComponentBytesReceived](#componentbytesreceived)
+    - [ComponentEventsReceived](#componenteventsreceived)
+    - [ComponentEventsSent](#componenteventssent)
+    - [ComponentBytesSent](#componentbytessent)
+    - [ComponentError](#componenterror)
+    - [ComponentEventsDropped](#componenteventsdropped)
+- [Health checks](#health-checks)
 
 <!-- /MarkdownTOC -->
 
@@ -76,32 +76,26 @@ configuration.
 
 #### `endpoint(s)`
 
-When a component makes a connection to a downstream target, it MUST
+When a component makes a connection to a downstream target, it SHOULD
 expose either an `endpoint` option that takes a `string` representing a
 single endpoint, or an `endpoints` option that takes an array of strings
-representing multiple endpoints.
+representing multiple endpoints. If a component uses multiple options to
+automatically build the endpoint, then the `endpoint(s)` option MUST
+override that process.
 
 ## Instrumentation
 
+**Extends the [Instrumentation Specification].**
+
 Vector components MUST be instrumented for optimal observability and monitoring.
-This is required to drive various interfaces that Vector users depend on to
-manage Vector installations in mission critical production environments. This
-section extends the [Instrumentation Specification].
-
-### Batching
-
-For performance reasons, components SHOULD instrument batches of Vector events
-as opposed to individual Vector events. [Pull request #8383] demonstrated
-meaningful performance improvements as a result of this strategy.
 
 ### Events
 
-Vector implements an event driven pattern ([RFC 2064]) for internal
-instrumentation. This section lists all required and optional events that a
-component must emit. It is expected that components will emit custom events
-beyond those listed here that reflect component specific behavior.
-
-There is leeway in the implementation of these events:
+This section lists all required events that a component MUST emit. Additional events
+are listed that a component is RECOMMENDED to emit, but remain OPTIONAL. It is
+expected that components will emit custom events beyond those listed here that
+reflect component specific behavior. There is leeway in the implementation of these
+events:
 
 * Events MAY be augmented with additional component-specific context. For
   example, the `socket` source adds a `mode` attribute as additional context.
@@ -113,9 +107,9 @@ There is leeway in the implementation of these events:
   individual events. For example, emitting the `EventsReceived` event for 10
   events MUST increment the `component_received_events_total` counter by 10.
 
-#### BytesReceived
+#### ComponentBytesReceived
 
-*Sources* MUST emit a `BytesReceived` event immediately after receiving, decompressing
+*Sources* MUST emit a `ComponentBytesReceived` event immediately after receiving, decompressing
 and filtering bytes from the upstream source and before the creation of a Vector event.
 
 * Properties
@@ -135,11 +129,12 @@ and filtering bytes from the upstream source and before the creation of a Vector
     the defined properties as metric tags.
 * Logs
   * MUST log a `Bytes received.` message at the `trace` level with the
-    defined properties as key-value pairs. It MUST NOT be rate limited.
+    defined properties as key-value pairs.
+  * MUST NOT be rate limited.
 
-#### EventsReceived
+#### ComponentEventsReceived
 
-*All components* MUST emit an `EventsReceived` event immediately after creating
+*All components* MUST emit an `ComponentEventsReceived` event immediately after creating
 or receiving one or more Vector events.
 
 * Properties
@@ -152,12 +147,13 @@ or receiving one or more Vector events.
     `byte_size` property with the other properties as metric tags.
 * Logs
   * MUST log a `Events received.` message at the `trace` level with the
-    defined properties as key-value pairs. It MUST NOT be rate limited.
+    defined properties as key-value pairs.
+  * MUST NOT be rate limited.
 
-#### EventsSent
+#### ComponentEventsSent
 
 *All components* that send events down stream, and delete them in Vector, MUST
-emit an `EventsSent` event immediately after sending, if the transmission was
+emit an `ComponentEventsSent` event immediately after sending, if the transmission was
 successful.
 
 Note that for sinks that simply expose data, but don't delete the data after
@@ -176,12 +172,13 @@ sending it, like the `prometheus_exporter` sink, SHOULD NOT publish this metric.
     in JSON representation.
 * Logs
   * MUST log a `Events sent.` message at the `trace` level with the
-    defined properties as key-value pairs. It MUST NOT be rate limited.
+    defined properties as key-value pairs.
+  * MUST NOT be rate limited.
 
-#### BytesSent
+#### ComponentBytesSent
 
 *Sinks* that send events down stream, and delete them in Vector, MUST emit
-a `BytesSent` event immediately after sending bytes to the downstream target, if
+a `ComponentBytesSent` event immediately after sending bytes to the downstream target, if
 the transmission was successful. The reported bytes MUST be before compression.
 
 Note that for sinks that simply expose data, but don't delete the data after
@@ -205,53 +202,25 @@ sending it, like the `prometheus_exporter` sink, SHOULD NOT publish this metric.
     defined properties as metric tags.
 * Logs
   * MUST log a `Bytes sent.` message at the `trace` level with the
-    defined properties as key-value pairs. It MUST NOT be rate limited.
+    defined properties as key-value pairs.
+  * MUST NOT be rate limited.
 
-#### Error
+#### ComponentError
 
-*All components* MUST emit error events when an error occurs, and errors MUST be
-named with an `Error` suffix. For example, the `socket` source emits a
-`SocketReceiveError` representing any error that occurs while receiving data off
-of the socket.
+**Extends the [Error event].**
+
+*All components* MUST emit error events in accordance with the [Error event]
+requirements.
 
 This specification does not list a standard set of errors that components must
 implement since errors are specific to the component.
 
-* Properties
-  * `message` - A human readable error message.
-  * `error_code` - An error code for the failure, if applicable.
+#### ComponentEventsDropped
 
-    `error_code` SHOULD only be specified if it adds additional information
-    beyond `error_type`.
+**Extends the [EventsDropped event].**
 
-    The values for `error_code` for a given error event MUST be a bounded set
-    with relatively low cardinality because it will be used as a metric tag.
-    Examples would be syscall error code. Examples of values that should not be
-    used are raw error messages from `serde` as these are highly variable
-    depending on the input. Instead, these errors should be converted to an
-    error code like `invalid_json`.
-  * `error_type` - The type of error condition. This MUST be one of the types
-    listed in the `error_type` enum list in the cue docs.
-  * `stage` - The stage at which the error occurred. This MUST be one of
-    `receiving`, `processing`, or `sending`.
-  * If any of the above properties are implicit to the specific error
-    type, they MAY be omitted from being represented explicitly in the
-    event fields. However, they MUST still be included in the emitted
-    logs and metrics, as specified below, as if they were present.
-* Metrics
-  * MUST increment the `component_errors_total` counter by 1 with the defined
-    properties, except `message` as metric tags.
-  * MUST increment the `component_discarded_events_total` counter by the number
-    of Vector events discarded if the error resulted in discarding (dropping)
-    acknowledged events. For sources, only increment this metric if incoming
-    events were consumed (and acknowledged if applicable) and discarded. The
-    metric MUST not include events that will be re-ingested. For sinks, this
-    means only incrementing this metric if the error resulted in the sink
-    dropping the events, and thus acknowledging them. Retried events MUST not be
-    included in the metric.
-* Logs
-  * MUST log a message at the `error` level with the defined properties
-    as key-value pairs. It SHOULD be rate limited to 10 seconds.
+*All components* that can drop events MUST emit a `ComponentEventsDropped`
+event in accordance with the [EventsDropped event] requirements.
 
 ## Health checks
 
@@ -268,10 +237,10 @@ AWS's status.
 See the [development documentation][health checks] for more context guidance.
 
 [Configuration Specification]: configuration.md
+[Error event]: instrumentation.md#Error
+[EventsDropped event]: instrumentation.md#EventsDropped
 [high user experience expectations]: https://github.com/vectordotdev/vector/blob/master/docs/USER_EXPERIENCE_DESIGN.md
 [health checks]: ../DEVELOPING.md#sink-healthchecks
 [Instrumentation Specification]: instrumentation.md
 [logical boundaries of components]: ../USER_EXPERIENCE_DESIGN.md#logical-boundaries
-[Pull request #8383]: https://github.com/vectordotdev/vector/pull/8383/
-[RFC 2064]: https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 [RFC 2119]: https://datatracker.ietf.org/doc/html/rfc2119
