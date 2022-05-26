@@ -1,11 +1,11 @@
-use std::{fmt, sync::Arc};
+use std::{any::Any, fmt, sync::Arc};
 
 use anymap::AnyMap;
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 
 use super::Block;
 use crate::{
-    expression::{levenstein, ExpressionError, FunctionArgument, Noop},
+    expression::{levenstein, Expr, ExpressionError, FunctionArgument, Noop},
     function::{
         closure::{self, VariableKind},
         ArgumentList, Example, FunctionClosure, FunctionCompileContext, Parameter,
@@ -538,6 +538,50 @@ impl FunctionCall {
         Ok(result)
     }
 
+    fn compile_arguments(
+        &self,
+        function: &dyn Function,
+        external_env: &mut ExternalEnv,
+    ) -> Result<Vec<Option<CompiledArgument>>, String> {
+        // Resolve the arguments so they are in the order defined in the function.
+        let arguments = self.resolve_arguments(function)?;
+
+        // We take the external context, and pass it to the function compile context, this allows
+        // functions mutable access to external state, but keeps the internal compiler state behind
+        // an immutable reference, to ensure compiler state correctness.
+        let external_context = external_env.swap_external_context(AnyMap::new());
+
+        let mut compile_ctx =
+            FunctionCompileContext::new(self.span).with_external_context(external_context);
+
+        let compiled_arguments = arguments
+            .iter()
+            .map(|(keyword, argument)| -> Result<_, String> {
+                let argument = argument.as_ref().map(|argument| argument.inner());
+
+                // Call `compile_argument` for functions that need to perform any compile time processing
+                // on the argument.
+                let compiled_argument = function
+                    .compile_argument(&arguments, &mut compile_ctx, keyword, argument)
+                    .map_err(|error| error.to_string())?;
+
+                let argument = match compiled_argument {
+                    Some(argument) => Some(CompiledArgument::Static(argument)),
+                    None => {
+                        argument.map(|expression| CompiledArgument::Dynamic(expression.clone()))
+                    }
+                };
+
+                Ok(argument)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        // Re-insert the external context into the compiler state.
+        let _ = external_env.swap_external_context(compile_ctx.into_external_context());
+
+        Ok(compiled_arguments)
+    }
+
     pub fn noop() -> Self {
         let expr = Box::new(Noop) as _;
 
@@ -567,6 +611,11 @@ impl FunctionCall {
             .map(|arg| format!("{:?}", arg.inner()))
             .collect::<Vec<_>>()
     }
+}
+
+enum CompiledArgument {
+    Static(Box<dyn Any + Send + Sync>),
+    Dynamic(Expr),
 }
 
 impl Expression for FunctionCall {
@@ -689,49 +738,31 @@ impl Expression for FunctionCall {
         vm: &mut crate::vm::Vm,
         (local, external): (&mut LocalEnv, &mut ExternalEnv),
     ) -> Result<(), String> {
-        // Resolve the arguments so they are in the order defined in the function.
-        let args = match vm.function(self.function_id) {
-            Some(fun) => self.resolve_arguments(fun)?,
-            None => return Err(format!("Function {} not found.", self.function_id)),
-        };
+        let function = vm
+            .function(self.function_id)
+            .ok_or(format!("Function {} not found.", self.function_id))?;
 
-        // We take the external context, and pass it to the function compile context, this allows
-        // functions mutable access to external state, but keeps the internal compiler state behind
-        // an immutable reference, to ensure compiler state correctness.
-        let external_context = external.swap_external_context(AnyMap::new());
+        let compiled_arguments = self.compile_arguments(function, external)?;
 
-        let mut compile_ctx =
-            FunctionCompileContext::new(self.span).with_external_context(external_context);
-
-        for (keyword, argument) in &args {
-            let fun = vm.function(self.function_id).unwrap();
-            let argument = argument.as_ref().map(|argument| argument.inner());
-
-            // Call `compile_argument` for functions that need to perform any compile time processing
-            // on the argument.
-            match fun
-                .compile_argument(&args, &mut compile_ctx, keyword, argument)
-                .map_err(|err| err.to_string())?
-            {
-                Some(stat) => {
+        for argument in compiled_arguments {
+            match argument {
+                Some(CompiledArgument::Static(argument)) => {
                     // The function has compiled this argument as a static.
-                    let stat = vm.add_static(stat);
+                    let argument = vm.add_static(argument);
                     vm.write_opcode(OpCode::MoveStaticParameter);
-                    vm.write_primitive(stat);
+                    vm.write_primitive(argument);
                 }
-                None => match argument {
-                    Some(argument) => {
-                        // Compile the argument, `MoveParameter` will move the result of the expression onto the
-                        // parameter stack to be passed into the function.
-                        argument.compile_to_vm(vm, (local, external))?;
-                        vm.write_opcode(OpCode::MoveParameter);
-                    }
-                    None => {
-                        // The parameter hasn't been specified, so just move an empty parameter onto the
-                        // parameter stack.
-                        vm.write_opcode(OpCode::EmptyParameter);
-                    }
-                },
+                Some(CompiledArgument::Dynamic(argument)) => {
+                    // Compile the argument, `MoveParameter` will move the result of the expression onto the
+                    // parameter stack to be passed into the function.
+                    argument.compile_to_vm(vm, (local, external))?;
+                    vm.write_opcode(OpCode::MoveParameter);
+                }
+                None => {
+                    // The parameter hasn't been specified, so just move an empty parameter onto the
+                    // parameter stack.
+                    vm.write_opcode(OpCode::EmptyParameter);
+                }
             }
         }
 
@@ -748,9 +779,6 @@ impl Expression for FunctionCall {
             vm.write_opcode(OpCode::MoveClosure);
             vm.write_primitive(closure);
         }
-
-        // Re-insert the external context into the compiler state.
-        let _ = external.swap_external_context(compile_ctx.into_external_context());
 
         // Call the function with the given id.
         vm.write_opcode(OpCode::Call);

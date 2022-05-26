@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use vrl_core::{
     Context, ExpressionError, LookupBuf, Resolved, Span, Target, Value, VrlValueArithmetic,
+    VrlValueConvert,
 };
 
 // We only want to precompile the stub for this function, and therefore don't
@@ -43,12 +44,20 @@ pub extern "C" fn vrl_resolved_is_err(result: &mut Resolved) -> bool {
 }
 
 #[no_mangle]
-pub extern "C" fn vrl_resolved_boolean_is_true(result: &Resolved) -> bool {
+pub extern "C" fn vrl_value_boolean_is_true(result: &Resolved) -> bool {
     result
         .as_ref()
         .expect("VRL result must not contain an error")
         .as_boolean()
         .expect("VRL value must be boolean")
+}
+
+#[no_mangle]
+pub extern "C" fn vrl_value_is_falsy(result: &Resolved) -> bool {
+    result
+        .as_ref()
+        .expect("VRL result must not contain an error")
+        .is_falsy()
 }
 
 /// # Safety
@@ -179,20 +188,57 @@ pub extern "C" fn vrl_expression_op_add_impl(rhs: &mut Resolved, result: &mut Re
 
 #[no_mangle]
 pub extern "C" fn vrl_expression_op_eq_impl(rhs: &mut Resolved, result: &mut Resolved) {
+    let lhs = {
+        let mut moved = Ok(Value::Null);
+        std::mem::swap(result, &mut moved);
+        moved
+    }
+    .expect("VRL value must not contain an error");
     let rhs = {
         let mut moved = Ok(Value::Null);
         std::mem::swap(rhs, &mut moved);
         moved
-    };
-    match (&result, rhs) {
-        (Ok(lhs), Ok(rhs)) => {
-            *result = Ok(lhs.eq_lossy(&rhs).into());
-        }
-        (Err(_), _) => (),
-        (_, Err(error)) => {
-            *result = Err(error);
-        }
     }
+    .expect("VRL value must not contain an error");
+    *result = Ok(lhs.eq_lossy(&rhs).into());
+}
+
+#[no_mangle]
+pub extern "C" fn vrl_expression_op_eq_bytes_impl(rhs: &mut Resolved, result: &mut Resolved) {
+    let lhs = {
+        let mut moved = Ok(Value::Null);
+        std::mem::swap(result, &mut moved);
+        moved
+    }
+    .expect("VRL value must not contain an error");
+    let rhs = {
+        let mut moved = Ok(Value::Null);
+        std::mem::swap(rhs, &mut moved);
+        moved
+    }
+    .expect("VRL value must not contain an error");
+    *result = Ok((lhs.as_bytes().expect("VRL value must be bytes")
+        == rhs.as_bytes().expect("VRL value must be bytes"))
+    .into());
+}
+
+#[no_mangle]
+pub extern "C" fn vrl_expression_op_eq_integer_impl(rhs: &mut Resolved, result: &mut Resolved) {
+    let lhs = {
+        let mut moved = Ok(Value::Null);
+        std::mem::swap(result, &mut moved);
+        moved
+    }
+    .expect("VRL value must not contain an error");
+    let rhs = {
+        let mut moved = Ok(Value::Null);
+        std::mem::swap(rhs, &mut moved);
+        moved
+    }
+    .expect("VRL value must not contain an error");
+    *result = Ok((lhs.as_integer().expect("VRL value must be bytes")
+        == rhs.as_integer().expect("VRL value must be bytes"))
+    .into());
 }
 
 #[no_mangle]
@@ -220,4 +266,81 @@ pub extern "C" fn vrl_expression_query_target_impl(path: &LookupBuf, result: &mu
         .flatten()
         .map(|value| value.clone())
         .unwrap_or(Value::Null));
+}
+
+#[no_mangle]
+pub extern "C" fn vrl_fn_downcase(value: &mut Resolved, resolved: &mut Resolved) {
+    let value = {
+        let mut moved = Ok(Value::Null);
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+
+    *resolved = (|| {
+        let bytes = value?.try_bytes()?;
+        Ok(String::from_utf8_lossy(&bytes).to_lowercase().into())
+    })();
+}
+
+#[no_mangle]
+pub extern "C" fn vrl_fn_starts_with(
+    value: &mut Resolved,
+    substring: &mut Resolved,
+    case_sensitive: &mut Resolved,
+    resolved: &mut Resolved,
+) {
+    let value = {
+        let mut moved = Ok(Value::Null);
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+    let substring = {
+        let mut moved = Ok(Value::Null);
+        std::mem::swap(substring, &mut moved);
+        moved
+    };
+    let case_sensitive = {
+        let mut moved = Ok(Value::Null);
+        std::mem::swap(case_sensitive, &mut moved);
+        moved
+    };
+
+    *resolved = (|| {
+        let case_sensitive = case_sensitive?.try_boolean().unwrap_or(true);
+        let substring = {
+            let substring = substring?;
+            let string = substring.try_bytes_utf8_lossy()?;
+
+            match case_sensitive {
+                true => string.into_owned(),
+                false => string.to_lowercase(),
+            }
+        };
+
+        let value = {
+            let value = value?;
+            let string = value.try_bytes_utf8_lossy()?;
+
+            match case_sensitive {
+                true => string.into_owned(),
+                false => string.to_lowercase(),
+            }
+        };
+
+        Ok(value.starts_with(&substring).into())
+    })();
+}
+
+#[no_mangle]
+pub extern "C" fn vrl_fn_string(value: &mut Resolved, resolved: &mut Resolved) {
+    let value = {
+        let mut moved = Ok(Value::Null);
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+
+    *resolved = (|| match value? {
+        v @ Value::Bytes(_) => Ok(v),
+        v => Err(format!(r#"expected "string", got {}"#, v.kind()).into()),
+    })();
 }

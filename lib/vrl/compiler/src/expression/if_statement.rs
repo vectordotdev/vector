@@ -113,7 +113,7 @@ impl Expression for IfStatement {
         self.predicate.emit_llvm(state, ctx)?;
 
         let is_true = {
-            let fn_ident = "vrl_resolved_boolean_is_true";
+            let fn_ident = "vrl_value_boolean_is_true";
             let fn_impl = ctx
                 .module()
                 .get_function(fn_ident)
