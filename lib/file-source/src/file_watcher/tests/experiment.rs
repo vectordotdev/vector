@@ -74,9 +74,9 @@ fn experiment(actions: Vec<FileWatcherAction>) {
             FileWatcherAction::Exit => break,
             FileWatcherAction::WriteLine(ref s) => {
                 fwfiles[0].write_line(s);
-                assert!(fp.write(s.as_bytes()).is_ok());
-                assert!(fp.write(b"\n").is_ok());
-                assert!(fp.flush().is_ok());
+                assert_eq!(fp.write(s.as_bytes()), Ok(s.len()));
+                assert_eq!(fp.write(b"\n"), Ok("\n".len()));
+                assert_eq!(fp.flush(), Ok(()));
                 writes += 1;
             }
             FileWatcherAction::RotateFile => {

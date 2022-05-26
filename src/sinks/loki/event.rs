@@ -24,7 +24,7 @@ impl Encoder<Vec<LokiRecord>> for LokiBatchEncoder {
         let batch = LokiBatch::from(input);
         let body = serde_json::json!({ "streams": [batch] });
         let body = serde_json::to_vec(&body)?;
-        writer.write(&body)
+        writer.write_all(&body).map(|()| body.len())
     }
 }
 
