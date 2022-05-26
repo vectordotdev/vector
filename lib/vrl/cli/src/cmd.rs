@@ -1,4 +1,4 @@
-use core::{ValueWithMetadata, ValueWithMetadataRef};
+use core::{TargetValue, TargetValueRef};
 use std::{
     collections::BTreeMap,
     fs::File,
@@ -135,7 +135,7 @@ fn run(opts: &Opts) -> Result<(), Error> {
 
         for mut object in objects {
             let mut metadata = Value::Object(BTreeMap::new());
-            let mut target = ValueWithMetadataRef {
+            let mut target = TargetValueRef {
                 value: &mut object,
                 metadata: &mut metadata,
             };
@@ -173,7 +173,7 @@ fn run(opts: &Opts) -> Result<(), Error> {
 fn repl(objects: Vec<Value>, timezone: &TimeZone, vrl_runtime: VrlRuntime) -> Result<(), Error> {
     let objects = objects
         .into_iter()
-        .map(|value| ValueWithMetadata {
+        .map(|value| TargetValue {
             value,
             metadata: Value::Object(BTreeMap::new()),
         })

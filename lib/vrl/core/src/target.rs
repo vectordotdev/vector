@@ -67,14 +67,13 @@ pub trait MetadataTarget {
     fn remove_metadata(&mut self, _path: &LookupBuf) -> Result<(), String>;
 }
 
-//TODO: find a better home for this
 #[derive(Debug)]
-pub struct ValueWithMetadataRef<'a> {
+pub struct TargetValueRef<'a> {
     pub value: &'a mut Value,
     pub metadata: &'a mut Value,
 }
 
-impl Target for ValueWithMetadataRef<'_> {
+impl Target for TargetValueRef<'_> {
     fn target_insert(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
         Ok(self.value.insert_by_path(path, value))
     }
@@ -92,7 +91,7 @@ impl Target for ValueWithMetadataRef<'_> {
     }
 }
 
-impl MetadataTarget for ValueWithMetadataRef<'_> {
+impl MetadataTarget for TargetValueRef<'_> {
     fn get_metadata(&self, path: &LookupBuf) -> Result<Option<Value>, String> {
         Ok(self.metadata.get_by_path(path).cloned())
     }
@@ -108,12 +107,12 @@ impl MetadataTarget for ValueWithMetadataRef<'_> {
 }
 
 #[derive(Debug)]
-pub struct ValueWithMetadata {
+pub struct TargetValue {
     pub value: Value,
     pub metadata: Value,
 }
 
-impl Target for ValueWithMetadata {
+impl Target for TargetValue {
     fn target_insert(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
         Ok(self.value.insert_by_path(path, value))
     }
@@ -131,7 +130,7 @@ impl Target for ValueWithMetadata {
     }
 }
 
-impl MetadataTarget for ValueWithMetadata {
+impl MetadataTarget for TargetValue {
     fn get_metadata(&self, path: &LookupBuf) -> Result<Option<Value>, String> {
         Ok(self.metadata.get_by_path(path).cloned())
     }
@@ -199,9 +198,13 @@ mod tests {
 
         for (value, segments, expect) in cases {
             let value: Value = value;
+            let target = TargetValue {
+                value,
+                metadata: value!({}),
+            };
             let path = LookupBuf::from_segments(segments);
 
-            assert_eq!(value.target_get(&path).map(|v| v.cloned()), expect);
+            assert_eq!(target.target_get(&path).map(|v| v.cloned()), expect);
         }
     }
 
@@ -306,7 +309,11 @@ mod tests {
             */
         ];
 
-        for (mut target, segments, value, expect, result) in cases {
+        for (target, segments, value, expect, result) in cases {
+            let mut target = TargetValue {
+                value: target,
+                metadata: value!({}),
+            };
             println!("Inserting at {:?}", segments);
             let path = LookupBuf::from_segments(segments);
 
@@ -314,7 +321,7 @@ mod tests {
                 Target::target_insert(&mut target, &path, value.clone()),
                 result
             );
-            assert_eq!(target, expect);
+            assert_eq!(target.value, expect);
             assert_eq!(
                 Target::target_get(&target, &path).map(|v| v.cloned()),
                 Ok(Some(value))
@@ -401,9 +408,13 @@ mod tests {
             ),
         ];
 
-        for (mut target, segments, compact, value, expect) in cases {
+        for (target, segments, compact, value, expect) in cases {
             let path = LookupBuf::from_segments(segments);
 
+            let mut target = TargetValue {
+                value: target,
+                metadata: value!({}),
+            };
             assert_eq!(
                 Target::target_remove(&mut target, &path, compact),
                 Ok(value)

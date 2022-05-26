@@ -1,7 +1,7 @@
 use std::borrow::Cow::{self, Borrowed, Owned};
 
 use ::value::Value;
-use core::ValueWithMetadata;
+use core::TargetValue;
 use indoc::indoc;
 use once_cell::sync::Lazy;
 use prettytable::{format, Cell, Row, Table};
@@ -49,11 +49,7 @@ const RESERVED_TERMS: &[&str] = &[
     "help docs",
 ];
 
-pub(crate) fn run(
-    mut objects: Vec<ValueWithMetadata>,
-    timezone: &TimeZone,
-    vrl_runtime: VrlRuntime,
-) {
+pub(crate) fn run(mut objects: Vec<TargetValue>, timezone: &TimeZone, vrl_runtime: VrlRuntime) {
     let mut index = 0;
     let func_docs_regex = Regex::new(r"^help\sdocs\s(\w{1,})$").unwrap();
     let error_docs_regex = Regex::new(r"^help\serror\s(\w{1,})$").unwrap();
@@ -96,7 +92,7 @@ pub(crate) fn run(
 
                         // add new object
                         if index == objects.len() {
-                            objects.push(ValueWithMetadata {
+                            objects.push(TargetValue {
                                 value: Value::Null,
                                 metadata: Value::Object(BTreeMap::new()),
                             });
@@ -154,7 +150,7 @@ pub(crate) fn run(
 }
 
 fn resolve(
-    target: &mut ValueWithMetadata,
+    target: &mut TargetValue,
     runtime: &mut Runtime,
     program: &str,
     external: &mut state::ExternalEnv,
@@ -303,7 +299,7 @@ impl Validator for Repl {
         let local_state = state::LocalEnv::default();
         let mut external_state = state::ExternalEnv::default();
         let mut rt = Runtime::new(state::Runtime::default());
-        let mut target = ValueWithMetadata {
+        let mut target = TargetValue {
             value: Value::Null,
             metadata: Value::Object(BTreeMap::new()),
         };
