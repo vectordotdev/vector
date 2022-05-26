@@ -7,7 +7,7 @@ use ::value::Value;
 use lookup::{Lookup, LookupBuf, SegmentBuf};
 use vrl::prelude::*;
 
-pub const LEGACY_METADATA_KEYS: [&'static str; 2] = ["datadog_api_key", "splunk_hec_token"];
+pub const LEGACY_METADATA_KEYS: [&str; 2] = ["datadog_api_key", "splunk_hec_token"];
 
 pub fn is_legacy_metadata_path(path: &LookupBuf) -> bool {
     if path.segments.len() != 1 {
@@ -31,7 +31,7 @@ pub fn vrl_functions() -> Vec<Box<dyn vrl::Function>> {
 }
 
 fn compile_path_arg(path: &str) -> std::result::Result<LookupBuf, Box<dyn DiagnosticMessage>> {
-    match Lookup::from_str(path.as_ref()) {
+    match Lookup::from_str(path) {
         Ok(lookup) => Ok(lookup.into()),
         Err(_) => Err(vrl::function::Error::InvalidArgument {
             keyword: "key",

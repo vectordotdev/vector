@@ -9018,6 +9018,7 @@ dependencies = [
  "value",
  "vector_common",
  "vrl-compiler",
+ "vrl-core",
  "vrl-diagnostic",
  "vrl-parser",
  "vrl-stdlib",

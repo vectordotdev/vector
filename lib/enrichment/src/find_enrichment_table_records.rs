@@ -253,6 +253,7 @@ impl Expression for FindEnrichmentTableRecordsFn {
 #[cfg(test)]
 mod tests {
     use vector_common::TimeZone;
+    use vrl::TargetValue;
 
     use super::*;
     use crate::test_util::get_table_registry;
@@ -273,9 +274,13 @@ mod tests {
         };
 
         let tz = TimeZone::default();
-        let mut object: Value = BTreeMap::new().into();
+        let object: Value = BTreeMap::new().into();
+        let mut target = TargetValue {
+            value: object,
+            metadata: value!({}),
+        };
         let mut runtime_state = vrl::state::Runtime::default();
-        let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
+        let mut ctx = Context::new(&mut target, &mut runtime_state, &tz);
 
         registry.finish_load();
 

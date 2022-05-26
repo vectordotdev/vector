@@ -63,7 +63,7 @@ impl Function for SetMetadataField {
         // backwards compat until schemas are supported for metadata. Make sure the "legacy"
         // fields stay as string or null
         if is_legacy_metadata_path(&path) {
-            let type_def = value.type_def((&state.0, &state.1));
+            let type_def = value.type_def((state.0, state.1));
             if !TypeDef::bytes().add_null().is_superset(&type_def) {
                 return Err(vrl::function::Error::UnexpectedExpression {
                     keyword: "key",
@@ -73,20 +73,19 @@ impl Function for SetMetadataField {
                 .into());
             }
         }
-        if path.len() > 1 {
-            if is_legacy_metadata_path(&LookupBuf::from(VecDeque::from([path
+        if path.len() > 1
+            && is_legacy_metadata_path(&LookupBuf::from(VecDeque::from([path
                 .segments
                 .front()
                 .unwrap()
                 .clone()])))
-            {
-                return Err(vrl::function::Error::InvalidArgument {
-                    keyword: "key",
-                    value: Value::Bytes(Bytes::from(key.as_bytes().to_vec())),
-                    error: "Cannot write to this path.",
-                }
-                .into());
+        {
+            return Err(vrl::function::Error::InvalidArgument {
+                keyword: "key",
+                value: Value::Bytes(Bytes::from(key.as_bytes().to_vec())),
+                error: "Cannot write to this path.",
             }
+            .into());
         }
 
         Ok(Box::new(SetMetadataFieldFn {

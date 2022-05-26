@@ -17,7 +17,9 @@ pub mod type_def;
 pub mod value;
 pub mod vm;
 
-pub use core::{value, ExpressionError, MetadataTarget, Resolved, Target};
+pub use core::{
+    value, ExpressionError, MetadataTarget, Resolved, Target, TargetValue, TargetValueRef,
+};
 use std::{fmt::Display, str::FromStr};
 
 use ::serde::{Deserialize, Serialize};

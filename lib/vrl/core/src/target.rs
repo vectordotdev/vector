@@ -75,7 +75,8 @@ pub struct TargetValueRef<'a> {
 
 impl Target for TargetValueRef<'_> {
     fn target_insert(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
-        Ok(self.value.insert_by_path(path, value))
+        self.value.insert_by_path(path, value);
+        Ok(())
     }
 
     fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
@@ -97,7 +98,8 @@ impl MetadataTarget for TargetValueRef<'_> {
     }
 
     fn set_metadata(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
-        Ok(self.metadata.insert_by_path(path, value))
+        self.metadata.insert_by_path(path, value);
+        Ok(())
     }
 
     fn remove_metadata(&mut self, path: &LookupBuf) -> Result<(), String> {
@@ -114,7 +116,8 @@ pub struct TargetValue {
 
 impl Target for TargetValue {
     fn target_insert(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
-        Ok(self.value.insert_by_path(path, value))
+        self.value.insert_by_path(path, value);
+        Ok(())
     }
 
     fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
@@ -136,12 +139,48 @@ impl MetadataTarget for TargetValue {
     }
 
     fn set_metadata(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
-        Ok(self.metadata.insert_by_path(path, value))
+        self.metadata.insert_by_path(path, value);
+        Ok(())
     }
 
     fn remove_metadata(&mut self, path: &LookupBuf) -> Result<(), String> {
         self.metadata.remove_by_path(path, true);
         Ok(())
+    }
+}
+
+#[cfg(any(test, feature = "test"))]
+impl Target for Value {
+    fn target_insert(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
+        self.insert_by_path(path, value);
+        Ok(())
+    }
+
+    fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
+        Ok(self.get_by_path(path))
+    }
+
+    fn target_get_mut(&mut self, path: &LookupBuf) -> Result<Option<&mut Value>, String> {
+        Ok(self.get_by_path_mut(path))
+    }
+
+    fn target_remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String> {
+        Ok(self.remove_by_path(path, compact))
+    }
+}
+
+#[cfg(any(test, feature = "test"))]
+impl MetadataTarget for Value {
+    fn get_metadata(&self, _path: &LookupBuf) -> Result<Option<Value>, String> {
+        panic!("Value has no metadata. Use `TargetValue` instead.")
+    }
+
+    fn set_metadata(&mut self, _path: &LookupBuf, _value: Value) -> Result<(), String> {
+        panic!("Value has no metadata. Use `TargetValue` instead.")
+    }
+
+    fn remove_metadata(&mut self, _path: &LookupBuf) -> Result<(), String> {
+        panic!("Value has no metadata. Use `TargetValue` instead.")
     }
 }
 
