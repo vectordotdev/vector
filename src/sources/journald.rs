@@ -432,7 +432,7 @@ struct StartJournalctl {
 }
 
 impl StartJournalctl {
-    fn new(
+    const fn new(
         path: PathBuf,
         journal_dir: Option<PathBuf>,
         current_boot_only: bool,
@@ -795,6 +795,7 @@ mod checkpointer_tests {
 mod tests {
     use std::{
         io::{BufRead, BufReader, Cursor},
+        path::Path,
         task::Poll,
     };
 
@@ -1224,13 +1225,13 @@ mod tests {
     }
 
     fn create_command(
-        path: &PathBuf,
+        path: &Path,
         journal_dir: Option<PathBuf>,
         current_boot_only: bool,
         since_now: bool,
         cursor: Option<&str>,
     ) -> Command {
-        StartJournalctl::new(path.clone(), journal_dir, current_boot_only, since_now)
+        StartJournalctl::new(path.into(), journal_dir, current_boot_only, since_now)
             .make_command(cursor)
     }
 
