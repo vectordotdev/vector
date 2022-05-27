@@ -35,7 +35,7 @@ event names MUST adhere to the following rules:
 - MUST follow the `<Namespace><Noun><Verb>[Error]` template
   - `Namespace` - the internal domain the event belongs to (e.g., `Component`, `Buffer`, `Topology`)
   - `Noun` - the subject of the event (e.g., `Bytes`, `Events`)
-  - `Verb` - the past tense verb describing when the event occured (e.g., `Received`, `Sent`, `Processes`)
+  - `Verb` - the past tense verb describing when the event occurred (e.g., `Received`, `Sent`, `Processes`)
   - `[Error]` - if the event is an error it MUST end with `Error`
 
 ### Metric naming
@@ -58,7 +58,7 @@ Vector broadly follows the [Prometheus metric naming standards]:
 For performance reasons, as demonstrated in [pull request #8383],
 instrumentation SHOULD be batched whenever possible:
 
-- Telemtry SHOULD emit for entire event batches, not each individual event.
+- Telemetry SHOULD emit for entire event batches, not each individual event.
   [RFC 9480] describes Vector's batching strategy.
 - Benchmarking SHOULD prove that batching produces performance benefits.
   [Issue 10658] could eliminate the need to batch for performance improvements.
