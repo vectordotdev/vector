@@ -22,9 +22,9 @@ remap: functions: remove_metadata_field: {
 
 	examples: [
 		{
-			title: "Removes the Datadog API key from the event metadata."
+			title: "Removes metadata."
 			source: #"""
-				remove_metadata_field("datadog_api_key")
+				remove_metadata_field("my_metadata_field")
 				"""#
 			return: "null"
 		},
