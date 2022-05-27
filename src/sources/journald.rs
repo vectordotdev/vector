@@ -496,8 +496,9 @@ struct RunningJournalctl(Child);
 
 impl Drop for RunningJournalctl {
     fn drop(&mut self) {
-        let pid = Pid::from_raw(self.0.id().unwrap() as _);
-        let _ = kill(pid, Signal::SIGTERM);
+        if let Some(pid) = self.0.id().and_then(|pid| pid.try_into().ok()) {
+            let _ = kill(Pid::from_raw(pid), Signal::SIGTERM);
+        }
     }
 }
 
