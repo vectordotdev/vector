@@ -13,26 +13,23 @@
 #   = learn more about error code 100 at https://errors.vrl.dev/100
 #   = see language documentation at https://vrl.dev
 #
-# error[E103]: unhandled fallible assignment
-#   ┌─ :4:15
+# error[E111]: fallible predicate
+#   ┌─ :4:4
 #   │
-# 4 │ if (parsed  = parse_grok(.message, "%{GREEDYDATA:parsed}"); parsed != null) {
-#   │     --------- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-#   │     │         │
-#   │     │         this expression is fallible
-#   │     │         update the expression to be infallible
-#   │     or change this to an infallible assignment:
-#   │     parsed, err = parse_grok(.message, "%{GREEDYDATA:parsed}")
+# 4 │ if parse_grok(.message, "%{GREEDYDATA:parsed}") != null {
+#   │    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#   │    │
+#   │    this predicate can result in runtime error
+#   │    handle the error case to ensure runtime success
 #   │
 #   = see documentation about error handling at https://errors.vrl.dev/#handling
-#   = learn more about error code 103 at https://errors.vrl.dev/103
 #   = see language documentation at https://vrl.dev
 #
 # error[E100]: unhandled error
 #   ┌─ :8:1
 #   │
 # 8 │ "foo" + .bar + .baz[1]
-#   │ ^^^^^^^^^^^^^^^^^^^^^^
+#   │ ^^^^^^^^^^^^
 #   │ │
 #   │ expression can result in runtime error
 #   │ handle the error case to ensure runtime success
@@ -40,11 +37,26 @@
 #   = see documentation about error handling at https://errors.vrl.dev/#handling
 #   = learn more about error code 100 at https://errors.vrl.dev/100
 #   = see language documentation at https://vrl.dev
+#
+# error[E100]: unhandled error
+#    ┌─ :10:5
+#    │
+# 10 │ 5 + to_int(.foo)
+#    │     ^^^^^^^^^^^^
+#    │     │
+#    │     expression can result in runtime error
+#    │     handle the error case to ensure runtime success
+#    │
+#    = see documentation about error handling at https://errors.vrl.dev/#handling
+#    = learn more about error code 100 at https://errors.vrl.dev/100
+#    = see language documentation at https://vrl.dev
 
 to_string(.foo)
 
-if (parsed  = parse_grok(.message, "%{GREEDYDATA:parsed}"); parsed != null) {
-  merge(., parsed)
+if parse_grok(.message, "%{GREEDYDATA:parsed}") != null {
+  true
 }
 
 "foo" + .bar + .baz[1]
+
+5 + to_int(.foo)
