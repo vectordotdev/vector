@@ -105,7 +105,7 @@ events:
 
 #### ComponentBytesReceived
 
-*Sources- MUST emit a `ComponentBytesReceived` event immediately after receiving, decompressing
+*Sources* MUST emit a `ComponentBytesReceived` event immediately after receiving, decompressing
 and filtering bytes from the upstream source and before the creation of a Vector event.
 
 - Properties
@@ -130,7 +130,7 @@ and filtering bytes from the upstream source and before the creation of a Vector
 
 #### ComponentEventsReceived
 
-*All components- MUST emit an `ComponentEventsReceived` event immediately after creating
+*All components* MUST emit an `ComponentEventsReceived` event immediately after creating
 or receiving one or more Vector events.
 
 - Properties
@@ -148,7 +148,7 @@ or receiving one or more Vector events.
 
 #### ComponentEventsSent
 
-*All components- that send events down stream, and delete them in Vector, MUST
+*All components* that send events down stream, and delete them in Vector, MUST
 emit an `ComponentEventsSent` event immediately after sending, if the transmission was
 successful.
 
@@ -173,7 +173,7 @@ sending it, like the `prometheus_exporter` sink, SHOULD NOT publish this metric.
 
 #### ComponentBytesSent
 
-*Sinks- that send events down stream, and delete them in Vector, MUST emit
+*Sinks* that send events down stream, and delete them in Vector, MUST emit
 a `ComponentBytesSent` event immediately after sending bytes to the downstream target, if
 the transmission was successful. The reported bytes MUST be before compression.
 
@@ -205,7 +205,7 @@ sending it, like the `prometheus_exporter` sink, SHOULD NOT publish this metric.
 
 **Extends the [Error event].**
 
-*All components- MUST emit error events in accordance with the [Error event]
+*All components* MUST emit error events in accordance with the [Error event]
 requirements.
 
 This specification does not list a standard set of errors that components must
@@ -215,7 +215,7 @@ implement since errors are specific to the component.
 
 **Extends the [EventsDropped event].**
 
-*All components- that can drop events MUST emit a `ComponentEventsDropped`
+*All components* that can drop events MUST emit a `ComponentEventsDropped`
 event in accordance with the [EventsDropped event] requirements.
 
 ## Health checks
