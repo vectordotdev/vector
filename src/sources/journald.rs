@@ -12,7 +12,7 @@ use std::{
 use bytes::Bytes;
 use chrono::TimeZone;
 use codecs::{decoding::BoxedFramingError, CharacterDelimitedDecoder};
-use futures::{future, stream::BoxStream, StreamExt};
+use futures::{poll, stream::BoxStream, task::Poll, StreamExt};
 use nix::{
     sys::signal::{kill, Signal},
     unistd::Pid,
@@ -243,8 +243,7 @@ impl JournaldSource {
             shutdown.clone(),
         );
 
-        let run = Box::pin(self.run(checkpointer, finalizer, starter));
-        future::select(run, shutdown).await;
+        self.run(checkpointer, finalizer, shutdown, starter).await;
 
         Ok(())
     }
@@ -253,27 +252,35 @@ impl JournaldSource {
         mut self,
         checkpointer: SharedCheckpointer,
         finalizer: Finalizer,
+        mut shutdown: ShutdownSignal,
         mut starter: impl StartJournal,
     ) {
         loop {
+            if matches!(poll!(&mut shutdown), Poll::Ready(_)) {
+                break;
+            }
+
             info!("Starting journalctl.");
             let cursor = checkpointer.lock().await.cursor.clone();
             match starter.start(cursor.as_deref()) {
                 Ok((stream, running)) => {
-                    let should_restart = self.run_stream(stream, &finalizer).await;
-                    drop(running);
-                    if !should_restart {
+                    if !self.run_stream(stream, &finalizer, shutdown.clone()).await {
                         return;
                     }
+                    // Explicit drop to ensure it isn't dropped earlier.
+                    drop(running);
                 }
                 Err(error) => {
                     error!(message = "Error starting journalctl process.", %error);
                 }
-            };
+            }
 
             // journalctl process should never stop,
             // so it is an error if we reach here.
-            sleep(BACKOFF_DURATION).await;
+            tokio::select! {
+                _ = &mut shutdown => break,
+                _ = sleep(BACKOFF_DURATION) => (),
+            }
         }
     }
 
@@ -283,6 +290,7 @@ impl JournaldSource {
         &'a mut self,
         mut stream: JournalStream,
         finalizer: &'a Finalizer,
+        mut shutdown: ShutdownSignal,
     ) -> bool {
         let batch_size = self.batch_size;
         loop {
@@ -291,7 +299,11 @@ impl JournaldSource {
             // Start the timeout counter only once we have received a
             // valid and non-filtered event.
             while batch.events.is_empty() {
-                if !batch.handle_next(stream.next().await) {
+                let item = tokio::select! {
+                    _ = &mut shutdown => return false,
+                    item = stream.next() => item,
+                };
+                if !batch.handle_next(item) {
                     return true;
                 }
             }
@@ -1081,10 +1093,10 @@ mod tests {
         let (stream, _dummy) = FakeStarter.start(checkpointer.cursor.as_deref()).unwrap();
         let checkpointer = SharedCheckpointer::new(checkpointer);
         let (_trigger, shutdown, _tripwire) = ShutdownSignal::new_wired();
-        let finalizer = Finalizer::new(true, checkpointer.clone(), shutdown);
+        let finalizer = Finalizer::new(true, checkpointer.clone(), shutdown.clone());
 
         // The source runs to completion without setting the checkpoint
-        source.run_stream(stream, &finalizer).await;
+        source.run_stream(stream, &finalizer, shutdown).await;
 
         // Make sure the checkpointer cursor is empty
         assert_eq!(checkpointer.lock().await.cursor, None);
