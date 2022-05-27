@@ -243,15 +243,15 @@ mod value_target_impl {
     }
 
     impl SecretTarget for Value {
-        fn get_secret(&self, key: &str) -> Option<String> {
+        fn get_secret(&self, _key: &str) -> Option<&str> {
             panic!("Value has no secrets. Use `TargetValue` instead.")
         }
 
-        fn set_metadata(&mut self, key: &str, value: &str) {
+        fn insert_secret(&mut self, _key: &str, _value: &str) {
             panic!("Value has no secrets. Use `TargetValue` instead.")
         }
 
-        fn remove_metadata(&mut self, key: &str) {
+        fn remove_secret(&mut self, _key: &str) {
             panic!("Value has no secrets. Use `TargetValue` instead.")
         }
     }
@@ -313,6 +313,7 @@ mod tests {
             let target = TargetValue {
                 value,
                 metadata: value!({}),
+                secrets: Secrets::new(),
             };
             let path = LookupBuf::from_segments(segments);
 
@@ -425,6 +426,7 @@ mod tests {
             let mut target = TargetValue {
                 value: target,
                 metadata: value!({}),
+                secrets: Secrets::new(),
             };
             println!("Inserting at {:?}", segments);
             let path = LookupBuf::from_segments(segments);
@@ -526,6 +528,7 @@ mod tests {
             let mut target = TargetValue {
                 value: target,
                 metadata: value!({}),
+                secrets: Secrets::new(),
             };
             assert_eq!(
                 Target::target_remove(&mut target, &path, compact),
