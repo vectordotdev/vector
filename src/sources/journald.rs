@@ -257,7 +257,8 @@ impl JournaldSource {
     ) {
         loop {
             info!("Starting journalctl.");
-            match starter.start(&checkpointer.lock().await.cursor) {
+            let cursor = checkpointer.lock().await.cursor.clone();
+            match starter.start(cursor.as_deref()) {
                 Ok((stream, running)) => {
                     let should_restart = self.run_stream(stream, &finalizer).await;
                     drop(running);
@@ -414,10 +415,7 @@ impl<'a> Batch<'a> {
 /// We need this type to implement fake journald source in testing.
 trait StartJournal {
     type Running;
-    fn start(
-        &mut self,
-        checkpoint: &Option<String>,
-    ) -> crate::Result<(JournalStream, Self::Running)>;
+    fn start(&mut self, checkpoint: Option<&str>) -> crate::Result<(JournalStream, Self::Running)>;
 }
 
 type JournalStream = BoxStream<'static, Result<Bytes, BoxedFramingError>>;
@@ -444,7 +442,7 @@ impl StartJournalctl {
         }
     }
 
-    fn make_command(&self, checkpoint: &Option<String>) -> Command {
+    fn make_command(&self, checkpoint: Option<&str>) -> Command {
         let mut command = Command::new(&self.path);
         command.stdout(Stdio::piped());
         command.arg("--follow");
@@ -475,10 +473,7 @@ impl StartJournalctl {
 
 impl StartJournal for StartJournalctl {
     type Running = RunningJournalctl;
-    fn start(
-        &mut self,
-        checkpoint: &Option<String>,
-    ) -> crate::Result<(JournalStream, Self::Running)> {
+    fn start(&mut self, checkpoint: Option<&str>) -> crate::Result<(JournalStream, Self::Running)> {
         let mut command = self.make_command(checkpoint);
 
         let mut child = command.spawn().context(JournalctlSpawnSnafu)?;
@@ -854,7 +849,7 @@ mod tests {
         type Running = std::marker::PhantomData<()>;
         fn start(
             &mut self,
-            checkpoint: &Option<String>,
+            checkpoint: Option<&str>,
         ) -> crate::Result<(JournalStream, Self::Running)> {
             let cursor = Cursor::new(FAKE_JOURNAL);
             let reader = BufReader::new(cursor);
@@ -1088,7 +1083,7 @@ mod tests {
             out: tx,
             acknowledgements: true,
         };
-        let (stream, _dummy) = FakeStarter.start(&checkpointer.cursor).unwrap();
+        let (stream, _dummy) = FakeStarter.start(checkpointer.cursor.as_deref()).unwrap();
         let checkpointer = SharedCheckpointer::new(checkpointer);
         let (_trigger, shutdown, _tripwire) = ShutdownSignal::new_wired();
         let finalizer = Finalizer::new(true, checkpointer.clone(), shutdown);
@@ -1211,7 +1206,7 @@ mod tests {
         let cursor = None;
         let since_now = false;
 
-        let command = create_command(&path, journal_dir, current_boot_only, since_now, &cursor);
+        let command = create_command(&path, journal_dir, current_boot_only, since_now, cursor);
         let cmd_line = format!("{:?}", command);
         assert!(!cmd_line.contains("--directory="));
         assert!(!cmd_line.contains("--boot"));
@@ -1220,15 +1215,15 @@ mod tests {
         let since_now = true;
         let journal_dir = None;
 
-        let command = create_command(&path, journal_dir, current_boot_only, since_now, &cursor);
+        let command = create_command(&path, journal_dir, current_boot_only, since_now, cursor);
         let cmd_line = format!("{:?}", command);
         assert!(cmd_line.contains("--since=now"));
 
         let journal_dir = Some(PathBuf::from("/tmp/journal-dir"));
         let current_boot_only = true;
-        let cursor = Some(String::from("2021-01-01"));
+        let cursor = Some("2021-01-01");
 
-        let command = create_command(&path, journal_dir, current_boot_only, since_now, &cursor);
+        let command = create_command(&path, journal_dir, current_boot_only, since_now, cursor);
         let cmd_line = format!("{:?}", command);
         assert!(cmd_line.contains("--directory=/tmp/journal-dir"));
         assert!(cmd_line.contains("--boot"));
@@ -1240,7 +1235,7 @@ mod tests {
         journal_dir: Option<PathBuf>,
         current_boot_only: bool,
         since_now: bool,
-        cursor: &Option<String>,
+        cursor: Option<&str>,
     ) -> Command {
         StartJournalctl::new(path.clone(), journal_dir, current_boot_only, since_now)
             .make_command(cursor)
