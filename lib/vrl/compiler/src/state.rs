@@ -1,9 +1,9 @@
-use anymap::AnyMap;
 use std::collections::{hash_map::Entry, HashMap};
 
-use value::Kind;
+use anymap::AnyMap;
+use value::{Kind, Value};
 
-use crate::{parser::ast::Ident, type_def::Details, Value};
+use crate::{parser::ast::Ident, type_def::Details};
 
 /// Local environment, limited to a given scope.
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -90,6 +90,11 @@ impl ExternalEnv {
     /// Sets the external context data for VRL functions to use.
     pub fn set_external_context<T: 'static>(&mut self, data: T) {
         self.custom.insert::<T>(data);
+    }
+
+    /// Get external context data from the external environment.
+    pub fn get_external_context<T: 'static>(&self) -> Option<&T> {
+        self.custom.get::<T>()
     }
 
     /// Swap the existing external contexts with new ones, returning the old ones.

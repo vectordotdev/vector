@@ -25,9 +25,11 @@ use crate::{
     event::Event,
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
+    sources::http::HttpMethod,
     sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     tls::TlsEnableableConfig,
 };
+use lookup::path;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub(crate) struct LogplexConfig {
@@ -99,6 +101,7 @@ impl SourceConfig for LogplexConfig {
         source.run(
             self.address,
             "events",
+            HttpMethod::Post,
             true,
             &self.tls,
             &self.auth,
@@ -245,8 +248,8 @@ fn line_to_events(mut decoder: Decoder, line: String) -> SmallVec<[Event; 1]> {
 
                             log.try_insert(log_schema().host_key(), hostname.to_owned());
 
-                            log.try_insert_flat("app_name", app_name.to_owned());
-                            log.try_insert_flat("proc_id", proc_id.to_owned());
+                            log.try_insert(path!("app_name"), app_name.to_owned());
+                            log.try_insert(path!("proc_id"), proc_id.to_owned());
                         }
 
                         events.push(event);

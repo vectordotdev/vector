@@ -101,8 +101,41 @@ enum HealthcheckError {
 
 #[cfg(test)]
 mod test {
+    use futures::{future::ready, stream};
+    use vector_core::event::Event;
+
+    use crate::{
+        config::{GenerateConfig, SinkContext},
+        test_util::{
+            components::{run_and_assert_sink_compliance, SINK_TAGS},
+            next_addr, wait_for_tcp, CountReceiver,
+        },
+        tls::TlsEnableableConfig,
+    };
+
+    use super::VectorConfig;
+
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<super::VectorConfig>();
+    }
+
+    #[tokio::test]
+    async fn component_spec_compliance() {
+        let mock_endpoint_addr = next_addr();
+        let _receiver = CountReceiver::receive_lines(mock_endpoint_addr);
+
+        wait_for_tcp(mock_endpoint_addr).await;
+
+        let config = VectorConfig::generate_config().to_string();
+        let mut config = toml::from_str::<VectorConfig>(&config).expect("config should be valid");
+        config.address = mock_endpoint_addr.to_string();
+        config.tls = Some(TlsEnableableConfig::default());
+
+        let context = SinkContext::new_test();
+        let (sink, _healthcheck) = config.build(context).await.unwrap();
+
+        let event = Event::from("simple message");
+        run_and_assert_sink_compliance(sink, stream::once(ready(event)), &SINK_TAGS).await;
     }
 }

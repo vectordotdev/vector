@@ -2,7 +2,6 @@ use std::net::SocketAddr;
 #[cfg(unix)]
 use std::path::PathBuf;
 
-use crate::codecs::Decoder;
 use bytes::Bytes;
 use chrono::Utc;
 use codecs::{
@@ -15,6 +14,7 @@ use smallvec::SmallVec;
 use tokio::net::UdpSocket;
 use tokio_util::udp::UdpFramed;
 
+use crate::codecs::Decoder;
 #[cfg(unix)]
 use crate::sources::util::build_unix_stream_source;
 use crate::{
@@ -585,6 +585,7 @@ mod test {
             event
                 .as_log()
                 .all_fields()
+                .unwrap()
                 .find(|(key, _)| (&key[..]).starts_with("empty"))
                 == None
         }
@@ -1017,7 +1018,8 @@ mod test {
 
     impl From<Event> for SyslogMessageRfc5424 {
         fn from(e: Event) -> Self {
-            let (mut fields, _) = e.into_log().into_parts();
+            let (value, _) = e.into_log().into_parts();
+            let mut fields = value.into_object().unwrap();
 
             Self {
                 msgid: fields.remove("msgid").map(value_to_string).unwrap(),
@@ -1101,7 +1103,10 @@ mod test {
                 "info" => Some(Self::LOG_INFO),
                 "debug" => Some(Self::LOG_DEBUG),
                 x => {
-                    println!("converting severity str, got {}", x);
+                    #[allow(clippy::print_stdout)]
+                    {
+                        println!("converting severity str, got {}", x);
+                    }
                     None
                 }
             }

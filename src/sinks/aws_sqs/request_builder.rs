@@ -1,5 +1,4 @@
 use bytes::Bytes;
-
 use vector_core::buffers::Ackable;
 use vector_core::ByteSizeOf;
 
@@ -8,6 +7,7 @@ use crate::codecs::Encoder;
 use crate::event::{Event, EventFinalizers, Finalizable};
 use crate::internal_events::TemplateRenderingError;
 use crate::sinks::util::encoding::Transformer;
+use crate::sinks::util::request_builder::EncodeResult;
 use crate::sinks::util::{Compression, EncodedLength, RequestBuilder};
 use crate::template::Template;
 
@@ -29,9 +29,8 @@ pub(crate) struct SqsRequestBuilder {
 
 impl SqsRequestBuilder {
     pub fn new(config: SqsSinkConfig) -> crate::Result<Self> {
-        let encoding = config.encoding.clone();
-        let transformer = encoding.transformer();
-        let serializer = encoding.encoding();
+        let transformer = config.encoding.transformer();
+        let serializer = config.encoding.encoding();
         let encoder = Encoder::<()>::new(serializer);
 
         Ok(Self {
@@ -100,7 +99,12 @@ impl RequestBuilder<Event> for SqsRequestBuilder {
         (metadata, event)
     }
 
-    fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
+    fn build_request(
+        &self,
+        metadata: Self::Metadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
+        let payload = payload.into_payload();
         let message_body = String::from(std::str::from_utf8(&payload).unwrap());
         SendMessageEntry {
             message_body,

@@ -6,6 +6,7 @@ mod test_enrichment;
 use std::str::FromStr;
 use std::time::Instant;
 
+use ::value::Value;
 use ansi_term::Colour;
 use chrono::{DateTime, SecondsFormat, Utc};
 use chrono_tz::Tz;
@@ -14,7 +15,7 @@ use glob::glob;
 use vector_common::TimeZone;
 use vrl::prelude::VrlValueConvert;
 use vrl::VrlRuntime;
-use vrl::{diagnostic::Formatter, state, Runtime, Terminate, Value};
+use vrl::{diagnostic::Formatter, state, Runtime, Terminate};
 use vrl_tests::{docs, Test};
 
 #[cfg(not(target_env = "msvc"))]
@@ -25,7 +26,7 @@ static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 ///
 /// This list should ideally be zero, but might not be if specific features
 /// haven't been released on the "VM" runtime yet.
-static AST_ONLY_TESTS: &[&str] = &[];
+static AST_ONLY_TESTS: &[&str] = &["functions/type_def/return type definition"];
 
 #[derive(Parser, Debug)]
 #[clap(name = "VRL Tests", about = "Vector Remap Language Tests")]

@@ -34,7 +34,10 @@ mod tests {
         event::Event,
         proto::vector as proto,
         sinks::{util::test::build_test_server_generic, vector::v2::config::with_default_scheme},
-        test_util::{components, next_addr, random_lines_with_stream},
+        test_util::{
+            components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+            next_addr, random_lines_with_stream,
+        },
     };
 
     // one byte for the compression flag plus four bytes for the length
@@ -56,7 +59,6 @@ mod tests {
 
         let cx = SinkContext::new_test();
 
-        components::init_test();
         let (sink, _) = config.build(cx).await.unwrap();
         let (rx, trigger, server) = build_test_server_generic(in_addr, move || {
             hyper::Response::builder()
@@ -71,11 +73,10 @@ mod tests {
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let (input_lines, events) = random_lines_with_stream(8, num_lines, Some(batch));
 
-        sink.run(events).await.unwrap();
+        run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
         drop(trigger);
 
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
-        components::SINK_TESTS.assert(&components::HTTP_SINK_TAGS);
 
         let output_lines = get_received(rx, |parts| {
             assert_eq!(Method::POST, parts.method);
@@ -116,7 +117,8 @@ mod tests {
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let (_, events) = random_lines_with_stream(8, num_lines, Some(batch));
 
-        sink.run(events).await.unwrap();
+        sink.run(events).await.expect("Running sink failed");
+
         drop(trigger);
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
     }

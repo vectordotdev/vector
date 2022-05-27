@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn truncate(value: Value, limit: Value, ellipsis: Value) -> Resolved {

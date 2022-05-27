@@ -1,18 +1,18 @@
-use crate::api::schema::events::{create_events_stream, log, metric};
-use crate::config::Config;
-use crate::transforms::log_to_metric::{GaugeConfig, LogToMetricConfig, MetricConfig};
 use futures::SinkExt;
+use futures::StreamExt;
 use tokio::sync::watch;
 
 use super::*;
 use crate::api::schema::events::notification::{EventNotification, EventNotificationType};
 use crate::api::schema::events::output::OutputEventsPayload;
+use crate::api::schema::events::{create_events_stream, log, metric};
+use crate::config::Config;
 use crate::event::{Metric, MetricKind, MetricValue};
 use crate::sinks::blackhole::BlackholeConfig;
 use crate::sources::demo_logs::{DemoLogsConfig, OutputFormat};
 use crate::test_util::start_topology;
+use crate::transforms::log_to_metric::{GaugeConfig, LogToMetricConfig, MetricConfig};
 use crate::transforms::remap::RemapConfig;
-use futures::StreamExt;
 
 #[test]
 /// Patterns should accept globbing.

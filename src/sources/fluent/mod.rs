@@ -4,6 +4,7 @@ use std::net::SocketAddr;
 use bytes::{Buf, Bytes, BytesMut};
 use codecs::StreamDecodingError;
 use flate2::read::MultiGzDecoder;
+use lookup::path;
 use rmp_serde::{decode, Deserializer};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
@@ -442,7 +443,7 @@ impl From<FluentEvent> for LogEvent {
         log.insert(log_schema().timestamp_key(), timestamp);
         log.insert("tag", tag);
         for (key, value) in record.into_iter() {
-            log.insert_flat(key, value);
+            log.insert(path!(&key), value);
         }
         log
     }
@@ -453,12 +454,13 @@ mod tests {
     use bytes::BytesMut;
     use chrono::{DateTime, Utc};
     use rmp_serde::Serializer;
+    use std::collections::BTreeMap;
     use tokio::{
         io::{AsyncReadExt, AsyncWriteExt},
         time::{error::Elapsed, timeout, Duration},
     };
     use tokio_util::codec::Decoder;
-    use vector_common::{assert_event_data_eq, btreemap};
+    use vector_common::assert_event_data_eq;
     use vector_core::event::Value;
 
     use super::{message::FluentMessageOptions, *};
@@ -491,11 +493,18 @@ mod tests {
             101, 115, 115, 97, 103, 101, 163, 98, 97, 114,
         ];
 
-        let expected = Event::from(btreemap! {
-            "message" => "bar",
-            "tag" => "tag.name",
-            "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
-        });
+        let expected = Event::from(BTreeMap::from([
+            (String::from("message"), Value::from("bar")),
+            (String::from("tag"), Value::from("tag.name")),
+            (
+                String::from("timestamp"),
+                Value::Timestamp(
+                    DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z")
+                        .unwrap()
+                        .into(),
+                ),
+            ),
+        ]));
         let got = decode_all(message.clone()).unwrap();
         assert_event_data_eq!(got.0[0], expected);
         assert_eq!(got.1, message.len());
@@ -514,11 +523,18 @@ mod tests {
             101, 115, 115, 97, 103, 101, 163, 98, 97, 114, 129, 164, 115, 105, 122, 101, 1,
         ];
 
-        let expected = Event::from(btreemap! {
-            "message" => "bar",
-            "tag" => "tag.name",
-            "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
-        });
+        let expected = Event::from(BTreeMap::from([
+            (String::from("message"), Value::from("bar")),
+            (String::from("tag"), Value::from("tag.name")),
+            (
+                String::from("timestamp"),
+                Value::Timestamp(
+                    DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z")
+                        .unwrap()
+                        .into(),
+                ),
+            ),
+        ]));
         let got = decode_all(message.clone()).unwrap();
         assert_eq!(got.1, message.len());
         assert_event_data_eq!(got.0[0], expected);
@@ -542,21 +558,42 @@ mod tests {
         ];
 
         let expected = vec![
-            Event::from(btreemap! {
-                "message" => "foo",
-                "tag" => "tag.name",
-                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
-            }),
-            Event::from(btreemap! {
-                "message" => "bar",
-                "tag" => "tag.name",
-                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z").unwrap().into()),
-            }),
-            Event::from(btreemap! {
-                "message" => "baz",
-                "tag" => "tag.name",
-                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z").unwrap().into()),
-            }),
+            Event::from(BTreeMap::from([
+                (String::from("message"), Value::from("foo")),
+                (String::from("tag"), Value::from("tag.name")),
+                (
+                    String::from("timestamp"),
+                    Value::Timestamp(
+                        DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z")
+                            .unwrap()
+                            .into(),
+                    ),
+                ),
+            ])),
+            Event::from(BTreeMap::from([
+                (String::from("message"), Value::from("bar")),
+                (String::from("tag"), Value::from("tag.name")),
+                (
+                    String::from("timestamp"),
+                    Value::Timestamp(
+                        DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z")
+                            .unwrap()
+                            .into(),
+                    ),
+                ),
+            ])),
+            Event::from(BTreeMap::from([
+                (String::from("message"), Value::from("baz")),
+                (String::from("tag"), Value::from("tag.name")),
+                (
+                    String::from("timestamp"),
+                    Value::Timestamp(
+                        DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z")
+                            .unwrap()
+                            .into(),
+                    ),
+                ),
+            ])),
         ];
 
         let got = decode_all(message.clone()).unwrap();
@@ -587,21 +624,42 @@ mod tests {
         ];
 
         let expected = vec![
-            Event::from(btreemap! {
-                "message" => "foo",
-                "tag" => "tag.name",
-                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
-            }),
-            Event::from(btreemap! {
-                "message" => "bar",
-                "tag" => "tag.name",
-                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z").unwrap().into()),
-            }),
-            Event::from(btreemap! {
-                "message" => "baz",
-                "tag" => "tag.name",
-                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z").unwrap().into()),
-            }),
+            Event::from(BTreeMap::from([
+                (String::from("message"), Value::from("foo")),
+                (String::from("tag"), Value::from("tag.name")),
+                (
+                    String::from("timestamp"),
+                    Value::Timestamp(
+                        DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z")
+                            .unwrap()
+                            .into(),
+                    ),
+                ),
+            ])),
+            Event::from(BTreeMap::from([
+                (String::from("message"), Value::from("bar")),
+                (String::from("tag"), Value::from("tag.name")),
+                (
+                    String::from("timestamp"),
+                    Value::Timestamp(
+                        DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z")
+                            .unwrap()
+                            .into(),
+                    ),
+                ),
+            ])),
+            Event::from(BTreeMap::from([
+                (String::from("message"), Value::from("baz")),
+                (String::from("tag"), Value::from("tag.name")),
+                (
+                    String::from("timestamp"),
+                    Value::Timestamp(
+                        DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z")
+                            .unwrap()
+                            .into(),
+                    ),
+                ),
+            ])),
         ];
 
         let got = decode_all(message.clone()).unwrap();
@@ -633,21 +691,42 @@ mod tests {
         ];
 
         let expected = vec![
-            Event::from(btreemap! {
-                "message" => "foo",
-                "tag" => "tag.name",
-                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
-            }),
-            Event::from(btreemap! {
-                "message" => "bar",
-                "tag" => "tag.name",
-                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z").unwrap().into()),
-            }),
-            Event::from(btreemap! {
-                "message" => "baz",
-                "tag" => "tag.name",
-                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z").unwrap().into()),
-            }),
+            Event::from(BTreeMap::from([
+                (String::from("message"), Value::from("foo")),
+                (String::from("tag"), Value::from("tag.name")),
+                (
+                    String::from("timestamp"),
+                    Value::Timestamp(
+                        DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z")
+                            .unwrap()
+                            .into(),
+                    ),
+                ),
+            ])),
+            Event::from(BTreeMap::from([
+                (String::from("message"), Value::from("bar")),
+                (String::from("tag"), Value::from("tag.name")),
+                (
+                    String::from("timestamp"),
+                    Value::Timestamp(
+                        DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z")
+                            .unwrap()
+                            .into(),
+                    ),
+                ),
+            ])),
+            Event::from(BTreeMap::from([
+                (String::from("message"), Value::from("baz")),
+                (String::from("tag"), Value::from("tag.name")),
+                (
+                    String::from("timestamp"),
+                    Value::Timestamp(
+                        DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z")
+                            .unwrap()
+                            .into(),
+                    ),
+                ),
+            ])),
         ];
 
         let got = decode_all(message.clone()).unwrap();
@@ -680,21 +759,42 @@ mod tests {
         ];
 
         let expected = vec![
-            Event::from(btreemap! {
-                "message" => "foo",
-                "tag" => "tag.name",
-                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
-            }),
-            Event::from(btreemap! {
-                "message" => "bar",
-                "tag" => "tag.name",
-                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z").unwrap().into()),
-            }),
-            Event::from(btreemap! {
-                "message" => "baz",
-                "tag" => "tag.name",
-                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z").unwrap().into()),
-            }),
+            Event::from(BTreeMap::from([
+                (String::from("message"), Value::from("foo")),
+                (String::from("tag"), Value::from("tag.name")),
+                (
+                    String::from("timestamp"),
+                    Value::Timestamp(
+                        DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z")
+                            .unwrap()
+                            .into(),
+                    ),
+                ),
+            ])),
+            Event::from(BTreeMap::from([
+                (String::from("message"), Value::from("bar")),
+                (String::from("tag"), Value::from("tag.name")),
+                (
+                    String::from("timestamp"),
+                    Value::Timestamp(
+                        DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z")
+                            .unwrap()
+                            .into(),
+                    ),
+                ),
+            ])),
+            Event::from(BTreeMap::from([
+                (String::from("message"), Value::from("baz")),
+                (String::from("tag"), Value::from("tag.name")),
+                (
+                    String::from("timestamp"),
+                    Value::Timestamp(
+                        DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z")
+                            .unwrap()
+                            .into(),
+                    ),
+                ),
+            ])),
         ];
 
         let got = decode_all(message.clone()).unwrap();

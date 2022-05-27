@@ -4,7 +4,7 @@ use crate::{
     config::Config,
     sinks::{
         console::{ConsoleSinkConfig, Target},
-        util::encoding::StandardEncodings,
+        util::encoding::{EncodingConfig, StandardEncodings},
     },
     sources::demo_logs::DemoLogsConfig,
     test_util::start_topology,
@@ -20,7 +20,7 @@ async fn sources_finished() {
         &["in"],
         ConsoleSinkConfig {
             target: Target::Stdout,
-            encoding: StandardEncodings::Text.into(),
+            encoding: EncodingConfig::from(StandardEncodings::Text).into(),
         },
     );
 

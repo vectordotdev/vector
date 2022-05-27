@@ -6,14 +6,11 @@ macro_rules! btreemap {
     ($($key:expr => $value:expr,)+) => (btreemap!($($key => $value),+));
 
     ($($key:expr => $value:expr),*) => {
-        {
-            let mut _map = ::std::collections::BTreeMap::new();
+        ::std::collections::BTreeMap::from([
             $(
-                #[allow(clippy::let_underscore_drop)]
-                let _ = _map.insert($key.into(), $value.into());
+                ($key.into(), $value.into()),
             )*
-            _map
-        }
+        ])
     };
 }
 

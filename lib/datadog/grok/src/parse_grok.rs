@@ -1,15 +1,13 @@
+use std::collections::BTreeMap;
+
+use tracing::warn;
+use value::Value;
+use vrl_compiler::Target;
+
 use crate::{
     grok_filter::apply_filter,
     parse_grok_rules::{GrokField, GrokRule},
 };
-use itertools::{
-    FoldWhile::{Continue, Done},
-    Itertools,
-};
-use std::collections::BTreeMap;
-use tracing::warn;
-use value::Value;
-use vrl_compiler::Target;
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
@@ -25,17 +23,13 @@ pub fn parse_grok(
     grok_rules: &[GrokRule],
     remove_empty: bool,
 ) -> Result<Value, Error> {
-    grok_rules
-        .iter()
-        .fold_while(Err(Error::NoMatch), |_, rule| {
-            let result = apply_grok_rule(source_field, rule, remove_empty);
-            if let Err(Error::NoMatch) = result {
-                Continue(result)
-            } else {
-                Done(result)
-            }
-        })
-        .into_inner()
+    for rule in grok_rules {
+        match apply_grok_rule(source_field, rule, remove_empty) {
+            Err(Error::NoMatch) => continue,
+            other => return other,
+        }
+    }
+    Err(Error::NoMatch)
 }
 
 /// Tries to parse a given string with a given grok rule.
@@ -123,12 +117,12 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Re
 #[cfg(test)]
 mod tests {
     use ordered_float::NotNan;
+    use tracing_test::traced_test;
     use value::Value;
+    use vector_common::btreemap;
 
     use super::*;
     use crate::parse_grok_rules::parse_grok_rules;
-    use tracing_test::traced_test;
-    use vector_common::btreemap;
 
     #[test]
     fn parses_simple_grok() {
@@ -137,7 +131,7 @@ mod tests {
                 "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
                     .to_string(),
             ],
-            btreemap! {},
+            BTreeMap::new(),
         )
         .expect("couldn't parse rules");
         let parsed = parse_grok(
@@ -245,7 +239,7 @@ mod tests {
 
     fn test_grok_pattern(tests: Vec<(&str, &str, Result<Value, Error>)>) {
         for (filter, k, v) in tests {
-            let rules = parse_grok_rules(&[filter.to_string()], btreemap! {})
+            let rules = parse_grok_rules(&[filter.to_string()], BTreeMap::new())
                 .expect("couldn't parse rules");
             let parsed = parse_grok(k, &rules, false);
 
@@ -264,7 +258,7 @@ mod tests {
 
     fn test_full_grok(tests: Vec<(&str, &str, Result<Value, Error>)>) {
         for (filter, k, v) in tests {
-            let rules = parse_grok_rules(&[filter.to_string()], btreemap! {})
+            let rules = parse_grok_rules(&[filter.to_string()], BTreeMap::new())
                 .expect("couldn't parse rules");
             let parsed = parse_grok(k, &rules, false);
 
@@ -275,7 +269,7 @@ mod tests {
     #[test]
     fn fails_on_unknown_pattern_definition() {
         assert_eq!(
-            parse_grok_rules(&["%{unknown}".to_string()], btreemap! {})
+            parse_grok_rules(&["%{unknown}".to_string()], BTreeMap::new())
                 .unwrap_err()
                 .to_string(),
             r#"failed to parse grok expression '\A%{unknown}\z': The given pattern definition name "unknown" could not be found in the definition map"#
@@ -285,9 +279,12 @@ mod tests {
     #[test]
     fn fails_on_unknown_filter() {
         assert_eq!(
-            parse_grok_rules(&["%{data:field:unknownFilter}".to_string()], btreemap! {})
-                .unwrap_err()
-                .to_string(),
+            parse_grok_rules(
+                &["%{data:field:unknownFilter}".to_string()],
+                BTreeMap::new()
+            )
+            .unwrap_err()
+            .to_string(),
             r#"unknown filter 'unknownFilter'"#
         );
     }
@@ -295,7 +292,7 @@ mod tests {
     #[test]
     fn fails_on_invalid_matcher_parameter() {
         assert_eq!(
-            parse_grok_rules(&["%{regex(1):field}".to_string()], btreemap! {})
+            parse_grok_rules(&["%{regex(1):field}".to_string()], BTreeMap::new())
                 .unwrap_err()
                 .to_string(),
             r#"invalid arguments for the function 'regex'"#
@@ -305,7 +302,7 @@ mod tests {
     #[test]
     fn fails_on_invalid_filter_parameter() {
         assert_eq!(
-            parse_grok_rules(&["%{data:field:scale()}".to_string()], btreemap! {})
+            parse_grok_rules(&["%{data:field:scale()}".to_string()], BTreeMap::new())
                 .unwrap_err()
                 .to_string(),
             r#"invalid arguments for the function 'scale'"#
@@ -371,7 +368,7 @@ mod tests {
             (
                 "%{data::json}",
                 r#"not a json"#,
-                Ok(Value::from(btreemap! {})),
+                Ok(Value::from(BTreeMap::new())),
             ),
         ]);
     }
@@ -382,7 +379,7 @@ mod tests {
         test_full_grok(vec![(
             "%{notSpace:field1:integer} %{data:field2:json}",
             r#"not_a_number not a json"#,
-            Ok(Value::from(btreemap! {})),
+            Ok(Value::from(BTreeMap::new())),
         )]);
     }
 
@@ -393,7 +390,7 @@ mod tests {
                 "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
                     .to_string(),
             ],
-            btreemap! {},
+            BTreeMap::new(),
         )
         .expect("couldn't parse rules");
         let error = parse_grok("an ungrokkable message", &rules, false).unwrap_err();
@@ -408,7 +405,7 @@ mod tests {
                 r#"%{integer:nested.field} %{notSpace:nested.field:uppercase} %{notSpace:nested.field:nullIf("-")}"#
                     .to_string(),
             ],
-            btreemap! {},
+            BTreeMap::new(),
         )
             .expect("couldn't parse rules");
         let parsed = parse_grok("1 info message", &rules, false).unwrap();
@@ -562,15 +559,18 @@ mod tests {
 
         // check error handling
         assert_eq!(
-            parse_grok_rules(&[r#"%{date("ABC:XYZ"):field}"#.to_string()], btreemap! {})
-                .unwrap_err()
-                .to_string(),
+            parse_grok_rules(
+                &[r#"%{date("ABC:XYZ"):field}"#.to_string()],
+                BTreeMap::new()
+            )
+            .unwrap_err()
+            .to_string(),
             r#"invalid arguments for the function 'date'"#
         );
         assert_eq!(
             parse_grok_rules(
                 &[r#"%{date("EEE MMM dd HH:mm:ss yyyy", "unknown timezone"):field}"#.to_string()],
-                btreemap! {},
+                BTreeMap::new(),
             )
             .unwrap_err()
             .to_string(),
@@ -648,13 +648,13 @@ mod tests {
             (
                 r#"%{data:field:array}"#,
                 "abc",
-                Ok(Value::Object(btreemap! {})),
+                Ok(Value::Object(BTreeMap::new())),
             ),
             // failed to apply value filter(values are strings)
             (
                 r#"%{data:field:array(scale(10))}"#,
                 "[a,b]",
-                Ok(Value::Object(btreemap! {})),
+                Ok(Value::Object(BTreeMap::new())),
             ),
         ]);
     }
@@ -768,7 +768,7 @@ mod tests {
             (
                 "%{data::keyvalue}",
                 "key:=valueStr",
-                Ok(Value::from(btreemap! {})),
+                Ok(Value::from(BTreeMap::new())),
             ),
             // empty key or null
             (
@@ -790,7 +790,7 @@ mod tests {
             (
                 "%{data::keyvalue}",
                 "=,=value",
-                Ok(Value::from(btreemap! {})),
+                Ok(Value::from(BTreeMap::new())),
             ),
             // type inference
             (
@@ -820,17 +820,17 @@ mod tests {
             (
                 "%{data::keyvalue}",
                 "key = valueStr",
-                Ok(Value::from(btreemap! {})),
+                Ok(Value::from(BTreeMap::new())),
             ),
             (
                 "%{data::keyvalue}",
                 "key= valueStr",
-                Ok(Value::from(btreemap! {})),
+                Ok(Value::from(BTreeMap::new())),
             ),
             (
                 "%{data::keyvalue}",
                 "key =valueStr",
-                Ok(Value::from(btreemap! {})),
+                Ok(Value::from(BTreeMap::new())),
             ),
             (
                 r#"%{data::keyvalue(":")}"#,

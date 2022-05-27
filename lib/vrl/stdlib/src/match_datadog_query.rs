@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use ::value::Value;
 use datadog_filter::{
     build_matcher,
     regex::{wildcard_regex, word_regex},

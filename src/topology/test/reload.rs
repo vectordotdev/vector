@@ -14,7 +14,7 @@ use crate::{
     sinks::{
         console::{ConsoleSinkConfig, Target},
         prometheus::exporter::PrometheusExporterConfig,
-        util::encoding::StandardEncodings,
+        util::encoding::{EncodingConfig, StandardEncodings},
     },
     sources::{demo_logs::DemoLogsConfig, splunk_hec::SplunkConfig},
     test_util::{next_addr, start_topology, temp_dir, wait_for_tcp},
@@ -38,7 +38,7 @@ async fn topology_reuse_old_port() {
         &["in1"],
         ConsoleSinkConfig {
             target: Target::Stdout,
-            encoding: StandardEncodings::Text.into(),
+            encoding: EncodingConfig::from(StandardEncodings::Text).into(),
         },
     );
 
@@ -49,7 +49,7 @@ async fn topology_reuse_old_port() {
         &["in2"],
         ConsoleSinkConfig {
             target: Target::Stdout,
-            encoding: StandardEncodings::Text.into(),
+            encoding: EncodingConfig::from(StandardEncodings::Text).into(),
         },
     );
 
@@ -72,7 +72,7 @@ async fn topology_rebuild_old() {
         &["in1"],
         ConsoleSinkConfig {
             target: Target::Stdout,
-            encoding: StandardEncodings::Text.into(),
+            encoding: EncodingConfig::from(StandardEncodings::Text).into(),
         },
     );
 
@@ -83,7 +83,7 @@ async fn topology_rebuild_old() {
         &["in1"],
         ConsoleSinkConfig {
             target: Target::Stdout,
-            encoding: StandardEncodings::Text.into(),
+            encoding: EncodingConfig::from(StandardEncodings::Text).into(),
         },
     );
 
@@ -108,7 +108,7 @@ async fn topology_old() {
         &["in1"],
         ConsoleSinkConfig {
             target: Target::Stdout,
-            encoding: StandardEncodings::Text.into(),
+            encoding: EncodingConfig::from(StandardEncodings::Text).into(),
         },
     );
 

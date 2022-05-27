@@ -3,7 +3,7 @@ use std::fmt;
 use lookup::LookupBuf;
 use value::{
     kind::{remove, Collection},
-    Kind,
+    Kind, Value,
 };
 
 use crate::{
@@ -12,7 +12,7 @@ use crate::{
     state::{ExternalEnv, LocalEnv},
     type_def::Details,
     vm::{self, OpCode},
-    Context, Expression, TypeDef, Value,
+    Context, Expression, TypeDef,
 };
 
 #[derive(Clone, PartialEq)]
@@ -39,6 +39,13 @@ impl Query {
 
     pub fn is_external(&self) -> bool {
         matches!(self.target, Target::External)
+    }
+
+    pub fn as_variable(&self) -> Option<&Variable> {
+        match &self.target {
+            Target::Internal(variable) => Some(variable),
+            _ => None,
+        }
     }
 
     pub fn variable_ident(&self) -> Option<&Ident> {
@@ -120,19 +127,11 @@ impl Expression for Query {
         use Target::*;
 
         match &self.target {
-            External => {
-                // `.` path must be an object
-                //
-                // TODO: make sure to enforce this
-                if self.path.is_root() {
-                    return TypeDef::object(Collection::any()).infallible();
-                }
-
-                match state.1.target() {
-                    None => TypeDef::any().infallible(),
-                    Some(details) => details.clone().type_def.at_path(&self.path.to_lookup()),
-                }
-            }
+            External => match state.1.target() {
+                None if self.path().is_root() => TypeDef::object(Collection::any()).infallible(),
+                None => TypeDef::any().infallible(),
+                Some(details) => details.clone().type_def.at_path(&self.path.to_lookup()),
+            },
 
             Internal(variable) => variable.type_def(state).at_path(&self.path.to_lookup()),
             FunctionCall(call) => call.type_def(state).at_path(&self.path.to_lookup()),
@@ -153,7 +152,7 @@ impl Expression for Query {
             }
             Target::Internal(variable) => {
                 vm.write_opcode(OpCode::GetPath);
-                vm::Variable::Internal(variable.ident().clone(), Some(self.path.clone()))
+                vm::Variable::Internal(variable.ident().clone(), self.path.clone())
             }
             Target::FunctionCall(call) => {
                 // Write the code to call the function.
@@ -232,9 +231,8 @@ impl fmt::Debug for Target {
 
 #[cfg(test)]
 mod tests {
-    use crate::state;
-
     use super::*;
+    use crate::state;
 
     #[test]
     fn test_type_def() {

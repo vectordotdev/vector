@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn match_array(list: Value, pattern: Value, all: Option<Value>) -> Resolved {

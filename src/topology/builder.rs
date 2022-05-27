@@ -23,6 +23,7 @@ use vector_core::{
         BufferType, WhenFull,
     },
     internal_event::EventsSent,
+    schema::Definition,
     ByteSizeOf,
 };
 
@@ -35,7 +36,7 @@ use super::{
 use crate::{
     config::{
         ComponentKey, DataType, Input, Output, OutputId, ProxyConfig, SinkContext, SourceContext,
-        TransformContext,
+        TransformContext, TransformOuter,
     },
     event::{EventArray, EventContainer},
     internal_events::EventsReceived,
@@ -298,14 +299,7 @@ pub async fn build_pieces(
             merged_schema_definition: merged_definition.clone(),
         };
 
-        let node = TransformNode {
-            key: key.clone(),
-            typetag: transform.inner.transform_type(),
-            inputs: transform.inputs.clone(),
-            input_details: transform.inner.input(),
-            outputs: transform.inner.outputs(&merged_definition),
-            enable_concurrency: transform.inner.enable_concurrency(),
-        };
+        let node = TransformNode::from_parts(key.clone(), transform, &merged_definition);
 
         let transform = match transform.inner.build(&context).await {
             Err(error) => {
@@ -340,6 +334,15 @@ pub async fn build_pieces(
         let typetag = sink.inner.sink_type();
         let input_type = sink.inner.input().data_type();
 
+        if config.schema.enabled {
+            // At this point, we've validated that all transforms are valid, including any
+            // transform that mutates the schema provided by their sources. We can now validate the
+            // schema expectations of each invidual sink.
+            if let Err(mut err) = schema::validate_sink_expectations(key, sink, config) {
+                errors.append(&mut err);
+            };
+        }
+
         let (tx, rx, acker) = if let Some(buffer) = buffers.remove(key) {
             buffer
         } else {
@@ -373,6 +376,7 @@ pub async fn build_pieces(
             healthcheck,
             globals: config.global.clone(),
             proxy: ProxyConfig::merge_with_env(&config.global.proxy, sink.proxy()),
+            schema: config.schema,
         };
 
         let (sink, healthcheck) = match sink.inner.build(cx).await {
@@ -514,6 +518,23 @@ struct TransformNode {
     input_details: Input,
     outputs: Vec<Output>,
     enable_concurrency: bool,
+}
+
+impl TransformNode {
+    pub fn from_parts(
+        key: ComponentKey,
+        transform: &TransformOuter<OutputId>,
+        schema_definition: &Definition,
+    ) -> Self {
+        Self {
+            key,
+            typetag: transform.inner.transform_type(),
+            inputs: transform.inputs.clone(),
+            input_details: transform.inner.input(),
+            outputs: transform.inner.outputs(schema_definition),
+            enable_concurrency: transform.inner.enable_concurrency(),
+        }
+    }
 }
 
 fn build_transform(

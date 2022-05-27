@@ -17,10 +17,11 @@ pub mod type_def;
 pub mod value;
 pub mod vm;
 
-pub use crate::value::Value;
+pub use core::{value, ExpressionError, Resolved, Target};
+use std::{fmt::Display, str::FromStr};
+
 use ::serde::{Deserialize, Serialize};
 pub use context::Context;
-pub use core::{value, ExpressionError, Resolved, Target};
 use diagnostic::DiagnosticList;
 pub(crate) use diagnostic::Span;
 pub use expression::Expression;
@@ -28,7 +29,6 @@ pub use function::{Function, Parameter};
 pub use paste::paste;
 pub use program::{Program, ProgramInfo};
 use state::ExternalEnv;
-use std::{fmt::Display, str::FromStr};
 pub use type_def::TypeDef;
 
 pub type Result<T = (Program, DiagnosticList)> = std::result::Result<T, DiagnosticList>;

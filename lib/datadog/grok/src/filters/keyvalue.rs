@@ -1,9 +1,6 @@
-use crate::{
-    ast::{Function, FunctionArgument},
-    grok_filter::GrokFilter,
-    parse_grok::Error as GrokRuntimeError,
-    parse_grok_rules::Error as GrokStaticError,
-};
+use std::collections::BTreeMap;
+use std::fmt::Formatter;
+
 use bytes::Bytes;
 use lookup::{Lookup, LookupBuf};
 use nom::{
@@ -20,10 +17,16 @@ use nom::{
 use once_cell::sync::Lazy;
 use ordered_float::NotNan;
 use regex::Regex;
-use std::collections::BTreeMap;
-use std::fmt::Formatter;
 use tracing::warn;
-use vrl_compiler::{Target, Value};
+use value::Value;
+use vrl_compiler::Target;
+
+use crate::{
+    ast::{Function, FunctionArgument},
+    grok_filter::GrokFilter,
+    parse_grok::Error as GrokRuntimeError,
+    parse_grok_rules::Error as GrokStaticError,
+};
 
 static DEFAULT_FILTER_RE: Lazy<regex::Regex> = Lazy::new(|| Regex::new(r"^[\w.\-_@]*").unwrap());
 

@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn push(list: Value, item: Value) -> Resolved {
@@ -90,8 +91,9 @@ impl Expression for PushFn {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use vector_common::btreemap;
+
+    use super::*;
 
     test_function![
         push => Push;

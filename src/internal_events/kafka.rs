@@ -1,7 +1,7 @@
-use super::prelude::{error_stage, error_type};
 use metrics::{counter, gauge};
-
 use vector_core::{internal_event::InternalEvent, update_counter};
+
+use super::prelude::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct KafkaBytesReceived<'a> {

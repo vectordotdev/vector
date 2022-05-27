@@ -3,12 +3,11 @@ use std::{num::NonZeroU64, path::Path};
 use tokio_test::{assert_pending, task::spawn};
 use tracing::{Metadata, Span};
 
+use super::{open, Reader, Writer};
 use crate::{
     buffer_usage_data::BufferUsageHandle, test::common::install_tracing_helpers,
     variants::disk_v1::reader::FLUSH_INTERVAL, Acker, Bufferable, WhenFull,
 };
-
-use super::{open, Reader, Writer};
 
 mod acknowledgements;
 mod basic;
