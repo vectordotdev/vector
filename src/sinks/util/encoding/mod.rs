@@ -116,19 +116,18 @@ impl Encoder<Vec<Event>> for (Transformer, crate::codecs::Encoder<Framer>) {
     ) -> io::Result<usize> {
         let mut encoder = self.1.clone();
         let mut bytes_written = 0;
-        if events.is_empty() {
-            bytes_written += writer.write(encoder.batch_prefix())?;
-            bytes_written += writer.write(encoder.batch_suffix())?;
-        } else {
-            let last = events.pop().unwrap();
-            bytes_written += writer.write(encoder.batch_prefix())?;
+        let batch_prefix = encoder.batch_prefix();
+        writer.write_all(batch_prefix)?;
+        bytes_written += batch_prefix.len();
+        if let Some(last) = events.pop() {
             for mut event in events {
                 self.0.transform(&mut event);
                 let mut bytes = BytesMut::new();
                 encoder
                     .encode(event, &mut bytes)
                     .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-                bytes_written += writer.write(&bytes)?;
+                writer.write_all(&bytes)?;
+                bytes_written += bytes.len();
             }
             let mut event = last;
             self.0.transform(&mut event);
@@ -136,9 +135,12 @@ impl Encoder<Vec<Event>> for (Transformer, crate::codecs::Encoder<Framer>) {
             encoder
                 .serialize(event, &mut bytes)
                 .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-            bytes_written += writer.write(&bytes)?;
-            bytes_written += writer.write(encoder.batch_suffix())?;
+            writer.write_all(&bytes)?;
+            bytes_written += bytes.len();
         }
+        let batch_suffix = encoder.batch_suffix();
+        writer.write_all(batch_suffix)?;
+        bytes_written += batch_suffix.len();
 
         Ok(bytes_written)
     }
@@ -152,7 +154,8 @@ impl Encoder<Event> for (Transformer, crate::codecs::Encoder<()>) {
         encoder
             .serialize(event, &mut bytes)
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-        writer.write(&bytes)
+        writer.write_all(&bytes)?;
+        Ok(bytes.len())
     }
 }
 

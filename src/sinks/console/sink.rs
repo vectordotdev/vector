@@ -64,8 +64,11 @@ where
 #[cfg(test)]
 mod test {
     use chrono::{offset::TimeZone, Utc};
-    use codecs::BytesEncoder;
+    use codecs::{BytesEncoder, NewlineDelimitedEncoder};
+    use futures::future::ready;
+    use futures_util::stream;
     use pretty_assertions::assert_eq;
+    use vector_core::sink::VectorSink;
 
     use super::*;
     use crate::{
@@ -77,6 +80,7 @@ mod test {
             EncodingConfig, EncodingConfigWithFramingAdapter, StandardEncodings,
             StandardEncodingsWithFramingMigrator,
         },
+        test_util::components::{run_and_assert_sink_compliance, SINK_TAGS},
     };
 
     fn encode_event(
@@ -92,6 +96,33 @@ mod test {
         let mut bytes = BytesMut::new();
         encoder.encode(event, &mut bytes)?;
         Ok(String::from_utf8_lossy(&bytes).to_string())
+    }
+
+    #[tokio::test]
+    async fn component_spec_compliance() {
+        let event = Event::from("foo");
+
+        let encoding: EncodingConfigWithFramingAdapter<
+            EncodingConfig<StandardEncodings>,
+            StandardEncodingsWithFramingMigrator,
+        > = EncodingConfig::from(StandardEncodings::Json).into();
+        let transformer = encoding.transformer();
+        let (_, serializer) = encoding.encoding();
+        let encoder = Encoder::<Framer>::new(NewlineDelimitedEncoder::new().into(), serializer);
+
+        let sink = WriterSink {
+            acker: Acker::passthrough(),
+            output: Vec::new(),
+            transformer,
+            encoder,
+        };
+
+        run_and_assert_sink_compliance(
+            VectorSink::from_event_streamsink(sink),
+            stream::once(ready(event)),
+            &SINK_TAGS,
+        )
+        .await;
     }
 
     #[test]

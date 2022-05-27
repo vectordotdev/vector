@@ -4,7 +4,6 @@ use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 use value::Value;
 
 use crate::{
-    compiler::Diagnostics,
     expression::{Expr, Resolved},
     parser::Node,
     state::{ExternalEnv, LocalEnv},
@@ -20,28 +19,12 @@ pub struct Predicate {
 }
 
 impl Predicate {
-    pub fn new(
-        node: Node<Vec<Expr>>,
-        state: (&LocalEnv, &ExternalEnv),
-        warnings: &mut Diagnostics,
-    ) -> Result {
+    pub fn new(node: Node<Vec<Expr>>, state: (&LocalEnv, &ExternalEnv)) -> Result {
         let (span, exprs) = node.take();
-        let (type_def, value) = exprs
+        let type_def = exprs
             .last()
-            .map(|expr| (expr.type_def(state), expr.as_value()))
-            .unwrap_or_else(|| (TypeDef::null(), None));
-
-        match value {
-            Some(Value::Boolean(true)) => warnings.push(Box::new(Error {
-                variant: ErrorVariant::AlwaysTrue,
-                span,
-            })),
-            Some(Value::Boolean(false)) => warnings.push(Box::new(Error {
-                variant: ErrorVariant::AlwaysFalse,
-                span,
-            })),
-            _ => {}
-        }
+            .map(|expr| expr.type_def(state))
+            .unwrap_or_else(TypeDef::null);
 
         if type_def.is_fallible() {
             return Err(Error {
@@ -160,10 +143,6 @@ pub(crate) enum ErrorVariant {
     NonBoolean(Kind),
     #[error("fallible predicate")]
     Fallible,
-    #[error("predicate always resolves to `true`")]
-    AlwaysTrue,
-    #[error("predicate always resolves to `false`")]
-    AlwaysFalse,
 }
 
 impl fmt::Display for Error {
@@ -185,8 +164,6 @@ impl DiagnosticMessage for Error {
         match &self.variant {
             NonBoolean(..) => 102,
             Fallible => 111,
-            AlwaysFalse => 112,
-            AlwaysTrue => 113,
         }
     }
 
@@ -201,17 +178,6 @@ impl DiagnosticMessage for Error {
             Fallible => vec![
                 Label::primary("this predicate can result in runtime error", self.span),
                 Label::context("handle the error case to ensure runtime success", self.span),
-            ],
-            AlwaysFalse => vec![
-                Label::primary("this predicate never resolves to true", self.span),
-                Label::context("this means the code inside the block never runs", self.span),
-            ],
-            AlwaysTrue => vec![
-                Label::primary("this predicate always resolves to true", self.span),
-                Label::context(
-                    "this means the conditional around this block is unnecessary",
-                    self.span,
-                ),
             ],
         }
     }
@@ -228,17 +194,6 @@ impl DiagnosticMessage for Error {
                 ),
             ],
             Fallible => vec![Note::SeeErrorDocs],
-            _ => vec![],
-        }
-    }
-
-    fn severity(&self) -> diagnostic::Severity {
-        use diagnostic::Severity;
-        use ErrorVariant::*;
-
-        match &self.variant {
-            AlwaysTrue | AlwaysFalse => Severity::Warning,
-            _ => Severity::Error,
         }
     }
 }

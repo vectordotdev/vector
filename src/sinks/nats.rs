@@ -8,6 +8,8 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
 use vector_buffers::Acker;
+use vector_common::internal_event::{BytesSent, EventsSent};
+use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::Encoder,
@@ -15,7 +17,7 @@ use crate::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
     },
     event::Event,
-    internal_events::{NatsEventSendError, NatsEventSendSuccess, TemplateRenderingError},
+    internal_events::{NatsEventSendError, TemplateRenderingError},
     nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfigAdapter, EncodingConfigMigrator, Transformer},
@@ -182,6 +184,8 @@ impl StreamSink<Event> for NatsSink {
 
             self.transformer.transform(&mut event);
 
+            let event_byte_size = event.size_of();
+
             let mut bytes = BytesMut::new();
             if self.encoder.encode(event, &mut bytes).is_err() {
                 // Error is logged by `Encoder`.
@@ -192,7 +196,15 @@ impl StreamSink<Event> for NatsSink {
 
             match self.connection.publish(&subject, bytes).await {
                 Ok(_) => {
-                    emit!(NatsEventSendSuccess { byte_size });
+                    emit!(EventsSent {
+                        count: 1,
+                        byte_size: event_byte_size,
+                        output: None
+                    });
+                    emit!(BytesSent {
+                        byte_size,
+                        protocol: "tcp"
+                    });
                 }
                 Err(error) => {
                     emit!(NatsEventSendError { error });
@@ -224,7 +236,10 @@ mod integration_tests {
     use super::*;
     use crate::nats::{NatsAuthCredentialsFile, NatsAuthNKey, NatsAuthToken, NatsAuthUserPassword};
     use crate::sinks::VectorSink;
-    use crate::test_util::{random_lines_with_stream, random_string, trace_init};
+    use crate::test_util::{
+        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        random_lines_with_stream, random_string, trace_init,
+    };
     use crate::tls::TlsConfig;
 
     async fn publish_and_check(conf: NatsSinkConfig) -> Result<(), BuildError> {
@@ -254,7 +269,7 @@ mod integration_tests {
         let num_events = 1_000;
         let (input, events) = random_lines_with_stream(100, num_events, None);
 
-        let _ = sink.run(events).await.unwrap();
+        run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
 
         // Unsubscribe from the channel.
         thread::sleep(Duration::from_secs(3));
@@ -281,12 +296,14 @@ mod integration_tests {
         trace_init();
 
         let subject = format!("test-{}", random_string(10));
+        let url =
+            std::env::var("NATS_ADDRESS").unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSinkConfig {
             encoding: EncodingConfig::from(Encoding::Text).into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
-            url: "nats://127.0.0.1:4222".to_owned(),
+            url,
             tls: None,
             auth: None,
         };
@@ -304,12 +321,14 @@ mod integration_tests {
         trace_init();
 
         let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_USERPASS_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSinkConfig {
             encoding: EncodingConfig::from(Encoding::Text).into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
-            url: "nats://127.0.0.1:4223".to_owned(),
+            url,
             tls: None,
             auth: Some(NatsAuthConfig::UserPassword {
                 user_password: NatsAuthUserPassword {
@@ -329,12 +348,14 @@ mod integration_tests {
         trace_init();
 
         let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_USERPASS_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSinkConfig {
             encoding: EncodingConfig::from(Encoding::Text).into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
-            url: "nats://127.0.0.1:4224".to_owned(),
+            url,
             tls: None,
             auth: Some(NatsAuthConfig::UserPassword {
                 user_password: NatsAuthUserPassword {
@@ -357,12 +378,14 @@ mod integration_tests {
         trace_init();
 
         let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_TOKEN_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSinkConfig {
             encoding: EncodingConfig::from(Encoding::Text).into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
-            url: "nats://127.0.0.1:4224".to_owned(),
+            url,
             tls: None,
             auth: Some(NatsAuthConfig::Token {
                 token: NatsAuthToken {
@@ -384,12 +407,14 @@ mod integration_tests {
         trace_init();
 
         let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_TOKEN_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSinkConfig {
             encoding: EncodingConfig::from(Encoding::Text).into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
-            url: "nats://127.0.0.1:4224".to_owned(),
+            url,
             tls: None,
             auth: Some(NatsAuthConfig::Token {
                 token: NatsAuthToken {
@@ -411,12 +436,14 @@ mod integration_tests {
         trace_init();
 
         let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_NKEY_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSinkConfig {
             encoding: EncodingConfig::from(Encoding::Text).into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
-            url: "nats://127.0.0.1:4225".to_owned(),
+            url,
             tls: None,
             auth: Some(NatsAuthConfig::Nkey {
                 nkey: NatsAuthNKey {
@@ -439,12 +466,14 @@ mod integration_tests {
         trace_init();
 
         let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_NKEY_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSinkConfig {
             encoding: EncodingConfig::from(Encoding::Text).into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
-            url: "nats://127.0.0.1:4225".to_owned(),
+            url,
             tls: None,
             auth: Some(NatsAuthConfig::Nkey {
                 nkey: NatsAuthNKey {
@@ -467,16 +496,18 @@ mod integration_tests {
         trace_init();
 
         let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_TLS_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSinkConfig {
             encoding: EncodingConfig::from(Encoding::Text).into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
-            url: "nats://localhost:4227".to_owned(),
+            url,
             tls: Some(TlsEnableableConfig {
                 enabled: Some(true),
                 options: TlsConfig {
-                    ca_file: Some("tests/data/mkcert_rootCA.pem".into()),
+                    ca_file: Some("tests/data/nats/rootCA.pem".into()),
                     ..Default::default()
                 },
             }),
@@ -496,12 +527,14 @@ mod integration_tests {
         trace_init();
 
         let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_TLS_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSinkConfig {
             encoding: EncodingConfig::from(Encoding::Text).into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
-            url: "nats://localhost:4227".to_owned(),
+            url,
             tls: None,
             auth: None,
         };
@@ -519,18 +552,20 @@ mod integration_tests {
         trace_init();
 
         let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_TLS_CLIENT_CERT_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSinkConfig {
             encoding: EncodingConfig::from(Encoding::Text).into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
-            url: "nats://localhost:4228".to_owned(),
+            url,
             tls: Some(TlsEnableableConfig {
                 enabled: Some(true),
                 options: TlsConfig {
-                    ca_file: Some("tests/data/mkcert_rootCA.pem".into()),
-                    crt_file: Some("tests/data/nats_client_cert.pem".into()),
-                    key_file: Some("tests/data/nats_client_key.pem".into()),
+                    ca_file: Some("tests/data/nats/rootCA.pem".into()),
+                    crt_file: Some("tests/data/nats/nats-client.pem".into()),
+                    key_file: Some("tests/data/nats/nats-client.key".into()),
                     ..Default::default()
                 },
             }),
@@ -550,16 +585,18 @@ mod integration_tests {
         trace_init();
 
         let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_TLS_CLIENT_CERT_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSinkConfig {
             encoding: EncodingConfig::from(Encoding::Text).into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
-            url: "nats://localhost:4228".to_owned(),
+            url,
             tls: Some(TlsEnableableConfig {
                 enabled: Some(true),
                 options: TlsConfig {
-                    ca_file: Some("tests/data/mkcert_rootCA.pem".into()),
+                    ca_file: Some("tests/data/nats/rootCA.pem".into()),
                     ..Default::default()
                 },
             }),
@@ -579,22 +616,24 @@ mod integration_tests {
         trace_init();
 
         let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_JWT_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSinkConfig {
             encoding: EncodingConfig::from(Encoding::Text).into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
-            url: "nats://localhost:4229".to_owned(),
+            url,
             tls: Some(TlsEnableableConfig {
                 enabled: Some(true),
                 options: TlsConfig {
-                    ca_file: Some("tests/data/mkcert_rootCA.pem".into()),
+                    ca_file: Some("tests/data/nats/rootCA.pem".into()),
                     ..Default::default()
                 },
             }),
             auth: Some(NatsAuthConfig::CredentialsFile {
                 credentials_file: NatsAuthCredentialsFile {
-                    path: "tests/data/nats.creds".into(),
+                    path: "tests/data/nats/nats.creds".into(),
                 },
             }),
         };
@@ -612,22 +651,24 @@ mod integration_tests {
         trace_init();
 
         let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_JWT_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSinkConfig {
             encoding: EncodingConfig::from(Encoding::Text).into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
-            url: "nats://localhost:4229".to_owned(),
+            url,
             tls: Some(TlsEnableableConfig {
                 enabled: Some(true),
                 options: TlsConfig {
-                    ca_file: Some("tests/data/mkcert_rootCA.pem".into()),
+                    ca_file: Some("tests/data/nats/rootCA.pem".into()),
                     ..Default::default()
                 },
             }),
             auth: Some(NatsAuthConfig::CredentialsFile {
                 credentials_file: NatsAuthCredentialsFile {
-                    path: "tests/data/nats-bad.creds".into(),
+                    path: "tests/data/nats/nats-bad.creds".into(),
                 },
             }),
         };

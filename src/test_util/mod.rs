@@ -25,7 +25,7 @@ use rand::{thread_rng, Rng};
 use rand_distr::Alphanumeric;
 use tokio::{
     io::{AsyncRead, AsyncWrite, AsyncWriteExt, Result as IoResult},
-    net::{TcpListener, TcpStream},
+    net::{TcpListener, TcpStream, ToSocketAddrs},
     runtime,
     sync::oneshot,
     task::JoinHandle,
@@ -50,6 +50,10 @@ const WAIT_FOR_MAX_MILLIS: u64 = 500; // The maximum time to pause before retryi
 
 #[cfg(test)]
 pub mod components;
+
+#[cfg(test)]
+pub mod http;
+
 #[cfg(test)]
 pub mod metrics;
 pub mod stats;
@@ -415,8 +419,15 @@ where
 }
 
 // Wait (for 5 secs) for a TCP socket to be reachable
-pub async fn wait_for_tcp(addr: SocketAddr) {
-    wait_for(|| async move { TcpStream::connect(addr).await.is_ok() }).await
+pub async fn wait_for_tcp<A>(addr: A)
+where
+    A: ToSocketAddrs + Clone + Send + 'static,
+{
+    wait_for(move || {
+        let addr = addr.clone();
+        async move { TcpStream::connect(addr).await.is_ok() }
+    })
+    .await
 }
 
 // Allows specifying a custom duration to wait for a TCP socket to be reachable
@@ -652,6 +663,10 @@ where
     F: Future<Output = ()> + Send + 'static,
     S: Stream<Item = Event> + Unpin,
 {
+    // TODO: Switch to using `select!` so that we can drive `future` to completion while also driving `collect_n`,
+    // such that if `future` panics, we break out and don't continue driving `collect_n`. In most cases, `future`
+    // completing successfully is what actually drives events into `stream`, so continuing to wait for all N events when
+    // the catalyst has failed is.... almost never the desired behavior.
     let sender = tokio::spawn(future);
     let events = collect_n(stream, n).await;
     sender.await.expect("Failed to send data");
