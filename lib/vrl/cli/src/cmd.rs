@@ -1,4 +1,4 @@
-use core::{Secrets, TargetValue, TargetValueRef};
+use core::{TargetValue, TargetValueRef};
 use std::{
     collections::BTreeMap,
     fs::File,
@@ -9,6 +9,7 @@ use std::{
 
 use ::value::Value;
 use clap::Parser;
+use value::Secrets;
 use vector_common::TimeZone;
 use vrl::{
     diagnostic::Formatter,

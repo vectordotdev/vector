@@ -1,7 +1,7 @@
 use std::borrow::Cow::{self, Borrowed, Owned};
 
 use ::value::Value;
-use core::{Secrets, TargetValue};
+use core::TargetValue;
 use indoc::indoc;
 use once_cell::sync::Lazy;
 use prettytable::{format, Cell, Row, Table};
@@ -14,6 +14,7 @@ use rustyline::{
     validate::{self, ValidationResult, Validator},
     Context, Editor, Helper,
 };
+use value::Secrets;
 use vector_common::TimeZone;
 use vector_vrl_functions::vrl_functions;
 use vrl::prelude::BTreeMap;

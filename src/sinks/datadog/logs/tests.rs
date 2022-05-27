@@ -215,8 +215,7 @@ async fn api_key_in_metadata_inner(api_status: ApiStatus) {
     let events = events.map(|mut e| {
         println!("EVENT: {:?}", e);
         e.for_each_log(|log| {
-            log.metadata_mut()
-                .set_datadog_api_key(Some(Arc::from(api_key)));
+            log.metadata_mut().set_datadog_api_key(Arc::from(api_key));
         });
         e
     });
@@ -356,8 +355,7 @@ async fn enterprise_headers_inner(api_status: ApiStatus) {
     let events = events.map(|mut e| {
         println!("EVENT: {:?}", e);
         e.for_each_log(|log| {
-            log.metadata_mut()
-                .set_datadog_api_key(Some(Arc::from(api_key)));
+            log.metadata_mut().set_datadog_api_key(Arc::from(api_key));
         });
         e
     });
@@ -420,8 +418,7 @@ async fn no_enterprise_headers_inner(api_status: ApiStatus) {
     let events = events.map(|mut e| {
         println!("EVENT: {:?}", e);
         e.for_each_log(|log| {
-            log.metadata_mut()
-                .set_datadog_api_key(Some(Arc::from(api_key)));
+            log.metadata_mut().set_datadog_api_key(Arc::from(api_key));
         });
         e
     });

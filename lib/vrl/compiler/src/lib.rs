@@ -18,7 +18,7 @@ pub mod value;
 pub mod vm;
 
 pub use core::{
-    value, ExpressionError, MetadataTarget, Resolved, SecretTarget, Secrets, Target, TargetValue,
+    value, ExpressionError, MetadataTarget, Resolved, SecretTarget, Target, TargetValue,
     TargetValueRef,
 };
 use std::{fmt::Display, str::FromStr};

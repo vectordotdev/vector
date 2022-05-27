@@ -1,6 +1,5 @@
-use crate::Secrets;
 use lookup::LookupBuf;
-use value::Value;
+use value::{Secrets, Value};
 
 /// Any target object you want to remap using VRL has to implement this trait.
 pub trait Target: std::fmt::Debug + MetadataTarget + SecretTarget {
@@ -185,6 +184,20 @@ impl SecretTarget for TargetValue {
 
     fn remove_secret(&mut self, key: &str) {
         self.secrets.remove_secret(key);
+    }
+}
+
+impl SecretTarget for Secrets {
+    fn get_secret(&self, key: &str) -> Option<&str> {
+        self.get(key).map(|value| value.as_ref())
+    }
+
+    fn insert_secret(&mut self, key: &str, value: &str) {
+        self.insert(key, value);
+    }
+
+    fn remove_secret(&mut self, key: &str) {
+        self.remove(&key.to_owned());
     }
 }
 

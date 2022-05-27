@@ -7,10 +7,8 @@
 
 mod expression;
 mod r#macro;
-mod secrets;
 mod target;
 
 pub use expression::{ExpressionError, Resolved};
-pub use secrets::Secrets;
 pub use target::{MetadataTarget, SecretTarget, Target, TargetValue, TargetValueRef};
 pub use value::Value;

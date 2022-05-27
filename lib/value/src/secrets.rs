@@ -1,4 +1,5 @@
-use crate::target::SecretTarget;
+//! Contains the `Secrets` type.
+
 use std::collections::BTreeMap;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
@@ -20,35 +21,25 @@ impl Debug for Secrets {
 }
 
 impl Secrets {
+    /// Creates a new empty secrets container
     pub fn new() -> Secrets {
         Secrets {
             secrets: BTreeMap::new(),
         }
     }
 
+    /// Gets a secret
     pub fn get(&self, key: &str) -> Option<&Arc<str>> {
         self.secrets.get(key)
     }
 
+    /// Inserts a new secret into the container.
     pub fn insert(&mut self, key: &str, value: impl Into<Arc<str>>) {
         self.secrets.insert(key.to_owned(), value.into());
     }
 
+    /// Removes a secret
     pub fn remove(&mut self, key: &str) {
         self.secrets.remove(&key.to_owned());
-    }
-}
-
-impl SecretTarget for Secrets {
-    fn get_secret(&self, key: &str) -> Option<&str> {
-        self.get(key).map(|value| value.as_ref())
-    }
-
-    fn insert_secret(&mut self, key: &str, value: &str) {
-        self.insert(key, value);
-    }
-
-    fn remove_secret(&mut self, key: &str) {
-        self.remove(&key.to_owned());
     }
 }

@@ -5,9 +5,8 @@ use std::sync::Arc;
 
 use lookup::path;
 use serde::{Deserialize, Serialize};
-use value::Value;
+use value::{Secrets, Value};
 use vector_common::EventDataEq;
-use vrl_lib::prelude::Secrets;
 
 use super::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus};
 use crate::{schema, ByteSizeOf};
