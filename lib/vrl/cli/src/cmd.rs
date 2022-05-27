@@ -9,10 +9,7 @@ use std::{
 use ::value::Value;
 use clap::Parser;
 use vector_common::TimeZone;
-use vrl::{
-    diagnostic::Formatter,
-    state, Program, Runtime, Target, VrlRuntime,
-};
+use vrl::{diagnostic::Formatter, state, Program, Runtime, Target, VrlRuntime};
 
 #[cfg(feature = "repl")]
 use super::repl;
@@ -134,14 +131,7 @@ fn run(opts: &Opts) -> Result<(), Error> {
         for mut object in objects {
             let state = state::Runtime::default();
             let runtime = Runtime::new(state);
-            let result = execute(
-                &mut object,
-                &program,
-                &tz,
-                runtime,
-                opts.runtime,
-            )
-            .map(|v| {
+            let result = execute(&mut object, &program, &tz, runtime, opts.runtime).map(|v| {
                 if opts.print_object {
                     object.to_string()
                 } else {

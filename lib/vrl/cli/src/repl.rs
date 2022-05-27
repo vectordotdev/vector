@@ -14,10 +14,7 @@ use rustyline::{
     Context, Editor, Helper,
 };
 use vector_common::TimeZone;
-use vrl::{
-    diagnostic::Formatter,
-    state, value, Runtime, Target, VrlRuntime,
-};
+use vrl::{diagnostic::Formatter, state, value, Runtime, Target, VrlRuntime};
 
 // Create a list of all possible error values for potential docs lookup
 static ERRORS: Lazy<Vec<String>> = Lazy::new(|| {

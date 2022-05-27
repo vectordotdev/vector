@@ -6,8 +6,7 @@ use vrl::{
         ArgumentList, Compiled, CompiledArgument, Example, FunctionCompileContext, Parameter,
     },
     prelude::{
-        expression, DiagnosticMessage, FunctionArgument, Resolved, Result, TypeDef,
-        VrlValueConvert,
+        expression, DiagnosticMessage, FunctionArgument, Resolved, Result, TypeDef, VrlValueConvert,
     },
     state,
     value::kind,

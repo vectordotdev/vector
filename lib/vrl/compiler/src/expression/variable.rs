@@ -1,5 +1,5 @@
-use std::fmt;
 use diagnostic::{DiagnosticMessage, Label};
+use std::fmt;
 use value::Value;
 
 use crate::{

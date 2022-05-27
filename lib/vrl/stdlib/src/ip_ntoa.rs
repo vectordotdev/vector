@@ -46,7 +46,6 @@ impl Function for IpNtoa {
 
         Ok(Box::new(IpNtoaFn { value }))
     }
-
 }
 
 #[derive(Debug, Clone)]

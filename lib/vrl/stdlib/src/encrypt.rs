@@ -212,7 +212,6 @@ impl Function for Encrypt {
             iv,
         }))
     }
-
 }
 
 #[derive(Debug, Clone)]
