@@ -342,7 +342,10 @@ impl<'a> Compiler<'a> {
             Many(nodes) => self.compile_exprs(nodes, external)?,
         };
 
-        Some(Predicate::new(Node::new(span, exprs), (&self.local, external)))
+        Some(Predicate::new(
+            Node::new(span, exprs),
+            (&self.local, external),
+        ))
     }
 
     #[cfg(feature = "expr-op")]
