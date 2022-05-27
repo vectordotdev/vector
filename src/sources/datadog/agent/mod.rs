@@ -10,6 +10,7 @@ pub mod traces;
 use std::{fmt::Debug, io::Read, net::SocketAddr, sync::Arc};
 
 use bytes::{Buf, Bytes};
+use chrono::{serde::ts_milliseconds, DateTime, Utc};
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use futures::FutureExt;
@@ -152,11 +153,11 @@ impl SourceConfig for DatadogAgentConfig {
             DeserializerConfig::Bytes => schema::Definition::empty()
                 .required_field("message", Kind::bytes(), Some("message"))
                 .required_field("status", Kind::bytes(), Some("severity"))
-                .required_field("timestamp", Kind::integer(), Some("timestamp"))
+                .required_field("timestamp", Kind::timestamp(), Some("timestamp"))
                 .required_field("hostname", Kind::bytes(), Some("host"))
-                .required_field("service", Kind::bytes(), None)
-                .required_field("ddsource", Kind::bytes(), None)
-                .required_field("ddtags", Kind::bytes(), None)
+                .required_field("service", Kind::bytes(), Some("service"))
+                .required_field("ddsource", Kind::bytes(), Some("source"))
+                .required_field("ddtags", Kind::bytes(), Some("tags"))
                 .merge(self.decoding.schema_definition()),
 
             // JSON deserializer can overwrite existing fields at runtime, so we have to treat
@@ -418,7 +419,11 @@ fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMe
 struct LogMsg {
     pub message: Bytes,
     pub status: Bytes,
-    pub timestamp: i64,
+    #[serde(
+        deserialize_with = "ts_milliseconds::deserialize",
+        serialize_with = "ts_milliseconds::serialize"
+    )]
+    pub timestamp: DateTime<Utc>,
     pub hostname: Bytes,
     pub service: Bytes,
     pub ddsource: Bytes,
