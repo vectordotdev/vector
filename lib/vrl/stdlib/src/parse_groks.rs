@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, fmt};
+use std::{any::Any, collections::BTreeMap, fmt};
 
 use datadog_grok::{
     parse_grok,
@@ -125,6 +125,7 @@ impl Function for ParseGroks {
                         expr: expr.clone(),
                     }
                 })?;
+
                 let patterns = patterns
                     .try_array()
                     .map_err(|_| vrl::function::Error::ExpectedStaticExpression {
@@ -169,6 +170,7 @@ impl Function for ParseGroks {
 
                 Ok(Some(Box::new(grok_rules) as _))
             }
+            ("aliases", _) => Ok(Some(Box::new(()) as _)),
             _ => Ok(None),
         }
     }
@@ -276,6 +278,39 @@ impl Expression for ParseGrokFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::object(Collection::any()).fallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_parse_groks(
+    value: &mut Value,
+    patterns: &Box<dyn Any + Send + Sync>,
+    remove_empty: &mut Option<Value>,
+    _aliases: &Box<dyn Any + Send + Sync>,
+    resolved: &mut Resolved,
+) {
+    let value = {
+        let mut moved = Value::Null;
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+    let remove_empty = {
+        let mut moved = None;
+        std::mem::swap(remove_empty, &mut moved);
+        moved
+    };
+
+    let remove_empty = remove_empty
+        .and_then(|value| value.as_boolean())
+        .unwrap_or(false);
+
+    let patterns = patterns.downcast_ref::<Vec<GrokRule>>().unwrap();
+
+    *resolved = (|| {
+        let bytes = value.try_bytes_utf8_lossy()?;
+        parse_grok::parse_grok(bytes.as_ref(), patterns, remove_empty)
+            .map_err(|err| format!("unable to parse grok: {}", err).into())
+    })();
 }
 
 #[cfg(test)]

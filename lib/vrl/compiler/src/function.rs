@@ -94,8 +94,8 @@ pub trait Function: Send + Sync + fmt::Debug {
         &self,
         function_arguments: Vec<FunctionArgument>,
     ) -> Vec<(&'static str, Option<ResolvedArgument>)> {
-        let mut params = self.parameters().to_vec();
-        let mut arguments = params
+        let mut parameters = self.parameters().to_vec();
+        let mut arguments = parameters
             .iter()
             .map(|parameter| (parameter.keyword, None))
             .collect::<Vec<_>>();
@@ -103,40 +103,42 @@ pub trait Function: Send + Sync + fmt::Debug {
         let mut unnamed = Vec::new();
 
         // Position all the named parameters, keeping track of all the unnamed for later.
-        for param in function_arguments {
-            match param.keyword() {
-                None => unnamed.push(param.into_inner()),
+        for parameter in function_arguments {
+            match parameter.keyword() {
+                None => unnamed.push(parameter.into_inner()),
                 Some(keyword) => {
-                    match params.iter().position(|param| param.keyword == keyword) {
-                        None => {
-                            // The parameter was not found in the list.
-                            panic!("parameter {} not found.", keyword);
-                        }
-                        Some(pos) => {
-                            arguments[pos].1 = Some(ResolvedArgument {
-                                argument: params.remove(pos),
-                                expression: param.into_inner(),
-                            });
-                        }
-                    }
+                    let position_parameters = parameters
+                        .iter()
+                        .position(|parameter| parameter.keyword == keyword)
+                        .expect(&format!("parameter {} not found.", keyword));
+                    let position_arguments = arguments
+                        .iter()
+                        .position(|argument| argument.0 == keyword)
+                        .expect(&format!("argument {} not found.", keyword));
+
+                    let argument = parameters.remove(position_parameters);
+                    arguments[position_arguments].1 = Some(ResolvedArgument {
+                        argument: argument,
+                        expression: parameter.into_inner(),
+                    });
                 }
             }
         }
 
         // Position all the remaining unnamed parameters
-        let mut pos = 0;
+        let mut position = 0;
         for expression in unnamed {
-            while arguments[pos].1.is_some() {
-                pos += 1;
+            while arguments[position].1.is_some() {
+                position += 1;
             }
 
-            if pos > arguments.len() || params.is_empty() {
+            if position > arguments.len() || parameters.is_empty() {
                 panic!("Too many parameters");
             }
 
-            let argument = params.remove(0);
+            let argument = parameters.remove(0);
 
-            arguments[pos].1 = Some(ResolvedArgument {
+            arguments[position].1 = Some(ResolvedArgument {
                 argument,
                 expression,
             });

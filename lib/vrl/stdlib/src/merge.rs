@@ -16,7 +16,7 @@ impl Function for Merge {
             Parameter {
                 keyword: "to",
                 kind: kind::OBJECT,
-                required: false,
+                required: true,
             },
             Parameter {
                 keyword: "from",
@@ -91,6 +91,46 @@ impl Expression for MergeFn {
             .type_def(state)
             .merge_shallow(self.from.type_def(state))
     }
+}
+
+#[no_mangle]
+pub extern "C" fn vrl_fn_merge(
+    to: &mut Value,
+    from: &mut Value,
+    deep: &mut Option<Value>,
+    result: &mut Resolved,
+) {
+    let to = {
+        let mut moved = Value::Null;
+        std::mem::swap(to, &mut moved);
+        moved
+    };
+    let from = {
+        let mut moved = Value::Null;
+        std::mem::swap(from, &mut moved);
+        moved
+    };
+    let deep = {
+        let mut moved = None;
+        std::mem::swap(deep, &mut moved);
+        moved
+    };
+
+    let mut to = match to {
+        Value::Object(object) => object,
+        _ => panic!(r#"expected "to" to be object"#),
+    };
+    let from = match from {
+        Value::Object(object) => object,
+        _ => panic!(r#"expected "from" to be object"#),
+    };
+    let deep = deep
+        .and_then(|deep| deep.try_boolean().ok())
+        .unwrap_or(false);
+
+    merge_maps(&mut to, &from, deep);
+
+    *result = Ok(to.into());
 }
 
 /// Merges two BTreeMaps of Symbol’s value as variable is void: Values. The

@@ -330,7 +330,20 @@ impl Target {
                         .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
                     ctx.builder().build_call(
                         fn_impl,
-                        &[ctx.result_ref().into(), variable_ref.into()],
+                        &[
+                            ctx.builder()
+                                .build_bitcast(
+                                    ctx.result_ref(),
+                                    fn_impl
+                                        .get_nth_param(0)
+                                        .unwrap()
+                                        .get_type()
+                                        .into_pointer_type(),
+                                    "cast",
+                                )
+                                .into(),
+                            variable_ref.into(),
+                        ],
                         fn_ident,
                     );
                     return Ok(());

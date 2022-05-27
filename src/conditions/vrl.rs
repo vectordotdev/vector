@@ -75,6 +75,11 @@ impl ConditionConfig for VrlConfig {
                 let builder = vrl::llvm::Compiler::new().unwrap();
                 let mut symbols = HashMap::new();
                 symbols.insert("vrl_fn_downcase", vrl_stdlib::vrl_fn_downcase as usize);
+                symbols.insert("vrl_fn_merge", vrl_stdlib::vrl_fn_merge as usize);
+                symbols.insert(
+                    "vrl_fn_parse_groks",
+                    vrl_stdlib::vrl_fn_parse_groks as usize,
+                );
                 symbols.insert(
                     "vrl_fn_starts_with",
                     vrl_stdlib::vrl_fn_starts_with as usize,

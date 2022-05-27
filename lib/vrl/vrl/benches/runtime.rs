@@ -36,6 +36,156 @@ static SOURCES: &[Source] = &[
         "#},
     },
     Source {
+        name: "parse_groks_bla",
+        target: "{}",
+        program: indoc! {r#"
+            .custom.message = "127.0.0.1 - frank [13/Jul/2016:10:55:36 +0000] \"GET /apache_pb.gif HTTP/1.0\" 200 2326"
+            parse_groks!(value: .custom.message,
+                patterns: [
+                    "(?s)%{_prefix} %{regex(\"Compacting\"):db.operation}.* %{_keyspace}\\/%{_table}:%{data:partition_key} \\(%{_bytes} bytes\\)",
+                    "(?s)%{_prefix} %{regex(\"Flushing\"):db.operation}.*\\(Keyspace='%{_keyspace}', ColumnFamily='%{_table}'\\) %{data}: %{_onheap_total}\\/%{_offheap_total}, live: %{_onheap_live}\\/%{_offheap_live}, flushing: %{_onheap_flush}\\/%{_offheap_flush}, this: %{_onheap_this}\\/%{_offheap_this}",
+                    "(?s)%{_prefix} %{regex(\"Enqueuing\"):db.operation}.* of %{_keyspace}: %{_onheap_bytes}%{data} \\(%{_onheap_pct}%\\) on-heap, %{_offheap_bytes} \\(%{_offheap_pct}%\\).*",
+                    "(?s)%{_prefix} %{regex(\"Writing\"):db.operation}.*-%{_keyspace}%{data}\\(%{number:cassandra.bytes:scale(1000000)}%{data}, %{integer:cassandra.ops} ops, %{_onheap_pct}%\\/%{_offheap_pct}.*",
+                    "(?s)%{_prefix} Completed %{regex(\"flushing\"):db.operation} %{_sstable} \\(%{number:cassandra.bytes_kb}KiB\\) for commitlog %{data:commitlog}",
+                    "(?s)%{_prefix}\\s+%{regex(\"Compacted\"):db.operation}.* to \\[%{_sstable}\\].\\s+%{notSpace:cassandra.bytes_in} bytes to %{notSpace:cassandra.bytes_out} \\(\\~%{integer:cassandra.percent_of_orig}% of original\\) in %{notSpace:cassandra.duration_ms}ms = %{number:cassandra.speed_mb}MB/s.\\s+%{notSpace:cassandra.pkeys_in} total partitions merged to %{notSpace:cassandra.pkeys_out}\\.\\s+Partition merge counts were %{data:cassandra.merge_cnt}",
+                    "(?s)%{_prefix} G.* %{integer:duration:scale(1000000)}ms. %{data}: %{integer:cassandra.eden.orig_bytes} -> %{integer:cassandra.eden.new_bytes}; %{data}: %{integer:cassandra.oldgen.orig_bytes} -> %{integer:cassandra.oldgen.new_bytes};.*",
+                    "(?s)%{_prefix} %{word:cassandra.pool}\\s*(?>%{integer:cassandra.cache_used}\\s*%{integer:cassandra.cache_size}\\s*all|%{integer:cassandra.threads.active}\\s*%{integer:cassandra.threads.pending}\\s*%{integer:cassandra.threads.completed}\\s*%{integer:cassandra.threads.blocked}\\s*%{integer:cassandra.threads.all_time_blocked}|%{integer:cassandra.threads.active}\\s*%{integer:cassanadra.threads.pending})",
+                    "(?s)%{_prefix} %{integer:db.operations} operations were slow in the last %{integer:elapsed_time:scale(1000000)} msecs:\\n%{data:db.slow_statements:array(\"\", \"\\\\n\")}",
+                    "(?s)%{_prefix} %{data:msg}",
+                ],
+                aliases: {
+                    "cassandra_compaction_key": "%{_prefix} %{regex(\"Compacting\"):db.operation}.* %{_keyspace}\\/%{_table}:%{data:partition_key} \\(%{_bytes} bytes\\)",
+                    "cassandra_pool_cleaner": "%{_prefix} %{regex(\"Flushing\"):db.operation}.*\\(Keyspace='%{_keyspace}', ColumnFamily='%{_table}'\\) %{data}: %{_onheap_total}\\/%{_offheap_total}, live: %{_onheap_live}\\/%{_offheap_live}, flushing: %{_onheap_flush}\\/%{_offheap_flush}, this: %{_onheap_this}\\/%{_offheap_this}",
+                    "cassandra_pool_cleaner2": "%{_prefix} %{regex(\"Enqueuing\"):db.operation}.* of %{_keyspace}: %{_onheap_bytes}%{data} \\(%{_onheap_pct}%\\) on-heap, %{_offheap_bytes} \\(%{_offheap_pct}%\\).*",
+                    "cassandra_table_flush": "%{_prefix} %{regex(\"Writing\"):db.operation}.*-%{_keyspace}%{data}\\(%{number:cassandra.bytes:scale(1000000)}%{data}, %{integer:cassandra.ops} ops, %{_onheap_pct}%\\/%{_offheap_pct}.*",
+                    "cassandra_mem_flush": "%{_prefix} Completed %{regex(\"flushing\"):db.operation} %{_sstable} \\(%{number:cassandra.bytes_kb}KiB\\) for commitlog %{data:commitlog}",
+                    "cassandra_compaction": "%{_prefix}\\s+%{regex(\"Compacted\"):db.operation}.* to \\[%{_sstable}\\].\\s+%{notSpace:cassandra.bytes_in} bytes to %{notSpace:cassandra.bytes_out} \\(\\~%{integer:cassandra.percent_of_orig}% of original\\) in %{notSpace:cassandra.duration_ms}ms = %{number:cassandra.speed_mb}MB/s.\\s+%{notSpace:cassandra.pkeys_in} total partitions merged to %{notSpace:cassandra.pkeys_out}\\.\\s+Partition merge counts were %{data:cassandra.merge_cnt}",
+                    "cassandra_gc_format": "%{_prefix} G.* %{integer:duration:scale(1000000)}ms. %{data}: %{integer:cassandra.eden.orig_bytes} -> %{integer:cassandra.eden.new_bytes}; %{data}: %{integer:cassandra.oldgen.orig_bytes} -> %{integer:cassandra.oldgen.new_bytes};.*",
+                    "cassandra_thread_pending": "%{_prefix} %{word:cassandra.pool}\\s*(?>%{integer:cassandra.cache_used}\\s*%{integer:cassandra.cache_size}\\s*all|%{integer:cassandra.threads.active}\\s*%{integer:cassandra.threads.pending}\\s*%{integer:cassandra.threads.completed}\\s*%{integer:cassandra.threads.blocked}\\s*%{integer:cassandra.threads.all_time_blocked}|%{integer:cassandra.threads.active}\\s*%{integer:cassanadra.threads.pending})",
+                    "cassandra_slow_statements": "%{_prefix} %{integer:db.operations} operations were slow in the last %{integer:elapsed_time:scale(1000000)} msecs:\\n%{data:db.slow_statements:array(\"\", \"\\\\n\")}",
+                    "cassandra_fallback_parser": "%{_prefix} %{data:msg}",
+                    "_level": "%{word:db.severity}",
+                    "_thread_name": "%{notSpace:logger.thread_name}",
+                    "_thread_id": "%{integer:logger.thread_id}",
+                    "_logger_name": "%{notSpace:logger.name}",
+                    "_table": "%{word:db.table}",
+                    "_sstable": "%{notSpace:cassandra.sstable}",
+                    "_bytes": "%{integer:cassandra.bytes}",
+                    "_keyspace": "%{word:cassandra.keyspace}",
+                    "_onheap_total": "%{number:cassandra.onheap.total}",
+                    "_onheap_live": "%{number:cassandra.onheap.live}",
+                    "_onheap_flush": "%{number:cassandra.onheap.flush}",
+                    "_onheap_this": "%{number:cassandra.onheap.this}",
+                    "_onheap_bytes": "%{integer:cassandra.onheap.bytes}",
+                    "_onheap_pct": "%{integer:cassandra.onheap.percent}",
+                    "_offheap_total": "%{number:cassandra.offheap.total}",
+                    "_offheap_live": "%{number:cassandra.offheap.live}",
+                    "_offheap_flush": "%{number:cassandra.offheap.flush}",
+                    "_offheap_this": "%{number:cassandra.offheap.this}",
+                    "_offheap_bytes": "%{integer:cassandra.offheap.bytes}",
+                    "_offheap_pct": "%{integer:cassandra.offheap.percent}",
+                    "_default_prefix": "%{_level}\\s+\\[(%{_thread_name}:%{_thread_id}|%{_thread_name})\\]\\s+%{date(\"yyyy-MM-dd HH:mm:ss,SSS\"):db.date}\\s+%{word:filename}.java:%{integer:lineno} -",
+                    "_suggested_prefix": "%{date(\"yyyy-MM-dd HH:mm:ss\"):db.date} \\[(%{_thread_name}:%{_thread_id}|%{_thread_name})\\] %{_level} %{_logger_name}\\s+-",
+                    "_prefix": "(?>%{_default_prefix}|%{_suggested_prefix})"
+                }
+            )
+        "#},
+    },
+    Source {
+        name: "if_false",
+        target: "{}",
+        program: indoc! {r#"
+            if (.foo != null) {
+                .derp = 123
+            }
+        "#},
+    },
+    Source {
+        name: "merge",
+        target: "{}",
+        program: indoc! {r#"
+            merge({ "a": 1, "b": 2 }, { "b": 3, "c": 4 })
+        "#},
+    },
+    Source {
+        name: "parse_groks",
+        target: "{}",
+        program: indoc! {r#"
+            parse_groks!(
+                "2020-10-02T23:22:12.223222Z info hello world",
+                patterns: [
+                    "%{common_prefix} %{_status} %{_message}",
+                    "%{common_prefix} %{_message}"
+                ],
+                aliases: {
+                    "common_prefix": "%{_timestamp} %{_loglevel}",
+                    "_timestamp": "%{TIMESTAMP_ISO8601:timestamp}",
+                    "_loglevel": "%{LOGLEVEL:level}",
+                    "_status": "%{POSINT:status}",
+                    "_message": "%{GREEDYDATA:message}"
+                }
+            )
+        "#},
+    },
+    Source {
+        name: "pipelines_grok",
+        target: "{}",
+        program: indoc! {r#"
+            custom, err = parse_groks(value: .custom.message,
+                patterns: [
+                    "(?s)%{_prefix} %{regex(\"Compacting\"):db.operation}.* %{_keyspace}\\/%{_table}:%{data:partition_key} \\(%{_bytes} bytes\\)",
+                    "(?s)%{_prefix} %{regex(\"Flushing\"):db.operation}.*\\(Keyspace='%{_keyspace}', ColumnFamily='%{_table}'\\) %{data}: %{_onheap_total}\\/%{_offheap_total}, live: %{_onheap_live}\\/%{_offheap_live}, flushing: %{_onheap_flush}\\/%{_offheap_flush}, this: %{_onheap_this}\\/%{_offheap_this}",
+                    "(?s)%{_prefix} %{regex(\"Enqueuing\"):db.operation}.* of %{_keyspace}: %{_onheap_bytes}%{data} \\(%{_onheap_pct}%\\) on-heap, %{_offheap_bytes} \\(%{_offheap_pct}%\\).*",
+                    "(?s)%{_prefix} %{regex(\"Writing\"):db.operation}.*-%{_keyspace}%{data}\\(%{number:cassandra.bytes:scale(1000000)}%{data}, %{integer:cassandra.ops} ops, %{_onheap_pct}%\\/%{_offheap_pct}.*",
+                    "(?s)%{_prefix} Completed %{regex(\"flushing\"):db.operation} %{_sstable} \\(%{number:cassandra.bytes_kb}KiB\\) for commitlog %{data:commitlog}",
+                    "(?s)%{_prefix}\\s+%{regex(\"Compacted\"):db.operation}.* to \\[%{_sstable}\\].\\s+%{notSpace:cassandra.bytes_in} bytes to %{notSpace:cassandra.bytes_out} \\(\\~%{integer:cassandra.percent_of_orig}% of original\\) in %{notSpace:cassandra.duration_ms}ms = %{number:cassandra.speed_mb}MB/s.\\s+%{notSpace:cassandra.pkeys_in} total partitions merged to %{notSpace:cassandra.pkeys_out}\\.\\s+Partition merge counts were %{data:cassandra.merge_cnt}",
+                    "(?s)%{_prefix} G.* %{integer:duration:scale(1000000)}ms. %{data}: %{integer:cassandra.eden.orig_bytes} -> %{integer:cassandra.eden.new_bytes}; %{data}: %{integer:cassandra.oldgen.orig_bytes} -> %{integer:cassandra.oldgen.new_bytes};.*",
+                    "(?s)%{_prefix} %{word:cassandra.pool}\\s*(?>%{integer:cassandra.cache_used}\\s*%{integer:cassandra.cache_size}\\s*all|%{integer:cassandra.threads.active}\\s*%{integer:cassandra.threads.pending}\\s*%{integer:cassandra.threads.completed}\\s*%{integer:cassandra.threads.blocked}\\s*%{integer:cassandra.threads.all_time_blocked}|%{integer:cassandra.threads.active}\\s*%{integer:cassanadra.threads.pending})",
+                    "(?s)%{_prefix} %{integer:db.operations} operations were slow in the last %{integer:elapsed_time:scale(1000000)} msecs:\\n%{data:db.slow_statements:array(\"\", \"\\\\n\")}",
+                    "(?s)%{_prefix} %{data:msg}",
+                ],
+                aliases: {
+                    "cassandra_compaction_key": "%{_prefix} %{regex(\"Compacting\"):db.operation}.* %{_keyspace}\\/%{_table}:%{data:partition_key} \\(%{_bytes} bytes\\)",
+                    "cassandra_pool_cleaner": "%{_prefix} %{regex(\"Flushing\"):db.operation}.*\\(Keyspace='%{_keyspace}', ColumnFamily='%{_table}'\\) %{data}: %{_onheap_total}\\/%{_offheap_total}, live: %{_onheap_live}\\/%{_offheap_live}, flushing: %{_onheap_flush}\\/%{_offheap_flush}, this: %{_onheap_this}\\/%{_offheap_this}",
+                    "cassandra_pool_cleaner2": "%{_prefix} %{regex(\"Enqueuing\"):db.operation}.* of %{_keyspace}: %{_onheap_bytes}%{data} \\(%{_onheap_pct}%\\) on-heap, %{_offheap_bytes} \\(%{_offheap_pct}%\\).*",
+                    "cassandra_table_flush": "%{_prefix} %{regex(\"Writing\"):db.operation}.*-%{_keyspace}%{data}\\(%{number:cassandra.bytes:scale(1000000)}%{data}, %{integer:cassandra.ops} ops, %{_onheap_pct}%\\/%{_offheap_pct}.*",
+                    "cassandra_mem_flush": "%{_prefix} Completed %{regex(\"flushing\"):db.operation} %{_sstable} \\(%{number:cassandra.bytes_kb}KiB\\) for commitlog %{data:commitlog}",
+                    "cassandra_compaction": "%{_prefix}\\s+%{regex(\"Compacted\"):db.operation}.* to \\[%{_sstable}\\].\\s+%{notSpace:cassandra.bytes_in} bytes to %{notSpace:cassandra.bytes_out} \\(\\~%{integer:cassandra.percent_of_orig}% of original\\) in %{notSpace:cassandra.duration_ms}ms = %{number:cassandra.speed_mb}MB/s.\\s+%{notSpace:cassandra.pkeys_in} total partitions merged to %{notSpace:cassandra.pkeys_out}\\.\\s+Partition merge counts were %{data:cassandra.merge_cnt}",
+                    "cassandra_gc_format": "%{_prefix} G.* %{integer:duration:scale(1000000)}ms. %{data}: %{integer:cassandra.eden.orig_bytes} -> %{integer:cassandra.eden.new_bytes}; %{data}: %{integer:cassandra.oldgen.orig_bytes} -> %{integer:cassandra.oldgen.new_bytes};.*",
+                    "cassandra_thread_pending": "%{_prefix} %{word:cassandra.pool}\\s*(?>%{integer:cassandra.cache_used}\\s*%{integer:cassandra.cache_size}\\s*all|%{integer:cassandra.threads.active}\\s*%{integer:cassandra.threads.pending}\\s*%{integer:cassandra.threads.completed}\\s*%{integer:cassandra.threads.blocked}\\s*%{integer:cassandra.threads.all_time_blocked}|%{integer:cassandra.threads.active}\\s*%{integer:cassanadra.threads.pending})",
+                    "cassandra_slow_statements": "%{_prefix} %{integer:db.operations} operations were slow in the last %{integer:elapsed_time:scale(1000000)} msecs:\\n%{data:db.slow_statements:array(\"\", \"\\\\n\")}",
+                    "cassandra_fallback_parser": "%{_prefix} %{data:msg}",
+                    "_level": "%{word:db.severity}",
+                    "_thread_name": "%{notSpace:logger.thread_name}",
+                    "_thread_id": "%{integer:logger.thread_id}",
+                    "_logger_name": "%{notSpace:logger.name}",
+                    "_table": "%{word:db.table}",
+                    "_sstable": "%{notSpace:cassandra.sstable}",
+                    "_bytes": "%{integer:cassandra.bytes}",
+                    "_keyspace": "%{word:cassandra.keyspace}",
+                    "_onheap_total": "%{number:cassandra.onheap.total}",
+                    "_onheap_live": "%{number:cassandra.onheap.live}",
+                    "_onheap_flush": "%{number:cassandra.onheap.flush}",
+                    "_onheap_this": "%{number:cassandra.onheap.this}",
+                    "_onheap_bytes": "%{integer:cassandra.onheap.bytes}",
+                    "_onheap_pct": "%{integer:cassandra.onheap.percent}",
+                    "_offheap_total": "%{number:cassandra.offheap.total}",
+                    "_offheap_live": "%{number:cassandra.offheap.live}",
+                    "_offheap_flush": "%{number:cassandra.offheap.flush}",
+                    "_offheap_this": "%{number:cassandra.offheap.this}",
+                    "_offheap_bytes": "%{integer:cassandra.offheap.bytes}",
+                    "_offheap_pct": "%{integer:cassandra.offheap.percent}",
+                    "_default_prefix": "%{_level}\\s+\\[(%{_thread_name}:%{_thread_id}|%{_thread_name})\\]\\s+%{date(\"yyyy-MM-dd HH:mm:ss,SSS\"):db.date}\\s+%{word:filename}.java:%{integer:lineno} -",
+                    "_suggested_prefix": "%{date(\"yyyy-MM-dd HH:mm:ss\"):db.date} \\[(%{_thread_name}:%{_thread_id}|%{_thread_name})\\] %{_level} %{_logger_name}\\s+-",
+                    "_prefix": "(?>%{_default_prefix}|%{_suggested_prefix})"
+                }
+            )
+            if (err == null) {
+                .custom, err = merge(.custom, custom, deep: true)
+            }
+        "#},
+    },
+    Source {
         name: "pipelines",
         target: "{}",
         program: indoc! {r#"
@@ -44,26 +194,48 @@ static SOURCES: &[Source] = &[
             if status == "" {
                 .status = 6
             } else {
-                if starts_with(status, "f", true) || starts_with(status, "emerg", true) {
+                if starts_with(status, "f") || starts_with(status, "emerg") {
                     .status = 0
-                } else if starts_with(status, "a", true) {
+                } else if starts_with(status, "a") {
                     .status = 1
-                } else if starts_with(status, "c", true) {
+                } else if starts_with(status, "c") {
                     .status = 2
-                } else if starts_with(status, "e", true) {
+                } else if starts_with(status, "e") {
                     .status = 3
-                } else if starts_with(status, "w", true) {
+                } else if starts_with(status, "w") {
                     .status = 4
-                } else if starts_with(status, "n", true) {
+                } else if starts_with(status, "n") {
                     .status = 5
-                } else if starts_with(status, "i", true) {
+                } else if starts_with(status, "i") {
                     .status = 6
-                } else if starts_with(status, "d", true) || starts_with(status, "trace", true) || starts_with(status, "verbose", true) {
+                } else if starts_with(status, "d") || starts_with(status, "trace") || starts_with(status, "verbose") {
                     .status = 7
-                } else if starts_with(status, "o", true) || starts_with(status, "s", true) || status == "ok" || status == "success" {
+                } else if starts_with(status, "o") || starts_with(status, "s") || status == "ok" || status == "success" {
                     .status = 8
                 }
             }
+        "#},
+    },
+    Source {
+        name: "add_bytes",
+        target: "{}",
+        program: indoc! {r#"
+            . = "hello" + "world"
+        "#},
+    },
+    Source {
+        name: "add",
+        target: "{}",
+        program: indoc! {r#"
+            . = 1 + 2
+        "#},
+    },
+    Source {
+        name: "derp",
+        target: "{}",
+        program: indoc! {r#"
+            .foo = { "foo": 123 }
+            .matches = { "num": "2", "name": .message }
         "#},
     },
     Source {
@@ -78,6 +250,17 @@ static SOURCES: &[Source] = &[
             } else {
                 .nong = upcase(.hostname)
             }
+
+            .matches = { "name": .message, "num": "2" }
+            .origin, .err = .hostname + "/" + .matches.name + "/" + .matches.num
+        "#},
+    },
+    Source {
+        name: "starts_with",
+        target: "{}",
+        program: indoc! {r#"
+            status = string(.foo) ?? ""
+            .status = starts_with("a", status)
         "#},
     },
     Source {
@@ -318,8 +501,18 @@ fn benchmark_vrl_runtimes(c: &mut Criterion) {
         let builder = compiler::llvm::Compiler::new().unwrap();
         println!("bench 1");
         let mut symbols = HashMap::new();
-        symbols.insert("vrl_fn_upcase", upcase as usize);
-        symbols.insert("vrl_fn_downcase", downcase as usize);
+        symbols.insert("vrl_fn_downcase", vrl_stdlib::vrl_fn_downcase as usize);
+        symbols.insert("vrl_fn_merge", vrl_stdlib::vrl_fn_merge as usize);
+        symbols.insert(
+            "vrl_fn_parse_groks",
+            vrl_stdlib::vrl_fn_parse_groks as usize,
+        );
+        symbols.insert(
+            "vrl_fn_starts_with",
+            vrl_stdlib::vrl_fn_starts_with as usize,
+        );
+        symbols.insert("vrl_fn_string", vrl_stdlib::vrl_fn_string as usize);
+        symbols.insert("vrl_fn_upcase", vrl_stdlib::vrl_fn_upcase as usize);
         let library = builder
             .compile(
                 (&mut local_env, &mut external_env),
@@ -343,6 +536,41 @@ fn benchmark_vrl_runtimes(c: &mut Criterion) {
             println!("bla");
             unsafe { execute.call(&mut context, &mut result) };
             println!("derp");
+        }
+
+        {
+            let mut target: Value = serde_json::from_str(source.target).expect("valid json");
+            let mut context = core::Context {
+                target: &mut target,
+                timezone: &tz,
+            };
+            let mut result = Ok(Value::Null);
+            unsafe { execute.call(&mut context, &mut result) };
+
+            println!("LLVM target: {}", target);
+            println!("LLVM result: {:?}", result);
+        }
+
+        {
+            let state = state::Runtime::default();
+            let mut runtime = Runtime::new(state);
+            let mut target: Value = serde_json::from_str(source.target).expect("valid json");
+            let result = runtime.run_vm(&vm, &mut target, &tz);
+            runtime.clear();
+
+            println!("VM target: {}", target);
+            println!("VM result: {:?}", result);
+        }
+
+        {
+            let state = state::Runtime::default();
+            let mut runtime = Runtime::new(state);
+            let mut target: Value = serde_json::from_str(source.target).expect("valid json");
+            let result = runtime.resolve(&mut target, &program, &tz);
+            runtime.clear();
+
+            println!("AST target: {}", target);
+            println!("AST result: {:?}", result);
         }
 
         group.bench_with_input(

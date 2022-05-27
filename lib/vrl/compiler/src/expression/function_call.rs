@@ -795,8 +795,12 @@ impl Expression for FunctionCall {
             match argument {
                 Some(CompiledArgument::Static(argument)) => {
                     let static_ref = ctx
-                        .into_const(argument, &argument_name)
-                        .as_pointer_value()
+                        .builder()
+                        .build_bitcast(
+                            ctx.into_const(argument, &argument_name).as_pointer_value(),
+                            ctx.static_ref_type(),
+                            "cast",
+                        )
                         .into();
 
                     argument_refs.push(static_ref);
@@ -941,6 +945,44 @@ impl Expression for FunctionCall {
 
         ctx.builder()
             .build_call(function, &argument_refs, self.ident);
+
+        let type_def = self.expr.type_def((state.0, state.1));
+        if type_def.is_fallible() {
+            let error = format!(
+                r#"function call error for "{}" at ({}:{})"#,
+                self.ident,
+                self.span.start(),
+                self.span.end()
+            );
+
+            let error_ref = ctx.into_const(error.clone(), &error).as_pointer_value();
+
+            {
+                let fn_ident = "vrl_handle_function_call_result";
+                let fn_impl = ctx
+                    .module()
+                    .get_function(fn_ident)
+                    .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+                ctx.builder().build_call(
+                    fn_impl,
+                    &[
+                        ctx.builder()
+                            .build_bitcast(
+                                error_ref,
+                                fn_impl
+                                    .get_nth_param(0)
+                                    .unwrap()
+                                    .get_type()
+                                    .into_pointer_type(),
+                                "cast",
+                            )
+                            .into(),
+                        result_ref.into(),
+                    ],
+                    fn_ident,
+                );
+            }
+        }
 
         argument_refs.pop();
 

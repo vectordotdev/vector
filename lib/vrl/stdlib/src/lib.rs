@@ -405,7 +405,7 @@ pub use match_array::MatchArray;
 #[cfg(feature = "match_datadog_query")]
 pub use match_datadog_query::MatchDatadogQuery;
 #[cfg(feature = "merge")]
-pub use merge::Merge;
+pub use merge::{vrl_fn_merge, Merge};
 #[cfg(feature = "now")]
 pub use now::Now;
 #[cfg(feature = "object")]
@@ -429,9 +429,9 @@ pub use parse_duration::ParseDuration;
 #[cfg(feature = "parse_glog")]
 pub use parse_glog::ParseGlog;
 #[cfg(feature = "parse_grok")]
-pub use parse_grok::ParseGrok;
+pub use parse_grok::{vrl_fn_parse_grok, ParseGrok};
 #[cfg(feature = "parse_groks")]
-pub use parse_groks::ParseGroks;
+pub use parse_groks::{vrl_fn_parse_groks, ParseGroks};
 #[cfg(feature = "parse_int")]
 pub use parse_int::ParseInt;
 #[cfg(feature = "parse_json")]

@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, fmt, sync::Arc};
+use std::{any::Any, collections::BTreeMap, fmt, sync::Arc};
 
 use ::value::Value;
 use vrl::{
@@ -198,6 +198,35 @@ impl Expression for ParseGrokFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::object(Collection::any()).fallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_parse_grok(
+    value: &mut Value,
+    remove_empty: &mut Option<Value>,
+    pattern: &Box<dyn Any + Send + Sync>,
+    resolved: &mut Resolved,
+) {
+    let value = {
+        let mut moved = Value::Null;
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+    let remove_empty = {
+        let mut moved = None;
+        std::mem::swap(remove_empty, &mut moved);
+        moved
+    };
+
+    let remove_empty = remove_empty.unwrap_or(Value::Boolean(false));
+
+    let pattern = pattern
+        .downcast_ref::<Arc<grok::Pattern>>()
+        .unwrap()
+        .clone();
+
+    *resolved = parse_grok(value, remove_empty, pattern);
 }
 
 #[cfg(test)]

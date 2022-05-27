@@ -990,3 +990,22 @@ pub extern "C" fn vrl_expression_query_target_impl(path: &LookupBuf, result: &mu
         .map(Clone::clone)
         .unwrap_or(Value::Null));
 }
+
+#[no_mangle]
+pub extern "C" fn vrl_handle_function_call_result(
+    #[allow(clippy::ptr_arg)] error: &String,
+    result: &mut Resolved,
+) {
+    if let Err(ExpressionError::Error {
+        message,
+        labels,
+        notes,
+    }) = result
+    {
+        *result = Err(ExpressionError::Error {
+            message: format!(r#"{}: {}"#, error, message),
+            labels: std::mem::take(labels),
+            notes: std::mem::take(notes),
+        })
+    }
+}
