@@ -164,7 +164,10 @@ mod tests {
             Event, Metric,
         },
         sinks::util::test::{build_test_server, load_sink},
-        test_util::{self, components, components::HTTP_SINK_TAGS},
+        test_util::{
+            self,
+            components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+        },
     };
 
     #[test]
@@ -248,7 +251,7 @@ mod tests {
         ];
 
         let len = metrics.len();
-        components::run_sink_events(sink, stream::iter(metrics), &HTTP_SINK_TAGS).await;
+        run_and_assert_sink_compliance(sink, stream::iter(metrics), &HTTP_SINK_TAGS).await;
 
         let output = rx.take(len).collect::<Vec<_>>().await;
         assert_eq!(

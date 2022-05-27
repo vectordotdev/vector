@@ -1103,7 +1103,10 @@ mod test {
                 "info" => Some(Self::LOG_INFO),
                 "debug" => Some(Self::LOG_DEBUG),
                 x => {
-                    println!("converting severity str, got {}", x);
+                    #[allow(clippy::print_stdout)]
+                    {
+                        println!("converting severity str, got {}", x);
+                    }
                     None
                 }
             }

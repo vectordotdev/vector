@@ -333,6 +333,7 @@ async fn healthcheck(config: LogdnaConfig, client: HttpClient) -> crate::Result<
 #[cfg(test)]
 mod tests {
     use futures::{channel::mpsc, StreamExt};
+    use futures_util::stream;
     use http::{request::Parts, StatusCode};
     use serde_json::json;
     use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
@@ -342,7 +343,7 @@ mod tests {
         config::SinkConfig,
         sinks::util::test::{build_test_server_status, load_sink},
         test_util::{
-            components::{self, HTTP_SINK_TAGS},
+            components::{assert_sink_compliance, HTTP_SINK_TAGS},
             next_addr, random_lines,
         },
     };
@@ -401,8 +402,6 @@ mod tests {
         Vec<Vec<String>>,
         mpsc::Receiver<(Parts, bytes::Bytes)>,
     ) {
-        components::init_test();
-
         let (mut config, cx) = load_sink::<LogdnaConfig>(
             r#"
             api_key = "mylogtoken"
@@ -446,10 +445,8 @@ mod tests {
         }
         drop(batch);
 
-        sink.run_events(events).await.unwrap();
-        if batch_status == BatchStatus::Delivered {
-            components::SINK_TESTS.assert(&HTTP_SINK_TAGS);
-        }
+        let events = stream::iter(events).map(Into::into);
+        sink.run(events).await.expect("Running sink failed");
 
         assert_eq!(receiver.try_recv(), Ok(batch_status));
 
@@ -465,50 +462,54 @@ mod tests {
 
     #[tokio::test]
     async fn smoke() {
-        let (hosts, partitions, mut rx) = smoke_start(StatusCode::OK, BatchStatus::Delivered).await;
+        assert_sink_compliance(&HTTP_SINK_TAGS, async {
+            let (hosts, partitions, mut rx) =
+                smoke_start(StatusCode::OK, BatchStatus::Delivered).await;
 
-        for _ in 0..partitions.len() {
-            let output = rx.next().await.unwrap();
+            for _ in 0..partitions.len() {
+                let output = rx.next().await.unwrap();
 
-            let request = &output.0;
-            let body: serde_json::Value = serde_json::from_slice(&output.1[..]).unwrap();
+                let request = &output.0;
+                let body: serde_json::Value = serde_json::from_slice(&output.1[..]).unwrap();
 
-            let query = request.uri.query().unwrap();
+                let query = request.uri.query().unwrap();
 
-            let (p, host) = hosts
-                .iter()
-                .enumerate()
-                .find(|(_, host)| query.contains(&format!("hostname={}", host)))
-                .expect("invalid hostname");
-            let lines = &partitions[p];
+                let (p, host) = hosts
+                    .iter()
+                    .enumerate()
+                    .find(|(_, host)| query.contains(&format!("hostname={}", host)))
+                    .expect("invalid hostname");
+                let lines = &partitions[p];
 
-            assert!(query.contains("ip=127.0.0.1"));
-            assert!(query.contains("mac=some-mac-addr"));
-            assert!(query.contains("tags=test%2Cmaybeanothertest"));
+                assert!(query.contains("ip=127.0.0.1"));
+                assert!(query.contains("mac=some-mac-addr"));
+                assert!(query.contains("tags=test%2Cmaybeanothertest"));
 
-            let output = body
-                .as_object()
-                .unwrap()
-                .get("lines")
-                .unwrap()
-                .as_array()
-                .unwrap();
+                let output = body
+                    .as_object()
+                    .unwrap()
+                    .get("lines")
+                    .unwrap()
+                    .as_array()
+                    .unwrap();
 
-            for (i, line) in output.iter().enumerate() {
-                // All lines are json objects
-                let line = line.as_object().unwrap();
+                for (i, line) in output.iter().enumerate() {
+                    // All lines are json objects
+                    let line = line.as_object().unwrap();
 
-                assert_eq!(line.get("app").unwrap(), &json!("vector"));
-                assert_eq!(line.get("env").unwrap(), &json!("production"));
-                assert_eq!(line.get("line").unwrap(), &json!(lines[i]));
+                    assert_eq!(line.get("app").unwrap(), &json!("vector"));
+                    assert_eq!(line.get("env").unwrap(), &json!("production"));
+                    assert_eq!(line.get("line").unwrap(), &json!(lines[i]));
 
-                assert_eq!(
-                    line.get("meta").unwrap(),
-                    &json!({
-                        "hostname": host,
-                    })
-                );
+                    assert_eq!(
+                        line.get("meta").unwrap(),
+                        &json!({
+                            "hostname": host,
+                        })
+                    );
+                }
             }
-        }
+        })
+        .await;
     }
 }

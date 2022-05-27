@@ -84,6 +84,24 @@ pub trait EventCount {
     fn event_count(&self) -> usize;
 }
 
+impl<T> EventCount for Vec<T>
+where
+    T: EventCount,
+{
+    fn event_count(&self) -> usize {
+        self.iter().map(EventCount::event_count).sum()
+    }
+}
+
+impl<'a, T> EventCount for &'a T
+where
+    T: EventCount,
+{
+    fn event_count(&self) -> usize {
+        (*self).event_count()
+    }
+}
+
 #[track_caller]
 pub(crate) fn spawn_named<T>(
     task: impl std::future::Future<Output = T> + Send + 'static,

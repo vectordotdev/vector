@@ -14,7 +14,7 @@ use file_source::{
     ReadFrom,
 };
 use futures_util::Stream;
-use k8s_openapi::api::core::v1::{Namespace, Pod};
+use k8s_openapi::api::core::v1::{Namespace, Node, Pod};
 use kube::{
     api::{Api, ListParams},
     config::{self, KubeConfigOptions},
@@ -37,7 +37,8 @@ use crate::{
     internal_events::{
         BytesReceived, FileSourceInternalEventsEmitter, KubernetesLifecycleError,
         KubernetesLogsEventAnnotationError, KubernetesLogsEventNamespaceAnnotationError,
-        KubernetesLogsEventsReceived, KubernetesLogsPodInfo, StreamClosedError,
+        KubernetesLogsEventNodeAnnotationError, KubernetesLogsEventsReceived,
+        KubernetesLogsPodInfo, StreamClosedError,
     },
     kubernetes::custom_reflector,
     shutdown::ShutdownSignal,
@@ -49,6 +50,7 @@ use crate::{
 mod k8s_paths_provider;
 mod lifecycle;
 mod namespace_metadata_annotator;
+mod node_metadata_annotator;
 mod parser;
 mod partial_events_merger;
 mod path_helpers;
@@ -56,11 +58,12 @@ mod pod_metadata_annotator;
 mod transform_utils;
 mod util;
 
+use self::namespace_metadata_annotator::NamespaceMetadataAnnotator;
+use self::node_metadata_annotator::NodeMetadataAnnotator;
+use self::pod_metadata_annotator::PodMetadataAnnotator;
 use futures::{future::FutureExt, stream::StreamExt};
 use k8s_paths_provider::K8sPathsProvider;
 use lifecycle::Lifecycle;
-use namespace_metadata_annotator::NamespaceMetadataAnnotator;
-use pod_metadata_annotator::PodMetadataAnnotator;
 
 /// The key we use for `file` field.
 const FILE_KEY: &str = "file";
@@ -101,6 +104,9 @@ pub struct Config {
 
     /// Specifies the field names for Namespace metadata annotation.
     namespace_annotation_fields: namespace_metadata_annotator::FieldsSpec,
+
+    /// Specifies the field names for Node metadata annotation.
+    node_annotation_fields: node_metadata_annotator::FieldsSpec,
 
     /// A list of glob patterns to exclude from reading the files.
     exclude_paths_glob_patterns: Vec<PathBuf>,
@@ -170,6 +176,7 @@ impl Default for Config {
             data_dir: None,
             pod_annotation_fields: pod_metadata_annotator::FieldsSpec::default(),
             namespace_annotation_fields: namespace_metadata_annotator::FieldsSpec::default(),
+            node_annotation_fields: node_metadata_annotator::FieldsSpec::default(),
             exclude_paths_glob_patterns: default_path_exclusion(),
             max_read_bytes: default_max_read_bytes(),
             max_line_bytes: default_max_line_bytes(),
@@ -217,9 +224,12 @@ struct Source {
     auto_partial_merge: bool,
     pod_fields_spec: pod_metadata_annotator::FieldsSpec,
     namespace_fields_spec: namespace_metadata_annotator::FieldsSpec,
+    node_field_spec: node_metadata_annotator::FieldsSpec,
     field_selector: String,
     label_selector: String,
     namespace_label_selector: String,
+    node_selector: String,
+    self_node_name: String,
     exclude_paths: Vec<glob::Pattern>,
     max_read_bytes: usize,
     max_line_bytes: usize,
@@ -236,10 +246,24 @@ impl Source {
         globals: &GlobalOptions,
         key: &ComponentKey,
     ) -> crate::Result<Self> {
-        let field_selector = prepare_field_selector(config)?;
+        let self_node_name = if config.self_node_name.is_empty()
+            || config.self_node_name == default_self_node_name_env_template()
+        {
+            std::env::var(SELF_NODE_NAME_ENV_KEY).map_err(|_| {
+                format!(
+                    "self_node_name config value or {} env var is not set",
+                    SELF_NODE_NAME_ENV_KEY
+                )
+            })?
+        } else {
+            config.self_node_name.clone()
+        };
+
+        let field_selector = prepare_field_selector(config, self_node_name.as_str())?;
         let label_selector = prepare_label_selector(config.extra_label_selector.as_ref());
         let namespace_label_selector =
             prepare_label_selector(config.extra_namespace_label_selector.as_ref());
+        let node_selector = prepare_node_selector(self_node_name.as_str())?;
 
         // If the user passed a custom Kubeconfig use it, otherwise
         // we attempt to load the local kubec-config, followed by the
@@ -279,9 +303,12 @@ impl Source {
             auto_partial_merge: config.auto_partial_merge,
             pod_fields_spec: config.pod_annotation_fields.clone(),
             namespace_fields_spec: config.namespace_annotation_fields.clone(),
+            node_field_spec: config.node_annotation_fields.clone(),
             field_selector,
             label_selector,
             namespace_label_selector,
+            node_selector,
+            self_node_name,
             exclude_paths,
             max_read_bytes: config.max_read_bytes,
             max_line_bytes: config.max_line_bytes,
@@ -304,9 +331,12 @@ impl Source {
             auto_partial_merge,
             pod_fields_spec,
             namespace_fields_spec,
+            node_field_spec,
             field_selector,
             label_selector,
             namespace_label_selector,
+            node_selector,
+            self_node_name,
             exclude_paths,
             max_read_bytes,
             max_line_bytes,
@@ -339,7 +369,7 @@ impl Source {
 
         // -----------------------------------------------------------------
 
-        let namespaces = Api::<Namespace>::all(client);
+        let namespaces = Api::<Namespace>::all(client.clone());
         let ns_watcher = watcher(
             namespaces,
             ListParams {
@@ -356,10 +386,30 @@ impl Source {
             delay_deletion,
         )));
 
+        // -----------------------------------------------------------------
+
+        let nodes = Api::<Node>::all(client);
+        let node_watcher = watcher(
+            nodes,
+            ListParams {
+                field_selector: Some(node_selector),
+                ..Default::default()
+            },
+        );
+        let node_store_w = reflector::store::Writer::default();
+        let node_state = node_store_w.as_reader();
+
+        reflectors.push(tokio::spawn(custom_reflector(
+            node_store_w,
+            node_watcher,
+            delay_deletion,
+        )));
+
         let paths_provider =
             K8sPathsProvider::new(pod_state.clone(), ns_state.clone(), exclude_paths);
         let annotator = PodMetadataAnnotator::new(pod_state, pod_fields_spec);
         let ns_annotator = NamespaceMetadataAnnotator::new(ns_state, namespace_fields_spec);
+        let node_annotator = NodeMetadataAnnotator::new(node_state, node_field_spec);
 
         // TODO: maybe more of the parameters have to be configurable.
 
@@ -459,6 +509,12 @@ impl Source {
                     if ns_info.is_none() {
                         emit!(KubernetesLogsEventNamespaceAnnotationError { event: &event });
                     }
+                }
+
+                let node_info = node_annotator.annotate(&mut event, self_node_name.as_str());
+
+                if node_info.is_none() {
+                    emit!(KubernetesLogsEventNodeAnnotationError { event: &event });
                 }
             }
 
@@ -606,19 +662,7 @@ fn prepare_exclude_paths(config: &Config) -> crate::Result<Vec<glob::Pattern>> {
 
 // This function constructs the effective field selector to use, based on
 // the specified configuration.
-fn prepare_field_selector(config: &Config) -> crate::Result<String> {
-    let self_node_name = if config.self_node_name.is_empty()
-        || config.self_node_name == default_self_node_name_env_template()
-    {
-        std::env::var(SELF_NODE_NAME_ENV_KEY).map_err(|_| {
-            format!(
-                "self_node_name config value or {} env var is not set",
-                SELF_NODE_NAME_ENV_KEY
-            )
-        })?
-    } else {
-        config.self_node_name.clone()
-    };
+fn prepare_field_selector(config: &Config, self_node_name: &str) -> crate::Result<String> {
     info!(
         message = "Obtained Kubernetes Node name to collect logs for (self).",
         ?self_node_name
@@ -634,6 +678,11 @@ fn prepare_field_selector(config: &Config) -> crate::Result<String> {
         "{},{}",
         field_selector, config.extra_field_selector
     ))
+}
+
+// This function constructs the selector for a node to annotate entries with a node metadata.
+fn prepare_node_selector(self_node_name: &str) -> crate::Result<String> {
+    Ok(format!("metadata.name={}", self_node_name))
 }
 
 // This function constructs the effective label selector to use, based on
@@ -730,7 +779,7 @@ mod tests {
         ];
 
         for (input, expected) in cases {
-            let output = super::prepare_field_selector(&input).unwrap();
+            let output = super::prepare_field_selector(&input, "qwe").unwrap();
             assert_eq!(expected, output, "expected left, actual right");
         }
     }
