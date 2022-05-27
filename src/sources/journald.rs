@@ -794,11 +794,9 @@ mod checkpointer_tests {
 mod tests {
     use std::{
         io::{BufRead, BufReader, Cursor},
-        pin::Pin,
-        task::{Context, Poll},
+        task::Poll,
     };
 
-    use futures::Stream;
     use tempfile::tempdir;
     use tokio::time::{sleep, timeout, Duration};
 
@@ -821,8 +819,9 @@ mod tests {
         reader: BufReader<Cursor<&'static str>>,
     }
 
-    impl FakeJournal {
-        fn next(&mut self) -> Option<Result<Bytes, BoxedFramingError>> {
+    impl Iterator for FakeJournal {
+        type Item = Result<Bytes, BoxedFramingError>;
+        fn next(&mut self) -> Option<Self::Item> {
             let mut line = String::new();
             match self.reader.read_line(&mut line) {
                 Ok(0) => None,
@@ -832,14 +831,6 @@ mod tests {
                 }
                 Err(err) => Some(Err(err.into())),
             }
-        }
-    }
-
-    impl Stream for FakeJournal {
-        type Item = Result<Bytes, BoxedFramingError>;
-
-        fn poll_next(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Option<Self::Item>> {
-            Poll::Ready(Pin::into_inner(self).next())
         }
     }
 
@@ -863,7 +854,8 @@ mod tests {
                 }
             }
 
-            Ok((Box::pin(journal), Default::default()))
+            let stream = futures::stream::iter(journal).boxed();
+            Ok((stream, Default::default()))
         }
     }
 
