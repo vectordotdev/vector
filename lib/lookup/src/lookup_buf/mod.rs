@@ -112,6 +112,8 @@ impl Arbitrary for LookupBuf {
 
 impl Display for LookupBuf {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        f.write_str(".")?;
+
         let mut peeker = self.segments.iter().peekable();
         while let Some(segment) = peeker.next() {
             let maybe_next = peeker

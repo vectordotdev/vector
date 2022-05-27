@@ -40,6 +40,11 @@ impl FunctionArgument {
         self.expr.inner()
     }
 
+    #[cfg(feature = "expr-function_call")]
+    pub(crate) fn expr_span(&self) -> crate::Span {
+        self.expr.span()
+    }
+
     pub(crate) fn into_inner(self) -> Expr {
         self.expr.into_inner()
     }
