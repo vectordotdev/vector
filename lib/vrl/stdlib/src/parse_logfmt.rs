@@ -1,4 +1,3 @@
-use ::value::Value;
 use vrl::prelude::*;
 
 use crate::parse_key_value::{ParseKeyValueFn, Whitespace};

@@ -15,7 +15,7 @@ use crate::{
     parser::Node,
     state::{ExternalEnv, LocalEnv},
     value::{kind, Kind},
-    Context, ExpressionError, Span,
+    Span,
 };
 
 pub type Compiled = Result<Box<dyn Expression>, Box<dyn DiagnosticMessage>>;

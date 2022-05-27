@@ -147,6 +147,7 @@ impl Function for Log {
     }
 }
 
+#[allow(unused)] // will be used by LLVM runtime
 #[derive(Debug)]
 struct LogInfo {
     level: Bytes,

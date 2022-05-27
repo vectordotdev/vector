@@ -463,6 +463,7 @@ impl<'a> Builder<'a> {
     }
 }
 
+#[allow(unused)] // will be used by LLVM runtime
 #[derive(Clone)]
 pub struct FunctionCall {
     abort_on_error: bool,
@@ -485,6 +486,7 @@ pub struct FunctionCall {
     arguments: Arc<Vec<Node<FunctionArgument>>>,
 }
 
+#[allow(unused)] // will be used by LLVM runtime
 impl FunctionCall {
     /// Takes the arguments passed and resolves them into the order they are defined
     /// in the function

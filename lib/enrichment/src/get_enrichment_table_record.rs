@@ -15,7 +15,7 @@ use vrl::{
 };
 
 use crate::{
-    vrl_util::{self, add_index, evaluate_condition, index_from_args, EnrichmentTableRecord},
+    vrl_util::{self, add_index, evaluate_condition, index_from_args},
     Case, Condition, IndexHandle, TableRegistry, TableSearch,
 };
 

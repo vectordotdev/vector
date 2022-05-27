@@ -211,6 +211,7 @@ impl Function for ParseUserAgent {
     }
 }
 
+#[allow(dead_code)] // will be used by LLVM runtime
 struct ParserMode {
     fun: Box<dyn Fn(&str) -> Value + Send + Sync>,
 }

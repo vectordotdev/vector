@@ -2,7 +2,6 @@ use std::fmt;
 
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 use parser::ast::Node;
-use value::Value;
 
 use super::Expr;
 use crate::{

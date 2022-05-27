@@ -1,7 +1,4 @@
 use std::fmt;
-
-use value::Value;
-
 use crate::{
     expression::{Expr, Resolved},
     state::{ExternalEnv, LocalEnv},

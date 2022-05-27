@@ -1,9 +1,6 @@
-use std::{error::Error, fmt, sync::Arc};
+use std::{error::Error, fmt};
 
-use compiler::{
-    state::{ExternalEnv, LocalEnv},
-    ExpressionError, Function,
-};
+use compiler::ExpressionError;
 use lookup::LookupBuf;
 use value::Value;
 use vector_common::TimeZone;

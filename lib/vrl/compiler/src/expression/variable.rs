@@ -1,7 +1,5 @@
 use std::fmt;
-
 use diagnostic::{DiagnosticMessage, Label};
-use lookup::LookupBuf;
 use value::Value;
 
 use crate::{

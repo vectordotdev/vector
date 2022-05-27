@@ -1,4 +1,3 @@
-use ::value::Value;
 use vrl::prelude::*;
 
 use crate::encode_key_value::EncodeKeyValueFn;
