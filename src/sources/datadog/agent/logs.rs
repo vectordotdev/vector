@@ -4,7 +4,6 @@ use bytes::{BufMut, Bytes, BytesMut};
 use chrono::Utc;
 use codecs::StreamDecodingError;
 use http::StatusCode;
-use serde::{Deserialize, Serialize};
 use tokio_util::codec::Decoder;
 use vector_core::ByteSizeOf;
 use warp::{filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response, Filter};
@@ -13,7 +12,7 @@ use crate::{
     event::Event,
     internal_events::EventsReceived,
     sources::{
-        datadog::agent::{self, handle_request, ApiKeyQueryParams, DatadogAgentSource},
+        datadog::agent::{self, handle_request, ApiKeyQueryParams, DatadogAgentSource, LogMsg},
         util::ErrorMessage,
     },
     SourceSender,
@@ -88,21 +87,30 @@ pub(crate) fn decode_log_body(
     let now = Utc::now();
     let mut decoded = Vec::new();
 
-    for message in messages {
+    for LogMsg {
+        message,
+        status,
+        timestamp,
+        hostname,
+        service,
+        ddsource,
+        ddtags,
+    } in messages
+    {
         let mut decoder = source.decoder.clone();
         let mut buffer = BytesMut::new();
-        buffer.put(message.message);
+        buffer.put(message);
         loop {
             match decoder.decode_eof(&mut buffer) {
                 Ok(Some((events, _byte_size))) => {
                     for mut event in events {
                         if let Event::Log(ref mut log) = event {
-                            log.try_insert(path!("status"), message.status.clone());
-                            log.try_insert(path!("timestamp"), message.timestamp);
-                            log.try_insert(path!("hostname"), message.hostname.clone());
-                            log.try_insert(path!("service"), message.service.clone());
-                            log.try_insert(path!("ddsource"), message.ddsource.clone());
-                            log.try_insert(path!("ddtags"), message.ddtags.clone());
+                            log.try_insert(path!("status"), status.clone());
+                            log.try_insert(path!("timestamp"), timestamp);
+                            log.try_insert(path!("hostname"), hostname.clone());
+                            log.try_insert(path!("service"), service.clone());
+                            log.try_insert(path!("ddsource"), ddsource.clone());
+                            log.try_insert(path!("ddtags"), ddtags.clone());
                             log.try_insert(
                                 path!(source.log_schema_source_type_key),
                                 Bytes::from("datadog_agent"),
@@ -137,16 +145,4 @@ pub(crate) fn decode_log_body(
     });
 
     Ok(decoded)
-}
-
-// https://github.com/DataDog/datadog-agent/blob/a33248c2bc125920a9577af1e16f12298875a4ad/pkg/logs/processor/json.go#L23-L49
-#[derive(Deserialize, Clone, Serialize, Debug)]
-pub(crate) struct LogMsg {
-    pub message: Bytes,
-    pub status: Bytes,
-    pub timestamp: i64,
-    pub hostname: Bytes,
-    pub service: Bytes,
-    pub ddsource: Bytes,
-    pub ddtags: Bytes,
 }

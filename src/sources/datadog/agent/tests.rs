@@ -30,9 +30,8 @@ use crate::{
     schema,
     serde::{default_decoding, default_framing_message_based},
     sources::datadog::agent::{
-        logs::{decode_log_body, LogMsg},
-        metrics::DatadogSeriesRequest,
-        DatadogAgentConfig, DatadogAgentSource, LOGS, METRICS, TRACES,
+        logs::decode_log_body, metrics::DatadogSeriesRequest, DatadogAgentConfig,
+        DatadogAgentSource, LogMsg, LOGS, METRICS, TRACES,
     },
     test_util::{
         components::{assert_source_compliance, HTTP_PUSH_SOURCE_TAGS},
@@ -70,7 +69,7 @@ impl Arbitrary for LogMsg {
         LogMsg {
             message: Bytes::from(String::arbitrary(g)),
             status: Bytes::from(String::arbitrary(g)),
-            timestamp: i64::arbitrary(g),
+            timestamp: Utc.timestamp_millis(u32::arbitrary(g) as i64),
             hostname: Bytes::from(String::arbitrary(g)),
             service: Bytes::from(String::arbitrary(g)),
             ddsource: Bytes::from(String::arbitrary(g)),
@@ -205,7 +204,7 @@ async fn full_payload_v1() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("foo"),
-                            timestamp: 123,
+                            timestamp: Utc.timestamp(123, 0),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -228,7 +227,7 @@ async fn full_payload_v1() {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["message"], "foo".into());
-            assert_eq!(log["timestamp"], 123.into());
+            assert_eq!(log["timestamp"], Utc.timestamp(123, 0).into());
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
@@ -258,7 +257,7 @@ async fn full_payload_v2() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("foo"),
-                            timestamp: 123,
+                            timestamp: Utc.timestamp(123, 0),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -281,7 +280,7 @@ async fn full_payload_v2() {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["message"], "foo".into());
-            assert_eq!(log["timestamp"], 123.into());
+            assert_eq!(log["timestamp"], Utc.timestamp(123, 0).into());
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
@@ -311,7 +310,7 @@ async fn no_api_key() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("foo"),
-                            timestamp: 123,
+                            timestamp: Utc.timestamp(123, 0),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -334,7 +333,7 @@ async fn no_api_key() {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["message"], "foo".into());
-            assert_eq!(log["timestamp"], 123.into());
+            assert_eq!(log["timestamp"], Utc.timestamp(123, 0).into());
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
@@ -364,7 +363,7 @@ async fn api_key_in_url() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("bar"),
-                            timestamp: 456,
+                            timestamp: Utc.timestamp(456, 0),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -387,7 +386,7 @@ async fn api_key_in_url() {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["message"], "bar".into());
-            assert_eq!(log["timestamp"], 456.into());
+            assert_eq!(log["timestamp"], Utc.timestamp(456, 0).into());
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
@@ -420,7 +419,7 @@ async fn api_key_in_query_params() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("bar"),
-                            timestamp: 456,
+                            timestamp: Utc.timestamp(456, 0),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -443,7 +442,7 @@ async fn api_key_in_query_params() {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["message"], "bar".into());
-            assert_eq!(log["timestamp"], 456.into());
+            assert_eq!(log["timestamp"], Utc.timestamp(456, 0).into());
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
@@ -482,7 +481,7 @@ async fn api_key_in_header() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("baz"),
-                            timestamp: 789,
+                            timestamp: Utc.timestamp(789, 0),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -505,7 +504,7 @@ async fn api_key_in_header() {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["message"], "baz".into());
-            assert_eq!(log["timestamp"], 789.into());
+            assert_eq!(log["timestamp"], Utc.timestamp(789, 0).into());
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
@@ -538,7 +537,7 @@ async fn delivery_failure() {
                     addr,
                     &serde_json::to_string(&[LogMsg {
                         message: Bytes::from("foo"),
-                        timestamp: 123,
+                        timestamp: Utc.timestamp(123, 0),
                         hostname: Bytes::from("festeburg"),
                         status: Bytes::from("notice"),
                         service: Bytes::from("vector"),
@@ -571,7 +570,7 @@ async fn ignores_disabled_acknowledgements() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("foo"),
-                            timestamp: 123,
+                            timestamp: Utc.timestamp(123, 0),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -614,7 +613,7 @@ async fn ignores_api_key() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("baz"),
-                            timestamp: 789,
+                            timestamp: Utc.timestamp(789, 0),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -637,7 +636,7 @@ async fn ignores_api_key() {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["message"], "baz".into());
-            assert_eq!(log["timestamp"], 789.into());
+            assert_eq!(log["timestamp"], Utc.timestamp(789, 0).into());
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
@@ -1042,7 +1041,7 @@ async fn split_outputs() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("baz"),
-                            timestamp: 789,
+                            timestamp: Utc.timestamp(789, 0),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -1125,7 +1124,7 @@ async fn split_outputs() {
             let event = log_event.remove(0);
             let log = event.as_log();
             assert_eq!(log["message"], "baz".into());
-            assert_eq!(log["timestamp"], 789.into());
+            assert_eq!(log["timestamp"], Utc.timestamp(789, 0).into());
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
@@ -1173,11 +1172,11 @@ fn test_config_outputs() {
                         schema::Definition::empty()
                             .required_field("message", Kind::bytes(), Some("message"))
                             .required_field("status", Kind::bytes(), Some("severity"))
-                            .required_field("timestamp", Kind::integer(), Some("timestamp"))
+                            .required_field("timestamp", Kind::timestamp(), Some("timestamp"))
                             .required_field("hostname", Kind::bytes(), Some("host"))
-                            .required_field("service", Kind::bytes(), None)
-                            .required_field("ddsource", Kind::bytes(), None)
-                            .required_field("ddtags", Kind::bytes(), None),
+                            .required_field("service", Kind::bytes(), Some("service"))
+                            .required_field("ddsource", Kind::bytes(), Some("source"))
+                            .required_field("ddtags", Kind::bytes(), Some("tags")),
                     ),
                 )]),
             },
@@ -1193,11 +1192,11 @@ fn test_config_outputs() {
                         schema::Definition::empty()
                             .required_field("message", Kind::bytes(), Some("message"))
                             .required_field("status", Kind::bytes(), Some("severity"))
-                            .required_field("timestamp", Kind::integer(), Some("timestamp"))
+                            .required_field("timestamp", Kind::timestamp(), Some("timestamp"))
                             .required_field("hostname", Kind::bytes(), Some("host"))
-                            .required_field("service", Kind::bytes(), None)
-                            .required_field("ddsource", Kind::bytes(), None)
-                            .required_field("ddtags", Kind::bytes(), None),
+                            .required_field("service", Kind::bytes(), Some("service"))
+                            .required_field("ddsource", Kind::bytes(), Some("source"))
+                            .required_field("ddtags", Kind::bytes(), Some("tags")),
                     ),
                 )]),
             },
@@ -1214,11 +1213,11 @@ fn test_config_outputs() {
                             schema::Definition::empty()
                                 .required_field("message", Kind::bytes(), Some("message"))
                                 .required_field("status", Kind::bytes(), Some("severity"))
-                                .required_field("timestamp", Kind::integer(), Some("timestamp"))
+                                .required_field("timestamp", Kind::timestamp(), Some("timestamp"))
                                 .required_field("hostname", Kind::bytes(), Some("host"))
-                                .required_field("service", Kind::bytes(), None)
-                                .required_field("ddsource", Kind::bytes(), None)
-                                .required_field("ddtags", Kind::bytes(), None),
+                                .required_field("service", Kind::bytes(), Some("service"))
+                                .required_field("ddsource", Kind::bytes(), Some("source"))
+                                .required_field("ddtags", Kind::bytes(), Some("tags")),
                         ),
                     ),
                     (Some(METRICS), None),
