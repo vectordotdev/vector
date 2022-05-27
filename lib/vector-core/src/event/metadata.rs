@@ -3,6 +3,7 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use lookup::path;
 use serde::{Deserialize, Serialize};
 use value::Value;
 use vector_common::EventDataEq;
@@ -72,8 +73,8 @@ impl EventMetadata {
     }
 
     /// Return the datadog API key, if it exists
-    pub fn datadog_api_key(&self) -> Option<&Arc<str>> {
-        self.secrets.get(DATADOG_API_KEY)
+    pub fn datadog_api_key(&self) -> Option<Arc<str>> {
+        self.get_legacy_secret(DATADOG_API_KEY)
     }
 
     /// Set the datadog API key to passed value
@@ -82,13 +83,25 @@ impl EventMetadata {
     }
 
     /// Return the splunk hec token, if it exists
-    pub fn splunk_hec_token(&self) -> Option<&Arc<str>> {
-        self.secrets.get(SPLUNK_HEC_TOKEN)
+    pub fn splunk_hec_token(&self) -> Option<Arc<str>> {
+        self.get_legacy_secret(SPLUNK_HEC_TOKEN)
     }
 
     /// Set the splunk hec token to passed value
     pub fn set_splunk_hec_token(&mut self, secret: Arc<str>) {
         self.secrets.insert(SPLUNK_HEC_TOKEN, secret);
+    }
+
+    /// Fetches a key from secrets. If it doesn't exist, for backwards compatibility
+    /// it is fetched from normal metadata instead.
+    fn get_legacy_secret(&self, key: &str) -> Option<Arc<str>> {
+        if let Some(secret) = self.secrets.get(key) {
+            return Some(secret.clone());
+        }
+
+        self.value()
+            .get(path!(key))
+            .and_then(|value| value.as_str().map(|cow| cow.as_ref().into()))
     }
 }
 
@@ -236,5 +249,47 @@ impl<T> WithMetadata<T> {
             data: T1::from(self.data),
             metadata: self.metadata,
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    const SECRET: &'static str = "secret";
+    const SECRET2: &'static str = "secret2";
+
+    #[test]
+    fn get_set_secret() {
+        let mut metadata = EventMetadata::default();
+        metadata.set_datadog_api_key(Arc::from(SECRET));
+        metadata.set_splunk_hec_token(Arc::from(SECRET2));
+        assert_eq!(metadata.datadog_api_key().unwrap().as_ref(), SECRET);
+        assert_eq!(metadata.splunk_hec_token().unwrap().as_ref(), SECRET2);
+    }
+
+    #[test]
+    fn get_set_secret_legacy() {
+        let mut metadata = EventMetadata::default();
+        metadata.value_mut().insert(path!(DATADOG_API_KEY), SECRET);
+        metadata
+            .value_mut()
+            .insert(path!(SPLUNK_HEC_TOKEN), SECRET2);
+
+        assert_eq!(metadata.datadog_api_key().unwrap().as_ref(), SECRET);
+        assert_eq!(metadata.splunk_hec_token().unwrap().as_ref(), SECRET2);
+    }
+
+    #[test]
+    fn get_set_secret_override_metadata() {
+        let mut metadata = EventMetadata::default();
+        metadata.value_mut().insert(path!(DATADOG_API_KEY), "asdf");
+        metadata.value_mut().insert(path!(SPLUNK_HEC_TOKEN), "asdf");
+
+        metadata.set_datadog_api_key(Arc::from(SECRET));
+        metadata.set_splunk_hec_token(Arc::from(SECRET2));
+
+        assert_eq!(metadata.datadog_api_key().unwrap().as_ref(), SECRET);
+        assert_eq!(metadata.splunk_hec_token().unwrap().as_ref(), SECRET2);
     }
 }

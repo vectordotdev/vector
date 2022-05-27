@@ -57,7 +57,7 @@ impl Partitioner for EventPartitioner {
         };
 
         PartitionKey {
-            api_key: item.metadata().datadog_api_key().cloned(),
+            api_key: item.metadata().datadog_api_key().clone(),
             env,
             hostname,
             lang,

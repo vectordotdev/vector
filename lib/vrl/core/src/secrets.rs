@@ -1,5 +1,5 @@
 use crate::target::SecretTarget;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 

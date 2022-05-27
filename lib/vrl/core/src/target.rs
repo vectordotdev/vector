@@ -1,6 +1,5 @@
 use crate::Secrets;
 use lookup::LookupBuf;
-use std::collections::HashMap;
 use value::Value;
 
 /// Any target object you want to remap using VRL has to implement this trait.

@@ -1,6 +1,9 @@
 pub mod get_metadata_field;
+pub mod get_secret;
 pub mod remove_metadata_field;
+pub mod remove_secret;
 pub mod set_metadata_field;
+pub mod set_secret;
 pub mod set_semantic_meaning;
 
 use ::value::Value;
@@ -27,6 +30,9 @@ pub fn vrl_functions() -> Vec<Box<dyn vrl::Function>> {
         Box::new(remove_metadata_field::RemoveMetadataField) as _,
         Box::new(set_metadata_field::SetMetadataField) as _,
         Box::new(set_semantic_meaning::SetSemanticMeaning) as _,
+        Box::new(get_secret::GetSecret) as _,
+        Box::new(remove_secret::RemoveSecret) as _,
+        Box::new(set_secret::SetSecret) as _,
     ]
 }
 
