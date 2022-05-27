@@ -681,10 +681,7 @@ impl Checkpointer {
 
     async fn set(&mut self, token: &str) -> Result<(), io::Error> {
         self.file.seek(SeekFrom::Start(0)).await?;
-        self.file
-            .write_all(format!("{}\n", token).as_bytes())
-            .await?;
-        Ok(())
+        self.file.write_all(format!("{}\n", token).as_bytes()).await
     }
 
     async fn get(&mut self) -> Result<Option<String>, io::Error> {
