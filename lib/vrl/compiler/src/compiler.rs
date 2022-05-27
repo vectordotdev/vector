@@ -416,15 +416,15 @@ impl<'a> Compiler<'a> {
                                 let query = match target.as_ref().clone() {
                                     ast::AssignmentTarget::Noop => return None,
                                     AssignmentTarget::Query(ast::Query { target, path }) => {
-                                        (target.clone().into_inner(), path.clone().into_inner())
+                                        (target.into_inner(), path.into_inner())
                                     }
                                     AssignmentTarget::Internal(ident, path) => (
                                         QueryTarget::Internal(ident),
-                                        path.unwrap_or_else(|| LookupBuf::root()),
+                                        path.unwrap_or_else(LookupBuf::root),
                                     ),
                                     AssignmentTarget::External(path) => (
                                         QueryTarget::External,
-                                        path.unwrap_or_else(|| LookupBuf::root()),
+                                        path.unwrap_or_else(LookupBuf::root),
                                     ),
                                 };
 
@@ -452,15 +452,15 @@ impl<'a> Compiler<'a> {
                                 let ok = match ok.as_ref().clone() {
                                     ast::AssignmentTarget::Noop => return None,
                                     AssignmentTarget::Query(ast::Query { target, path }) => {
-                                        (target.clone().into_inner(), path.clone().into_inner())
+                                        (target.into_inner(), path.into_inner())
                                     }
                                     AssignmentTarget::Internal(ident, path) => (
                                         QueryTarget::Internal(ident),
-                                        path.unwrap_or_else(|| LookupBuf::root()),
+                                        path.unwrap_or_else(LookupBuf::root),
                                     ),
                                     AssignmentTarget::External(path) => (
                                         QueryTarget::External,
-                                        path.unwrap_or_else(|| LookupBuf::root()),
+                                        path.unwrap_or_else(LookupBuf::root),
                                     ),
                                 };
 
@@ -469,15 +469,15 @@ impl<'a> Compiler<'a> {
                                 let err = match err.as_ref().clone() {
                                     ast::AssignmentTarget::Noop => return None,
                                     AssignmentTarget::Query(ast::Query { target, path }) => {
-                                        (target.clone().into_inner(), path.clone().into_inner())
+                                        (target.into_inner(), path.into_inner())
                                     }
                                     AssignmentTarget::Internal(ident, path) => (
                                         QueryTarget::Internal(ident),
-                                        path.unwrap_or_else(|| LookupBuf::root()),
+                                        path.unwrap_or_else(LookupBuf::root),
                                     ),
                                     AssignmentTarget::External(path) => (
                                         QueryTarget::External,
-                                        path.unwrap_or_else(|| LookupBuf::root()),
+                                        path.unwrap_or_else(LookupBuf::root),
                                     ),
                                 };
 
@@ -721,7 +721,7 @@ impl<'a> Compiler<'a> {
             return None;
         }
 
-        Variable::new(span, ident.clone(), &self.local)
+        Variable::new(span, ident, &self.local)
             .map_err(|err| self.diagnostics.push(Box::new(err)))
             .ok()
     }
