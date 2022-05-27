@@ -30,7 +30,7 @@ impl RawMessageSerializerConfig {
 
     /// The schema required by the serializer.
     pub fn schema_requirement(&self) -> schema::Requirement {
-        schema::Requirement::empty().require_meaning(log_schema().message_key(), Kind::any())
+        schema::Requirement::empty().required_meaning(log_schema().message_key(), Kind::any())
     }
 }
 

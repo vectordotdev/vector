@@ -51,6 +51,7 @@ pub struct ConfigBuilder {
 struct ConfigBuilderHash<'a> {
     #[cfg(feature = "api")]
     api: &'a api::Options,
+    schema: &'a schema::Options,
     global: &'a GlobalOptions,
     healthchecks: &'a HealthcheckOptions,
     enrichment_tables: BTreeMap<&'a ComponentKey, &'a EnrichmentTableOuter>,
@@ -204,6 +205,8 @@ impl ConfigBuilder {
             errors.push(error);
         }
 
+        self.schema = with.schema;
+
         #[cfg(feature = "enterprise")]
         {
             self.enterprise = with.enterprise;
@@ -296,6 +299,7 @@ impl ConfigBuilder {
         let value = serde_json::to_string(&ConfigBuilderHash {
             #[cfg(feature = "api")]
             api: &self.api,
+            schema: &self.schema,
             global: &self.global,
             healthchecks: &self.healthchecks,
             enrichment_tables: self.enrichment_tables.iter().collect(),
@@ -340,6 +344,7 @@ mod tests {
         // hash is reproducible across versions.
         let expected_keys = [
             "api",
+            "schema",
             "global",
             "healthchecks",
             "enrichment_tables",
@@ -355,6 +360,7 @@ mod tests {
 
         let value = json!(ConfigBuilderHash {
             api: &builder.api,
+            schema: &builder.schema,
             global: &builder.global,
             healthchecks: &builder.healthchecks,
             enrichment_tables: builder.enrichment_tables.iter().collect(),
@@ -386,7 +392,7 @@ mod tests {
     /// should ideally be able to fix so that the original hash passes!
     fn version_hash_match() {
         assert_eq!(
-            "e71a87b3e4c761176a9f90aa94387e26383113554a119b1cbaaa25d439f25464",
+            "2bc405edda02d6a32f2a93332d5e73840670cce4731a78cf6f73e2f7df8e7229",
             ConfigBuilder::default().sha256_hash()
         );
     }

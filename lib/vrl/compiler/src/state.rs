@@ -92,6 +92,11 @@ impl ExternalEnv {
         self.custom.insert::<T>(data);
     }
 
+    /// Get external context data from the external environment.
+    pub fn get_external_context<T: 'static>(&self) -> Option<&T> {
+        self.custom.get::<T>()
+    }
+
     /// Swap the existing external contexts with new ones, returning the old ones.
     #[must_use]
     #[cfg(feature = "expr-function_call")]
