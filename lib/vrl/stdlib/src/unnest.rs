@@ -126,16 +126,6 @@ impl Function for Unnest {
             _ => Ok(None),
         }
     }
-
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let path = args
-            .required_any("path")
-            .downcast_ref::<expression::Query>()
-            .unwrap();
-        let root = LookupBuf::root();
-
-        unnest(path, &root, ctx)
-    }
 }
 
 #[derive(Debug, Clone)]

@@ -14,7 +14,7 @@ use vector_vrl_functions::set_semantic_meaning::MeaningList;
 use vrl::{
     diagnostic::{Formatter, Note},
     prelude::{DiagnosticMessage, ExpressionError},
-    Program, Runtime, Terminate, Vm, VrlRuntime,
+    Program, Runtime, Terminate, VrlRuntime,
 };
 
 use crate::{
@@ -112,10 +112,6 @@ impl TransformConfig for RemapConfig {
         let (transform, warnings) = match self.runtime {
             VrlRuntime::Ast => {
                 let (remap, warnings) = Remap::new_ast(self.clone(), context)?;
-                (Transform::synchronous(remap), warnings)
-            }
-            VrlRuntime::Vm => {
-                let (remap, warnings) = Remap::new_vm(self.clone(), context)?;
                 (Transform::synchronous(remap), warnings)
             }
         };
@@ -231,32 +227,6 @@ pub trait VrlRunner {
 }
 
 #[derive(Debug)]
-pub struct VmRunner {
-    runtime: Runtime,
-    vm: Arc<Vm>,
-}
-
-impl Clone for VmRunner {
-    fn clone(&self) -> Self {
-        Self {
-            runtime: Runtime::default(),
-            vm: Arc::clone(&self.vm),
-        }
-    }
-}
-
-impl VrlRunner for VmRunner {
-    fn run(
-        &mut self,
-        target: &mut VrlTarget,
-        _: &Program,
-        timezone: &TimeZone,
-    ) -> std::result::Result<value::Value, Terminate> {
-        self.runtime.run_vm(&self.vm, target, timezone)
-    }
-}
-
-#[derive(Debug)]
 pub struct AstRunner {
     pub runtime: Runtime,
 }
@@ -279,27 +249,6 @@ impl VrlRunner for AstRunner {
         let result = self.runtime.resolve(target, program, timezone);
         self.runtime.clear();
         result
-    }
-}
-
-impl Remap<VmRunner> {
-    pub fn new_vm(
-        config: RemapConfig,
-        context: &TransformContext,
-    ) -> crate::Result<(Self, String)> {
-        let (program, warnings, functions, mut state) = config.compile_vrl_program(
-            context.enrichment_tables.clone(),
-            context.merged_schema_definition.clone(),
-        )?;
-
-        let runtime = Runtime::default();
-        let vm = runtime.compile(functions, &program, &mut state)?;
-        let runner = VmRunner {
-            runtime,
-            vm: Arc::new(vm),
-        };
-
-        Self::new(config, context, program, runner).map(|remap| (remap, warnings))
     }
 }
 

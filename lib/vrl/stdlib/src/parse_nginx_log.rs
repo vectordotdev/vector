@@ -114,14 +114,6 @@ impl Function for ParseNginxLog {
             _ => Ok(None),
         }
     }
-
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let format = args.required_any("format").downcast_ref::<Bytes>().unwrap();
-        let timestamp_format = args.optional("timestamp_format");
-
-        parse_nginx_log(value, timestamp_format, format, ctx)
-    }
 }
 
 fn regex_for_format(format: &[u8]) -> &Regex {

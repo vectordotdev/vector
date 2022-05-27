@@ -2,7 +2,6 @@ use std::{error::Error, fmt, sync::Arc};
 
 use compiler::{
     state::{ExternalEnv, LocalEnv},
-    vm::{OpCode, Vm},
     ExpressionError, Function,
 };
 use lookup::LookupBuf;
@@ -95,37 +94,6 @@ impl Runtime {
         let mut ctx = Context::new(target, &mut self.state, timezone);
 
         program.resolve(&mut ctx).map_err(|err| match err {
-            #[cfg(feature = "expr-abort")]
-            ExpressionError::Abort { .. } => Terminate::Abort(err),
-            err @ ExpressionError::Error { .. } => Terminate::Error(err),
-        })
-    }
-
-    pub fn compile(
-        &self,
-        fns: Vec<Box<dyn Function>>,
-        program: &Program,
-        external: &mut ExternalEnv,
-    ) -> Result<Vm, String> {
-        let mut local = LocalEnv::default();
-        let mut vm = Vm::new(Arc::new(fns));
-
-        program.compile_to_vm(&mut vm, (&mut local, external))?;
-
-        vm.write_opcode(OpCode::Return);
-
-        Ok(vm)
-    }
-
-    /// Given the provided [`Target`], runs the [`Vm`] to completion.
-    pub fn run_vm(
-        &mut self,
-        vm: &Vm,
-        target: &mut dyn Target,
-        timezone: &TimeZone,
-    ) -> Result<Value, Terminate> {
-        let mut context = Context::new(target, &mut self.state, timezone);
-        vm.interpret(&mut context).map_err(|err| match err {
             #[cfg(feature = "expr-abort")]
             ExpressionError::Abort { .. } => Terminate::Abort(err),
             err @ ExpressionError::Error { .. } => Terminate::Error(err),

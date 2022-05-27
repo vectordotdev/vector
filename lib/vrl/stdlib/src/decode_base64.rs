@@ -66,13 +66,6 @@ impl Function for DecodeBase64 {
             result: Ok(r#"some string value"#),
         }]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let charset = args.optional("charset");
-
-        decode_base64(charset, value)
-    }
 }
 
 #[derive(Clone, Debug)]

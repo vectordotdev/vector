@@ -103,12 +103,6 @@ impl Function for ToString {
 
         Ok(Box::new(ToStringFn { value }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-
-        to_string(value)
-    }
 }
 
 #[derive(Debug, Clone)]

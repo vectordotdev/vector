@@ -184,17 +184,6 @@ impl Function for ParseJson {
             None => Ok(Box::new(ParseJsonFn { value })),
         }
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let max_depth = args.optional("max_depth");
-
-        if let Some(max_depth) = max_depth {
-            parse_json_with_depth(value, max_depth)
-        } else {
-            parse_json(value)
-        }
-    }
 }
 
 #[derive(Debug, Clone)]

@@ -16,8 +16,7 @@ use rustyline::{
 use vector_common::TimeZone;
 use vrl::{
     diagnostic::Formatter,
-    state::{self, ExternalEnv},
-    value, Runtime, Target, VrlRuntime,
+    state, value, Runtime, Target, VrlRuntime,
 };
 
 // Create a list of all possible error values for potential docs lookup
@@ -179,15 +178,7 @@ fn execute(
     timezone: &TimeZone,
     vrl_runtime: VrlRuntime,
 ) -> Result<Value, String> {
-    let mut state = ExternalEnv::default();
-
     match vrl_runtime {
-        VrlRuntime::Vm => {
-            let vm = runtime.compile(stdlib::all(), &program, &mut state)?;
-            runtime
-                .run_vm(&vm, object, timezone)
-                .map_err(|err| err.to_string())
-        }
         VrlRuntime::Ast => runtime
             .resolve(object, &program, timezone)
             .map_err(|err| err.to_string()),

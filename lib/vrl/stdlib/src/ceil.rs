@@ -65,13 +65,6 @@ impl Function for Ceil {
             result: Ok("6.0"),
         }]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let precision = args.optional("precision");
-
-        ceil(value, precision)
-    }
 }
 
 #[derive(Clone, Debug)]

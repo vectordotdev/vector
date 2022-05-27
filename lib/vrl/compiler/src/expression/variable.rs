@@ -8,7 +8,6 @@ use crate::{
     expression::{levenstein, Resolved},
     parser::ast::Ident,
     state::{ExternalEnv, LocalEnv},
-    vm::{self, OpCode, Vm},
     Context, Expression, Span, TypeDef,
 };
 
@@ -63,21 +62,6 @@ impl Expression for Variable {
             .cloned()
             .map(|d| d.type_def)
             .unwrap_or_else(|| TypeDef::null().infallible())
-    }
-
-    fn compile_to_vm(
-        &self,
-        vm: &mut Vm,
-        _state: (&mut LocalEnv, &mut ExternalEnv),
-    ) -> Result<(), String> {
-        vm.write_opcode(OpCode::GetPath);
-
-        // Store the required path in the targets list, write its index to the vm.
-        let variable = vm::Variable::Internal(self.ident().clone(), LookupBuf::root());
-        let target = vm.get_target(&variable);
-        vm.write_primitive(target);
-
-        Ok(())
     }
 }
 

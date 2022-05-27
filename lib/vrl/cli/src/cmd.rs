@@ -11,8 +11,7 @@ use clap::Parser;
 use vector_common::TimeZone;
 use vrl::{
     diagnostic::Formatter,
-    state::{self, ExternalEnv},
-    Program, Runtime, Target, VrlRuntime,
+    state, Program, Runtime, Target, VrlRuntime,
 };
 
 #[cfg(feature = "repl")]
@@ -140,7 +139,6 @@ fn run(opts: &Opts) -> Result<(), Error> {
                 &program,
                 &tz,
                 runtime,
-                stdlib::all(),
                 opts.runtime,
             )
             .map(|v| {
@@ -179,18 +177,9 @@ fn execute(
     program: &Program,
     timezone: &TimeZone,
     mut runtime: Runtime,
-    functions: Vec<Box<dyn vrl::Function>>,
     vrl_runtime: VrlRuntime,
 ) -> Result<Value, Error> {
     match vrl_runtime {
-        VrlRuntime::Vm => {
-            let mut state = ExternalEnv::default();
-            let vm = runtime.compile(functions, program, &mut state).unwrap();
-
-            runtime
-                .run_vm(&vm, object, timezone)
-                .map_err(Error::Runtime)
-        }
         VrlRuntime::Ast => runtime
             .resolve(object, program, timezone)
             .map_err(Error::Runtime),

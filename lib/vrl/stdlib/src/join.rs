@@ -61,13 +61,6 @@ impl Function for Join {
             result: Ok(r#"a,b,c"#),
         }]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let separator = args.optional("separator");
-
-        join(value, separator)
-    }
 }
 
 #[derive(Clone, Debug)]
