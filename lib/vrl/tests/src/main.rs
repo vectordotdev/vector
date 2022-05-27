@@ -12,6 +12,7 @@ use chrono::{DateTime, SecondsFormat, Utc};
 use chrono_tz::Tz;
 use clap::Parser;
 use glob::glob;
+use value::Secrets;
 use vector_common::TimeZone;
 use vrl::prelude::{BTreeMap, VrlValueConvert};
 use vrl::{diagnostic::Formatter, state, Runtime, Terminate};
@@ -404,6 +405,7 @@ fn run_vrl(
     let mut target = TargetValueRef {
         value: &mut test.object,
         metadata: &mut metadata,
+        secrets: &mut Secrets::new(),
     };
     match vrl_runtime {
         VrlRuntime::Vm => {
