@@ -255,6 +255,7 @@ impl Expression for GetEnrichmentTableRecordFn {
 
 #[cfg(test)]
 mod tests {
+    use value::Secrets;
     use vector_common::TimeZone;
     use vrl::TargetValue;
 
@@ -281,6 +282,7 @@ mod tests {
         let mut target = TargetValue {
             value: object,
             metadata: vrl::value!({}),
+            secrets: Secrets::new(),
         };
         let mut runtime_state = vrl::state::Runtime::default();
         let mut ctx = Context::new(&mut target, &mut runtime_state, &tz);
