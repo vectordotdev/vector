@@ -1,7 +1,7 @@
 mod log;
 
-use log::OpentelemetryLogConfig;
 use crate::config::SourceDescription;
+use log::OpentelemetryLogConfig;
 
 inventory::submit! {
     SourceDescription::new::<OpentelemetryLogConfig>("otel_log")

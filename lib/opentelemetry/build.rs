@@ -6,9 +6,7 @@ fn main() {
         tonic_build::configure()
             .compile_with_config(
                 prost_build,
-                &[
-                    "opentelemetry/proto/collector/logs/v1/logs_service.proto",
-                ],
+                &["opentelemetry/proto/collector/logs/v1/logs_service.proto"],
                 &["."],
             )
             .unwrap();

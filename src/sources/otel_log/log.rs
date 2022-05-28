@@ -1,43 +1,25 @@
-use std::net::SocketAddr;
-use futures::TryFutureExt;
-use serde::{Deserialize, Serialize};
-use tonic::{Request, Response, Status};
-use vector_core::{
-    event::{
-        BatchNotifier, 
-        BatchStatus, 
-        BatchStatusReceiver, 
-        Event, 
-    },
-    ByteSizeOf,
-};
-use otel_proto::{
-    LogService::{
-        ExportLogsServiceRequest,
-        ExportLogsServiceResponse,
-        logs_service_server::{
-            LogsService,
-            LogsServiceServer,
-        },
-    },
-};
 use crate::{
     config::{
-        GenerateConfig,
-        SourceConfig,
-        AcknowledgementsConfig,
+        AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource, SourceConfig,
         SourceContext,
-        Output,
-        DataType,
-        Resource,
     },
     internal_events::{EventsReceived, StreamClosedError},
     serde::bool_or_struct,
-    sources::{
-        util::grpc::run_grpc_server,
-        Source},
+    sources::{util::grpc::run_grpc_server, Source},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
     SourceSender,
+};
+use futures::TryFutureExt;
+use otel_proto::LogService::{
+    logs_service_server::{LogsService, LogsServiceServer},
+    ExportLogsServiceRequest, ExportLogsServiceResponse,
+};
+use serde::{Deserialize, Serialize};
+use std::net::SocketAddr;
+use tonic::{Request, Response, Status};
+use vector_core::{
+    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
+    ByteSizeOf,
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -70,10 +52,12 @@ impl SourceConfig for OpentelemetryLogConfig {
         let service = LogsServiceServer::new(Service {
             pipeline: cx.out,
             acknowledgements,
-        }).accept_gzip();
-        let source = run_grpc_server(self.address, tls_settings, service, cx.shutdown).map_err(|error| {
-            error!(message = "Source future failed.", %error);
-        });
+        })
+        .accept_gzip();
+        let source =
+            run_grpc_server(self.address, tls_settings, service, cx.shutdown).map_err(|error| {
+                error!(message = "Source future failed.", %error);
+            });
 
         Ok(Box::pin(source))
     }
@@ -131,7 +115,7 @@ impl LogsService for Service {
             })
             .and_then(|_| handle_batch_status(receiver))
             .await?;
-        Ok(Response::new(ExportLogsServiceResponse{}))
+        Ok(Response::new(ExportLogsServiceResponse {}))
     }
 }
 
