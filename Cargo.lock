@@ -5192,12 +5192,17 @@ checksum = "8e22443d1643a904602595ba1cd8f7d896afe56d26712531c5ff73a15b2fbf64"
 name = "otel_proto"
 version = "0.1.0"
 dependencies = [
+ "bytes 1.1.0",
  "futures 0.3.21",
  "futures-util",
+ "hex",
+ "ordered-float 3.0.0",
  "prost 0.10.4",
  "prost-build 0.10.4",
  "tonic",
  "tonic-build",
+ "value",
+ "vector_core",
 ]
 
 [[package]]
