@@ -22,13 +22,15 @@ impl Debug for Secrets {
 
 impl Secrets {
     /// Creates a new empty secrets container
-    pub fn new() -> Secrets {
-        Secrets {
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
             secrets: BTreeMap::new(),
         }
     }
 
     /// Gets a secret
+    #[must_use]
     pub fn get(&self, key: &str) -> Option<&Arc<str>> {
         self.secrets.get(key)
     }
