@@ -3,10 +3,7 @@ mod body_decoding;
 mod encoding_config;
 #[cfg(all(unix, feature = "sources-dnstap"))]
 pub mod framestream;
-#[cfg(any(
-    feature = "sources-vector",
-    feature = "sources-otel_log"
-))]
+#[cfg(any(feature = "sources-vector", feature = "sources-otel_log"))]
 pub mod grpc;
 #[cfg(any(
     feature = "sources-utils-http-auth",
