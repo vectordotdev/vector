@@ -12,7 +12,10 @@ mod encoding_config;
 pub mod finalizer;
 #[cfg(all(unix, feature = "sources-dnstap"))]
 pub mod framestream;
-#[cfg(feature = "sources-vector")]
+#[cfg(any(
+    feature = "sources-vector",
+    feature = "sources-otel_log"
+))]
 pub mod grpc;
 #[cfg(any(
     feature = "sources-utils-http-auth",
