@@ -219,6 +219,14 @@ impl LogEvent {
             .and_then(|path| self.inner.fields.get_by_path(path))
     }
 
+    // TODO(Jean): Once the event API uses `Lookup`, the allocation here can be removed.
+    pub fn find_key_by_meaning(&self, meaning: impl AsRef<str>) -> Option<String> {
+        self.metadata()
+            .schema_definition()
+            .meaning_path(meaning.as_ref())
+            .map(std::string::ToString::to_string)
+    }
+
     pub fn get_mut<'a>(&mut self, path: impl Path<'a>) -> Option<&mut Value> {
         self.value_mut().get_mut(path)
     }

@@ -334,6 +334,15 @@ pub async fn build_pieces(
         let typetag = sink.inner.sink_type();
         let input_type = sink.inner.input().data_type();
 
+        if config.schema.enabled {
+            // At this point, we've validated that all transforms are valid, including any
+            // transform that mutates the schema provided by their sources. We can now validate the
+            // schema expectations of each invidual sink.
+            if let Err(mut err) = schema::validate_sink_expectations(key, sink, config) {
+                errors.append(&mut err);
+            };
+        }
+
         let (tx, rx, acker) = if let Some(buffer) = buffers.remove(key) {
             buffer
         } else {
@@ -367,6 +376,7 @@ pub async fn build_pieces(
             healthcheck,
             globals: config.global.clone(),
             proxy: ProxyConfig::merge_with_env(&config.global.proxy, sink.proxy()),
+            schema: config.schema,
         };
 
         let (sink, healthcheck) = match sink.inner.build(cx).await {
