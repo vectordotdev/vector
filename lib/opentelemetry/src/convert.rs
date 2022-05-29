@@ -12,6 +12,13 @@ use vector_core::{
     event::{Event, LogEvent},
 };
 
+const RESOURCE_KEY: &str = "resources";
+const ATTRIBUTES_KEY: &str = "attributes";
+const TRACE_ID_KEY: &str = "trace_id";
+const SPAN_ID_KEY: &str = "span_id";
+const SEVERITY_TEXT_KEY: &str = "severity_text";
+const SEVERITY_NUMBER_KEY: &str = "severity_number";
+
 impl From<InstrumentationLibraryLogs> for ScopeLogs {
     fn from(v: InstrumentationLibraryLogs) -> Self {
         Self {
@@ -28,6 +35,7 @@ impl From<InstrumentationLibraryLogs> for ScopeLogs {
 impl IntoIterator for ResourceLogs {
     type Item = Event;
     type IntoIter = std::vec::IntoIter<Self::Item>;
+    #[allow(deprecated)]
     fn into_iter(self) -> Self::IntoIter {
         let resource = self.resource;
         // convert instrumentation_library_logs(deprecated) into scope_logs
@@ -71,7 +79,7 @@ impl From<PBValue> for Value {
                     .map(|v| v.into())
                     .collect::<Vec<Value>>(),
             ),
-            PBValue::KvlistValue(arr) => kvlist_2_value(arr.values),
+            PBValue::KvlistValue(arr) => kv_list_2_value(arr.values),
         }
     }
 }
@@ -81,14 +89,14 @@ struct ResourceLog {
     log_record: LogRecord,
 }
 
-fn kvlist_2_value(arr: Vec<KeyValue>) -> Value {
+fn kv_list_2_value(arr: Vec<KeyValue>) -> Value {
     Value::Object(
         arr.into_iter()
             .filter_map(|kv| kv.value.map(|av| (kv.key, av)))
             .fold(BTreeMap::default(), |mut acc, (k, av)| {
-                av.value.map(|v| {
+                if let Some(v) = av.value {
                     acc.insert(k, v.into());
-                });
+                }
                 acc
             }),
     )
@@ -98,27 +106,27 @@ impl From<ResourceLog> for Event {
     fn from(rl: ResourceLog) -> Self {
         let mut le = LogEvent::default();
         // resource
-        rl.resource.map(|resource| {
-            le.insert("resources", kvlist_2_value(resource.attributes));
-        });
-        le.insert("attributes", kvlist_2_value(rl.log_record.attributes));
-        rl.log_record.body.and_then(|av| av.value).map(|v| {
+        if let Some(resource) = rl.resource {
+            le.insert(RESOURCE_KEY, kv_list_2_value(resource.attributes));
+        }
+        le.insert(ATTRIBUTES_KEY, kv_list_2_value(rl.log_record.attributes));
+        if let Some(v) = rl.log_record.body.and_then(|av| av.value) {
             le.insert(log_schema().message_key(), v);
-        });
+        }
         le.insert(
             log_schema().timestamp_key(),
             rl.log_record.time_unix_nano as i64,
         );
         le.insert(
-            "trace_id",
+            TRACE_ID_KEY,
             Value::Bytes(Bytes::from(hex::encode(rl.log_record.trace_id))),
         );
         le.insert(
-            "span_id",
+            SPAN_ID_KEY,
             Value::Bytes(Bytes::from(hex::encode(rl.log_record.span_id))),
         );
-        le.insert("severity_text", rl.log_record.severity_text);
-        le.insert("severity_number", rl.log_record.severity_number as i64);
+        le.insert(SEVERITY_TEXT_KEY, rl.log_record.severity_text);
+        le.insert(SEVERITY_NUMBER_KEY, rl.log_record.severity_number as i64);
         le.into()
     }
 }
