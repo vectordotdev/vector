@@ -1,6 +1,6 @@
 use diagnostic::{DiagnosticList, DiagnosticMessage, Severity, Span};
 use lookup::LookupBuf;
-use parser::ast::{self, AssignmentTarget, Node, QueryTarget};
+use parser::ast::{self, Node, QueryTarget};
 
 use crate::{
     expression::*,
@@ -416,22 +416,7 @@ impl<'a> Compiler<'a> {
                             .compile_expr(*expr, external)
                             .map(|expr| Box::new(Node::new(span, expr)))
                             .or_else(|| {
-                                let query = match target.as_ref().clone() {
-                                    ast::AssignmentTarget::Noop => return None,
-                                    AssignmentTarget::Query(ast::Query { target, path }) => {
-                                        (target.into_inner(), path.into_inner())
-                                    }
-                                    AssignmentTarget::Internal(ident, path) => (
-                                        QueryTarget::Internal(ident),
-                                        path.unwrap_or_else(LookupBuf::root),
-                                    ),
-                                    AssignmentTarget::External(path) => (
-                                        QueryTarget::External,
-                                        path.unwrap_or_else(LookupBuf::root),
-                                    ),
-                                };
-
-                                self.skip_missing_query_target.push(query);
+                                self.skip_missing_assignment_target(target.clone().into_inner());
                                 None
                             })?;
 
@@ -452,39 +437,8 @@ impl<'a> Compiler<'a> {
                             .compile_expr(*expr, external)
                             .map(|expr| Box::new(Node::new(span, expr)))
                             .or_else(|| {
-                                let ok = match ok.as_ref().clone() {
-                                    ast::AssignmentTarget::Noop => return None,
-                                    AssignmentTarget::Query(ast::Query { target, path }) => {
-                                        (target.into_inner(), path.into_inner())
-                                    }
-                                    AssignmentTarget::Internal(ident, path) => (
-                                        QueryTarget::Internal(ident),
-                                        path.unwrap_or_else(LookupBuf::root),
-                                    ),
-                                    AssignmentTarget::External(path) => (
-                                        QueryTarget::External,
-                                        path.unwrap_or_else(LookupBuf::root),
-                                    ),
-                                };
-
-                                self.skip_missing_query_target.push(ok);
-
-                                let err = match err.as_ref().clone() {
-                                    ast::AssignmentTarget::Noop => return None,
-                                    AssignmentTarget::Query(ast::Query { target, path }) => {
-                                        (target.into_inner(), path.into_inner())
-                                    }
-                                    AssignmentTarget::Internal(ident, path) => (
-                                        QueryTarget::Internal(ident),
-                                        path.unwrap_or_else(LookupBuf::root),
-                                    ),
-                                    AssignmentTarget::External(path) => (
-                                        QueryTarget::External,
-                                        path.unwrap_or_else(LookupBuf::root),
-                                    ),
-                                };
-
-                                self.skip_missing_query_target.push(err);
+                                self.skip_missing_assignment_target(ok.clone().into_inner());
+                                self.skip_missing_assignment_target(err.clone().into_inner());
                                 None
                             })?;
 
@@ -567,7 +521,7 @@ impl<'a> Compiler<'a> {
     }
 
     #[cfg(not(feature = "expr-query"))]
-    fn compile_query(&mut self, node: Node<ast::Query>, _: &mut ExternalEnv) -> Noop {
+    fn compile_query(&mut self, node: Node<ast::Query>, _: &mut ExternalEnv) -> Option<Expr> {
         self.handle_missing_feature_error(node.span(), "expr-query")
     }
 
@@ -702,12 +656,13 @@ impl<'a> Compiler<'a> {
         &mut self,
         node: Node<ast::FunctionCall>,
         _: &mut ExternalEnv,
-    ) -> Option<Expr> {
+    ) -> Option<Noop> {
         // Guard against `dead_code` lint, to avoid having to sprinkle
         // attributes all over the place.
         let _ = self.fns;
 
-        self.handle_missing_feature_error(node.span(), "expr-function_call")
+        self.handle_missing_feature_error(node.span(), "expr-function_call");
+        None
     }
 
     fn compile_variable(
@@ -801,5 +756,24 @@ impl<'a> Compiler<'a> {
             .push(Box::new(Error::Missing { span, feature }));
 
         None
+    }
+
+    #[cfg(feature = "expr-assignment")]
+    fn skip_missing_assignment_target(&mut self, target: ast::AssignmentTarget) {
+        let query = match target {
+            ast::AssignmentTarget::Noop => return,
+            ast::AssignmentTarget::Query(ast::Query { target, path }) => {
+                (target.into_inner(), path.into_inner())
+            }
+            ast::AssignmentTarget::Internal(ident, path) => (
+                QueryTarget::Internal(ident),
+                path.unwrap_or_else(LookupBuf::root),
+            ),
+            ast::AssignmentTarget::External(path) => {
+                (QueryTarget::External, path.unwrap_or_else(LookupBuf::root))
+            }
+        };
+
+        self.skip_missing_query_target.push(query);
     }
 }
