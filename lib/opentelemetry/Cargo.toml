@@ -18,5 +18,3 @@ vector_core = { path = "../vector-core"}
 value = {path = "../value"}
 hex = { version = "0.4.3", default-features = false}
 ordered-float = { version = "3.0.0", default-features = false }
-futures = { version = "0.3.21", default-features = false, features = ["std"] }
-futures-util = { version = "0.3.21", default-features = false, features = ["std"] }

@@ -5193,8 +5193,6 @@ name = "otel_proto"
 version = "0.1.0"
 dependencies = [
  "bytes 1.1.0",
- "futures 0.3.21",
- "futures-util",
  "hex",
  "ordered-float 3.0.0",
  "prost 0.10.4",
