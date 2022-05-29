@@ -21,7 +21,7 @@ interpreted as described in [RFC 2119].
 Vector's telemetry drives various interfaces that operators depend on to manage
 mission critical Vector deployments. Therefore, Vector's telemetry should be
 high quality and treated as a first class feature in the development of Vector.
-This document strives to guide developers towards achieving this.
+This document guides Vector developers towards this goal.
 
 ## Naming
 
@@ -32,11 +32,13 @@ event names MUST adhere to the following rules:
 
 - MUST only contain ASCII alphanumeric and lowercase characters
 - MUST be in [camelcase] format
-- MUST follow the `<Namespace><Noun><Verb>[Error]` template
-  - `Namespace` - the internal domain the event belongs to (e.g., `Component`, `Buffer`, `Topology`)
-  - `Noun` - the subject of the event (e.g., `Bytes`, `Events`)
-  - `Verb` - the past tense verb describing when the event occured (e.g., `Received`, `Sent`, `Processes`)
-  - `[Error]` - if the event is an error it MUST end with `Error`
+- MUST follow the `[<Namespace>]<Noun><Verb>[<Type>]` template
+  - `Namespace` - OPTIONAL internal domain (e.g., `Component`, `Buffer`,
+    `Topology`)
+  - `Noun` - REQUIRED subject of the event (e.g., `Bytes`, `Events`)
+  - `Verb` - REQUIRED past tense verb describing when the event occured (e.g.,
+    `Received`, `Sent`, `Processes`)
+  - `TYPE` - OPTIONAL type of event. MUST be one of `Error`.
 
 ### Metric naming
 
@@ -44,12 +46,18 @@ Vector broadly follows the [Prometheus metric naming standards]:
 
 - MUST only contain ASCII alphanumeric, lowercase, and underscore characters
 - MUST be in [snakecase] format
-- MUST follow the `<namespace>_<name>_<unit>_[total]` template
-  - `namespace` - the internal domain that the metric belongs to (e.g., `component`, `buffer`, `topology`)
-  - `name` - is one or more words that describes the measurement (e.g., `memory_rss`, `requests`)
-  - `unit` - MUST be a single [base unit] in plural form, if applicable (e.g., `seconds`, `bytes`)
-  - Counters MUST end with `total` (e.g., `disk_written_bytes_total`, `http_requests_total`)
-- SHOULD be broad in purpose and use tags to differentiate characteristics of the measurement (e.g., `host_cpu_seconds_total{cpu="0",mode="idle"}`)
+- MUST follow the `[<namespace>_]<name>[_<unit>]_[total]` template
+  - `namespace` - OPTIONAL internal domain (e.g., `component`, `buffer`,
+    `topology`). Only supply a namespace if the metric is *truly* specific to
+    the namespace. For example, 
+  - `name` - REQUIRED name that describes the measurement (e.g., `memory_rss`,
+    `requests`)
+  - `unit` - OPTIONAL unit of the metric value. MUST be a single [base unit] in
+    plural form (e.g., `seconds`, `bytes`)
+  - `total` - REQUIRED suffix for counters only (e.g.,
+    `disk_written_bytes_total`, `http_requests_total`)
+- SHOULD be broad in purpose and use tags to differentiate characteristics of
+  the measurement (e.g., `errors_count_total{domain="component" error_code="123"}`)
 
 ## Emission
 
@@ -94,7 +102,7 @@ An `<Name>Error` event MUST be emitted when an error occurs.
     logs and metrics, as specified below, as if they were present.
 - Metrics
   - MUST include the defined properties as tags.
-  - MUST increment `<namespace>_errors_total` metric.
+  - MUST increment the `errors_total` metric.
 - Logs
   - MUST log a descriptive, user friendly error message that sufficiently
     describes the error.
