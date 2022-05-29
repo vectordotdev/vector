@@ -14,7 +14,7 @@ use inkwell::{
     },
     passes::{PassManager, PassManagerBuilder},
     targets::{InitializationConfig, Target},
-    types::PointerType,
+    types::{IntType, PointerType, StructType},
     values::{FunctionValue, GlobalValue, PointerValue},
     OptimizationLevel,
 };
@@ -365,7 +365,46 @@ impl<'ctx> Context<'ctx> {
             .get_type()
     }
 
+    pub fn vec_type(&self) -> StructType<'ctx> {
+        let fn_ident = "vrl_vec_initialize";
+        let fn_impl = self
+            .module()
+            .get_function(fn_ident)
+            .expect(&format!(r#"failed to get "{}" function"#, fn_ident));
+        fn_impl
+            .get_nth_param(0)
+            .unwrap()
+            .into_pointer_value()
+            .get_type()
+            .get_element_type()
+            .into_struct_type()
+    }
+
+    pub fn btree_map_type(&self) -> StructType<'ctx> {
+        let fn_ident = "vrl_btree_map_initialize";
+        let fn_impl = self
+            .module()
+            .get_function(fn_ident)
+            .expect(&format!(r#"failed to get "{}" function"#, fn_ident));
+        fn_impl
+            .get_nth_param(0)
+            .unwrap()
+            .into_pointer_value()
+            .get_type()
+            .get_element_type()
+            .into_struct_type()
+    }
+
+    pub fn usize_type(&self) -> IntType<'ctx> {
+        self.context
+            .custom_width_int_type((std::mem::size_of::<usize>() * 8) as _)
+    }
+
     pub fn optimize(&self) -> Result<(), String> {
+        let function_pass_manager = PassManager::create(());
+        function_pass_manager.add_function_inlining_pass();
+        function_pass_manager.run_on(&self.module);
+
         let pass_manager = PassManager::create(());
         let pass_manager_builder = PassManagerBuilder::create();
         pass_manager_builder.set_optimization_level(OptimizationLevel::Aggressive);

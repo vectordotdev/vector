@@ -101,18 +101,11 @@ impl Expression for Object {
         ctx.builder().build_unconditional_branch(begin_block);
         ctx.builder().position_at_end(begin_block);
 
+        let result_ref = ctx.result_ref();
+
         let end_block = ctx.context().append_basic_block(function, "object_end");
 
-        let btree_map_type_identifier =
-            "alloc::collections::btree::map::BTreeMap<u64, read::abbrev::Abbreviation>";
-        let btree_map_type = ctx
-            .module()
-            .get_struct_type(btree_map_type_identifier)
-            .ok_or(format!(
-                r#"failed getting type "{}" from module"#,
-                btree_map_type_identifier
-            ))?;
-        let btree_map_ref = ctx.builder().build_alloca(btree_map_type, "temp");
+        let btree_map_ref = ctx.builder().build_alloca(ctx.btree_map_type(), "temp");
 
         {
             let fn_ident = "vrl_btree_map_initialize";
@@ -120,27 +113,44 @@ impl Expression for Object {
                 .module()
                 .get_function(fn_ident)
                 .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
-            ctx.builder()
-                .build_call(fn_impl, &[btree_map_ref.into()], fn_ident)
-        };
-        {
+            ctx.builder().build_call(
+                fn_impl,
+                &[
+                    btree_map_ref.into(),
+                    ctx.usize_type()
+                        .const_int(self.inner.len() as _, false)
+                        .into(),
+                ],
+                fn_ident,
+            );
+        }
+
+        let insert_block = ctx.context().append_basic_block(function, "object_insert");
+        ctx.builder().build_unconditional_branch(insert_block);
+        ctx.builder().position_at_end(insert_block);
+
+        let value_refs = self
+            .inner
+            .iter()
+            .enumerate()
+            .map(|(index, _)| ctx.build_alloca_resolved(&format!("value_{}", index)))
+            .collect::<Vec<_>>();
+
+        for (index, _) in self.inner.iter().enumerate() {
             let fn_ident = "vrl_resolved_initialize";
             let fn_impl = ctx
                 .module()
                 .get_function(fn_ident)
                 .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
             ctx.builder()
-                .build_call(fn_impl, &[ctx.result_ref().into()], fn_ident)
-        };
+                .build_call(fn_impl, &[value_refs[index].into()], fn_ident);
+        }
 
-        let insert_block = ctx.context().append_basic_block(function, "object_insert");
-        ctx.builder().build_unconditional_branch(insert_block);
-        ctx.builder().position_at_end(insert_block);
-
-        for (key, expr) in &self.inner {
-            expr.emit_llvm((state.0, state.1), ctx)?;
-
-            let type_def = expr.type_def((state.0, state.1));
+        for (index, (_, expression)) in self.inner.iter().enumerate() {
+            let value_ref = value_refs[index];
+            ctx.set_result_ref(value_ref);
+            expression.emit_llvm((state.0, state.1), ctx)?;
+            let type_def = expression.type_def((state.0, state.1));
             if type_def.is_abortable() {
                 let is_err = {
                     let fn_ident = "vrl_resolved_is_err";
@@ -149,7 +159,7 @@ impl Expression for Object {
                         .get_function(fn_ident)
                         .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
                     ctx.builder()
-                        .build_call(fn_impl, &[ctx.result_ref().into()], fn_ident)
+                        .build_call(fn_impl, &[value_ref.into()], fn_ident)
                         .try_as_basic_value()
                         .left()
                         .ok_or(format!(r#"result of "{}" is not a basic value"#, fn_ident))?
@@ -162,7 +172,10 @@ impl Expression for Object {
                     .build_conditional_branch(is_err, end_block, insert_block);
                 ctx.builder().position_at_end(insert_block);
             }
+        }
 
+        for (index, (key, _)) in self.inner.iter().enumerate() {
+            let value_ref = value_refs[index];
             let key_ref = ctx.into_const(key.to_owned(), key).as_pointer_value();
 
             {
@@ -175,23 +188,26 @@ impl Expression for Object {
                     fn_impl,
                     &[
                         btree_map_ref.into(),
+                        ctx.usize_type().const_int(index as _, false).into(),
                         ctx.builder()
                             .build_bitcast(
                                 key_ref,
                                 fn_impl
-                                    .get_nth_param(1)
+                                    .get_nth_param(2)
                                     .unwrap()
                                     .get_type()
                                     .into_pointer_type(),
                                 "cast",
                             )
                             .into(),
-                        ctx.result_ref().into(),
+                        value_ref.into(),
                     ],
                     fn_ident,
                 )
             };
         }
+
+        ctx.set_result_ref(result_ref);
 
         let set_result_block = ctx
             .context()
@@ -214,6 +230,16 @@ impl Expression for Object {
 
         ctx.builder().build_unconditional_branch(end_block);
         ctx.builder().position_at_end(end_block);
+
+        for (index, _) in self.inner.iter().enumerate() {
+            let fn_ident = "vrl_resolved_drop";
+            let fn_impl = ctx
+                .module()
+                .get_function(fn_ident)
+                .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+            ctx.builder()
+                .build_call(fn_impl, &[value_refs[index].into()], fn_ident);
+        }
 
         Ok(())
     }

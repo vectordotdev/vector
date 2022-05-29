@@ -173,6 +173,14 @@ impl Expression for IfStatement {
         ctx.builder().position_at_end(else_branch_block);
         if let Some(alternative) = &self.alternative {
             alternative.emit_llvm((state.0, state.1), ctx)?;
+        } else {
+            let fn_ident = "vrl_resolved_set_null";
+            let fn_impl = ctx
+                .module()
+                .get_function(fn_ident)
+                .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+            ctx.builder()
+                .build_call(fn_impl, &[result_ref.into()], fn_ident);
         }
         ctx.builder().build_unconditional_branch(end_block);
 

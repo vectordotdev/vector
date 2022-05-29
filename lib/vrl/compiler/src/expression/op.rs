@@ -390,9 +390,29 @@ impl Expression for Op {
         let rhs_def = self.rhs.type_def((state.0, state.1));
 
         let function = ctx.function();
-        let op_begin_block = ctx
-            .context()
-            .append_basic_block(function, &format!("op_{}_begin", self.opcode));
+        let op_begin_block = ctx.context().append_basic_block(
+            function,
+            &format!(
+                "op_{}_begin",
+                match self.opcode {
+                    ast::Opcode::Mul => "mul",
+                    ast::Opcode::Div => "div",
+                    ast::Opcode::Add => "add",
+                    ast::Opcode::Sub => "sub",
+                    ast::Opcode::Rem => "rem",
+                    ast::Opcode::Or => "or",
+                    ast::Opcode::And => "and",
+                    ast::Opcode::Err => "err",
+                    ast::Opcode::Ne => "ne",
+                    ast::Opcode::Eq => "eq",
+                    ast::Opcode::Ge => "ge",
+                    ast::Opcode::Gt => "gt",
+                    ast::Opcode::Le => "le",
+                    ast::Opcode::Lt => "lt",
+                    ast::Opcode::Merge => "merge",
+                }
+            ),
+        );
         ctx.builder().build_unconditional_branch(op_begin_block);
         ctx.builder().position_at_end(op_begin_block);
 
@@ -409,7 +429,8 @@ impl Expression for Op {
             | ast::Opcode::Ge
             | ast::Opcode::Gt
             | ast::Opcode::Le
-            | ast::Opcode::Lt => {
+            | ast::Opcode::Lt
+            | ast::Opcode::Merge => {
                 let lhs_resolved_ref = ctx.build_alloca_resolved("lhs");
                 {
                     let fn_ident = "vrl_resolved_initialize";
@@ -622,6 +643,11 @@ impl Expression for Op {
                             "vrl_expression_op_lt_bytes_impl"
                         }
                         (ast::Opcode::Lt, _, _) => "vrl_expression_op_lt_impl",
+                        (ast::Opcode::Merge, lhs_def, rhs_def)
+                            if lhs_def.is_object() && rhs_def.is_object() =>
+                        {
+                            "vrl_expression_op_merge_object_impl"
+                        }
                         _ => return Err("invalid operation".to_owned()),
                     };
                     let fn_impl = ctx
@@ -644,9 +670,7 @@ impl Expression for Op {
             ast::Opcode::Or => {
                 self.lhs.emit_llvm((state.0, state.1), ctx)?;
 
-                let op_or_end_block = ctx
-                    .context()
-                    .append_basic_block(function, &format!("op_{}_err_end", self.opcode));
+                let op_or_end_block = ctx.context().append_basic_block(function, "op_or_end");
 
                 let is_falsy = {
                     let fn_ident = "vrl_value_is_falsy";
@@ -663,25 +687,112 @@ impl Expression for Op {
                         .map_err(|_| format!(r#"result of "{}" is not an int value"#, fn_ident))?
                 };
 
-                let op_or_err_block = ctx
-                    .context()
-                    .append_basic_block(function, &format!("op_{}_falsey", self.opcode));
-                ctx.builder()
-                    .build_conditional_branch(is_falsy, op_or_err_block, op_or_end_block);
+                let op_or_falsy_block = ctx.context().append_basic_block(function, "op_or_falsy");
+                ctx.builder().build_conditional_branch(
+                    is_falsy,
+                    op_or_falsy_block,
+                    op_or_end_block,
+                );
 
-                ctx.builder().position_at_end(op_or_err_block);
+                ctx.builder().position_at_end(op_or_falsy_block);
                 self.rhs.emit_llvm((state.0, state.1), ctx)?;
                 ctx.builder().build_unconditional_branch(op_or_end_block);
 
                 ctx.builder().position_at_end(op_or_end_block);
             }
-            ast::Opcode::And => todo!(),
+            ast::Opcode::And => {
+                let lhs_resolved_ref = ctx.build_alloca_resolved("lhs");
+                {
+                    let fn_ident = "vrl_resolved_initialize";
+                    let fn_impl = ctx
+                        .module()
+                        .get_function(fn_ident)
+                        .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+                    ctx.builder()
+                        .build_call(fn_impl, &[lhs_resolved_ref.into()], fn_ident);
+                }
+
+                ctx.set_result_ref(lhs_resolved_ref);
+                self.lhs.emit_llvm((state.0, state.1), ctx)?;
+
+                let op_and_end_block = ctx.context().append_basic_block(function, "op_and_end");
+
+                let is_falsy = {
+                    let fn_ident = "vrl_value_is_falsy";
+                    let fn_impl = ctx
+                        .module()
+                        .get_function(fn_ident)
+                        .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+                    ctx.builder()
+                        .build_call(fn_impl, &[lhs_resolved_ref.into()], fn_ident)
+                        .try_as_basic_value()
+                        .left()
+                        .ok_or(format!(r#"result of "{}" is not a basic value"#, fn_ident))?
+                        .try_into()
+                        .map_err(|_| format!(r#"result of "{}" is not an int value"#, fn_ident))?
+                };
+
+                let op_and_falsy_block = ctx.context().append_basic_block(function, "op_and_falsy");
+                let op_and_truthy_block =
+                    ctx.context().append_basic_block(function, "op_and_truthy");
+                ctx.builder().build_conditional_branch(
+                    is_falsy,
+                    op_and_falsy_block,
+                    op_and_truthy_block,
+                );
+
+                ctx.builder().position_at_end(op_and_truthy_block);
+                let lhs_resolved_ref = ctx.build_alloca_resolved("lhs");
+                {
+                    let fn_ident = "vrl_resolved_initialize";
+                    let fn_impl = ctx
+                        .module()
+                        .get_function(fn_ident)
+                        .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+                    ctx.builder()
+                        .build_call(fn_impl, &[lhs_resolved_ref.into()], fn_ident);
+                }
+                ctx.set_result_ref(lhs_resolved_ref);
+                self.rhs.emit_llvm((state.0, state.1), ctx)?;
+                {
+                    let fn_ident = "vrl_expression_op_and_truthy_impl";
+                    let fn_impl = ctx
+                        .module()
+                        .get_function(fn_ident)
+                        .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+                    ctx.builder().build_call(
+                        fn_impl,
+                        &[
+                            lhs_resolved_ref.into(),
+                            lhs_resolved_ref.into(),
+                            result_ref.into(),
+                        ],
+                        fn_ident,
+                    );
+                }
+                ctx.builder().build_unconditional_branch(op_and_end_block);
+
+                ctx.builder().position_at_end(op_and_falsy_block);
+                {
+                    let fn_ident = "vrl_expression_op_and_falsy_impl";
+                    let fn_impl = ctx
+                        .module()
+                        .get_function(fn_ident)
+                        .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+                    ctx.builder().build_call(
+                        fn_impl,
+                        &[lhs_resolved_ref.into(), result_ref.into()],
+                        fn_ident,
+                    );
+                }
+                ctx.builder().build_unconditional_branch(op_and_end_block);
+
+                ctx.builder().position_at_end(op_and_end_block);
+            }
             ast::Opcode::Err => {
                 self.lhs.emit_llvm((state.0, state.1), ctx)?;
 
-                let op_err_end_block = ctx
-                    .context()
-                    .append_basic_block(function, &format!("op_{}_err_end", self.opcode));
+                let op_err_end_block = ctx.context().append_basic_block(function, "op_err_end");
 
                 let is_err = {
                     let fn_ident = "vrl_resolved_is_err";
@@ -698,9 +809,7 @@ impl Expression for Op {
                         .map_err(|_| format!(r#"result of "{}" is not an int value"#, fn_ident))?
                 };
 
-                let op_err_err_block = ctx
-                    .context()
-                    .append_basic_block(function, &format!("op_{}_err", self.opcode));
+                let op_err_err_block = ctx.context().append_basic_block(function, "op_err_err");
                 ctx.builder()
                     .build_conditional_branch(is_err, op_err_err_block, op_err_end_block);
 
@@ -710,7 +819,6 @@ impl Expression for Op {
 
                 ctx.builder().position_at_end(op_err_end_block);
             }
-            ast::Opcode::Merge => todo!(),
         };
 
         Ok(())

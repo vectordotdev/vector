@@ -339,7 +339,7 @@ pub use format_number::FormatNumber;
 #[cfg(feature = "format_timestamp")]
 pub use format_timestamp::FormatTimestamp;
 #[cfg(feature = "get")]
-pub use get::Get;
+pub use get::{vrl_fn_get, Get};
 #[cfg(feature = "get_env_var")]
 pub use get_env_var::GetEnvVar;
 #[cfg(feature = "get_hostname")]
@@ -435,7 +435,7 @@ pub use parse_groks::{vrl_fn_parse_groks, ParseGroks};
 #[cfg(feature = "parse_int")]
 pub use parse_int::ParseInt;
 #[cfg(feature = "parse_json")]
-pub use parse_json::ParseJson;
+pub use parse_json::{vrl_fn_parse_json, ParseJson};
 #[cfg(feature = "parse_key_value")]
 pub use parse_key_value::ParseKeyValue;
 #[cfg(feature = "parse_klog")]

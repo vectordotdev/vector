@@ -667,6 +667,21 @@ where
                 ctx.builder()
                     .position_at_end(assignment_infallible_begin_block);
 
+                let result_ref = ctx.result_ref();
+
+                let result_temp_ref = ctx.build_alloca_resolved("temp");
+                ctx.set_result_ref(result_temp_ref);
+
+                {
+                    let fn_ident = "vrl_resolved_initialize";
+                    let fn_impl = ctx
+                        .module()
+                        .get_function(fn_ident)
+                        .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+                    ctx.builder()
+                        .build_call(fn_impl, &[result_temp_ref.into()], fn_ident);
+                }
+
                 expr.emit_llvm(state, ctx)?;
 
                 let is_ok = {
@@ -676,7 +691,7 @@ where
                         .get_function(fn_ident)
                         .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
                     ctx.builder()
-                        .build_call(fn_impl, &[ctx.result_ref().into()], fn_ident)
+                        .build_call(fn_impl, &[result_temp_ref.into()], fn_ident)
                         .try_as_basic_value()
                         .left()
                         .ok_or(format!(r#"result of "{}" is not a basic value"#, fn_ident))?
@@ -705,12 +720,21 @@ where
 
                 ok.emit_llvm_insert(ctx)?;
 
-                let result_ref = ctx.result_ref();
-                let result_temp_ref = ctx.build_alloca_resolved("temp");
+                ctx.builder()
+                    .build_unconditional_branch(assignment_infallible_end_block);
+
+                ctx.builder()
+                    .position_at_end(assignment_infallible_begin_is_err_block);
+
+                let default_ref = ctx.into_resolved_const_ref(Ok(default.clone()));
+                ctx.set_result_ref(default_ref);
+
+                ok.emit_llvm_insert(ctx)?;
+
                 ctx.set_result_ref(result_temp_ref);
 
                 {
-                    let fn_ident = "vrl_resolved_initialize";
+                    let fn_ident = "vrl_resolved_err_into_ok";
                     let fn_impl = ctx
                         .module()
                         .get_function(fn_ident)
@@ -720,6 +744,12 @@ where
                 }
 
                 err.emit_llvm_insert(ctx)?;
+
+                ctx.builder()
+                    .build_unconditional_branch(assignment_infallible_end_block);
+
+                ctx.builder()
+                    .position_at_end(assignment_infallible_end_block);
 
                 {
                     let fn_ident = "vrl_resolved_drop";
@@ -732,37 +762,6 @@ where
                 }
 
                 ctx.set_result_ref(result_ref);
-
-                ctx.builder()
-                    .build_unconditional_branch(assignment_infallible_end_block);
-
-                ctx.builder()
-                    .position_at_end(assignment_infallible_begin_is_err_block);
-
-                let default_ref = ctx.into_resolved_const_ref(Ok(default.clone()));
-                ctx.set_result_ref(default_ref);
-
-                ok.emit_llvm_insert(ctx)?;
-
-                ctx.set_result_ref(result_ref);
-
-                {
-                    let fn_ident = "vrl_resolved_err_into_ok";
-                    let fn_impl = ctx
-                        .module()
-                        .get_function(fn_ident)
-                        .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
-                    ctx.builder()
-                        .build_call(fn_impl, &[ctx.result_ref().into()], fn_ident);
-                }
-
-                err.emit_llvm_insert(ctx)?;
-
-                ctx.builder()
-                    .build_unconditional_branch(assignment_infallible_end_block);
-
-                ctx.builder()
-                    .position_at_end(assignment_infallible_end_block);
             }
         }
 

@@ -121,9 +121,25 @@ pub extern "C" fn vrl_value_is_falsy(result: &Resolved) -> bool {
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_btree_map_initialize(map: &mut BTreeMap<String, Value>) {
-    let map = map as *mut BTreeMap<String, Value>;
-    map.write(Default::default());
+pub unsafe extern "C" fn vrl_vec_initialize(vec: &mut Vec<Value>, capacity: usize) {
+    let vec = vec as *mut Vec<Value>;
+    vec.write({
+        let mut vec = Vec::with_capacity(capacity);
+        vec.set_len(capacity);
+        vec
+    });
+}
+
+/// # Safety
+/// TODO.
+#[no_mangle]
+pub unsafe extern "C" fn vrl_btree_map_initialize(vec: &mut Vec<(String, Value)>, capacity: usize) {
+    let vec = vec as *mut Vec<(String, Value)>;
+    vec.write({
+        let mut vec = Vec::with_capacity(capacity);
+        vec.set_len(capacity);
+        vec
+    });
 }
 
 #[no_mangle]
@@ -131,21 +147,43 @@ pub extern "C" fn vrl_target_assign(value: &Resolved, target: &mut Resolved) {
     *target = value.clone()
 }
 
+/// # Safety
+/// TODO.
 #[no_mangle]
-pub extern "C" fn vrl_btree_map_insert(
-    map: &mut BTreeMap<String, Value>,
-    #[allow(clippy::ptr_arg)] key: &String,
-    result: &mut Resolved,
-) {
-    let result = {
+pub unsafe extern "C" fn vrl_vec_insert(vec: &mut Vec<Value>, index: usize, value: &mut Resolved) {
+    let value = {
         let mut moved = Ok(Value::Null);
-        std::mem::swap(result, &mut moved);
+        std::mem::swap(value, &mut moved);
         moved
     };
-    map.insert(
+    vec.as_mut_ptr()
+        .add(index)
+        .write(value.expect("VRL result must not contain an error"));
+}
+
+/// # Safety
+/// TODO.
+#[no_mangle]
+pub unsafe extern "C" fn vrl_btree_map_insert(
+    vec: &mut Vec<(String, Value)>,
+    index: usize,
+    #[allow(clippy::ptr_arg)] key: &String,
+    value: &mut Resolved,
+) {
+    let value = {
+        let mut moved = Ok(Value::Null);
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+    vec.as_mut_ptr().add(index).write((
         key.clone(),
-        result.expect("VRL result must not contain an error"),
-    );
+        value.expect("VRL result must not contain an error"),
+    ));
+}
+
+#[no_mangle]
+pub extern "C" fn vrl_resolved_set_null(result: &mut Resolved) {
+    *result = Ok(Value::Null)
 }
 
 #[no_mangle]
@@ -210,12 +248,23 @@ pub extern "C" fn vrl_expression_not_impl(result: &mut Resolved) {
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_object_set_result_impl(
-    map: &mut BTreeMap<String, Value>,
+pub unsafe extern "C" fn vrl_expression_array_set_result_impl(
+    vec: &mut Vec<Value>,
     result: &mut Resolved,
 ) {
-    let map = map as *mut BTreeMap<String, Value>;
-    *result = Ok(Value::Object(map.read()));
+    let vec = vec as *mut Vec<Value>;
+    *result = Ok(Value::Array(vec.read()));
+}
+
+/// # Safety
+/// TODO.
+#[no_mangle]
+pub unsafe extern "C" fn vrl_expression_object_set_result_impl(
+    vec: &mut Vec<(String, Value)>,
+    result: &mut Resolved,
+) {
+    let vec = (vec as *mut Vec<(String, Value)>).read();
+    *result = Ok(Value::Object(vec.into_iter().collect()));
 }
 
 /// # Safety
@@ -962,6 +1011,58 @@ pub unsafe extern "C" fn vrl_expression_op_lt_impl(
     let rhs = (rhs as *mut Value).read();
 
     *result = lhs.try_lt(rhs).map_err(Into::into)
+}
+
+/// # Safety
+/// TODO.
+#[no_mangle]
+pub unsafe extern "C" fn vrl_expression_op_merge_object_impl(
+    lhs: &mut Value,
+    rhs: &mut Value,
+    result: &mut Resolved,
+) {
+    let lhs = match (lhs as *mut Value).read() {
+        Value::Object(object) => object,
+        _ => panic!(),
+    };
+    let rhs = match (rhs as *mut Value).read() {
+        Value::Object(object) => object,
+        _ => panic!(),
+    };
+
+    *result = Ok(lhs
+        .iter()
+        .chain(rhs.iter())
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect::<BTreeMap<String, Value>>()
+        .into())
+}
+
+/// # Safety
+/// TODO.
+#[no_mangle]
+pub unsafe extern "C" fn vrl_expression_op_and_truthy_impl(
+    lhs: &mut Resolved,
+    rhs: &mut Resolved,
+    result: &mut Resolved,
+) {
+    let lhs = (lhs as *mut Resolved).read();
+    let rhs = (rhs as *mut Resolved).read();
+
+    *result = (|| lhs?.try_and(rhs?).map_err(Into::into))()
+}
+
+/// # Safety
+/// TODO.
+#[no_mangle]
+pub unsafe extern "C" fn vrl_expression_op_and_falsy_impl(
+    lhs: &mut Resolved,
+    result: &mut Resolved,
+) {
+    let lhs = (lhs as *mut Resolved).read();
+    drop(lhs);
+
+    *result = Ok(false.into())
 }
 
 #[no_mangle]

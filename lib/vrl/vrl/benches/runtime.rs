@@ -36,16 +36,112 @@ static SOURCES: &[Source] = &[
         "#},
     },
     Source {
+        name: "variable",
+        target: "{}",
+        program: indoc! {r#"
+            foo = {}
+        "#},
+    },
+    Source {
+        name: "object",
+        target: "{}",
+        program: indoc! {r#"
+            {
+                "a": "A",
+                "c": "C",
+                "b": "B",
+            }
+        "#},
+    },
+    Source {
+        name: "pipelines_lookup",
+        target: "{}",
+        program: indoc! {r#"
+            lookup = {
+                "api_limit" : " The maximum number of requests to the Authentication API in given time has reached.",
+                "cls" : " Passwordless login code/link has been sent",
+                "coff" : " AD/LDAP Connector is offline ",
+                "con" : " AD/LDAP Connector is online and working",
+                "cs" : " Passwordless login code has been sent",
+                "du" : " User has been deleted.",
+                "fce" : " Failed to change user email",
+                "fco" : " Origin is not in the Allowed Origins list for the specified application",
+                "fcpro" : " Failed to provision a AD/LDAP connector",
+                "fcu" : " Failed to change username",
+                "fd" : " Failed to generate delegation token",
+                "fdeac" : " Failed to activate device.",
+                "fdeaz" : " Device authorization request failed.",
+                "fdecc" : " User did not confirm device.",
+                "feacft" : " Failed to exchange authorization code for Access Token",
+                "feccft" : " Failed exchange of Access Token for a Client Credentials Grant",
+                "fede" : " Failed to exchange Device Code for Access Token",
+                "fens" : " Failed exchange for Native Social Login",
+                "feoobft" : " Failed exchange of Password and OOB Challenge for Access Token",
+                "feotpft" : " Failed exchange of Password and OTP Challenge for Access Token",
+                "fepft" : "Failed exchange of Password for Access Token",
+                "fercft" : " Failed Exchange of Password and MFA Recovery code for Access Token",
+                "fertft" : " Failed Exchange of Refresh Token for Access Token",
+                "flo" : " User logout failed",
+                "fn" : " Failed to send email notification",
+                "fui" : " Failed to import users",
+                "fv" : " Failed to send verification email",
+                "fvr" : " Failed to process verification email request",
+                "gd_auth_failed" : " One-time password authentication failed.",
+                "gd_auth_rejected" : " One-time password authentication rejected.",
+                "gd_auth_succeed" : " One-time password authentication success.",
+                "gd_recovery_failed" : " Multi-factor recovery code failed.",
+                "gd_recovery_rate_limit_exceed" : " Multi-factor recovery code has failed too many times.",
+                "gd_recovery_succeed" : " Multi-factor recovery code succeeded authorization.",
+                "gd_send_pn" : " Push notification for MFA sent successfully sent.",
+                "gd_send_sms" : " SMS for MFA sent successfully sent.",
+                "gd_start_auth" : " Second factor authentication event started for MFA.",
+                "gd_start_enroll" : " Multi-factor authentication enroll has started.",
+                "gd_unenroll" : " Device used for second factor authentication has been unenrolled.",
+                "gd_update_device_account" : " Device used for second factor authentication has been updated.",
+                "gd_user_delete" : " Deleted multi-factor user account.",
+                "limit_delegation" : " Rate limit exceeded to /delegation endpoint",
+                "limit_mu" : " An IP address is blocked with 100 failed login attempts using different usernames all with incorrect passwords in 24 hours or 50 sign-up attempts per minute from the same IP address.",
+                "limit_wc" : " An IP address is blocked with 10 failed login attempts into a single account from the same IP address.",
+                "pwd_leak" : " Someone behind the IP address: ip attempted to login with a leaked password.",
+                "s" : " Successful login event.",
+                "sdu" : " User successfully deleted",
+                "seacft" : " Successful exchange of authorization code for Access Token",
+                "seccft" : " Successful exchange of Access Token for a Client Credentials Grant",
+                "sede" : " Successful exchange of device code for Access Token",
+                "sens" : " Native Social Login",
+                "seoobft" : " Successful exchange of Password and OOB Challenge for Access Token",
+                "seotpft" : " Successful exchange of Password and OTP Challenge for Access Token",
+                "sepft" : " Successful exchange of Password for Access Token",
+                "sercft" : " Successful exchange of Password and MFA Recovery code for Access Token",
+                "sertft" : " Successful exchange of Refresh Token for Access Token",
+                "slo" : " User successfully logged out",
+                "sui" : " Successfully imported users",
+                "ublkdu" : " User block setup by anomaly detection has been released"
+            }
+            if (lookup_value, err = get(lookup, [.custom.data.type]); lookup_value != null) {
+                .custom.message = lookup_value
+            }
+        "#},
+    },
+    Source {
+        name: "parse_json",
+        target: "{}",
+        program: indoc! {r#"
+            .result, .err = parse_json("{")
+            [.result, .err]
+        "#},
+    },
+    Source {
         name: "parse_groks_bla",
         target: "{}",
         program: indoc! {r#"
-            .custom.message = "127.0.0.1 - frank [13/Jul/2016:10:55:36 +0000] \"GET /apache_pb.gif HTTP/1.0\" 200 2326"
+            .custom.message = "INFO  [MemtableFlushWriter:1] 2016-06-28 16:19:48,627  Memtable.java:382 - Completed flushing /app/cassandra/datastax/dse-data01/system/local-7ad54392bcdd35a684174e047860b377/system-local-tmp-ka-3981-Data.db (0.000KiB) for commitlog position ReplayPosition(segmentId=1467130786324, position=567)"
             parse_groks!(value: .custom.message,
                 patterns: [
-                    "(?s)%{_prefix} %{regex(\"Compacting\"):db.operation}.* %{_keyspace}\\/%{_table}:%{data:partition_key} \\(%{_bytes} bytes\\)",
-                    "(?s)%{_prefix} %{regex(\"Flushing\"):db.operation}.*\\(Keyspace='%{_keyspace}', ColumnFamily='%{_table}'\\) %{data}: %{_onheap_total}\\/%{_offheap_total}, live: %{_onheap_live}\\/%{_offheap_live}, flushing: %{_onheap_flush}\\/%{_offheap_flush}, this: %{_onheap_this}\\/%{_offheap_this}",
+                    "(?s)%{_prefix} %{regex(\"Compacting\"):db.operation}.* %{_keyspace}/%{_table}:%{data:partition_key} \\(%{_bytes} bytes\\)",
+                    "(?s)%{_prefix} %{regex(\"Flushing\"):db.operation}.*\\(Keyspace='%{_keyspace}', ColumnFamily='%{_table}'\\) %{data}: %{_onheap_total}/%{_offheap_total}, live: %{_onheap_live}/%{_offheap_live}, flushing: %{_onheap_flush}/%{_offheap_flush}, this: %{_onheap_this}/%{_offheap_this}",
                     "(?s)%{_prefix} %{regex(\"Enqueuing\"):db.operation}.* of %{_keyspace}: %{_onheap_bytes}%{data} \\(%{_onheap_pct}%\\) on-heap, %{_offheap_bytes} \\(%{_offheap_pct}%\\).*",
-                    "(?s)%{_prefix} %{regex(\"Writing\"):db.operation}.*-%{_keyspace}%{data}\\(%{number:cassandra.bytes:scale(1000000)}%{data}, %{integer:cassandra.ops} ops, %{_onheap_pct}%\\/%{_offheap_pct}.*",
+                    "(?s)%{_prefix} %{regex(\"Writing\"):db.operation}.*-%{_keyspace}%{data}\\(%{number:cassandra.bytes:scale(1000000)}%{data}, %{integer:cassandra.ops} ops, %{_onheap_pct}%/%{_offheap_pct}.*",
                     "(?s)%{_prefix} Completed %{regex(\"flushing\"):db.operation} %{_sstable} \\(%{number:cassandra.bytes_kb}KiB\\) for commitlog %{data:commitlog}",
                     "(?s)%{_prefix}\\s+%{regex(\"Compacted\"):db.operation}.* to \\[%{_sstable}\\].\\s+%{notSpace:cassandra.bytes_in} bytes to %{notSpace:cassandra.bytes_out} \\(\\~%{integer:cassandra.percent_of_orig}% of original\\) in %{notSpace:cassandra.duration_ms}ms = %{number:cassandra.speed_mb}MB/s.\\s+%{notSpace:cassandra.pkeys_in} total partitions merged to %{notSpace:cassandra.pkeys_out}\\.\\s+Partition merge counts were %{data:cassandra.merge_cnt}",
                     "(?s)%{_prefix} G.* %{integer:duration:scale(1000000)}ms. %{data}: %{integer:cassandra.eden.orig_bytes} -> %{integer:cassandra.eden.new_bytes}; %{data}: %{integer:cassandra.oldgen.orig_bytes} -> %{integer:cassandra.oldgen.new_bytes};.*",
@@ -54,10 +150,10 @@ static SOURCES: &[Source] = &[
                     "(?s)%{_prefix} %{data:msg}",
                 ],
                 aliases: {
-                    "cassandra_compaction_key": "%{_prefix} %{regex(\"Compacting\"):db.operation}.* %{_keyspace}\\/%{_table}:%{data:partition_key} \\(%{_bytes} bytes\\)",
-                    "cassandra_pool_cleaner": "%{_prefix} %{regex(\"Flushing\"):db.operation}.*\\(Keyspace='%{_keyspace}', ColumnFamily='%{_table}'\\) %{data}: %{_onheap_total}\\/%{_offheap_total}, live: %{_onheap_live}\\/%{_offheap_live}, flushing: %{_onheap_flush}\\/%{_offheap_flush}, this: %{_onheap_this}\\/%{_offheap_this}",
+                    "cassandra_compaction_key": "%{_prefix} %{regex(\"Compacting\"):db.operation}.* %{_keyspace}/%{_table}:%{data:partition_key} \\(%{_bytes} bytes\\)",
+                    "cassandra_pool_cleaner": "%{_prefix} %{regex(\"Flushing\"):db.operation}.*\\(Keyspace='%{_keyspace}', ColumnFamily='%{_table}'\\) %{data}: %{_onheap_total}/%{_offheap_total}, live: %{_onheap_live}/%{_offheap_live}, flushing: %{_onheap_flush}/%{_offheap_flush}, this: %{_onheap_this}/%{_offheap_this}",
                     "cassandra_pool_cleaner2": "%{_prefix} %{regex(\"Enqueuing\"):db.operation}.* of %{_keyspace}: %{_onheap_bytes}%{data} \\(%{_onheap_pct}%\\) on-heap, %{_offheap_bytes} \\(%{_offheap_pct}%\\).*",
-                    "cassandra_table_flush": "%{_prefix} %{regex(\"Writing\"):db.operation}.*-%{_keyspace}%{data}\\(%{number:cassandra.bytes:scale(1000000)}%{data}, %{integer:cassandra.ops} ops, %{_onheap_pct}%\\/%{_offheap_pct}.*",
+                    "cassandra_table_flush": "%{_prefix} %{regex(\"Writing\"):db.operation}.*-%{_keyspace}%{data}\\(%{number:cassandra.bytes:scale(1000000)}%{data}, %{integer:cassandra.ops} ops, %{_onheap_pct}%/%{_offheap_pct}.*",
                     "cassandra_mem_flush": "%{_prefix} Completed %{regex(\"flushing\"):db.operation} %{_sstable} \\(%{number:cassandra.bytes_kb}KiB\\) for commitlog %{data:commitlog}",
                     "cassandra_compaction": "%{_prefix}\\s+%{regex(\"Compacted\"):db.operation}.* to \\[%{_sstable}\\].\\s+%{notSpace:cassandra.bytes_in} bytes to %{notSpace:cassandra.bytes_out} \\(\\~%{integer:cassandra.percent_of_orig}% of original\\) in %{notSpace:cassandra.duration_ms}ms = %{number:cassandra.speed_mb}MB/s.\\s+%{notSpace:cassandra.pkeys_in} total partitions merged to %{notSpace:cassandra.pkeys_out}\\.\\s+Partition merge counts were %{data:cassandra.merge_cnt}",
                     "cassandra_gc_format": "%{_prefix} G.* %{integer:duration:scale(1000000)}ms. %{data}: %{integer:cassandra.eden.orig_bytes} -> %{integer:cassandra.eden.new_bytes}; %{data}: %{integer:cassandra.oldgen.orig_bytes} -> %{integer:cassandra.oldgen.new_bytes};.*",
@@ -133,10 +229,10 @@ static SOURCES: &[Source] = &[
         program: indoc! {r#"
             custom, err = parse_groks(value: .custom.message,
                 patterns: [
-                    "(?s)%{_prefix} %{regex(\"Compacting\"):db.operation}.* %{_keyspace}\\/%{_table}:%{data:partition_key} \\(%{_bytes} bytes\\)",
-                    "(?s)%{_prefix} %{regex(\"Flushing\"):db.operation}.*\\(Keyspace='%{_keyspace}', ColumnFamily='%{_table}'\\) %{data}: %{_onheap_total}\\/%{_offheap_total}, live: %{_onheap_live}\\/%{_offheap_live}, flushing: %{_onheap_flush}\\/%{_offheap_flush}, this: %{_onheap_this}\\/%{_offheap_this}",
+                    "(?s)%{_prefix} %{regex(\"Compacting\"):db.operation}.* %{_keyspace}/%{_table}:%{data:partition_key} \\(%{_bytes} bytes\\)",
+                    "(?s)%{_prefix} %{regex(\"Flushing\"):db.operation}.*\\(Keyspace='%{_keyspace}', ColumnFamily='%{_table}'\\) %{data}: %{_onheap_total}/%{_offheap_total}, live: %{_onheap_live}/%{_offheap_live}, flushing: %{_onheap_flush}/%{_offheap_flush}, this: %{_onheap_this}/%{_offheap_this}",
                     "(?s)%{_prefix} %{regex(\"Enqueuing\"):db.operation}.* of %{_keyspace}: %{_onheap_bytes}%{data} \\(%{_onheap_pct}%\\) on-heap, %{_offheap_bytes} \\(%{_offheap_pct}%\\).*",
-                    "(?s)%{_prefix} %{regex(\"Writing\"):db.operation}.*-%{_keyspace}%{data}\\(%{number:cassandra.bytes:scale(1000000)}%{data}, %{integer:cassandra.ops} ops, %{_onheap_pct}%\\/%{_offheap_pct}.*",
+                    "(?s)%{_prefix} %{regex(\"Writing\"):db.operation}.*-%{_keyspace}%{data}\\(%{number:cassandra.bytes:scale(1000000)}%{data}, %{integer:cassandra.ops} ops, %{_onheap_pct}%/%{_offheap_pct}.*",
                     "(?s)%{_prefix} Completed %{regex(\"flushing\"):db.operation} %{_sstable} \\(%{number:cassandra.bytes_kb}KiB\\) for commitlog %{data:commitlog}",
                     "(?s)%{_prefix}\\s+%{regex(\"Compacted\"):db.operation}.* to \\[%{_sstable}\\].\\s+%{notSpace:cassandra.bytes_in} bytes to %{notSpace:cassandra.bytes_out} \\(\\~%{integer:cassandra.percent_of_orig}% of original\\) in %{notSpace:cassandra.duration_ms}ms = %{number:cassandra.speed_mb}MB/s.\\s+%{notSpace:cassandra.pkeys_in} total partitions merged to %{notSpace:cassandra.pkeys_out}\\.\\s+Partition merge counts were %{data:cassandra.merge_cnt}",
                     "(?s)%{_prefix} G.* %{integer:duration:scale(1000000)}ms. %{data}: %{integer:cassandra.eden.orig_bytes} -> %{integer:cassandra.eden.new_bytes}; %{data}: %{integer:cassandra.oldgen.orig_bytes} -> %{integer:cassandra.oldgen.new_bytes};.*",
@@ -145,10 +241,10 @@ static SOURCES: &[Source] = &[
                     "(?s)%{_prefix} %{data:msg}",
                 ],
                 aliases: {
-                    "cassandra_compaction_key": "%{_prefix} %{regex(\"Compacting\"):db.operation}.* %{_keyspace}\\/%{_table}:%{data:partition_key} \\(%{_bytes} bytes\\)",
-                    "cassandra_pool_cleaner": "%{_prefix} %{regex(\"Flushing\"):db.operation}.*\\(Keyspace='%{_keyspace}', ColumnFamily='%{_table}'\\) %{data}: %{_onheap_total}\\/%{_offheap_total}, live: %{_onheap_live}\\/%{_offheap_live}, flushing: %{_onheap_flush}\\/%{_offheap_flush}, this: %{_onheap_this}\\/%{_offheap_this}",
+                    "cassandra_compaction_key": "%{_prefix} %{regex(\"Compacting\"):db.operation}.* %{_keyspace}/%{_table}:%{data:partition_key} \\(%{_bytes} bytes\\)",
+                    "cassandra_pool_cleaner": "%{_prefix} %{regex(\"Flushing\"):db.operation}.*\\(Keyspace='%{_keyspace}', ColumnFamily='%{_table}'\\) %{data}: %{_onheap_total}/%{_offheap_total}, live: %{_onheap_live}/%{_offheap_live}, flushing: %{_onheap_flush}/%{_offheap_flush}, this: %{_onheap_this}/%{_offheap_this}",
                     "cassandra_pool_cleaner2": "%{_prefix} %{regex(\"Enqueuing\"):db.operation}.* of %{_keyspace}: %{_onheap_bytes}%{data} \\(%{_onheap_pct}%\\) on-heap, %{_offheap_bytes} \\(%{_offheap_pct}%\\).*",
-                    "cassandra_table_flush": "%{_prefix} %{regex(\"Writing\"):db.operation}.*-%{_keyspace}%{data}\\(%{number:cassandra.bytes:scale(1000000)}%{data}, %{integer:cassandra.ops} ops, %{_onheap_pct}%\\/%{_offheap_pct}.*",
+                    "cassandra_table_flush": "%{_prefix} %{regex(\"Writing\"):db.operation}.*-%{_keyspace}%{data}\\(%{number:cassandra.bytes:scale(1000000)}%{data}, %{integer:cassandra.ops} ops, %{_onheap_pct}%/%{_offheap_pct}.*",
                     "cassandra_mem_flush": "%{_prefix} Completed %{regex(\"flushing\"):db.operation} %{_sstable} \\(%{number:cassandra.bytes_kb}KiB\\) for commitlog %{data:commitlog}",
                     "cassandra_compaction": "%{_prefix}\\s+%{regex(\"Compacted\"):db.operation}.* to \\[%{_sstable}\\].\\s+%{notSpace:cassandra.bytes_in} bytes to %{notSpace:cassandra.bytes_out} \\(\\~%{integer:cassandra.percent_of_orig}% of original\\) in %{notSpace:cassandra.duration_ms}ms = %{number:cassandra.speed_mb}MB/s.\\s+%{notSpace:cassandra.pkeys_in} total partitions merged to %{notSpace:cassandra.pkeys_out}\\.\\s+Partition merge counts were %{data:cassandra.merge_cnt}",
                     "cassandra_gc_format": "%{_prefix} G.* %{integer:duration:scale(1000000)}ms. %{data}: %{integer:cassandra.eden.orig_bytes} -> %{integer:cassandra.eden.new_bytes}; %{data}: %{integer:cassandra.oldgen.orig_bytes} -> %{integer:cassandra.oldgen.new_bytes};.*",
@@ -503,10 +599,12 @@ fn benchmark_vrl_runtimes(c: &mut Criterion) {
         let mut symbols = HashMap::new();
         symbols.insert("vrl_fn_downcase", vrl_stdlib::vrl_fn_downcase as usize);
         symbols.insert("vrl_fn_merge", vrl_stdlib::vrl_fn_merge as usize);
+        symbols.insert("vrl_fn_get", vrl_stdlib::vrl_fn_get as usize);
         symbols.insert(
             "vrl_fn_parse_groks",
             vrl_stdlib::vrl_fn_parse_groks as usize,
         );
+        symbols.insert("vrl_fn_parse_json", vrl_stdlib::vrl_fn_parse_json as usize);
         symbols.insert(
             "vrl_fn_starts_with",
             vrl_stdlib::vrl_fn_starts_with as usize,

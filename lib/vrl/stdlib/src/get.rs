@@ -163,6 +163,23 @@ impl Expression for GetFn {
     }
 }
 
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_get(value: &mut Value, path: &mut Value, resolved: &mut Resolved) {
+    let value = {
+        let mut moved = Value::Null;
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+    let path = {
+        let mut moved = Value::Null;
+        std::mem::swap(path, &mut moved);
+        moved
+    };
+
+    *resolved = get(value, path);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -231,6 +231,23 @@ impl Expression for ParseJsonMaxDepthFn {
     }
 }
 
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_parse_json(
+    value: &mut Value,
+    _max_depth: &mut Option<Value>,
+    resolved: &mut Resolved,
+) {
+    let value = {
+        let mut moved = Value::Null;
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+    // TODO: make max_depth a compiled argument.
+
+    *resolved = parse_json(value);
+}
+
 fn inner_kind() -> Kind {
     Kind::null()
         | Kind::bytes()
