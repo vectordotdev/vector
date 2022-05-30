@@ -248,7 +248,7 @@ http = { version = "0.2.6", default-features = false }
 hyper = { version = "0.14.18", default-features = false, features = ["client", "runtime", "http1", "http2", "server", "stream"] }
 hyper-openssl = { version = "0.9.2", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
-indexmap = { version = "~1.8.1", default-features = false, features = ["serde"] }
+indexmap = { version = "~1.8.2", default-features = false, features = ["serde"] }
 infer = { version = "0.8.0", default-features = false, optional = true}
 indoc = { version = "1.0.6", default-features = false }
 inventory = { version = "0.1.10", default-features = false }
