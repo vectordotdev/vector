@@ -1046,7 +1046,7 @@ mod test {
 
         assert_eq!(
             Err(format!(
-                "invalid path zork: expected one of {}",
+                "invalid path .zork: expected one of {}",
                 validpaths_get.join(", ")
             )),
             target.target_get(&LookupBuf::from_str("zork").unwrap())
