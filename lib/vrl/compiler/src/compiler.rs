@@ -401,7 +401,7 @@ impl<'a> Compiler<'a> {
         Some(Predicate::new(
             Node::new(span, exprs),
             (&self.local, external),
-            self.fallible_expression_error.as_ref(),
+            self.fallible_expression_error.as_deref(),
         ))
     }
 
@@ -541,7 +541,7 @@ impl<'a> Compiler<'a> {
             node,
             &mut self.local,
             external,
-            self.fallible_expression_error.as_ref(),
+            self.fallible_expression_error.as_deref(),
         )
         .map_err(|err| self.diagnostics.push(Box::new(err)))
         .ok()?;

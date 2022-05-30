@@ -22,7 +22,7 @@ impl Predicate {
     pub(crate) fn new(
         node: Node<Vec<Expr>>,
         state: (&LocalEnv, &ExternalEnv),
-        fallible_predicate: Option<&Box<dyn DiagnosticMessage>>,
+        fallible_predicate: Option<&dyn DiagnosticMessage>,
     ) -> Result {
         let (span, exprs) = node.take();
         let type_def = exprs
@@ -32,9 +32,9 @@ impl Predicate {
 
         if let Some(error) = fallible_predicate {
             return Err(Error::Fallible {
-                code: error.code().clone(),
-                labels: error.labels().clone(),
-                notes: error.notes().clone(),
+                code: error.code(),
+                labels: error.labels(),
+                notes: error.notes(),
             });
         }
 

@@ -26,7 +26,7 @@ impl Assignment {
         node: Node<Variant<Node<ast::AssignmentTarget>, Node<Expr>>>,
         local: &mut LocalEnv,
         external: &mut ExternalEnv,
-        fallible_rhs: Option<&Box<dyn DiagnosticMessage>>,
+        fallible_rhs: Option<&dyn DiagnosticMessage>,
     ) -> Result<Self, Error> {
         let (_, variant) = node.take();
 
@@ -38,7 +38,7 @@ impl Assignment {
                 let type_def = expr.type_def((local, external));
 
                 // Fallible expressions require infallible assignment.
-                if let Some(_) = fallible_rhs {
+                if fallible_rhs.is_some() {
                     return Err(Error {
                         variant: ErrorVariant::FallibleAssignment(
                             target.to_string(),
