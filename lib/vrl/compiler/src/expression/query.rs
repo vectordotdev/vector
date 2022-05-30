@@ -169,7 +169,7 @@ impl fmt::Display for Target {
 
         match self {
             Internal(v) => v.fmt(f),
-            External => write!(f, ""),
+            External => write!(f, "."),
             FunctionCall(v) => v.fmt(f),
             Container(v) => v.fmt(f),
         }

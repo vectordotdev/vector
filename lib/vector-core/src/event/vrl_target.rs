@@ -1046,7 +1046,7 @@ mod test {
 
         assert_eq!(
             Err(format!(
-                "invalid path .zork: expected one of {}",
+                "invalid path zork: expected one of {}",
                 validpaths_get.join(", ")
             )),
             target.target_get(&LookupBuf::from_str("zork").unwrap())
@@ -1054,7 +1054,7 @@ mod test {
 
         assert_eq!(
             Err(format!(
-                "invalid path .zork: expected one of {}",
+                "invalid path zork: expected one of {}",
                 validpaths_set.join(", ")
             )),
             target.target_insert(&LookupBuf::from_str("zork").unwrap(), "thing".into())
@@ -1062,7 +1062,7 @@ mod test {
 
         assert_eq!(
             Err(format!(
-                "invalid path .zork: expected one of {}",
+                "invalid path zork: expected one of {}",
                 validpaths_set.join(", ")
             )),
             target.target_remove(&LookupBuf::from_str("zork").unwrap(), true)
@@ -1070,7 +1070,7 @@ mod test {
 
         assert_eq!(
             Err(format!(
-                "invalid path .tags.foo.flork: expected one of {}",
+                "invalid path tags.foo.flork: expected one of {}",
                 validpaths_get.join(", ")
             )),
             target.target_get(&LookupBuf::from_str("tags.foo.flork").unwrap())
