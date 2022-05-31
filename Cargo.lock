@@ -4195,12 +4195,12 @@ checksum = "5284f00d480e1c39af34e72f8ad60b94f47007e3481cd3b731c1d67190ddc7b7"
 
 [[package]]
 name = "listenfd"
-version = "0.5.0"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c02b14f35d9f5f082fd0b1b34aa0ef32e3354c859c721d7f3325b3f79a42ba54"
+checksum = "14e4fcc00ff6731d94b70e16e71f43bda62883461f31230742e3bc6dddf12988"
 dependencies = [
  "libc",
- "uuid 0.8.2",
+ "uuid 1.1.0",
  "winapi 0.3.9",
 ]
 
