@@ -1,13 +1,12 @@
 use std::net::SocketAddr;
 
-use futures::{FutureExt, TryFutureExt};
+use futures::TryFutureExt;
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpStream;
 use tonic::{
-    transport::{server::Connected, Certificate, Server},
+    transport::{server::Connected, Certificate},
     Request, Response, Status,
 };
-use tracing::{Instrument, Span};
 use vector_core::{
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
     ByteSizeOf,
@@ -18,8 +17,7 @@ use crate::{
     internal_events::{EventsReceived, StreamClosedError},
     proto::vector as proto,
     serde::bool_or_struct,
-    shutdown::ShutdownSignalToken,
-    sources::{util::grpc::DecompressionAndMetricsLayer, Source},
+    sources::{util::grpc::run_grpc_server, Source},
     tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsEnableableConfig},
     SourceSender,
 };
@@ -121,10 +119,16 @@ impl VectorConfig {
     pub(super) async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let tls_settings = MaybeTlsSettings::from_config(&self.tls, true)?;
         let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
+        let service = proto::Server::new(Service {
+            pipeline: cx.out,
+            acknowledgements,
+        })
+        .accept_gzip();
 
-        let source = run(self.address, tls_settings, cx, acknowledgements).map_err(|error| {
-            error!(message = "Source future failed.", %error);
-        });
+        let source =
+            run_grpc_server(self.address, tls_settings, service, cx.shutdown).map_err(|error| {
+                error!(message = "Source future failed.", %error);
+            });
 
         Ok(Box::pin(source))
     }
@@ -140,47 +144,6 @@ impl VectorConfig {
     pub(super) fn resources(&self) -> Vec<Resource> {
         vec![Resource::tcp(self.address)]
     }
-}
-
-async fn run(
-    address: SocketAddr,
-    tls_settings: MaybeTlsSettings,
-    cx: SourceContext,
-    acknowledgements: bool,
-) -> crate::Result<()> {
-    let span = Span::current();
-
-    let service = proto::Server::new(Service {
-        pipeline: cx.out,
-        acknowledgements,
-    })
-    .accept_gzip();
-
-    let (tx, rx) = tokio::sync::oneshot::channel::<ShutdownSignalToken>();
-
-    let listener = tls_settings.bind(&address).await?;
-    let incoming = listener.accept_stream();
-
-    Server::builder()
-        .trace_fn(move |_| span.clone())
-        // This layer explicitly decompresses payloads, if compressed, and reports the number of message bytes we've
-        // received if the message is processed successfully, aka `BytesReceived`. We do this because otherwise the only
-        // access we have is either the event-specific bytes (the in-memory representation) or the raw bytes over the
-        // wire prior to decompression... and if that case, any bytes at all, not just the ones we successfully process.
-        //
-        // The weaving of `tonic`, `axum`, `tower`, and `hyper` is fairly complex and there currently exists no way to
-        // use independent `tower` layers when the request body itself (the body type, not the actual bytes) must be
-        // modified or wrapped.. so instead of a cleaner design, we're opting here to bake it all together until the
-        // crates are sufficiently flexible for us to craft a better design.
-        .layer(DecompressionAndMetricsLayer::default())
-        .add_service(service)
-        .serve_with_incoming_shutdown(incoming, cx.shutdown.map(|token| tx.send(token).unwrap()))
-        .in_current_span()
-        .await?;
-
-    drop(rx.await);
-
-    Ok(())
 }
 
 #[derive(Clone)]

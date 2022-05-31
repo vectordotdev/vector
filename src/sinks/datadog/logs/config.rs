@@ -4,20 +4,19 @@ use futures::FutureExt;
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
+use value::Kind;
 use vector_core::config::proxy::ProxyConfig;
 
-use super::{
-    service::LogApiRetry,
-    sink::{DatadogLogsJsonEncoding, LogSinkBuilder},
-};
+use super::{service::LogApiRetry, sink::LogSinkBuilder};
 use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
+    schema,
     sinks::{
         datadog::{get_api_validate_endpoint, healthcheck, logs::service::LogApiService, Region},
         util::{
-            encoding::EncodingConfigFixed, service::ServiceBuilderExt, BatchConfig, Compression,
-            SinkBatchSettings, TowerRequestConfig,
+            service::ServiceBuilderExt, BatchConfig, Compression, SinkBatchSettings,
+            TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -55,11 +54,6 @@ pub(crate) struct DatadogLogsConfig {
     // Deprecated name
     #[serde(alias = "api_key")]
     pub default_api_key: String,
-    #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
-    )]
-    pub encoding: EncodingConfigFixed<DatadogLogsJsonEncoding>,
     pub tls: Option<TlsEnableableConfig>,
 
     #[serde(default)]
@@ -134,8 +128,8 @@ impl DatadogLogsConfig {
         let service = ServiceBuilder::new()
             .settings(request_limits, LogApiRetry)
             .service(LogApiService::new(client, self.get_uri(), self.enterprise));
+
         let sink = LogSinkBuilder::new(service, cx, default_api_key, batch)
-            .encoding(self.encoding.clone())
             .compression(self.compression.unwrap_or_default())
             .build();
 
@@ -172,7 +166,16 @@ impl SinkConfig for DatadogLogsConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        let requirement = schema::Requirement::empty()
+            .required_meaning("message", Kind::bytes())
+            .required_meaning("timestamp", Kind::timestamp())
+            .optional_meaning("host", Kind::bytes())
+            .optional_meaning("source", Kind::bytes())
+            .optional_meaning("severity", Kind::bytes())
+            .optional_meaning("service", Kind::bytes())
+            .optional_meaning("trace_id", Kind::bytes());
+
+        Input::log().with_schema_requirement(requirement)
     }
 
     fn sink_type(&self) -> &'static str {
