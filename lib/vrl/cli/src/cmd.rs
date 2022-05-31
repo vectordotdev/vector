@@ -1,4 +1,4 @@
-use core::{TargetValue, TargetValueRef};
+use core::TargetValueRef;
 use std::{
     collections::BTreeMap,
     fs::File,
@@ -174,6 +174,8 @@ fn run(opts: &Opts) -> Result<(), Error> {
 
 #[cfg(feature = "repl")]
 fn repl(objects: Vec<Value>, timezone: &TimeZone, vrl_runtime: VrlRuntime) -> Result<(), Error> {
+    use core::TargetValue;
+
     let objects = objects
         .into_iter()
         .map(|value| TargetValue {
