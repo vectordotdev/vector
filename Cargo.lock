@@ -3683,37 +3683,14 @@ dependencies = [
 [[package]]
 name = "inkwell"
 version = "0.1.0"
-source = "git+https://github.com/TheDan64/inkwell?branch=master#36c3b106e61b1b45295a35f94023d93d9328c76f"
-dependencies = [
- "either",
- "inkwell_internals 0.5.0 (git+https://github.com/TheDan64/inkwell?branch=master)",
- "libc",
- "llvm-sys",
- "once_cell",
- "parking_lot 0.12.0",
-]
-
-[[package]]
-name = "inkwell"
-version = "0.1.0"
 source = "git+https://github.com/pablosichert/inkwell?branch=orc2#e335e56c4f293a6e0ef22d062bce8483cf3ec6d0"
 dependencies = [
  "either",
- "inkwell_internals 0.5.0 (git+https://github.com/pablosichert/inkwell?branch=orc2)",
+ "inkwell_internals",
  "libc",
  "llvm-sys",
  "once_cell",
  "parking_lot 0.12.0",
-]
-
-[[package]]
-name = "inkwell_internals"
-version = "0.5.0"
-source = "git+https://github.com/TheDan64/inkwell?branch=master#36c3b106e61b1b45295a35f94023d93d9328c76f"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
@@ -4250,14 +4227,6 @@ dependencies = [
  "libc",
  "uuid 0.8.2",
  "winapi 0.3.9",
-]
-
-[[package]]
-name = "llvm"
-version = "0.0.0"
-dependencies = [
- "inkwell 0.1.0 (git+https://github.com/TheDan64/inkwell?branch=master)",
- "llvm-sys",
 ]
 
 [[package]]
@@ -9154,7 +9123,7 @@ dependencies = [
  "criterion",
  "dyn-clone",
  "indoc",
- "inkwell 0.1.0 (git+https://github.com/pablosichert/inkwell?branch=orc2)",
+ "inkwell",
  "lalrpop-util",
  "libc",
  "llvm-sys",
