@@ -31,6 +31,7 @@ pub const TEST_PEM_CRT_PATH: &str = "tests/data/localhost.crt";
 #[cfg(test)]
 pub const TEST_PEM_KEY_PATH: &str = "tests/data/localhost.key";
 
+/// Standard TLS options with an `enabled` flag
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct TlsEnableableConfig {
     pub enabled: Option<bool>,
@@ -55,6 +56,7 @@ impl TlsEnableableConfig {
     }
 }
 
+/// TlsEnableableConfig for `sources`, adding metadata from the client certificate
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct TlsSourceConfig {
     pub peer_key: Option<String>,
