@@ -451,7 +451,6 @@ impl CustomDefinitionGenerator for DefinitionGenerator {
         _symbol_lookup_flags: SymbolLookupFlags,
     ) -> Result<MaterializationUnit, String> {
         let symbol_name = symbol_entry.get_string();
-        println!("resolving symbol {:?}", symbol_name);
         #[cfg(target_os = "macos")]
         let symbol_name = if symbol_name.to_string_lossy().starts_with('_') {
             &symbol_name[1..]
@@ -459,17 +458,11 @@ impl CustomDefinitionGenerator for DefinitionGenerator {
             symbol_name
         };
 
-        println!("&self: {}", self as *mut _ as usize);
-
         let address = self
             .symbols
             .remove(symbol_name.to_string_lossy().deref())
-            .map(|address| {
-                println!("lul");
-                Ok(address)
-            })
+            .map(|address| Ok(address))
             .unwrap_or_else(|| {
-                println!("wat");
                 let address = unsafe { dlsym(libc::RTLD_DEFAULT, symbol_name.as_ptr()) };
                 if address.is_null() {
                     let error = unsafe { dlerror() };
@@ -482,8 +475,6 @@ impl CustomDefinitionGenerator for DefinitionGenerator {
 
                 Ok(address as _)
             })?;
-
-        println!("symbol address {:?}", address as *const ());
 
         let flags = SymbolFlags::new(
             &[SymbolGenericFlag::Exported, SymbolGenericFlag::Callable],

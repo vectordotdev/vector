@@ -1,7 +1,7 @@
 use std::{collections::HashMap, time::Duration};
 
 use ::value::Value;
-use compiler::{state, Resolved};
+use compiler::state;
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use indoc::indoc;
 use vector_common::TimeZone;
@@ -13,43 +13,71 @@ struct Source {
     program: &'static str,
 }
 
-use vrl_stdlib::{uuid_v4, vrl_fn_downcase as downcase, vrl_fn_upcase as upcase};
-
-#[inline(never)]
-#[no_mangle]
-pub extern "C" fn vrl_fn_uuid_v4(resolved: &mut Resolved) {
-    println!("yo? uuid?");
-    *resolved = uuid_v4()
-}
-
-extern "C" {
-    fn vrl_fn_upcase(value: *mut Resolved, resolved: *mut Resolved);
-}
-
 static SOURCES: &[Source] = &[
     Source {
-        name: "starts_with",
-        target: "{}",
-        program: indoc! {r#"
-            status = string(.foo) ?? ""
-            .status = starts_with("a", status, true)
-        "#},
-    },
-    Source {
-        name: "variable",
-        target: "{}",
-        program: indoc! {r#"
-            foo = {}
-        "#},
-    },
-    Source {
-        name: "object",
+        name: "big_object",
         target: "{}",
         program: indoc! {r#"
             {
-                "a": "A",
-                "c": "C",
-                "b": "B",
+                "api_limit" : " The maximum number of requests to the Authentication API in given time has reached.",
+                "cls" : " Passwordless login code/link has been sent",
+                "coff" : " AD/LDAP Connector is offline ",
+                "con" : " AD/LDAP Connector is online and working",
+                "cs" : " Passwordless login code has been sent",
+                "du" : " User has been deleted.",
+                "fce" : " Failed to change user email",
+                "fco" : " Origin is not in the Allowed Origins list for the specified application",
+                "fcpro" : " Failed to provision a AD/LDAP connector",
+                "fcu" : " Failed to change username",
+                "fd" : " Failed to generate delegation token",
+                "fdeac" : " Failed to activate device.",
+                "fdeaz" : " Device authorization request failed.",
+                "fdecc" : " User did not confirm device.",
+                "feacft" : " Failed to exchange authorization code for Access Token",
+                "feccft" : " Failed exchange of Access Token for a Client Credentials Grant",
+                "fede" : " Failed to exchange Device Code for Access Token",
+                "fens" : " Failed exchange for Native Social Login",
+                "feoobft" : " Failed exchange of Password and OOB Challenge for Access Token",
+                "feotpft" : " Failed exchange of Password and OTP Challenge for Access Token",
+                "fepft" : "Failed exchange of Password for Access Token",
+                "fercft" : " Failed Exchange of Password and MFA Recovery code for Access Token",
+                "fertft" : " Failed Exchange of Refresh Token for Access Token",
+                "flo" : " User logout failed",
+                "fn" : " Failed to send email notification",
+                "fui" : " Failed to import users",
+                "fv" : " Failed to send verification email",
+                "fvr" : " Failed to process verification email request",
+                "gd_auth_failed" : " One-time password authentication failed.",
+                "gd_auth_rejected" : " One-time password authentication rejected.",
+                "gd_auth_succeed" : " One-time password authentication success.",
+                "gd_recovery_failed" : " Multi-factor recovery code failed.",
+                "gd_recovery_rate_limit_exceed" : " Multi-factor recovery code has failed too many times.",
+                "gd_recovery_succeed" : " Multi-factor recovery code succeeded authorization.",
+                "gd_send_pn" : " Push notification for MFA sent successfully sent.",
+                "gd_send_sms" : " SMS for MFA sent successfully sent.",
+                "gd_start_auth" : " Second factor authentication event started for MFA.",
+                "gd_start_enroll" : " Multi-factor authentication enroll has started.",
+                "gd_unenroll" : " Device used for second factor authentication has been unenrolled.",
+                "gd_update_device_account" : " Device used for second factor authentication has been updated.",
+                "gd_user_delete" : " Deleted multi-factor user account.",
+                "limit_delegation" : " Rate limit exceeded to /delegation endpoint",
+                "limit_mu" : " An IP address is blocked with 100 failed login attempts using different usernames all with incorrect passwords in 24 hours or 50 sign-up attempts per minute from the same IP address.",
+                "limit_wc" : " An IP address is blocked with 10 failed login attempts into a single account from the same IP address.",
+                "pwd_leak" : " Someone behind the IP address: ip attempted to login with a leaked password.",
+                "s" : " Successful login event.",
+                "sdu" : " User successfully deleted",
+                "seacft" : " Successful exchange of authorization code for Access Token",
+                "seccft" : " Successful exchange of Access Token for a Client Credentials Grant",
+                "sede" : " Successful exchange of device code for Access Token",
+                "sens" : " Native Social Login",
+                "seoobft" : " Successful exchange of Password and OOB Challenge for Access Token",
+                "seotpft" : " Successful exchange of Password and OTP Challenge for Access Token",
+                "sepft" : " Successful exchange of Password for Access Token",
+                "sercft" : " Successful exchange of Password and MFA Recovery code for Access Token",
+                "sertft" : " Successful exchange of Refresh Token for Access Token",
+                "slo" : " User successfully logged out",
+                "sui" : " Successfully imported users",
+                "ublkdu" : " User block setup by anomaly detection has been released"
             }
         "#},
     },
@@ -120,6 +148,44 @@ static SOURCES: &[Source] = &[
             }
             if (lookup_value, err = get(lookup, [.custom.data.type]); lookup_value != null) {
                 .custom.message = lookup_value
+            }
+        "#},
+    },
+    Source {
+        name: "pipelines_lookup_short",
+        target: "{}",
+        program: indoc! {r#"
+            lookup = {
+                "api_limit" : " The maximum number of requests to the Authentication API in given time has reached.",
+            }
+            if (lookup_value, err = get(lookup, [.custom.data.type]); lookup_value != null) {
+                .custom.message = lookup_value
+            }
+        "#},
+    },
+    Source {
+        name: "starts_with",
+        target: "{}",
+        program: indoc! {r#"
+            status = string(.foo) ?? ""
+            .status = starts_with("a", status, true)
+        "#},
+    },
+    Source {
+        name: "variable",
+        target: "{}",
+        program: indoc! {r#"
+            foo = {}
+        "#},
+    },
+    Source {
+        name: "object",
+        target: "{}",
+        program: indoc! {r#"
+            {
+                "a": "A",
+                "c": "C",
+                "b": "B",
             }
         "#},
     },
@@ -524,65 +590,6 @@ pub extern "C" fn derp() {
 }
 
 fn benchmark_vrl_runtimes(c: &mut Criterion) {
-    derp();
-    downcase(&mut Value::Null, &mut Ok(Value::Null));
-    unsafe { vrl_fn_uuid_v4(&mut Ok(Value::Null)) };
-    unsafe { vrl_fn_upcase(&mut Ok(Value::Null), &mut Ok(Value::Null)) };
-    upcase(&mut Value::Null, &mut Ok(Value::Null));
-
-    /*
-    {
-        use inkwell::context::Context;
-        use inkwell::targets::{InitializationConfig, Target};
-        use inkwell::OptimizationLevel;
-        Target::initialize_native(&InitializationConfig::default()).unwrap();
-        let context = Context::create();
-        let module = context.create_module("test");
-        let builder = context.create_builder();
-
-        // Set up the function signature
-        let double = context.f64_type();
-        let sig = double.fn_type(&[], false);
-
-        // Add the function to our module
-        let f = module.add_function("test_fn", sig, None);
-        let b = context.append_basic_block(f, "entry");
-        builder.position_at_end(b);
-
-        let function_name = "derp".to_owned();
-        let function_type = context.void_type().fn_type(&[], false);
-        let fn_impl = module.add_function(&function_name, function_type, None);
-        builder.build_call(fn_impl, &[], &function_name);
-
-        {
-            let function_name = "vrl_fn_uuid_v4".to_owned();
-            let function_type = context.void_type().fn_type(&[], false);
-            let fn_impl = module.add_function(&function_name, function_type, None);
-            builder.build_call(fn_impl, &[], &function_name);
-        }
-
-        // Insert a return statement
-        let ret = double.const_float(64.0);
-        builder.build_return(Some(&ret));
-
-        println!("{}", module.print_to_string().to_string());
-
-        // create the JIT engine
-        let mut ee = module
-            .create_jit_execution_engine(OptimizationLevel::None)
-            .unwrap();
-
-        // fetch our JIT'd function and execute it
-        unsafe {
-            let test_fn = ee
-                .get_function::<unsafe extern "C" fn() -> f64>("test_fn")
-                .unwrap();
-            let return_value = test_fn.call();
-            assert_eq!(return_value, 64.0);
-        }
-    }
-    */
-
     let mut group = c.benchmark_group("vrl/runtime");
     for source in SOURCES {
         let state = state::Runtime::default();
@@ -595,7 +602,6 @@ fn benchmark_vrl_runtimes(c: &mut Criterion) {
             .compile(vrl_stdlib::all(), &program, &mut external_env)
             .unwrap();
         let builder = compiler::llvm::Compiler::new().unwrap();
-        println!("bench 1");
         let mut symbols = HashMap::new();
         symbols.insert("vrl_fn_downcase", vrl_stdlib::vrl_fn_downcase as usize);
         symbols.insert("vrl_fn_merge", vrl_stdlib::vrl_fn_merge as usize);
@@ -619,21 +625,16 @@ fn benchmark_vrl_runtimes(c: &mut Criterion) {
                 symbols,
             )
             .unwrap();
-        println!("bench 2");
         let execute = library.get_function().unwrap();
-        println!("bench 3");
 
         {
-            println!("yo");
             let mut target: Value = serde_json::from_str(source.target).expect("valid json");
             let mut context = core::Context {
                 target: &mut target,
                 timezone: &tz,
             };
             let mut result = Ok(Value::Null);
-            println!("bla");
             unsafe { execute.call(&mut context, &mut result) };
-            println!("derp");
         }
 
         {
