@@ -39,7 +39,10 @@ use crate::{
         SourceDescription,
     },
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent, Value},
-    internal_events::{BytesReceived, JournaldInvalidRecordError, OldEventsReceived},
+    internal_events::{
+        BytesReceived, JournaldInvalidRecordError, JournaldNegativeAcknowledgmentError,
+        OldEventsReceived,
+    },
     serde::bool_or_struct,
     shutdown::ShutdownSignal,
     sources::util::finalizer::OrderedFinalizer,
@@ -655,6 +658,7 @@ impl Finalizer {
                     if trigger.is_some() && status == BatchStatus::Delivered {
                         checkpointer.lock().await.set(cursor).await;
                     } else if let Some(trigger) = trigger.take() {
+                        emit!(JournaldNegativeAcknowledgmentError { cursor: &cursor });
                         let _ = trigger.send(());
                     }
                 }
@@ -730,8 +734,7 @@ impl StatefulCheckpointer {
         })
     }
 
-    async fn set(&mut self, token: impl Into<String>) {
-        let token = token.into();
+    async fn set(&mut self, token: String) {
         if let Err(error) = self.checkpointer.set(&token).await {
             error!(
                 message = "Could not set journald checkpoint.",
