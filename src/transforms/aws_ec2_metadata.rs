@@ -81,6 +81,7 @@ pub struct Ec2Metadata {
     namespace: Option<String>,
     refresh_interval_secs: Option<u64>,
     fields: Option<Vec<String>>,
+    refresh_timeout_secs: Option<u64>,
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
@@ -154,6 +155,10 @@ impl TransformConfig for Ec2Metadata {
             .fields
             .clone()
             .unwrap_or_else(|| DEFAULT_FIELD_WHITELIST.clone());
+        let refresh_timeout = self
+            .refresh_timeout_secs
+            .map(Duration::from_secs)
+            .unwrap_or_else(|| Duration::from_secs(1));
 
         let proxy = ProxyConfig::merge_with_env(&context.globals.proxy, &self.proxy);
         let http_client = HttpClient::new(None, &proxy)?;
@@ -164,6 +169,7 @@ impl TransformConfig for Ec2Metadata {
             keys,
             Arc::clone(&state),
             refresh_interval,
+            refresh_timeout,
             fields,
         );
 
@@ -233,6 +239,7 @@ struct MetadataClient {
     keys: Keys,
     state: Arc<ArcSwap<Vec<(MetadataKey, Bytes)>>>,
     refresh_interval: Duration,
+    refresh_timeout: Duration,
     fields: HashSet<String>,
 }
 
@@ -257,6 +264,7 @@ impl MetadataClient {
         keys: Keys,
         state: Arc<ArcSwap<Vec<(MetadataKey, Bytes)>>>,
         refresh_interval: Duration,
+        refresh_timeout: Duration,
         fields: Vec<String>,
     ) -> Self {
         Self {
@@ -266,6 +274,7 @@ impl MetadataClient {
             keys,
             state,
             refresh_interval,
+            refresh_timeout,
             fields: fields.into_iter().collect(),
         }
     }
@@ -303,10 +312,8 @@ impl MetadataClient {
             .header("X-aws-ec2-metadata-token-ttl-seconds", "21600")
             .body(Body::empty())?;
 
-        let res = self
-            .client
-            .send(req)
-            .await
+        let res = tokio::time::timeout(self.refresh_timeout, self.client.send(req))
+            .await?
             .map_err(crate::Error::from)
             .and_then(|res| match res.status() {
                 StatusCode::OK => Ok(res),
@@ -473,10 +480,8 @@ impl MetadataClient {
             .header(TOKEN_HEADER.as_ref(), token.as_ref())
             .body(Body::empty())?;
 
-        match self
-            .client
-            .send(req)
-            .await
+        match tokio::time::timeout(self.refresh_timeout, self.client.send(req))
+            .await?
             .map_err(crate::Error::from)
             .and_then(|res| match res.status() {
                 StatusCode::OK => Ok(Some(res)),
