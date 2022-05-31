@@ -470,6 +470,7 @@ sources-metrics = [
   "sources-internal_metrics",
   "sources-mongodb_metrics",
   "sources-nginx_metrics",
+  "sources-otel_log",
   "sources-postgresql_metrics",
   "sources-prometheus",
   "sources-statsd",
@@ -502,7 +503,7 @@ sources-logstash = ["listenfd", "tokio-util/net", "sources-utils-tcp-keepalive",
 sources-mongodb_metrics = ["mongodb"]
 sources-nats = ["nats", "nkeys"]
 sources-nginx_metrics = ["nom"]
-sources-otel_log = ["listenfd", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "tonic", "protobuf-build", "otel_proto"]
+sources-otel_log = ["sources-vector", "otel_proto"]
 sources-postgresql_metrics = ["postgres-openssl", "tokio-postgres"]
 sources-prometheus = ["prometheus-parser", "sinks-prometheus", "sources-http", "sources-utils-http"]
 sources-redis= ["redis"]
