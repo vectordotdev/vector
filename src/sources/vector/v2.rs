@@ -182,14 +182,14 @@ mod tests {
         sinks::vector::v2::VectorConfig as SinkConfig,
         test_util::{
             self,
-            components::{assert_source_compliance, SOCKET_PUSH_SOURCE_TAGS},
+            components::{assert_source_compliance, SOURCE_TAGS},
         },
         SourceSender,
     };
 
     #[tokio::test]
     async fn receive_message() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, async {
             let addr = test_util::next_addr();
             let config = format!(r#"address = "{}""#, addr);
             let source: VectorConfig = toml::from_str(&config).unwrap();
@@ -221,7 +221,7 @@ mod tests {
 
     #[tokio::test]
     async fn receive_compressed_message() {
-        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+        assert_source_compliance(&SOURCE_TAGS, async {
             let addr = test_util::next_addr();
             let config = format!(r#"address = "{}""#, addr);
             let source: VectorConfig = toml::from_str(&config).unwrap();

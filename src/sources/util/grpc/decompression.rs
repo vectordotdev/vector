@@ -258,8 +258,7 @@ where
         select! {
             biased;
 
-            // Drive the inner future, as this will be consuming the message chunks we give it. We forcefully unwrap the
-            // result because the future must be infallible.
+            // Drive the inner future, as this will be consuming the message chunks we give it.
             result = &mut inner => break result,
 
             // Drive the core decompression loop, reading chunks from the underlying body, decompressing them if needed,
@@ -317,8 +316,7 @@ where
             // can support decompression based on the indicated compression scheme... so wrap the body to decompress, if
             // need be, and then track the bytes that flowed through.
             //
-            // TODO: Actually use the scheme given back to us to support other compression scheme, and don't call this
-            // thing `GrpcGzipDecompression` specifically.
+            // TODO: Actually use the scheme given back to us to support other compression schemes.
             Ok(_) => {
                 let (destination, decompressed_body) = Body::channel();
                 let (req_parts, req_body) = req.into_parts();
@@ -332,7 +330,7 @@ where
     }
 }
 
-/// A layer for decomopressing Tonic request payloads and emitting telemetry for the payload sizes.
+/// A layer for decompressing Tonic request payloads and emitting telemetry for the payload sizes.
 ///
 /// In some cases, we configure `tonic` to use compression on requests to save CPU and throughput when sending those
 /// large requests. In the case of Vector-to-Vector communication, this means the Vector v2 source may deal with
