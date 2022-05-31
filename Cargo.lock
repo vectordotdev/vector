@@ -8785,6 +8785,8 @@ dependencies = [
  "vector-vrl-functions",
  "vector_buffers",
  "vector_common",
+ "vector_config",
+ "vector_config_macros",
  "vector_core",
  "vrl",
  "vrl-cli",
@@ -8812,29 +8814,6 @@ dependencies = [
  "tokio-tungstenite 0.17.1",
  "url",
  "uuid 1.1.0",
-]
-
-[[package]]
-name = "vector-config-common"
-version = "0.1.0"
-dependencies = [
- "darling 0.14.1",
- "proc-macro2",
- "quote",
- "schemars",
- "syn",
-]
-
-[[package]]
-name = "vector-config-macros"
-version = "0.1.0"
-dependencies = [
- "darling 0.14.1",
- "proc-macro2",
- "quote",
- "serde_derive_internals",
- "syn",
- "vector-config-common",
 ]
 
 [[package]]
@@ -8918,8 +8897,31 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
- "vector-config-common",
- "vector-config-macros",
+ "vector_config_common",
+ "vector_config_macros",
+]
+
+[[package]]
+name = "vector_config_common"
+version = "0.1.0"
+dependencies = [
+ "darling 0.14.1",
+ "proc-macro2",
+ "quote",
+ "schemars",
+ "syn",
+]
+
+[[package]]
+name = "vector_config_macros"
+version = "0.1.0"
+dependencies = [
+ "darling 0.14.1",
+ "proc-macro2",
+ "quote",
+ "serde_derive_internals",
+ "syn",
+ "vector_config_common",
 ]
 
 [[package]]

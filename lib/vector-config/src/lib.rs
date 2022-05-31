@@ -31,17 +31,21 @@ use core::fmt;
 use core::marker::PhantomData;
 
 use num_traits::{Bounded, ToPrimitive};
-use schemars::{gen::SchemaGenerator, schema::SchemaObject};
 use serde::{Deserialize, Serialize};
 
 pub mod schema;
+
+// Re-export of `schemars` to make the imports simpler in `vector`.
+pub mod schemars {
+    pub use schemars::{gen, schema};
+}
 
 mod stdlib;
 
 // Re-export of the `#[configurable_component]` and `#[derive(Configurable)]` proc macros.
 pub use vector_config_macros::*;
 
-// Re-export of both `Format` and `Validation` from `vetor_config_common`.
+// Re-export of both `Format` and `Validation` from `vector_config_common`.
 //
 // The crate exists so that both `vector_config_macros` and `vector_config` can import the types and work with them
 // natively, but from a codegen and usage perspective, it's much cleaner to export everything needed to use
@@ -49,6 +53,7 @@ pub use vector_config_macros::*;
 pub mod validation {
     pub use vector_config_common::validation::*;
 }
+
 #[derive(Clone)]
 pub struct Metadata<'de, T: Configurable<'de>> {
     title: Option<&'static str>,
@@ -301,7 +306,7 @@ where
     }
 
     /// Generates the schema for this value.
-    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject;
+    fn generate_schema(gen: &mut schemars::gen::SchemaGenerator, overrides: Metadata<'de, Self>) -> schemars::schema::SchemaObject;
 }
 
 #[doc(hidden)]

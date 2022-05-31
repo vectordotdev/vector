@@ -122,6 +122,8 @@ tracing-limit = { path = "lib/tracing-limit" }
 value = { path = "lib/value" }
 vector_buffers = { path = "lib/vector-buffers", default-features = false }
 vector_common = { path = "lib/vector-common" }
+vector_config = { path = "lib/vector-config" }
+vector_config_macros = { path = "lib/vector-config-macros" }
 vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl"] }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
 vector-vrl-functions = { path = "lib/vector-vrl-functions" }
