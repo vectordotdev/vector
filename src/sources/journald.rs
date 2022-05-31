@@ -1030,7 +1030,7 @@ mod tests {
 
     #[tokio::test]
     async fn handles_negative_acknowledgements() {
-        let (count, checkpoint) = run_acknowledgements(2).await;
+        let (_count, checkpoint) = run_acknowledgements(2).await;
 
         assert_eq!(checkpoint.as_deref(), Some("2"));
         // The acknowledgements for the events are delivered after the
