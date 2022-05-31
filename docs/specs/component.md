@@ -18,10 +18,11 @@ interpreted as described in [RFC 2119].
     - [`endpoint(s)`](#endpoints)
 - [Instrumentation](#instrumentation)
   - [Events](#events)
+    - [ComponentBilled](#componentbilled)
     - [ComponentBytesReceived](#componentbytesreceived)
+    - [ComponentBytesSent](#componentbytessent)
     - [ComponentEventsReceived](#componenteventsreceived)
     - [ComponentEventsSent](#componenteventssent)
-    - [ComponentBytesSent](#componentbytessent)
     - [ComponentError](#componenterror)
     - [ComponentEventsDropped](#componenteventsdropped)
 - [Health checks](#health-checks)
@@ -103,13 +104,36 @@ events:
   individual events. For example, emitting the `EventsReceived` event for 10
   events MUST increment the `component_received_events_total` counter by 10.
 
+#### ComponentBilled
+
+*Sources* MUST emit a `ComponentBilled` event that repsents the billing of
+enterprise customers.
+
+- Emission
+  - MUST emit only if the `enterprise.enabled` config option is set to `true`.
+  - MUST emit immediatley before the creation of Vector events and after
+    decompression and filtering of raw bytes.
+- Properties
+  - `byte_size` - REQUIRED, number of raw bytes received that will be turned
+    into Vector events.
+- Metrics
+  - MUST increment the `component_billed_bytes_total` counter by the defined
+    value with the defined properties as metric tags.
+- Logs
+  - MUST log a `Bytes billed.` message at the `trace` level with the defined
+    properties as key-value pairs.
+  - MUST NOT be rate limited.
+
 #### ComponentBytesReceived
 
-*Sources* MUST emit a `ComponentBytesReceived` event immediately after receiving
-bytes from the upstream source in order to reflect the *raw event bytes*
-received. This MUST happen before decompression, filtering, and the creation of
-Vector events.
+*Sources* MUST emit a `ComponentBytesReceived` event that represents the
+reception of *raw event bytes*. It MUST emit immediately after receiving
+bytes from the upstream source and before decompression, filtering, and the
+creation of Vector events.
 
+- Emission
+  - MUST emit immediately after receiving bytes from the upstream source,
+    before decompression, filtering, and the creation of Vector events.
 - Properties
   - `byte_size` - REQUIRED, number of raw event bytes received.
     - For HTTP-based protocols, the total number of raw bytes in the HTTP body,
@@ -130,58 +154,16 @@ Vector events.
     properties as key-value pairs.
   - MUST NOT be rate limited.
 
-#### ComponentEventsReceived
-
-*All components* MUST emit an `ComponentEventsReceived` event immediately after
-creating or receiving one or more Vector events.
-
-- Properties
-  - `count` - The count of Vector events.
-  - `byte_size` - The cumulative in-memory byte size of all events received.
-- Metrics
-  - MUST increment the `component_received_events_total` counter by the defined `quantity`
-    property with the other properties as metric tags.
-  - MUST increment the `component_received_event_bytes_total` counter by the defined
-    `byte_size` property with the other properties as metric tags.
-- Logs
-  - MUST log a `Events received.` message at the `trace` level with the
-    defined properties as key-value pairs.
-  - MUST NOT be rate limited.
-
-#### ComponentEventsSent
-
-*All components* that send events down stream, and delete them in Vector, MUST
-emit an `ComponentEventsSent` event immediately after sending, if the
-transmission was successful.
-
-Note that for sinks that simply expose data, but don't delete the data after
-sending it, like the `prometheus_exporter` sink, SHOULD NOT publish this metric.
-
-- Properties
-  - `count` - The count of Vector events.
-  - `byte_size` - The cumulative in-memory byte size of all events sent.
-  - `output` - For components that can use multiple outputs, the name of the
-    output that events were sent to. For events sent to the default output, this
-    value MUST be `_default`.
-- Metrics
-  - MUST increment the `component_sent_events_total` counter by the defined value with the
-    defined properties as metric tags.
-  - MUST increment the `component_sent_event_bytes_total` counter by the event's byte size
-    in JSON representation.
-- Logs
-  - MUST log a `Events sent.` message at the `trace` level with the
-    defined properties as key-value pairs.
-  - MUST NOT be rate limited.
-
 #### ComponentBytesSent
 
-*Sinks* that send events down stream, and delete them in Vector, MUST emit
-a `ComponentBytesSent` event immediately after sending bytes to the downstream target, if
-the transmission was successful. The reported bytes MUST be before compression.
+*Sinks* MUST emit a `ComponentBytesSent` that represents the number of raw
+bytes sent downstream.
 
-Note that for sinks that simply expose data, but don't delete the data after
-sending it, like the `prometheus_exporter` sink, SHOULD NOT publish this metric.
-
+- Emission
+  - MUST emit immediately after *successful* transmission the bytes.
+  - MUST emit before compression.
+  - MUST NOT emit for pull-based sinks since they do not send data. For
+    example, the `prometheus_exporter` sink MUST NOT emit this event.
 - Properties
   - `byte_size`
     - For UDP, TCP, and Unix protocols, the total number of bytes placed on the
@@ -200,6 +182,61 @@ sending it, like the `prometheus_exporter` sink, SHOULD NOT publish this metric.
     defined properties as metric tags.
 - Logs
   - MUST log a `Bytes sent.` message at the `trace` level with the
+    defined properties as key-value pairs.
+  - MUST NOT be rate limited.
+
+#### ComponentEventsReceived
+
+*All components* MUST emit a `ComponentEventsReceived` event that represents
+the number of Vector events received upstream.
+
+- Emission
+  - MUST emit immediately after creating or receiving Vector events.
+- Properties
+  - `count` - The count of Vector events.
+  - `byte_size` - The cumulative in-memory byte size of all events received.
+- Metrics
+  - MUST increment the `component_received_events_total` counter by the defined
+    `quantity` property with the other properties as metric tags.
+  - MUST increment the `component_received_event_bytes_total` counter by the
+    defined `byte_size` property with the other properties as metric tags.
+- Logs
+  - MUST log a `Events received.` message at the `trace` level with the
+    defined properties as key-value pairs.
+  - MUST NOT be rate limited.
+
+#### ComponentEventsSent
+
+*All components* MUST emit an `ComponentEventsSent` event that represents the
+number of Vector events sent downstream if the component sends events.
+
+
+ that send events down stream, and delete them in Vector, MUST
+emit an `ComponentEventsSent` event immediately after sending, if the
+transmission was successful.
+
+Note that for sinks that simply expose data, but don't delete the data after
+sending it, like the `prometheus_exporter` sink, SHOULD NOT publish this metric.
+
+- Emission
+  - MUST emit immediately after *successful* transmission of Vector events.
+    MUST NOT emit if the transmission was unsuccessful.
+  - MUST NOT emit for pull-based sinks since they do not send events. For
+    example, the `prometheus_exporter` sink MUST NOT emit this event.
+- Properties
+  - `count` - REQUIRED, the number of Vector events.
+  - `byte_size` - REQUIRED, the cumulative in-memory byte size of all events
+    sent.
+  - `output` - OPTIONAL, for components that can use multiple outputs, the name
+    of the output that events were sent to. For events sent to the default
+    output, this value MUST be `_default`.
+- Metrics
+  - MUST increment the `component_sent_events_total` counter by the defined
+    value with the defined properties as metric tags.
+  - MUST increment the `component_sent_event_bytes_total` counter by the event's
+    byte size in JSON representation.
+- Logs
+  - MUST log a `Events sent.` message at the `trace` level with the
     defined properties as key-value pairs.
   - MUST NOT be rate limited.
 
