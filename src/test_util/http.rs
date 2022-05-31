@@ -37,7 +37,7 @@ where
 
     tokio::spawn(async move {
         if let Err(e) = server.await {
-            eprintln!("blackhole HTTP server error: {}", e);
+            error!("blackhole HTTP server error: {:?}", e);
         }
     });
 
