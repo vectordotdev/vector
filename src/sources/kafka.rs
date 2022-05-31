@@ -31,8 +31,8 @@ use crate::{
     },
     event::{BatchNotifier, BatchStatus, Event, Value},
     internal_events::{
-        KafkaBytesReceived, KafkaEventsReceived, KafkaOffsetUpdateError, KafkaReadError,
-        StreamClosedError,
+        KafkaBytesReceived, KafkaEventsReceived, KafkaNegativeAcknowledgmentError,
+        KafkaOffsetUpdateError, KafkaReadError, StreamClosedError,
     },
     kafka::{KafkaAuthConfig, KafkaStatisticsContext},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
@@ -233,6 +233,11 @@ fn handle_ack(
                 emit!(KafkaOffsetUpdateError { error });
             }
         } else {
+            emit!(KafkaNegativeAcknowledgmentError {
+                topic: &entry.topic,
+                partition: entry.partition,
+                offset: entry.offset,
+            });
             // Try to unsubscribe from the named topic
             if topics.subscribed.remove(&entry.topic) {
                 let topics: Vec<&str> = topics.subscribed.iter().map(|s| s.as_str()).collect();
