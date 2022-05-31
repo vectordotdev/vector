@@ -105,33 +105,35 @@ events:
 
 #### ComponentBytesReceived
 
-*Sources* MUST emit a `ComponentBytesReceived` event immediately after receiving, decompressing
-and filtering bytes from the upstream source and before the creation of a Vector event.
+*Sources* MUST emit a `ComponentBytesReceived` event immediately after receiving
+bytes from the upstream source in order to reflect the *raw event bytes*
+received. This MUST happen before decompression, filtering, and the creation of
+Vector events.
 
 - Properties
-  - `byte_size`
-    - For UDP, TCP, and Unix protocols, the total number of bytes received from
-      the socket excluding the delimiter.
-    - For HTTP-based protocols, the total number of bytes in the HTTP body, as
-      represented by the `Content-Length` header.
-    - For files, the total number of bytes read from the file excluding the
+  - `byte_size` - REQUIRED, number of raw event bytes received.
+    - For HTTP-based protocols, the total number of raw bytes in the HTTP body,
+      as typically represented by the `Content-Length` header.
+    - For UDP, TCP, and Unix protocols, the total number of raw bytes received
+      from the socket excluding the delimiter.
+    - For files, the total number of raw bytes read from the file excluding the
       delimiter.
-  - `protocol` - The protocol used to send the bytes (i.e., `tcp`, `udp`,
-    `unix`, `http`, `https`, `file`, etc.)
-  - `http_path` - If relevant, the HTTP path, excluding query strings.
-  - `socket` - If relevant, the socket number that bytes were received from.
+  - `protocol` - REQUIRED, the protocol used to send the bytes. MUST be one of
+    `tcp`, `udp`, `unix`, `http`, `https`, `file`, etc.)
+  - `http_path` - OPTIONAL, the HTTP path, excluding query strings.
+  - `socket` - OPTIONAL, the socket number that bytes were received from.
 - Metrics
-  - MUST increment the `component_received_bytes_total` counter by the defined value with
-    the defined properties as metric tags.
+  - MUST increment the `component_received_bytes_total` counter by the defined
+    value with the defined properties as metric tags.
 - Logs
-  - MUST log a `Bytes received.` message at the `trace` level with the
-    defined properties as key-value pairs.
+  - MUST log a `Bytes received.` message at the `trace` level with the defined
+    properties as key-value pairs.
   - MUST NOT be rate limited.
 
 #### ComponentEventsReceived
 
-*All components* MUST emit an `ComponentEventsReceived` event immediately after creating
-or receiving one or more Vector events.
+*All components* MUST emit an `ComponentEventsReceived` event immediately after
+creating or receiving one or more Vector events.
 
 - Properties
   - `count` - The count of Vector events.
@@ -149,8 +151,8 @@ or receiving one or more Vector events.
 #### ComponentEventsSent
 
 *All components* that send events down stream, and delete them in Vector, MUST
-emit an `ComponentEventsSent` event immediately after sending, if the transmission was
-successful.
+emit an `ComponentEventsSent` event immediately after sending, if the
+transmission was successful.
 
 Note that for sinks that simply expose data, but don't delete the data after
 sending it, like the `prometheus_exporter` sink, SHOULD NOT publish this metric.
