@@ -348,7 +348,7 @@ where
 /// before it enters the decoding phase, and emit metrics based on the decompressed payload.
 ///
 /// Since we can see the decompressed bytes, and also know if the underlying service responded successfully -- i.e. the
-/// request was valif, and was processed -- we can now report the number of bytes (after decompression) that were
+/// request was valid, and was processed -- we can now report the number of bytes (after decompression) that were
 /// received _and_ processed correctly.
 ///
 /// The only supported compression scheme is gzip, which is also the only supported compression scheme in `tonic` itself.
