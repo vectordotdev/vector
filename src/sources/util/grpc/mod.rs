@@ -1,2 +1,2 @@
 mod decompression;
-pub use self::decompression::{GrpcGzipDecompression, GrpcGzipDecompressionLayer};
+pub use self::decompression::{DecompressionAndMetrics, DecompressionAndMetricsLayer};
