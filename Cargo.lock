@@ -3719,34 +3719,12 @@ dependencies = [
 
 [[package]]
 name = "inventory"
-version = "0.1.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0eb5160c60ba1e809707918ee329adb99d222888155835c6feedba19f6c3fd4"
-dependencies = [
- "ctor",
- "ghost",
- "inventory-impl",
-]
-
-[[package]]
-name = "inventory"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "84344c6e0b90a9e2b6f3f9abe5cc74402684e348df7b32adca28747e0cef091a"
 dependencies = [
  "ctor",
  "ghost",
-]
-
-[[package]]
-name = "inventory-impl"
-version = "0.1.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e41b53715c6f0c4be49510bb82dee2c1e51c8586d885abe65396e82ed518548"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
@@ -8392,7 +8370,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4080564c5b2241b5bff53ab610082234e0c57b0417f4bd10596f183001505b8a"
 dependencies = [
  "erased-serde",
- "inventory 0.2.3",
+ "inventory",
  "once_cell",
  "serde",
  "typetag-impl",
@@ -8686,7 +8664,7 @@ dependencies = [
  "indexmap",
  "indoc",
  "infer 0.8.0",
- "inventory 0.1.11",
+ "inventory",
  "itertools",
  "k8s-openapi",
  "kube",
