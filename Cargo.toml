@@ -173,7 +173,6 @@ azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git",
 
 # Tower
 tower = { version = "0.4.12", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util"] }
-
 # Serde
 serde = { version = "1.0.137", default-features = false, features = ["derive"] }
 serde-toml-merge = { version = "0.3.0", default-features = false }
@@ -220,6 +219,7 @@ vrl-stdlib = { path = "lib/vrl/stdlib" }
 arc-swap = { version = "1.5", default-features = false, optional = true }
 async-compression = { version = "0.3.12", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 avro-rs = { version = "0.13.0", default-features = false, optional = true }
+axum = { version = "0.5.6", default-features = false }
 base64 = { version = "0.13.0", default-features = false, optional = true }
 bloom = { version = "0.3.2", default-features = false, optional = true }
 bollard = { version = "0.12.0", default-features = false, features = ["ssl"] }
@@ -245,6 +245,7 @@ hash_hasher = { version = "2.0.0", default-features = false, optional  = true }
 headers = { version = "0.3.6", default-features = false }
 hostname = { version = "0.3.1", default-features = false }
 http = { version = "0.2.6", default-features = false }
+http-body = { version = "0.4.5", default-features = false }
 hyper = { version = "0.14.18", default-features = false, features = ["client", "runtime", "http1", "http2", "server", "stream"] }
 hyper-openssl = { version = "0.9.2", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
