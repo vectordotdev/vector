@@ -281,7 +281,7 @@ async fn handle_stream<T>(
         .get_ref()
         .ssl_stream()
         .and_then(|stream| stream.ssl().peer_certificate())
-        .map(|cert| CertificateMetadata::from_x509(cert.to_owned()));
+        .map(CertificateMetadata::from_x509);
 
     let reader = FramedRead::new(socket, source.decoder());
     let mut reader = ReadyFrames::new(reader);

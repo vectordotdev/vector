@@ -409,7 +409,7 @@ impl CertificateMetadata {
         if let Some(c) = &self.country_name {
             components.push(format!("C={}", c));
         }
-        return components.join(",");
+        components.join(",")
     }
 }
 

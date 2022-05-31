@@ -688,7 +688,7 @@ mod integration_tests {
             components::{assert_source_compliance, SOCKET_PUSH_SOURCE_TAGS},
             wait_for_tcp,
         },
-        tls::TlsConfig,
+        tls::{TlsConfig, TlsEnableableConfig},
         SourceSender,
     };
 
@@ -762,14 +762,15 @@ mod integration_tests {
     ) -> impl Stream<Item = Event> {
         let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
         let address: std::net::SocketAddr = address.parse().unwrap();
+        let tls_options: Some(tls);
         let tls_config = TlsSourceConfig {
             peer_key: None,
-            tls_config: tls,
+            tls_config: Some(tls),
         };
         tokio::spawn(async move {
             LogstashConfig {
                 address: address.into(),
-                tls_config,
+                tls: Some(tls_config),
                 keepalive: None,
                 receive_buffer_bytes: None,
                 acknowledgements: false.into(),
