@@ -321,11 +321,11 @@ impl SecretTarget for VrlTarget {
     }
 
     fn insert_secret(&mut self, key: &str, value: &str) {
-        self.metadata_mut().secrets_mut().insert_secret(key, value)
+        self.metadata_mut().secrets_mut().insert_secret(key, value);
     }
 
     fn remove_secret(&mut self, key: &str) {
-        self.metadata_mut().secrets_mut().remove_secret(key)
+        self.metadata_mut().secrets_mut().remove_secret(key);
     }
 }
 

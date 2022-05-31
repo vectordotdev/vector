@@ -15,7 +15,7 @@ use glob::glob;
 use value::Secrets;
 use vector_common::TimeZone;
 use vrl::prelude::{BTreeMap, VrlValueConvert};
-use vrl::{diagnostic::Formatter, state, Runtime, Terminate};
+use vrl::{diagnostic::Formatter, state, Runtime, SecretTarget, Terminate};
 use vrl::{TargetValueRef, VrlRuntime};
 use vrl_tests::{docs, Test};
 
@@ -186,6 +186,7 @@ fn main() {
         let runtime = Runtime::new(state);
         let mut functions = stdlib::all();
         functions.append(&mut enrichment::vrl_functions());
+        functions.append(&mut vector_vrl_functions::vrl_functions());
         let test_enrichment = test_enrichment::test_enrichment_table();
 
         let mut state = vrl::state::ExternalEnv::default();
@@ -257,7 +258,6 @@ fn main() {
                                     }
                                 }
                             };
-
                             if got == want {
                                 print!("{}{}", Colour::Green.bold().paint("OK"), timings,);
                             } else {
@@ -407,6 +407,10 @@ fn run_vrl(
         metadata: &mut metadata,
         secrets: &mut Secrets::new(),
     };
+
+    // Insert a dummy secret for examples to use
+    target.insert_secret("my_secret", "secret value");
+
     match vrl_runtime {
         VrlRuntime::Vm => {
             let vm = runtime.compile(functions, &program, &mut state).unwrap();

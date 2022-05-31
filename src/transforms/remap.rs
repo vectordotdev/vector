@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use value::Kind;
 use vector_common::TimeZone;
+use vector_vrl_functions::set_semantic_meaning::MeaningList;
 use vrl::{
     diagnostic::{Formatter, Note},
     prelude::{DiagnosticMessage, ExpressionError},
@@ -78,6 +79,7 @@ impl RemapConfig {
 
         let mut state = vrl::state::ExternalEnv::new_with_kind(merged_schema_definition.into());
         state.set_external_context(enrichment_tables);
+        state.set_external_context(MeaningList::default());
 
         vrl::compile_with_state(&source, &functions, &mut state)
             .map_err(|diagnostics| {
@@ -137,17 +139,32 @@ impl TransformConfig for RemapConfig {
         // We need to compile the VRL program in order to know the schema definition output of this
         // transform. We ignore any compilation errors, as those are caught by the transform build
         // step.
-        //
-        // TODO: Keep track of semantic meaning for fields.
         let default_definition = self
             .compile_vrl_program(
                 enrichment::TableRegistry::default(),
                 merged_definition.clone(),
             )
             .ok()
-            .and_then(|(_, _, _, state)| state.target_kind().cloned())
-            .and_then(Kind::into_object)
-            .map(Into::into)
+            .and_then(|(_, _, _, state)| {
+                let meaning = state
+                    .get_external_context::<MeaningList>()
+                    .cloned()
+                    .expect("context exists")
+                    .0;
+
+                state
+                    .target_kind()
+                    .cloned()
+                    .and_then(Kind::into_object)
+                    .map(schema::Definition::from)
+                    .map(|mut def| {
+                        for (id, path) in meaning {
+                            def.register_known_meaning(path, &id)
+                        }
+
+                        def
+                    })
+            })
             .unwrap_or_else(schema::Definition::empty);
 
         // When a message is dropped and re-routed, we keep the original event, but also annotate

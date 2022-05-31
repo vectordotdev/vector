@@ -1968,7 +1968,7 @@ dependencies = [
  "futures-core",
  "libc",
  "mio 0.8.2",
- "parking_lot 0.12.0",
+ "parking_lot 0.12.1",
  "signal-hook",
  "signal-hook-mio",
  "winapi 0.3.9",
@@ -2150,7 +2150,7 @@ checksum = "4c8858831f7781322e539ea39e72449c46b059638250c14344fec8d0aa6e539c"
 dependencies = [
  "cfg-if 1.0.0",
  "num_cpus",
- "parking_lot 0.12.0",
+ "parking_lot 0.12.1",
 ]
 
 [[package]]
@@ -2756,13 +2756,11 @@ checksum = "279fb028e20b3c4c320317955b77c5e0c9701f05a1d309905d6fc702cdc5053e"
 
 [[package]]
 name = "flate2"
-version = "1.0.23"
+version = "1.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b39522e96686d38f4bc984b9198e3a0613264abaebaff2c5c918bfa6b6da09af"
+checksum = "f82b0f4c27ad9f8bfd1f3208d882da2b09c301bc1c828fd3a00d0216d2fbbff6"
 dependencies = [
- "cfg-if 1.0.0",
  "crc32fast",
- "libc",
  "miniz_oxide",
 ]
 
@@ -3093,7 +3091,7 @@ dependencies = [
  "futures-timer",
  "no-std-compat",
  "nonzero_ext",
- "parking_lot 0.12.0",
+ "parking_lot 0.12.1",
  "rand 0.8.5",
  "smallvec",
 ]
@@ -3530,7 +3528,7 @@ dependencies = [
  "once_cell",
  "openssl",
  "openssl-sys",
- "parking_lot 0.12.0",
+ "parking_lot 0.12.1",
  "tokio",
  "tokio-openssl",
  "tower-layer",
@@ -3642,9 +3640,9 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "1.8.1"
+version = "1.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f647032dfaa1f8b6dc29bd3edb7bbef4861b8b8007ebb118d6db284fd59f6ee"
+checksum = "e6012d540c5baa3589337a98ce73408de9b5a25ec9fc2c6fd6be8f0d39e0ca5a"
 dependencies = [
  "autocfg",
  "hashbrown 0.11.2",
@@ -4043,7 +4041,7 @@ dependencies = [
  "json-patch",
  "k8s-openapi",
  "kube-client",
- "parking_lot 0.12.0",
+ "parking_lot 0.12.1",
  "pin-project",
  "serde",
  "serde_json",
@@ -4256,9 +4254,9 @@ dependencies = [
 
 [[package]]
 name = "lru"
-version = "0.7.5"
+version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32613e41de4c47ab04970c348ca7ae7382cf116625755af070b008a15516a889"
+checksum = "8015d95cb7b2ddd3c0d32ca38283ceb1eea09b4713ee380bceb942d85a244228"
 
 [[package]]
 name = "lru-cache"
@@ -4694,7 +4692,7 @@ dependencies = [
  "nkeys",
  "nuid",
  "once_cell",
- "parking_lot 0.12.0",
+ "parking_lot 0.12.1",
  "regex",
  "rustls 0.19.1",
  "rustls-native-certs 0.5.0",
@@ -5284,9 +5282,9 @@ dependencies = [
 
 [[package]]
 name = "parking_lot"
-version = "0.12.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87f5ec2493a61ac0506c0f4199f99070cbe83857b0337006a30f3e6719b8ef58"
+checksum = "3742b2c103b9f06bc9fff0a37ff4912935851bee6d36f3c02bcc755bcfec228f"
 dependencies = [
  "lock_api",
  "parking_lot_core 0.9.2",
@@ -6985,11 +6983,10 @@ dependencies = [
 
 [[package]]
 name = "serde_with"
-version = "1.13.0"
+version = "1.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b827f2113224f3f19a665136f006709194bdfdcb1fdc1e4b2b5cbac8e0cced54"
+checksum = "678b5a069e50bf00ecd22d0cd8ddf7c236f68581b03db652061ed5eb13a312ff"
 dependencies = [
- "rustversion",
  "serde",
  "serde_with_macros",
 ]
@@ -7328,7 +7325,7 @@ checksum = "213494b7a2b503146286049378ce02b482200519accc31872ee8be91fa820a08"
 dependencies = [
  "new_debug_unreachable",
  "once_cell",
- "parking_lot 0.12.0",
+ "parking_lot 0.12.1",
  "phf_shared",
  "precomputed-hash",
 ]
@@ -7691,7 +7688,7 @@ dependencies = [
  "mio 0.8.2",
  "num_cpus",
  "once_cell",
- "parking_lot 0.12.0",
+ "parking_lot 0.12.1",
  "pin-project-lite",
  "signal-hook-registry",
  "socket2",
@@ -7766,7 +7763,7 @@ dependencies = [
  "fallible-iterator",
  "futures 0.3.21",
  "log",
- "parking_lot 0.12.0",
+ "parking_lot 0.12.1",
  "percent-encoding",
  "phf",
  "pin-project-lite",
@@ -8285,7 +8282,7 @@ dependencies = [
  "lazy_static",
  "log",
  "lru-cache",
- "parking_lot 0.12.0",
+ "parking_lot 0.12.1",
  "resolv-conf",
  "smallvec",
  "thiserror",
@@ -8874,7 +8871,7 @@ dependencies = [
  "metrics-util",
  "num-traits",
  "once_cell",
- "parking_lot 0.12.0",
+ "parking_lot 0.12.1",
  "pin-project",
  "proptest",
  "quickcheck",
@@ -9172,6 +9169,7 @@ dependencies = [
  "tikv-jemallocator",
  "tracing-subscriber 0.3.11",
  "value",
+ "vector-vrl-functions",
  "vector_common",
  "vrl",
  "vrl-stdlib",

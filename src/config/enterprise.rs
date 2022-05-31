@@ -135,7 +135,7 @@ struct PipelinesAuth<'a> {
 
 /// Holds the relevant fields for reporting a configuration to Datadog Observability Pipelines.
 struct PipelinesStrFields<'a> {
-    config_version: &'a str,
+    configuration_version_hash: &'a str,
     vector_version: &'a str,
 }
 
@@ -237,7 +237,7 @@ impl<'a> PipelinesVersionPayload<'a> {
         Self {
             data: PipelinesData {
                 attributes: PipelinesAttributes {
-                    config_hash: fields.config_version,
+                    config_hash: fields.configuration_version_hash,
                     vector_version: fields.vector_version,
                     config,
                 },
@@ -257,7 +257,7 @@ impl<'a> PipelinesVersionPayload<'a> {
 pub(crate) struct EnterpriseMetadata {
     pub opts: Options,
     pub api_key: String,
-    pub config_version: String,
+    pub configuration_version_hash: String,
 }
 
 impl TryFrom<&Config> for EnterpriseMetadata {
@@ -290,13 +290,13 @@ impl TryFrom<&Config> for EnterpriseMetadata {
             DATADOG_REPORTING_PRODUCT
         );
 
-        // Get the configuration version. In DD Pipelines, this is referred to as the 'config hash'.
-        let config_version = value.version.clone().expect("Config should be versioned");
+        // Get the configuration version hash. In DD Pipelines, this is referred to as the 'config hash'.
+        let configuration_version_hash = value.version.clone().expect("Config should be versioned");
 
         Ok(Self {
             opts,
             api_key,
-            config_version,
+            configuration_version_hash,
         })
     }
 }
@@ -379,17 +379,17 @@ pub(crate) fn report_on_reload(
 
 pub(crate) fn attach_enterprise_components(config: &mut Config, metadata: &EnterpriseMetadata) {
     let api_key = metadata.api_key.clone();
-    let config_version = metadata.config_version.clone();
+    let configuration_version_hash = metadata.configuration_version_hash.clone();
 
     setup_metrics_reporting(
         config,
         &metadata.opts,
         api_key.clone(),
-        config_version.clone(),
+        configuration_version_hash.clone(),
     );
 
     if metadata.opts.enable_logs_reporting {
-        setup_logs_reporting(config, &metadata.opts, api_key, config_version);
+        setup_logs_reporting(config, &metadata.opts, api_key, configuration_version_hash);
     }
 }
 
@@ -397,7 +397,7 @@ fn setup_logs_reporting(
     config: &mut Config,
     datadog: &Options,
     api_key: String,
-    config_version: String,
+    configuration_version_hash: String,
 ) {
     let tag_logs_id = OutputId::from(ComponentKey::from(TAG_LOGS_KEY));
     let internal_logs_id = OutputId::from(ComponentKey::from(INTERNAL_LOGS_KEY));
@@ -412,26 +412,25 @@ fn setup_logs_reporting(
         .as_ref()
         .map_or("".to_string(), |tags| convert_tags_to_vrl(tags, false));
 
+    let configuration_key = &datadog.configuration_key;
+    let vector_version = crate::vector_version();
+    let build_arch = built_info::TARGET_ARCH;
+    let build_os = built_info::TARGET_OS;
+    let build_vendor = built_info::TARGET_VENDOR;
     let tag_logs = RemapConfig {
         source: Some(format!(
             r#"
-            .version = "{}"
-            .configuration_key = "{}"
             .ddsource = "vector"
             .vector = {{
-                "version": "{}",
-                "arch": "{}",
-                "os": "{}",
-                "vendor": "{}"
+                "configuration_key": "{configuration_key}",
+                "configuration_version_hash": "{configuration_version_hash}",
+                "version": "{vector_version}",
+                "arch": "{build_arch}",
+                "os": "{build_os}",
+                "vendor": "{build_vendor}"
             }}
             {}
         "#,
-            &config_version,
-            &datadog.configuration_key,
-            crate::vector_version(),
-            built_info::TARGET_ARCH,
-            built_info::TARGET_OS,
-            built_info::TARGET_VENDOR,
             custom_logs_tags_vrl,
         )),
         ..Default::default()
@@ -467,7 +466,7 @@ fn setup_metrics_reporting(
     config: &mut Config,
     datadog: &Options,
     api_key: String,
-    config_version: String,
+    configuration_version_hash: String,
 ) {
     let host_metrics_id = OutputId::from(ComponentKey::from(HOST_METRICS_KEY));
     let tag_metrics_id = OutputId::from(ComponentKey::from(TAG_METRICS_KEY));
@@ -493,14 +492,17 @@ fn setup_metrics_reporting(
         .as_ref()
         .map_or("".to_string(), |tags| convert_tags_to_vrl(tags, true));
 
+    let configuration_key = &datadog.configuration_key;
+    let vector_version = crate::vector_version();
     let tag_metrics = RemapConfig {
         source: Some(format!(
             r#"
-            .tags.version = "{}"
-            .tags.configuration_key = "{}"
+            .tags.configuration_version_hash = "{configuration_version_hash}"
+            .tags.configuration_key = "{configuration_key}"
+            .tags.vector_version = "{vector_version}"
             {}
         "#,
-            &config_version, &datadog.configuration_key, custom_metric_tags_vrl
+            custom_metric_tags_vrl
         )),
         ..Default::default()
     };
@@ -553,7 +555,7 @@ pub(crate) fn report_configuration(
     let fut = async move {
         let EnterpriseMetadata {
             api_key,
-            config_version,
+            configuration_version_hash,
             opts,
         } = metadata;
 
@@ -570,7 +572,7 @@ pub(crate) fn report_configuration(
         // Set the relevant fields needed to report a config to Datadog. This is a struct rather than
         // exploding as func arguments to avoid confusion with multiple &str fields.
         let fields = PipelinesStrFields {
-            config_version: config_version.as_ref(),
+            configuration_version_hash: &configuration_version_hash,
             vector_version: &vector_version,
         };
 
@@ -608,7 +610,7 @@ pub(crate) fn report_configuration(
             Ok(()) => {
                 info!(
                     "Vector config {} successfully reported to {}.",
-                    &config_version, DATADOG_REPORTING_PRODUCT
+                    &configuration_version_hash, DATADOG_REPORTING_PRODUCT
                 );
             }
             Err(err) => {
@@ -763,7 +765,7 @@ mod test {
 
     const fn get_pipelines_fields() -> PipelinesStrFields<'static> {
         PipelinesStrFields {
-            config_version: "config_version",
+            configuration_version_hash: "configuration_version_hash",
             vector_version: "vector_version",
         }
     }

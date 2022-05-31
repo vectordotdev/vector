@@ -255,8 +255,8 @@ impl<T> WithMetadata<T> {
 mod test {
     use super::*;
 
-    const SECRET: &'static str = "secret";
-    const SECRET2: &'static str = "secret2";
+    const SECRET: &str = "secret";
+    const SECRET2: &str = "secret2";
 
     #[test]
     fn get_set_secret() {

@@ -24,9 +24,9 @@ remap: functions: get_secret: {
 		{
 			title: "Get the Datadog API key from the event metadata."
 			source: #"""
-				get_secret("datadog_api_key")
+				get_secret("my_secret")
 				"""#
-			return: "abc123"
+			return: "secret value"
 		},
 	]
 }

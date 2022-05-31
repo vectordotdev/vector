@@ -2,11 +2,19 @@ syntax = "proto3";
 
 package dd_trace;
 
+// TracePayload can represent either an older payload or a new one
 message TracePayload {
 	string hostName = 1;
 	string env = 2;
+	// Older payload fields
 	repeated APITrace traces = 3;
 	repeated Span transactions = 4;
+	// Newer payload fields
+	repeated TracerPayload tracerPayloads = 5;
+	map<string, string> tags = 6;
+	string agentVersion = 7;
+	double targetTPS = 8;
+	double errorTPS = 9;
 }
 
 message APITrace {
@@ -16,6 +24,25 @@ message APITrace {
 	int64 endTime = 7;
 }
 
+message TracerPayload {
+	string containerID = 1;
+	string languageName = 2;
+	string languageVersion = 3;
+	string tracerVersion = 4;
+	string runtimeID = 5;
+	repeated TraceChunk chunks = 6;
+	string appVersion = 10;
+}
+
+message TraceChunk {
+	int32 priority = 1;
+	string origin = 2;
+	repeated Span spans = 3;
+	map<string, string> tags = 4;
+	bool droppedTrace = 5;
+}
+
+// The Span construct is the same in all circumstances
 message Span {
 	string service = 1;
 	string name = 2;
@@ -29,4 +56,5 @@ message Span {
 	map<string, string> meta = 10;
 	map<string, double> metrics = 11;
 	string type = 12;
+	map<string, bytes> meta_struct = 13;
 }

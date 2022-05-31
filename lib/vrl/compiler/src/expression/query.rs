@@ -41,6 +41,13 @@ impl Query {
         matches!(self.target, Target::External)
     }
 
+    pub fn as_variable(&self) -> Option<&Variable> {
+        match &self.target {
+            Target::Internal(variable) => Some(variable),
+            _ => None,
+        }
+    }
+
     pub fn variable_ident(&self) -> Option<&Ident> {
         match &self.target {
             Target::Internal(v) => Some(v.ident()),
