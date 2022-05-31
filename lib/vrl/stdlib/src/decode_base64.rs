@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use ::value::Value;
 use vrl::prelude::*;
 
 use crate::util::Base64Charset;

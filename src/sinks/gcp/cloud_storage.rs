@@ -1,20 +1,22 @@
-use std::{
-    collections::HashMap,
-    convert::TryFrom,
-    io::{self},
-};
+use std::{collections::HashMap, convert::TryFrom, io};
 
 use bytes::Bytes;
 use chrono::Utc;
+use codecs::{
+    encoding::{Framer, Serializer},
+    CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder,
+};
 use http::header::{HeaderName, HeaderValue};
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
+use snafu::Snafu;
 use tower::ServiceBuilder;
 use uuid::Uuid;
-use vector_core::{event::Finalizable, ByteSizeOf};
+use vector_core::event::{EventFinalizers, Finalizable};
 
 use crate::{
+    codecs::Encoder,
     config::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
     },
@@ -25,24 +27,35 @@ use crate::{
     sinks::{
         gcs_common::{
             config::{
-                build_healthcheck, GcsPredefinedAcl, GcsRetryLogic, GcsStorageClass,
-                KeyPrefixTemplateSnafu, BASE_URL,
+                build_healthcheck, GcsPredefinedAcl, GcsRetryLogic, GcsStorageClass, BASE_URL,
             },
-            service::{GcsMetadata, GcsRequest, GcsRequestSettings, GcsService},
+            service::{GcsRequest, GcsRequestSettings, GcsService},
             sink::GcsSink,
         },
         util::{
             batch::BatchConfig,
-            encoding::{EncodingConfig, EncodingConfiguration, StandardEncodings},
+            encoding::{
+                EncodingConfig, EncodingConfigWithFramingAdapter, StandardEncodings,
+                StandardEncodingsWithFramingMigrator, Transformer,
+            },
+            metadata::{RequestMetadata, RequestMetadataBuilder},
             partitioner::KeyPartitioner,
+            request_builder::EncodeResult,
             BulkSizeBasedDefaultBatchSettings, Compression, RequestBuilder, ServiceBuilderExt,
             TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
-    template::Template,
+    template::{Template, TemplateParseError},
     tls::{TlsConfig, TlsSettings},
 };
+
+#[derive(Debug, Snafu)]
+#[snafu(visibility(pub))]
+pub enum GcsHealthcheckError {
+    #[snafu(display("key_prefix template parse error: {}", source))]
+    KeyPrefixTemplate { source: TemplateParseError },
+}
 
 const NAME: &str = "gcp_cloud_storage";
 
@@ -57,7 +70,11 @@ pub struct GcsSinkConfig {
     filename_time_format: Option<String>,
     filename_append_uuid: Option<bool>,
     filename_extension: Option<String>,
-    encoding: EncodingConfig<StandardEncodings>,
+    #[serde(flatten)]
+    encoding: EncodingConfigWithFramingAdapter<
+        EncodingConfig<StandardEncodings>,
+        StandardEncodingsWithFramingMigrator,
+    >,
     #[serde(default)]
     compression: Compression,
     #[serde(default)]
@@ -86,7 +103,7 @@ fn default_config(e: StandardEncodings) -> GcsSinkConfig {
         filename_time_format: Default::default(),
         filename_append_uuid: Default::default(),
         filename_extension: Default::default(),
-        encoding: e.into(),
+        encoding: EncodingConfig::from(e).into(),
         compression: Compression::gzip_default(),
         batch: Default::default(),
         request: Default::default(),
@@ -134,7 +151,7 @@ impl SinkConfig for GcsSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(self.encoding.config().1.input_type())
     }
 
     fn sink_type(&self) -> &'static str {
@@ -195,58 +212,61 @@ struct RequestSettings {
     extension: String,
     time_format: String,
     append_uuid: bool,
-    encoding: EncodingConfig<StandardEncodings>,
+    encoder: (Transformer, Encoder<Framer>),
     compression: Compression,
 }
 
 impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
-    type Metadata = GcsMetadata;
+    type Metadata = (String, EventFinalizers, RequestMetadataBuilder);
     type Events = Vec<Event>;
-    type Encoder = EncodingConfig<StandardEncodings>;
+    type Encoder = (Transformer, Encoder<Framer>);
     type Payload = Bytes;
     type Request = GcsRequest;
-    type Error = io::Error; // TODO: this is ugly.
+    type Error = io::Error;
 
     fn compression(&self) -> Compression {
         self.compression
     }
 
     fn encoder(&self) -> &Self::Encoder {
-        &self.encoding
+        &self.encoder
     }
 
     fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
         let (partition_key, mut events) = input;
+        let metadata_builder = RequestMetadata::builder(&events);
         let finalizers = events.take_finalizers();
 
-        let metadata = GcsMetadata {
-            key: partition_key,
-            count: events.len(),
-            byte_size: events.size_of(),
-            finalizers,
-        };
-        (metadata, events)
+        ((partition_key, finalizers, metadata_builder), events)
     }
 
-    fn build_request(&self, mut metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
+    fn build_request(
+        &self,
+        metadata: Self::Metadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
+        let (key, finalizers, metadata_builder) = metadata;
         // TODO: pull the seconds from the last event
         let filename = {
             let seconds = Utc::now().format(&self.time_format);
 
             if self.append_uuid {
                 let uuid = Uuid::new_v4();
-                format!("{}-{}", seconds, uuid.to_hyphenated())
+                format!("{}-{}", seconds, uuid.hyphenated())
             } else {
                 seconds.to_string()
             }
         };
 
-        metadata.key = format!("{}{}.{}", metadata.key, filename, self.extension);
+        let key = format!("{}{}.{}", key, filename, self.extension);
 
-        trace!(message = "Sending events.", bytes = ?payload.len(), events_len = ?metadata.count, key = ?metadata.key);
+        let metadata = metadata_builder.build(&payload);
+        let body = payload.into_payload();
 
         GcsRequest {
-            body: payload,
+            key,
+            body,
+            finalizers,
             settings: GcsRequestSettings {
                 acl: self.acl.clone(),
                 content_type: self.content_type.clone(),
@@ -261,10 +281,25 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
 
 impl RequestSettings {
     fn new(config: &GcsSinkConfig) -> crate::Result<Self> {
+        let transformer = config.encoding.transformer();
+        let (framer, serializer) = config.encoding.encoding();
+        let framer = match (framer, &serializer) {
+            (Some(framer), _) => framer,
+            (None, Serializer::Json(_)) => CharacterDelimitedEncoder::new(b',').into(),
+            (None, Serializer::Native(_)) => LengthDelimitedEncoder::new().into(),
+            (
+                None,
+                Serializer::Logfmt(_)
+                | Serializer::NativeJson(_)
+                | Serializer::RawMessage(_)
+                | Serializer::Text(_),
+            ) => NewlineDelimitedEncoder::new().into(),
+        };
+        let encoder = Encoder::<Framer>::new(framer, serializer);
         let acl = config
             .acl
             .map(|acl| HeaderValue::from_str(&to_string(acl)).unwrap());
-        let content_type = HeaderValue::from_str(config.encoding.codec().content_type()).unwrap();
+        let content_type = HeaderValue::from_str(encoder.content_type()).unwrap();
         let content_encoding = config
             .compression
             .content_encoding()
@@ -300,7 +335,7 @@ impl RequestSettings {
             time_format,
             append_uuid,
             compression: config.compression,
-            encoding: config.encoding.clone(),
+            encoder: (transformer, encoder),
         })
     }
 }
@@ -315,13 +350,38 @@ fn make_header((name, value): (&String, &String)) -> crate::Result<(HeaderName, 
 
 #[cfg(test)]
 mod tests {
+    use futures_util::{future::ready, stream};
     use vector_core::partition::Partitioner;
+
+    use crate::test_util::{
+        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        http::{always_200_response, spawn_blackhole_http_server},
+    };
 
     use super::*;
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<GcsSinkConfig>();
+    }
+
+    #[tokio::test]
+    async fn component_spec_compliance() {
+        let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
+
+        let context = SinkContext::new_test();
+
+        let tls = TlsSettings::default();
+        let client =
+            HttpClient::new(tls, context.proxy()).expect("should not fail to create HTTP client");
+
+        let config = default_config(StandardEncodings::Json);
+        let sink = config
+            .build_sink(client, mock_endpoint.to_string(), None, context)
+            .expect("failed to build sink");
+
+        let event = Event::from("simple message");
+        run_and_assert_sink_compliance(sink, stream::once(ready(event)), &SINK_TAGS).await;
     }
 
     #[test]
@@ -366,21 +426,21 @@ mod tests {
             .expect("key wasn't provided");
         let request_settings = request_settings(&sink_config);
         let (metadata, _events) = request_settings.split_input((key, vec![log]));
-        request_settings.build_request(metadata, Bytes::new())
+        request_settings.build_request(metadata, EncodeResult::uncompressed(Bytes::new()))
     }
 
     #[test]
     fn gcs_build_request() {
         let req = build_request(Some("ext"), false, Compression::None);
-        assert_eq!(req.metadata.key, "key/date.ext".to_string());
+        assert_eq!(req.key, "key/date.ext".to_string());
 
         let req = build_request(None, false, Compression::None);
-        assert_eq!(req.metadata.key, "key/date.log".to_string());
+        assert_eq!(req.key, "key/date.log".to_string());
 
         let req = build_request(None, false, Compression::gzip_default());
-        assert_eq!(req.metadata.key, "key/date.log.gz".to_string());
+        assert_eq!(req.key, "key/date.log.gz".to_string());
 
         let req = build_request(None, true, Compression::gzip_default());
-        assert_ne!(req.metadata.key, "key/date.log.gz".to_string());
+        assert_ne!(req.key, "key/date.log.gz".to_string());
     }
 }

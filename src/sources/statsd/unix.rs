@@ -26,7 +26,7 @@ pub fn statsd_unix(
 ) -> crate::Result<Source> {
     let decoder = Decoder::new(
         Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
-        Deserializer::Boxed(Box::new(StatsdDeserializer)),
+        Deserializer::Boxed(Box::new(StatsdDeserializer::unix())),
     );
 
     build_unix_stream_source(

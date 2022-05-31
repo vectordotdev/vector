@@ -2,20 +2,20 @@ version: "3"
 
 services:
   localstack:
-    image: localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
+    image: docker.io/localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
     environment:
       - SERVICES=elasticsearch:4571
     networks:
       - backend
   elasticsearch:
-    image: elasticsearch:7.13.1
+    image: docker.io/elasticsearch:7.13.1
     environment:
       - discovery.type=single-node
       - "ES_JAVA_OPTS=-Xms400m -Xmx400m"
     networks:
       - backend
   elasticsearch-secure:
-    image: elasticsearch:7.13.1
+    image: docker.io/elasticsearch:7.13.1
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=true

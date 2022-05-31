@@ -1,13 +1,11 @@
-use std::net::SocketAddr;
-
-use futures::{FutureExt, StreamExt, TryFutureExt};
+use futures::TryFutureExt;
 use serde::{Deserialize, Serialize};
+use std::net::SocketAddr;
 use tokio::net::TcpStream;
 use tonic::{
-    transport::{server::Connected, Certificate, Server},
+    transport::{server::Connected, Certificate},
     Request, Response, Status,
 };
-use tracing::{Instrument, Span};
 use vector_core::{
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
     ByteSizeOf,
@@ -15,11 +13,10 @@ use vector_core::{
 
 use crate::{
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource, SourceContext},
-    internal_events::{EventsReceived, StreamClosedError, TcpBytesReceived},
+    internal_events::{EventsReceived, StreamClosedError},
     proto::vector as proto,
     serde::bool_or_struct,
-    shutdown::ShutdownSignalToken,
-    sources::{util::AfterReadExt as _, Source},
+    sources::{util::grpc::run_grpc_server, Source},
     tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsEnableableConfig},
     SourceSender,
 };
@@ -89,7 +86,6 @@ async fn handle_batch_status(receiver: Option<BatchStatusReceiver>) -> Result<()
         BatchStatus::Delivered => Ok(()),
     }
 }
-
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct VectorConfig {
@@ -122,10 +118,15 @@ impl VectorConfig {
     pub(super) async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let tls_settings = MaybeTlsSettings::from_config(&self.tls, true)?;
         let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
-
-        let source = run(self.address, tls_settings, cx, acknowledgements).map_err(|error| {
-            error!(message = "Source future failed.", %error);
-        });
+        let service = proto::Server::new(Service {
+            pipeline: cx.out,
+            acknowledgements,
+        })
+        .accept_gzip();
+        let source =
+            run_grpc_server(self.address, tls_settings, service, cx.shutdown).map_err(|error| {
+                error!(message = "Source future failed.", %error);
+            });
 
         Ok(Box::pin(source))
     }
@@ -141,47 +142,6 @@ impl VectorConfig {
     pub(super) fn resources(&self) -> Vec<Resource> {
         vec![Resource::tcp(self.address)]
     }
-}
-
-async fn run(
-    address: SocketAddr,
-    tls_settings: MaybeTlsSettings,
-    cx: SourceContext,
-    acknowledgements: bool,
-) -> crate::Result<()> {
-    let span = Span::current();
-
-    let service = proto::Server::new(Service {
-        pipeline: cx.out,
-        acknowledgements,
-    })
-    .accept_gzip();
-
-    let (tx, rx) = tokio::sync::oneshot::channel::<ShutdownSignalToken>();
-
-    let listener = tls_settings.bind(&address).await?;
-    let stream = listener.accept_stream().map(|result| {
-        result.map(|socket| {
-            let peer_addr = socket.connect_info().remote_addr;
-            socket.after_read(move |byte_size| {
-                emit!(TcpBytesReceived {
-                    byte_size,
-                    peer_addr,
-                })
-            })
-        })
-    });
-
-    Server::builder()
-        .trace_fn(move |_| span.clone())
-        .add_service(service)
-        .serve_with_incoming_shutdown(stream, cx.shutdown.map(|token| tx.send(token).unwrap()))
-        .in_current_span()
-        .await?;
-
-    drop(rx.await);
-
-    Ok(())
 }
 
 #[derive(Clone)]
@@ -218,73 +178,78 @@ mod tests {
     use crate::{
         config::SinkContext,
         sinks::vector::v2::VectorConfig as SinkConfig,
-        test_util::{self, components},
+        test_util::{
+            self,
+            components::{assert_source_compliance, SOCKET_PUSH_SOURCE_TAGS},
+        },
         SourceSender,
     };
 
     #[tokio::test]
     async fn receive_message() {
-        let addr = test_util::next_addr();
-        let config = format!(r#"address = "{}""#, addr);
-        let source: VectorConfig = toml::from_str(&config).unwrap();
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let addr = test_util::next_addr();
+            let config = format!(r#"address = "{}""#, addr);
+            let source: VectorConfig = toml::from_str(&config).unwrap();
 
-        components::init_test();
-        let (tx, rx) = SourceSender::new_test();
-        let server = source
-            .build(SourceContext::new_test(tx, None))
-            .await
-            .unwrap();
-        tokio::spawn(server);
-        test_util::wait_for_tcp(addr).await;
+            let (tx, rx) = SourceSender::new_test();
+            let server = source
+                .build(SourceContext::new_test(tx, None))
+                .await
+                .unwrap();
+            tokio::spawn(server);
+            test_util::wait_for_tcp(addr).await;
 
-        // Ideally, this would be a fully custom agent to send the data,
-        // but the sink side already does such a test and this is good
-        // to ensure interoperability.
-        let config = format!(r#"address = "{}""#, addr);
-        let sink: SinkConfig = toml::from_str(&config).unwrap();
-        let cx = SinkContext::new_test();
-        let (sink, _) = sink.build(cx).await.unwrap();
+            // Ideally, this would be a fully custom agent to send the data,
+            // but the sink side already does such a test and this is good
+            // to ensure interoperability.
+            let config = format!(r#"address = "{}""#, addr);
+            let sink: SinkConfig = toml::from_str(&config).unwrap();
+            let cx = SinkContext::new_test();
+            let (sink, _) = sink.build(cx).await.unwrap();
 
-        let (events, stream) = test_util::random_events_with_stream(100, 100, None);
-        sink.run(stream).await.unwrap();
-        components::SOURCE_TESTS.assert(&components::TCP_SOURCE_TAGS);
+            let (events, stream) = test_util::random_events_with_stream(100, 100, None);
+            sink.run(stream).await.unwrap();
 
-        let output = test_util::collect_ready(rx).await;
-        assert_event_data_eq!(events, output);
+            let output = test_util::collect_ready(rx).await;
+            assert_event_data_eq!(events, output);
+        })
+        .await;
     }
 
     #[tokio::test]
     async fn receive_compressed_message() {
-        let addr = test_util::next_addr();
-        let config = format!(r#"address = "{}""#, addr);
-        let source: VectorConfig = toml::from_str(&config).unwrap();
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let addr = test_util::next_addr();
+            let config = format!(r#"address = "{}""#, addr);
+            let source: VectorConfig = toml::from_str(&config).unwrap();
 
-        components::init_test();
-        let (tx, rx) = SourceSender::new_test();
-        let server = source
-            .build(SourceContext::new_test(tx, None))
-            .await
-            .unwrap();
-        tokio::spawn(server);
-        test_util::wait_for_tcp(addr).await;
+            let (tx, rx) = SourceSender::new_test();
+            let server = source
+                .build(SourceContext::new_test(tx, None))
+                .await
+                .unwrap();
+            tokio::spawn(server);
+            test_util::wait_for_tcp(addr).await;
 
-        // Ideally, this would be a fully custom agent to send the data,
-        // but the sink side already does such a test and this is good
-        // to ensure interoperability.
-        let config = format!(
-            r#"address = "{}"
-        compression=true"#,
-            addr
-        );
-        let sink: SinkConfig = toml::from_str(&config).unwrap();
-        let cx = SinkContext::new_test();
-        let (sink, _) = sink.build(cx).await.unwrap();
+            // Ideally, this would be a fully custom agent to send the data,
+            // but the sink side already does such a test and this is good
+            // to ensure interoperability.
+            let config = format!(
+                r#"address = "{}"
+            compression=true"#,
+                addr
+            );
+            let sink: SinkConfig = toml::from_str(&config).unwrap();
+            let cx = SinkContext::new_test();
+            let (sink, _) = sink.build(cx).await.unwrap();
 
-        let (events, stream) = test_util::random_events_with_stream(100, 100, None);
-        sink.run(stream).await.unwrap();
-        components::SOURCE_TESTS.assert(&components::TCP_SOURCE_TAGS);
+            let (events, stream) = test_util::random_events_with_stream(100, 100, None);
+            sink.run(stream).await.unwrap();
 
-        let output = test_util::collect_ready(rx).await;
-        assert_event_data_eq!(events, output);
+            let output = test_util::collect_ready(rx).await;
+            assert_event_data_eq!(events, output);
+        })
+        .await;
     }
 }

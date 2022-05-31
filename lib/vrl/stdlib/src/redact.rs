@@ -4,6 +4,7 @@ use std::{
     str::FromStr,
 };
 
+use ::value::Value;
 use once_cell::sync::Lazy;
 use vrl::prelude::*;
 

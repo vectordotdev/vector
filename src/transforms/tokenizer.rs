@@ -134,13 +134,14 @@ impl FunctionTransform for Tokenizer {
 
 #[cfg(test)]
 mod tests {
+    use ordered_float::NotNan;
+
     use super::TokenizerConfig;
     use crate::{
         config::{TransformConfig, TransformContext},
         event::{Event, LogEvent, Value},
         transforms::OutputBuffer,
     };
-    use ordered_float::NotNan;
 
     #[test]
     fn generate_config() {

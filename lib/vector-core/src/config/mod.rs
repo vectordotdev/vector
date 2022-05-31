@@ -1,6 +1,7 @@
+use std::{fmt, num::NonZeroUsize};
+
 use bitmask_enum::bitmask;
 use serde::{Deserialize, Serialize};
-use std::{fmt, num::NonZeroUsize};
 
 mod global_options;
 mod id;
@@ -83,6 +84,13 @@ impl Input {
             ty: DataType::all(),
             log_schema_requirement: schema::Requirement::empty(),
         }
+    }
+
+    /// Set the schema requirement for this output.
+    #[must_use]
+    pub fn with_schema_requirement(mut self, schema_requirement: schema::Requirement) -> Self {
+        self.log_schema_requirement = schema_requirement;
+        self
     }
 }
 

@@ -10,6 +10,7 @@ pub mod traces;
 use std::{fmt::Debug, io::Read, net::SocketAddr, sync::Arc};
 
 use bytes::{Buf, Bytes};
+use chrono::{serde::ts_milliseconds, DateTime, Utc};
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use futures::FutureExt;
@@ -113,14 +114,7 @@ impl SourceConfig for DatadogAgentConfig {
         );
         let listener = tls.bind(&self.address).await?;
         let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
-        let filters = source.build_warp_filters(
-            cx.out,
-            acknowledgements,
-            !self.disable_logs,
-            !self.disable_metrics,
-            !self.disable_traces,
-            self.multiple_outputs,
-        )?;
+        let filters = source.build_warp_filters(cx.out, acknowledgements, self)?;
         let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
             let span = Span::current();
@@ -152,11 +146,11 @@ impl SourceConfig for DatadogAgentConfig {
             DeserializerConfig::Bytes => schema::Definition::empty()
                 .required_field("message", Kind::bytes(), Some("message"))
                 .required_field("status", Kind::bytes(), Some("severity"))
-                .required_field("timestamp", Kind::integer(), Some("timestamp"))
+                .required_field("timestamp", Kind::timestamp(), Some("timestamp"))
                 .required_field("hostname", Kind::bytes(), Some("host"))
-                .required_field("service", Kind::bytes(), None)
-                .required_field("ddsource", Kind::bytes(), None)
-                .required_field("ddtags", Kind::bytes(), None)
+                .required_field("service", Kind::bytes(), Some("service"))
+                .required_field("ddsource", Kind::bytes(), Some("source"))
+                .required_field("ddtags", Kind::bytes(), Some("tags"))
                 .merge(self.decoding.schema_definition()),
 
             // JSON deserializer can overwrite existing fields at runtime, so we have to treat
@@ -279,28 +273,25 @@ impl DatadogAgentSource {
         }
     }
 
-    pub(crate) fn build_warp_filters(
+    fn build_warp_filters(
         &self,
         out: SourceSender,
         acknowledgements: bool,
-        logs: bool,
-        metrics: bool,
-        traces: bool,
-        multiple_outputs: bool,
+        config: &DatadogAgentConfig,
     ) -> crate::Result<BoxedFilter<(Response,)>> {
-        let mut filters = logs.then(|| {
+        let mut filters = (!config.disable_logs).then(|| {
             logs::build_warp_filter(
                 acknowledgements,
-                multiple_outputs,
+                config.multiple_outputs,
                 out.clone(),
                 self.clone(),
             )
         });
 
-        if traces {
+        if !config.disable_traces {
             let trace_filter = traces::build_warp_filter(
                 acknowledgements,
-                multiple_outputs,
+                config.multiple_outputs,
                 out.clone(),
                 self.clone(),
             );
@@ -309,9 +300,13 @@ impl DatadogAgentSource {
                 .or(Some(trace_filter));
         }
 
-        if metrics {
-            let metrics_filter =
-                metrics::build_warp_filter(acknowledgements, multiple_outputs, out, self.clone());
+        if !config.disable_metrics {
+            let metrics_filter = metrics::build_warp_filter(
+                acknowledgements,
+                config.multiple_outputs,
+                out,
+                self.clone(),
+            );
             filters = filters
                 .map(|f| f.or(metrics_filter.clone()).unify().boxed())
                 .or(Some(metrics_filter));
@@ -418,7 +413,11 @@ fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMe
 struct LogMsg {
     pub message: Bytes,
     pub status: Bytes,
-    pub timestamp: i64,
+    #[serde(
+        deserialize_with = "ts_milliseconds::deserialize",
+        serialize_with = "ts_milliseconds::serialize"
+    )]
+    pub timestamp: DateTime<Utc>,
     pub hostname: Bytes,
     pub service: Bytes,
     pub ddsource: Bytes,

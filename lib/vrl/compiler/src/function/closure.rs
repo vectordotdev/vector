@@ -1,18 +1,18 @@
+use core::ExpressionError;
+use std::collections::BTreeMap;
+
 use parser::ast::Ident;
 use value::{
     kind::{Collection, Field, Index},
     Value,
 };
 
+use super::Example;
 use crate::{
     state::Runtime,
     value::{Kind, VrlValueConvert},
     Context,
 };
-use core::ExpressionError;
-use std::collections::BTreeMap;
-
-use super::Example;
 
 /// The definition of a function-closure block a function expects to
 /// receive.

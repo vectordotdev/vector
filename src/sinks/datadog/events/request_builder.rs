@@ -1,13 +1,14 @@
-use bytes::Bytes;
-use lookup::lookup_v2::OwnedSegment;
 use std::{io, sync::Arc};
 
+use bytes::Bytes;
+use lookup::lookup_v2::OwnedSegment;
 use vector_core::{buffers::Ackable, ByteSizeOf};
 
 use crate::{
     event::{EventFinalizers, Finalizable, LogEvent},
     sinks::util::{
         encoding::{EncodingConfigFixed, StandardJsonEncoding, TimestampFormat},
+        request_builder::EncodeResult,
         Compression, ElementCount, RequestBuilder,
     },
 };
@@ -86,8 +87,15 @@ impl RequestBuilder<LogEvent> for DatadogEventsRequestBuilder {
         (metadata, log)
     }
 
-    fn build_request(&self, metadata: Self::Metadata, body: Self::Payload) -> Self::Request {
-        DatadogEventsRequest { body, metadata }
+    fn build_request(
+        &self,
+        metadata: Self::Metadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
+        DatadogEventsRequest {
+            body: payload.into_payload(),
+            metadata,
+        }
     }
 }
 

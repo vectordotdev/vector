@@ -2,7 +2,7 @@ version: "3"
 
 services:
   humio:
-    image: humio/humio:${HUMIO_VERSION:-1.13.1}
+    image: docker.io/humio/humio:${HUMIO_VERSION:-1.13.1}
     network_mode: host
   runner:
     build:

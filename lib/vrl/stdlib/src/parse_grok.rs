@@ -1,5 +1,6 @@
 use std::{collections::BTreeMap, fmt, sync::Arc};
 
+use ::value::Value;
 use vrl::{
     diagnostic::{Label, Span},
     prelude::*,

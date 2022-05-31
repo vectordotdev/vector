@@ -1,10 +1,21 @@
 mod jit;
-
-use crate::lookup_v2::jit::{JitLookup, JitPath};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::borrow::Cow;
 use std::iter::Cloned;
 use std::slice::Iter;
+
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+use self::jit::{JitLookup, JitPath};
+
+/// Syntactic sugar for creating a pre-parsed path.
+///
+/// Example: `path!("foo", 4, "bar")` is the pre-parsed path of `foo[4].bar`
+#[macro_export]
+macro_rules! path {
+    ($($segment:expr),*) => {{
+           &[$(lookup::lookup_v2::BorrowedSegment::from($segment),)*]
+    }};
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct OwnedPath {
@@ -117,12 +128,33 @@ pub fn parse_path(path: &str) -> OwnedPath {
     OwnedPath { segments }
 }
 
+#[derive(Clone)]
+pub struct PathConcat<A, B> {
+    a: A,
+    b: B,
+}
+
+impl<'a, A: Path<'a>, B: Path<'a>> Path<'a> for PathConcat<A, B> {
+    type Iter = std::iter::Chain<A::Iter, B::Iter>;
+
+    fn segment_iter(&self) -> Self::Iter {
+        self.a.segment_iter().chain(self.b.segment_iter())
+    }
+}
+
 /// A path is simply the data describing how to look up a value.
 /// This should only be implemented for types that are very cheap to clone, such as references.
 pub trait Path<'a>: Clone {
     type Iter: Iterator<Item = BorrowedSegment<'a>>;
 
     fn segment_iter(&self) -> Self::Iter;
+
+    fn concat<T: Path<'a>>(&self, path: T) -> PathConcat<Self, T> {
+        PathConcat {
+            a: self.clone(),
+            b: path,
+        }
+    }
 }
 
 impl<'a> Path<'a> for &'a Vec<OwnedSegment> {
@@ -159,24 +191,24 @@ impl<'a> Iterator for OwnedSegmentSliceIter<'a> {
     }
 }
 
-impl<'a, 'b: 'a> Path<'a> for &'b Vec<BorrowedSegment<'a>> {
-    type Iter = Cloned<Iter<'a, BorrowedSegment<'a>>>;
+impl<'a, 'b> Path<'a> for &'b Vec<BorrowedSegment<'a>> {
+    type Iter = Cloned<Iter<'b, BorrowedSegment<'a>>>;
 
     fn segment_iter(&self) -> Self::Iter {
         self.as_slice().iter().cloned()
     }
 }
 
-impl<'a, 'b: 'a> Path<'a> for &'b [BorrowedSegment<'a>] {
-    type Iter = Cloned<Iter<'a, BorrowedSegment<'a>>>;
+impl<'a, 'b> Path<'a> for &'b [BorrowedSegment<'a>] {
+    type Iter = Cloned<Iter<'b, BorrowedSegment<'a>>>;
 
     fn segment_iter(&self) -> Self::Iter {
         self.iter().cloned()
     }
 }
 
-impl<'a, 'b: 'a, const A: usize> Path<'a> for &'b [BorrowedSegment<'a>; A] {
-    type Iter = Cloned<Iter<'a, BorrowedSegment<'a>>>;
+impl<'a, 'b, const A: usize> Path<'a> for &'b [BorrowedSegment<'a>; A] {
+    type Iter = Cloned<Iter<'b, BorrowedSegment<'a>>>;
 
     fn segment_iter(&self) -> Self::Iter {
         self.iter().cloned()
@@ -188,6 +220,24 @@ impl<'a> Path<'a> for &'a str {
 
     fn segment_iter(&self) -> Self::Iter {
         JitPath::new(self).segment_iter()
+    }
+}
+
+impl<'a> From<&'a str> for BorrowedSegment<'a> {
+    fn from(field: &'a str) -> Self {
+        BorrowedSegment::field(field)
+    }
+}
+
+impl<'a> From<&'a String> for BorrowedSegment<'a> {
+    fn from(field: &'a String) -> Self {
+        BorrowedSegment::field(field.as_str())
+    }
+}
+
+impl From<usize> for BorrowedSegment<'_> {
+    fn from(index: usize) -> Self {
+        BorrowedSegment::index(index)
     }
 }
 
@@ -257,6 +307,29 @@ impl<'a> From<BorrowedSegment<'a>> for OwnedSegment {
             BorrowedSegment::Field(value) => OwnedSegment::Field((*value).to_owned()),
             BorrowedSegment::Index(value) => OwnedSegment::Index(value),
             BorrowedSegment::Invalid => OwnedSegment::Invalid,
+        }
+    }
+}
+
+#[cfg(any(test, feature = "arbitrary"))]
+impl quickcheck::Arbitrary for BorrowedSegment<'static> {
+    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+        match usize::arbitrary(g) % 2 {
+            0 => BorrowedSegment::Index(usize::arbitrary(g) % 20),
+            _ => BorrowedSegment::Field(String::arbitrary(g).into()),
+        }
+    }
+
+    fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
+        match self {
+            BorrowedSegment::Invalid => Box::new(std::iter::empty()),
+            BorrowedSegment::Index(index) => Box::new(index.shrink().map(BorrowedSegment::Index)),
+            BorrowedSegment::Field(field) => Box::new(
+                field
+                    .to_string()
+                    .shrink()
+                    .map(|f| BorrowedSegment::Field(f.into())),
+            ),
         }
     }
 }

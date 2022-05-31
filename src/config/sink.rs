@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use vector_buffers::{Acker, BufferConfig, BufferType};
 use vector_core::config::{AcknowledgementsConfig, GlobalOptions, Input};
 
-use super::{component, ComponentKey, ProxyConfig, Resource};
+use super::{component, schema, ComponentKey, ProxyConfig, Resource};
 use crate::sinks::{self, util::UriSerde};
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -153,6 +153,7 @@ pub struct SinkContext {
     pub healthcheck: SinkHealthcheckOptions,
     pub globals: GlobalOptions,
     pub proxy: ProxyConfig,
+    pub schema: schema::Options,
 }
 
 impl SinkContext {
@@ -163,6 +164,7 @@ impl SinkContext {
             healthcheck: SinkHealthcheckOptions::default(),
             globals: GlobalOptions::default(),
             proxy: ProxyConfig::default(),
+            schema: schema::Options::default(),
         }
     }
 

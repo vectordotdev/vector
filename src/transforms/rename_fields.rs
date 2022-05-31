@@ -7,7 +7,7 @@ use crate::{
         TransformDescription,
     },
     event::Event,
-    internal_events::{RenameFieldsFieldDoesNotExist, RenameFieldsFieldOverwritten},
+    internal_events::{FieldOverwritten, RenameFieldsFieldDoesNotExist},
     schema,
     serde::Fields,
     transforms::{FunctionTransform, OutputBuffer, Transform},
@@ -76,7 +76,7 @@ impl FunctionTransform for RenameFields {
             match log.remove_prune(old_key.as_str(), self.drop_empty) {
                 Some(v) => {
                     if event.as_mut_log().insert(new_key.as_str(), v).is_some() {
-                        emit!(RenameFieldsFieldOverwritten { field: old_key });
+                        emit!(FieldOverwritten { field: old_key });
                     }
                 }
                 None => {

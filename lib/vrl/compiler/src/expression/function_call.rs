@@ -3,8 +3,8 @@ use std::{fmt, sync::Arc};
 use anymap::AnyMap;
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 
+use super::Block;
 use crate::{
-    expression::assignment::Details,
     expression::{levenstein, ExpressionError, FunctionArgument, Noop},
     function::{
         closure::{self, VariableKind},
@@ -12,12 +12,11 @@ use crate::{
     },
     parser::{Ident, Node},
     state::{ExternalEnv, LocalEnv},
+    type_def::Details,
     value::Kind,
     vm::{OpCode, VmFunctionClosure},
     Context, Expression, Function, Resolved, Span, TypeDef,
 };
-
-use super::Block;
 
 pub(crate) struct Builder<'a> {
     abort_on_error: bool,
@@ -573,6 +572,7 @@ impl FunctionCall {
 impl Expression for FunctionCall {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         self.expr.resolve(ctx).map_err(|err| match err {
+            #[cfg(feature = "expr-abort")]
             ExpressionError::Abort { .. } => {
                 panic!("abort errors must only be defined by `abort` statement")
             }
@@ -1190,13 +1190,8 @@ impl DiagnosticMessage for Error {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        expression::{Expr, Literal},
-        state::ExternalEnv,
-        value::kind,
-    };
-
     use super::*;
+    use crate::{state::ExternalEnv, value::kind};
 
     #[derive(Clone, Debug)]
     struct Fn;
@@ -1261,17 +1256,22 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "expr-literal")]
     fn create_node<T>(inner: T) -> Node<T> {
         Node::new(Span::new(0, 0), inner)
     }
 
+    #[cfg(feature = "expr-literal")]
     fn create_argument(ident: Option<&str>, value: i64) -> FunctionArgument {
+        use crate::expression::{Expr, Literal};
+
         FunctionArgument::new(
             ident.map(|ident| create_node(Ident::new(ident))),
             create_node(Expr::Literal(Literal::Integer(value))),
         )
     }
 
+    #[cfg(feature = "expr-literal")]
     fn create_function_call(arguments: Vec<Node<FunctionArgument>>) -> FunctionCall {
         let mut local = LocalEnv::default();
         let mut external = ExternalEnv::default();
@@ -1292,6 +1292,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "expr-literal")]
     fn resolve_arguments_simple() {
         let call = create_function_call(vec![
             create_node(create_argument(None, 1)),
@@ -1310,6 +1311,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "expr-literal")]
     fn resolve_arguments_named() {
         let call = create_function_call(vec![
             create_node(create_argument(Some("one"), 1)),
@@ -1328,6 +1330,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "expr-literal")]
     fn resolve_arguments_named_unordered() {
         let call = create_function_call(vec![
             create_node(create_argument(Some("three"), 3)),
@@ -1346,6 +1349,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "expr-literal")]
     fn resolve_arguments_unnamed_unordered_one() {
         let call = create_function_call(vec![
             create_node(create_argument(Some("three"), 3)),
@@ -1364,6 +1368,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "expr-literal")]
     fn resolve_arguments_unnamed_unordered_two() {
         let call = create_function_call(vec![
             create_node(create_argument(Some("three"), 3)),

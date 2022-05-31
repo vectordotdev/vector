@@ -12,15 +12,6 @@ impl InternalEvent for LokiEventUnlabeled {
 }
 
 #[derive(Debug)]
-pub struct LokiUniqueStream;
-
-impl InternalEvent for LokiUniqueStream {
-    fn emit(self) {
-        counter!("streams_total", 1);
-    }
-}
-
-#[derive(Debug)]
 pub struct LokiOutOfOrderEventDropped {
     pub count: usize,
 }

@@ -3,7 +3,7 @@ use vrl::prelude::*;
 
 fn uuid_v4() -> Resolved {
     let mut buf = [0; 36];
-    let uuid = uuid::Uuid::new_v4().to_hyphenated().encode_lower(&mut buf);
+    let uuid = uuid::Uuid::new_v4().hyphenated().encode_lower(&mut buf);
     Ok(Bytes::copy_from_slice(uuid.as_bytes()).into())
 }
 
@@ -52,6 +52,9 @@ impl Expression for UuidV4Fn {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
+    use ::value::Value;
     use vector_common::TimeZone;
 
     use super::*;
@@ -64,7 +67,7 @@ mod tests {
     #[test]
     fn uuid_v4() {
         let mut state = vrl::state::Runtime::default();
-        let mut object: Value = map![].into();
+        let mut object: Value = Value::Object(BTreeMap::new());
         let tz = TimeZone::default();
         let mut ctx = Context::new(&mut object, &mut state, &tz);
         let value = UuidV4Fn.resolve(&mut ctx).unwrap();

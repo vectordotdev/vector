@@ -1,13 +1,13 @@
+use std::{collections::HashMap, fmt, task::Poll};
+
 use futures::{Stream, StreamExt};
 use futures_util::{pending, poll};
 use indexmap::IndexMap;
-use std::{collections::HashMap, fmt, task::Poll};
 use tokio::sync::mpsc;
 use tokio_util::sync::ReusableBoxFuture;
+use vector_buffers::topology::channel::BufferSender;
 
 use crate::{config::ComponentKey, event::EventArray};
-
-use vector_buffers::topology::channel::BufferSender;
 
 pub enum ControlMessage {
     Add(ComponentKey, BufferSender<EventArray>),

@@ -12,8 +12,8 @@ use super::api;
 use super::enterprise;
 use super::{
     compiler, provider, schema, ComponentKey, Config, EnrichmentTableConfig, EnrichmentTableOuter,
-    HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig, SourceOuter, TestDefinition,
-    TransformOuter,
+    HealthcheckOptions, SecretBackend, SinkConfig, SinkOuter, SourceConfig, SourceOuter,
+    TestDefinition, TransformOuter,
 };
 
 #[derive(Deserialize, Serialize, Debug, Default)]
@@ -42,6 +42,8 @@ pub struct ConfigBuilder {
     #[serde(default)]
     pub tests: Vec<TestDefinition<String>>,
     pub provider: Option<Box<dyn provider::ProviderConfig>>,
+    #[serde(default)]
+    pub secret: IndexMap<ComponentKey, Box<dyn SecretBackend>>,
 }
 
 #[cfg(feature = "enterprise")]
@@ -49,6 +51,7 @@ pub struct ConfigBuilder {
 struct ConfigBuilderHash<'a> {
     #[cfg(feature = "api")]
     api: &'a api::Options,
+    schema: &'a schema::Options,
     global: &'a GlobalOptions,
     healthchecks: &'a HealthcheckOptions,
     enrichment_tables: BTreeMap<&'a ComponentKey, &'a EnrichmentTableOuter>,
@@ -57,6 +60,7 @@ struct ConfigBuilderHash<'a> {
     transforms: BTreeMap<&'a ComponentKey, &'a TransformOuter<String>>,
     tests: &'a Vec<TestDefinition<String>>,
     provider: &'a Option<Box<dyn provider::ProviderConfig>>,
+    secret: BTreeMap<&'a ComponentKey, &'a dyn SecretBackend>,
 }
 
 impl Clone for ConfigBuilder {
@@ -86,6 +90,7 @@ impl From<Config> for ConfigBuilder {
             sinks,
             transforms,
             tests,
+            secret,
             ..
         } = config;
 
@@ -115,6 +120,7 @@ impl From<Config> for ConfigBuilder {
             transforms,
             provider: None,
             tests,
+            secret,
         }
     }
 }
@@ -199,15 +205,11 @@ impl ConfigBuilder {
             errors.push(error);
         }
 
+        self.schema = with.schema;
+
         #[cfg(feature = "enterprise")]
         {
             self.enterprise = with.enterprise;
-            if let Some(datadog) = &self.enterprise {
-                if datadog.enabled {
-                    // enable other enterprise features
-                    self.global.enterprise = true;
-                }
-            }
         }
 
         self.provider = with.provider;
@@ -269,6 +271,11 @@ impl ConfigBuilder {
                 errors.push(format!("duplicate test name found: {}", wt.name));
             }
         });
+        with.secret.keys().for_each(|k| {
+            if self.secret.contains_key(k) {
+                errors.push(format!("duplicate secret id found: {}", k));
+            }
+        });
         if !errors.is_empty() {
             return Err(errors);
         }
@@ -278,6 +285,7 @@ impl ConfigBuilder {
         self.sinks.extend(with.sinks);
         self.transforms.extend(with.transforms);
         self.tests.extend(with.tests);
+        self.secret.extend(with.secret);
 
         Ok(())
     }
@@ -291,6 +299,7 @@ impl ConfigBuilder {
         let value = serde_json::to_string(&ConfigBuilderHash {
             #[cfg(feature = "api")]
             api: &self.api,
+            schema: &self.schema,
             global: &self.global,
             healthchecks: &self.healthchecks,
             enrichment_tables: self.enrichment_tables.iter().collect(),
@@ -299,9 +308,9 @@ impl ConfigBuilder {
             transforms: self.transforms.iter().collect(),
             tests: &self.tests,
             provider: &self.provider,
+            secret: self.secret.iter().map(|(k, v)| (k, v.as_ref())).collect(),
         })
         .expect("should serialize to JSON");
-
         let output = Sha256::digest(value.as_bytes());
 
         hex::encode(output)
@@ -335,6 +344,7 @@ mod tests {
         // hash is reproducible across versions.
         let expected_keys = [
             "api",
+            "schema",
             "global",
             "healthchecks",
             "enrichment_tables",
@@ -343,12 +353,14 @@ mod tests {
             "transforms",
             "tests",
             "provider",
+            "secret",
         ];
 
         let builder = ConfigBuilder::default();
 
         let value = json!(ConfigBuilderHash {
             api: &builder.api,
+            schema: &builder.schema,
             global: &builder.global,
             healthchecks: &builder.healthchecks,
             enrichment_tables: builder.enrichment_tables.iter().collect(),
@@ -357,6 +369,11 @@ mod tests {
             transforms: builder.transforms.iter().collect(),
             tests: &builder.tests,
             provider: &builder.provider,
+            secret: builder
+                .secret
+                .iter()
+                .map(|(k, v)| (k, v.as_ref()))
+                .collect(),
         });
 
         match value {
@@ -375,7 +392,7 @@ mod tests {
     /// should ideally be able to fix so that the original hash passes!
     fn version_hash_match() {
         assert_eq!(
-            "14def8ff43fe0255b3234a7c3d7488379a119b7dbcf311c77ad308a83173d92c",
+            "2bc405edda02d6a32f2a93332d5e73840670cce4731a78cf6f73e2f7df8e7229",
             ConfigBuilder::default().sha256_hash()
         );
     }

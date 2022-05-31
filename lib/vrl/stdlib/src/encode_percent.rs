@@ -1,3 +1,4 @@
+use ::value::Value;
 use percent_encoding::{utf8_percent_encode, AsciiSet};
 use vrl::prelude::*;
 

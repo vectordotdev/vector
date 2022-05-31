@@ -66,6 +66,7 @@ scopes:
   - setup # Anything related to setting up or installing Vector
   - shutdown # Anything related to the shutdown of Vector
   - sinks # Anything related to the Vector's sinks
+  - soak tests # Anything related to Vector's soak tests
   - sources # Anything related to the Vector's sources
   - startup # Anything related to the startup of Vector
   - templating # Anything related to templating Vector's configuration values
@@ -133,6 +134,7 @@ scopes:
   - exec source # Anything `exec` source related
   - file source # Anything `file` source related
   - fluent source # Anything `fluent` source related
+  - gcp_pubsub source # Anything `gcp_pubsub` source related
   - heroku_logs source # Anything `heroku_logs` source related
   - host_metrics source # Anything `host_metrics` source related
   - http source # Anything `http` source related
