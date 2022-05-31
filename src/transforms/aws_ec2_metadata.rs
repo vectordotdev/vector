@@ -569,8 +569,9 @@ mod integration_tests {
     use super::*;
     use crate::{
         event::{metric, EventArray, LogEvent, Metric},
-        test_util::trace_init,
+        test_util::{next_addr, trace_init},
     };
+    use warp::Filter;
 
     fn ec2_metadata_address() -> String {
         std::env::var("EC2_METADATA_ADDRESS").unwrap_or_else(|_| "http://localhost:8111".into())
@@ -693,6 +694,38 @@ mod integration_tests {
 
         let event = stream.next().await.unwrap();
         assert_eq!(event.into_log(), expected_log);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn timeout() {
+        trace_init();
+
+        let addr = next_addr();
+
+        async fn sleepy() -> Result<impl warp::Reply, std::convert::Infallible> {
+            tokio::time::sleep(Duration::from_secs(3)).await;
+            Ok(format!("I waited 3 seconds!"))
+        }
+
+        let slow = warp::any().and_then(sleepy);
+        let server = warp::serve(slow).bind(addr);
+        let _server = tokio::spawn(server);
+
+        let config = Ec2Metadata {
+            endpoint: Some(format!("http://{}", addr)),
+            refresh_timeout_secs: Some(1),
+            ..Default::default()
+        };
+
+        match config.build(&TransformContext::default()).await {
+            Ok(_) => panic!("expected timeout failure"),
+            // cannot create tokio::time::error::Elapsed to compare with since constructor is
+            // private
+            Err(err) => assert_eq!(
+                err.to_string(),
+                "Unable to fetch metadata authentication token: deadline has elapsed."
+            ),
+        }
     }
 
     #[tokio::test]
