@@ -379,12 +379,17 @@ pub fn file_source(
                         byte_size: line.text.len(),
                         file: &line.filename,
                     });
-                    // transcode each line from the file's encoding charset to utf8
-                    line.text = match encoding_decoder.as_mut() {
-                        Some(d) => d.decode_to_utf8(line.text),
-                        None => line.text,
-                    };
-                    Some(line)
+                    (!failed_files
+                        .lock()
+                        .expect("Poisoned lock on failed files set")
+                        .contains(&line.file_id))
+                    .then(|| {
+                        // transcode each line from the file's encoding charset to utf8
+                        if let Some(d) = &mut encoding_decoder {
+                            line.text = d.decode_to_utf8(line.text);
+                        }
+                        line
+                    })
                 }
                 FileEvent::Open(file_id) | FileEvent::Close(file_id) => {
                     failed_files
@@ -1149,7 +1154,7 @@ mod tests {
         let checkpoints = read_checkpoints(&dir);
         assert_eq!(checkpoints.len(), 1);
         assert_eq!(checkpoints[0].position, line_len as u64 * 2 + 2);
-        assert_eq!(&lines, &orig);
+        assert_eq!(&lines, &orig[0..3]);
     }
 
     async fn slow_write(filename: &Path, lines: &[String], millis: u64) {
@@ -1769,28 +1774,31 @@ mod tests {
             let data_dir = config.data_dir.clone().unwrap();
             let acks = !matches!(acking_mode, NoAcks);
 
+            // Run the collector concurrent to the file source, to execute finalizers.
+            let collector = if acking_mode == Unfinalized {
+                tokio::spawn(
+                rx.take_until(tokio::time::sleep(Duration::from_secs(5)))
+                    .collect::<Vec<_>>())
+            } else {
+                tokio::spawn(async {
+                    timeout(Duration::from_secs(5), rx.collect::<Vec<_>>())
+                        .await
+                        .expect(
+                            "Unclosed channel: may indicate file-server could not shutdown gracefully.",
+                        )
+                })
+            };
             tokio::spawn(file::file_source(config, data_dir, shutdown, tx, acks));
 
             inner.await;
 
             drop(trigger_shutdown);
 
-            let result = if acking_mode == Unfinalized {
-                rx.take_until(tokio::time::sleep(Duration::from_secs(5)))
-                    .collect::<Vec<_>>()
-                    .await
-            } else {
-                timeout(Duration::from_secs(5), rx.collect::<Vec<_>>())
-                    .await
-                    .expect(
-                        "Unclosed channel: may indicate file-server could not shutdown gracefully.",
-                    )
-            };
             if wait_shutdown {
                 shutdown_done.await;
             }
 
-            result
+            collector.await.expect("Collector task failed")
         })
         .await
     }
