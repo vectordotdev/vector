@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, collections::HashMap};
 
 use bytes::Bytes;
 use vector_core::{
@@ -16,6 +16,7 @@ pub struct HecRequest {
     pub events_byte_size: usize,
     pub finalizers: EventFinalizers,
     pub passthrough_token: Option<Arc<str>>,
+    pub metadata: Option<HashMap<String, String>>,
 }
 
 impl ByteSizeOf for HecRequest {

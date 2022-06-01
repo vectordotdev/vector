@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use futures_util::FutureExt;
 use serde::{Deserialize, Serialize};
@@ -15,6 +15,7 @@ use crate::{
             build_healthcheck, build_http_batch_service, create_client, host_key,
             service::{HecService, HttpRequestBuilder},
             timestamp_key, SplunkHecDefaultBatchSettings,
+            EndpointTarget,
         },
         util::{
             encoding::EncodingConfig, http::HttpRetryLogic, BatchConfig, Compression,
@@ -54,6 +55,14 @@ pub struct HecLogsSinkConfig {
     pub timestamp_nanos_key: Option<String>,
     #[serde(default = "crate::sinks::splunk_hec::common::timestamp_key")]
     pub timestamp_key: String,
+    #[serde(default = "default_data")]
+    pub endpoint_target: EndpointTarget,
+    #[serde(default)]
+    pub metadata: HashMap<String, Template>,
+}
+
+const fn default_data() -> EndpointTarget {
+    EndpointTarget::Event
 }
 
 impl GenerateConfig for HecLogsSinkConfig {
@@ -74,6 +83,8 @@ impl GenerateConfig for HecLogsSinkConfig {
             acknowledgements: Default::default(),
             timestamp_nanos_key: None,
             timestamp_key: timestamp_key(),
+            endpoint_target: EndpointTarget::Event,
+            metadata: Default::default(),
         })
         .unwrap()
     }
@@ -136,6 +147,7 @@ impl HecLogsSinkConfig {
             .service(build_http_batch_service(
                 client,
                 Arc::clone(&http_request_builder),
+                self.endpoint_target,
             ));
 
         let service = HecService::new(
@@ -159,6 +171,8 @@ impl HecLogsSinkConfig {
             host: self.host_key.clone(),
             timestamp_nanos_key: self.timestamp_nanos_key.clone(),
             timestamp_key: self.timestamp_key.clone(),
+            metadata: self.metadata.clone(),
+            endpoint_target: self.endpoint_target,
         };
 
         Ok(VectorSink::from_event_streamsink(sink))

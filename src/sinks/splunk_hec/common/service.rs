@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     fmt,
     sync::Arc,
     task::{Context, Poll},
@@ -201,8 +202,9 @@ impl HttpRequestBuilder {
         body: Bytes,
         path: &str,
         passthrough_token: Option<Arc<str>>,
+        metadata: Option<HashMap<String, String>>,
     ) -> Result<Request<Bytes>, crate::Error> {
-        let uri = build_uri(self.endpoint.as_str(), path).context(UriParseSnafu)?;
+        let uri = build_uri(self.endpoint.as_str(), path, metadata).context(UriParseSnafu)?;
 
         let mut builder = Request::post(uri)
             .header("Content-Type", "application/json")
@@ -275,8 +277,11 @@ mod tests {
             String::from(TOKEN),
             Compression::default(),
         ));
-        let http_service =
-            build_http_batch_service(client.clone(), Arc::clone(&http_request_builder));
+        let http_service = build_http_batch_service(
+            client.clone(),
+            Arc::clone(&http_request_builder),
+            Data::Event,
+        );
         HecService::new(
             BoxService::new(http_service),
             Some(client),
