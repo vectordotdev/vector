@@ -123,6 +123,10 @@ impl CloudwatchLogsPartitionSvc {
     pub fn new(
         config: CloudwatchLogsSinkConfig,
         client: CloudwatchLogsClient,
+        // we store a separate smithy_client to set request headers for PutLogEvents since the regular
+        // client cannot set headers
+        //
+        // https://github.com/awslabs/aws-sdk-rust/issues/537
         smithy_client: std::sync::Arc<
             aws_smithy_client::Client<
                 aws_smithy_client::erase::DynConnector,
