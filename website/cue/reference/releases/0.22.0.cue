@@ -42,9 +42,6 @@ releases: "0.22.0": {
 		- A new GCP PubSub (`gcp_pubsub`) source to consume events from GCP PubSub.
 		- A new `websocket` sink was added to send events to a remote websocket listener.
 		- [New VRL functions for encrypting and decrypting data.](/highlights/2022-05-24-vrl-encryption)
-		- All sources and transforms now emit consistent metrics in accordance with Vector's [component
-		  specification](https://github.com/vectordotdev/vector/blob/927fd2eeb4ee15b10f8c046f0f9347789ca1c356/docs/specs/component.md).
-		  Sinks will included in this in the next release.
 
 		We also made additional performance improvements this release increasing the average throughput by up to 50% for
 		common topologies (see our [soak test
