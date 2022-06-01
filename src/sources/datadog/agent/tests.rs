@@ -17,7 +17,7 @@ use indoc::indoc;
 use pretty_assertions::assert_eq;
 use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
-use value::Kind;
+use value::{kind::Collection, Kind};
 
 use crate::{
     common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
