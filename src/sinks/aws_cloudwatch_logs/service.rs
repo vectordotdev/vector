@@ -50,6 +50,13 @@ type Svc = Buffer<
     Vec<InputLogEvent>,
 >;
 
+pub type SmithyClient = std::sync::Arc<
+    aws_smithy_client::Client<
+        aws_smithy_client::erase::DynConnector,
+        aws_smithy_client::erase::DynMiddleware<aws_smithy_client::erase::DynConnector>,
+    >,
+>;
+
 #[derive(Debug)]
 pub enum CloudwatchError {
     Put(SdkError<PutLogEventsError>),
@@ -127,12 +134,7 @@ impl CloudwatchLogsPartitionSvc {
         // client cannot set headers
         //
         // https://github.com/awslabs/aws-sdk-rust/issues/537
-        smithy_client: std::sync::Arc<
-            aws_smithy_client::Client<
-                aws_smithy_client::erase::DynConnector,
-                aws_smithy_client::erase::DynMiddleware<aws_smithy_client::erase::DynConnector>,
-            >,
-        >,
+        smithy_client: SmithyClient,
     ) -> Self {
         let request_settings = config
             .request
@@ -193,7 +195,7 @@ impl Service<BatchCloudwatchRequest> for CloudwatchLogsPartitionSvc {
                     self.config.clone(),
                     &key,
                     self.client.clone(),
-                    self.smithy_client.clone(),
+                    std::sync::Arc::clone(&self.smithy_client),
                 ));
 
             self.clients.insert(key, svc.clone());
@@ -215,12 +217,7 @@ impl CloudwatchLogsSvc {
         config: CloudwatchLogsSinkConfig,
         key: &CloudwatchKey,
         client: CloudwatchLogsClient,
-        smithy_client: std::sync::Arc<
-            aws_smithy_client::Client<
-                aws_smithy_client::erase::DynConnector,
-                aws_smithy_client::erase::DynMiddleware<aws_smithy_client::erase::DynConnector>,
-            >,
-        >,
+        smithy_client: SmithyClient,
     ) -> Self {
         let group_name = key.group.clone();
         let stream_name = key.stream.clone();
@@ -311,7 +308,7 @@ impl Service<Vec<InputLogEvent>> for CloudwatchLogsSvc {
 
             request::CloudwatchFuture::new(
                 self.client.clone(),
-                self.smithy_client.clone(),
+                std::sync::Arc::clone(&self.smithy_client),
                 self.headers.clone(),
                 self.stream_name.clone(),
                 self.group_name.clone(),
@@ -329,12 +326,7 @@ impl Service<Vec<InputLogEvent>> for CloudwatchLogsSvc {
 
 pub struct CloudwatchLogsSvc {
     client: CloudwatchLogsClient,
-    smithy_client: std::sync::Arc<
-        aws_smithy_client::Client<
-            aws_smithy_client::erase::DynConnector,
-            aws_smithy_client::erase::DynMiddleware<aws_smithy_client::erase::DynConnector>,
-        >,
-    >,
+    smithy_client: SmithyClient,
     headers: IndexMap<String, String>,
     stream_name: String,
     group_name: String,
@@ -356,10 +348,5 @@ pub struct CloudwatchLogsPartitionSvc {
     clients: HashMap<CloudwatchKey, Svc>,
     request_settings: TowerRequestSettings,
     client: CloudwatchLogsClient,
-    smithy_client: std::sync::Arc<
-        aws_smithy_client::Client<
-            aws_smithy_client::erase::DynConnector,
-            aws_smithy_client::erase::DynMiddleware<aws_smithy_client::erase::DynConnector>,
-        >,
-    >,
+    smithy_client: SmithyClient,
 }
