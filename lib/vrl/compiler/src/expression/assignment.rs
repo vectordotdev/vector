@@ -640,10 +640,10 @@ where
                 let result_ref = ctx.result_ref();
 
                 let result_temp_ref = ctx.build_alloca_resolved("temp");
-                ctx.set_result_ref(result_temp_ref);
                 ctx.vrl_resolved_initialize()
                     .build_call(ctx.builder(), result_temp_ref);
 
+                ctx.set_result_ref(result_temp_ref);
                 expr.emit_llvm(state, ctx)?;
 
                 let is_ok = {
@@ -674,33 +674,35 @@ where
 
                 ctx.builder()
                     .position_at_end(assignment_infallible_begin_is_ok_block);
-
                 ok.emit_llvm_insert(ctx)?;
-
+                let error_temp_ref = ctx.build_alloca_resolved("temp");
+                ctx.vrl_resolved_initialize()
+                    .build_call(ctx.builder(), error_temp_ref);
+                ctx.vrl_resolved_set_null()
+                    .build_call(ctx.builder(), error_temp_ref);
+                ctx.set_result_ref(error_temp_ref);
+                err.emit_llvm_insert(ctx)?;
+                ctx.vrl_resolved_drop()
+                    .build_call(ctx.builder(), error_temp_ref);
                 ctx.builder()
                     .build_unconditional_branch(assignment_infallible_end_block);
 
                 ctx.builder()
                     .position_at_end(assignment_infallible_begin_is_err_block);
-
                 let default_ref = ctx.into_resolved_const_ref(Ok(default.clone()));
                 ctx.set_result_ref(default_ref);
-
                 ok.emit_llvm_insert(ctx)?;
-
-                ctx.set_result_ref(result_temp_ref);
-
                 ctx.vrl_resolved_err_into_ok()
                     .build_call(ctx.builder(), result_temp_ref);
-
+                ctx.set_result_ref(result_temp_ref);
                 err.emit_llvm_insert(ctx)?;
-
                 ctx.builder()
                     .build_unconditional_branch(assignment_infallible_end_block);
 
                 ctx.builder()
                     .position_at_end(assignment_infallible_end_block);
-
+                ctx.vrl_target_assign()
+                    .build_call(ctx.builder(), result_temp_ref, result_ref);
                 ctx.vrl_resolved_drop()
                     .build_call(ctx.builder(), result_temp_ref);
 

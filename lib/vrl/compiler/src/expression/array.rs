@@ -98,6 +98,8 @@ impl Expression for Array {
         ctx.builder().build_unconditional_branch(begin_block);
         ctx.builder().position_at_end(begin_block);
 
+        let result_ref = ctx.result_ref();
+
         let end_block = ctx.context().append_basic_block(function, "array_end");
 
         let vec_ref = ctx.builder().build_alloca(ctx.vec_type(), "temp");
@@ -112,6 +114,12 @@ impl Expression for Array {
         ctx.builder().position_at_end(insert_block);
 
         for (index, value) in self.inner.iter().enumerate() {
+            let value_ref = ctx.build_alloca_resolved("value");
+            ctx.vrl_resolved_initialize()
+                .build_call(ctx.builder(), value_ref);
+            ctx.set_result_ref(value_ref);
+            value.emit_llvm((state.0, state.1), ctx)?;
+
             let type_def = value.type_def((state.0, state.1));
             if type_def.is_abortable() {
                 let is_err = {
@@ -134,7 +142,7 @@ impl Expression for Array {
                 ctx.builder(),
                 vec_ref,
                 ctx.usize_type().const_int(index as _, false),
-                ctx.result_ref(),
+                value_ref,
             );
         }
 
@@ -145,10 +153,12 @@ impl Expression for Array {
         ctx.builder().position_at_end(set_result_block);
 
         ctx.vrl_expression_array_set_result()
-            .build_call(ctx.builder(), vec_ref, ctx.result_ref());
+            .build_call(ctx.builder(), vec_ref, result_ref);
 
         ctx.builder().build_unconditional_branch(end_block);
         ctx.builder().position_at_end(end_block);
+
+        ctx.set_result_ref(result_ref);
 
         Ok(())
     }
