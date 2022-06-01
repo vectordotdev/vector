@@ -35,7 +35,7 @@ releases: "0.22.0": {
 
 		- [Support for iteration has landed in VRL](/highlights/2022-05-18-vrl-iteration-support). Now you can
 		  dynamically map unknown key/value pairs in objects and items in arrays. This replaces some common use cases for
-		  the `lua` transform with the much more performant [`remap`](\(urls.vector_remap_transform) transform.
+		  the `lua` transform with the much more performant [`remap`](\(urls.vector_remap_transform)) transform.
 		- [New native event codecs](/highlights/2022-03-31-native-event-codecs) for Vector. We are still rolling out the
 		  new codec support to all sinks, but this will allow sending events (logs, metrics, and traces) between Vector
 		  instances via transports like `kafka` rather than being limited to the gRPC `vector` source and sink.
