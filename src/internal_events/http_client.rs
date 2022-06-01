@@ -73,7 +73,7 @@ pub struct GotHttpError<'a> {
 
 impl<'a> InternalEvent for GotHttpError<'a> {
     fn emit(self) {
-        error!(
+        debug!(
             message = "HTTP error.",
             error = %self.error,
             error_type = error_type::REQUEST_FAILED,
