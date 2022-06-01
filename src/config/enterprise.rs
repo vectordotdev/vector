@@ -732,6 +732,7 @@ mod test {
     use http::StatusCode;
     use indexmap::IndexMap;
     use indoc::formatdoc;
+    use std::collections::BTreeMap;
     use tokio::time::sleep;
     use value::Kind;
     use vector_common::btreemap;
