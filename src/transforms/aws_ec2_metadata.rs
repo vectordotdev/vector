@@ -704,7 +704,7 @@ mod integration_tests {
 
         async fn sleepy() -> Result<impl warp::Reply, std::convert::Infallible> {
             tokio::time::sleep(Duration::from_secs(3)).await;
-            Ok(format!("I waited 3 seconds!"))
+            Ok("I waited 3 seconds!")
         }
 
         let slow = warp::any().and_then(sleepy);
