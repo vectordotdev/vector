@@ -9149,6 +9149,7 @@ dependencies = [
  "value",
  "vector_common",
  "vrl",
+ "vrl-core",
  "woothee",
 ]
 
