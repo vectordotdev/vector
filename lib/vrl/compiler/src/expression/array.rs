@@ -101,24 +101,11 @@ impl Expression for Array {
         let end_block = ctx.context().append_basic_block(function, "array_end");
 
         let vec_ref = ctx.builder().build_alloca(ctx.vec_type(), "temp");
-
-        {
-            let fn_ident = "vrl_vec_initialize";
-            let fn_impl = ctx
-                .module()
-                .get_function(fn_ident)
-                .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
-            ctx.builder().build_call(
-                fn_impl,
-                &[
-                    vec_ref.into(),
-                    ctx.usize_type()
-                        .const_int(self.inner.len() as _, false)
-                        .into(),
-                ],
-                fn_ident,
-            )
-        };
+        ctx.vrl_vec_initialize().build_call(
+            ctx.builder(),
+            vec_ref,
+            ctx.usize_type().const_int(self.inner.len() as _, false),
+        );
 
         let insert_block = ctx.context().append_basic_block(function, "array_insert");
         ctx.builder().build_unconditional_branch(insert_block);
@@ -128,18 +115,13 @@ impl Expression for Array {
             let type_def = value.type_def((state.0, state.1));
             if type_def.is_abortable() {
                 let is_err = {
-                    let fn_ident = "vrl_resolved_is_err";
-                    let fn_impl = ctx
-                        .module()
-                        .get_function(fn_ident)
-                        .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
-                    ctx.builder()
-                        .build_call(fn_impl, &[ctx.result_ref().into()], fn_ident)
+                    ctx.vrl_resolved_is_err()
+                        .build_call(ctx.builder(), ctx.result_ref())
                         .try_as_basic_value()
                         .left()
-                        .ok_or(format!(r#"result of "{}" is not a basic value"#, fn_ident))?
+                        .expect("result is not a basic value")
                         .try_into()
-                        .map_err(|_| format!(r#"result of "{}" is not an int value"#, fn_ident))?
+                        .expect("result is not an int value")
                 };
 
                 let insert_block = ctx.context().append_basic_block(function, "array_insert");
@@ -148,22 +130,12 @@ impl Expression for Array {
                 ctx.builder().position_at_end(insert_block);
             }
 
-            {
-                let fn_ident = "vrl_vec_insert";
-                let fn_impl = ctx
-                    .module()
-                    .get_function(fn_ident)
-                    .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
-                ctx.builder().build_call(
-                    fn_impl,
-                    &[
-                        vec_ref.into(),
-                        ctx.usize_type().const_int(index as _, false).into(),
-                        ctx.result_ref().into(),
-                    ],
-                    fn_ident,
-                )
-            };
+            ctx.vrl_vec_insert().build_call(
+                ctx.builder(),
+                vec_ref,
+                ctx.usize_type().const_int(index as _, false),
+                ctx.result_ref(),
+            );
         }
 
         let set_result_block = ctx
@@ -172,18 +144,8 @@ impl Expression for Array {
         ctx.builder().build_unconditional_branch(set_result_block);
         ctx.builder().position_at_end(set_result_block);
 
-        {
-            let fn_ident = "vrl_expression_array_set_result_impl";
-            let fn_impl = ctx
-                .module()
-                .get_function(fn_ident)
-                .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
-            ctx.builder().build_call(
-                fn_impl,
-                &[vec_ref.into(), ctx.result_ref().into()],
-                fn_ident,
-            )
-        };
+        ctx.vrl_expression_array_set_result()
+            .build_call(ctx.builder(), vec_ref, ctx.result_ref());
 
         ctx.builder().build_unconditional_branch(end_block);
         ctx.builder().position_at_end(end_block);

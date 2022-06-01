@@ -92,17 +92,9 @@ impl Expression for Variable {
             .build_unconditional_branch(variable_begin_block);
         ctx.builder().position_at_end(variable_begin_block);
 
-        let fn_ident = "vrl_target_assign";
-        let fn_impl = ctx
-            .module()
-            .get_function(fn_ident)
-            .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
         let variable_ref = ctx.get_variable_ref(&self.ident);
-        ctx.builder().build_call(
-            fn_impl,
-            &[variable_ref.into(), ctx.result_ref().into()],
-            fn_ident,
-        );
+        ctx.vrl_target_assign()
+            .build_call(ctx.builder(), variable_ref, ctx.result_ref());
 
         Ok(())
     }

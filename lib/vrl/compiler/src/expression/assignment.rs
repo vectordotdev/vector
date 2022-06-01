@@ -323,28 +323,20 @@ impl Target {
                 // Get the provided path, or else insert into the variable
                 // without any path appended and return early.
                 if path.is_root() {
-                    let fn_ident = "vrl_target_assign";
-                    let fn_impl = ctx
-                        .module()
-                        .get_function(fn_ident)
-                        .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
-                    ctx.builder().build_call(
-                        fn_impl,
-                        &[
-                            ctx.builder()
-                                .build_bitcast(
-                                    ctx.result_ref(),
-                                    fn_impl
-                                        .get_nth_param(0)
-                                        .unwrap()
-                                        .get_type()
-                                        .into_pointer_type(),
-                                    "cast",
-                                )
-                                .into(),
-                            variable_ref.into(),
-                        ],
-                        fn_ident,
+                    let vrl_target_assign = ctx.vrl_target_assign();
+                    vrl_target_assign.build_call(
+                        ctx.builder(),
+                        ctx.builder().build_bitcast(
+                            ctx.result_ref(),
+                            vrl_target_assign
+                                .function
+                                .get_nth_param(0)
+                                .unwrap()
+                                .get_type()
+                                .into_pointer_type(),
+                            "cast",
+                        ),
+                        variable_ref,
                     );
                     return Ok(());
                 }
@@ -352,68 +344,53 @@ impl Target {
                 // Update existing variable using the provided path, or create a
                 // new value in the store.
                 let path_ref = ctx.into_lookup_buf_const_ref(path.clone());
-                let fn_ident = "vrl_expression_assignment_target_insert_internal_path_impl";
-                let fn_impl = ctx
-                    .module()
-                    .get_function(fn_ident)
-                    .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
-                ctx.builder().build_call(
-                    fn_impl,
-                    &[
-                        ctx.result_ref().into(),
-                        ctx.builder()
-                            .build_bitcast(
-                                path_ref,
-                                fn_impl
-                                    .get_nth_param(1)
-                                    .unwrap()
-                                    .get_type()
-                                    .into_pointer_type(),
-                                "cast",
-                            )
-                            .into(),
-                        variable_ref.into(),
-                    ],
-                    fn_ident,
+                let vrl_expression_assignment_target_insert_internal_path =
+                    ctx.vrl_expression_assignment_target_insert_internal_path();
+                vrl_expression_assignment_target_insert_internal_path.build_call(
+                    ctx.builder(),
+                    ctx.result_ref(),
+                    ctx.builder().build_bitcast(
+                        path_ref,
+                        vrl_expression_assignment_target_insert_internal_path
+                            .function
+                            .get_nth_param(1)
+                            .unwrap()
+                            .get_type()
+                            .into_pointer_type(),
+                        "cast",
+                    ),
+                    variable_ref,
                 );
                 Ok(())
             }
             Target::External(path) => {
                 let path_ref = ctx.into_lookup_buf_const_ref(path.clone());
 
-                let fn_ident = "vrl_expression_assignment_target_insert_external_impl";
-                let fn_impl = ctx
-                    .module()
-                    .get_function(fn_ident)
-                    .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
-                ctx.builder().build_call(
-                    fn_impl,
-                    &[
-                        ctx.builder()
-                            .build_bitcast(
-                                ctx.result_ref(),
-                                fn_impl
-                                    .get_nth_param(0)
-                                    .unwrap()
-                                    .get_type()
-                                    .into_pointer_type(),
-                                "cast",
-                            )
-                            .into(),
-                        ctx.builder()
-                            .build_bitcast(
-                                path_ref,
-                                fn_impl
-                                    .get_nth_param(1)
-                                    .unwrap()
-                                    .get_type()
-                                    .into_pointer_type(),
-                                "cast",
-                            )
-                            .into(),
-                        ctx.context_ref().into(),
-                    ],
-                    fn_ident,
+                let vrl_expression_assignment_target_insert_external =
+                    ctx.vrl_expression_assignment_target_insert_external();
+                vrl_expression_assignment_target_insert_external.build_call(
+                    ctx.builder(),
+                    ctx.builder().build_bitcast(
+                        ctx.result_ref(),
+                        vrl_expression_assignment_target_insert_external
+                            .function
+                            .get_nth_param(0)
+                            .unwrap()
+                            .get_type()
+                            .into_pointer_type(),
+                        "cast",
+                    ),
+                    ctx.builder().build_bitcast(
+                        path_ref,
+                        vrl_expression_assignment_target_insert_external
+                            .function
+                            .get_nth_param(1)
+                            .unwrap()
+                            .get_type()
+                            .into_pointer_type(),
+                        "cast",
+                    ),
+                    ctx.context_ref(),
                 );
                 Ok(())
             }
@@ -617,20 +594,13 @@ where
 
                 if expr.type_def((state.0, state.1)).is_abortable() {
                     let is_err = {
-                        let fn_ident = "vrl_resolved_is_err";
-                        let fn_impl = ctx
-                            .module()
-                            .get_function(fn_ident)
-                            .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
-                        ctx.builder()
-                            .build_call(fn_impl, &[ctx.result_ref().into()], fn_ident)
+                        ctx.vrl_resolved_is_err()
+                            .build_call(ctx.builder(), ctx.result_ref())
                             .try_as_basic_value()
                             .left()
-                            .ok_or(format!(r#"result of "{}" is not a basic value"#, fn_ident))?
+                            .expect("result is not a basic value")
                             .try_into()
-                            .map_err(|_| {
-                                format!(r#"result of "{}" is not an int value"#, fn_ident)
-                            })?
+                            .expect("result is not an int value")
                     };
 
                     let assignment_single_is_ok_block = ctx
@@ -671,32 +641,19 @@ where
 
                 let result_temp_ref = ctx.build_alloca_resolved("temp");
                 ctx.set_result_ref(result_temp_ref);
-
-                {
-                    let fn_ident = "vrl_resolved_initialize";
-                    let fn_impl = ctx
-                        .module()
-                        .get_function(fn_ident)
-                        .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
-                    ctx.builder()
-                        .build_call(fn_impl, &[result_temp_ref.into()], fn_ident);
-                }
+                ctx.vrl_resolved_initialize()
+                    .build_call(ctx.builder(), result_temp_ref);
 
                 expr.emit_llvm(state, ctx)?;
 
                 let is_ok = {
-                    let fn_ident = "vrl_resolved_is_ok";
-                    let fn_impl = ctx
-                        .module()
-                        .get_function(fn_ident)
-                        .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
-                    ctx.builder()
-                        .build_call(fn_impl, &[result_temp_ref.into()], fn_ident)
+                    ctx.vrl_resolved_is_ok()
+                        .build_call(ctx.builder(), result_temp_ref)
                         .try_as_basic_value()
                         .left()
-                        .ok_or(format!(r#"result of "{}" is not a basic value"#, fn_ident))?
+                        .expect("result is not a basic value")
                         .try_into()
-                        .map_err(|_| format!(r#"result of "{}" is not an int value"#, fn_ident))?
+                        .expect("result is not an int value")
                 };
 
                 let assignment_infallible_end_block = ctx
@@ -733,15 +690,8 @@ where
 
                 ctx.set_result_ref(result_temp_ref);
 
-                {
-                    let fn_ident = "vrl_resolved_err_into_ok";
-                    let fn_impl = ctx
-                        .module()
-                        .get_function(fn_ident)
-                        .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
-                    ctx.builder()
-                        .build_call(fn_impl, &[result_temp_ref.into()], fn_ident);
-                }
+                ctx.vrl_resolved_err_into_ok()
+                    .build_call(ctx.builder(), result_temp_ref);
 
                 err.emit_llvm_insert(ctx)?;
 
@@ -751,15 +701,8 @@ where
                 ctx.builder()
                     .position_at_end(assignment_infallible_end_block);
 
-                {
-                    let fn_ident = "vrl_resolved_drop";
-                    let fn_impl = ctx
-                        .module()
-                        .get_function(fn_ident)
-                        .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
-                    ctx.builder()
-                        .build_call(fn_impl, &[result_temp_ref.into()], fn_ident);
-                }
+                ctx.vrl_resolved_drop()
+                    .build_call(ctx.builder(), result_temp_ref);
 
                 ctx.set_result_ref(result_ref);
             }

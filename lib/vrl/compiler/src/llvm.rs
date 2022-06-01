@@ -15,7 +15,7 @@ use inkwell::{
     passes::{PassManager, PassManagerBuilder},
     targets::{InitializationConfig, Target},
     types::{IntType, PointerType, StructType},
-    values::{FunctionValue, GlobalValue, PointerValue},
+    values::{BasicMetadataValueEnum, CallSiteValue, FunctionValue, GlobalValue, PointerValue},
     OptimizationLevel,
 };
 use libc::{dlerror, dlsym};
@@ -51,6 +51,7 @@ impl Compiler {
             r#"failed getting function "{}" from module"#,
             VRL_EXECUTE_SYMBOL
         ))?;
+        let precompiled_functions = PrecompiledFunctions::new(&module);
         let context_ref = function.get_nth_param(0).unwrap().into_pointer_value();
         let result_ref = function.get_nth_param(1).unwrap().into_pointer_value();
 
@@ -67,6 +68,7 @@ impl Compiler {
             module,
             builder,
             function,
+            precompiled_functions,
             context_ref,
             result_ref,
             variable_map: Default::default(),
@@ -80,14 +82,9 @@ impl Compiler {
         program.emit_llvm(state, &mut context)?;
 
         for variable_ref in &context.variables {
-            let fn_ident = "vrl_resolved_drop";
-            let fn_impl = context
-                .module
-                .get_function(fn_ident)
-                .unwrap_or_else(|| panic!(r#"failed to get "{}" function"#, fn_ident));
             context
-                .builder
-                .build_call(fn_impl, &[(*variable_ref).into()], fn_ident);
+                .vrl_resolved_drop()
+                .build_call(&context.builder, *variable_ref);
         }
 
         context.builder().build_return(None);
@@ -139,6 +136,7 @@ pub struct Context<'ctx> {
     module: Module<'ctx>,
     builder: inkwell::builder::Builder<'ctx>,
     function: FunctionValue<'ctx>,
+    precompiled_functions: PrecompiledFunctions<'ctx>,
     context_ref: PointerValue<'ctx>,
     result_ref: PointerValue<'ctx>,
     variable_map: HashMap<Ident, usize>,
@@ -199,13 +197,8 @@ impl<'ctx> Context<'ctx> {
                 self.builder.position_before(&instruction);
             }
             let variable = self.build_alloca_resolved(ident);
-            let fn_ident = "vrl_resolved_initialize";
-            let fn_impl = self
-                .module
-                .get_function(fn_ident)
-                .unwrap_or_else(|| panic!(r#"failed to get "{}" function"#, fn_ident));
-            self.builder
-                .build_call(fn_impl, &[variable.into()], fn_ident);
+            self.vrl_resolved_initialize()
+                .build_call(&self.builder, variable);
             self.builder.position_at_end(position);
             let index = self.variables.len();
             self.variables.push(variable);
@@ -314,12 +307,8 @@ impl<'ctx> Context<'ctx> {
     }
 
     pub fn resolved_ref_type(&self) -> PointerType<'ctx> {
-        let fn_ident = "vrl_resolved_initialize";
-        let fn_impl = self
-            .module()
-            .get_function(fn_ident)
-            .expect(&format!(r#"failed to get "{}" function"#, fn_ident));
-        fn_impl
+        self.vrl_resolved_initialize()
+            .function
             .get_nth_param(0)
             .unwrap()
             .into_pointer_value()
@@ -327,12 +316,8 @@ impl<'ctx> Context<'ctx> {
     }
 
     pub fn value_ref_type(&self) -> PointerType<'ctx> {
-        let fn_ident = "vrl_value_initialize";
-        let fn_impl = self
-            .module()
-            .get_function(fn_ident)
-            .expect(&format!(r#"failed to get "{}" function"#, fn_ident));
-        fn_impl
+        self.vrl_value_initialize()
+            .function
             .get_nth_param(0)
             .unwrap()
             .into_pointer_value()
@@ -340,12 +325,8 @@ impl<'ctx> Context<'ctx> {
     }
 
     pub fn optional_value_ref_type(&self) -> PointerType<'ctx> {
-        let fn_ident = "vrl_optional_value_initialize";
-        let fn_impl = self
-            .module()
-            .get_function(fn_ident)
-            .expect(&format!(r#"failed to get "{}" function"#, fn_ident));
-        fn_impl
+        self.vrl_optional_value_initialize()
+            .function
             .get_nth_param(0)
             .unwrap()
             .into_pointer_value()
@@ -353,12 +334,8 @@ impl<'ctx> Context<'ctx> {
     }
 
     pub fn static_ref_type(&self) -> PointerType<'ctx> {
-        let fn_ident = "vrl_static_initialize";
-        let fn_impl = self
-            .module()
-            .get_function(fn_ident)
-            .expect(&format!(r#"failed to get "{}" function"#, fn_ident));
-        fn_impl
+        self.vrl_static_initialize()
+            .function
             .get_nth_param(0)
             .unwrap()
             .into_pointer_value()
@@ -366,12 +343,8 @@ impl<'ctx> Context<'ctx> {
     }
 
     pub fn vec_type(&self) -> StructType<'ctx> {
-        let fn_ident = "vrl_vec_initialize";
-        let fn_impl = self
-            .module()
-            .get_function(fn_ident)
-            .expect(&format!(r#"failed to get "{}" function"#, fn_ident));
-        fn_impl
+        self.vrl_vec_initialize()
+            .function
             .get_nth_param(0)
             .unwrap()
             .into_pointer_value()
@@ -381,12 +354,8 @@ impl<'ctx> Context<'ctx> {
     }
 
     pub fn btree_map_type(&self) -> StructType<'ctx> {
-        let fn_ident = "vrl_btree_map_initialize";
-        let fn_impl = self
-            .module()
-            .get_function(fn_ident)
-            .expect(&format!(r#"failed to get "{}" function"#, fn_ident));
-        fn_impl
+        self.vrl_btree_map_initialize()
+            .function
             .get_nth_param(0)
             .unwrap()
             .into_pointer_value()
@@ -398,6 +367,300 @@ impl<'ctx> Context<'ctx> {
     pub fn usize_type(&self) -> IntType<'ctx> {
         self.context
             .custom_width_int_type((std::mem::size_of::<usize>() * 8) as _)
+    }
+
+    pub fn vrl_resolved_initialize(&self) -> PrecompiledFunction<'ctx, 1> {
+        self.precompiled_functions.vrl_resolved_initialize
+    }
+
+    pub fn vrl_value_initialize(&self) -> PrecompiledFunction<'ctx, 1> {
+        self.precompiled_functions.vrl_value_initialize
+    }
+
+    pub fn vrl_optional_value_initialize(&self) -> PrecompiledFunction<'ctx, 1> {
+        self.precompiled_functions.vrl_optional_value_initialize
+    }
+
+    pub fn vrl_static_initialize(&self) -> PrecompiledFunction<'ctx, 1> {
+        self.precompiled_functions.vrl_static_initialize
+    }
+
+    pub fn vrl_vec_initialize(&self) -> PrecompiledFunction<'ctx, 2> {
+        self.precompiled_functions.vrl_vec_initialize
+    }
+
+    pub fn vrl_btree_map_initialize(&self) -> PrecompiledFunction<'ctx, 2> {
+        self.precompiled_functions.vrl_btree_map_initialize
+    }
+
+    pub fn vrl_resolved_drop(&self) -> PrecompiledFunction<'ctx, 1> {
+        self.precompiled_functions.vrl_resolved_drop
+    }
+
+    pub fn vrl_optional_value_drop(&self) -> PrecompiledFunction<'ctx, 1> {
+        self.precompiled_functions.vrl_optional_value_drop
+    }
+
+    pub fn vrl_resolved_as_value(&self) -> PrecompiledFunction<'ctx, 1> {
+        self.precompiled_functions.vrl_resolved_as_value
+    }
+
+    pub fn vrl_resolved_as_value_to_optional_value(&self) -> PrecompiledFunction<'ctx, 2> {
+        self.precompiled_functions
+            .vrl_resolved_as_value_to_optional_value
+    }
+
+    pub fn vrl_resolved_err_into_ok(&self) -> PrecompiledFunction<'ctx, 1> {
+        self.precompiled_functions.vrl_resolved_err_into_ok
+    }
+
+    pub fn vrl_resolved_is_ok(&self) -> PrecompiledFunction<'ctx, 1> {
+        self.precompiled_functions.vrl_resolved_is_ok
+    }
+
+    pub fn vrl_resolved_is_err(&self) -> PrecompiledFunction<'ctx, 1> {
+        self.precompiled_functions.vrl_resolved_is_err
+    }
+
+    pub fn vrl_value_boolean_is_true(&self) -> PrecompiledFunction<'ctx, 1> {
+        self.precompiled_functions.vrl_value_boolean_is_true
+    }
+
+    pub fn vrl_value_is_falsy(&self) -> PrecompiledFunction<'ctx, 1> {
+        self.precompiled_functions.vrl_value_is_falsy
+    }
+
+    pub fn vrl_target_assign(&self) -> PrecompiledFunction<'ctx, 2> {
+        self.precompiled_functions.vrl_target_assign
+    }
+
+    pub fn vrl_vec_insert(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_vec_insert
+    }
+
+    pub fn vrl_btree_map_insert(&self) -> PrecompiledFunction<'ctx, 4> {
+        self.precompiled_functions.vrl_btree_map_insert
+    }
+
+    pub fn vrl_resolved_set_null(&self) -> PrecompiledFunction<'ctx, 1> {
+        self.precompiled_functions.vrl_resolved_set_null
+    }
+
+    pub fn vrl_expression_abort(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_abort
+    }
+
+    pub fn vrl_expression_assignment_target_insert_internal_path(
+        &self,
+    ) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions
+            .vrl_expression_assignment_target_insert_internal_path
+    }
+
+    pub fn vrl_expression_assignment_target_insert_external(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions
+            .vrl_expression_assignment_target_insert_external
+    }
+
+    pub fn vrl_expression_literal(&self) -> PrecompiledFunction<'ctx, 2> {
+        self.precompiled_functions.vrl_expression_literal
+    }
+
+    pub fn vrl_expression_not(&self) -> PrecompiledFunction<'ctx, 1> {
+        self.precompiled_functions.vrl_expression_not
+    }
+
+    pub fn vrl_expression_array_set_result(&self) -> PrecompiledFunction<'ctx, 2> {
+        self.precompiled_functions.vrl_expression_array_set_result
+    }
+
+    pub fn vrl_expression_object_set_result(&self) -> PrecompiledFunction<'ctx, 2> {
+        self.precompiled_functions.vrl_expression_object_set_result
+    }
+
+    pub fn vrl_expression_op_mul_integer(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_mul_integer
+    }
+
+    pub fn vrl_expression_op_mul_float(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_mul_float
+    }
+
+    pub fn vrl_expression_op_mul(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_mul
+    }
+
+    pub fn vrl_expression_op_div_integer(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_div_integer
+    }
+
+    pub fn vrl_expression_op_div_float(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_div_float
+    }
+
+    pub fn vrl_expression_op_div(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_div
+    }
+
+    pub fn vrl_expression_op_add_integer(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_add_integer
+    }
+
+    pub fn vrl_expression_op_add_float(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_add_float
+    }
+
+    pub fn vrl_expression_op_add_bytes(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_add_bytes
+    }
+
+    pub fn vrl_expression_op_add(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_add
+    }
+
+    pub fn vrl_expression_op_sub_integer(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_sub_integer
+    }
+
+    pub fn vrl_expression_op_sub_float(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_sub_float
+    }
+
+    pub fn vrl_expression_op_sub(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_sub
+    }
+
+    pub fn vrl_expression_op_rem_integer(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_rem_integer
+    }
+
+    pub fn vrl_expression_op_rem_float(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_rem_float
+    }
+
+    pub fn vrl_expression_op_rem(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_rem
+    }
+
+    pub fn vrl_expression_op_ne_integer(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_ne_integer
+    }
+
+    pub fn vrl_expression_op_ne_float(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_ne_float
+    }
+
+    pub fn vrl_expression_op_ne_bytes(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_ne_bytes
+    }
+
+    pub fn vrl_expression_op_ne(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_ne
+    }
+
+    pub fn vrl_expression_op_eq_integer(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_eq_integer
+    }
+
+    pub fn vrl_expression_op_eq_float(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_eq_float
+    }
+
+    pub fn vrl_expression_op_eq_bytes(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_eq_bytes
+    }
+
+    pub fn vrl_expression_op_eq(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_eq
+    }
+
+    pub fn vrl_expression_op_ge_integer(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_ge_integer
+    }
+
+    pub fn vrl_expression_op_ge_float(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_ge_float
+    }
+
+    pub fn vrl_expression_op_ge_bytes(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_ge_bytes
+    }
+
+    pub fn vrl_expression_op_ge(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_ge
+    }
+
+    pub fn vrl_expression_op_gt_integer(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_gt_integer
+    }
+
+    pub fn vrl_expression_op_gt_float(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_gt_float
+    }
+
+    pub fn vrl_expression_op_gt_bytes(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_gt_bytes
+    }
+
+    pub fn vrl_expression_op_gt(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_gt
+    }
+
+    pub fn vrl_expression_op_le_integer(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_le_integer
+    }
+
+    pub fn vrl_expression_op_le_float(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_le_float
+    }
+
+    pub fn vrl_expression_op_le_bytes(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_le_bytes
+    }
+
+    pub fn vrl_expression_op_le(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_le
+    }
+
+    pub fn vrl_expression_op_lt_integer(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_lt_integer
+    }
+
+    pub fn vrl_expression_op_lt_float(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_lt_float
+    }
+
+    pub fn vrl_expression_op_lt_bytes(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_lt_bytes
+    }
+
+    pub fn vrl_expression_op_lt(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_lt
+    }
+
+    pub fn vrl_expression_op_merge_object(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_merge_object
+    }
+
+    pub fn vrl_expression_op_and_truthy(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_expression_op_and_truthy
+    }
+
+    pub fn vrl_expression_op_and_falsy(&self) -> PrecompiledFunction<'ctx, 2> {
+        self.precompiled_functions.vrl_expression_op_and_falsy
+    }
+
+    pub fn vrl_expression_query_target_external(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions
+            .vrl_expression_query_target_external
+    }
+
+    pub fn vrl_expression_query_target(&self) -> PrecompiledFunction<'ctx, 2> {
+        self.precompiled_functions.vrl_expression_query_target
+    }
+
+    pub fn vrl_expression_function_call(&self) -> PrecompiledFunction<'ctx, 2> {
+        self.precompiled_functions.vrl_expression_function_call
     }
 
     pub fn optimize(&self) -> Result<(), String> {
@@ -517,5 +780,396 @@ impl<'jit> Library<'jit> {
 
     pub fn get_function_address(&self) -> Result<usize, LLVMError> {
         Ok(self.1.get_function_address(VRL_EXECUTE_SYMBOL)? as usize)
+    }
+}
+
+pub struct PrecompiledFunctions<'ctx> {
+    vrl_resolved_initialize: PrecompiledFunction<'ctx, 1>,
+    vrl_value_initialize: PrecompiledFunction<'ctx, 1>,
+    vrl_optional_value_initialize: PrecompiledFunction<'ctx, 1>,
+    vrl_static_initialize: PrecompiledFunction<'ctx, 1>,
+    vrl_vec_initialize: PrecompiledFunction<'ctx, 2>,
+    vrl_btree_map_initialize: PrecompiledFunction<'ctx, 2>,
+    vrl_resolved_drop: PrecompiledFunction<'ctx, 1>,
+    vrl_optional_value_drop: PrecompiledFunction<'ctx, 1>,
+    vrl_resolved_as_value: PrecompiledFunction<'ctx, 1>,
+    vrl_resolved_as_value_to_optional_value: PrecompiledFunction<'ctx, 2>,
+    vrl_resolved_err_into_ok: PrecompiledFunction<'ctx, 1>,
+    vrl_resolved_is_ok: PrecompiledFunction<'ctx, 1>,
+    vrl_resolved_is_err: PrecompiledFunction<'ctx, 1>,
+    vrl_value_boolean_is_true: PrecompiledFunction<'ctx, 1>,
+    vrl_value_is_falsy: PrecompiledFunction<'ctx, 1>,
+    vrl_target_assign: PrecompiledFunction<'ctx, 2>,
+    vrl_vec_insert: PrecompiledFunction<'ctx, 3>,
+    vrl_btree_map_insert: PrecompiledFunction<'ctx, 4>,
+    vrl_resolved_set_null: PrecompiledFunction<'ctx, 1>,
+    vrl_expression_abort: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_assignment_target_insert_internal_path: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_assignment_target_insert_external: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_literal: PrecompiledFunction<'ctx, 2>,
+    vrl_expression_not: PrecompiledFunction<'ctx, 1>,
+    vrl_expression_array_set_result: PrecompiledFunction<'ctx, 2>,
+    vrl_expression_object_set_result: PrecompiledFunction<'ctx, 2>,
+    vrl_expression_op_mul_integer: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_mul_float: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_mul: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_div_integer: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_div_float: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_div: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_add_integer: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_add_float: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_add_bytes: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_add: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_sub_integer: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_sub_float: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_sub: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_rem_integer: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_rem_float: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_rem: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_ne_integer: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_ne_float: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_ne_bytes: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_ne: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_eq_integer: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_eq_float: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_eq_bytes: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_eq: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_ge_integer: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_ge_float: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_ge_bytes: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_ge: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_gt_integer: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_gt_float: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_gt_bytes: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_gt: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_le_integer: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_le_float: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_le_bytes: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_le: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_lt_integer: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_lt_float: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_lt_bytes: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_lt: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_merge_object: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_and_truthy: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_op_and_falsy: PrecompiledFunction<'ctx, 2>,
+    vrl_expression_query_target_external: PrecompiledFunction<'ctx, 3>,
+    vrl_expression_query_target: PrecompiledFunction<'ctx, 2>,
+    vrl_expression_function_call: PrecompiledFunction<'ctx, 2>,
+}
+
+impl<'ctx> PrecompiledFunctions<'ctx> {
+    pub fn new(module: &Module<'ctx>) -> Self {
+        Self {
+            vrl_resolved_initialize: PrecompiledFunction {
+                function: module.get_function("vrl_resolved_initialize").unwrap(),
+            },
+            vrl_value_initialize: PrecompiledFunction {
+                function: module.get_function("vrl_value_initialize").unwrap(),
+            },
+            vrl_optional_value_initialize: PrecompiledFunction {
+                function: module
+                    .get_function("vrl_optional_value_initialize")
+                    .unwrap(),
+            },
+            vrl_static_initialize: PrecompiledFunction {
+                function: module.get_function("vrl_static_initialize").unwrap(),
+            },
+            vrl_vec_initialize: PrecompiledFunction {
+                function: module.get_function("vrl_vec_initialize").unwrap(),
+            },
+            vrl_btree_map_initialize: PrecompiledFunction {
+                function: module.get_function("vrl_btree_map_initialize").unwrap(),
+            },
+            vrl_resolved_drop: PrecompiledFunction {
+                function: module.get_function("vrl_resolved_drop").unwrap(),
+            },
+            vrl_optional_value_drop: PrecompiledFunction {
+                function: module.get_function("vrl_optional_value_drop").unwrap(),
+            },
+            vrl_resolved_as_value: PrecompiledFunction {
+                function: module.get_function("vrl_resolved_as_value").unwrap(),
+            },
+            vrl_resolved_as_value_to_optional_value: PrecompiledFunction {
+                function: module
+                    .get_function("vrl_resolved_as_value_to_optional_value")
+                    .unwrap(),
+            },
+            vrl_resolved_err_into_ok: PrecompiledFunction {
+                function: module.get_function("vrl_resolved_err_into_ok").unwrap(),
+            },
+            vrl_resolved_is_ok: PrecompiledFunction {
+                function: module.get_function("vrl_resolved_is_ok").unwrap(),
+            },
+            vrl_resolved_is_err: PrecompiledFunction {
+                function: module.get_function("vrl_resolved_is_err").unwrap(),
+            },
+            vrl_value_boolean_is_true: PrecompiledFunction {
+                function: module.get_function("vrl_value_boolean_is_true").unwrap(),
+            },
+            vrl_value_is_falsy: PrecompiledFunction {
+                function: module.get_function("vrl_value_is_falsy").unwrap(),
+            },
+            vrl_target_assign: PrecompiledFunction {
+                function: module.get_function("vrl_target_assign").unwrap(),
+            },
+            vrl_vec_insert: PrecompiledFunction {
+                function: module.get_function("vrl_vec_insert").unwrap(),
+            },
+            vrl_btree_map_insert: PrecompiledFunction {
+                function: module.get_function("vrl_btree_map_insert").unwrap(),
+            },
+            vrl_resolved_set_null: PrecompiledFunction {
+                function: module.get_function("vrl_resolved_set_null").unwrap(),
+            },
+            vrl_expression_abort: PrecompiledFunction {
+                function: module.get_function("vrl_expression_abort").unwrap(),
+            },
+            vrl_expression_assignment_target_insert_internal_path: PrecompiledFunction {
+                function: module
+                    .get_function("vrl_expression_assignment_target_insert_internal_path")
+                    .unwrap(),
+            },
+            vrl_expression_assignment_target_insert_external: PrecompiledFunction {
+                function: module
+                    .get_function("vrl_expression_assignment_target_insert_external")
+                    .unwrap(),
+            },
+            vrl_expression_literal: PrecompiledFunction {
+                function: module.get_function("vrl_expression_literal").unwrap(),
+            },
+            vrl_expression_not: PrecompiledFunction {
+                function: module.get_function("vrl_expression_not").unwrap(),
+            },
+            vrl_expression_array_set_result: PrecompiledFunction {
+                function: module
+                    .get_function("vrl_expression_array_set_result")
+                    .unwrap(),
+            },
+            vrl_expression_object_set_result: PrecompiledFunction {
+                function: module
+                    .get_function("vrl_expression_object_set_result")
+                    .unwrap(),
+            },
+            vrl_expression_op_mul_integer: PrecompiledFunction {
+                function: module
+                    .get_function("vrl_expression_op_mul_integer")
+                    .unwrap(),
+            },
+            vrl_expression_op_mul_float: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_mul_float").unwrap(),
+            },
+            vrl_expression_op_mul: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_mul").unwrap(),
+            },
+            vrl_expression_op_div_integer: PrecompiledFunction {
+                function: module
+                    .get_function("vrl_expression_op_div_integer")
+                    .unwrap(),
+            },
+            vrl_expression_op_div_float: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_div_float").unwrap(),
+            },
+            vrl_expression_op_div: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_div").unwrap(),
+            },
+            vrl_expression_op_add_integer: PrecompiledFunction {
+                function: module
+                    .get_function("vrl_expression_op_add_integer")
+                    .unwrap(),
+            },
+            vrl_expression_op_add_float: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_add_float").unwrap(),
+            },
+            vrl_expression_op_add_bytes: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_add_bytes").unwrap(),
+            },
+            vrl_expression_op_add: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_add").unwrap(),
+            },
+            vrl_expression_op_sub_integer: PrecompiledFunction {
+                function: module
+                    .get_function("vrl_expression_op_sub_integer")
+                    .unwrap(),
+            },
+            vrl_expression_op_sub_float: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_sub_float").unwrap(),
+            },
+            vrl_expression_op_sub: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_sub").unwrap(),
+            },
+            vrl_expression_op_rem_integer: PrecompiledFunction {
+                function: module
+                    .get_function("vrl_expression_op_rem_integer")
+                    .unwrap(),
+            },
+            vrl_expression_op_rem_float: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_rem_float").unwrap(),
+            },
+            vrl_expression_op_rem: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_rem").unwrap(),
+            },
+            vrl_expression_op_ne_integer: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_ne_integer").unwrap(),
+            },
+            vrl_expression_op_ne_float: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_ne_float").unwrap(),
+            },
+            vrl_expression_op_ne_bytes: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_ne_bytes").unwrap(),
+            },
+            vrl_expression_op_ne: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_ne").unwrap(),
+            },
+            vrl_expression_op_eq_integer: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_eq_integer").unwrap(),
+            },
+            vrl_expression_op_eq_float: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_eq_float").unwrap(),
+            },
+            vrl_expression_op_eq_bytes: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_eq_bytes").unwrap(),
+            },
+            vrl_expression_op_eq: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_eq").unwrap(),
+            },
+            vrl_expression_op_ge_integer: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_ge_integer").unwrap(),
+            },
+            vrl_expression_op_ge_float: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_ge_float").unwrap(),
+            },
+            vrl_expression_op_ge_bytes: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_ge_bytes").unwrap(),
+            },
+            vrl_expression_op_ge: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_ge").unwrap(),
+            },
+            vrl_expression_op_gt_integer: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_gt_integer").unwrap(),
+            },
+            vrl_expression_op_gt_float: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_gt_float").unwrap(),
+            },
+            vrl_expression_op_gt_bytes: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_gt_bytes").unwrap(),
+            },
+            vrl_expression_op_gt: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_gt").unwrap(),
+            },
+            vrl_expression_op_le_integer: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_le_integer").unwrap(),
+            },
+            vrl_expression_op_le_float: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_le_float").unwrap(),
+            },
+            vrl_expression_op_le_bytes: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_le_bytes").unwrap(),
+            },
+            vrl_expression_op_le: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_le").unwrap(),
+            },
+            vrl_expression_op_lt_integer: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_lt_integer").unwrap(),
+            },
+            vrl_expression_op_lt_float: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_lt_float").unwrap(),
+            },
+            vrl_expression_op_lt_bytes: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_lt_bytes").unwrap(),
+            },
+            vrl_expression_op_lt: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_lt").unwrap(),
+            },
+            vrl_expression_op_merge_object: PrecompiledFunction {
+                function: module
+                    .get_function("vrl_expression_op_merge_object")
+                    .unwrap(),
+            },
+            vrl_expression_op_and_truthy: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_and_truthy").unwrap(),
+            },
+            vrl_expression_op_and_falsy: PrecompiledFunction {
+                function: module.get_function("vrl_expression_op_and_falsy").unwrap(),
+            },
+            vrl_expression_query_target_external: PrecompiledFunction {
+                function: module
+                    .get_function("vrl_expression_query_target_external")
+                    .unwrap(),
+            },
+            vrl_expression_query_target: PrecompiledFunction {
+                function: module.get_function("vrl_expression_query_target").unwrap(),
+            },
+            vrl_expression_function_call: PrecompiledFunction {
+                function: module.get_function("vrl_expression_function_call").unwrap(),
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct PrecompiledFunction<'ctx, const N: usize> {
+    pub function: FunctionValue<'ctx>,
+}
+
+impl<'ctx> PrecompiledFunction<'ctx, 1> {
+    pub fn build_call(
+        &self,
+        builder: &inkwell::builder::Builder<'ctx>,
+        arg1: impl Into<BasicMetadataValueEnum<'ctx>>,
+    ) -> CallSiteValue<'ctx> {
+        builder.build_call(
+            self.function,
+            &[arg1.into()],
+            &self.function.get_name().to_string_lossy(),
+        )
+    }
+}
+
+impl<'ctx> PrecompiledFunction<'ctx, 2> {
+    pub fn build_call(
+        &self,
+        builder: &inkwell::builder::Builder<'ctx>,
+        arg1: impl Into<BasicMetadataValueEnum<'ctx>>,
+        arg2: impl Into<BasicMetadataValueEnum<'ctx>>,
+    ) -> CallSiteValue<'ctx> {
+        builder.build_call(
+            self.function,
+            &[arg1.into(), arg2.into()],
+            &self.function.get_name().to_string_lossy(),
+        )
+    }
+}
+
+impl<'ctx> PrecompiledFunction<'ctx, 3> {
+    pub fn build_call(
+        &self,
+        builder: &inkwell::builder::Builder<'ctx>,
+        arg1: impl Into<BasicMetadataValueEnum<'ctx>>,
+        arg2: impl Into<BasicMetadataValueEnum<'ctx>>,
+        arg3: impl Into<BasicMetadataValueEnum<'ctx>>,
+    ) -> CallSiteValue<'ctx> {
+        builder.build_call(
+            self.function,
+            &[arg1.into(), arg2.into(), arg3.into()],
+            &self.function.get_name().to_string_lossy(),
+        )
+    }
+}
+
+impl<'ctx> PrecompiledFunction<'ctx, 4> {
+    pub fn build_call(
+        &self,
+        builder: &inkwell::builder::Builder<'ctx>,
+        arg1: impl Into<BasicMetadataValueEnum<'ctx>>,
+        arg2: impl Into<BasicMetadataValueEnum<'ctx>>,
+        arg3: impl Into<BasicMetadataValueEnum<'ctx>>,
+        arg4: impl Into<BasicMetadataValueEnum<'ctx>>,
+    ) -> CallSiteValue<'ctx> {
+        builder.build_call(
+            self.function,
+            &[arg1.into(), arg2.into(), arg3.into(), arg4.into()],
+            &self.function.get_name().to_string_lossy(),
+        )
     }
 }

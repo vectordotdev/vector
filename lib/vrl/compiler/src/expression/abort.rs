@@ -118,62 +118,35 @@ impl Expression for Abort {
 
         let message_ref = ctx.build_alloca_resolved("message");
 
-        {
-            let fn_ident = "vrl_resolved_initialize";
-            let fn_impl = ctx
-                .module()
-                .get_function(fn_ident)
-                .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+        ctx.vrl_resolved_initialize()
+            .build_call(ctx.builder(), message_ref);
 
-            ctx.builder()
-                .build_call(fn_impl, &[message_ref.into()], fn_ident);
+        if let Some(message) = &self.message {
+            let result_ref = ctx.result_ref();
+            ctx.set_result_ref(message_ref);
+            message.emit_llvm(state, ctx)?;
+            ctx.set_result_ref(result_ref);
         }
 
-        {
-            let fn_ident = "vrl_expression_abort_impl";
-            let fn_impl = ctx
-                .module()
-                .get_function(fn_ident)
-                .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
+        let vrl_expression_abort = ctx.vrl_expression_abort();
+        vrl_expression_abort.build_call(
+            ctx.builder(),
+            ctx.builder().build_bitcast(
+                span_ref,
+                vrl_expression_abort
+                    .function
+                    .get_nth_param(0)
+                    .unwrap()
+                    .get_type()
+                    .into_pointer_type(),
+                "cast",
+            ),
+            message_ref,
+            ctx.result_ref(),
+        );
 
-            if let Some(message) = &self.message {
-                let result_ref = ctx.result_ref();
-                ctx.set_result_ref(message_ref);
-                message.emit_llvm(state, ctx)?;
-                ctx.set_result_ref(result_ref);
-            }
-
-            ctx.builder().build_call(
-                fn_impl,
-                &[
-                    ctx.builder()
-                        .build_bitcast(
-                            span_ref,
-                            fn_impl
-                                .get_nth_param(0)
-                                .unwrap()
-                                .get_type()
-                                .into_pointer_type(),
-                            "cast",
-                        )
-                        .into(),
-                    message_ref.into(),
-                    ctx.result_ref().into(),
-                ],
-                fn_ident,
-            );
-        }
-
-        {
-            let fn_ident = "vrl_resolved_drop";
-            let fn_impl = ctx
-                .module()
-                .get_function(fn_ident)
-                .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
-
-            ctx.builder()
-                .build_call(fn_impl, &[message_ref.into()], fn_ident);
-        }
+        ctx.vrl_resolved_drop()
+            .build_call(ctx.builder(), message_ref);
 
         Ok(())
     }

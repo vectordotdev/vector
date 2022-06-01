@@ -43,6 +43,52 @@ pub unsafe extern "C" fn vrl_static_initialize(result: &mut Box<dyn Any + Send +
     result.write(Box::new(()));
 }
 
+/// # Safety
+/// TODO.
+#[no_mangle]
+pub unsafe extern "C" fn vrl_vec_initialize(vec: &mut Vec<Value>, capacity: usize) {
+    let vec = vec as *mut Vec<Value>;
+    vec.write(
+        #[allow(clippy::uninit_vec)]
+        {
+            let mut vec = Vec::with_capacity(capacity);
+            vec.set_len(capacity);
+            vec
+        },
+    );
+}
+
+/// # Safety
+/// TODO.
+#[no_mangle]
+pub unsafe extern "C" fn vrl_btree_map_initialize(vec: &mut Vec<(String, Value)>, capacity: usize) {
+    let vec = vec as *mut Vec<(String, Value)>;
+    vec.write(
+        #[allow(clippy::uninit_vec)]
+        {
+            let mut vec = Vec::with_capacity(capacity);
+            vec.set_len(capacity);
+            vec
+        },
+    );
+}
+
+/// # Safety
+/// TODO.
+#[no_mangle]
+pub unsafe extern "C" fn vrl_resolved_drop(result: &mut Resolved) {
+    let result = result as *mut Resolved;
+    drop(result.read());
+}
+
+/// # Safety
+/// TODO.
+#[no_mangle]
+pub unsafe extern "C" fn vrl_optional_value_drop(result: &mut Option<Value>) {
+    let result = result as *mut Option<Value>;
+    drop(result.read());
+}
+
 #[no_mangle]
 pub extern "C" fn vrl_resolved_as_value(result: &mut Resolved) -> &mut Value {
     match result {
@@ -65,22 +111,6 @@ pub extern "C" fn vrl_resolved_as_value_to_optional_value(
         Ok(value) => Some(value),
         Err(_) => panic!(r#"expected value "{:?}" not to be an error"#, result),
     }
-}
-
-/// # Safety
-/// TODO.
-#[no_mangle]
-pub unsafe extern "C" fn vrl_resolved_drop(result: &mut Resolved) {
-    let result = result as *mut Resolved;
-    drop(result.read());
-}
-
-/// # Safety
-/// TODO.
-#[no_mangle]
-pub unsafe extern "C" fn vrl_optional_value_drop(result: &mut Option<Value>) {
-    let result = result as *mut Option<Value>;
-    drop(result.read());
 }
 
 #[no_mangle]
@@ -116,30 +146,6 @@ pub extern "C" fn vrl_value_is_falsy(result: &Resolved) -> bool {
         .as_ref()
         .expect("VRL result must not contain an error")
         .is_falsy()
-}
-
-/// # Safety
-/// TODO.
-#[no_mangle]
-pub unsafe extern "C" fn vrl_vec_initialize(vec: &mut Vec<Value>, capacity: usize) {
-    let vec = vec as *mut Vec<Value>;
-    vec.write({
-        let mut vec = Vec::with_capacity(capacity);
-        vec.set_len(capacity);
-        vec
-    });
-}
-
-/// # Safety
-/// TODO.
-#[no_mangle]
-pub unsafe extern "C" fn vrl_btree_map_initialize(vec: &mut Vec<(String, Value)>, capacity: usize) {
-    let vec = vec as *mut Vec<(String, Value)>;
-    vec.write({
-        let mut vec = Vec::with_capacity(capacity);
-        vec.set_len(capacity);
-        vec
-    });
 }
 
 #[no_mangle]
@@ -187,11 +193,7 @@ pub extern "C" fn vrl_resolved_set_null(result: &mut Resolved) {
 }
 
 #[no_mangle]
-pub extern "C" fn vrl_expression_abort_impl(
-    span: &Span,
-    message: &Resolved,
-    result: &mut Resolved,
-) {
+pub extern "C" fn vrl_expression_abort(span: &Span, message: &Resolved, result: &mut Resolved) {
     let message = match message {
         Ok(Value::Null) => None,
         Ok(Value::Bytes(bytes)) => Some(String::from_utf8_lossy(bytes).into()),
@@ -204,7 +206,7 @@ pub extern "C" fn vrl_expression_abort_impl(
 }
 
 #[no_mangle]
-pub extern "C" fn vrl_expression_assignment_target_insert_internal_path_impl(
+pub extern "C" fn vrl_expression_assignment_target_insert_internal_path(
     value: &Resolved,
     path: &LookupBuf,
     target: &mut Resolved,
@@ -219,7 +221,7 @@ pub extern "C" fn vrl_expression_assignment_target_insert_internal_path_impl(
 }
 
 #[no_mangle]
-pub extern "C" fn vrl_expression_assignment_target_insert_external_impl(
+pub extern "C" fn vrl_expression_assignment_target_insert_external(
     value: &Resolved,
     path: &LookupBuf,
     ctx: &mut Context,
@@ -231,12 +233,12 @@ pub extern "C" fn vrl_expression_assignment_target_insert_external_impl(
 }
 
 #[no_mangle]
-pub extern "C" fn vrl_expression_literal_impl(value: &Value, result: &mut Resolved) {
+pub extern "C" fn vrl_expression_literal(value: &Value, result: &mut Resolved) {
     *result = Ok(value.clone());
 }
 
 #[no_mangle]
-pub extern "C" fn vrl_expression_not_impl(result: &mut Resolved) {
+pub extern "C" fn vrl_expression_not(result: &mut Resolved) {
     *result = Ok((!result
         .as_ref()
         .expect("VRL result must not contain an error")
@@ -248,7 +250,7 @@ pub extern "C" fn vrl_expression_not_impl(result: &mut Resolved) {
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_array_set_result_impl(
+pub unsafe extern "C" fn vrl_expression_array_set_result(
     vec: &mut Vec<Value>,
     result: &mut Resolved,
 ) {
@@ -259,7 +261,7 @@ pub unsafe extern "C" fn vrl_expression_array_set_result_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_object_set_result_impl(
+pub unsafe extern "C" fn vrl_expression_object_set_result(
     vec: &mut Vec<(String, Value)>,
     result: &mut Resolved,
 ) {
@@ -270,7 +272,7 @@ pub unsafe extern "C" fn vrl_expression_object_set_result_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_mul_integer_impl(
+pub unsafe extern "C" fn vrl_expression_op_mul_integer(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -290,7 +292,7 @@ pub unsafe extern "C" fn vrl_expression_op_mul_integer_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_mul_float_impl(
+pub unsafe extern "C" fn vrl_expression_op_mul_float(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -310,7 +312,7 @@ pub unsafe extern "C" fn vrl_expression_op_mul_float_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_mul_impl(
+pub unsafe extern "C" fn vrl_expression_op_mul(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -324,7 +326,7 @@ pub unsafe extern "C" fn vrl_expression_op_mul_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_div_integer_impl(
+pub unsafe extern "C" fn vrl_expression_op_div_integer(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -348,7 +350,7 @@ pub unsafe extern "C" fn vrl_expression_op_div_integer_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_div_float_impl(
+pub unsafe extern "C" fn vrl_expression_op_div_float(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -372,7 +374,7 @@ pub unsafe extern "C" fn vrl_expression_op_div_float_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_div_impl(
+pub unsafe extern "C" fn vrl_expression_op_div(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -386,7 +388,7 @@ pub unsafe extern "C" fn vrl_expression_op_div_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_add_integer_impl(
+pub unsafe extern "C" fn vrl_expression_op_add_integer(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -406,7 +408,7 @@ pub unsafe extern "C" fn vrl_expression_op_add_integer_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_add_float_impl(
+pub unsafe extern "C" fn vrl_expression_op_add_float(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -426,7 +428,7 @@ pub unsafe extern "C" fn vrl_expression_op_add_float_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_add_bytes_impl(
+pub unsafe extern "C" fn vrl_expression_op_add_bytes(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -450,7 +452,7 @@ pub unsafe extern "C" fn vrl_expression_op_add_bytes_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_add_impl(
+pub unsafe extern "C" fn vrl_expression_op_add(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -464,7 +466,7 @@ pub unsafe extern "C" fn vrl_expression_op_add_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_sub_integer_impl(
+pub unsafe extern "C" fn vrl_expression_op_sub_integer(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -484,7 +486,7 @@ pub unsafe extern "C" fn vrl_expression_op_sub_integer_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_sub_float_impl(
+pub unsafe extern "C" fn vrl_expression_op_sub_float(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -504,7 +506,7 @@ pub unsafe extern "C" fn vrl_expression_op_sub_float_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_sub_impl(
+pub unsafe extern "C" fn vrl_expression_op_sub(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -518,7 +520,7 @@ pub unsafe extern "C" fn vrl_expression_op_sub_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_rem_integer_impl(
+pub unsafe extern "C" fn vrl_expression_op_rem_integer(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -538,7 +540,7 @@ pub unsafe extern "C" fn vrl_expression_op_rem_integer_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_rem_float_impl(
+pub unsafe extern "C" fn vrl_expression_op_rem_float(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -558,7 +560,7 @@ pub unsafe extern "C" fn vrl_expression_op_rem_float_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_rem_impl(
+pub unsafe extern "C" fn vrl_expression_op_rem(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -572,7 +574,7 @@ pub unsafe extern "C" fn vrl_expression_op_rem_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_ne_integer_impl(
+pub unsafe extern "C" fn vrl_expression_op_ne_integer(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -592,7 +594,7 @@ pub unsafe extern "C" fn vrl_expression_op_ne_integer_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_ne_float_impl(
+pub unsafe extern "C" fn vrl_expression_op_ne_float(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -612,7 +614,7 @@ pub unsafe extern "C" fn vrl_expression_op_ne_float_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_ne_bytes_impl(
+pub unsafe extern "C" fn vrl_expression_op_ne_bytes(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -632,7 +634,7 @@ pub unsafe extern "C" fn vrl_expression_op_ne_bytes_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_ne_impl(
+pub unsafe extern "C" fn vrl_expression_op_ne(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -646,7 +648,7 @@ pub unsafe extern "C" fn vrl_expression_op_ne_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_eq_integer_impl(
+pub unsafe extern "C" fn vrl_expression_op_eq_integer(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -666,7 +668,7 @@ pub unsafe extern "C" fn vrl_expression_op_eq_integer_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_eq_float_impl(
+pub unsafe extern "C" fn vrl_expression_op_eq_float(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -686,7 +688,7 @@ pub unsafe extern "C" fn vrl_expression_op_eq_float_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_eq_bytes_impl(
+pub unsafe extern "C" fn vrl_expression_op_eq_bytes(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -706,7 +708,7 @@ pub unsafe extern "C" fn vrl_expression_op_eq_bytes_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_eq_impl(
+pub unsafe extern "C" fn vrl_expression_op_eq(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -720,7 +722,7 @@ pub unsafe extern "C" fn vrl_expression_op_eq_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_ge_integer_impl(
+pub unsafe extern "C" fn vrl_expression_op_ge_integer(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -740,7 +742,7 @@ pub unsafe extern "C" fn vrl_expression_op_ge_integer_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_ge_float_impl(
+pub unsafe extern "C" fn vrl_expression_op_ge_float(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -760,7 +762,7 @@ pub unsafe extern "C" fn vrl_expression_op_ge_float_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_ge_bytes_impl(
+pub unsafe extern "C" fn vrl_expression_op_ge_bytes(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -780,7 +782,7 @@ pub unsafe extern "C" fn vrl_expression_op_ge_bytes_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_ge_impl(
+pub unsafe extern "C" fn vrl_expression_op_ge(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -794,7 +796,7 @@ pub unsafe extern "C" fn vrl_expression_op_ge_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_gt_integer_impl(
+pub unsafe extern "C" fn vrl_expression_op_gt_integer(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -814,7 +816,7 @@ pub unsafe extern "C" fn vrl_expression_op_gt_integer_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_gt_float_impl(
+pub unsafe extern "C" fn vrl_expression_op_gt_float(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -834,7 +836,7 @@ pub unsafe extern "C" fn vrl_expression_op_gt_float_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_gt_bytes_impl(
+pub unsafe extern "C" fn vrl_expression_op_gt_bytes(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -854,7 +856,7 @@ pub unsafe extern "C" fn vrl_expression_op_gt_bytes_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_gt_impl(
+pub unsafe extern "C" fn vrl_expression_op_gt(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -868,7 +870,7 @@ pub unsafe extern "C" fn vrl_expression_op_gt_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_le_integer_impl(
+pub unsafe extern "C" fn vrl_expression_op_le_integer(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -888,7 +890,7 @@ pub unsafe extern "C" fn vrl_expression_op_le_integer_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_le_float_impl(
+pub unsafe extern "C" fn vrl_expression_op_le_float(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -908,7 +910,7 @@ pub unsafe extern "C" fn vrl_expression_op_le_float_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_le_bytes_impl(
+pub unsafe extern "C" fn vrl_expression_op_le_bytes(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -928,7 +930,7 @@ pub unsafe extern "C" fn vrl_expression_op_le_bytes_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_le_impl(
+pub unsafe extern "C" fn vrl_expression_op_le(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -942,7 +944,7 @@ pub unsafe extern "C" fn vrl_expression_op_le_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_lt_integer_impl(
+pub unsafe extern "C" fn vrl_expression_op_lt_integer(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -962,7 +964,7 @@ pub unsafe extern "C" fn vrl_expression_op_lt_integer_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_lt_float_impl(
+pub unsafe extern "C" fn vrl_expression_op_lt_float(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -982,7 +984,7 @@ pub unsafe extern "C" fn vrl_expression_op_lt_float_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_lt_bytes_impl(
+pub unsafe extern "C" fn vrl_expression_op_lt_bytes(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -1002,7 +1004,7 @@ pub unsafe extern "C" fn vrl_expression_op_lt_bytes_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_lt_impl(
+pub unsafe extern "C" fn vrl_expression_op_lt(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -1016,7 +1018,7 @@ pub unsafe extern "C" fn vrl_expression_op_lt_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_merge_object_impl(
+pub unsafe extern "C" fn vrl_expression_op_merge_object(
     lhs: &mut Value,
     rhs: &mut Value,
     result: &mut Resolved,
@@ -1041,7 +1043,7 @@ pub unsafe extern "C" fn vrl_expression_op_merge_object_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_and_truthy_impl(
+pub unsafe extern "C" fn vrl_expression_op_and_truthy(
     lhs: &mut Resolved,
     rhs: &mut Resolved,
     result: &mut Resolved,
@@ -1055,10 +1057,7 @@ pub unsafe extern "C" fn vrl_expression_op_and_truthy_impl(
 /// # Safety
 /// TODO.
 #[no_mangle]
-pub unsafe extern "C" fn vrl_expression_op_and_falsy_impl(
-    lhs: &mut Resolved,
-    result: &mut Resolved,
-) {
+pub unsafe extern "C" fn vrl_expression_op_and_falsy(lhs: &mut Resolved, result: &mut Resolved) {
     let lhs = (lhs as *mut Resolved).read();
     drop(lhs);
 
@@ -1066,7 +1065,7 @@ pub unsafe extern "C" fn vrl_expression_op_and_falsy_impl(
 }
 
 #[no_mangle]
-pub extern "C" fn vrl_expression_query_target_external_impl(
+pub extern "C" fn vrl_expression_query_target_external(
     context: &mut Context,
     path: &LookupBuf,
     result: &mut Resolved,
@@ -1081,7 +1080,7 @@ pub extern "C" fn vrl_expression_query_target_external_impl(
 }
 
 #[no_mangle]
-pub extern "C" fn vrl_expression_query_target_impl(path: &LookupBuf, result: &mut Resolved) {
+pub extern "C" fn vrl_expression_query_target(path: &LookupBuf, result: &mut Resolved) {
     *result = Ok(result
         .as_ref()
         .expect("VRL result must not contain an error")
@@ -1093,7 +1092,7 @@ pub extern "C" fn vrl_expression_query_target_impl(path: &LookupBuf, result: &mu
 }
 
 #[no_mangle]
-pub extern "C" fn vrl_handle_function_call_result(
+pub extern "C" fn vrl_expression_function_call(
     #[allow(clippy::ptr_arg)] error: &String,
     result: &mut Resolved,
 ) {

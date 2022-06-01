@@ -813,39 +813,22 @@ impl Expression for FunctionCall {
                             .into_struct_type(),
                         &argument_name,
                     );
-
-                    {
-                        let fn_ident = "vrl_resolved_initialize";
-                        let fn_impl = ctx
-                            .module()
-                            .get_function(fn_ident)
-                            .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
-                        ctx.builder()
-                            .build_call(fn_impl, &[resolved_ref.into()], fn_ident);
-                    }
+                    ctx.vrl_resolved_initialize()
+                        .build_call(ctx.builder(), resolved_ref);
 
                     ctx.set_result_ref(resolved_ref);
                     argument.expression.emit_llvm((state.0, state.1), ctx)?;
                     ctx.set_result_ref(result_ref);
 
-                    let value_ref = {
-                        let fn_ident = "vrl_resolved_as_value";
-                        let fn_impl = ctx
-                            .module()
-                            .get_function(fn_ident)
-                            .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
-                        ctx.builder()
-                            .build_call(fn_impl, &[resolved_ref.into()], fn_ident)
-                            .try_as_basic_value()
-                            .left()
-                            .ok_or(format!(r#"result of "{}" is not a basic value"#, fn_ident))?
-                    };
+                    let value_ref = ctx
+                        .vrl_resolved_as_value()
+                        .build_call(ctx.builder(), resolved_ref)
+                        .try_as_basic_value()
+                        .left()
+                        .expect("result is not a basic value");
 
                     argument_refs.push(value_ref.into());
-                    drop_calls.push(vec![(
-                        resolved_ref,
-                        ctx.module().get_function("vrl_resolved_drop").unwrap(),
-                    )]);
+                    drop_calls.push(vec![(resolved_ref, ctx.vrl_resolved_drop())]);
                 }
                 Some(CompiledArgument::Dynamic(argument)) => {
                     let resolved_ref = ctx.builder().build_alloca(
@@ -854,62 +837,31 @@ impl Expression for FunctionCall {
                             .into_struct_type(),
                         &argument_name,
                     );
+                    ctx.vrl_resolved_initialize()
+                        .build_call(ctx.builder(), resolved_ref);
                     let optional_value_ref = ctx.builder().build_alloca(
                         ctx.optional_value_ref_type()
                             .get_element_type()
                             .into_struct_type(),
                         &argument_name,
                     );
-
-                    {
-                        let fn_ident = "vrl_resolved_initialize";
-                        let fn_impl = ctx
-                            .module()
-                            .get_function(fn_ident)
-                            .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
-                        ctx.builder()
-                            .build_call(fn_impl, &[resolved_ref.into()], fn_ident);
-                    }
+                    ctx.vrl_optional_value_initialize()
+                        .build_call(ctx.builder(), optional_value_ref);
 
                     ctx.set_result_ref(resolved_ref);
                     argument.expression.emit_llvm((state.0, state.1), ctx)?;
                     ctx.set_result_ref(result_ref);
 
-                    {
-                        let fn_ident = "vrl_optional_value_initialize";
-                        let fn_impl = ctx
-                            .module()
-                            .get_function(fn_ident)
-                            .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
-                        ctx.builder()
-                            .build_call(fn_impl, &[optional_value_ref.into()], fn_ident);
-                    }
-
-                    {
-                        let fn_ident = "vrl_resolved_as_value_to_optional_value";
-                        let fn_impl = ctx
-                            .module()
-                            .get_function(fn_ident)
-                            .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
-                        ctx.builder().build_call(
-                            fn_impl,
-                            &[resolved_ref.into(), optional_value_ref.into()],
-                            fn_ident,
-                        );
-                    }
+                    ctx.vrl_resolved_as_value_to_optional_value().build_call(
+                        ctx.builder(),
+                        resolved_ref,
+                        optional_value_ref,
+                    );
 
                     argument_refs.push(optional_value_ref.into());
                     drop_calls.push(vec![
-                        (
-                            optional_value_ref,
-                            ctx.module()
-                                .get_function("vrl_optional_value_drop")
-                                .unwrap(),
-                        ),
-                        (
-                            resolved_ref,
-                            ctx.module().get_function("vrl_resolved_drop").unwrap(),
-                        ),
+                        (optional_value_ref, ctx.vrl_optional_value_drop()),
+                        (resolved_ref, ctx.vrl_resolved_drop()),
                     ]);
                 }
                 None => {
@@ -919,24 +871,11 @@ impl Expression for FunctionCall {
                             .into_struct_type(),
                         &argument_name,
                     );
-
-                    {
-                        let fn_ident = "vrl_optional_value_initialize";
-                        let fn_impl = ctx
-                            .module()
-                            .get_function(fn_ident)
-                            .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
-                        ctx.builder()
-                            .build_call(fn_impl, &[optional_value_ref.into()], fn_ident);
-                    }
+                    ctx.vrl_optional_value_initialize()
+                        .build_call(ctx.builder(), optional_value_ref);
 
                     argument_refs.push(optional_value_ref.into());
-                    drop_calls.push(vec![(
-                        optional_value_ref,
-                        ctx.module()
-                            .get_function("vrl_optional_value_drop")
-                            .unwrap(),
-                    )]);
+                    drop_calls.push(vec![(optional_value_ref, ctx.vrl_optional_value_drop())]);
                 }
             }
         }
@@ -957,43 +896,28 @@ impl Expression for FunctionCall {
 
             let error_ref = ctx.into_const(error.clone(), &error).as_pointer_value();
 
-            {
-                let fn_ident = "vrl_handle_function_call_result";
-                let fn_impl = ctx
-                    .module()
-                    .get_function(fn_ident)
-                    .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
-                ctx.builder().build_call(
-                    fn_impl,
-                    &[
-                        ctx.builder()
-                            .build_bitcast(
-                                error_ref,
-                                fn_impl
-                                    .get_nth_param(0)
-                                    .unwrap()
-                                    .get_type()
-                                    .into_pointer_type(),
-                                "cast",
-                            )
-                            .into(),
-                        result_ref.into(),
-                    ],
-                    fn_ident,
-                );
-            }
+            let vrl_expression_function_call = ctx.vrl_expression_function_call();
+            vrl_expression_function_call.build_call(
+                ctx.builder(),
+                ctx.builder().build_bitcast(
+                    error_ref,
+                    vrl_expression_function_call
+                        .function
+                        .get_nth_param(0)
+                        .unwrap()
+                        .get_type()
+                        .into_pointer_type(),
+                    "cast",
+                ),
+                result_ref,
+            );
         }
 
         argument_refs.pop();
 
         for drop_calls in drop_calls {
             for (value_ref, drop_fn) in drop_calls {
-                let drop_fn_ident = drop_fn.get_name();
-                ctx.builder().build_call(
-                    drop_fn,
-                    &[value_ref.into()],
-                    &drop_fn_ident.to_string_lossy(),
-                );
+                drop_fn.build_call(ctx.builder(), value_ref);
             }
         }
 

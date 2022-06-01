@@ -192,29 +192,22 @@ impl Expression for Query {
 
         match &self.target {
             Target::External => {
-                let fn_ident = "vrl_expression_query_target_external_impl";
-                let fn_impl = ctx
-                    .module()
-                    .get_function(fn_ident)
-                    .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
-                ctx.builder().build_call(
-                    fn_impl,
-                    &[
-                        ctx.context_ref().into(),
-                        ctx.builder()
-                            .build_bitcast(
-                                path_ref,
-                                fn_impl
-                                    .get_nth_param(1)
-                                    .unwrap()
-                                    .get_type()
-                                    .into_pointer_type(),
-                                "cast",
-                            )
-                            .into(),
-                        result_ref.into(),
-                    ],
-                    fn_ident,
+                let vrl_expression_query_target_external =
+                    ctx.vrl_expression_query_target_external();
+                vrl_expression_query_target_external.build_call(
+                    ctx.builder(),
+                    ctx.context_ref(),
+                    ctx.builder().build_bitcast(
+                        path_ref,
+                        vrl_expression_query_target_external
+                            .function
+                            .get_nth_param(1)
+                            .unwrap()
+                            .get_type()
+                            .into_pointer_type(),
+                        "cast",
+                    ),
+                    result_ref,
                 );
 
                 return Ok(());
@@ -224,13 +217,8 @@ impl Expression for Query {
             Target::Container(container) => container.emit_llvm(state, ctx)?,
         };
 
-        let fn_ident = "vrl_expression_query_target_impl";
-        let fn_impl = ctx
-            .module()
-            .get_function(fn_ident)
-            .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
-        ctx.builder()
-            .build_call(fn_impl, &[path_ref.into(), result_ref.into()], fn_ident);
+        ctx.vrl_expression_query_target()
+            .build_call(ctx.builder(), path_ref, result_ref);
 
         Ok(())
     }

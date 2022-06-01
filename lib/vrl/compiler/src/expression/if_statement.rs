@@ -113,44 +113,24 @@ impl Expression for IfStatement {
         let result_ref = ctx.result_ref();
 
         let predicate_ref = ctx.build_alloca_resolved("predicate");
-        {
-            let fn_ident = "vrl_resolved_initialize";
-            let fn_impl = ctx
-                .module()
-                .get_function(fn_ident)
-                .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
-            ctx.builder()
-                .build_call(fn_impl, &[predicate_ref.into()], fn_ident);
-        }
+        ctx.vrl_resolved_initialize()
+            .build_call(ctx.builder(), predicate_ref);
 
         ctx.set_result_ref(predicate_ref);
         self.predicate.emit_llvm((state.0, state.1), ctx)?;
         ctx.set_result_ref(result_ref);
 
-        let is_true = {
-            let fn_ident = "vrl_value_boolean_is_true";
-            let fn_impl = ctx
-                .module()
-                .get_function(fn_ident)
-                .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
-            ctx.builder()
-                .build_call(fn_impl, &[predicate_ref.into()], fn_ident)
-                .try_as_basic_value()
-                .left()
-                .ok_or(format!(r#"result of "{}" is not a basic value"#, fn_ident))?
-                .try_into()
-                .map_err(|_| format!(r#"result of "{}" is not an int value"#, fn_ident))?
-        };
+        let is_true = ctx
+            .vrl_value_boolean_is_true()
+            .build_call(ctx.builder(), predicate_ref)
+            .try_as_basic_value()
+            .left()
+            .expect("result is not a basic value")
+            .try_into()
+            .expect("result is not an int value");
 
-        {
-            let fn_ident = "vrl_resolved_drop";
-            let fn_impl = ctx
-                .module()
-                .get_function(fn_ident)
-                .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
-            ctx.builder()
-                .build_call(fn_impl, &[predicate_ref.into()], fn_ident);
-        }
+        ctx.vrl_resolved_drop()
+            .build_call(ctx.builder(), predicate_ref);
 
         let end_block = ctx
             .context()
@@ -174,13 +154,8 @@ impl Expression for IfStatement {
         if let Some(alternative) = &self.alternative {
             alternative.emit_llvm((state.0, state.1), ctx)?;
         } else {
-            let fn_ident = "vrl_resolved_set_null";
-            let fn_impl = ctx
-                .module()
-                .get_function(fn_ident)
-                .ok_or(format!(r#"failed to get "{}" function"#, fn_ident))?;
-            ctx.builder()
-                .build_call(fn_impl, &[result_ref.into()], fn_ident);
+            ctx.vrl_resolved_set_null()
+                .build_call(ctx.builder(), result_ref);
         }
         ctx.builder().build_unconditional_branch(end_block);
 
