@@ -32,8 +32,12 @@ pub struct CloudwatchFuture {
 
 struct Client {
     client: CloudwatchLogsClient,
-    smithy_client: std::sync::Arc<aws_smithy_client::Client<aws_smithy_client::erase::DynConnector,
-    aws_smithy_client::erase::DynMiddleware<aws_smithy_client::erase::DynConnector>>>,
+    smithy_client: std::sync::Arc<
+        aws_smithy_client::Client<
+            aws_smithy_client::erase::DynConnector,
+            aws_smithy_client::erase::DynMiddleware<aws_smithy_client::erase::DynConnector>,
+        >,
+    >,
     stream_name: String,
     group_name: String,
     headers: IndexMap<String, String>,
@@ -53,8 +57,12 @@ impl CloudwatchFuture {
     #[allow(clippy::too_many_arguments)]
     pub(super) fn new(
         client: CloudwatchLogsClient,
-        smithy_client: std::sync::Arc<aws_smithy_client::Client<aws_smithy_client::erase::DynConnector,
-        aws_smithy_client::erase::DynMiddleware<aws_smithy_client::erase::DynConnector>>>,
+        smithy_client: std::sync::Arc<
+            aws_smithy_client::Client<
+                aws_smithy_client::erase::DynConnector,
+                aws_smithy_client::erase::DynMiddleware<aws_smithy_client::erase::DynConnector>,
+            >,
+        >,
         headers: IndexMap<String, String>,
         stream_name: String,
         group_name: String,
@@ -234,32 +242,38 @@ impl Client {
             // about to be sent. https://github.com/awslabs/aws-sdk-rust/issues/537 should
             // eventually make this better.
             let op = PutLogEvents::builder()
-            .set_log_events(Some(log_events))
-            .set_sequence_token(sequence_token)
-            .log_group_name(group_name)
-            .log_stream_name(stream_name)
-            .build()
-            .map_err(|err| aws_smithy_http::result::SdkError::ConstructionFailure(err.into()))?
-            .make_operation(cw_client.conf())
-            .await
-            .map_err(|err| {
-                aws_smithy_http::result::SdkError::ConstructionFailure(err.into())
-            })?;
-            
+                .set_log_events(Some(log_events))
+                .set_sequence_token(sequence_token)
+                .log_group_name(group_name)
+                .log_stream_name(stream_name)
+                .build()
+                .map_err(|err| aws_smithy_http::result::SdkError::ConstructionFailure(err.into()))?
+                .make_operation(cw_client.conf())
+                .await
+                .map_err(|err| {
+                    aws_smithy_http::result::SdkError::ConstructionFailure(err.into())
+                })?;
+
             let (req, parts) = op.into_request_response();
             let (mut body, props) = req.into_parts();
-            for(header, value) in headers.iter() {
+            for (header, value) in headers.iter() {
                 let owned_header = header.clone();
                 let owned_value = value.clone();
                 body.headers_mut().insert(
-                    http::header::HeaderName::from_bytes(owned_header.as_bytes()).map_err(|err| {
-                        aws_smithy_http::result::SdkError::ConstructionFailure(err.into())
-                    })?,
+                    http::header::HeaderName::from_bytes(owned_header.as_bytes()).map_err(
+                        |err| aws_smithy_http::result::SdkError::ConstructionFailure(err.into()),
+                    )?,
                     http::HeaderValue::from_str(owned_value.as_str()).map_err(|err| {
                         aws_smithy_http::result::SdkError::ConstructionFailure(err.into())
-                    })?);
+                    })?,
+                );
             }
-            client.call(Operation::from_parts(Request::from_parts(body, props), parts)).await
+            client
+                .call(Operation::from_parts(
+                    Request::from_parts(body, props),
+                    parts,
+                ))
+                .await
         })
     }
 

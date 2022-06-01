@@ -83,7 +83,7 @@ pub trait ClientBuilder {
 }
 
 pub async fn create_smithy_client<T: ClientBuilder>(
-    region: Region, 
+    region: Region,
     proxy: &ProxyConfig,
     tls_options: &Option<TlsConfig>,
     is_sink: bool,
@@ -148,8 +148,8 @@ pub async fn create_client<T: ClientBuilder>(
 
     let config = config_builder.build();
 
-    let client = create_smithy_client::<T>(
-        region, proxy, tls_options, is_sink, retry_config).await?;
+    let client =
+        create_smithy_client::<T>(region, proxy, tls_options, is_sink, retry_config).await?;
 
     Ok(T::build(client, &config))
 }
