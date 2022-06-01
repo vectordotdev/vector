@@ -8,7 +8,8 @@ use crate::{
     sinks::{
         splunk_hec::{
             common::{
-                acknowledgements::HecClientAcknowledgementsConfig, SplunkHecDefaultBatchSettings, Data,
+                acknowledgements::HecClientAcknowledgementsConfig, EndpointTarget,
+                SplunkHecDefaultBatchSettings,
             },
             logs::config::HecLogsSinkConfig,
         },
@@ -125,7 +126,8 @@ impl HumioLogsConfig {
                 indexer_acknowledgements_enabled: false,
                 ..Default::default()
             },
-            data: Data::Event
+            endpoint_target: EndpointTarget::Event,
+            metadata: Default::default(),
         }
     }
 }

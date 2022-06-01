@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use bytes::Bytes;
 use futures_util::future::BoxFuture;
@@ -7,7 +7,7 @@ use hyper::Body;
 use snafu::{ResultExt, Snafu};
 use vector_core::{config::proxy::ProxyConfig, event::EventRef};
 
-use super::{request::HecRequest, service::HttpRequestBuilder, Data};
+use super::{request::HecRequest, service::HttpRequestBuilder, EndpointTarget};
 use crate::{
     http::HttpClient,
     internal_events::TemplateRenderingError,
@@ -48,7 +48,7 @@ pub fn create_client(
 pub fn build_http_batch_service(
     client: HttpClient,
     http_request_builder: Arc<HttpRequestBuilder>,
-    data: Data,
+    endpoint_target: EndpointTarget,
 ) -> HttpBatchService<BoxFuture<'static, Result<Request<Bytes>, crate::Error>>, HecRequest> {
     HttpBatchService::new(client, move |req: HecRequest| {
         let request_builder = Arc::clone(&http_request_builder);
@@ -56,11 +56,12 @@ pub fn build_http_batch_service(
             Box::pin(async move {
                 request_builder.build_request(
                     req.body,
-                    match data {
-                        Data::Event => "/services/collector/event",
-                        Data::Raw => "/services/collector/raw",
+                    match endpoint_target {
+                        EndpointTarget::Event => "/services/collector/event",
+                        EndpointTarget::Raw => "/services/collector/raw",
                     },
                     req.passthrough_token,
+                    req.metadata,
                 )
             });
         future
@@ -72,8 +73,8 @@ pub async fn build_healthcheck(
     token: String,
     client: HttpClient,
 ) -> crate::Result<()> {
-    let uri =
-        build_uri(endpoint.as_str(), "/services/collector/health/1.0").context(UriParseSnafu)?;
+    let uri = build_uri(endpoint.as_str(), "/services/collector/health/1.0", None)
+        .context(UriParseSnafu)?;
 
     let request = Request::get(uri)
         .header("Authorization", format!("Splunk {}", token))
@@ -89,8 +90,23 @@ pub async fn build_healthcheck(
     }
 }
 
-pub fn build_uri(host: &str, path: &str) -> Result<Uri, http::uri::InvalidUri> {
-    format!("{}{}", host.trim_end_matches('/'), path).parse::<Uri>()
+pub fn build_uri(
+    host: &str,
+    path: &str,
+    query: Option<HashMap<String, String>>,
+) -> Result<Uri, http::uri::InvalidUri> {
+    let mut uri = format!("{}{}", host.trim_end_matches('/'), path);
+
+    if let Some(query) = query {
+        uri.push('?');
+        for (key, value) in query {
+            uri.push_str(&key);
+            uri.push('=');
+            uri.push_str(&value);
+        }
+    }
+
+    uri.parse::<Uri>()
 }
 
 pub fn host_key() -> String {

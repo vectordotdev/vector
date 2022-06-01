@@ -201,7 +201,7 @@ impl HecAckClient {
             .freeze();
         let request = self
             .http_request_builder
-            .build_request(request_body_bytes, "/services/collector/ack", None)
+            .build_request(request_body_bytes, "/services/collector/ack", None, None)
             .map_err(|_| HecAckApiError::ClientBuildRequest)?;
 
         let response = self

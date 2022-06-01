@@ -1,4 +1,4 @@
-use std::{fmt, num::NonZeroUsize, sync::Arc};
+use std::{collections::HashMap, fmt, num::NonZeroUsize, sync::Arc};
 
 use async_trait::async_trait;
 use futures_util::{stream::BoxStream, StreamExt};
@@ -15,8 +15,9 @@ use vector_core::{
 use super::request_builder::HecLogsRequestBuilder;
 use crate::{
     config::SinkContext,
+    internal_events::TemplateRenderingError,
     sinks::{
-        splunk_hec::common::{render_template_string, request::HecRequest},
+        splunk_hec::common::{render_template_string, request::HecRequest, EndpointTarget},
         util::{processed_event::ProcessedEvent, SinkBuilderExt},
     },
     template::Template,
@@ -33,6 +34,8 @@ pub struct HecLogsSink<S> {
     pub indexed_fields: Vec<String>,
     pub host: String,
     pub timestamp_nanos_key: Option<String>,
+    pub metadata: HashMap<String, Template>,
+    pub endpoint_target: EndpointTarget,
 }
 
 impl<S> HecLogsSink<S>
@@ -49,6 +52,8 @@ where
         let indexed_fields = self.indexed_fields.as_slice();
         let host = self.host.as_ref();
         let timestamp_nanos_key = self.timestamp_nanos_key.as_deref();
+        let metadata = self.metadata.clone();
+        let endpoint_target = self.endpoint_target;
 
         let builder_limit = NonZeroUsize::new(64);
         let sink = input
@@ -61,9 +66,14 @@ where
                     host,
                     indexed_fields,
                     timestamp_nanos_key,
+                    metadata.clone(),
+                    endpoint_target,
                 )
             })
-            .batched_partitioned(EventPartitioner::default(), self.batch_settings)
+            .batched_partitioned(
+                EventPartitioner::new(self.metadata.clone()),
+                self.batch_settings,
+            )
             .request_builder(builder_limit, self.request_builder)
             .filter_map(|request| async move {
                 match request {
@@ -93,15 +103,73 @@ where
     }
 }
 
+#[derive(Clone, Debug, Eq)]
+pub(super) struct Partitioned {
+    pub(super) token: Option<Arc<str>>,
+    pub(super) metadata: HashMap<String, String>,
+}
+
+impl Partitioned {
+    pub(super) fn into_parts(self) -> (Option<Arc<str>>, HashMap<String, String>) {
+        (self.token, self.metadata)
+    }
+}
+
+impl PartialEq for Partitioned {
+    fn eq(&self, other: &Self) -> bool {
+        self.token == other.token && self.metadata == other.metadata
+    }
+}
+
+impl std::hash::Hash for Partitioned {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.token.hash(state);
+
+        for (key, value) in &self.metadata {
+            key.hash(state);
+            value.hash(state);
+        }
+    }
+}
+
 #[derive(Default)]
-struct EventPartitioner;
+struct EventPartitioner {
+    metadata: HashMap<String, Template>,
+}
+
+impl EventPartitioner {
+    const fn new(metadata: HashMap<String, Template>) -> Self {
+        Self { metadata }
+    }
+}
 
 impl Partitioner for EventPartitioner {
     type Item = HecProcessedEvent;
-    type Key = Option<Arc<str>>;
+    type Key = Option<Partitioned>;
 
     fn partition(&self, item: &Self::Item) -> Self::Key {
-        item.event.metadata().splunk_hec_token().clone()
+        self.metadata
+            .iter()
+            .map(|(key, value)| {
+                let res = value
+                    .render_string(&item.event)
+                    .map_err(|error| {
+                        emit!(TemplateRenderingError {
+                            error,
+                            field: Some(key.as_str()),
+                            drop_event: false,
+                        })
+                    })
+                    .ok()
+                    .map(|rendered| (key.clone(), rendered));
+
+                res
+            })
+            .collect::<Option<_>>()
+            .map(|metadata| Partitioned {
+                token: item.event.metadata().splunk_hec_token().clone(),
+                metadata,
+            })
     }
 }
 
@@ -114,6 +182,7 @@ pub struct HecLogsProcessedEventMetadata {
     pub host: Option<Value>,
     pub timestamp: f64,
     pub fields: LogEvent,
+    pub endpoint_target: EndpointTarget,
 }
 
 impl ByteSizeOf for HecLogsProcessedEventMetadata {
@@ -136,6 +205,8 @@ pub fn process_log(
     host_key: &str,
     indexed_fields: &[String],
     timestamp_nanos_key: Option<&str>,
+    metadata: HashMap<String, Template>,
+    endpoint_target: EndpointTarget,
 ) -> HecProcessedEvent {
     let event_byte_size = event.size_of();
     let mut log = event.into_log();
@@ -173,6 +244,7 @@ pub fn process_log(
         host,
         timestamp,
         fields,
+        endpoint_target,
     };
 
     ProcessedEvent {

@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use futures_util::FutureExt;
 use serde::{Deserialize, Serialize};
@@ -14,7 +14,7 @@ use crate::{
             acknowledgements::HecClientAcknowledgementsConfig,
             build_healthcheck, build_http_batch_service, create_client, host_key,
             service::{HecService, HttpRequestBuilder},
-            SplunkHecDefaultBatchSettings, Data,
+            EndpointTarget, SplunkHecDefaultBatchSettings,
         },
         util::{
             encoding::EncodingConfig, http::HttpRetryLogic, BatchConfig, Compression,
@@ -53,11 +53,13 @@ pub struct HecLogsSinkConfig {
     // This settings is relevant only for the `humio_logs` sink and should be left to None everywhere else
     pub timestamp_nanos_key: Option<String>,
     #[serde(default = "default_data")]
-    pub data: Data,
+    pub endpoint_target: EndpointTarget,
+    #[serde(default)]
+    pub metadata: HashMap<String, Template>,
 }
 
-const fn default_data() -> Data {
-    Data::Event
+const fn default_data() -> EndpointTarget {
+    EndpointTarget::Event
 }
 
 impl GenerateConfig for HecLogsSinkConfig {
@@ -77,7 +79,8 @@ impl GenerateConfig for HecLogsSinkConfig {
             tls: None,
             acknowledgements: Default::default(),
             timestamp_nanos_key: None,
-            data: Data::Event,
+            endpoint_target: EndpointTarget::Event,
+            metadata: Default::default(),
         })
         .unwrap()
     }
@@ -140,7 +143,7 @@ impl HecLogsSinkConfig {
             .service(build_http_batch_service(
                 client,
                 Arc::clone(&http_request_builder),
-                self.data,
+                self.endpoint_target,
             ));
 
         let service = HecService::new(
@@ -163,6 +166,8 @@ impl HecLogsSinkConfig {
             indexed_fields: self.indexed_fields.clone(),
             host: self.host_key.clone(),
             timestamp_nanos_key: self.timestamp_nanos_key.clone(),
+            metadata: self.metadata.clone(),
+            endpoint_target: self.endpoint_target,
         };
 
         Ok(VectorSink::from_event_streamsink(sink))
