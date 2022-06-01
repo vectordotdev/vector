@@ -1,5 +1,13 @@
 use std::{cmp, future::ready, panic, sync::Arc};
 
+use aws_sdk_s3::error::GetObjectError;
+use aws_sdk_s3::Client as S3Client;
+use aws_sdk_sqs::error::{DeleteMessageBatchError, ReceiveMessageError};
+use aws_sdk_sqs::model::{DeleteMessageBatchRequestEntry, Message};
+use aws_sdk_sqs::output::DeleteMessageBatchOutput;
+use aws_sdk_sqs::Client as SqsClient;
+use aws_smithy_client::SdkError;
+use aws_types::region::Region;
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use codecs::{decoding::FramingError, CharacterDelimitedDecoder};
@@ -12,29 +20,21 @@ use tokio_util::codec::FramedRead;
 use tracing::Instrument;
 use vector_core::ByteSizeOf;
 
-use aws_sdk_s3::error::GetObjectError;
-use aws_sdk_s3::Client as S3Client;
-use aws_sdk_sqs::error::{DeleteMessageBatchError, ReceiveMessageError};
-use aws_sdk_sqs::model::{DeleteMessageBatchRequestEntry, Message};
-use aws_sdk_sqs::output::DeleteMessageBatchOutput;
-use aws_sdk_sqs::Client as SqsClient;
-use aws_smithy_client::SdkError;
-use aws_types::region::Region;
-
-use crate::tls::TlsOptions;
+use crate::tls::TlsConfig;
 use crate::{
     config::{log_schema, AcknowledgementsConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, LogEvent},
     internal_events::{
-        BytesReceived, SqsMessageDeleteBatchError, SqsMessageDeletePartialError,
+        BytesReceived, OldEventsReceived, SqsMessageDeleteBatchError, SqsMessageDeletePartialError,
         SqsMessageDeleteSucceeded, SqsMessageProcessingError, SqsMessageProcessingSucceeded,
         SqsMessageReceiveError, SqsMessageReceiveSucceeded, SqsS3EventRecordInvalidEventIgnored,
-        SqsS3EventsReceived, StreamClosedError,
+        StreamClosedError,
     },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
     SourceSender,
 };
+use lookup::path;
 
 static SUPPORTED_S3S_EVENT_VERSION: Lazy<semver::VersionReq> =
     Lazy::new(|| semver::VersionReq::parse("~2").unwrap());
@@ -66,7 +66,7 @@ pub(super) struct Config {
 
     #[serde(default)]
     #[derivative(Default)]
-    pub(super) tls_options: Option<TlsOptions>,
+    pub(super) tls_options: Option<TlsConfig>,
 }
 
 const fn default_poll_secs() -> u32 {
@@ -473,11 +473,11 @@ impl IngestorProcess {
         let mut stream = lines.filter_map(move |line| {
             let mut log = LogEvent::from(line).with_batch_notifier_option(&batch);
 
-            log.insert_flat("bucket", bucket_name.clone());
-            log.insert_flat("object", object_key.clone());
-            log.insert_flat("region", aws_region.clone());
-            log.insert_flat(log_schema().source_type_key(), Bytes::from("aws_s3"));
-            log.insert_flat(log_schema().timestamp_key(), timestamp);
+            log.insert(path!("bucket"), bucket_name.clone());
+            log.insert(path!("object"), object_key.clone());
+            log.insert(path!("region"), aws_region.clone());
+            log.insert(log_schema().source_type_key(), Bytes::from("aws_s3"));
+            log.insert(log_schema().timestamp_key(), timestamp);
 
             if let Some(metadata) = &metadata {
                 for (key, value) in metadata {
@@ -485,7 +485,8 @@ impl IngestorProcess {
                 }
             }
 
-            emit!(SqsS3EventsReceived {
+            emit!(OldEventsReceived {
+                count: 1,
                 byte_size: log.size_of()
             });
 
@@ -692,7 +693,7 @@ pub struct S3Bucket {
     pub name: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct S3Object {
     // S3ObjectKeys are URL encoded
@@ -710,13 +711,21 @@ mod urlencoded_string {
     {
         use serde::de::Error;
 
-        serde::de::Deserialize::deserialize(deserializer).and_then(|s| {
-            percent_decode(s)
-                .decode_utf8()
-                .map(Into::into)
-                .map_err(|err| {
-                    D::Error::custom(format!("error url decoding S3 object key: {}", err))
-                })
+        serde::de::Deserialize::deserialize(deserializer).and_then(|s: &[u8]| {
+            let decoded = if s.iter().any(|c| *c == b'+') {
+                // AWS encodes spaces as `+` rather than `%20`, so we first need to handle this.
+                let s = s
+                    .iter()
+                    .map(|c| if *c == b'+' { b' ' } else { *c })
+                    .collect::<Vec<_>>();
+                percent_decode(&s).decode_utf8().map(Into::into)
+            } else {
+                percent_decode(s).decode_utf8().map(Into::into)
+            };
+
+            decoded.map_err(|err| {
+                D::Error::custom(format!("error url decoding S3 object key: {}", err))
+            })
         })
     }
 
@@ -728,4 +737,23 @@ mod urlencoded_string {
             &utf8_percent_encode(s, percent_encoding::NON_ALPHANUMERIC).collect::<String>(),
         )
     }
+}
+
+#[test]
+fn test_key_deserialize() {
+    let value = serde_json::from_str(r#"{"key": "noog+nork"}"#).unwrap();
+    assert_eq!(
+        S3Object {
+            key: "noog nork".to_string(),
+        },
+        value
+    );
+
+    let value = serde_json::from_str(r#"{"key": "noog%2bnork"}"#).unwrap();
+    assert_eq!(
+        S3Object {
+            key: "noog+nork".to_string(),
+        },
+        value
+    );
 }

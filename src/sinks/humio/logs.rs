@@ -16,7 +16,7 @@ use crate::{
         Healthcheck, VectorSink,
     },
     template::Template,
-    tls::TlsOptions,
+    tls::TlsConfig,
 };
 
 const HOST: &str = "https://cloud.humio.com";
@@ -42,7 +42,7 @@ pub struct HumioLogsConfig {
     pub(super) request: TowerRequestConfig,
     #[serde(default)]
     pub(super) batch: BatchConfig<SplunkHecDefaultBatchSettings>,
-    pub(super) tls: Option<TlsOptions>,
+    pub(super) tls: Option<TlsConfig>,
     #[serde(default = "timestamp_nanos_key")]
     pub(super) timestamp_nanos_key: Option<String>,
     #[serde(
@@ -142,18 +142,23 @@ mod tests {
 #[cfg(test)]
 #[cfg(feature = "humio-integration-tests")]
 mod integration_tests {
+    use std::{collections::HashMap, convert::TryFrom};
+
     use chrono::{TimeZone, Utc};
+    use futures::{future::ready, stream};
     use indoc::indoc;
     use serde_json::{json, Value as JsonValue};
-    use std::{collections::HashMap, convert::TryFrom};
     use tokio::time::Duration;
 
     use super::*;
     use crate::{
         config::{log_schema, SinkConfig, SinkContext},
-        event::Event,
+        event::LogEvent,
         sinks::util::Compression,
-        test_util::{components, components::HTTP_SINK_TAGS, random_string},
+        test_util::{
+            components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+            random_string,
+        },
     };
 
     fn humio_address() -> String {
@@ -174,14 +179,13 @@ mod integration_tests {
 
         let message = random_string(100);
         let host = "192.168.1.1".to_string();
-        let mut event = Event::from(message.clone());
-        let log = event.as_mut_log();
-        log.insert(log_schema().host_key(), host.clone());
+        let mut event = LogEvent::from(message.clone());
+        event.insert(log_schema().host_key(), host.clone());
 
         let ts = Utc.timestamp_nanos(Utc::now().timestamp_millis() * 1_000_000 + 132_456);
-        log.insert(log_schema().timestamp_key(), ts);
+        event.insert(log_schema().timestamp_key(), ts);
 
-        components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
+        run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
         let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 
@@ -219,8 +223,8 @@ mod integration_tests {
         let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
-        let event = Event::from(message.clone());
-        components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
+        let event = LogEvent::from(message.clone());
+        run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
         let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 
@@ -248,14 +252,12 @@ mod integration_tests {
             let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
 
             let message = random_string(100);
-            let mut event = Event::from(message.clone());
+            let mut event = LogEvent::from(message.clone());
             // Humio expects to find an @timestamp field for JSON lines
             // https://docs.humio.com/ingesting-data/parsers/built-in-parsers/#json
-            event
-                .as_mut_log()
-                .insert("@timestamp", Utc::now().to_rfc3339());
+            event.insert("@timestamp", Utc::now().to_rfc3339());
 
-            components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
+            run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
             let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 
@@ -276,9 +278,9 @@ mod integration_tests {
             let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
 
             let message = random_string(100);
-            let event = Event::from(message.clone());
+            let event = LogEvent::from(message.clone());
 
-            components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
+            run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
             let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 

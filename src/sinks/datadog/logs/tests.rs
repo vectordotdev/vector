@@ -29,8 +29,8 @@ use crate::{
 enum ApiStatus {
     OKv1,
     OKv2,
-    Forbiddenv1,
-    Forbiddenv2,
+    BadRequestv1,
+    BadRequestv2,
 }
 
 fn test_server(
@@ -44,7 +44,7 @@ fn test_server(
     let status = match api_status {
         ApiStatus::OKv1 => StatusCode::OK,
         ApiStatus::OKv2 => StatusCode::ACCEPTED,
-        ApiStatus::Forbiddenv1 | ApiStatus::Forbiddenv2 => StatusCode::FORBIDDEN,
+        ApiStatus::BadRequestv1 | ApiStatus::BadRequestv2 => StatusCode::BAD_REQUEST,
     };
 
     // NOTE: we pass `Trigger` out to the caller even though this suite never
@@ -147,11 +147,11 @@ async fn smoke() {
 #[tokio::test]
 /// Assert delivery error behavior for v1 API
 ///
-/// In the event that delivery fails -- in this case because it is FORBIDDEN --
+/// In the event that delivery fails -- in this case because it is BAD_REQUEST --
 /// there should be no outbound messages from the sink. That is, receiving from
 /// its Receiver must fail.
 async fn handles_failure_v1() {
-    let (_expected, mut rx) = start_test(ApiStatus::Forbiddenv1, BatchStatus::Errored).await;
+    let (_expected, mut rx) = start_test(ApiStatus::BadRequestv1, BatchStatus::Rejected).await;
     let res = rx.try_next();
 
     assert!(matches!(res, Err(TryRecvError { .. })));
@@ -160,11 +160,11 @@ async fn handles_failure_v1() {
 #[tokio::test]
 /// Assert delivery error behavior for v2 API
 ///
-/// In the event that delivery fails -- in this case because it is FORBIDDEN --
+/// In the event that delivery fails -- in this case because it is BAD_REQUEST --
 /// there should be no outbound messages from the sink. That is, receiving from
 /// its Receiver must fail.
 async fn handles_failure_v2() {
-    let (_expected, mut rx) = start_test(ApiStatus::Forbiddenv2, BatchStatus::Errored).await;
+    let (_expected, mut rx) = start_test(ApiStatus::BadRequestv2, BatchStatus::Rejected).await;
     let res = rx.try_next();
 
     assert!(matches!(res, Err(TryRecvError { .. })));
@@ -333,7 +333,7 @@ async fn enterprise_headers_v1() {
 }
 
 async fn enterprise_headers_inner(api_status: ApiStatus) {
-    let (mut config, mut cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
+    let (mut config, cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
             default_api_key = "atoken"
             compression = "none"
         "#})
@@ -344,7 +344,7 @@ async fn enterprise_headers_inner(api_status: ApiStatus) {
     let endpoint = format!("http://{}", addr);
     config.endpoint = Some(endpoint.clone());
 
-    cx.globals.enterprise = true;
+    config.enterprise = true;
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (rx, _trigger, server) = test_server(addr, api_status);
@@ -398,7 +398,7 @@ async fn no_enterprise_headers_v1() {
 }
 
 async fn no_enterprise_headers_inner(api_status: ApiStatus) {
-    let (mut config, mut cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
+    let (mut config, cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
             default_api_key = "atoken"
             compression = "none"
         "#})
@@ -409,7 +409,6 @@ async fn no_enterprise_headers_inner(api_status: ApiStatus) {
     let endpoint = format!("http://{}", addr);
     config.endpoint = Some(endpoint.clone());
 
-    cx.globals.enterprise = false;
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (rx, _trigger, server) = test_server(addr, api_status);

@@ -1,9 +1,12 @@
-use vector_core::{config::log_schema, event::Event, schema};
-
 use bytes::{BufMut, BytesMut};
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder;
 use value::Kind;
+use vector_core::{
+    config::{log_schema, DataType},
+    event::Event,
+    schema,
+};
 
 /// Config used to build a `RawMessageSerializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -20,9 +23,14 @@ impl RawMessageSerializerConfig {
         RawMessageSerializer
     }
 
+    /// The data type of events that are accepted by `RawMessageSerializer`.
+    pub fn input_type(&self) -> DataType {
+        DataType::Log
+    }
+
     /// The schema required by the serializer.
     pub fn schema_requirement(&self) -> schema::Requirement {
-        schema::Requirement::empty().require_meaning(log_schema().message_key(), Kind::any())
+        schema::Requirement::empty().required_meaning(log_schema().message_key(), Kind::any())
     }
 }
 
@@ -43,16 +51,13 @@ impl Encoder<Event> for RawMessageSerializer {
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let message_key = log_schema().message_key();
 
-        let bytes = match event {
-            Event::Log(log) => log
-                .get_by_meaning(message_key)
-                .or_else(|| log.get(message_key)) // backward compatibility
-                .map(|value| value.coerce_to_bytes()),
-            Event::Metric(_) => None,
-            Event::Trace(_) => None,
-        };
+        let log = event.as_log();
 
-        if let Some(bytes) = bytes {
+        if let Some(bytes) = log
+            .get_by_meaning(message_key)
+            .or_else(|| log.get(message_key))
+            .map(|value| value.coerce_to_bytes())
+        {
             buffer.put(bytes);
         }
 
@@ -62,8 +67,9 @@ impl Encoder<Event> for RawMessageSerializer {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use bytes::{Bytes, BytesMut};
+
+    use super::*;
 
     #[test]
     fn serialize_bytes() {

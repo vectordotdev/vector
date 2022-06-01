@@ -1,5 +1,6 @@
-use serde::{de, Deserialize, Deserializer};
 use std::{fmt, marker::PhantomData};
+
+use serde::{de, Deserialize, Deserializer};
 
 /// Answers "Is it possible to skip serializing this value, because it's the
 /// default?"

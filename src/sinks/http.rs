@@ -3,10 +3,10 @@ use std::io::Write;
 use bytes::{BufMut, Bytes, BytesMut};
 use codecs::encoding::{
     CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig, Framer, FramingConfig,
-    JsonSerializerConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
-    RawMessageSerializerConfig, Serializer, SerializerConfig,
+    JsonSerializerConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig, Serializer,
+    SerializerConfig, TextSerializerConfig,
 };
-use flate2::write::GzEncoder;
+use flate2::write::{GzEncoder, ZlibEncoder};
 use futures::{future, FutureExt, SinkExt};
 use http::{
     header::{self, HeaderName, HeaderValue},
@@ -35,7 +35,7 @@ use crate::{
         BatchConfig, Buffer, Compression, RealtimeSizeBasedDefaultBatchSettings,
         TowerRequestConfig, UriSerde,
     },
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 #[derive(Debug, Snafu)]
@@ -60,7 +60,7 @@ impl EncodingConfigWithFramingMigrator for Migrator {
 
     fn migrate(codec: &Self::Codec) -> (Option<FramingConfig>, SerializerConfig) {
         match codec {
-            Encoding::Text => (None, RawMessageSerializerConfig::new().into()),
+            Encoding::Text => (None, TextSerializerConfig::new().into()),
             Encoding::Ndjson => (
                 Some(NewlineDelimitedEncoderConfig::new().into()),
                 JsonSerializerConfig::new().into(),
@@ -74,6 +74,7 @@ impl EncodingConfigWithFramingMigrator for Migrator {
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct HttpSinkConfig {
     pub uri: UriSerde,
     pub method: Option<HttpMethod>,
@@ -88,7 +89,7 @@ pub struct HttpSinkConfig {
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
     #[serde(default)]
     pub request: RequestConfig,
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -196,7 +197,7 @@ impl SinkConfig for HttpSinkConfig {
         request.add_old_option(self.headers.clone());
         validate_headers(&request.headers, &self.auth)?;
 
-        let encoding = self.encoding.clone().encoding();
+        let encoding = self.encoding.encoding();
         let framing = encoding
             .0
             .unwrap_or_else(|| NewlineDelimitedEncoder::new().into());
@@ -236,7 +237,7 @@ impl SinkConfig for HttpSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(self.encoding.config().1.input_type())
     }
 
     fn sink_type(&self) -> &'static str {
@@ -294,7 +295,7 @@ impl util::http::HttpSink for HttpSink {
             use Framer::*;
             use Serializer::*;
             match (self.encoder.serializer(), self.encoder.framer()) {
-                (RawMessage(_), _) => Some("text/plain"),
+                (RawMessage(_) | Text(_), _) => Some("text/plain"),
                 (Json(_), NewlineDelimited(_)) => {
                     if !body.is_empty() {
                         // Remove trailing newline for backwards-compatibility
@@ -334,6 +335,14 @@ impl util::http::HttpSink for HttpSink {
 
                 let buffer = BytesMut::new();
                 let mut w = GzEncoder::new(buffer.writer(), level);
+                w.write_all(&body).expect("Writing to Vec can't fail");
+                body = w.finish().expect("Writing to Vec can't fail").into_inner();
+            }
+            Compression::Zlib(level) => {
+                builder = builder.header("Content-Encoding", "deflate");
+
+                let buffer = BytesMut::new();
+                let mut w = ZlibEncoder::new(buffer.writer(), level);
                 w.write_all(&body).expect("Writing to Vec can't fail");
                 body = w.finish().expect("Writing to Vec can't fail").into_inner();
             }
@@ -755,7 +764,7 @@ mod tests {
 
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let (input_lines, events) = random_lines_with_stream(100, num_lines, Some(batch));
-        components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
+        components::run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
         drop(trigger);
 
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));

@@ -1,15 +1,3 @@
-use crate::{
-    codecs::{Decoder, DecodingConfig},
-    config::{
-        log_schema, DataType, GenerateConfig, Output, SourceConfig, SourceContext,
-        SourceDescription,
-    },
-    event::Event,
-    internal_events::{BytesReceived, EventsReceived, StreamClosedError},
-    serde::{default_decoding, default_framing_message_based},
-    shutdown::ShutdownSignal,
-    SourceSender,
-};
 use bytes::Bytes;
 use chrono::Utc;
 use codecs::{
@@ -17,11 +5,19 @@ use codecs::{
     StreamDecodingError,
 };
 use futures::StreamExt;
-use redis::{Client, RedisResult};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 use vector_core::ByteSizeOf;
+
+use crate::{
+    codecs::{Decoder, DecodingConfig},
+    config::{log_schema, GenerateConfig, Output, SourceConfig, SourceContext, SourceDescription},
+    event::Event,
+    internal_events::{BytesReceived, EventsReceived, StreamClosedError},
+    serde::{default_decoding, default_framing_message_based},
+    SourceSender,
+};
 
 mod channel;
 mod list;
@@ -54,6 +50,25 @@ pub enum Method {
     #[derivative(Default)]
     Lpop,
     Rpop,
+}
+
+pub struct ConnectionInfo {
+    protocol: &'static str,
+    endpoint: String,
+}
+
+impl From<&redis::ConnectionInfo> for ConnectionInfo {
+    fn from(redis_conn_info: &redis::ConnectionInfo) -> Self {
+        let (protocol, endpoint) = match &redis_conn_info.addr {
+            redis::ConnectionAddr::Tcp(host, port)
+            | redis::ConnectionAddr::TcpTls { host, port, .. } => {
+                ("tcp", format!("{}:{}", host, port))
+            }
+            redis::ConnectionAddr::Unix(path) => ("uds", path.to_string_lossy().to_string()),
+        };
+
+        Self { protocol, endpoint }
+    }
 }
 
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
@@ -96,12 +111,45 @@ inventory::submit! {
 #[typetag::serde(name = "redis")]
 impl SourceConfig for RedisSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        // A key must be specified to actually query i.e. the list to pop from, or the channel to subscribe to.
+        if self.key.is_empty() {
+            return Err("`key` cannot be empty.".into());
+        }
+
+        let client = redis::Client::open(self.url.as_str()).context(ClientSnafu {})?;
+        let connection_info = client.get_connection_info().into();
         let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
-        redis_source(self, decoder, cx.shutdown, cx.out).await
+
+        match self.data_type {
+            DataTypeConfig::List => {
+                let list = self.list.unwrap_or_default();
+                list::watch(
+                    client,
+                    connection_info,
+                    self.key.clone(),
+                    self.redis_key.clone(),
+                    list.method,
+                    decoder,
+                    cx,
+                )
+                .await
+            }
+            DataTypeConfig::Channel => {
+                channel::subscribe(
+                    client,
+                    connection_info,
+                    self.key.clone(),
+                    self.redis_key.clone(),
+                    decoder,
+                    cx,
+                )
+                .await
+            }
+        }
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+        vec![Output::default(self.decoding.output_type())]
     }
 
     fn source_type(&self) -> &'static str {
@@ -113,54 +161,8 @@ impl SourceConfig for RedisSourceConfig {
     }
 }
 
-async fn redis_source(
-    config: &RedisSourceConfig,
-    decoder: Decoder,
-    shutdown: ShutdownSignal,
-    out: SourceSender,
-) -> crate::Result<super::Source> {
-    if config.key.is_empty() {
-        return Err("`key` cannot be empty.".into());
-    }
-
-    let client = build_client(config).context(ClientSnafu {})?;
-
-    match config.data_type {
-        DataTypeConfig::List => {
-            let list = config.list.unwrap_or_default();
-            list::watch(
-                client,
-                config.key.clone(),
-                config.redis_key.clone(),
-                list.method,
-                decoder,
-                shutdown,
-                out,
-            )
-            .await
-        }
-        DataTypeConfig::Channel => {
-            channel::subscribe(
-                client,
-                config.key.clone(),
-                config.redis_key.clone(),
-                decoder,
-                shutdown,
-                out,
-            )
-            .await
-        }
-    }
-}
-
-fn build_client(config: &RedisSourceConfig) -> RedisResult<Client> {
-    trace!("Opening redis client.");
-    let client = redis::Client::open(config.url.as_str());
-    trace!("Opened redis client.");
-    client
-}
-
 async fn handle_line(
+    connection_info: &ConnectionInfo,
     line: String,
     key: &str,
     redis_key: Option<&str>,
@@ -171,8 +173,9 @@ async fn handle_line(
 
     emit!(BytesReceived {
         byte_size: line.len(),
-        protocol: "tcp",
+        protocol: connection_info.protocol,
     });
+
     let mut stream = FramedRead::new(line.as_ref(), decoder.clone());
     while let Some(next) = stream.next().await {
         match next {
@@ -221,28 +224,34 @@ mod test {
     }
 }
 
-#[cfg(feature = "redis-integration-tests")]
-#[cfg(test)]
+#[cfg(all(test, feature = "redis-integration-tests"))]
 mod integration_test {
+    use redis::AsyncCommands;
+
     use super::*;
     use crate::config::log_schema;
+    use crate::test_util::components::{run_and_assert_source_compliance_n, SOURCE_TAGS};
     use crate::{
-        shutdown::ShutdownSignal,
         test_util::{collect_n, random_string},
         SourceSender,
     };
-    use redis::AsyncCommands;
 
     const REDIS_SERVER: &str = "redis://redis:6379/0";
 
     #[tokio::test]
     async fn redis_source_list_rpop() {
+        // Push some test data into a list object which we'll read from.
         let client = redis::Client::open(REDIS_SERVER).unwrap();
         let mut conn = client.get_tokio_connection_manager().await.unwrap();
 
         let key = format!("test-key-{}", random_string(10));
         debug!("Test key name: {}.", key);
 
+        let _: i32 = conn.rpush(&key, "1").await.unwrap();
+        let _: i32 = conn.rpush(&key, "2").await.unwrap();
+        let _: i32 = conn.rpush(&key, "3").await.unwrap();
+
+        // Now run the source and make sure we get all three events.
         let config = RedisSourceConfig {
             data_type: DataTypeConfig::List,
             list: Some(ListOption {
@@ -255,22 +264,7 @@ mod integration_test {
             decoding: default_decoding(),
         };
 
-        let _: i32 = conn.rpush(&key, "1").await.unwrap();
-        let _: i32 = conn.rpush(&key, "2").await.unwrap();
-        let _: i32 = conn.rpush(&key, "3").await.unwrap();
-
-        let (tx, rx) = SourceSender::new_test();
-        tokio::spawn(
-            redis_source(
-                &config,
-                crate::codecs::Decoder::default(),
-                ShutdownSignal::noop(),
-                tx,
-            )
-            .await
-            .unwrap(),
-        );
-        let events = collect_n(rx, 3).await;
+        let events = run_and_assert_source_compliance_n(config, 3, &SOURCE_TAGS).await;
 
         assert_eq!(events[0].as_log()[log_schema().message_key()], "3".into());
         assert_eq!(events[1].as_log()[log_schema().message_key()], "2".into());
@@ -279,12 +273,18 @@ mod integration_test {
 
     #[tokio::test]
     async fn redis_source_list_lpop() {
+        // Push some test data into a list object which we'll read from.
         let client = redis::Client::open(REDIS_SERVER).unwrap();
         let mut conn = client.get_tokio_connection_manager().await.unwrap();
 
         let key = format!("test-key-{}", random_string(10));
         debug!("Test key name: {}.", key);
 
+        let _: i32 = conn.rpush(&key, "1").await.unwrap();
+        let _: i32 = conn.rpush(&key, "2").await.unwrap();
+        let _: i32 = conn.rpush(&key, "3").await.unwrap();
+
+        // Now run the source and make sure we get all three events.
         let config = RedisSourceConfig {
             data_type: DataTypeConfig::List,
             list: Some(ListOption {
@@ -297,22 +297,7 @@ mod integration_test {
             decoding: default_decoding(),
         };
 
-        let _: i32 = conn.rpush(&key, "1").await.unwrap();
-        let _: i32 = conn.rpush(&key, "2").await.unwrap();
-        let _: i32 = conn.rpush(&key, "3").await.unwrap();
-
-        let (tx, rx) = SourceSender::new_test();
-        tokio::spawn(
-            redis_source(
-                &config,
-                crate::codecs::Decoder::default(),
-                ShutdownSignal::noop(),
-                tx,
-            )
-            .await
-            .unwrap(),
-        );
-        let events = collect_n(rx, 3).await;
+        let events = run_and_assert_source_compliance_n(config, 3, &SOURCE_TAGS).await;
 
         assert_eq!(events[0].as_log()[log_schema().message_key()], "1".into());
         assert_eq!(events[1].as_log()[log_schema().message_key()], "2".into());
@@ -321,11 +306,10 @@ mod integration_test {
 
     #[tokio::test]
     async fn redis_source_channel_consume_event() {
-        let key = "test-channel".to_owned();
-        debug!("Test key name: {}.", key);
-
+        let key = format!("test-channel-{}", random_string(10));
         let text = "test message for channel";
 
+        // Create the source and spawn it in the background, so that we're already listening before we publish any messages.
         let config = RedisSourceConfig {
             data_type: DataTypeConfig::Channel,
             list: None,
@@ -336,19 +320,22 @@ mod integration_test {
             decoding: default_decoding(),
         };
 
-        debug!("Receiving event.");
         let (tx, rx) = SourceSender::new_test();
-        tokio::spawn(
-            redis_source(
-                &config,
-                crate::codecs::Decoder::default(),
-                ShutdownSignal::noop(),
-                tx,
-            )
+        let context = SourceContext::new_test(tx, None);
+        let source = config
+            .build(context)
             .await
-            .unwrap(),
-        );
+            .expect("source should not fail to build");
 
+        tokio::spawn(source);
+
+        // Briefly wait to ensure the source is subscribed.
+        //
+        // TODO: This is a prime example of where being able to check if the shutdown signal had been polled at least
+        // once would serve as the most precise indicator of "is the source ready and waiting to receieve?".
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
+        // Now create a normal Redis client and use it to publish a bunch of message, which we'll ensure the source consumes.
         let client = redis::Client::open(REDIS_SERVER).unwrap();
 
         let mut async_conn = client
@@ -356,18 +343,14 @@ mod integration_test {
             .await
             .expect("Failed to get redis async connection.");
 
-        // wait for redis_source subscribe the channel.
-        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-
         for _i in 0..10000 {
             let _: i32 = async_conn.publish(key.clone(), text).await.unwrap();
         }
 
         let events = collect_n(rx, 10000).await;
-
         assert_eq!(events.len(), 10000);
 
-        for event in events.iter().take(10000) {
+        for event in events {
             assert_eq!(event.as_log()[log_schema().message_key()], text.into());
             assert_eq!(
                 event.as_log()[log_schema().source_type_key()],

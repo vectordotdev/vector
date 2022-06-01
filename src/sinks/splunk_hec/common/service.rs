@@ -187,7 +187,7 @@ pub struct HttpRequestBuilder {
 
 impl HttpRequestBuilder {
     pub fn new(endpoint: String, default_token: String, compression: Compression) -> Self {
-        let channel = Uuid::new_v4().to_hyphenated().to_string();
+        let channel = Uuid::new_v4().hyphenated().to_string();
         Self {
             endpoint,
             default_token,

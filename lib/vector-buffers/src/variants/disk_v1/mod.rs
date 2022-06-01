@@ -30,6 +30,8 @@ use leveldb::{
 use snafu::{ResultExt, Snafu};
 use tokio::{sync::Notify, time::Instant};
 
+use self::key::Key;
+pub use self::{acknowledgements::create_disk_v1_acker, reader::Reader, writer::Writer};
 use crate::{
     buffer_usage_data::BufferUsageHandle,
     topology::{
@@ -39,9 +41,6 @@ use crate::{
     },
     Acker, Bufferable,
 };
-
-use self::key::Key;
-pub use self::{acknowledgements::create_disk_v1_acker, reader::Reader, writer::Writer};
 
 /// How much of disk buffer needs to be deleted before we trigger compaction.
 const MAX_UNCOMPACTED_DENOMINATOR: u64 = 10;

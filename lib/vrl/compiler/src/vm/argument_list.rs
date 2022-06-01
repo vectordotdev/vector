@@ -1,12 +1,16 @@
-use diagnostic::DiagnosticError;
+use std::{any::Any, collections::BTreeMap};
 
+use diagnostic::DiagnosticMessage;
+use parser::ast::Ident;
+use value::Value;
+
+use super::Vm;
 use crate::{
     expression::{Expr, FunctionArgument},
     function::FunctionCompileContext,
     value::Kind,
-    ExpressionError, Function, Parameter, Value,
+    ExpressionError, Function, Parameter,
 };
-use std::{any::Any, collections::BTreeMap};
 
 pub enum VmArgument<'a> {
     Value(Value),
@@ -42,11 +46,16 @@ impl<'a> VmArgument<'a> {
 pub struct VmArgumentList<'a> {
     args: &'static [Parameter],
     values: Vec<Option<VmArgument<'a>>>,
+    closure: Option<&'a VmFunctionClosure>,
 }
 
 impl<'a> VmArgumentList<'a> {
     pub fn new(args: &'static [Parameter], values: Vec<Option<VmArgument<'a>>>) -> Self {
-        Self { args, values }
+        Self {
+            args,
+            values,
+            closure: None,
+        }
     }
 
     fn argument_pos(&self, name: &str) -> usize {
@@ -100,6 +109,16 @@ impl<'a> VmArgumentList<'a> {
         self.values[pos].take().map(|v| v.into_any())
     }
 
+    /// Get closure parameter.
+    pub fn closure(&mut self) -> &VmFunctionClosure {
+        self.closure.take().unwrap()
+    }
+
+    /// Add closure to argument list.
+    pub fn set_closure(&mut self, closure: &'a VmFunctionClosure) {
+        self.closure = Some(closure);
+    }
+
     /// Validates the arguments are correct.
     pub fn check_arguments(&self) -> Result<(), ExpressionError> {
         for (param, args) in self.args.iter().zip(self.values.iter()) {
@@ -120,9 +139,24 @@ impl<'a> VmArgumentList<'a> {
     }
 }
 
+#[derive(Debug)]
+pub struct VmFunctionClosure {
+    pub variables: Vec<Ident>,
+    pub vm: Vm,
+}
+
+impl VmFunctionClosure {
+    pub fn new<T: Into<Ident>>(variables: Vec<T>, vm: Vm) -> Self {
+        Self {
+            variables: variables.into_iter().map(Into::into).collect(),
+            vm,
+        }
+    }
+}
+
 /// Keeps clippy happy.
 type CompiledArguments =
-    Result<BTreeMap<&'static str, Box<dyn Any + Send + Sync>>, Box<dyn DiagnosticError>>;
+    Result<BTreeMap<&'static str, Box<dyn Any + Send + Sync>>, Box<dyn DiagnosticMessage>>;
 
 /// Compiles the function arguments with the given argument list.
 /// This is used by the stdlib unit tests.
@@ -188,5 +222,6 @@ where
     VmArgumentList {
         args: params,
         values,
+        closure: None,
     }
 }

@@ -167,6 +167,24 @@ components: sources: kubernetes_logs: {
 				}
 			}
 		}
+		node_annotation_fields: {
+			common:      false
+			description: "Configuration for how the events are annotated with Node metadata."
+			required:    false
+			type: object: {
+				examples: []
+				options: {
+					node_labels: {
+						common:      false
+						description: "Event field for Node labels."
+						required:    false
+						type: string: {
+							default: "kubernetes.node_labels"
+						}
+					}
+				}
+			}
+		}
 		auto_partial_merge: {
 			common:      false
 			description: "Automatically merge partial messages into a single event. Partial here is in respect to messages that were split by the Kubernetes Container Runtime log driver."
@@ -222,6 +240,18 @@ components: sources: kubernetes_logs: {
 			common: false
 			description: """
 				Specifies the label selector to filter `Pod`s with, to be used in
+				addition to the built-in `vector.dev/exclude` filter.
+				"""
+			required: false
+			type: string: {
+				default: ""
+				examples: ["my_custom_label!=my_value", "my_custom_label!=my_value,my_other_custom_label=my_value"]
+			}
+		}
+		extra_namespace_label_selector: {
+			common: false
+			description: """
+				Specifies the label selector to filter `Namespace`s with, to be used in
 				addition to the built-in `vector.dev/exclude` filter.
 				"""
 			required: false

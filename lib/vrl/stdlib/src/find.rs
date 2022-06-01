@@ -1,4 +1,4 @@
-use ::value::ValueRegex;
+use ::value::{Value, ValueRegex};
 use vrl::prelude::*;
 
 fn find(value: Value, pattern: Value, from: Option<Value>) -> Resolved {

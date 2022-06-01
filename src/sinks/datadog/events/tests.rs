@@ -135,7 +135,7 @@ async fn api_key_in_metadata() {
         events
     });
 
-    components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
+    components::run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
     let output = rx.take(expected.len()).collect::<Vec<_>>().await;
 
     for (i, val) in output.iter().enumerate() {

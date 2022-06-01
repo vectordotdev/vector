@@ -1,26 +1,31 @@
-use aws_smithy_http::body::SdkBody;
-use bytes::Bytes;
 use std::{fs::File, io::Read};
 
+use aws_smithy_http::body::SdkBody;
+use bytes::Bytes;
 use chrono::Utc;
 use futures::StreamExt;
+use futures::{future::ready, stream};
 use http::{Request, StatusCode};
 use serde_json::{json, Value};
 use vector_core::{
     config::log_schema,
-    event::{BatchNotifier, BatchStatus, LogEvent},
+    event::{BatchNotifier, BatchStatus, Event, LogEvent},
 };
 
 use super::{config::DATA_STREAM_TIMESTAMP_KEY, *};
 use crate::{
+    aws::RegionOrEndpoint,
     config::{ProxyConfig, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
         util::{BatchConfig, Compression},
         HealthcheckError,
     },
-    test_util::{random_events_with_stream, random_string, trace_init},
-    tls::{self, TlsOptions},
+    test_util::{
+        components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+        random_events_with_stream, random_string, trace_init,
+    },
+    tls::{self, TlsConfig},
 };
 
 fn aws_server() -> String {
@@ -147,7 +152,12 @@ async fn structures_events_correctly() {
 
     let timestamp = input_event[crate::config::log_schema().timestamp_key()].clone();
 
-    sink.run_events(vec![input_event.into()]).await.unwrap();
+    run_and_assert_sink_compliance(
+        sink,
+        stream::once(ready(Event::from(input_event))),
+        &HTTP_SINK_TAGS,
+    )
+    .await;
 
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
@@ -222,7 +232,7 @@ async fn insert_events_over_https() {
             endpoint: https_server(),
             doc_type: Some("log_lines".into()),
             compression: Compression::None,
-            tls: Some(TlsOptions {
+            tls: Some(TlsConfig {
                 ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
                 ..Default::default()
             }),
@@ -240,8 +250,11 @@ async fn insert_events_on_aws() {
 
     run_insert_tests(
         ElasticsearchConfig {
-            auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {})),
+            auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
+                load_timeout_secs: Some(5),
+            })),
             endpoint: aws_server(),
+            aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
             ..config()
         },
         false,
@@ -256,8 +269,11 @@ async fn insert_events_on_aws_with_compression() {
 
     run_insert_tests(
         ElasticsearchConfig {
-            auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {})),
+            auth: Some(ElasticsearchAuth::Aws(AwsAuthentication::Default {
+                load_timeout_secs: Some(5),
+            })),
             endpoint: aws_server(),
+            aws: Some(RegionOrEndpoint::with_region(String::from("localstack"))),
             compression: Compression::gzip_default(),
             ..config()
         },
@@ -376,7 +392,7 @@ async fn run_insert_tests_with_config(
     if break_events {
         // Break all but the first event to simulate some kind of partial failure
         let mut doit = false;
-        sink.run(events.map(move |mut events| {
+        let events = events.map(move |mut events| {
             if doit {
                 events.for_each_log(|log| {
                     log.insert("_type", 1);
@@ -384,11 +400,11 @@ async fn run_insert_tests_with_config(
             }
             doit = true;
             events
-        }))
-        .await
-        .expect("Sending events failed");
+        });
+
+        run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
     } else {
-        sink.run(events).await.expect("Sending events failed");
+        run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
     }
 
     assert_eq!(receiver.try_recv(), Ok(batch_status));

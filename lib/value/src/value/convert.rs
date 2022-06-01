@@ -1,11 +1,13 @@
-use crate::value::regex::ValueRegex;
-use crate::{Kind, Value};
+use std::borrow::Cow;
+use std::collections::BTreeMap;
+
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
 use regex::Regex;
-use std::borrow::Cow;
-use std::collections::BTreeMap;
+
+use crate::value::regex::ValueRegex;
+use crate::{Kind, Value};
 
 impl Value {
     /// Returns self as `NotNan<f64>`, only if self is `Value::Float`.
@@ -29,6 +31,18 @@ impl Value {
         match &self {
             Value::Timestamp(ts) => Some(ts),
             _ => None,
+        }
+    }
+
+    /// Returns self as a `DateTime<Utc>`.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if self is anything other than `Value::Timestamp`.
+    pub fn as_timestamp_unwrap(&self) -> &DateTime<Utc> {
+        match self {
+            Value::Timestamp(ref timestamp) => timestamp,
+            _ => panic!("Tried to call `Value::as_timestamp_unwrap` on a non-timestamp value."),
         }
     }
 

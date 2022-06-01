@@ -1,5 +1,6 @@
 use std::{collections::BTreeMap, fmt, sync::Arc};
 
+use ::value::Value;
 use vrl::{
     diagnostic::{Label, Span},
     prelude::*,
@@ -39,7 +40,7 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-impl DiagnosticError for Error {
+impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
         109
     }
@@ -119,10 +120,10 @@ impl Function for ParseGrok {
             .into_owned();
 
         let mut grok = grok::Grok::with_patterns();
-        let pattern = Arc::new(
-            grok.compile(&pattern, true)
-                .map_err(|e| Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticError>)?,
-        );
+        let pattern =
+            Arc::new(grok.compile(&pattern, true).map_err(|e| {
+                Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticMessage>
+            })?);
 
         let remove_empty = arguments
             .optional("remove_empty")
@@ -152,7 +153,7 @@ impl Function for ParseGrok {
 
                 let mut grok = grok::Grok::with_patterns();
                 let pattern = Arc::new(grok.compile(&pattern, true).map_err(|e| {
-                    Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticError>
+                    Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticMessage>
                 })?);
 
                 Ok(Some(Box::new(pattern) as _))

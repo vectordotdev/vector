@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use vector_core::config::LogNamespace;
 use vector_core::{
+    config::DataType,
     event::{proto, Event, EventArray, EventContainer},
     schema,
 };
@@ -18,6 +19,11 @@ impl NativeDeserializerConfig {
     /// Build the `NativeDeserializer` from this configuration.
     pub fn build(&self) -> NativeDeserializer {
         NativeDeserializer::default()
+    }
+
+    /// Return the type of event build by this deserializer.
+    pub fn output_type(&self) -> DataType {
+        DataType::all()
     }
 
     /// The schema produced by the deserializer.

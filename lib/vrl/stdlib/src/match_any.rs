@@ -1,3 +1,4 @@
+use ::value::Value;
 use regex::bytes::RegexSet;
 use vrl::prelude::*;
 
@@ -64,7 +65,7 @@ impl Function for MatchAny {
 
             let re = value
                 .try_regex()
-                .map_err(|e| Box::new(e) as Box<dyn DiagnosticError>)?;
+                .map_err(|e| Box::new(e) as Box<dyn DiagnosticMessage>)?;
             re_strings.push(re.to_string());
         }
 
@@ -93,7 +94,7 @@ impl Function for MatchAny {
                 for value in patterns {
                     let re = value
                         .try_regex()
-                        .map_err(|e| Box::new(e) as Box<dyn DiagnosticError>)?;
+                        .map_err(|e| Box::new(e) as Box<dyn DiagnosticMessage>)?;
                     re_strings.push(re.to_string());
                 }
 

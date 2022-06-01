@@ -1,3 +1,4 @@
+use ::value::Value;
 use lookup_lib::{LookupBuf, SegmentBuf};
 use vrl::prelude::*;
 
@@ -34,7 +35,7 @@ fn get(value: Value, path: Value) -> Resolved {
             .into())
         }
     };
-    Ok(value.target_get(&path)?.unwrap_or(Value::Null))
+    Ok(value.target_get(&path)?.cloned().unwrap_or(Value::Null))
 }
 
 #[derive(Clone, Copy, Debug)]

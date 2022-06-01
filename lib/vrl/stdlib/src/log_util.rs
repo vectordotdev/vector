@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
 
+use ::value::Value;
 use chrono::prelude::{DateTime, Utc};
 use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
 use vector_common::TimeZone;
-use vrl::prelude::*;
 
 // Information about the common log format taken from the
 // - W3C specification: https://www.w3.org/Daemon/User/Config/Logging.html#common-logfile-format
@@ -111,20 +111,22 @@ pub(crate) static REGEX_NGINX_COMBINED_LOG: Lazy<Regex> = Lazy::new(|| {
 #[cfg(feature = "parse_nginx_log")]
 pub(crate) static REGEX_NGINX_ERROR_LOG: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
-        r#"(?x)                                         # Ignore whitespace and comments in the regex expression.
-        ^\s*                                            # Start with any number of whitespaces.
-        (?P<timestamp>.+)\s+                            # Match any character until [
-        \[(?P<severity>\w+)\]\s+                        # Match any word character
-        (?P<pid>\d+)\#                                  # Match any number
-        (?P<tid>\d+):                                   # Match any number
-        (\s+\*(?P<cid>\d+))?                            # Match any number
-        \s+(?P<message>[^,]*)                           # Match any character
-        (,\s+client:\s+(?P<client>[^,]+))?              # Match any character after ', client: '
-        (,\s+server:\s+(?P<server>[^,]+))?              # Match any character after ', server: '
-        (,\s+request:\s+"(?P<request>[^"]+)")?          # Match any character after ', request: '
-        (,\s+host:\s+"(?P<host>[^"]+)")?                # Match any character then ':' then any character after ', host: '
-        (,\s+refer?rer:\s+"(?P<referer>[^"]+)")?        # Match any character after ', referrer: '
-        \s*$                                            # Match any number of whitespaces (to be discarded).
+        r#"(?x)                                                                  # Ignore whitespace and comments in the regex expression.
+        ^\s*                                                                     # Start with any number of whitespaces.
+        (?P<timestamp>.+)\s+                                                     # Match any character until [
+        \[(?P<severity>\w+)\]\s+                                                 # Match any word character
+        (?P<pid>\d+)\#                                                           # Match any number
+        (?P<tid>\d+):                                                            # Match any number
+        (\s+\*(?P<cid>\d+))?                                                     # Match any number
+        \s+(?P<message>[^,]*)                                                    # Match any character
+        (,\s+excess:\s+(?P<excess>[^\s]+)\sby\szone\s"(?P<zone>[^,]+)")?         # Match any character after ', excess: ' until ' by zone ' and the rest of characters
+        (,\s+client:\s+(?P<client>[^,]+))?                                       # Match any character after ', client: '
+        (,\s+server:\s+(?P<server>[^,]+))?                                       # Match any character after ', server: '
+        (,\s+request:\s+"(?P<request>[^"]+)")?                                   # Match any character after ', request: '
+        (,\s+upstream:\s+"(?P<upstream>[^"]+)")?                                 # Match any character after ', upstream: '
+        (,\s+host:\s+"(?P<host>[^"]+)")?                                         # Match any character then ':' then any character after ', host: '
+        (,\s+refer?rer:\s+"(?P<referer>[^"]+)")?                                 # Match any character after ', referrer: '
+        \s*$                                                                     # Match any number of whitespaces (to be discarded).
     "#)
     .expect("failed compiling regex for Nginx error log")
 });
@@ -158,6 +160,11 @@ fn capture_value(
     Ok(match name {
         "timestamp" => Value::Timestamp(parse_time(value, timestamp_format, timezone)?),
         "status" | "size" | "pid" | "tid" | "cid" | "port" => Value::Integer(
+            value
+                .parse()
+                .map_err(|_| format!("failed parsing {}", name))?,
+        ),
+        "excess" => Value::Float(
             value
                 .parse()
                 .map_err(|_| format!("failed parsing {}", name))?,

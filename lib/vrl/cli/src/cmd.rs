@@ -6,12 +6,13 @@ use std::{
     path::PathBuf,
 };
 
+use ::value::Value;
 use clap::Parser;
 use vector_common::TimeZone;
 use vrl::{
     diagnostic::Formatter,
     state::{self, ExternalEnv},
-    Program, Runtime, Target, Value, VrlRuntime,
+    Program, Runtime, Target, VrlRuntime,
 };
 
 #[cfg(feature = "repl")]
@@ -46,6 +47,10 @@ pub struct Opts {
     /// Should we use the VM to evaluate the VRL
     #[clap(short, long = "runtime", default_value_t)]
     runtime: VrlRuntime,
+
+    // Should the CLI emit warnings
+    #[clap(long = "print-warnings")]
+    print_warnings: bool,
 }
 
 impl Opts {
@@ -117,9 +122,15 @@ fn run(opts: &Opts) -> Result<(), Error> {
     } else {
         let objects = opts.read_into_objects()?;
         let source = opts.read_program()?;
-        let program = vrl::compile(&source, &stdlib::all()).map_err(|diagnostics| {
+        let (program, warnings) = vrl::compile(&source, &stdlib::all()).map_err(|diagnostics| {
             Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
         })?;
+
+        #[allow(clippy::print_stderr)]
+        if opts.print_warnings {
+            let warnings = Formatter::new(&source, warnings).colored().to_string();
+            eprintln!("{warnings}")
+        }
 
         for mut object in objects {
             let state = state::Runtime::default();
@@ -190,7 +201,7 @@ fn serde_to_vrl(value: serde_json::Value) -> Value {
     use serde_json::Value as JsonValue;
 
     match value {
-        JsonValue::Null => vrl::Value::Null,
+        JsonValue::Null => ::value::Value::Null,
         JsonValue::Object(v) => v
             .into_iter()
             .map(|(k, v)| (k, serde_to_vrl(v)))

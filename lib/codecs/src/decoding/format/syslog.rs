@@ -4,14 +4,14 @@ use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
 use value::Kind;
-
-use super::Deserializer;
 use vector_core::config::LogNamespace;
 use vector_core::{
-    config::log_schema,
+    config::{log_schema, DataType},
     event::{Event, Value},
     schema,
 };
+
+use super::Deserializer;
 
 /// Config used to build a `SyslogDeserializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -21,6 +21,11 @@ impl SyslogDeserializerConfig {
     /// Build the `SyslogDeserializer` from this configuration.
     pub const fn build(&self) -> SyslogDeserializer {
         SyslogDeserializer
+    }
+
+    /// Return the type of event build by this deserializer.
+    pub fn output_type(&self) -> DataType {
+        DataType::Log
     }
 
     /// The schema produced by the deserializer.

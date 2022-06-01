@@ -1,6 +1,7 @@
+use std::{fmt, num::NonZeroUsize};
+
 use bitmask_enum::bitmask;
 use serde::{Deserialize, Serialize};
-use std::{fmt, num::NonZeroUsize};
 
 mod global_options;
 mod id;
@@ -88,6 +89,13 @@ impl Input {
             log_schema_requirement: schema::Requirement::empty(),
         }
     }
+
+    /// Set the schema requirement for this output.
+    #[must_use]
+    pub fn with_schema_requirement(mut self, schema_requirement: schema::Requirement) -> Self {
+        self.log_schema_requirement = schema_requirement;
+        self
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -122,21 +130,18 @@ impl Output {
         }
     }
 
-    /// Set the schema definition for this output.
+    /// Set the schema definition for this `Output`.
     #[must_use]
     pub fn with_schema_definition(mut self, schema_definition: schema::Definition) -> Self {
         self.log_schema_definition = Some(schema_definition);
         self
     }
-}
 
-impl<T: Into<String>> From<(T, DataType)> for Output {
-    fn from((name, ty): (T, DataType)) -> Self {
-        Self {
-            port: Some(name.into()),
-            ty,
-            log_schema_definition: None,
-        }
+    /// Set the port name for this `Output`.
+    #[must_use]
+    pub fn with_port(mut self, name: impl Into<String>) -> Self {
+        self.port = Some(name.into());
+        self
     }
 }
 
@@ -173,8 +178,8 @@ impl From<bool> for AcknowledgementsConfig {
 pub enum LogNamespace {
     /// Vector native namespacing
     ///
-    /// Deserialized data is placed in "body"
-    /// Extra data is placed in "metadata"
+    /// Deserialized data is placed in the root of the event.
+    /// Extra data is placed in "event metadata"
     Vector,
 
     /// This is the legacy namespacing.
@@ -222,25 +227,15 @@ impl LogNamespace {
         }
     }
 
-    pub fn new_log_from_data(&self, value: impl Into<Value>) -> crate::Result<LogEvent> {
+    pub fn new_log_from_data(&self, value: impl Into<Value>) -> LogEvent {
         match self {
             LogNamespace::Vector => {
                 let mut log = LogEvent::default();
                 log.insert(Self::VECTOR_DATA_KEY, value);
-                Ok(log)
-            }
-            LogNamespace::Legacy => LogEvent::try_from(value.into()),
-        }
-    }
 
-    pub fn add_body_namespace(&self, log: &mut LogEvent) {
-        match self {
-            LogNamespace::Legacy => { /* do nothing. Deserialized data stays on the root */ }
-            LogNamespace::Vector => {
-                let map = log.as_map_mut();
-                let value = std::mem::take(map);
-                map.insert("body".to_owned(), value.into());
+                log
             }
+            LogNamespace::Legacy => LogEvent::from(value.into()),
         }
     }
 }

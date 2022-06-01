@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::{
     collections::{hash_map, HashMap},
     pin::Pin,
@@ -20,6 +21,7 @@ use crate::{
 
 mod merge_strategy;
 
+use crate::event::Value;
 use merge_strategy::*;
 
 //------------------------------------------------------------------------------
@@ -80,10 +82,10 @@ struct ReduceState {
 
 impl ReduceState {
     fn new(e: LogEvent, strategies: &IndexMap<String, MergeStrategy>) -> Self {
-        let (fields, metadata) = e.into_parts();
-        Self {
-            stale_since: Instant::now(),
-            fields: fields
+        let (value, metadata) = e.into_parts();
+
+        let fields = if let Value::Object(fields) = value {
+            fields
                 .into_iter()
                 .filter_map(|(k, v)| {
                     if let Some(strat) = strategies.get(&k) {
@@ -98,14 +100,27 @@ impl ReduceState {
                         Some((k, v.into()))
                     }
                 })
-                .collect(),
+                .collect()
+        } else {
+            HashMap::new()
+        };
+
+        Self {
+            stale_since: Instant::now(),
+            fields,
             metadata,
         }
     }
 
     fn add_event(&mut self, e: LogEvent, strategies: &IndexMap<String, MergeStrategy>) {
-        let (fields, metadata) = e.into_parts();
+        let (value, metadata) = e.into_parts();
         self.metadata.merge(metadata);
+
+        let fields = if let Value::Object(fields) = value {
+            fields
+        } else {
+            BTreeMap::new()
+        };
 
         for (k, v) in fields.into_iter() {
             let strategy = strategies.get(&k);

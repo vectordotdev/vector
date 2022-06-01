@@ -1,17 +1,18 @@
-use crate::aws::create_client;
-use crate::codecs::DecodingConfig;
-use crate::common::sqs::SqsClientBuilder;
-use crate::tls::TlsOptions;
-use crate::{
-    aws::{auth::AwsAuthentication, region::RegionOrEndpoint},
-    config::{AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext},
-    serde::{bool_or_struct, default_decoding, default_framing_message_based},
-    sources::aws_sqs::source::SqsSource,
-};
+use std::cmp;
 
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use serde::{Deserialize, Serialize};
-use std::cmp;
+
+use crate::aws::create_client;
+use crate::codecs::DecodingConfig;
+use crate::common::sqs::SqsClientBuilder;
+use crate::tls::TlsConfig;
+use crate::{
+    aws::{auth::AwsAuthentication, region::RegionOrEndpoint},
+    config::{AcknowledgementsConfig, Output, SourceConfig, SourceContext},
+    serde::{bool_or_struct, default_decoding, default_framing_message_based},
+    sources::aws_sqs::source::SqsSource,
+};
 
 #[derive(Deserialize, Serialize, Derivative, Debug, Clone)]
 #[derivative(Default)]
@@ -50,7 +51,7 @@ pub struct AwsSqsConfig {
     pub decoding: DeserializerConfig,
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub acknowledgements: AcknowledgementsConfig,
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
 }
 
 #[async_trait::async_trait]
@@ -77,7 +78,7 @@ impl SourceConfig for AwsSqsConfig {
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+        vec![Output::default(self.decoding.output_type())]
     }
 
     fn source_type(&self) -> &'static str {
@@ -97,6 +98,7 @@ impl AwsSqsConfig {
             self.region.endpoint()?,
             &cx.proxy,
             &self.tls,
+            false,
         )
         .await
     }

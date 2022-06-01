@@ -7,18 +7,19 @@ use prost::Message;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use vector_core::config::LogNamespace;
+use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::Decoder,
     config::{DataType, GenerateConfig, Output, Resource, SourceContext},
     event::{proto, Event},
-    internal_events::{VectorEventReceived, VectorProtoDecodeError},
+    internal_events::{BytesReceived, OldEventsReceived, VectorProtoDecodeError},
     sources::{
         util::{SocketListenAddr, TcpNullAcker, TcpSource},
         Source,
     },
     tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -28,7 +29,7 @@ pub(crate) struct VectorConfig {
     keepalive: Option<TcpKeepaliveConfig>,
     #[serde(default = "default_shutdown_timeout_secs")]
     shutdown_timeout_secs: u64,
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     receive_buffer_bytes: Option<usize>,
 }
 
@@ -40,7 +41,7 @@ impl VectorConfig {
     #[cfg(test)]
     #[allow(unused)] // this test function is not always used in test, breaking
                      // our cargo-hack run
-    pub fn set_tls(&mut self, config: Option<TlsConfig>) {
+    pub fn set_tls(&mut self, config: Option<TlsEnableableConfig>) {
         self.tls = config;
     }
 
@@ -103,10 +104,17 @@ impl decoding::format::Deserializer for VectorDeserializer {
         _log_namespace: LogNamespace,
     ) -> crate::Result<SmallVec<[Event; 1]>> {
         let byte_size = bytes.len();
+        emit!(BytesReceived {
+            byte_size,
+            protocol: "tcp",
+        });
+
         match proto::EventWrapper::decode(bytes).map(Event::from) {
             Ok(event) => {
-                emit!(VectorEventReceived { byte_size });
-
+                emit!(OldEventsReceived {
+                    count: 1,
+                    byte_size: event.size_of()
+                });
                 Ok(smallvec![event])
             }
             Err(error) => {
@@ -167,8 +175,12 @@ mod test {
         },
         shutdown::ShutdownSignal,
         sinks::vector::v1::VectorConfig as SinkConfig,
-        test_util::{collect_ready, next_addr, trace_init, wait_for_tcp},
-        tls::{TlsConfig, TlsOptions},
+        test_util::{
+            collect_ready,
+            components::{assert_source_compliance, SOCKET_PUSH_SOURCE_TAGS},
+            next_addr, trace_init, wait_for_tcp,
+        },
+        tls::{TlsConfig, TlsEnableableConfig},
         SourceSender,
     };
 
@@ -216,37 +228,43 @@ mod test {
 
     #[tokio::test]
     async fn it_works_with_vector_sink() {
-        let addr = next_addr();
-        stream_test(
-            addr,
-            VectorConfig::from_address(addr.into()),
-            SinkConfig::from_address(format!("localhost:{}", addr.port())),
-        )
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let addr = next_addr();
+            stream_test(
+                addr,
+                VectorConfig::from_address(addr.into()),
+                SinkConfig::from_address(format!("localhost:{}", addr.port())),
+            )
+            .await;
+        })
         .await;
     }
 
     #[tokio::test]
     async fn it_works_with_vector_sink_tls() {
-        let addr = next_addr();
-        stream_test(
-            addr,
-            {
-                let mut config = VectorConfig::from_address(addr.into());
-                config.set_tls(Some(TlsConfig::test_config()));
-                config
-            },
-            {
-                let mut config = SinkConfig::from_address(format!("localhost:{}", addr.port()));
-                config.set_tls(Some(TlsConfig {
-                    enabled: Some(true),
-                    options: TlsOptions {
-                        verify_certificate: Some(false),
-                        ..Default::default()
-                    },
-                }));
-                config
-            },
-        )
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let addr = next_addr();
+            stream_test(
+                addr,
+                {
+                    let mut config = VectorConfig::from_address(addr.into());
+                    config.set_tls(Some(TlsEnableableConfig::test_config()));
+                    config
+                },
+                {
+                    let mut config = SinkConfig::from_address(format!("localhost:{}", addr.port()));
+                    config.set_tls(Some(TlsEnableableConfig {
+                        enabled: Some(true),
+                        options: TlsConfig {
+                            verify_certificate: Some(false),
+                            ..Default::default()
+                        },
+                    }));
+                    config
+                },
+            )
+            .await;
+        })
         .await;
     }
 
@@ -277,7 +295,7 @@ mod test {
         wait_for_tcp(addr).await;
 
         let mut stream = TcpStream::connect(&addr).await.unwrap();
-        stream.write(b"hello world \n").await.unwrap();
+        stream.write_all(b"hello world \n").await.unwrap();
 
         tokio::time::sleep(Duration::from_secs(2)).await;
         stream.shutdown().await.unwrap();

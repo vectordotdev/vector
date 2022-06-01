@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn to_syslog_level(value: Value) -> Resolved {

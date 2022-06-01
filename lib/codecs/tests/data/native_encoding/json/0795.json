@@ -1,1 +1,1 @@
-{"log":{"":false,".谄 ":[]}}
+{"metric":{"name":"h","namespace":"y","tags":{"z":"q"},"kind":"incremental","aggregated_summary":{"quantiles":[{"quantile":501376.0,"value":-252480.0},{"quantile":83008.0,"value":-234496.0},{"quantile":551655.1215,"value":599360.0},{"quantile":-995904.0,"value":-391360.0},{"quantile":-633536.0,"value":-655232.0}],"count":2481401144,"sum":-575872.0}}}

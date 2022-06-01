@@ -40,6 +40,16 @@ pub struct CharacterDelimitedDecoderOptions {
     max_length: Option<usize>,
 }
 
+impl CharacterDelimitedDecoderOptions {
+    /// Create a `CharacterDelimitedDecoderOptions` with a delimiter and optional max_length.
+    pub fn new(delimiter: u8, max_length: Option<usize>) -> Self {
+        Self {
+            delimiter,
+            max_length,
+        }
+    }
+}
+
 /// A decoder for handling bytes that are delimited by (a) chosen character(s).
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct CharacterDelimitedDecoder {
@@ -103,7 +113,7 @@ impl Decoder for CharacterDelimitedDecoder {
                         let frame = buf.split_to(next_delimiter_idx).freeze();
                         trace!(
                             message = "Decoding the frame.",
-                            bytes_proccesed = frame.len()
+                            bytes_processed = frame.len()
                         );
                         buf.advance(1); // scoot past the delimiter
                         return Ok(Some(frame));
@@ -138,10 +148,12 @@ impl Decoder for CharacterDelimitedDecoder {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::collections::HashMap;
+
     use bytes::BufMut;
     use indoc::indoc;
-    use std::collections::HashMap;
+
+    use super::*;
 
     #[test]
     fn decode() {

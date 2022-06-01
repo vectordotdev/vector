@@ -2,11 +2,11 @@ version: "3"
 
 services:
   influxdb-v1:
-    image: influxdb:${INFLUXDB_V1_VERSION:-1.8}
+    image: docker.io/influxdb:${INFLUXDB_V1_VERSION:-1.8}
     environment:
       - INFLUXDB_REPORTING_DISABLED=true
   influxdb-v1-tls:
-    image: influxdb:${INFLUXDB_V1_VERSION:-1.8}
+    image: docker.io/influxdb:${INFLUXDB_V1_VERSION:-1.8}
     environment:
       - INFLUXDB_REPORTING_DISABLED=true
       - INFLUXDB_HTTP_HTTPS_ENABLED=true
@@ -15,7 +15,7 @@ services:
     volumes:
       - ${PWD}/tests/data:/etc/ssl:ro
   influxdb-v2:
-    image: influxdb:2.0
+    image: docker.io/influxdb:2.0
     command: influxd --reporting-disabled
     environment:
       - INFLUXDB_REPORTING_DISABLED=true

@@ -5,13 +5,15 @@ use rdkafka::ClientConfig;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     kafka::{KafkaAuthConfig, KafkaCompression},
     serde::json::to_string,
     sinks::{
         kafka::sink::{healthcheck, KafkaSink},
         util::{
-            encoding::{EncodingConfig, StandardEncodings},
+            encoding::{
+                EncodingConfig, EncodingConfigAdapter, StandardEncodings, StandardEncodingsMigrator,
+            },
             BatchConfig, NoDefaultsBatchSettings,
         },
         Healthcheck, VectorSink,
@@ -21,11 +23,13 @@ use crate::{
 pub(crate) const QUEUED_MIN_MESSAGES: u64 = 100000;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct KafkaSinkConfig {
     pub bootstrap_servers: String,
     pub topic: String,
     pub key_field: Option<String>,
-    pub(crate) encoding: EncodingConfig<StandardEncodings>,
+    pub(crate) encoding:
+        EncodingConfigAdapter<EncodingConfig<StandardEncodings>, StandardEncodingsMigrator>,
     /// These batching options will **not** override librdkafka_options values.
     #[serde(default)]
     pub batch: BatchConfig<NoDefaultsBatchSettings>,
@@ -163,7 +167,7 @@ impl GenerateConfig for KafkaSinkConfig {
             bootstrap_servers: "10.14.22.123:9092,10.14.23.332:9092".to_owned(),
             topic: "topic-1234".to_owned(),
             key_field: Some("user_id".to_owned()),
-            encoding: StandardEncodings::Json.into(),
+            encoding: EncodingConfig::from(StandardEncodings::Json).into(),
             batch: Default::default(),
             compression: KafkaCompression::None,
             auth: Default::default(),
@@ -187,7 +191,7 @@ impl SinkConfig for KafkaSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(DataType::Metric | DataType::Log)
+        Input::new(self.encoding.config().input_type())
     }
 
     fn sink_type(&self) -> &'static str {

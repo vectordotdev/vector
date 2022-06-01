@@ -17,20 +17,21 @@ pub mod type_def;
 pub mod value;
 pub mod vm;
 
-pub use crate::value::Value;
+pub use core::{value, ExpressionError, Resolved, Target};
+use std::{fmt::Display, str::FromStr};
+
 use ::serde::{Deserialize, Serialize};
 pub use context::Context;
-pub use core::{value, ExpressionError, Resolved, Target};
+use diagnostic::DiagnosticList;
 pub(crate) use diagnostic::Span;
 pub use expression::Expression;
 pub use function::{Function, Parameter};
 pub use paste::paste;
-pub use program::Program;
+pub use program::{Program, ProgramInfo};
 use state::ExternalEnv;
-use std::{fmt::Display, str::FromStr};
 pub use type_def::TypeDef;
 
-pub type Result = std::result::Result<Program, compiler::Errors>;
+pub type Result<T = (Program, DiagnosticList)> = std::result::Result<T, DiagnosticList>;
 
 /// The choice of available runtimes.
 #[derive(Deserialize, Serialize, Debug, Copy, Clone, PartialEq)]
@@ -75,6 +76,17 @@ impl Display for VrlRuntime {
 pub fn compile(ast: parser::Program, fns: &[Box<dyn Function>]) -> Result {
     let mut external = ExternalEnv::default();
     compile_with_state(ast, fns, &mut external)
+}
+
+pub fn compile_for_repl(
+    ast: parser::Program,
+    fns: &[Box<dyn Function>],
+    local: state::LocalEnv,
+    external: &mut ExternalEnv,
+) -> Result<Program> {
+    compiler::Compiler::new_with_local_state(fns, local)
+        .compile(ast, external)
+        .map(|(program, _)| program)
 }
 
 /// Similar to [`compile`], except that it takes a pre-generated [`State`]

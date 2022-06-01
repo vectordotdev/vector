@@ -1,1 +1,1 @@
-{"log":{}}
+{"metric":{"name":"z","tags":{"u":"x","y":"z"},"kind":"absolute","gauge":{"value":609216.0}}}

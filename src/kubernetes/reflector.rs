@@ -1,12 +1,13 @@
 //! Intercept [`watcher::Event`]'s.
 
+use std::{hash::Hash, time::Duration};
+
 use futures::StreamExt;
 use futures_util::Stream;
 use kube::{
     runtime::{reflector::store, watcher},
     Resource,
 };
-use std::{hash::Hash, time::Duration};
 use tokio::pin;
 use tokio_util::time::DelayQueue;
 
@@ -16,7 +17,7 @@ pub async fn custom_reflector<K, W>(
     stream: W,
     delay_deletion: Duration,
 ) where
-    K: Resource + Clone,
+    K: Resource + Clone + std::fmt::Debug,
     K::DynamicType: Eq + Hash + Clone,
     W: Stream<Item = watcher::Result<watcher::Event<K>>>,
 {
@@ -24,26 +25,51 @@ pub async fn custom_reflector<K, W>(
     let mut delay_queue = DelayQueue::default();
     loop {
         tokio::select! {
-            Some(Ok(event)) = stream.next() => {
-                match event {
-                    watcher::Event::Applied(_) => {
-                        // Immediately apply event
-                        store.apply_watcher_event(&event);
-                    }
-                    watcher::Event::Deleted(_) => {
-                        // Delay reconciling any `Deleted` events
-                        delay_queue.insert(event.to_owned(), delay_deletion);
-                    }
-                    watcher::Event::Restarted(_) => {
-                        // Clear all delayed events when the cache is refreshed
-                        delay_queue.clear();
-                        store.apply_watcher_event(&event);
-                    }
+            result = stream.next() => {
+                match result {
+                    Some(Ok(event)) => {
+                        match event {
+                            // Immediately reoncile `Applied` event
+                            watcher::Event::Applied(_) => {
+                                trace!(message = "Processing Applied event.", ?event);
+                                store.apply_watcher_event(&event);
+                            }
+                            // Delay reconciling any `Deleted` events
+                            watcher::Event::Deleted(_) => {
+                                trace!(message = "Queuing Deleted event.", ?event);
+                                delay_queue.insert(event.to_owned(), delay_deletion);
+                            }
+                            // Clear all delayed events on `Restarted` events
+                            watcher::Event::Restarted(_) => {
+                                trace!(message = "Processing Restarted event.", ?event);
+                                delay_queue.clear();
+                                store.apply_watcher_event(&event);
+                            }
+                        }
+                    },
+                    Some(Err(error)) => {
+                        warn!(message = "Watcher Stream received an error. Retrying.", ?error);
+                    },
+                    // The watcher stream should never yield `None`
+                    // https://docs.rs/kube-runtime/0.71.0/src/kube_runtime/watcher.rs.html#234-237
+                    None => {
+                        unreachable!("a watcher Stream never ends");
+                    },
                 }
             }
-            // When the Deleted event expires from the queue pass it to the store
-            Some(Ok(event)) = delay_queue.next() => {
-                store.apply_watcher_event(&event.into_inner())
+            result = delay_queue.next(), if !delay_queue.is_empty() => {
+                match result {
+                    Some(event) => {
+                        trace!(message = "Processing Deleted event.", ?event);
+                        store.apply_watcher_event(&event.into_inner());
+                    },
+                    // DelayQueue returns None if the queue is exhausted,
+                    // however we disable the DelayQueue branch if there are
+                    // no items in the queue.
+                    None => {
+                        unreachable!("an empty DelayQueue is never polled");
+                    },
+                }
             }
         }
     }
@@ -51,7 +77,8 @@ pub async fn custom_reflector<K, W>(
 
 #[cfg(test)]
 mod tests {
-    use super::custom_reflector;
+    use std::time::Duration;
+
     use futures::channel::mpsc;
     use futures_util::SinkExt;
     use k8s_openapi::{api::core::v1::ConfigMap, apimachinery::pkg::apis::meta::v1::ObjectMeta};
@@ -59,7 +86,8 @@ mod tests {
         reflector::{store, ObjectRef},
         watcher,
     };
-    use std::time::Duration;
+
+    use super::custom_reflector;
 
     #[tokio::test]
     async fn applied_should_add_object() {

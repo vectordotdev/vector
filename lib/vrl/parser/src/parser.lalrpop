@@ -1,5 +1,6 @@
 use std::str::FromStr;
 use crate::ast::*;
+use crate::template_string::TemplateString;
 use crate::lex::*;
 use diagnostic::span;
 use std::collections::BTreeMap;
@@ -16,7 +17,8 @@ extern {
     enum Tok<'input> {
         "identifier" => Token::Identifier(<&'input str>),
         "path field" => Token::PathField(<&'input str>),
-        "string literal" => Token::StringLiteral(<StringLiteral<&'input str>>),
+        "string literal" => Token::StringLiteral(<StringLiteralToken<&'input str>>),
+        "raw string literal" => Token::RawStringLiteral(<RawStringLiteralToken<&'input str>>),
         "integer literal" => Token::IntegerLiteral(<i64>),
         "float literal" => Token::FloatLiteral(<NotNan<f64>>),
         "regex literal" => Token::RegexLiteral(<&'input str>),
@@ -48,6 +50,7 @@ extern {
         ":" => Token::Colon,
         "." => Token::Dot,
         "!" => Token::Bang,
+        "->" => Token::Arrow,
 
         "+" => Token::Operator("+"),
         "*" => Token::Operator("*"),
@@ -369,18 +372,37 @@ FunctionCall: FunctionCall = {
     <ident: Sp<"function call">> <abort_on_error: "!"?> "("
         NonterminalNewline*
         <arguments: CommaMultiline<Sp<FunctionArgument>>?>
-    ")" => {
+    ")" <closure: Sp<FunctionClosure>?> => {
         let ident = ident.map(|s| Ident(s.to_owned()));
         let abort_on_error = abort_on_error.is_some();
         let arguments = arguments.unwrap_or_default();
 
-        FunctionCall { ident, abort_on_error, arguments }
+        FunctionCall { ident, abort_on_error, arguments, closure }
     },
 };
 
 #[inline]
 FunctionArgument: FunctionArgument = {
     <ident: (<Sp<AnyIdent>> ":")?> <expr: ArithmeticExpr> => FunctionArgument { <> },
+};
+
+#[inline]
+FunctionClosure: FunctionClosure = {
+    "->" <variables: ClosureVariables> NonterminalNewline* <block: Sp<Block>> =>
+        FunctionClosure { variables, block }
+};
+
+#[inline]
+ClosureVariables: Vec<Node<Ident>> = {
+    "||" => vec![],
+    "|" <variables: CommaMultiline<ClosureVariable>?> "|" =>
+        variables.unwrap_or_default()
+};
+
+#[inline]
+ClosureVariable: Node<Ident> = {
+    Sp<Ident> => <>,
+    Sp<"_"> => <>.map(|s| Ident("".to_owned())),
 };
 
 // -----------------------------------------------------------------------------
@@ -461,11 +483,14 @@ Array: Array = {
 #[inline]
 Object: Object = {
     "{" NonterminalNewline* "}" => Object(BTreeMap::default()),
-    "{" NonterminalNewline* <CommaMultiline<(<Sp<String>> ":" <ArithmeticExpr>)>> "}" => {
+    "{" NonterminalNewline* <CommaMultiline<(<Sp<ObjectKey>> ":" <ArithmeticExpr>)>> "}" => {
         let object =<>.into_iter().collect::<BTreeMap<_, _>>();
         Object(object)
     },
 };
+
+#[inline]
+ObjectKey: String = "string literal" => <>.unescape();
 
 // -----------------------------------------------------------------------------
 // literals
@@ -473,6 +498,7 @@ Object: Object = {
 
 pub Literal: Literal = {
     String => Literal::String(<>),
+    RawString => Literal::RawString(<>),
     Integer => Literal::Integer(<>),
     Float => Literal::Float(<>),
     Boolean => Literal::Boolean(<>),
@@ -481,7 +507,12 @@ pub Literal: Literal = {
     Timestamp => Literal::Timestamp(<>),
 };
 
-String: String = "string literal" => <>.unescape();
+String: TemplateString = Sp<"string literal"> => {
+    let Node { span, node } = <>;
+    node.template(span)
+};
+
+RawString: String = "raw string literal" => <>.unescape();
 Integer: i64 = "integer literal";
 Float: NotNan<f64> = "float literal";
 Boolean: bool = { "true" => true, "false" => false };

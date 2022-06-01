@@ -4,16 +4,19 @@ mod builder;
 mod collection;
 mod comparison;
 mod conversion;
+mod debug;
 pub mod find;
 pub mod insert;
 pub mod merge;
 pub mod nest;
 pub mod remove;
 
-use crate::Value;
+use std::collections::BTreeMap;
+
 pub use builder::EmptyKindError;
 pub use collection::{Collection, Field, Index, Unknown};
-use std::collections::BTreeMap;
+
+use crate::Value;
 
 /// The type (kind) of a given value.
 ///
@@ -45,6 +48,16 @@ impl std::fmt::Display for Kind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.is_any() {
             return f.write_str("any");
+        }
+
+        // For collections, we expand to a more descriptive representation only
+        // if the type can only be this collection.
+        if self.is_exact() {
+            if let Some(object) = &self.object {
+                return object.fmt(f);
+            } else if let Some(array) = &self.array {
+                return array.fmt(f);
+            }
         }
 
         let mut kinds = vec![];

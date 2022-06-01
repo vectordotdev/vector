@@ -968,32 +968,38 @@ mod tests {
         let dnstap_data = base64::decode(raw_dnstap_data).expect("Invalid base64 encoded data.");
         let parse_result = parser.parse_dnstap_data(Bytes::from(dnstap_data));
         assert!(parse_result.is_ok());
-        assert!(log_event.all_fields().any(|(key, value)| key == "time"
-            && match *value {
-                Value::Integer(time) => time == 1_593_489_007_920_014_129,
-                _ => false,
-            }));
-        assert!(log_event.all_fields().any(|(key, value)| key == "timestamp"
-            && match *value {
-                Value::Timestamp(timestamp) =>
-                    timestamp.timestamp_nanos() == 1_593_489_007_920_014_129,
-                _ => false,
-            }));
         assert!(log_event
             .all_fields()
+            .unwrap()
+            .any(|(key, value)| key == "time"
+                && match *value {
+                    Value::Integer(time) => time == 1_593_489_007_920_014_129,
+                    _ => false,
+                }));
+        assert!(log_event
+            .all_fields()
+            .unwrap()
+            .any(|(key, value)| key == "timestamp"
+                && match *value {
+                    Value::Timestamp(timestamp) =>
+                        timestamp.timestamp_nanos() == 1_593_489_007_920_014_129,
+                    _ => false,
+                }));
+        assert!(log_event
+            .all_fields()
+            .unwrap()
             .any(|(key, value)| key == "requestData.header.qr"
                 && match *value {
                     Value::Integer(qr) => qr == 0,
                     _ => false,
                 }));
-        assert!(log_event
-            .all_fields()
-            .any(|(key, value)| key == "requestData.opt.udpPayloadSize"
-                && match *value {
-                    Value::Integer(udp_payload_size) => udp_payload_size == 512,
-                    _ => false,
-                }));
-        assert!(log_event.all_fields().any(|(key, value)| key
+        assert!(log_event.all_fields().unwrap().any(|(key, value)| key
+            == "requestData.opt.udpPayloadSize"
+            && match *value {
+                Value::Integer(udp_payload_size) => udp_payload_size == 512,
+                _ => false,
+            }));
+        assert!(log_event.all_fields().unwrap().any(|(key, value)| key
             == "requestData.question[0].domainName"
             && match value {
                 Value::Bytes(domain_name) => *domain_name == Bytes::from_static(b"facebook1.com."),
@@ -1013,19 +1019,26 @@ mod tests {
         let dnstap_data = base64::decode(raw_dnstap_data).expect("Invalid base64 encoded data.");
         let parse_result = parser.parse_dnstap_data(Bytes::from(dnstap_data));
         assert!(parse_result.is_ok());
-        assert!(log_event.all_fields().any(|(key, value)| key == "time"
-            && match *value {
-                Value::Integer(time) => time == 1_593_541_950_792_494_106,
-                _ => false,
-            }));
-        assert!(log_event.all_fields().any(|(key, value)| key == "timestamp"
-            && match *value {
-                Value::Timestamp(timestamp) =>
-                    timestamp.timestamp_nanos() == 1_593_541_950_792_494_106,
-                _ => false,
-            }));
         assert!(log_event
             .all_fields()
+            .unwrap()
+            .any(|(key, value)| key == "time"
+                && match *value {
+                    Value::Integer(time) => time == 1_593_541_950_792_494_106,
+                    _ => false,
+                }));
+        assert!(log_event
+            .all_fields()
+            .unwrap()
+            .any(|(key, value)| key == "timestamp"
+                && match *value {
+                    Value::Timestamp(timestamp) =>
+                        timestamp.timestamp_nanos() == 1_593_541_950_792_494_106,
+                    _ => false,
+                }));
+        assert!(log_event
+            .all_fields()
+            .unwrap()
             .any(|(key, value)| key == "requestData.header.qr"
                 && match *value {
                     Value::Integer(qr) => qr == 1,
@@ -1033,19 +1046,18 @@ mod tests {
                 }));
         assert!(log_event
             .all_fields()
+            .unwrap()
             .any(|(key, value)| key == "messageType"
                 && match value {
                     Value::Bytes(data_type) => *data_type == Bytes::from_static(b"UpdateResponse"),
                     _ => false,
                 }));
-        assert!(log_event
-            .all_fields()
-            .any(|(key, value)| key == "requestData.zone.zName"
-                && match value {
-                    Value::Bytes(domain_name) =>
-                        *domain_name == Bytes::from_static(b"example.com."),
-                    _ => false,
-                }));
+        assert!(log_event.all_fields().unwrap().any(|(key, value)| key
+            == "requestData.zone.zName"
+            && match value {
+                Value::Bytes(domain_name) => *domain_name == Bytes::from_static(b"example.com."),
+                _ => false,
+            }));
     }
 
     #[test]

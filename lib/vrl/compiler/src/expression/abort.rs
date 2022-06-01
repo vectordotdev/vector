@@ -1,18 +1,18 @@
 use std::fmt;
 
-use diagnostic::{DiagnosticError, Label, Note, Urls};
+use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 use parser::ast::Node;
+use value::Value;
 
+use super::Expr;
 use crate::{
     expression::{ExpressionError, Resolved},
     state::{ExternalEnv, LocalEnv},
     value::Kind,
     value::VrlValueConvert,
     vm::OpCode,
-    Context, Expression, Span, TypeDef, Value,
+    Context, Expression, Span, TypeDef,
 };
-
-use super::Expr;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Abort {
@@ -137,7 +137,7 @@ impl std::error::Error for Error {
     }
 }
 
-impl DiagnosticError for Error {
+impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
         use ErrorVariant::*;
 

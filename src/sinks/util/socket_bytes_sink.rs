@@ -102,7 +102,8 @@ where
             }
         }
 
-        self.project().inner.poll_ready(cx)
+        let inner = self.project().inner;
+        <FramedWrite<T, BytesCodec> as Sink<Bytes>>::poll_ready(inner, cx)
     }
 
     fn start_send(self: Pin<&mut Self>, item: Bytes) -> Result<(), Self::Error> {
@@ -126,13 +127,19 @@ where
             ShutdownCheck::Alive => {}
         }
 
-        let result = ready!(self.as_mut().project().inner.poll_flush(cx));
+        let inner = self.as_mut().project().inner;
+        let result = ready!(<FramedWrite<T, BytesCodec> as Sink<Bytes>>::poll_flush(
+            inner, cx
+        ));
         self.as_mut().get_mut().ack();
         Poll::Ready(result)
     }
 
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        let result = ready!(self.as_mut().project().inner.poll_close(cx));
+        let inner = self.as_mut().project().inner;
+        let result = ready!(<FramedWrite<T, BytesCodec> as Sink<Bytes>>::poll_close(
+            inner, cx
+        ));
         self.as_mut().get_mut().ack();
         Poll::Ready(result)
     }

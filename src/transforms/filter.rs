@@ -1,5 +1,6 @@
-use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
+
+use serde::{Deserialize, Serialize};
 
 use crate::{
     conditions::{AnyCondition, Condition},

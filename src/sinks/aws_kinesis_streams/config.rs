@@ -1,31 +1,30 @@
 use aws_sdk_kinesis::error::{DescribeStreamError, PutRecordsError, PutRecordsErrorKind};
 use aws_sdk_kinesis::types::SdkError;
-
-use aws_sdk_kinesis::{Client as KinesisClient, Endpoint, Region};
-use aws_smithy_client::erase::DynConnector;
-use aws_types::credentials::SharedCredentialsProvider;
+use aws_sdk_kinesis::Client as KinesisClient;
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tower::ServiceBuilder;
 
 use super::service::KinesisResponse;
-use crate::aws::{create_client, is_retriable_error, ClientBuilder};
-use crate::aws::{AwsAuthentication, RegionOrEndpoint};
 use crate::{
+    aws::{create_client, is_retriable_error, AwsAuthentication, ClientBuilder, RegionOrEndpoint},
+    codecs::Encoder,
     config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     sinks::{
         aws_kinesis_streams::{
             request_builder::KinesisRequestBuilder, service::KinesisService, sink::KinesisSink,
         },
         util::{
-            encoding::{EncodingConfig, StandardEncodings},
+            encoding::{
+                EncodingConfig, EncodingConfigAdapter, StandardEncodings, StandardEncodingsMigrator,
+            },
             retries::RetryLogic,
             BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
-    tls::TlsOptions,
+    tls::TlsConfig,
 };
 
 #[allow(clippy::large_enum_variant)]
@@ -47,31 +46,16 @@ enum HealthcheckError {
 pub struct KinesisClientBuilder;
 
 impl ClientBuilder for KinesisClientBuilder {
-    type ConfigBuilder = aws_sdk_kinesis::config::Builder;
-    type Client = KinesisClient;
+    type Config = aws_sdk_kinesis::config::Config;
+    type Client = aws_sdk_kinesis::client::Client;
+    type DefaultMiddleware = aws_sdk_kinesis::middleware::DefaultMiddleware;
 
-    fn create_config_builder(
-        credentials_provider: SharedCredentialsProvider,
-    ) -> Self::ConfigBuilder {
-        Self::ConfigBuilder::new().credentials_provider(credentials_provider)
+    fn default_middleware() -> Self::DefaultMiddleware {
+        aws_sdk_kinesis::middleware::DefaultMiddleware::new()
     }
 
-    fn with_endpoint_resolver(
-        builder: Self::ConfigBuilder,
-        endpoint: Endpoint,
-    ) -> Self::ConfigBuilder {
-        builder.endpoint_resolver(endpoint)
-    }
-
-    fn with_region(builder: Self::ConfigBuilder, region: Region) -> Self::ConfigBuilder {
-        builder.region(region)
-    }
-
-    fn client_from_conf_conn(
-        builder: Self::ConfigBuilder,
-        connector: DynConnector,
-    ) -> Self::Client {
-        Self::Client::from_conf_conn(builder.build(), connector)
+    fn build(client: aws_smithy_client::Client, config: &aws_types::SdkConfig) -> Self::Client {
+        aws_sdk_kinesis::client::Client::with_config(client, config.into())
     }
 }
 
@@ -91,14 +75,15 @@ pub struct KinesisSinkConfig {
     pub partition_key_field: Option<String>,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    pub encoding: EncodingConfig<StandardEncodings>,
+    pub encoding:
+        EncodingConfigAdapter<EncodingConfig<StandardEncodings>, StandardEncodingsMigrator>,
     #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
     pub batch: BatchConfig<KinesisDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
     #[serde(default)]
     pub auth: AwsAuthentication,
     #[serde(
@@ -144,6 +129,7 @@ impl KinesisSinkConfig {
             self.region.endpoint()?,
             proxy,
             &self.tls,
+            true,
         )
         .await
     }
@@ -169,9 +155,13 @@ impl SinkConfig for KinesisSinkConfig {
                 region,
             });
 
+        let transformer = self.encoding.transformer();
+        let serializer = self.encoding.encoding();
+        let encoder = Encoder::<()>::new(serializer);
+
         let request_builder = KinesisRequestBuilder {
             compression: self.compression,
-            encoder: self.encoding.clone(),
+            encoder: (transformer, encoder),
         };
 
         let sink = KinesisSink {
@@ -185,7 +175,7 @@ impl SinkConfig for KinesisSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(self.encoding.config().input_type())
     }
 
     fn sink_type(&self) -> &'static str {

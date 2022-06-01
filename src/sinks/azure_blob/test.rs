@@ -1,23 +1,27 @@
 use bytes::Bytes;
 use chrono::Utc;
+use codecs::{encoding::Framer, NewlineDelimitedEncoder, TextSerializer};
 use vector_core::partition::Partitioner;
 
 use super::config::AzureBlobSinkConfig;
 use super::request_builder::AzureBlobRequestOptions;
-
 use crate::event::Event;
 use crate::sinks::util::{
-    encoding::StandardEncodings, request_builder::RequestBuilder, Compression,
+    encoding::{EncodingConfig, StandardEncodings},
+    request_builder::RequestBuilder,
+    Compression,
 };
+use crate::{codecs::Encoder, sinks::util::request_builder::EncodeResult};
 
 fn default_config(e: StandardEncodings) -> AzureBlobSinkConfig {
     AzureBlobSinkConfig {
         connection_string: Default::default(),
+        storage_account: Default::default(),
         container_name: Default::default(),
         blob_prefix: Default::default(),
         blob_time_format: Default::default(),
         blob_append_uuid: Default::default(),
-        encoding: e.into(),
+        encoding: EncodingConfig::from(e).into(),
         compression: Compression::gzip_default(),
         batch: Default::default(),
         request: Default::default(),
@@ -53,12 +57,18 @@ fn azure_blob_build_request_without_compression() {
         container_name,
         blob_time_format,
         blob_append_uuid,
-        encoding: StandardEncodings::Text.into(),
+        encoder: (
+            Default::default(),
+            Encoder::<Framer>::new(
+                NewlineDelimitedEncoder::new().into(),
+                TextSerializer::new().into(),
+            ),
+        ),
         compression,
     };
 
     let (metadata, _events) = request_options.split_input((key, vec![log]));
-    let request = request_options.build_request(metadata, Bytes::new());
+    let request = request_options.build_request(metadata, EncodeResult::uncompressed(Bytes::new()));
 
     assert_eq!(request.metadata.partition_key, "blob.log".to_string());
     assert_eq!(request.content_encoding, None);
@@ -88,12 +98,18 @@ fn azure_blob_build_request_with_compression() {
         container_name,
         blob_time_format,
         blob_append_uuid,
-        encoding: StandardEncodings::Text.into(),
+        encoder: (
+            Default::default(),
+            Encoder::<Framer>::new(
+                NewlineDelimitedEncoder::new().into(),
+                TextSerializer::new().into(),
+            ),
+        ),
         compression,
     };
 
     let (metadata, _events) = request_options.split_input((key, vec![log]));
-    let request = request_options.build_request(metadata, Bytes::new());
+    let request = request_options.build_request(metadata, EncodeResult::uncompressed(Bytes::new()));
 
     assert_eq!(request.metadata.partition_key, "blob.log.gz".to_string());
     assert_eq!(request.content_encoding, Some("gzip"));
@@ -123,12 +139,18 @@ fn azure_blob_build_request_with_time_format() {
         container_name,
         blob_time_format,
         blob_append_uuid,
-        encoding: StandardEncodings::Text.into(),
+        encoder: (
+            Default::default(),
+            Encoder::<Framer>::new(
+                NewlineDelimitedEncoder::new().into(),
+                TextSerializer::new().into(),
+            ),
+        ),
         compression,
     };
 
     let (metadata, _events) = request_options.split_input((key, vec![log]));
-    let request = request_options.build_request(metadata, Bytes::new());
+    let request = request_options.build_request(metadata, EncodeResult::uncompressed(Bytes::new()));
 
     assert_eq!(
         request.metadata.partition_key,
@@ -161,12 +183,18 @@ fn azure_blob_build_request_with_uuid() {
         container_name,
         blob_time_format,
         blob_append_uuid,
-        encoding: StandardEncodings::Text.into(),
+        encoder: (
+            Default::default(),
+            Encoder::<Framer>::new(
+                NewlineDelimitedEncoder::new().into(),
+                TextSerializer::new().into(),
+            ),
+        ),
         compression,
     };
 
     let (metadata, _events) = request_options.split_input((key, vec![log]));
-    let request = request_options.build_request(metadata, Bytes::new());
+    let request = request_options.build_request(metadata, EncodeResult::uncompressed(Bytes::new()));
 
     assert_ne!(request.metadata.partition_key, "blob.log".to_string());
     assert_eq!(request.content_encoding, None);

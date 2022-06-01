@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn contains(value: Value, substring: Value, case_sensitive: bool) -> Resolved {

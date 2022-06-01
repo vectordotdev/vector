@@ -5,7 +5,7 @@ use std::{
 
 use futures::future::BoxFuture;
 use headers::{Authorization, HeaderMapExt};
-use http::{header::HeaderValue, request::Builder, uri::InvalidUri, HeaderMap, Request};
+use http::{header::HeaderValue, request::Builder, uri::InvalidUri, HeaderMap, Request, Uri};
 use hyper::{
     body::{Body, HttpBody},
     client,
@@ -16,7 +16,7 @@ use hyper_proxy::ProxyConnector;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tower::Service;
-use tracing_futures::Instrument;
+use tracing::Instrument;
 
 use crate::{
     config::ProxyConfig,
@@ -254,6 +254,20 @@ impl Auth {
             },
         }
     }
+}
+
+pub fn get_http_scheme_from_uri(uri: &Uri) -> &'static str {
+    // If there's no scheme, we just use "http" since it provides the most semantic relevance without inadvertently
+    // implying things it can't know i.e. returning "https" when we're not actually sure HTTPS was used.
+    uri.scheme_str().map_or("http", |scheme| match scheme {
+        "http" => "http",
+        "https" => "https",
+        // `http::Uri` ensures that we always get "http" or "https" if the URI is created with a well-formed scheme, but
+        // it also supports arbitrary schemes, which is where we bomb out down here, since we can't generate a static
+        // string for an arbitrary input string... and anything other than "http" and "https" makes no sense for an HTTP
+        // client anyways.
+        s => panic!("invalid URI scheme for HTTP client: {}", s),
+    })
 }
 
 #[cfg(test)]

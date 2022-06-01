@@ -25,26 +25,27 @@ dns-lookup = { version = "1.0.8", optional = true }
 grok = { version = "1", optional = true }
 hex = { version = "0.4", optional = true }
 hostname = { version = "0.3", optional = true }
-indexmap = { version = "~1.8.1", default-features = false, optional = true}
+indexmap = { version = "~1.8.2", default-features = false, optional = true}
 md-5 = { version = "0.10", optional = true }
 nom = { version = "7", optional = true }
 percent-encoding = { version = "2.1", optional = true }
-once_cell = { version = "1.10", optional = true }
+once_cell = { version = "1.12", optional = true }
 rand = { version = "0.8.5", optional = true }
 regex = { version = "1", optional = true }
 rust_decimal = { version = "1", optional = true }
+serde = { version = "1", default-features = false, features = ["derive"], optional = true }
 serde_json = { version = "1", optional = true }
 sha-1 = { version = "0.10", optional = true }
-sha-2 = { package = "sha2", version = "0.9", optional = true }
-sha-3 = { package = "sha3", version = "0.9", optional = true }
+sha-2 = { package = "sha2", version = "0.10", optional = true }
+sha-3 = { package = "sha3", version = "0.10", optional = true }
 strip-ansi-escapes = { version = "0.1", optional = true }
 syslog_loose = { version = "0.16", optional = true }
 tracing = { version = "0.1", optional = true }
 url = { version = "2", optional = true }
-uuid = { version = "0.8", features = ["v4"], optional = true }
+uuid = { version = "1", features = ["v4"], optional = true }
 roxmltree = { version = "0.14.1", optional = true }
 woothee = { version = "0.13.0", optional = true }
-uaparser = { version = "0.5.1", optional = true }
+uaparser = { version = "0.6.0", default-features = false, optional = true }
 utf8-width = { version = "0.1.6", optional = true }
 
 # Cryptography
@@ -61,6 +62,7 @@ ofb = { version = "0.6.1", optional = true }
 anyhow = "1"
 chrono-tz = "0.6"
 criterion = "0.3"
+tracing-test = "0.1"
 value = { path = "../../value", features = ["test"]}
 vector_common = { path = "../../vector-common", default-features = false, features = ["btreemap"] }
 
@@ -91,6 +93,7 @@ default = [
     "flatten",
     "float",
     "floor",
+    "for_each",
     "format_int",
     "format_number",
     "format_timestamp",
@@ -112,6 +115,7 @@ default = [
     "is_empty",
     "is_float",
     "is_integer",
+    "is_json",
     "is_null",
     "is_nullish",
     "is_object",
@@ -121,6 +125,8 @@ default = [
     "join",
     "length",
     "log",
+    "map_keys",
+    "map_values",
     "match",
     "match_any",
     "match_array",
@@ -189,6 +195,7 @@ default = [
     "to_timestamp",
     "to_unix_timestamp",
     "truncate",
+    "type_def",
     "unique",
     "unnest",
     "upcase",
@@ -222,6 +229,7 @@ find_table_row = []
 flatten = []
 float = []
 floor = []
+for_each = []
 format_int = []
 format_number = ["rust_decimal"]
 format_timestamp = ["chrono"]
@@ -243,6 +251,7 @@ is_boolean = []
 is_empty = []
 is_float = []
 is_integer = []
+is_json = ["serde", "serde_json", "value/json"]
 is_null = []
 is_nullish = []
 is_object = []
@@ -251,7 +260,9 @@ is_string = []
 is_timestamp = ["chrono"]
 join = []
 length = []
-log = ["tracing"]
+log = ["tracing", "value/json"]
+map_keys = []
+map_values = []
 match = ["regex"]
 match_any = ["regex"]
 match_array = ["regex"]
@@ -319,6 +330,7 @@ to_syslog_level = []
 to_syslog_severity = []
 to_timestamp = ["vector_common/conversion", "chrono"]
 to_unix_timestamp = ["chrono"]
+type_def = []
 truncate = []
 unique = ["indexmap"]
 unnest = ["lookup_lib"]

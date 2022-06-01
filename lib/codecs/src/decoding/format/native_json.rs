@@ -2,10 +2,10 @@ use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use value::Kind;
+use vector_core::{config::DataType, event::Event, schema};
 
 use super::Deserializer;
 use vector_core::config::LogNamespace;
-use vector_core::{event::Event, schema};
 
 /// Config used to build a `NativeJsonDeserializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -15,6 +15,11 @@ impl NativeJsonDeserializerConfig {
     /// Build the `NativeJsonDeserializer` from this configuration.
     pub const fn build(&self) -> NativeJsonDeserializer {
         NativeJsonDeserializer
+    }
+
+    /// Return the type of event build by this deserializer.
+    pub fn output_type(&self) -> DataType {
+        DataType::all()
     }
 
     /// The schema produced by the deserializer.
@@ -57,8 +62,9 @@ impl Deserializer for NativeJsonDeserializer {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use serde_json::json;
+
+    use super::*;
 
     #[test]
     fn parses_top_level_arrays() {

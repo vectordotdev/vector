@@ -2,7 +2,7 @@ use std::{convert::TryFrom, string::ToString};
 
 use ordered_float::NotNan;
 use strum_macros::Display;
-use vrl_compiler::Value;
+use value::Value;
 
 use crate::{
     ast::{Function, FunctionArgument},

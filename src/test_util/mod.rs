@@ -25,7 +25,7 @@ use rand::{thread_rng, Rng};
 use rand_distr::Alphanumeric;
 use tokio::{
     io::{AsyncRead, AsyncWrite, AsyncWriteExt, Result as IoResult},
-    net::{TcpListener, TcpStream},
+    net::{TcpListener, TcpStream, ToSocketAddrs},
     runtime,
     sync::oneshot,
     task::JoinHandle,
@@ -50,6 +50,10 @@ const WAIT_FOR_MAX_MILLIS: u64 = 500; // The maximum time to pause before retryi
 
 #[cfg(test)]
 pub mod components;
+
+#[cfg(test)]
+pub mod http;
+
 #[cfg(test)]
 pub mod metrics;
 pub mod stats;
@@ -290,7 +294,7 @@ pub fn random_string(len: usize) -> String {
 }
 
 pub fn random_lines(len: usize) -> impl Iterator<Item = String> {
-    std::iter::repeat(()).map(move |_| random_string(len))
+    iter::repeat_with(move || random_string(len))
 }
 
 pub fn random_map(max_size: usize, field_len: usize) -> HashMap<String, String> {
@@ -305,7 +309,7 @@ pub fn random_maps(
     max_size: usize,
     field_len: usize,
 ) -> impl Iterator<Item = HashMap<String, String>> {
-    iter::repeat(()).map(move |_| random_map(max_size, field_len))
+    iter::repeat_with(move || random_map(max_size, field_len))
 }
 
 pub async fn collect_n<S>(rx: S, n: usize) -> Vec<S::Item>
@@ -316,7 +320,7 @@ where
 }
 
 pub async fn collect_n_stream<T, S: Stream<Item = T> + Unpin>(stream: &mut S, n: usize) -> Vec<T> {
-    let mut events = Vec::new();
+    let mut events = Vec::with_capacity(n);
 
     while events.len() < n {
         let e = stream.next().await.unwrap();
@@ -415,8 +419,15 @@ where
 }
 
 // Wait (for 5 secs) for a TCP socket to be reachable
-pub async fn wait_for_tcp(addr: SocketAddr) {
-    wait_for(|| async move { TcpStream::connect(addr).await.is_ok() }).await
+pub async fn wait_for_tcp<A>(addr: A)
+where
+    A: ToSocketAddrs + Clone + Send + 'static,
+{
+    wait_for(move || {
+        let addr = addr.clone();
+        async move { TcpStream::connect(addr).await.is_ok() }
+    })
+    .await
 }
 
 // Allows specifying a custom duration to wait for a TCP socket to be reachable
@@ -518,6 +529,23 @@ impl<T: Send + 'static> CountReceiver<T> {
             connected: Some(connected),
             handle: tokio::spawn(make_fut(count, tripwire, trigger_connected)),
         }
+    }
+
+    pub fn receive_items_stream<S, F, Fut>(make_stream: F) -> CountReceiver<T>
+    where
+        S: Stream<Item = T> + Send + 'static,
+        F: FnOnce(oneshot::Receiver<()>, oneshot::Sender<()>) -> Fut + Send + 'static,
+        Fut: Future<Output = S> + Send + 'static,
+    {
+        CountReceiver::new(|count, tripwire, connected| async move {
+            let stream = make_stream(tripwire, connected).await;
+            stream
+                .inspect(move |_| {
+                    count.fetch_add(1, Ordering::Relaxed);
+                })
+                .collect::<Vec<T>>()
+                .await
+        })
     }
 }
 
@@ -635,6 +663,10 @@ where
     F: Future<Output = ()> + Send + 'static,
     S: Stream<Item = Event> + Unpin,
 {
+    // TODO: Switch to using `select!` so that we can drive `future` to completion while also driving `collect_n`,
+    // such that if `future` panics, we break out and don't continue driving `collect_n`. In most cases, `future`
+    // completing successfully is what actually drives events into `stream`, so continuing to wait for all N events when
+    // the catalyst has failed is.... almost never the desired behavior.
     let sender = tokio::spawn(future);
     let events = collect_n(stream, n).await;
     sender.await.expect("Failed to send data");

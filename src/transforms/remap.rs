@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::{
     collections::BTreeMap,
     fs::File,
@@ -7,12 +8,12 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::sync::Arc;
 use value::Kind;
 use vector_common::TimeZone;
+use vector_vrl_functions::set_semantic_meaning::MeaningList;
 use vrl::{
     diagnostic::{Formatter, Note},
-    prelude::{DiagnosticError, ExpressionError},
+    prelude::{DiagnosticMessage, ExpressionError},
     Program, Runtime, Terminate, Vm, VrlRuntime,
 };
 
@@ -21,7 +22,7 @@ use crate::{
         log_schema, ComponentKey, DataType, Input, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
-    event::{Event, VrlTarget},
+    event::{Event, TargetEvents, VrlTarget},
     internal_events::{RemapMappingAbort, RemapMappingError},
     schema,
     transforms::{SyncTransform, Transform, TransformOutputsBuf},
@@ -53,6 +54,7 @@ impl RemapConfig {
         merged_schema_definition: schema::Definition,
     ) -> Result<(
         vrl::Program,
+        String,
         Vec<Box<dyn vrl::Function>>,
         vrl::state::ExternalEnv,
     )> {
@@ -77,6 +79,7 @@ impl RemapConfig {
 
         let mut state = vrl::state::ExternalEnv::new_with_kind(merged_schema_definition.into());
         state.set_external_context(enrichment_tables);
+        state.set_external_context(MeaningList::default());
 
         vrl::compile_with_state(&source, &functions, &mut state)
             .map_err(|diagnostics| {
@@ -85,7 +88,14 @@ impl RemapConfig {
                     .to_string()
                     .into()
             })
-            .map(|program| (program, functions, state))
+            .map(|(program, diagnostics)| {
+                (
+                    program,
+                    Formatter::new(&source, diagnostics).to_string(),
+                    functions,
+                    state,
+                )
+            })
     }
 }
 
@@ -99,16 +109,26 @@ impl_generate_config_from_default!(RemapConfig);
 #[typetag::serde(name = "remap")]
 impl TransformConfig for RemapConfig {
     async fn build(&self, context: &TransformContext) -> Result<Transform> {
-        match self.runtime {
+        let (transform, warnings) = match self.runtime {
             VrlRuntime::Ast => {
-                let remap = Remap::new_ast(self.clone(), context)?;
-                Ok(Transform::synchronous(remap))
+                let (remap, warnings) = Remap::new_ast(self.clone(), context)?;
+                (Transform::synchronous(remap), warnings)
             }
             VrlRuntime::Vm => {
-                let remap = Remap::new_vm(self.clone(), context)?;
-                Ok(Transform::synchronous(remap))
+                let (remap, warnings) = Remap::new_vm(self.clone(), context)?;
+                (Transform::synchronous(remap), warnings)
             }
+        };
+
+        // TODO: We could improve on this by adding support for non-fatal error
+        // messages in the topology. This would make the topology responsible
+        // for printing warnings (including potentially emiting metrics),
+        // instead of individual transforms.
+        if !warnings.is_empty() {
+            warn!(message = "VRL compilation warning.", %warnings);
         }
+
+        Ok(transform)
     }
 
     fn input(&self) -> Input {
@@ -119,17 +139,32 @@ impl TransformConfig for RemapConfig {
         // We need to compile the VRL program in order to know the schema definition output of this
         // transform. We ignore any compilation errors, as those are caught by the transform build
         // step.
-        //
-        // TODO: Keep track of semantic meaning for fields.
         let default_definition = self
             .compile_vrl_program(
                 enrichment::TableRegistry::default(),
                 merged_definition.clone(),
             )
             .ok()
-            .and_then(|(_, _, state)| state.target_kind().cloned())
-            .and_then(Kind::into_object)
-            .map(Into::into)
+            .and_then(|(_, _, _, state)| {
+                let meaning = state
+                    .get_external_context::<MeaningList>()
+                    .cloned()
+                    .expect("context exists")
+                    .0;
+
+                state
+                    .target_kind()
+                    .cloned()
+                    .and_then(Kind::into_object)
+                    .map(schema::Definition::from)
+                    .map(|mut def| {
+                        for (id, path) in meaning {
+                            def.register_known_meaning(path, &id)
+                        }
+
+                        def
+                    })
+            })
             .unwrap_or_else(schema::Definition::empty);
 
         // When a message is dropped and re-routed, we keep the original event, but also annotate
@@ -152,7 +187,9 @@ impl TransformConfig for RemapConfig {
         if self.reroute_dropped {
             vec![
                 default_output,
-                Output::from((DROPPED, DataType::all())).with_schema_definition(dropped_definition),
+                Output::default(DataType::all())
+                    .with_schema_definition(dropped_definition)
+                    .with_port(DROPPED),
             ]
         } else {
             vec![default_output]
@@ -190,7 +227,7 @@ pub trait VrlRunner {
         target: &mut VrlTarget,
         program: &Program,
         timezone: &TimeZone,
-    ) -> std::result::Result<vrl::Value, Terminate>;
+    ) -> std::result::Result<value::Value, Terminate>;
 }
 
 #[derive(Debug)]
@@ -214,7 +251,7 @@ impl VrlRunner for VmRunner {
         target: &mut VrlTarget,
         _: &Program,
         timezone: &TimeZone,
-    ) -> std::result::Result<vrl::Value, Terminate> {
+    ) -> std::result::Result<value::Value, Terminate> {
         self.runtime.run_vm(&self.vm, target, timezone)
     }
 }
@@ -238,7 +275,7 @@ impl VrlRunner for AstRunner {
         target: &mut VrlTarget,
         program: &Program,
         timezone: &TimeZone,
-    ) -> std::result::Result<vrl::Value, Terminate> {
+    ) -> std::result::Result<value::Value, Terminate> {
         let result = self.runtime.resolve(target, program, timezone);
         self.runtime.clear();
         result
@@ -246,8 +283,11 @@ impl VrlRunner for AstRunner {
 }
 
 impl Remap<VmRunner> {
-    pub fn new_vm(config: RemapConfig, context: &TransformContext) -> crate::Result<Self> {
-        let (program, functions, mut state) = config.compile_vrl_program(
+    pub fn new_vm(
+        config: RemapConfig,
+        context: &TransformContext,
+    ) -> crate::Result<(Self, String)> {
+        let (program, warnings, functions, mut state) = config.compile_vrl_program(
             context.enrichment_tables.clone(),
             context.merged_schema_definition.clone(),
         )?;
@@ -259,13 +299,16 @@ impl Remap<VmRunner> {
             vm: Arc::new(vm),
         };
 
-        Self::new(config, context, program, runner)
+        Self::new(config, context, program, runner).map(|remap| (remap, warnings))
     }
 }
 
 impl Remap<AstRunner> {
-    pub fn new_ast(config: RemapConfig, context: &TransformContext) -> crate::Result<Self> {
-        let (program, _, _) = config.compile_vrl_program(
+    pub fn new_ast(
+        config: RemapConfig,
+        context: &TransformContext,
+    ) -> crate::Result<(Self, String)> {
+        let (program, warnings, _, _) = config.compile_vrl_program(
             context.enrichment_tables.clone(),
             context.merged_schema_definition.clone(),
         )?;
@@ -273,7 +316,7 @@ impl Remap<AstRunner> {
         let runtime = Runtime::default();
         let runner = AstRunner { runtime };
 
-        Self::new(config, context, program, runner)
+        Self::new(config, context, program, runner).map(|remap| (remap, warnings))
     }
 }
 
@@ -367,7 +410,7 @@ where
         }
     }
 
-    fn run_vrl(&mut self, target: &mut VrlTarget) -> std::result::Result<vrl::Value, Terminate> {
+    fn run_vrl(&mut self, target: &mut VrlTarget) -> std::result::Result<value::Value, Terminate> {
         self.runner.run(target, &self.program, &self.timezone)
     }
 }
@@ -389,23 +432,27 @@ where
         // the event to the `dropped` output.
         let forward_on_error = !self.drop_on_error || self.reroute_dropped;
         let forward_on_abort = !self.drop_on_abort || self.reroute_dropped;
-        let original_event = if (self.program.can_fail() && forward_on_error)
-            || (self.program.can_abort() && forward_on_abort)
+        let original_event = if (self.program.info().fallible && forward_on_error)
+            || (self.program.info().abortable && forward_on_abort)
         {
             Some(event.clone())
         } else {
             None
         };
 
-        let mut target: VrlTarget = event.into();
+        let mut target = VrlTarget::new(event, self.program.info());
         let result = self.run_vrl(&mut target);
 
         match result {
-            Ok(_) => {
-                for event in target.into_events() {
-                    push_default(event, output, &self.default_schema_definition);
+            Ok(_) => match target.into_events() {
+                TargetEvents::One(event) => {
+                    push_default(event, output, &self.default_schema_definition)
                 }
-            }
+                TargetEvents::Logs(events) => events
+                    .for_each(|event| push_default(event, output, &self.default_schema_definition)),
+                TargetEvents::Traces(events) => events
+                    .for_each(|event| push_default(event, output, &self.default_schema_definition)),
+            },
             Err(reason) => {
                 let (reason, error, drop) = match reason {
                     Terminate::Abort(error) => {
@@ -520,6 +567,7 @@ mod tests {
         ]);
 
         Remap::new_ast(config, &TransformContext::new_test(schema_definitions))
+            .map(|(remap, _)| remap)
     }
 
     #[test]
@@ -935,7 +983,7 @@ mod tests {
             ),
             ..Default::default()
         };
-        let mut tform = Remap::new_ast(conf, &context).unwrap();
+        let mut tform = Remap::new_ast(conf, &context).unwrap().0;
 
         let output = transform_one_fallible(&mut tform, happy).unwrap();
         let log = output.as_log();
@@ -1068,7 +1116,7 @@ mod tests {
             key: Some(ComponentKey::from("remapper")),
             ..Default::default()
         };
-        let mut tform = Remap::new_ast(conf, &context).unwrap();
+        let mut tform = Remap::new_ast(conf, &context).unwrap().0;
 
         let output =
             transform_one_fallible(&mut tform, error_trigger_assert_custom_message).unwrap_err();
@@ -1127,7 +1175,7 @@ mod tests {
             key: Some(ComponentKey::from("remapper")),
             ..Default::default()
         };
-        let mut tform = Remap::new_ast(conf, &context).unwrap();
+        let mut tform = Remap::new_ast(conf, &context).unwrap().0;
 
         let output = transform_one_fallible(&mut tform, error).unwrap_err();
         let log = output.as_log();
@@ -1194,7 +1242,7 @@ mod tests {
             key: Some(ComponentKey::from("remapper")),
             ..Default::default()
         };
-        let mut tform = Remap::new_ast(conf, &context).unwrap();
+        let mut tform = Remap::new_ast(conf, &context).unwrap().0;
 
         let output = transform_one_fallible(&mut tform, happy).unwrap();
         let log = output.as_log();
@@ -1253,7 +1301,7 @@ mod tests {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             vec![
                 Output::default(DataType::all()),
-                Output::from((DROPPED, DataType::all())),
+                Output::default(DataType::all()).with_port(DROPPED),
             ],
             1,
         );
@@ -1280,7 +1328,7 @@ mod tests {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
             vec![
                 Output::default(DataType::all()),
-                Output::from((DROPPED, DataType::all())),
+                Output::default(DataType::all()).with_port(DROPPED),
             ],
             1,
         );

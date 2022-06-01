@@ -2,17 +2,16 @@ use std::{borrow::Cow, convert::TryFrom, fmt};
 
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, Utc};
-use diagnostic::{DiagnosticError, Label, Note, Urls};
+use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 use ordered_float::NotNan;
-use parser::ast::{self, Node};
 use regex::Regex;
-use value::ValueRegex;
+use value::{Value, ValueRegex};
 
 use crate::{
     expression::Resolved,
     state::{ExternalEnv, LocalEnv},
     vm::OpCode,
-    Context, Expression, Span, TypeDef, Value,
+    Context, Expression, Span, TypeDef,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -27,6 +26,12 @@ pub enum Literal {
 }
 
 impl Literal {
+    /// Get a `Value` type stored in the literal.
+    ///
+    /// This differs from `Expression::as_value` insofar as this *always*
+    /// returns a `Value`, whereas `as_value` returns `Option<Value>` which, in
+    /// the case of `Literal` means it always returns `Some(Value)`, requiring
+    /// an extra `unwrap()`.
     pub fn to_value(&self) -> Value {
         use Literal::*;
 
@@ -39,31 +44,6 @@ impl Literal {
             Timestamp(v) => Value::Timestamp(v.to_owned()),
             Null => Value::Null,
         }
-    }
-}
-
-impl TryFrom<Node<ast::Literal>> for Literal {
-    type Error = Error;
-
-    fn try_from(node: Node<ast::Literal>) -> Result<Self, Self::Error> {
-        use ast::Literal::*;
-
-        let (span, lit) = node.take();
-
-        let literal = match lit {
-            String(v) => Literal::String(Bytes::from(v)),
-            Integer(v) => Literal::Integer(v),
-            Float(v) => Literal::Float(v),
-            Boolean(v) => Literal::Boolean(v),
-            Regex(v) => regex::Regex::new(&v)
-                .map_err(|err| (span, err))
-                .map(|r| Literal::Regex(r.into()))?,
-            // TODO: support more formats (similar to Vector's `Convert` logic)
-            Timestamp(v) => Literal::Timestamp(v.parse().map_err(|err| (span, err))?),
-            Null => Literal::Null,
-        };
-
-        Ok(literal)
     }
 }
 
@@ -307,7 +287,7 @@ impl std::error::Error for Error {
     }
 }
 
-impl DiagnosticError for Error {
+impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
         use ErrorVariant::*;
 

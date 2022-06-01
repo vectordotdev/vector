@@ -1,12 +1,17 @@
-use super::Deserializer;
+use std::convert::TryInto;
+
 use bytes::Bytes;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
-use std::convert::TryInto;
 use value::Kind;
-use vector_core::config::LogNamespace;
-use vector_core::{config::log_schema, event::Event, schema};
+use vector_core::{
+    config::{log_schema, DataType, LogNamespace},
+    event::Event,
+    schema,
+};
+
+use super::Deserializer;
 
 /// Config used to build a `JsonDeserializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -16,6 +21,11 @@ impl JsonDeserializerConfig {
     /// Build the `JsonDeserializer` from this configuration.
     pub fn build(&self) -> JsonDeserializer {
         Into::<JsonDeserializer>::into(self)
+    }
+
+    /// Return the type of event build by this deserializer.
+    pub fn output_type(&self) -> DataType {
+        DataType::Log
     }
 
     /// The schema produced by the deserializer.
@@ -68,7 +78,7 @@ impl Deserializer for JsonDeserializer {
         let events = match log_namespace {
             LogNamespace::Vector => {
                 // TODO: Should this still split arrays into multiple events?
-                smallvec![Event::from(log_namespace.new_log_from_data(json)?)]
+                smallvec![Event::from(log_namespace.new_log_from_data(json))]
             }
             LogNamespace::Legacy => {
                 let mut events = match json {
@@ -106,8 +116,9 @@ impl From<&JsonDeserializerConfig> for JsonDeserializer {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use vector_core::config::log_schema;
+
+    use super::*;
 
     #[test]
     fn deserialize_json() {

@@ -19,13 +19,65 @@ pub struct Definition {
     ///
     /// The value within this map points to a path inside the `collection`. It is an invalid state
     /// for there to be a meaning pointing to a non-existing path in the collection.
-    meaning: BTreeMap<String, LookupBuf>,
+    meaning: BTreeMap<String, MeaningPointer>,
 
     /// A list of paths that are allowed to be missing.
     ///
     /// The key in this set points to a path inside the `collection`. It is an invalid state for
     /// there to be a key pointing to a non-existing path in the collection.
     optional: BTreeSet<LookupBuf>,
+}
+
+/// In regular use, a semantic meaning points to exactly _one_ location in the collection. However,
+/// when merging two [`Definition`]s, we need to be able to allow for two definitions with the same
+/// semantic meaning identifier to be merged together.
+///
+/// We cannot error when this happens, because a follow-up component (such as the `remap`
+/// transform) might rectify the issue of having a semantic meaning with multiple pointers.
+///
+/// Because of this, we encapsulate this state in an enum. The schema validation step done by the
+/// sink builder, will return an error if the definition stores an "invalid" meaning pointer.
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
+enum MeaningPointer {
+    Valid(LookupBuf),
+    Invalid(BTreeSet<LookupBuf>),
+}
+
+impl MeaningPointer {
+    fn merge(self, other: Self) -> Self {
+        let set = match (self, other) {
+            (Self::Valid(lhs), Self::Valid(rhs)) if lhs == rhs => return Self::Valid(lhs),
+            (Self::Valid(lhs), Self::Valid(rhs)) => BTreeSet::from([lhs, rhs]),
+            (Self::Valid(lhs), Self::Invalid(mut rhs)) => {
+                rhs.insert(lhs);
+                rhs
+            }
+            (Self::Invalid(mut lhs), Self::Valid(rhs)) => {
+                lhs.insert(rhs);
+                lhs
+            }
+            (Self::Invalid(mut lhs), Self::Invalid(rhs)) => {
+                lhs.extend(rhs);
+                lhs
+            }
+        };
+
+        Self::Invalid(set)
+    }
+}
+
+#[cfg(test)]
+impl From<&str> for MeaningPointer {
+    fn from(v: &str) -> Self {
+        MeaningPointer::Valid(v.into())
+    }
+}
+
+#[cfg(test)]
+impl From<LookupBuf> for MeaningPointer {
+    fn from(v: LookupBuf) -> Self {
+        MeaningPointer::Valid(v)
+    }
 }
 
 impl Definition {
@@ -61,7 +113,7 @@ impl Definition {
         mut self,
         path: impl Into<LookupBuf>,
         kind: Kind,
-        meaning: Option<&'static str>,
+        meaning: Option<&str>,
     ) -> Self {
         let mut path = path.into();
         let meaning = meaning.map(ToOwned::to_owned);
@@ -92,7 +144,7 @@ impl Definition {
         );
 
         if let Some(meaning) = meaning {
-            self.meaning.insert(meaning, path);
+            self.meaning.insert(meaning, MeaningPointer::Valid(path));
         }
 
         self
@@ -108,12 +160,32 @@ impl Definition {
         mut self,
         path: impl Into<LookupBuf>,
         kind: Kind,
-        meaning: Option<&'static str>,
+        meaning: Option<&str>,
     ) -> Self {
         let path = path.into();
         self.optional.insert(path.clone());
 
         self.required_field(path, kind, meaning)
+    }
+
+    /// Register a semantic meaning for the definition.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the provided path points to an unknown location in the collection.
+    pub fn register_known_meaning(&mut self, path: impl Into<LookupBuf>, meaning: &str) {
+        let path = path.into();
+
+        // Ensure the path exists in the collection.
+        assert!(self
+            .collection
+            .find_known_at_path(&mut path.to_lookup())
+            .ok()
+            .flatten()
+            .is_some());
+
+        self.meaning
+            .insert(meaning.to_owned(), MeaningPointer::Valid(path));
     }
 
     /// Set the kind for all unknown fields.
@@ -167,7 +239,16 @@ impl Definition {
         }
 
         self.optional = optional;
-        self.meaning.extend(other.meaning);
+
+        for (other_id, other_meaning) in other.meaning {
+            let meaning = match self.meaning.remove(&other_id) {
+                Some(this_meaning) => this_meaning.merge(other_meaning),
+                None => other_meaning,
+            };
+
+            self.meaning.insert(other_id, meaning);
+        }
+
         self.collection.merge(
             other.collection,
             merge::Strategy {
@@ -180,15 +261,36 @@ impl Definition {
     }
 
     /// Returns a `Lookup` into an event, based on the provided `meaning`, if the meaning exists.
-    ///
-    /// TODO(Jean): return `Lookup` here, but it requires some changes to `Value`s API first.
     pub fn meaning_path(&self, meaning: &str) -> Option<&LookupBuf> {
-        self.meaning.get(meaning)
+        match self.meaning.get(meaning) {
+            Some(MeaningPointer::Valid(path)) => Some(path),
+            None | Some(MeaningPointer::Invalid(_)) => None,
+        }
+    }
+
+    pub fn invalid_meaning(&self, meaning: &str) -> Option<&BTreeSet<LookupBuf>> {
+        match &self.meaning.get(meaning) {
+            Some(MeaningPointer::Invalid(paths)) => Some(paths),
+            None | Some(MeaningPointer::Valid(_)) => None,
+        }
     }
 
     /// Returns `true` if the provided field is marked as optional.
     fn is_optional_field(&self, path: &LookupBuf) -> bool {
         self.optional.contains(path)
+    }
+
+    pub fn meanings(&self) -> impl Iterator<Item = (&String, &LookupBuf)> {
+        self.meaning
+            .iter()
+            .filter_map(|(id, pointer)| match pointer {
+                MeaningPointer::Valid(path) => Some((id, path)),
+                MeaningPointer::Invalid(_) => None,
+            })
+    }
+
+    pub fn collection(&self) -> &Collection<Field> {
+        &self.collection
     }
 }
 
@@ -283,7 +385,7 @@ mod tests {
                         )]));
                         let meaning = BTreeMap::from([(
                             "foobar".to_owned(),
-                            LookupBuf::from_str(".foo.bar").unwrap(),
+                            LookupBuf::from_str(".foo.bar").unwrap().into(),
                         )]);
                         let optional = BTreeSet::default();
 
@@ -374,7 +476,7 @@ mod tests {
                         )]));
                         let meaning = BTreeMap::from([(
                             "foobar".to_owned(),
-                            LookupBuf::from_str(".foo.bar").unwrap(),
+                            LookupBuf::from_str(".foo.bar").unwrap().into(),
                         )]);
                         let optional = BTreeSet::from([LookupBuf::from_str(".foo.bar").unwrap()]);
 
@@ -552,6 +654,82 @@ mod tests {
                         )])),
                         optional: BTreeSet::default(),
                         meaning: BTreeMap::default(),
+                    },
+                },
+            ),
+            (
+                "same meaning, pointing to different paths",
+                TestCase {
+                    this: Definition {
+                        collection: Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean(),
+                        )])),
+                        optional: BTreeSet::default(),
+                        meaning: BTreeMap::from([(
+                            "foo".into(),
+                            MeaningPointer::Valid("foo".into()),
+                        )]),
+                    },
+                    other: Definition {
+                        collection: Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean(),
+                        )])),
+                        optional: BTreeSet::default(),
+                        meaning: BTreeMap::from([(
+                            "foo".into(),
+                            MeaningPointer::Valid("bar".into()),
+                        )]),
+                    },
+                    want: Definition {
+                        collection: Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean(),
+                        )])),
+                        optional: BTreeSet::default(),
+                        meaning: BTreeMap::from([(
+                            "foo".into(),
+                            MeaningPointer::Invalid(BTreeSet::from(["foo".into(), "bar".into()])),
+                        )]),
+                    },
+                },
+            ),
+            (
+                "same meaning, pointing to same path",
+                TestCase {
+                    this: Definition {
+                        collection: Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean(),
+                        )])),
+                        optional: BTreeSet::default(),
+                        meaning: BTreeMap::from([(
+                            "foo".into(),
+                            MeaningPointer::Valid("foo".into()),
+                        )]),
+                    },
+                    other: Definition {
+                        collection: Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean(),
+                        )])),
+                        optional: BTreeSet::default(),
+                        meaning: BTreeMap::from([(
+                            "foo".into(),
+                            MeaningPointer::Valid("foo".into()),
+                        )]),
+                    },
+                    want: Definition {
+                        collection: Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean(),
+                        )])),
+                        optional: BTreeSet::default(),
+                        meaning: BTreeMap::from([(
+                            "foo".into(),
+                            MeaningPointer::Valid("foo".into()),
+                        )]),
                     },
                 },
             ),

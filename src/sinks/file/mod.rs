@@ -2,7 +2,12 @@ use std::time::{Duration, Instant};
 
 use async_compression::tokio::write::GzipEncoder;
 use async_trait::async_trait;
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
+use codecs::{
+    encoding::{Framer, FramingConfig, SerializerConfig},
+    JsonSerializerConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
+    TextSerializerConfig,
+};
 use futures::{
     future,
     stream::{BoxStream, StreamExt},
@@ -13,20 +18,22 @@ use tokio::{
     fs::{self, File},
     io::AsyncWriteExt,
 };
+use tokio_util::codec::Encoder as _;
 use vector_core::{buffers::Acker, internal_event::EventsSent, ByteSizeOf};
 
 use crate::{
+    codecs::Encoder,
     config::{
-        log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
-        SinkDescription,
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
     },
     event::{Event, EventStatus, Finalizable},
     expiring_hash_map::ExpiringHashMap,
-    internal_events::{
-        FileBytesSent, FileExpiringError, FileIoError, FileOpen, TemplateRenderingError,
-    },
+    internal_events::{FileBytesSent, FileIoError, FileOpen, TemplateRenderingError},
     sinks::util::{
-        encoding::{EncodingConfig, EncodingConfiguration},
+        encoding::{
+            EncodingConfig, EncodingConfigWithFramingAdapter, EncodingConfigWithFramingMigrator,
+            Transformer,
+        },
         StreamSink,
     },
     template::Template,
@@ -36,12 +43,30 @@ use std::convert::TryFrom;
 
 use bytes_path::BytesPath;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EncodingMigrator;
+
+impl EncodingConfigWithFramingMigrator for EncodingMigrator {
+    type Codec = Encoding;
+
+    fn migrate(codec: &Self::Codec) -> (Option<FramingConfig>, SerializerConfig) {
+        match codec {
+            Encoding::Text => (None, TextSerializerConfig::new().into()),
+            Encoding::Ndjson => (
+                Some(NewlineDelimitedEncoderConfig::new().into()),
+                JsonSerializerConfig::new().into(),
+            ),
+        }
+    }
+}
+
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct FileSinkConfig {
     pub path: Template,
     pub idle_timeout_secs: Option<u64>,
-    pub encoding: EncodingConfig<Encoding>,
+    #[serde(flatten)]
+    pub encoding: EncodingConfigWithFramingAdapter<EncodingConfig<Encoding>, EncodingMigrator>,
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
@@ -64,7 +89,7 @@ impl GenerateConfig for FileSinkConfig {
         toml::Value::try_from(Self {
             path: Template::try_from("/tmp/vector-%Y-%m-%d.log").unwrap(),
             idle_timeout_secs: None,
-            encoding: Encoding::Text.into(),
+            encoding: EncodingConfig::from(Encoding::Text).into(),
             compression: Default::default(),
             acknowledgements: Default::default(),
         })
@@ -149,7 +174,7 @@ impl SinkConfig for FileSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(self.encoding.config().1.input_type())
     }
 
     fn sink_type(&self) -> &'static str {
@@ -165,7 +190,8 @@ impl SinkConfig for FileSinkConfig {
 pub struct FileSink {
     acker: Acker,
     path: Template,
-    encoding: EncodingConfig<Encoding>,
+    transformer: Transformer,
+    encoder: Encoder<Framer>,
     idle_timeout: Duration,
     files: ExpiringHashMap<Bytes, OutFile>,
     compression: Compression,
@@ -173,10 +199,16 @@ pub struct FileSink {
 
 impl FileSink {
     pub fn new(config: &FileSinkConfig, acker: Acker) -> Self {
+        let transformer = config.encoding.transformer();
+        let (framer, serializer) = config.encoding.encoding();
+        let framer = framer.unwrap_or_else(|| NewlineDelimitedEncoder::new().into());
+        let encoder = Encoder::<Framer>::new(framer, serializer);
+
         Self {
             acker,
             path: config.path.clone(),
-            encoding: config.encoding.clone(),
+            transformer,
+            encoder,
             idle_timeout: Duration::from_secs(config.idle_timeout_secs.unwrap_or(30)),
             files: ExpiringHashMap::default(),
             compression: config.compression,
@@ -248,7 +280,7 @@ impl FileSink {
                         // We do not poll map when it's empty, so we should
                         // never reach this branch.
                         None => unreachable!(),
-                        Some(Ok((mut expired_file, path))) => {
+                        Some((mut expired_file, path)) => {
                             // We got an expired file. All we really want is to
                             // flush and close it.
                             if let Err(error) = expired_file.close().await {
@@ -259,9 +291,6 @@ impl FileSink {
                                 count: self.files.len()
                             });
                         }
-                        Some(Err(error)) => {
-                            emit!(FileExpiringError { error });
-                        },
                     }
                 }
             }
@@ -320,7 +349,7 @@ impl FileSink {
         trace!(message = "Writing an event to file.", path = ?path);
         let event_size = event.size_of();
         let finalizers = event.take_finalizers();
-        match write_event_to_file(file, event, &self.encoding).await {
+        match write_event_to_file(file, event, &self.transformer, &mut self.encoder).await {
             Ok(byte_size) => {
                 finalizers.update_status(EventStatus::Delivered);
                 emit!(EventsSent {
@@ -362,26 +391,18 @@ async fn open_file(path: impl AsRef<std::path::Path>) -> std::io::Result<File> {
         .await
 }
 
-pub fn encode_event(encoding: &EncodingConfig<Encoding>, mut event: Event) -> Vec<u8> {
-    encoding.apply_rules(&mut event);
-    let log = event.into_log();
-    match encoding.codec() {
-        Encoding::Ndjson => serde_json::to_vec(&log).expect("Unable to encode event as JSON."),
-        Encoding::Text => log
-            .get(log_schema().message_key())
-            .map(|v| v.to_string_lossy().into_bytes())
-            .unwrap_or_default(),
-    }
-}
-
 async fn write_event_to_file(
     file: &mut OutFile,
-    event: Event,
-    encoding: &EncodingConfig<Encoding>,
+    mut event: Event,
+    transformer: &Transformer,
+    encoder: &mut Encoder<Framer>,
 ) -> Result<usize, std::io::Error> {
-    let mut buf = encode_event(encoding, event);
-    buf.push(b'\n');
-    file.write_all(&buf[..]).await.map(|()| buf.len())
+    transformer.transform(&mut event);
+    let mut buffer = BytesMut::new();
+    encoder
+        .encode(event, &mut buffer)
+        .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
+    file.write_all(&buffer).await.map(|()| buffer.len())
 }
 
 #[async_trait]
@@ -400,12 +421,16 @@ mod tests {
 
     use futures::{stream, SinkExt};
     use pretty_assertions::assert_eq;
+    use vector_core::sink::VectorSink;
 
     use super::*;
-    use crate::test_util::{
-        components::{self, FILE_SINK_TAGS, SINK_TESTS},
-        lines_from_file, lines_from_gzip_file, random_events_with_stream, random_lines_with_stream,
-        temp_dir, temp_file, trace_init,
+    use crate::{
+        config::log_schema,
+        test_util::{
+            components::{run_and_assert_sink_compliance, FILE_SINK_TAGS},
+            lines_from_file, lines_from_gzip_file, random_events_with_stream,
+            random_lines_with_stream, temp_dir, temp_file, trace_init,
+        },
     };
 
     #[test]
@@ -415,7 +440,6 @@ mod tests {
 
     #[tokio::test]
     async fn single_partition() {
-        components::init_test();
         trace_init();
 
         let template = temp_file();
@@ -423,17 +447,21 @@ mod tests {
         let config = FileSinkConfig {
             path: template.clone().try_into().unwrap(),
             idle_timeout_secs: None,
-            encoding: Encoding::Text.into(),
+            encoding: EncodingConfig::from(Encoding::Text).into(),
             compression: Compression::None,
             acknowledgements: Default::default(),
         };
 
-        let mut sink = FileSink::new(&config, Acker::passthrough());
+        let sink = FileSink::new(&config, Acker::passthrough());
         let (input, _events) = random_lines_with_stream(100, 64, None);
 
         let events = Box::pin(stream::iter(input.clone().into_iter().map(Event::from)));
-        sink.run(events).await.unwrap();
-        SINK_TESTS.assert(&FILE_SINK_TAGS);
+        run_and_assert_sink_compliance(
+            VectorSink::from_event_streamsink(sink),
+            events,
+            &FILE_SINK_TAGS,
+        )
+        .await;
 
         let output = lines_from_file(template);
         for (input, output) in input.into_iter().zip(output) {
@@ -443,7 +471,6 @@ mod tests {
 
     #[tokio::test]
     async fn single_partition_gzip() {
-        components::init_test();
         trace_init();
 
         let template = temp_file();
@@ -451,17 +478,21 @@ mod tests {
         let config = FileSinkConfig {
             path: template.clone().try_into().unwrap(),
             idle_timeout_secs: None,
-            encoding: Encoding::Text.into(),
+            encoding: EncodingConfig::from(Encoding::Text).into(),
             compression: Compression::Gzip,
             acknowledgements: Default::default(),
         };
 
-        let mut sink = FileSink::new(&config, Acker::passthrough());
+        let sink = FileSink::new(&config, Acker::passthrough());
         let (input, _) = random_lines_with_stream(100, 64, None);
 
         let events = Box::pin(stream::iter(input.clone().into_iter().map(Event::from)));
-        sink.run(events).await.unwrap();
-        SINK_TESTS.assert(&FILE_SINK_TAGS);
+        run_and_assert_sink_compliance(
+            VectorSink::from_event_streamsink(sink),
+            events,
+            &FILE_SINK_TAGS,
+        )
+        .await;
 
         let output = lines_from_gzip_file(template);
         for (input, output) in input.into_iter().zip(output) {
@@ -471,7 +502,6 @@ mod tests {
 
     #[tokio::test]
     async fn many_partitions() {
-        components::init_test();
         trace_init();
 
         let directory = temp_dir();
@@ -484,12 +514,12 @@ mod tests {
         let config = FileSinkConfig {
             path: template.try_into().unwrap(),
             idle_timeout_secs: None,
-            encoding: Encoding::Text.into(),
+            encoding: EncodingConfig::from(Encoding::Text).into(),
             compression: Compression::None,
             acknowledgements: Default::default(),
         };
 
-        let mut sink = FileSink::new(&config, Acker::passthrough());
+        let sink = FileSink::new(&config, Acker::passthrough());
 
         let (mut input, _events) = random_events_with_stream(32, 8, None);
         input[0].as_mut_log().insert("date", "2019-26-07");
@@ -510,8 +540,12 @@ mod tests {
         input[7].as_mut_log().insert("level", "error");
 
         let events = Box::pin(stream::iter(input.clone().into_iter()));
-        sink.run(events).await.unwrap();
-        SINK_TESTS.assert(&FILE_SINK_TAGS);
+        run_and_assert_sink_compliance(
+            VectorSink::from_event_streamsink(sink),
+            events,
+            &FILE_SINK_TAGS,
+        )
+        .await;
 
         let output = vec![
             lines_from_file(&directory.join("warnings-2019-26-07.log")),
@@ -558,7 +592,6 @@ mod tests {
 
     #[tokio::test]
     async fn reopening() {
-        components::init_test();
         trace_init();
 
         let template = temp_file();
@@ -566,17 +599,24 @@ mod tests {
         let config = FileSinkConfig {
             path: template.clone().try_into().unwrap(),
             idle_timeout_secs: Some(1),
-            encoding: Encoding::Text.into(),
+            encoding: EncodingConfig::from(Encoding::Text).into(),
             compression: Compression::None,
             acknowledgements: Default::default(),
         };
 
-        let mut sink = FileSink::new(&config, Acker::passthrough());
+        let sink = FileSink::new(&config, Acker::passthrough());
         let (mut input, _events) = random_lines_with_stream(10, 64, None);
 
         let (mut tx, rx) = futures::channel::mpsc::channel(0);
 
-        let _ = tokio::spawn(async move { sink.run(Box::pin(rx)).await });
+        let sink_handle = tokio::spawn(async move {
+            run_and_assert_sink_compliance(
+                VectorSink::from_event_streamsink(sink),
+                Box::pin(rx),
+                &FILE_SINK_TAGS,
+            )
+            .await
+        });
 
         // send initial payload
         for line in input.clone() {
@@ -598,6 +638,8 @@ mod tests {
         let output = lines_from_file(template);
         assert_eq!(input, output);
 
-        SINK_TESTS.assert(&FILE_SINK_TAGS);
+        // make sure sink stops and that it did not panic
+        drop(tx);
+        sink_handle.await.unwrap();
     }
 }

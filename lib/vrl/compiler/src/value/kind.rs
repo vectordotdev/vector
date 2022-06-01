@@ -1,8 +1,8 @@
+use ::value::Value;
 use chrono::{TimeZone, Utc};
 use ordered_float::NotNan;
 use regex::Regex;
 
-use super::Value;
 use crate::value;
 
 pub const BYTES: u16 = 1 << 1;

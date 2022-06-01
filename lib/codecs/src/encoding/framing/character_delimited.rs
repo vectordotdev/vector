@@ -26,10 +26,11 @@ impl CharacterDelimitedEncoderConfig {
 }
 
 /// Options for building a `CharacterDelimitedEncoder`.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct CharacterDelimitedEncoderOptions {
     /// The character that delimits byte sequences.
-    delimiter: u8,
+    #[serde(with = "vector_core::serde::ascii_char")]
+    pub delimiter: u8,
 }
 
 /// An encoder for handling bytes that are delimited by (a) chosen character(s).

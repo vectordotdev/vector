@@ -1,24 +1,22 @@
-use aws_sdk_kinesis::model::PutRecordsRequestEntry;
-use aws_sdk_kinesis::types::Blob;
 use std::io;
 
+use aws_sdk_kinesis::model::PutRecordsRequestEntry;
+use aws_sdk_kinesis::types::Blob;
 use bytes::Bytes;
 use vector_core::{buffers::Ackable, ByteSizeOf};
 
 use crate::{
+    codecs::Encoder,
     event::{Event, EventFinalizers, Finalizable},
     sinks::{
         aws_kinesis_streams::sink::KinesisProcessedEvent,
-        util::{
-            encoding::{EncodingConfig, StandardEncodings},
-            Compression, RequestBuilder,
-        },
+        util::{encoding::Transformer, request_builder::EncodeResult, Compression, RequestBuilder},
     },
 };
 
 pub struct KinesisRequestBuilder {
     pub compression: Compression,
-    pub encoder: EncodingConfig<StandardEncodings>,
+    pub encoder: (Transformer, Encoder<()>),
 }
 
 pub struct Metadata {
@@ -90,7 +88,7 @@ impl ByteSizeOf for KinesisRequest {
 impl RequestBuilder<KinesisProcessedEvent> for KinesisRequestBuilder {
     type Metadata = Metadata;
     type Events = Event;
-    type Encoder = EncodingConfig<StandardEncodings>;
+    type Encoder = (Transformer, Encoder<()>);
     type Payload = Bytes;
     type Request = KinesisRequest;
     type Error = io::Error;
@@ -112,10 +110,15 @@ impl RequestBuilder<KinesisProcessedEvent> for KinesisRequestBuilder {
         (metadata, Event::from(event.event))
     }
 
-    fn build_request(&self, metadata: Self::Metadata, data: Bytes) -> Self::Request {
+    fn build_request(
+        &self,
+        metadata: Self::Metadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
+        let payload = payload.into_payload();
         KinesisRequest {
             put_records_request: PutRecordsRequestEntry::builder()
-                .data(Blob::new(data.as_ref()))
+                .data(Blob::new(&payload[..]))
                 .partition_key(metadata.partition_key)
                 .build(),
             finalizers: metadata.finalizers,

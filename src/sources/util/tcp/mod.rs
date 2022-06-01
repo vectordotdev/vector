@@ -1,25 +1,23 @@
 mod request_limiter;
 
+use std::net::SocketAddr;
+use std::{fmt, io, mem::drop, sync::Arc, time::Duration};
+
 use bytes::Bytes;
+use codecs::StreamDecodingError;
 use futures::{future::BoxFuture, FutureExt, StreamExt};
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use smallvec::SmallVec;
 use socket2::SockRef;
-use vector_core::ByteSizeOf;
-
-use std::net::SocketAddr;
-
-use std::{fmt, io, mem::drop, sync::Arc, time::Duration};
-
-use codecs::StreamDecodingError;
 use tokio::{
     io::AsyncWriteExt,
     net::{TcpListener, TcpStream},
     time::sleep,
 };
 use tokio_util::codec::{Decoder, FramedRead};
-use tracing_futures::Instrument;
+use tracing::Instrument;
+use vector_core::ByteSizeOf;
 
 use super::AfterReadExt as _;
 use crate::sources::util::tcp::request_limiter::RequestLimiter;
@@ -115,6 +113,7 @@ where
 
     fn build_acker(&self, item: &[Self::Item]) -> Self::Acker;
 
+    #[allow(clippy::too_many_arguments)]
     fn run(
         self,
         addr: SocketListenAddr,
@@ -226,6 +225,7 @@ where
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn handle_stream<T>(
     mut shutdown_signal: ShutdownSignal,
     mut socket: MaybeTlsIncomingStream<TcpStream>,

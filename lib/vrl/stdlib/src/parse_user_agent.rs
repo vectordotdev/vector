@@ -1,5 +1,11 @@
-use std::{borrow::Cow, fmt, str::FromStr, sync::Arc};
+use std::{
+    borrow::{Borrow, Cow},
+    fmt,
+    str::FromStr,
+    sync::Arc,
+};
 
+use ::value::Value;
 use once_cell::sync::Lazy;
 use uaparser::UserAgentParser as UAParser;
 use vrl::{function::Error, prelude::*};
@@ -595,11 +601,11 @@ impl Parser for WootheeParser {
 
 impl Parser for UAParser {
     fn parse_user_agent(&self, user_agent: &str) -> UserAgent {
-        fn unknown_to_none(s: impl Into<Option<String>>) -> Option<String> {
-            let s = s.into()?;
-            match s.as_str() {
+        #[inline]
+        fn unknown_to_none(s: Option<Cow<'_, str>>) -> Option<String> {
+            match s?.borrow() {
                 "" | "Other" => None,
-                _ => Some(s),
+                v => Some(v.to_owned()),
             }
         }
 
@@ -607,14 +613,14 @@ impl Parser for UAParser {
 
         UserAgent {
             browser: Browser {
-                family: unknown_to_none(ua.user_agent.family),
+                family: unknown_to_none(Some(ua.user_agent.family)),
                 major: unknown_to_none(ua.user_agent.major),
                 minor: unknown_to_none(ua.user_agent.minor),
                 patch: unknown_to_none(ua.user_agent.patch),
                 ..Default::default()
             },
             os: Os {
-                family: unknown_to_none(ua.os.family),
+                family: unknown_to_none(Some(ua.os.family)),
                 major: unknown_to_none(ua.os.major),
                 minor: unknown_to_none(ua.os.minor),
                 patch: unknown_to_none(ua.os.patch),
@@ -622,7 +628,7 @@ impl Parser for UAParser {
                 ..Default::default()
             },
             device: Device {
-                family: unknown_to_none(ua.device.family),
+                family: unknown_to_none(Some(ua.device.family)),
                 brand: unknown_to_none(ua.device.brand),
                 model: unknown_to_none(ua.device.model),
                 ..Default::default()

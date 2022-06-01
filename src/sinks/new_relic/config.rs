@@ -1,3 +1,10 @@
+use std::{fmt::Debug, sync::Arc};
+
+use futures::FutureExt;
+use http::Uri;
+use serde::{Deserialize, Serialize};
+use tower::ServiceBuilder;
+
 use super::{
     healthcheck, Encoding, NewRelicApiResponse, NewRelicApiService, NewRelicSink, NewRelicSinkError,
 };
@@ -10,11 +17,6 @@ use crate::{
     },
     tls::TlsSettings,
 };
-use futures::FutureExt;
-use http::Uri;
-use serde::{Deserialize, Serialize};
-use std::{fmt::Debug, sync::Arc};
-use tower::ServiceBuilder;
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Copy, Derivative)]
 #[serde(rename_all = "snake_case")]
@@ -81,6 +83,8 @@ pub struct NewRelicConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
+    #[serde(skip)]
+    pub override_uri: Option<Uri>,
 }
 
 impl_generate_config_from_default!(NewRelicConfig);
@@ -107,7 +111,7 @@ impl SinkConfig for NewRelicConfig {
         let batcher_settings = self
             .batch
             .validate()?
-            .limit_max_events(self.batch.max_events.unwrap_or(50))?
+            .limit_max_events(self.batch.max_events.unwrap_or(100))?
             .into_batcher_settings()?;
 
         let request_limits = self.request.unwrap_with(&Default::default());
@@ -152,10 +156,15 @@ pub struct NewRelicCredentials {
     pub account_id: String,
     pub api: NewRelicApi,
     pub region: NewRelicRegion,
+    pub override_uri: Option<Uri>,
 }
 
 impl NewRelicCredentials {
     pub fn get_uri(&self) -> Uri {
+        if let Some(override_uri) = self.override_uri.as_ref() {
+            return override_uri.clone();
+        }
+
         match self.api {
             NewRelicApi::Events => match self.region {
                 NewRelicRegion::Us => format!(
@@ -192,6 +201,7 @@ impl From<&NewRelicConfig> for NewRelicCredentials {
             account_id: config.account_id.clone(),
             api: config.api,
             region: config.region.unwrap_or(NewRelicRegion::Us),
+            override_uri: config.override_uri.clone(),
         }
     }
 }

@@ -1,14 +1,15 @@
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::{BufMut, BytesMut};
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use tokio_util::codec::Encoder;
 use vector_core::event::{proto, Event};
 
 use crate::{
     config::{GenerateConfig, SinkContext},
     sinks::{util::tcp::TcpSinkConfig, Healthcheck, VectorSink},
     tcp::TcpKeepaliveConfig,
-    tls::TlsConfig,
+    tls::TlsEnableableConfig,
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -16,19 +17,19 @@ use crate::{
 pub struct VectorConfig {
     address: String,
     keepalive: Option<TcpKeepaliveConfig>,
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     send_buffer_bytes: Option<usize>,
 }
 
 impl VectorConfig {
-    pub fn set_tls(&mut self, config: Option<TlsConfig>) {
+    pub fn set_tls(&mut self, config: Option<TlsEnableableConfig>) {
         self.tls = config;
     }
 
     pub const fn new(
         address: String,
         keepalive: Option<TcpKeepaliveConfig>,
-        tls: Option<TlsConfig>,
+        tls: Option<TlsEnableableConfig>,
         send_buffer_bytes: Option<usize>,
     ) -> Self {
         Self {
@@ -66,8 +67,29 @@ impl VectorConfig {
             self.tls.clone(),
             self.send_buffer_bytes,
         );
+        sink_config.build(cx, Default::default(), VectorEncoder)
+    }
+}
 
-        sink_config.build(cx, |event| Some(encode_event(event)))
+#[derive(Debug, Clone)]
+struct VectorEncoder;
+
+impl Encoder<Event> for VectorEncoder {
+    type Error = codecs::encoding::Error;
+
+    fn encode(&mut self, event: Event, out: &mut BytesMut) -> Result<(), Self::Error> {
+        let data = proto::EventWrapper::from(event);
+        let event_len = data.encoded_len();
+        let full_len = event_len + 4;
+
+        let capacity = out.capacity();
+        if capacity < full_len {
+            out.reserve(full_len - capacity);
+        }
+        out.put_u32(event_len as u32);
+        data.encode(out).unwrap();
+
+        Ok(())
     }
 }
 
@@ -77,22 +99,43 @@ enum HealthcheckError {
     ConnectError { source: std::io::Error },
 }
 
-fn encode_event(event: Event) -> Bytes {
-    let data = proto::EventWrapper::from(event);
-    let event_len = data.encoded_len();
-    let full_len = event_len + 4;
-
-    let mut out = BytesMut::with_capacity(full_len);
-    out.put_u32(event_len as u32);
-    data.encode(&mut out).unwrap();
-
-    out.into()
-}
-
 #[cfg(test)]
 mod test {
+    use futures::{future::ready, stream};
+    use vector_core::event::Event;
+
+    use crate::{
+        config::{GenerateConfig, SinkContext},
+        test_util::{
+            components::{run_and_assert_sink_compliance, SINK_TAGS},
+            next_addr, wait_for_tcp, CountReceiver,
+        },
+        tls::TlsEnableableConfig,
+    };
+
+    use super::VectorConfig;
+
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<super::VectorConfig>();
+    }
+
+    #[tokio::test]
+    async fn component_spec_compliance() {
+        let mock_endpoint_addr = next_addr();
+        let _receiver = CountReceiver::receive_lines(mock_endpoint_addr);
+
+        wait_for_tcp(mock_endpoint_addr).await;
+
+        let config = VectorConfig::generate_config().to_string();
+        let mut config = toml::from_str::<VectorConfig>(&config).expect("config should be valid");
+        config.address = mock_endpoint_addr.to_string();
+        config.tls = Some(TlsEnableableConfig::default());
+
+        let context = SinkContext::new_test();
+        let (sink, _healthcheck) = config.build(context).await.unwrap();
+
+        let event = Event::from("simple message");
+        run_and_assert_sink_compliance(sink, stream::once(ready(event)), &SINK_TAGS).await;
     }
 }

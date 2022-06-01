@@ -10,19 +10,19 @@ mod native_json;
 #[cfg(feature = "syslog")]
 mod syslog;
 
-pub use self::bytes::{BytesDeserializer, BytesDeserializerConfig};
-#[cfg(feature = "syslog")]
-pub use self::syslog::{SyslogDeserializer, SyslogDeserializerConfig};
+use ::bytes::Bytes;
+use dyn_clone::DynClone;
 pub use json::{JsonDeserializer, JsonDeserializerConfig};
 pub use native::{NativeDeserializer, NativeDeserializerConfig};
 pub use native_json::{NativeJsonDeserializer, NativeJsonDeserializerConfig};
-
-use ::bytes::Bytes;
-use dyn_clone::DynClone;
 use smallvec::SmallVec;
 use std::fmt::Debug;
 use vector_core::config::LogNamespace;
 use vector_core::event::Event;
+
+pub use self::bytes::{BytesDeserializer, BytesDeserializerConfig};
+#[cfg(feature = "syslog")]
+pub use self::syslog::{SyslogDeserializer, SyslogDeserializerConfig};
 
 /// Parse structured events from bytes.
 pub trait Deserializer: DynClone + Debug + Send + Sync {

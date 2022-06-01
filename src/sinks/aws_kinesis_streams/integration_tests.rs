@@ -3,18 +3,23 @@
 
 use aws_sdk_kinesis::model::{Record, ShardIteratorType};
 use aws_sdk_kinesis::types::DateTime;
-
 use tokio::time::{sleep, Duration};
 
 use super::*;
-use crate::aws::create_client;
-use crate::aws::{AwsAuthentication, RegionOrEndpoint};
-use crate::config::ProxyConfig;
-use crate::sinks::aws_kinesis_streams::config::KinesisClientBuilder;
 use crate::{
-    config::{SinkConfig, SinkContext},
-    sinks::util::{encoding::StandardEncodings, BatchConfig, Compression},
-    test_util::{components, random_lines_with_stream, random_string},
+    aws::{create_client, AwsAuthentication, RegionOrEndpoint},
+    config::{ProxyConfig, SinkConfig, SinkContext},
+    sinks::{
+        aws_kinesis_streams::config::KinesisClientBuilder,
+        util::{
+            encoding::{EncodingConfig, StandardEncodings},
+            BatchConfig, Compression,
+        },
+    },
+    test_util::{
+        components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
+        random_lines_with_stream, random_string,
+    },
 };
 
 fn kinesis_address() -> String {
@@ -34,7 +39,7 @@ async fn kinesis_put_records() {
         stream_name: stream.clone(),
         partition_key_field: None,
         region: RegionOrEndpoint::with_both("localstack", kinesis_address().as_str()),
-        encoding: StandardEncodings::Text.into(),
+        encoding: EncodingConfig::from(StandardEncodings::Text).into(),
         compression: Compression::None,
         batch,
         request: Default::default(),
@@ -51,10 +56,9 @@ async fn kinesis_put_records() {
 
     let (mut input_lines, events) = random_lines_with_stream(100, 11, None);
 
-    components::init_test();
-    let _ = sink.run(events).await.unwrap();
+    run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
+
     sleep(Duration::from_secs(1)).await;
-    components::SINK_TESTS.assert(&["region"]);
 
     let records = fetch_records(stream, timestamp).await.unwrap();
 
@@ -115,6 +119,7 @@ async fn client() -> aws_sdk_kinesis::Client {
         region.endpoint().unwrap(),
         &proxy,
         &None,
+        true,
     )
     .await
     .unwrap()
