@@ -5,7 +5,7 @@ use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 
 use super::Block;
 use crate::{
-    expression::{levenstein, ExpressionError, FunctionArgument, Noop},
+    expression::{levenstein, ExpressionError, FunctionArgument},
     function::{
         closure::{self, VariableKind},
         ArgumentList, Example, FunctionClosure, FunctionCompileContext, Parameter,
@@ -536,22 +536,6 @@ impl FunctionCall {
         }
 
         Ok(result)
-    }
-
-    pub fn noop() -> Self {
-        let expr = Box::new(Noop) as _;
-
-        Self {
-            abort_on_error: false,
-            expr,
-            maybe_fallible_arguments: false,
-            closure_fallible: false,
-            closure: None,
-            span: Span::default(),
-            ident: "noop",
-            arguments: Arc::new(Vec::new()),
-            function_id: 0,
-        }
     }
 
     pub fn arguments_fmt(&self) -> Vec<String> {

@@ -6,7 +6,7 @@ use value::Value;
 use crate::state::{ExternalEnv, LocalEnv};
 use crate::value::VrlValueArithmetic;
 use crate::{
-    expression::{self, Expr, Noop, Resolved},
+    expression::{self, Expr, Resolved},
     parser::{ast, Node},
     vm::OpCode,
     Context, Expression, TypeDef,
@@ -75,17 +75,6 @@ impl Op {
             rhs: Box::new(rhs),
             opcode,
         })
-    }
-
-    pub fn noop() -> Self {
-        let lhs = Box::new(Noop.into());
-        let rhs = Box::new(Noop.into());
-
-        Op {
-            lhs,
-            rhs,
-            opcode: ast::Opcode::Eq,
-        }
     }
 }
 
@@ -702,10 +691,17 @@ mod tests {
         }
 
         divide_dynamic_rhs {
-            expr: |_| Op {
-                lhs: Box::new(Literal::from(1).into()),
-                rhs: Box::new(Variable::noop(Ident::new("foo")).into()),
-                opcode: Div,
+            expr: |(local, _): (&mut LocalEnv, &mut ExternalEnv)| {
+                local.insert_variable(Ident::new("foo"), crate::type_def::Details {
+                    type_def: TypeDef::null(),
+                    value: None,
+                });
+
+                Op {
+                    lhs: Box::new(Literal::from(1).into()),
+                    rhs: Box::new(Variable::new(Span::default(), Ident::new("foo"), local).unwrap().into()),
+                    opcode: Div,
+                }
             },
             want: TypeDef::float().fallible(),
         }

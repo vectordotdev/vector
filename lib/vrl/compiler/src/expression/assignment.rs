@@ -5,7 +5,7 @@ use lookup::LookupBuf;
 use value::Value;
 
 use crate::{
-    expression::{Expr, Noop, Resolved},
+    expression::{Expr, Resolved},
     parser::{
         ast::{self, Ident},
         Node,
@@ -132,14 +132,6 @@ impl Assignment {
         };
 
         Ok(Self { variant })
-    }
-
-    pub(crate) fn noop() -> Self {
-        let target = Target::Noop;
-        let expr = Box::new(Expr::Noop(Noop));
-        let variant = Variant::Single { target, expr };
-
-        Self { variant }
     }
 
     /// Get a list of targets for this assignment.

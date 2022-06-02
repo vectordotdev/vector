@@ -49,13 +49,6 @@ impl Abort {
 
         Ok(Self { span, message })
     }
-
-    pub fn noop(span: Span) -> Self {
-        Self {
-            span,
-            message: None,
-        }
-    }
 }
 
 impl Expression for Abort {
