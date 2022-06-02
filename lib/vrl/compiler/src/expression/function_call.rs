@@ -754,6 +754,7 @@ impl Expression for FunctionCall {
         state: (&mut LocalEnv, &mut ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
+        println!("compiling function call to {}", self.ident);
         if self.ident == "del" {
             return self.expr.emit_llvm(state, ctx);
         }
