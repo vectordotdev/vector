@@ -533,6 +533,7 @@ transforms-logs = [
   "transforms-dedupe",
   "transforms-field_filter",
   "transforms-filter",
+  "transforms-function",
   "transforms-geoip",
   "transforms-grok_parser",
   "transforms-json_parser",
@@ -558,6 +559,7 @@ transforms-metrics = [
   "transforms-add_tags",
   "transforms-aggregate",
   "transforms-filter",
+  "transforms-function",
   "transforms-log_to_metric",
   "transforms-lua",
   "transforms-metric_to_log",
@@ -579,6 +581,7 @@ transforms-concat = []
 transforms-dedupe = ["lru"]
 transforms-field_filter = []
 transforms-filter = []
+transforms-function = ["transforms-remap"]
 transforms-geoip = ["maxminddb"]
 transforms-grok_parser = ["grok"]
 transforms-json_parser = []
@@ -809,6 +812,7 @@ vector-unit-test-tests = [
   "transforms-remap",
   "transforms-route",
   "transforms-filter",
+  "transforms-function",
   "transforms-reduce",
   "transforms-add_tags",
   "transforms-log_to_metric",
@@ -846,7 +850,7 @@ language-benches = ["sinks-socket", "sources-socket", "transforms-add_fields", "
 statistic-benches = []
 metrics-benches = ["sinks-socket", "sources-socket"]
 remap-benches = ["transforms-add_fields", "transforms-coercer", "transforms-json_parser", "transforms-remap"]
-transform-benches = ["transforms-filter", "transforms-dedupe", "transforms-reduce", "transforms-route"]
+transform-benches = ["transforms-filter", "transforms-dedupe", "transforms-reduce", "transforms-route", "transforms-function"]
 codecs-benches = []
 loki-benches = ["sinks-loki"]
 enrichment-tables-benches = ["enrichment-tables-file"]
