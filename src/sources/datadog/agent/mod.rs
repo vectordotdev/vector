@@ -114,14 +114,7 @@ impl SourceConfig for DatadogAgentConfig {
         );
         let listener = tls.bind(&self.address).await?;
         let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
-        let filters = source.build_warp_filters(
-            cx.out,
-            acknowledgements,
-            !self.disable_logs,
-            !self.disable_metrics,
-            !self.disable_traces,
-            self.multiple_outputs,
-        )?;
+        let filters = source.build_warp_filters(cx.out, acknowledgements, self)?;
         let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
             let span = Span::current();
@@ -280,28 +273,25 @@ impl DatadogAgentSource {
         }
     }
 
-    pub(crate) fn build_warp_filters(
+    fn build_warp_filters(
         &self,
         out: SourceSender,
         acknowledgements: bool,
-        logs: bool,
-        metrics: bool,
-        traces: bool,
-        multiple_outputs: bool,
+        config: &DatadogAgentConfig,
     ) -> crate::Result<BoxedFilter<(Response,)>> {
-        let mut filters = logs.then(|| {
+        let mut filters = (!config.disable_logs).then(|| {
             logs::build_warp_filter(
                 acknowledgements,
-                multiple_outputs,
+                config.multiple_outputs,
                 out.clone(),
                 self.clone(),
             )
         });
 
-        if traces {
+        if !config.disable_traces {
             let trace_filter = traces::build_warp_filter(
                 acknowledgements,
-                multiple_outputs,
+                config.multiple_outputs,
                 out.clone(),
                 self.clone(),
             );
@@ -310,9 +300,13 @@ impl DatadogAgentSource {
                 .or(Some(trace_filter));
         }
 
-        if metrics {
-            let metrics_filter =
-                metrics::build_warp_filter(acknowledgements, multiple_outputs, out, self.clone());
+        if !config.disable_metrics {
+            let metrics_filter = metrics::build_warp_filter(
+                acknowledgements,
+                config.multiple_outputs,
+                out,
+                self.clone(),
+            );
             filters = filters
                 .map(|f| f.or(metrics_filter.clone()).unify().boxed())
                 .or(Some(metrics_filter));
