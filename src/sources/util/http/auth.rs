@@ -42,12 +42,12 @@ impl TryFrom<Option<&HttpSourceAuthConfig>> for HttpSourceAuth {
 
 #[derive(Debug, Clone)]
 pub struct HttpSourceAuth {
-    #[allow(unused)] // triggered by cargo-hack
+    #[allow(unused)] // triggered by check-component-features
     pub(self) token: Option<String>,
 }
 
 impl HttpSourceAuth {
-    #[allow(unused)] // triggered by cargo-hack
+    #[allow(unused)] // triggered by check-component-features
     pub fn is_valid(&self, header: &Option<String>) -> Result<(), ErrorMessage> {
         use warp::http::StatusCode;
 
