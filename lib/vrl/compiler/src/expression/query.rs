@@ -217,8 +217,21 @@ impl Expression for Query {
             Target::Container(container) => container.emit_llvm(state, ctx)?,
         };
 
-        ctx.vrl_expression_query_target()
-            .build_call(ctx.builder(), path_ref, result_ref);
+        let vrl_expression_query_target = ctx.vrl_expression_query_target();
+        vrl_expression_query_target.build_call(
+            ctx.builder(),
+            ctx.builder().build_bitcast(
+                path_ref,
+                vrl_expression_query_target
+                    .function
+                    .get_nth_param(0)
+                    .unwrap()
+                    .get_type()
+                    .into_pointer_type(),
+                "cast",
+            ),
+            result_ref,
+        );
 
         Ok(())
     }
