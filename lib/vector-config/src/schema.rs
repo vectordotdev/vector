@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, mem};
 
 use indexmap::IndexMap;
 use num_traits::{Bounded, ToPrimitive};
@@ -63,9 +63,6 @@ pub fn apply_metadata<'de, T>(schema: &mut SchemaObject, metadata: Metadata<'de,
 where
     T: Configurable<'de>,
 {
-    // TODO: apply validations here depending on the instance type(s) in the schema, and figure out how to split, or if
-    // we need to split, whether we apply validations to the referencable type and/or the actual mutable schema ref
-
     // Figure out if we're applying metadata to a schema reference or the actual schema itself.
     // Some things only makes sense to add to the reference (like a default value to use), while
     // some things only make sense to add to the schema itself (like custom metadata, validation,
@@ -113,6 +110,26 @@ where
     }
 
     schema.metadata = Some(Box::new(schema_metadata));
+}
+
+pub fn convert_to_flattened_schema(primary: &mut SchemaObject, mut subschemas: Vec<SchemaObject>) {
+    // Now we need to extract our object validation portion into a new schema object, add it to the list of subschemas,
+    // and then update the primary schema to use `allOf`. It is not valid to "extend" a schema via `allOf`, hence why we
+    // have to extract the primary schema object validation first.
+
+    // First, we replace the primary schema with an empty schema, because we need to push it the actual primary schema
+    // into the list of `allOf` schemas. This is due to the fact that it's not valid to "extend" a schema using `allOf`,
+    // so everything has to be in there.
+    let primary_subschema = mem::replace(primary, SchemaObject::default());
+    subschemas.insert(0, primary_subschema);
+
+    let all_of_schemas = subschemas.into_iter().map(Schema::Object).collect();
+
+    // Now update the primary schema to use `allOf` to bring everything together.
+    primary.subschemas = Some(Box::new(SubschemaValidation {
+        all_of: Some(all_of_schemas),
+        ..Default::default()
+    }));
 }
 
 pub fn generate_null_schema() -> SchemaObject {
@@ -319,6 +336,16 @@ pub fn generate_const_string_schema(value: String) -> SchemaObject {
         const_value: Some(Value::String(value)),
         ..Default::default()
     }
+}
+
+pub fn generate_internal_tagged_variant_schema(tag: String, value: String) -> SchemaObject {
+    let mut properties = IndexMap::new();
+    properties.insert(tag.clone(), generate_const_string_schema(value));
+
+    let mut required = BTreeSet::new();
+    required.insert(tag);
+
+    generate_struct_schema(properties, required, None)
 }
 
 pub fn generate_root_schema<'de, T>() -> RootSchema

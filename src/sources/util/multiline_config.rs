@@ -3,15 +3,23 @@ use std::{convert::TryFrom, time::Duration};
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use vector_config::Configurable;
 
 use crate::line_agg;
 
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+/// Multi-line parsing configuration.
+#[derive(Clone, Configurable, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct MultilineConfig {
+    /// Start regex pattern to look for as a beginning of the message.
     pub start_pattern: String,
+    /// Condition regex pattern to look for. Exact behavior is configured via `mode`.
     pub condition_pattern: String,
+    /// Mode of operation, specifies how `condition_pattern` is interpreted.
     pub mode: line_agg::Mode,
+    /// The maximum time to wait for the continuation, in milliseconds.
+    ///
+    /// Once this timeout is reached, the buffered message is guaranteed to be flushed, even if incomplete.
     pub timeout_ms: u64,
 }
 

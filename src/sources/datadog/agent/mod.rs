@@ -20,6 +20,7 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tracing::Span;
 use value::Kind;
+use vector_config::configurable_component;
 use vector_core::event::{BatchNotifier, BatchStatus};
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
 
@@ -42,26 +43,53 @@ pub const LOGS: &str = "logs";
 pub const METRICS: &str = "metrics";
 pub const TRACES: &str = "traces";
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
-struct DatadogAgentConfig {
+/// Configuration for the `datadog_agent` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
+pub struct DatadogAgentConfig {
+    /// The address to accept connections on.
+    ///
+    /// The address _must_ include a port.
     address: SocketAddr,
-    tls: Option<TlsEnableableConfig>,
+
+    /// When incoming events contain a Datadog API key, if this setting is set to `true` the key will kept in the event
+    /// metadata and will be used if the event is sent to a Datadog sink.
     #[serde(default = "crate::serde::default_true")]
     store_api_key: bool,
-    #[serde(default = "default_framing_message_based")]
-    framing: FramingConfig,
-    #[serde(default = "default_decoding")]
-    decoding: DeserializerConfig,
-    #[serde(default, deserialize_with = "bool_or_struct")]
-    acknowledgements: AcknowledgementsConfig,
+
+    /// If this settings is set to `true`, logs won't be accepted by the component.
     #[serde(default = "crate::serde::default_false")]
     disable_logs: bool,
+
+    /// If this settings is set to `true`, metrics won't be accepted by the component.
     #[serde(default = "crate::serde::default_false")]
     disable_metrics: bool,
+
+    /// If this settings is set to `true`, traces won't be accepted by the component.
     #[serde(default = "crate::serde::default_false")]
     disable_traces: bool,
+
+    /// If this setting is set to `true` logs, metrics and traces will be sent to different outputs.
+    ///
+    /// For a source component named `agent` the received logs, metrics, and traces can then be accessed by specifying
+    /// `agent.logs`, `agent.metrics`, and `agent.traces`, respectively, as the input to another component.
     #[serde(default = "crate::serde::default_false")]
     multiple_outputs: bool,
+
+    #[configurable(derived)]
+    tls: Option<TlsEnableableConfig>,
+
+    #[configurable(derived)]
+    #[serde(default = "default_framing_message_based")]
+    framing: FramingConfig,
+
+    #[configurable(derived)]
+    #[serde(default = "default_decoding")]
+    decoding: DeserializerConfig,
+
+    #[configurable(derived)]
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 impl GenerateConfig for DatadogAgentConfig {
@@ -408,7 +436,7 @@ fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMe
 }
 
 // https://github.com/DataDog/datadog-agent/blob/a33248c2bc125920a9577af1e16f12298875a4ad/pkg/logs/processor/json.go#L23-L49
-#[derive(Deserialize, Clone, Serialize, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct LogMsg {
     pub message: Bytes,

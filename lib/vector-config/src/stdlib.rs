@@ -1,6 +1,7 @@
-use std::{collections::HashMap, net::SocketAddr};
+use std::{collections::HashMap, net::SocketAddr, path::PathBuf};
 
 use schemars::{gen::SchemaGenerator, schema::SchemaObject};
+use vector_config_common::validation::Validation;
 
 use crate::{
     schema::{
@@ -24,6 +25,17 @@ where
 {
     fn is_optional() -> bool {
         true
+    }
+
+    fn metadata() -> Metadata<'de, Self> {
+        // We clone the default metadata of the wrapped type because otherwise this "level" of the schema would
+        // effective sever the link between things like the description of `T` itself and what we show for a field of
+        // type `Option<T>`.
+        //
+        // To wit, this allows callers to use `#[configurable(derived)]` on a field of `Option<T>` so long as `T` has a
+        // description, and both the optional field and the schema for `T` will get the description... but the
+        // description for the optional field can still be overridden independently, etc.
+        T::metadata().map_default_value(|default| Some(default))
     }
 
     fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
@@ -118,7 +130,13 @@ where
     T: Configurable<'de>,
 {
     fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
-        let element_metadata = T::metadata();
+        // We set `T` to be "transparent", which means that during schema finalization, we will relax the rules we
+        // enforce, such as needing a description, knowing that they'll be enforced on the field using `HashMap<String,
+        // V>` itself, where carrying that description forward to `V` might literally make no sense, such as when `V` is
+        // a primitive type like an integer or string.
+        let mut element_metadata = T::metadata();
+        element_metadata.set_transparent();
+
         let mut schema = generate_array_schema(gen, element_metadata);
         finalize_schema(gen, &mut schema, overrides);
         schema
@@ -154,6 +172,7 @@ where
     }
 }
 
+// Additional types that do not map directly to scalars.
 impl<'de> Configurable<'de> for SocketAddr {
     fn referencable_name() -> Option<&'static str> {
         Some("SocketAddr")
@@ -167,6 +186,38 @@ impl<'de> Configurable<'de> for SocketAddr {
         // TODO: We don't need anything other than a string schema to (de)serialize a `SocketAddr`,
         // but we eventually should have validation since the format for the possible permutations
         // is well-known and can be easily codified.
+        let mut schema = generate_string_schema();
+        finalize_schema(gen, &mut schema, overrides);
+        schema
+    }
+}
+
+impl<'de> Configurable<'de> for PathBuf {
+    fn referencable_name() -> Option<&'static str> {
+        Some("PathBuf")
+    }
+
+    fn description() -> Option<&'static str> {
+        Some("A file path.")
+    }
+
+    fn metadata() -> Metadata<'de, Self> {
+        let mut metadata = Metadata::default();
+        if let Some(description) = Self::description() {
+            metadata.set_description(description);
+        }
+
+        // Taken from
+        // https://stackoverflow.com/questions/44289075/regular-expression-to-validate-windows-and-linux-path-with-extension
+        // and manually checked against common Linux and Windows paths. It's probably not 100% correct, but it
+        // definitely covers the most basic cases.
+        const PATH_REGEX: &str = r#"(\/.*|[a-zA-Z]:\\(?:([^<>:"\/\\|?*]*[^<>:"\/\\|?*.]\\|..\\)*([^<>:"\/\\|?*]*[^<>:"\/\\|?*.]\\?|..\\))?)"#;
+        metadata.add_validation(Validation::Pattern(PATH_REGEX.to_string()));
+
+        metadata
+    }
+
+    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
         let mut schema = generate_string_schema();
         finalize_schema(gen, &mut schema, overrides);
         schema

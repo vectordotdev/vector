@@ -11,9 +11,9 @@ use codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
 };
-use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use tokio_util::codec::Decoder as _;
+use vector_config::configurable_component;
 use warp::http::{HeaderMap, StatusCode};
 
 use crate::{
@@ -31,17 +31,30 @@ use crate::{
 };
 use lookup::path;
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub(crate) struct LogplexConfig {
+/// Configuration for `heroku_logs` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
+pub struct LogplexConfig {
+    /// The address to listen for connections on.
     address: SocketAddr,
+
     #[serde(default)]
     query_parameters: Vec<String>,
+
+    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
+
     auth: Option<HttpSourceAuthConfig>,
+
+    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     framing: FramingConfig,
+
+    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
+
+    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
 }

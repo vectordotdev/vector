@@ -42,7 +42,7 @@ enum ConfigError {
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
-struct PrometheusScrapeConfig {
+pub struct PrometheusScrapeConfig {
     // Deprecated name
     #[serde(alias = "hosts")]
     endpoints: Vec<String>,

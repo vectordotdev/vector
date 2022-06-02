@@ -7,6 +7,7 @@
 use std::{
     collections::HashMap,
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
+    path::PathBuf,
 };
 
 use serde::{de, Deserialize, Deserializer};
@@ -62,6 +63,26 @@ pub enum Encoding {
         /// Starting offset for fields something something this is a fake description anyways.
         u64,
     ),
+}
+
+/// Enableable TLS configuration.
+#[derive(Clone)]
+#[configurable_component]
+pub struct TlsEnablableConfig {
+    /// Whether or not TLS is enabled.
+    pub enabled: bool,
+    #[serde(flatten)]
+    pub options: TlsConfig,
+}
+
+/// TLS configuration.
+#[derive(Clone)]
+#[configurable_component]
+pub struct TlsConfig {
+    /// Certificate file.
+    pub crt_file: Option<PathBuf>,
+    /// Private key file.
+    pub key_file: Option<PathBuf>,
 }
 
 /// A listening address that can optionally support being passed in by systemd.
@@ -168,6 +189,9 @@ pub struct AdvancedSinkConfig {
     #[deprecated]
     #[serde(default = "default_advanced_sink_encoding")]
     encoding: Encoding,
+    /// Overridden TLS description.
+    #[configurable(derived)]
+    tls: Option<TlsEnablableConfig>,
     /// The tags to apply to each event.
     tags: HashMap<String, String>,
 }
@@ -191,6 +215,7 @@ fn default_advanced_sink_endpoint() -> String {
 /// Collection of various sources available in Vector.
 #[derive(Clone)]
 #[configurable_component]
+#[serde(tag = "type")]
 pub enum SourceConfig {
     /// Simple source.
     Simple(#[configurable(derived)] SimpleSourceConfig),
@@ -199,6 +224,7 @@ pub enum SourceConfig {
 /// Collection of various sinks available in Vector.
 #[derive(Clone)]
 #[configurable_component]
+#[serde(tag = "type")]
 pub enum SinkConfig {
     /// Simple sink.
     Simple(#[configurable(derived)] SimpleSinkConfig),

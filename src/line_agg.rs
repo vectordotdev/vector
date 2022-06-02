@@ -16,51 +16,54 @@ use pin_project::pin_project;
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use tokio_util::time::delay_queue::{DelayQueue, Key};
+use vector_config::Configurable;
 
 /// The mode of operation of the line aggregator.
-#[derive(Debug, Hash, Clone, Copy, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Configurable, Copy, Debug, Hash, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Mode {
     /// All consecutive lines matching this pattern are included in the group.
-    /// The first line (the line that matched the start pattern) does not need
-    /// to match the `ContinueThrough` pattern.
-    /// This is useful in cases such as a Java stack trace, where some indicator
-    /// in the line (such as leading whitespace) indicates that it is an
-    /// extension of the proceeding line.
+    ///
+    /// The first line (the line that matched the start pattern) does not need to match the `ContinueThrough` pattern.
+    ///
+    /// This is useful in cases such as a Java stack trace, where some indicator in the line (such as leading
+    /// whitespace) indicates that it is an extension of the proceeding line.
     ContinueThrough,
 
-    /// All consecutive lines matching this pattern, plus one additional line,
-    /// are included in the group.
-    /// This is useful in cases where a log message ends with a continuation
-    /// marker, such as a backslash, indicating that the following line is part
-    /// of the same message.
+    /// All consecutive lines matching this pattern, plus one additional line,  are included in the group.
+    ///
+    /// This is useful in cases where a log message ends with a continuation marker, such as a backslash, indicating
+    /// that the following line is part of the same message.
     ContinuePast,
 
-    /// All consecutive lines not matching this pattern are included in the
-    /// group.
-    /// This is useful where a log line contains a marker indicating that it
-    /// begins a new message.
+    /// All consecutive lines not matching this pattern are included in the group.
+    ///
+    /// This is useful where a log line contains a marker indicating that it begins a new message.
     HaltBefore,
 
-    /// All consecutive lines, up to and including the first line matching this
-    /// pattern, are included in the group.
-    /// This is useful where a log line ends with a termination marker, such as
-    /// a semicolon.
+    /// All consecutive lines, up to and including the first line matching this pattern, are included in the group.
+    ///
+    /// This is useful where a log line ends with a termination marker, such as a semicolon.
     HaltWith,
 }
 
 /// Configuration parameters of the line aggregator.
 #[derive(Debug, Clone)]
 pub struct Config {
-    /// Start pattern to look for as a beginning of the message.
+    /// The regular expression pattern for detecting the beginning of the message.
     pub start_pattern: Regex,
-    /// Condition pattern to look for. Exact behavior is configured via `mode`.
+    /// The regular expression pattern used for evaluating whether the current line should be aggregated or if
+    /// aggregation should stop.
+    ///
+    /// Configured in tandem with `mode` to define the overall aggregation behavior.
     pub condition_pattern: Regex,
-    /// Mode of operation, specifies how the condition pattern is interpreted.
+    /// The mode of aggregation.
+    ///
+    /// Configured in tandem with `condition_pattern` to define the overall aggregation behavior.
     pub mode: Mode,
-    /// The maximum time to wait for the continuation. Once this timeout is
-    /// reached, the buffered message is guaranteed to be flushed, even if
-    /// incomplete.
+    /// The maximum time to wait for subsequent lines to be received and evaluated for aggregation.
+    ///
+    /// Once this timeout is reached, the buffered message is guaranteed to be flushed, even if incomplete.
     pub timeout: Duration,
 }
 

@@ -14,6 +14,7 @@ use openssl::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
+use vector_config::Configurable;
 
 use super::{
     AddCertToStoreSnafu, AddExtraChainCertSnafu, CaStackPushSnafu, DerExportSnafu,
@@ -31,8 +32,13 @@ pub const TEST_PEM_CRT_PATH: &str = "tests/data/localhost.crt";
 #[cfg(test)]
 pub const TEST_PEM_KEY_PATH: &str = "tests/data/localhost.key";
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+/// Configures the TLS options for incoming/outgoing connections.
+#[derive(Clone, Configurable, Debug, Default, Deserialize, Serialize)]
 pub struct TlsEnableableConfig {
+    /// Whether or not to require TLS for incoming/outgoing connections.
+    ///
+    /// When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
+    /// more information.
     pub enabled: Option<bool>,
     #[serde(flatten)]
     pub options: TlsConfig,
@@ -55,18 +61,45 @@ impl TlsEnableableConfig {
     }
 }
 
-/// Standard TLS options
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+/// Standard TLS options.
+#[derive(Clone, Configurable, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct TlsConfig {
+    /// Whether or not to require a valid identity certificate from the peer host.
+    ///
+    /// For outgoing connections, this implies that the certificate must be valid according to its chain of trust, up to
+    /// the root certificate authority configured on the host Vector is running on.
+    ///
+    /// For incoming connections, this implies that the peer host must present a valid client certificate that is also
+    /// valid according to its chain of trust.
     pub verify_certificate: Option<bool>,
+    /// Whether or not to verify the remote host's TLS certificate is valid for the hostname Vector connected to.
+    ///
+    /// Only relevant for outgoing connections.
+    ///
+    /// Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
     pub verify_hostname: Option<bool>,
+    /// Absolute path to an additional CA certificate file.
+    ///
+    /// The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
     #[serde(alias = "ca_path")]
     pub ca_file: Option<PathBuf>,
+    /// Absolute path to a certificate file used to identify this server.
+    ///
+    /// The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
+    /// an inline string in PEM format.
+    ///
+    /// If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
     #[serde(alias = "crt_path")]
     pub crt_file: Option<PathBuf>,
+    /// Absolute path to a private key file used to identify this server.
+    ///
+    /// The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
     #[serde(alias = "key_path")]
     pub key_file: Option<PathBuf>,
+    /// Passphrase used to unlock the encrypted key file.
+    ///
+    /// This has no effect unless `key_file` is set.
     pub key_pass: Option<String>,
 }
 

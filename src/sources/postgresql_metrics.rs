@@ -15,7 +15,6 @@ use openssl::{
     ssl::{SslConnector, SslMethod},
 };
 use postgres_openssl::MakeTlsConnector;
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_postgres::{
@@ -24,6 +23,7 @@ use tokio_postgres::{
     Client, Config, Error as PgError, NoTls, Row,
 };
 use tokio_stream::wrappers::IntervalStream;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -100,14 +100,21 @@ struct PostgresqlMetricsTlsConfig {
     ca_file: PathBuf,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
-#[serde(default, deny_unknown_fields)]
-struct PostgresqlMetricsConfig {
+/// Configuration for the `postgresql_metrics` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
+#[serde(default)]
+pub struct PostgresqlMetricsConfig {
     endpoints: Vec<String>,
+
     include_databases: Option<Vec<String>>,
+
     exclude_databases: Option<Vec<String>>,
+
     scrape_interval_secs: u64,
+
     namespace: String,
+
     tls: Option<PostgresqlMetricsTlsConfig>,
 }
 

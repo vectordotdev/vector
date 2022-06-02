@@ -4,11 +4,15 @@ use aws_smithy_http::endpoint::Endpoint;
 use aws_types::region::Region;
 use http::Uri;
 use serde::{Deserialize, Serialize};
+use vector_config::Configurable;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+/// The region/endpoint configuration for interacting with an AWS service.
+#[derive(Clone, Configurable, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(default)]
 pub struct RegionOrEndpoint {
+    /// The AWS region to use.
     pub region: Option<String>,
+    /// The API endpoint of the service.
     pub endpoint: Option<String>,
 }
 

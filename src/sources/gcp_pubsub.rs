@@ -6,7 +6,6 @@ use derivative::Derivative;
 use futures::{stream, Stream, StreamExt, TryFutureExt};
 use http::uri::{InvalidUri, Scheme, Uri};
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::sync::Mutex;
 use tonic::{
@@ -14,6 +13,7 @@ use tonic::{
     transport::{Certificate, Channel, ClientTlsConfig, Endpoint, Identity},
     Code, Request, Status,
 };
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -93,19 +93,24 @@ pub(crate) enum PubsubError {
 
 static CLIENT_ID: Lazy<String> = Lazy::new(|| uuid::Uuid::new_v4().to_string());
 
-#[derive(Deserialize, Serialize, Derivative, Debug, Clone)]
+/// Configuration for the `gcp_pubsub` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
-#[serde(deny_unknown_fields)]
 pub struct PubsubConfig {
     pub project: String,
+
     pub subscription: String,
+
     pub endpoint: Option<String>,
 
     #[serde(default)]
     pub skip_authentication: bool,
+
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
 
+    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
     #[serde(default = "default_ack_deadline")]
@@ -114,13 +119,17 @@ pub struct PubsubConfig {
     #[serde(default = "default_retry_delay")]
     pub retry_delay_seconds: f64,
 
+    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     pub framing: FramingConfig,
+
+    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,
 
+    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub acknowledgements: AcknowledgementsConfig,
 }

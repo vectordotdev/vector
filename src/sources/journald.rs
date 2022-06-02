@@ -18,7 +18,6 @@ use nix::{
     unistd::Pid,
 };
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
 use serde_json::{Error as JsonError, Value as JsonValue};
 use snafu::{ResultExt, Snafu};
 use tokio::{
@@ -29,6 +28,7 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::FramedRead;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -80,24 +80,40 @@ enum BuildError {
 
 type Matches = HashMap<String, HashSet<String>>;
 
-#[derive(Deserialize, Serialize, Debug, Default)]
-#[serde(deny_unknown_fields, default)]
+/// Configuration for the `journald` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug, Default)]
+#[serde(default)]
 pub struct JournaldConfig {
     pub since_now: Option<bool>,
+
     pub current_boot_only: Option<bool>,
+
     pub units: Vec<String>,
+
     pub include_units: Vec<String>,
+
     pub exclude_units: Vec<String>,
+
     pub include_matches: Matches,
+
     pub exclude_matches: Matches,
+
     pub data_dir: Option<PathBuf>,
+
     pub batch_size: Option<usize>,
+
     pub journalctl_path: Option<PathBuf>,
+
     pub journal_directory: Option<PathBuf>,
+
+    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
+
     /// Deprecated
     #[serde(default)]
+    #[deprecated]
     remap_priority: bool,
 }
 

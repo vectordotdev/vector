@@ -31,14 +31,17 @@ mod parser;
 
 pub use parser::ParseError;
 
+/// Configuration for the `apache_metrics` source.
 #[configurable_component(source)]
 #[derive(Clone, Debug)]
 pub struct ApacheMetricsConfig {
     /// The list of `mod_status` endpoints to scrape metrics from.
     endpoints: Vec<String>,
+
     /// The interval between scrapes, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
+
     /// The namespace of the metric.
     ///
     /// Disabled if empty.

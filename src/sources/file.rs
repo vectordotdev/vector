@@ -8,10 +8,10 @@ use file_source::{
 };
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
 use regex::bytes::Regex;
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::{sync::oneshot, task::spawn_blocking};
 use tracing::{Instrument, Span};
+use vector_config::configurable_component;
 
 use super::util::{finalizer::OrderedFinalizer, EncodingConfig, MultilineConfig};
 use crate::{
@@ -59,42 +59,72 @@ enum BuildError {
     },
 }
 
-#[derive(Deserialize, Serialize, Debug, PartialEq)]
-#[serde(deny_unknown_fields, default)]
+/// Configuration for the `file` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug, PartialEq)]
+#[serde(default)]
 pub struct FileConfig {
     pub include: Vec<PathBuf>,
+
     pub exclude: Vec<PathBuf>,
+
     pub file_key: Option<String>,
+
     pub start_at_beginning: Option<bool>,
+
     pub ignore_checkpoints: Option<bool>,
+
+    #[configurable(derived)]
     pub read_from: Option<ReadFromConfig>,
+
     // Deprecated name
     #[serde(alias = "ignore_older")]
     pub ignore_older_secs: Option<u64>,
+
     #[serde(default = "default_max_line_bytes")]
     pub max_line_bytes: usize,
+
     pub host_key: Option<String>,
+
     pub data_dir: Option<PathBuf>,
+
     #[serde(alias = "glob_minimum_cooldown")]
     pub glob_minimum_cooldown_ms: u64,
+
     // Deprecated name
     #[serde(alias = "fingerprinting")]
     fingerprint: FingerprintConfig,
+
     pub ignore_not_found: bool,
+
     pub message_start_indicator: Option<String>,
+
     pub multi_line_timeout: u64, // millis
+
+    /// Multiline parsing configuration.
+    ///
+    /// If not specified, multiline parsing is disabled.
     pub multiline: Option<MultilineConfig>,
+
     pub max_read_bytes: usize,
+
     pub oldest_first: bool,
+
     #[serde(alias = "remove_after")]
     pub remove_after_secs: Option<u64>,
+
     pub line_delimiter: String,
+
     pub encoding: Option<EncodingConfig>,
+
+    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
+/// Fingerprinting schemes.
+#[configurable_component]
+#[derive(Clone, Debug, PartialEq)]
 #[serde(tag = "strategy", rename_all = "snake_case")]
 pub enum FingerprintConfig {
     Checksum {
@@ -109,7 +139,9 @@ pub enum FingerprintConfig {
     DevInode,
 }
 
-#[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq)]
+/// File position to use when reading a new file.
+#[configurable_component]
+#[derive(Copy, Clone, Debug, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum ReadFromConfig {
     Beginning,

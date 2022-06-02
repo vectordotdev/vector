@@ -26,7 +26,7 @@ use crate::{
 const SOURCE_NAME: &str = "prometheus_remote_write";
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-struct PrometheusRemoteWriteConfig {
+pub struct PrometheusRemoteWriteConfig {
     address: SocketAddr,
 
     tls: Option<TlsEnableableConfig>,

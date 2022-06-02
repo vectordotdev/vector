@@ -1,44 +1,61 @@
 pub mod v1;
 pub mod v2;
 
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use crate::config::{
     GenerateConfig, Output, Resource, SourceConfig, SourceContext, SourceDescription,
 };
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+/// Marker type for the version one of the configuration for the `vector` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
 enum V1 {
+    /// Marker value for version one.
     #[serde(rename = "1")]
     V1,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(deny_unknown_fields)]
+/// Configuration for version two of the `vector` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct VectorConfigV1 {
+    /// Version of the configuration.
     version: V1,
+
     #[serde(flatten)]
     config: v1::VectorConfig,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+/// Marker type for the version two of the configuration for the `vector` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
 enum V2 {
+    /// Marker value for version two.
     #[serde(rename = "2")]
     V2,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(deny_unknown_fields)]
+/// Configuration for version two of the `vector` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct VectorConfigV2 {
+    /// Version of the configuration.
     version: Option<V2>,
+
     #[serde(flatten)]
     config: v2::VectorConfig,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+/// Configurable for the `vector` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
 #[serde(untagged)]
 pub enum VectorConfig {
+    /// Configuration for version one.
     V1(VectorConfigV1),
+
+    /// Configuration for version two.
     V2(VectorConfigV2),
 }
 

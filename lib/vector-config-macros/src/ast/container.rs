@@ -15,6 +15,7 @@ const ERR_NO_ENUM_NEWTYPE_INTERNAL_TAG: &str = "newtype variants (i.e. `enum Som
 const ERR_NO_ENUM_VARIANT_DESCRIPTION: &str = "enum variants must have a description i.e. `/// This is a description` or `#[configurable(description = \"This is a description...\")]`";
 const ERR_ENUM_UNTAGGED_DUPLICATES: &str = "enum variants must be unique in style/shape when in untagged mode i.e. there cannot be multiple unit variants, or tuple variants with the same fields, etc";
 const ERR_NO_UNIT_STRUCTS: &str = "unit structs are not supported by `Configurable`";
+const ERR_MISSING_DESC: &str = "all structs/enums must have a description i.e. `/// This is a description` or `#[configurable(description = \"This is a description...\")]`";
 
 pub struct Container<'a> {
     original: &'a DeriveInput,
@@ -70,16 +71,6 @@ impl<'a> Container<'a> {
                                 );
                             }
 
-                            // We don't support internal tag for newtype variants, because `serde` doesn't support it.
-                            if variant.style() == Style::Newtype
-                                && matches!(variant.tagging(), Tagging::Internal { .. })
-                            {
-                                accumulator.push(
-                                    darling::Error::custom(ERR_NO_ENUM_NEWTYPE_INTERNAL_TAG)
-                                        .with_span(variant),
-                                );
-                            }
-
                             // All variants must have a description.  No derived/transparent mode.
                             if variant.description().is_none() {
                                 accumulator.push(
@@ -126,6 +117,15 @@ impl<'a> Container<'a> {
                         }
                     },
                 };
+
+                // All containers must have a description: no ifs, ands, or buts.
+                //
+                // The compile-time errors are a bit too inscrutable otherwise, and inscrutable errors are not very
+                // helpful when using procedural macros.
+                if attrs.description.is_none() {
+                    accumulator
+                        .push(darling::Error::custom(ERR_MISSING_DESC).with_span(&serde.ident));
+                }
 
                 let original = input;
                 let name = serde.attrs.name().deserialize_name();

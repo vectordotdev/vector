@@ -15,10 +15,6 @@
 // of that get generated in terms of what ends up in the schema? Do we even have fields with lifetime bounds in any of
 // our configuration types in `vector`? :thinking:
 //
-// TODO: We don't support `#[serde(flatten)]` either for collecting unknown fields or for flattening a field into its
-// parent struct. However, per #12341, we might actually not want to allow using `flatten` for collecting unknown
-// fields, at least, which would make implementing flatten support for merging structs a bit easier.
-//
 // TODO: Is there a way that we could attempt to brute force detect the types of fields being used with a validation to
 // give a compile-time error when validators are used incorrectly? For example, we throw a runtime error if you use a
 // negative `min` range bound on an unsigned integer field, but it's a bit opaque and hard to decipher.  Could we simply
@@ -26,7 +22,51 @@
 // `u64`, etc -- and then throw a compile-error from the macro? We would still end up throwing an error at runtime if
 // our heuristic to detect unsigned integers failed, but we might be able to give a meaningful error closer to the
 // problem, which would be much better.
-
+//
+// TODO: If we want to deny unknown fields on structs, JSON Schema supports that by setting `additionalProperties` to
+// `false` on a schema, which turns it into a "closed" schema. However, this is at odds with types used in enums, which
+// is all of our component configuration types. This is because applying `additionalProperties` to the configuration
+// type's schema itself would consider something like an internal enum tag (i.e. `"type": "aws_s3"`) as an additional
+// property, even if `type` was already accounted for in another subschema that was validated against.
+//
+// JSON Schema draft 2019-09 has a solution for this -- `unevaluatedProperties` -- which forces the validator to track
+// what properties have been "accounted" for, so far, during subschema validation during things like validating against
+// all subschemas in `allOf`.
+//
+// Essentially, we should force all structs to generate a schema that sets `additionalProperties` to `false`, but if it
+// gets used in a way that will place it into `allOf` (which is the case for internally tagged enum variants aka all
+// component configuration types) then we need to update the schema codegen to unset that field, and re-apply it as
+// `unevaluatedProperties` on the schema which is using `allOf`.
+//
+// Logically, this makes sense because we're only creating a new wrapper schema B around some schema A such that we can
+// use it as a tagged enum variant, so rules like "no additional properties" should apply to the wrapper, since schema A
+// and B should effectively represent the same exact thing.
+//
+// TODO: We may want to simply switch from using `description` as the baseline descriptive field to using `title`.
+// While, by itself, I think `description` makes a little more sense than `title`, it makes it hard to do split-location
+// documentation.
+//
+// For example, it would be nice to have helper types (i.e. `BatchConfig`, `MultilineConfig`, etc) define their own
+// titles, and then allow other structs that have theor types as fields specify a description. This would be very useful
+// in cases where fields are optional, such that you want the field's title to be the title of the underlying type (e.g.
+// "Multi-line parsing configuration.") but you want the field's description to say something like "If not specified,
+// then multiline parsing is disabled". Including that description on `MultilineConfig` itself is kind of weird because
+// it forces that on everyone else using it, where, in some cases, it may not be optional at all.
+//
+// TODO: It's not clear what happens if we schemafy identically-named types i.e. `some::mod::Foo` and
+// `another::mod::Foo` since we use the type's ident, not its full path, to generate its referencable name. This is good
+// because the full names would be ugly as hell and offer little value but it means that we need all types, including
+// transitive types, to have unique names... and we can't check this at develop-time, only compile-time. :thinkies:
+//
+// TODO: When we implement `Configurable` for all the `NonZero*` types, we should make sure they have default metadata
+// that specifies a validation of having to be a minimum of 1.
+//
+// TODO: We need to figure out how to handle aliases. Looking previously, it seemed like we might need to do some very
+// ugly combinatorial explosion stuff to define a schema per perumtation of all aliased fields in a config. We might be
+// able to get away with using a combination of `allOf` and `oneOf` where we define a subschema for the non-aliased
+// fields, and then a subschema using `oneOf`for each aliased field -- allowing it to match any of the possible field
+// names for that specific field -- and then combine them all with `allOf`, which keeps the schema as compact as
+// possible, I think, short of a new version of the specification coming out that adds native alias support for properties.
 use core::fmt;
 use core::marker::PhantomData;
 
@@ -35,9 +75,13 @@ use serde::{Deserialize, Serialize};
 
 pub mod schema;
 
-// Re-export of `schemars` to make the imports simpler in `vector`.
+// Re-export of the various public dependencies required by the generated code to simplify the import requirements for
+// crates actually using the macros/derives.
+pub mod indexmap {
+    pub use indexmap::*;
+}
 pub mod schemars {
-    pub use schemars::{gen, schema};
+    pub use schemars::*;
 }
 
 mod stdlib;
@@ -306,7 +350,10 @@ where
     }
 
     /// Generates the schema for this value.
-    fn generate_schema(gen: &mut schemars::gen::SchemaGenerator, overrides: Metadata<'de, Self>) -> schemars::schema::SchemaObject;
+    fn generate_schema(
+        gen: &mut schemars::gen::SchemaGenerator,
+        overrides: Metadata<'de, Self>,
+    ) -> schemars::schema::SchemaObject;
 }
 
 #[doc(hidden)]

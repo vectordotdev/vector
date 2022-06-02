@@ -19,7 +19,6 @@ use crate::{
 
 mod parser;
 
-
 /// Version of the AWS ECS task metadata endpoint to use.
 ///
 /// More information about the different versions can be found
@@ -45,10 +44,9 @@ pub enum Version {
     V4,
 }
 
-
+/// Configuration for the `aws_ecs_metrics` source.
 #[configurable_component(source)]
 #[derive(Clone, Debug)]
-#[serde(deny_unknown_fields)]
 pub struct AwsEcsMetricsSourceConfig {
     /// Base URI of the task metadata endpoint.
     ///
@@ -56,14 +54,15 @@ pub struct AwsEcsMetricsSourceConfig {
     ///
     /// By default:
     /// - The version 2 endpoint base URI is `169.254.170.2/v2/`.
-	/// - The version 3 endpoint base URI is stored in the environment variable `ECS_CONTAINER_METADATA_URI`.
-	/// - The version 4 endpoint base URI is stored in the environment variable `ECS_CONTAINER_METADATA_URI_V4`.
+    /// - The version 3 endpoint base URI is stored in the environment variable `ECS_CONTAINER_METADATA_URI`.
+    /// - The version 4 endpoint base URI is stored in the environment variable `ECS_CONTAINER_METADATA_URI_V4`.
     #[serde(default = "default_endpoint")]
     endpoint: String,
+
     /// The version of the task metadata endpoint to use.
     ///
     /// If empty, the version is automatically discovered based on environment variables.
-    /// 
+    ///
     /// By default:
     /// - Version 4 is used if the environment variable `ECS_CONTAINER_METADATA_URI_V4` is defined.
     /// - Version 3 is used if the environment variable `ECS_CONTAINER_METADATA_URI_V4` is not defined, but the
@@ -72,11 +71,13 @@ pub struct AwsEcsMetricsSourceConfig {
     ///   `ECS_CONTAINER_METADATA_URI` are defined.
     #[serde(default = "default_version")]
     version: Version,
-    /// The interval between scrapes, in seconds. 
+
+    /// The interval between scrapes, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
+
     /// The namespace of the metric.
-    /// 
+    ///
     /// Disabled if empty.
     #[serde(default = "default_namespace")]
     namespace: String,

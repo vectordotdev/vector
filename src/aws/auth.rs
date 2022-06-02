@@ -5,33 +5,47 @@ use aws_config::{
 };
 use aws_types::{credentials::SharedCredentialsProvider, region::Region, Credentials};
 use serde::{Deserialize, Serialize};
+use vector_config::Configurable;
 
 // matches default load timeout from the SDK as of 0.10.1, but lets us confidently document the
 // default rather than relying on the SDK default to not change
 const DEFAULT_LOAD_TIMEOUT: Duration = Duration::from_secs(5);
 
-/// Configuration for configuring authentication strategy for AWS.
-#[derive(Serialize, Deserialize, Clone, Debug, Derivative)]
+/// Configuration of the authentication strategy for interacting with AWS services.
+#[derive(Clone, Configurable, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
 #[serde(untagged)]
 #[serde(deny_unknown_fields)]
 pub enum AwsAuthentication {
+    /// Authenticate using a fixed access key and secret pair.
     Static {
+        /// The AWS access key ID.
         access_key_id: String,
+        /// The AWS secret access key.
         secret_access_key: String,
     },
+    /// Authenticate using credentials stored in a file.
+    ///
+    /// Optionally, specifies a credentials profile to use.
     File {
+        /// Path to the credentials file.
         credentials_file: String,
+        /// The credentials profile to use.
         profile: Option<String>,
     },
+    /// Assumes the given role ARN.
     Role {
+        /// The ARN of the role to assume.
         assume_role: String,
+        /// Timeout for assuming the role, in seconds.
         load_timeout_secs: Option<u64>,
     },
-    // Default variant is used instead of Option<AWSAuthentication> since even for
-    // None we need to build `AwsCredentialsProvider`.
+    /// Default authentication strategy which tries a variety of substrategies in a chained fallback fashion.
     #[derivative(Default)]
-    Default { load_timeout_secs: Option<u64> },
+    Default {
+        /// Timeout for successfully loading credentials, in seconds.
+        load_timeout_secs: Option<u64>,
+    },
 }
 
 impl AwsAuthentication {

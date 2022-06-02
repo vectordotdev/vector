@@ -2,9 +2,9 @@ use bytes::Bytes;
 use chrono::Utc;
 use codecs::decoding::{DeserializerConfig, FramingConfig, StreamDecodingError};
 use futures::{pin_mut, stream, Stream, StreamExt};
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -29,20 +29,30 @@ enum BuildError {
     Subscribe { source: std::io::Error },
 }
 
-#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
+#[configurable_component(source)]
+#[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
-#[serde(deny_unknown_fields)]
-struct NatsSourceConfig {
+pub struct NatsSourceConfig {
     url: String,
+
     #[serde(alias = "name")]
     connection_name: String,
+
     subject: String,
+
     queue: Option<String>,
+
+    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
+
     auth: Option<NatsAuthConfig>,
+
+    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     framing: FramingConfig,
+
+    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     decoding: DeserializerConfig,

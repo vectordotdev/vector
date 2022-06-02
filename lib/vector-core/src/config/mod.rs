@@ -11,6 +11,7 @@ pub mod proxy;
 pub use global_options::GlobalOptions;
 pub use id::ComponentKey;
 pub use log_schema::{init_log_schema, log_schema, LogSchema};
+use vector_config::Configurable;
 
 use crate::schema;
 
@@ -141,8 +142,10 @@ impl Output {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+/// Acknowledgement configuration.
+#[derive(Clone, Configurable, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct AcknowledgementsConfig {
+    /// Whether or not acknowledgements should be enabled.
     enabled: Option<bool>,
 }
 

@@ -17,9 +17,9 @@ use rdkafka::{
     consumer::{Consumer, StreamConsumer},
     message::{BorrowedMessage, Headers, Message},
 };
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use super::util::finalizer::OrderedFinalizer;
@@ -48,42 +48,63 @@ enum BuildError {
     KafkaSubscribeError { source: rdkafka::error::KafkaError },
 }
 
-#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
+/// Configuration for the `kafka` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
-#[serde(deny_unknown_fields)]
 pub struct KafkaSourceConfig {
     bootstrap_servers: String,
+
     topics: Vec<String>,
+
     group_id: String,
+
     #[serde(default = "default_auto_offset_reset")]
     auto_offset_reset: String,
+
     #[serde(default = "default_session_timeout_ms")]
     session_timeout_ms: u64,
+
     #[serde(default = "default_socket_timeout_ms")]
     socket_timeout_ms: u64,
+
     #[serde(default = "default_fetch_wait_max_ms")]
     fetch_wait_max_ms: u64,
+
     #[serde(default = "default_commit_interval_ms")]
     commit_interval_ms: u64,
+
     #[serde(default = "default_key_field")]
     key_field: String,
+
     #[serde(default = "default_topic_key")]
     topic_key: String,
+
     #[serde(default = "default_partition_key")]
     partition_key: String,
+
     #[serde(default = "default_offset_key")]
     offset_key: String,
+
     #[serde(default = "default_headers_key")]
     headers_key: String,
+
     librdkafka_options: Option<HashMap<String, String>>,
+
     #[serde(flatten)]
     auth: KafkaAuthConfig,
+
+    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     framing: FramingConfig,
+
+    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     decoding: DeserializerConfig,
+
+    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
 }
