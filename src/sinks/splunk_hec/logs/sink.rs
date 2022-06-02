@@ -154,7 +154,6 @@ pub fn process_log(
     let host = log.get(host_key).cloned();
 
     let timestamp = if timestamp_key.is_empty() {
-        info!("timestamp_key is empty. Allowing splunk to set timestamp.");
         None
     } else {
         match log.remove(timestamp_key) {
@@ -163,12 +162,11 @@ pub fn process_log(
                 if let Some(key) = timestamp_nanos_key {
                     log.try_insert(path!(key), ts.timestamp_subsec_nanos() % 1_000_000);
                 }
-
                 Some((ts.timestamp_millis() as f64) / 1000f64)
             }
             Some(value) => {
                 warn!(
-                    "timestamp_key is not valid timestamp: type is {}. Allowing splunk to set timestamp.",
+                    "timestamp_key is not valid timestamp: type is {}. Ignoring and allowing splunk to set timestamp.",
                     value.kind_str()
                 );
                 None
