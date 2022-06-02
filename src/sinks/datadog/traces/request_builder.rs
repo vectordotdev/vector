@@ -2,6 +2,7 @@ use std::{collections::BTreeMap, io::Write, sync::Arc};
 
 use bytes::Bytes;
 use prost::Message;
+use rmp_serde;
 use snafu::Snafu;
 use vector_core::event::{EventFinalizers, Finalizable};
 
@@ -79,6 +80,7 @@ pub struct RequestMetadata {
     endpoint: DatadogTracesEndpoint,
     finalizers: EventFinalizers,
     uncompressed_size: usize,
+    content_type: String,
 }
 
 impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequestBuilder {
@@ -121,6 +123,7 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
                         endpoint: DatadogTracesEndpoint::Traces,
                         finalizers: processed.take_finalizers(),
                         uncompressed_size,
+                        content_type: "application/x-protobuf".to_string(),
                     };
                     let mut compressor = Compressor::from(self.compression);
                     match compressor.write_all(&payload) {
@@ -143,10 +146,7 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
 
     fn build_request(&mut self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
         let mut headers = BTreeMap::<String, String>::new();
-        headers.insert(
-            "Content-Type".to_string(),
-            "application/x-protobuf".to_string(),
-        );
+        headers.insert("Content-Type".to_string(), metadata.content_type);
         headers.insert("DD-API-KEY".to_string(), metadata.api_key.to_string());
         if let Some(ce) = self.compression.content_encoding() {
             headers.insert("Content-Encoding".to_string(), ce.to_string());
@@ -406,7 +406,12 @@ fn get_apm_stats_request(
     default_api_key: &Arc<str>,
 ) -> Result<(RequestMetadata, Bytes), RequestBuilderError> {
     let payload = stats::compute_apm_stats(key, events);
-    let encoded_payload = payload.encode_to_vec();
+    let encoded_payload =
+        rmp_serde::to_vec_named(&payload).map_err(|e| RequestBuilderError::FailedToEncode {
+            message: "APM stats encoding failed.",
+            reason: e.to_string(),
+            dropped_events: 0,
+        })?;
     let uncompressed_size = encoded_payload.len();
     let metadata = RequestMetadata {
         api_key: key
@@ -417,6 +422,7 @@ fn get_apm_stats_request(
         endpoint: DatadogTracesEndpoint::APMStats,
         finalizers: EventFinalizers::default(),
         uncompressed_size,
+        content_type: "application/msgpack".to_string(),
     };
     let mut compressor = Compressor::from(compression);
     match compressor.write_all(&encoded_payload) {

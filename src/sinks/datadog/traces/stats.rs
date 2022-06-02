@@ -2,15 +2,13 @@ use std::{collections::BTreeMap, time};
 
 use chrono::Utc;
 use prost::Message;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     event::{TraceEvent, Value},
     metrics::AgentDDSketch,
     sinks::datadog::traces::sink::PartitionKey,
 };
-mod dd_proto {
-    include!(concat!(env!("OUT_DIR"), "/dd_trace.rs"));
-}
 
 mod ddsketch_full {
     include!(concat!(env!("OUT_DIR"), "/ddsketch_full.rs"));
@@ -33,7 +31,7 @@ impl AggregationKey {
         payload_key: PayloadAggregationKey,
     ) -> Self {
         AggregationKey {
-            payload_key: payload_key.clone(),
+            payload_key,
             bucket_key: BucketAggregationKey {
                 service: span
                     .get("service")
@@ -95,8 +93,8 @@ impl GroupedStats {
         }
     }
 
-    fn export(&self, key: &AggregationKey) -> dd_proto::ClientGroupedStats {
-        dd_proto::ClientGroupedStats {
+    fn export(&self, key: &AggregationKey) -> ClientGroupedStats {
+        ClientGroupedStats {
             service: key.bucket_key.service.clone(),
             name: key.bucket_key.name.clone(),
             resource: key.bucket_key.resource.clone(),
@@ -115,16 +113,57 @@ impl GroupedStats {
 }
 
 /// Convert agent sketch variant to ./proto/dd_sketch_full.proto
-/// see this for conversion https://github.com/DataDog/datadog-agent/pull/11146
-fn encode_sketch(_agent_sketch: &AgentDDSketch) -> Vec<u8> {
+fn encode_sketch(agent_sketch: &AgentDDSketch) -> Vec<u8> {
+    let index_mapping = ddsketch_full::IndexMapping {
+        gamma: agent_sketch.gamma(),
+        index_offset: 0.0,
+        interpolation: ddsketch_full::index_mapping::Interpolation::None as i32,
+    };
+
+    let (positives, negatives, zeroes) = convert_stores(agent_sketch);
+    let positives_store = ddsketch_full::Store {
+        bin_counts: positives,
+        contiguous_bin_counts: Vec::new(),
+        contiguous_bin_index_offset: 0,
+    };
+    let negatives_store = ddsketch_full::Store {
+        bin_counts: negatives,
+        contiguous_bin_counts: Vec::new(),
+        contiguous_bin_index_offset: 0,
+    };
     let s = ddsketch_full::DdSketch {
-        mapping: None,
-        positive_values: None,
-        negative_values: None,
-        zero_count: 0.0,
+        mapping: Some(index_mapping),
+        positive_values: Some(positives_store),
+        negative_values: Some(negatives_store),
+        zero_count: zeroes,
     };
     s.encode_to_vec()
 }
+
+fn convert_stores(agent_sketch: &AgentDDSketch) -> (BTreeMap<i32, f64>, BTreeMap<i32, f64>, f64) {
+    let mut positives = BTreeMap::<i32, f64>::new();
+    let mut negatives = BTreeMap::<i32, f64>::new();
+    let mut zeroes = 0.0;
+    let bin_map = agent_sketch.bin_map();
+    bin_map
+        .keys
+        .into_iter()
+        .zip(bin_map.counts.into_iter())
+        .for_each(|(k, n)| {
+            match k.signum() {
+                0 => zeroes = n as f64,
+                1 => {
+                    positives.insert(k as i32, n as f64);
+                }
+                -1 => {
+                    negatives.insert((-k) as i32, n as f64);
+                }
+                _ => {}
+            };
+        });
+    (positives, negatives, zeroes)
+}
+
 struct Bucket {
     start: u64,
     duration: u64,
@@ -132,13 +171,13 @@ struct Bucket {
 }
 
 impl Bucket {
-    fn export(&self) -> BTreeMap<PayloadAggregationKey, dd_proto::ClientStatsBucket> {
-        let mut m = BTreeMap::<PayloadAggregationKey, dd_proto::ClientStatsBucket>::new();
+    fn export(&self) -> BTreeMap<PayloadAggregationKey, ClientStatsBucket> {
+        let mut m = BTreeMap::<PayloadAggregationKey, ClientStatsBucket>::new();
         self.data.iter().for_each(|(k, v)| {
             let b = v.export(k);
             match m.get_mut(&k.payload_key) {
                 None => {
-                    let sb = dd_proto::ClientStatsBucket {
+                    let sb = ClientStatsBucket {
                         start: self.start,
                         duration: self.duration,
                         agent_time_shift: 0,
@@ -220,12 +259,10 @@ impl Aggregator {
             hostname: partition_key.hostname.clone().unwrap_or_default(),
             version: trace
                 .get("app_version")
-                .clone()
                 .map(|v| v.to_string_lossy())
                 .unwrap_or_default(),
             container_id: trace
                 .get("container_id")
-                .clone()
                 .map(|v| v.to_string_lossy())
                 .unwrap_or_default(),
         };
@@ -253,13 +290,13 @@ impl Aggregator {
         self.bucket.add(span, weight, is_top, aggkey);
     }
 
-    fn get_client_stats_payload(&self) -> Vec<dd_proto::ClientStatsPayload> {
+    fn get_client_stats_payload(&self) -> Vec<ClientStatsPayload> {
         let client_stats_buckets = self.bucket.export();
 
         client_stats_buckets
             .into_iter()
             .map(|(payload_aggkey, csb)| {
-                dd_proto::ClientStatsPayload {
+                ClientStatsPayload {
                     env: payload_aggkey.env,
                     hostname: payload_aggkey.hostname,
                     container_id: payload_aggkey.container_id,
@@ -274,7 +311,7 @@ impl Aggregator {
                     tags: vec![],                   // empty on purpose
                 }
             })
-            .collect::<Vec<dd_proto::ClientStatsPayload>>()
+            .collect::<Vec<ClientStatsPayload>>()
     }
 }
 
@@ -288,7 +325,7 @@ fn metric_flag(span: &BTreeMap<String, Value>, key: &str) -> bool {
         .unwrap_or(false)
 }
 
-fn extract_weigth_from_root_span(spans: &Vec<&BTreeMap<String, Value>>) -> f64 {
+fn extract_weigth_from_root_span(spans: &[&BTreeMap<String, Value>]) -> f64 {
     if spans.is_empty() {
         return 1.0;
     }
@@ -332,24 +369,110 @@ fn extract_weigth_from_root_span(spans: &Vec<&BTreeMap<String, Value>>) -> f64 {
     if parent_id_to_child_weigth.len() != 1 {
         debug!("Didn't reliably find the root span.");
     }
-    for v in parent_id_to_child_weigth.values() {
-        return *v;
-    }
-    debug!("Root span was not found");
-    1.0
+
+    *parent_id_to_child_weigth
+        .values()
+        .next()
+        .unwrap_or_else(|| {
+            debug!("Root span was not found");
+            &1.0
+        })
 }
 
-pub(crate) fn compute_apm_stats(
-    key: &PartitionKey,
-    traces: &[TraceEvent],
-) -> dd_proto::StatsPayload {
+pub(crate) fn compute_apm_stats(key: &PartitionKey, traces: &[TraceEvent]) -> StatsPayload {
     let mut aggregator = Aggregator::new();
     traces.iter().for_each(|t| aggregator.handle_trace(key, t));
-    dd_proto::StatsPayload {
+    StatsPayload {
         agent_hostname: key.hostname.clone().unwrap_or_else(|| "".to_string()),
         agent_env: key.env.clone().unwrap_or_else(|| "".to_string()),
         stats: aggregator.get_client_stats_payload(),
         agent_version: key.agent_version.clone().unwrap_or_else(|| "".to_string()),
         client_computed: false,
     }
+}
+
+// Stats struct come from .proto and field name are set to match go
+// See this https://github.com/DataDog/datadog-agent/blob/b5bed4d/pkg/trace/pb/stats_gen.go for the reference go code
+#[derive(Debug, PartialEq, Deserialize, Serialize)]
+pub(crate) struct StatsPayload {
+    #[serde(rename(serialize = "AgentHostname"))]
+    agent_hostname: String,
+    #[serde(rename(serialize = "AgentEnv"))]
+    agent_env: String,
+    #[serde(rename(serialize = "Stats"))]
+    stats: Vec<ClientStatsPayload>,
+    #[serde(rename(serialize = "AgentVersion"))]
+    agent_version: String,
+    #[serde(rename(serialize = "ClientComputed"))]
+    client_computed: bool,
+}
+
+#[derive(Debug, PartialEq, Deserialize, Serialize)]
+pub struct ClientStatsPayload {
+    #[serde(rename(serialize = "Hostname"))]
+    pub hostname: String,
+    #[serde(rename(serialize = "Env"))]
+    pub env: String,
+    #[serde(rename(serialize = "Version"))]
+    pub version: String,
+    #[serde(rename(serialize = "Stats"))]
+    pub stats: Vec<ClientStatsBucket>,
+    #[serde(rename(serialize = "Lang"))]
+    pub lang: String,
+    #[serde(rename(serialize = "TracerVersion"))]
+    pub tracer_version: String,
+    #[serde(rename(serialize = "RuntimeID"))]
+    pub runtime_id: String,
+    #[serde(rename(serialize = "Sequence"))]
+    pub sequence: u64,
+    #[serde(rename(serialize = "AgentAggregation"))]
+    pub agent_aggregation: String,
+    #[serde(rename(serialize = "Service"))]
+    pub service: String,
+    #[serde(rename(serialize = "ContainerID"))]
+    pub container_id: String,
+    #[serde(rename(serialize = "Tags"))]
+    pub tags: Vec<String>,
+}
+
+#[derive(Debug, PartialEq, Deserialize, Serialize)]
+pub struct ClientStatsBucket {
+    #[serde(rename(serialize = "Start"))]
+    pub start: u64,
+    #[serde(rename(serialize = "Duration"))]
+    pub duration: u64,
+    #[serde(rename(serialize = "Stats"))]
+    pub stats: Vec<ClientGroupedStats>,
+    #[serde(rename(serialize = "AgentTimeShift"))]
+    pub agent_time_shift: i64,
+}
+
+#[derive(Debug, PartialEq, Deserialize, Serialize)]
+pub struct ClientGroupedStats {
+    #[serde(rename(serialize = "Service"))]
+    pub service: String,
+    #[serde(rename(serialize = "Name"))]
+    pub name: String,
+    #[serde(rename(serialize = "Resource"))]
+    pub resource: String,
+    #[serde(rename(serialize = "HTTPStatusCode"))]
+    pub http_status_code: u32,
+    #[serde(rename(serialize = "Type"))]
+    pub r#type: String,
+    #[serde(rename(serialize = "DBType"))]
+    pub db_type: String,
+    #[serde(rename(serialize = "Hits"))]
+    pub hits: u64,
+    #[serde(rename(serialize = "Errors"))]
+    pub errors: u64,
+    #[serde(rename(serialize = "Duration"))]
+    pub duration: u64,
+    #[serde(rename(serialize = "OkSummary"))]
+    pub ok_summary: Vec<u8>,
+    #[serde(rename(serialize = "ErrorSummary"))]
+    pub error_summary: Vec<u8>,
+    #[serde(rename(serialize = "Synthetics"))]
+    pub synthetics: bool,
+    #[serde(rename(serialize = "TopLevelHits"))]
+    pub top_level_hits: u64,
 }
