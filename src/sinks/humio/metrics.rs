@@ -102,6 +102,7 @@ impl SinkConfig for HumioMetricsConfig {
             tls: self.tls.clone(),
             timestamp_nanos_key: None,
             acknowledgements: Default::default(),
+            timestamp_key: Default::default(),
         };
 
         let (sink, healthcheck) = sink.clone().build(cx).await?;
@@ -252,11 +253,11 @@ mod tests {
 
         let output = rx.take(len).collect::<Vec<_>>().await;
         assert_eq!(
-            r#"{"event":{"counter":{"value":42.0},"kind":"incremental","name":"metric1","tags":{"os.host":"somehost"}},"fields":{},"time":1597784401.0}"#,
+            r#"{"event":{"counter":{"value":42.0},"kind":"incremental","name":"metric1","tags":{"os.host":"somehost"},"timestamp":"2020-08-18T21:00:01Z"},"fields":{}}"#,
             output[0].1
         );
         assert_eq!(
-            r#"{"event":{"distribution":{"samples":[{"rate":100,"value":1.0},{"rate":200,"value":2.0},{"rate":300,"value":3.0}],"statistic":"histogram"},"kind":"absolute","name":"metric2","tags":{"os.host":"somehost"}},"fields":{},"time":1597784402.0}"#,
+            r#"{"event":{"distribution":{"samples":[{"rate":100,"value":1.0},{"rate":200,"value":2.0},{"rate":300,"value":3.0}],"statistic":"histogram"},"kind":"absolute","name":"metric2","tags":{"os.host":"somehost"},"timestamp":"2020-08-18T21:00:02Z"},"fields":{}}"#,
             output[1].1
         );
     }

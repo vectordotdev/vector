@@ -14,7 +14,7 @@ use crate::{
             acknowledgements::HecClientAcknowledgementsConfig,
             build_healthcheck, build_http_batch_service, create_client, host_key,
             service::{HecService, HttpRequestBuilder},
-            SplunkHecDefaultBatchSettings,
+            timestamp_key, SplunkHecDefaultBatchSettings,
         },
         util::{
             encoding::EncodingConfig, http::HttpRetryLogic, BatchConfig, Compression,
@@ -52,6 +52,8 @@ pub struct HecLogsSinkConfig {
     pub acknowledgements: HecClientAcknowledgementsConfig,
     // This settings is relevant only for the `humio_logs` sink and should be left to None everywhere else
     pub timestamp_nanos_key: Option<String>,
+    #[serde(default = "crate::sinks::splunk_hec::common::timestamp_key")]
+    pub timestamp_key: String,
 }
 
 impl GenerateConfig for HecLogsSinkConfig {
@@ -71,6 +73,7 @@ impl GenerateConfig for HecLogsSinkConfig {
             tls: None,
             acknowledgements: Default::default(),
             timestamp_nanos_key: None,
+            timestamp_key: timestamp_key(),
         })
         .unwrap()
     }
@@ -155,6 +158,7 @@ impl HecLogsSinkConfig {
             indexed_fields: self.indexed_fields.clone(),
             host: self.host_key.clone(),
             timestamp_nanos_key: self.timestamp_nanos_key.clone(),
+            timestamp_key: self.timestamp_key.clone(),
         };
 
         Ok(VectorSink::from_event_streamsink(sink))

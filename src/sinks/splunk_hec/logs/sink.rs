@@ -4,7 +4,6 @@ use async_trait::async_trait;
 use futures_util::{stream::BoxStream, StreamExt};
 use tower::Service;
 use vector_core::{
-    config::log_schema,
     event::{Event, LogEvent, Value},
     partition::Partitioner,
     sink::StreamSink,
@@ -34,6 +33,7 @@ pub struct HecLogsSink<S> {
     pub indexed_fields: Vec<String>,
     pub host: String,
     pub timestamp_nanos_key: Option<String>,
+    pub timestamp_key: String,
 }
 
 impl<S> HecLogsSink<S>
@@ -50,6 +50,7 @@ where
         let indexed_fields = self.indexed_fields.as_slice();
         let host = self.host.as_ref();
         let timestamp_nanos_key = self.timestamp_nanos_key.as_deref();
+        let timestamp_key = self.timestamp_key.as_ref();
 
         let builder_limit = NonZeroUsize::new(64);
         let sink = input
@@ -62,6 +63,7 @@ where
                     host,
                     indexed_fields,
                     timestamp_nanos_key,
+                    timestamp_key,
                 )
             })
             .batched_partitioned(EventPartitioner::default(), self.batch_settings)
@@ -113,7 +115,7 @@ pub struct HecLogsProcessedEventMetadata {
     pub source: Option<String>,
     pub index: Option<String>,
     pub host: Option<Value>,
-    pub timestamp: f64,
+    pub timestamp: Option<f64>,
     pub fields: LogEvent,
 }
 
@@ -137,6 +139,7 @@ pub fn process_log(
     host_key: &str,
     indexed_fields: &[String],
     timestamp_nanos_key: Option<&str>,
+    timestamp_key: &str,
 ) -> HecProcessedEvent {
     let event_byte_size = event.size_of();
     let mut log = event.into_log();
@@ -150,16 +153,32 @@ pub fn process_log(
 
     let host = log.get(host_key).cloned();
 
-    let timestamp = match log.remove(log_schema().timestamp_key()) {
-        Some(Value::Timestamp(ts)) => ts,
-        _ => chrono::Utc::now(),
+    let timestamp = if timestamp_key.is_empty() {
+        info!("timestamp_key is empty. Allowing splunk to set timestamp.");
+        None
+    } else {
+        match log.remove(timestamp_key) {
+            Some(Value::Timestamp(ts)) => {
+                // set nanos in log if valid timestamp in event and timestamp_nanos_key is configured
+                if let Some(key) = timestamp_nanos_key {
+                    log.try_insert(path!(key), ts.timestamp_subsec_nanos() % 1_000_000);
+                }
+
+                Some((ts.timestamp_millis() as f64) / 1000f64)
+            }
+            Some(value) => {
+                warn!(
+                    "timestamp_key is not valid timestamp: type is {}. Allowing splunk to set timestamp.",
+                    value.kind_str()
+                );
+                None
+            }
+            None => {
+                warn!("No timestamp was not found. Allowing splunk to set timestamp.");
+                None
+            }
+        }
     };
-
-    if let Some(key) = timestamp_nanos_key {
-        log.try_insert(path!(key), timestamp.timestamp_subsec_nanos() % 1_000_000);
-    }
-
-    let timestamp = (timestamp.timestamp_millis() as f64) / 1000f64;
 
     let fields = indexed_fields
         .iter()

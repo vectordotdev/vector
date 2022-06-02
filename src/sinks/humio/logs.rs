@@ -8,7 +8,8 @@ use crate::{
     sinks::{
         splunk_hec::{
             common::{
-                acknowledgements::HecClientAcknowledgementsConfig, SplunkHecDefaultBatchSettings,
+                acknowledgements::HecClientAcknowledgementsConfig, timestamp_key,
+                SplunkHecDefaultBatchSettings,
             },
             logs::config::HecLogsSinkConfig,
         },
@@ -51,6 +52,8 @@ pub struct HumioLogsConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+    #[serde(default = "timestamp_key")]
+    pub(super) timestamp_key: String,
 }
 
 inventory::submit! {
@@ -78,6 +81,7 @@ impl GenerateConfig for HumioLogsConfig {
             tls: None,
             timestamp_nanos_key: None,
             acknowledgements: Default::default(),
+            timestamp_key: timestamp_key(),
         })
         .unwrap()
     }
@@ -125,6 +129,7 @@ impl HumioLogsConfig {
                 indexer_acknowledgements_enabled: false,
                 ..Default::default()
             },
+            timestamp_key: self.timestamp_key.clone(),
         }
     }
 }

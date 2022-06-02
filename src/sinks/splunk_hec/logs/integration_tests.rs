@@ -115,6 +115,7 @@ async fn config(
         tls: None,
         acknowledgements: Default::default(),
         timestamp_nanos_key: None,
+        timestamp_key: Default::default(),
     }
 }
 
