@@ -51,7 +51,7 @@ impl FromStr for VrlRuntime {
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
             "ast" => Ok(Self::Ast),
-            _ => Err("runtime must be ast or vm."),
+            _ => Err("runtime must be ast."),
         }
     }
 }
