@@ -31,7 +31,7 @@ impl AggregationKey {
         payload_key: PayloadAggregationKey,
     ) -> Self {
         AggregationKey {
-            payload_key,
+            payload_key: payload_key.with_span_context(span),
             bucket_key: BucketAggregationKey {
                 service: span
                     .get("service")
@@ -61,6 +61,17 @@ struct PayloadAggregationKey {
     hostname: String,
     version: String,
     container_id: String,
+}
+
+impl PayloadAggregationKey {
+    fn with_span_context(self, span: &BTreeMap<String, Value>) -> Self {
+        PayloadAggregationKey {
+            env: span.get("meta").and_then(|m| m.as_object()).and_then(|m| m.get("env")).map(|s| s.to_string_lossy()).unwrap_or(self.env),
+            hostname: self.hostname,
+            version: self.version,
+            container_id: self.container_id,
+        }
+    }
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
@@ -105,7 +116,7 @@ impl GroupedStats {
             errors: self.errors.round() as u64,
             duration: self.duration.round() as u64,
             ok_summary: encode_sketch(&self.ok_distribution),
-            error_summary: encode_sketch(&self.ok_distribution),
+            error_summary: encode_sketch(&self.err_distribution),
             synthetics: false,
             top_level_hits: self.top_level_hits.round() as u64,
         }
@@ -241,7 +252,7 @@ impl Aggregator {
         Self {
             bucket: Bucket {
                 start: (Utc::now() - chrono::Duration::seconds(10)).timestamp_nanos() as u64,
-                duration: time::Duration::from_secs(10).as_nanos() as u64, // This is fixed now, we assume static 10 sec windows
+                duration: time::Duration::from_secs(10).as_nanos() as u64, // This is fixed now, we assume a static 10 sec windows
                 data: BTreeMap::new(),
             },
         }
