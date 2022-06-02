@@ -762,10 +762,13 @@ mod integration_tests {
     ) -> impl Stream<Item = Event> {
         let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
         let address: std::net::SocketAddr = address.parse().unwrap();
-        let tls_options: Some(tls);
+        let tls_options = match tls {
+            Some(options) => options,
+            None => TlsEnableableConfig::default(),
+        };
         let tls_config = TlsSourceConfig {
             peer_key: None,
-            tls_config: Some(tls),
+            tls_config: tls_options,
         };
         tokio::spawn(async move {
             LogstashConfig {
