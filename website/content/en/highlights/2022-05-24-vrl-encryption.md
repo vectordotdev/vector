@@ -95,3 +95,5 @@ feedback for us, whether it's related to the new disk buffers or anything else, 
 [encrypt]: /docs/reference/vrl/functions/#encrypt
 [decrypt]: /docs/reference/vrl/functions/#decrypt
 [random_bytes]: /docs/reference/vrl/functions/#random_bytes
+[Discord]: https://discord.gg/n3CuBAwNCn
+[Twitter]: https://twitter.com/vectordotdev
