@@ -25,7 +25,8 @@ use crate::{
     encoding_transcode::{Decoder, Encoder},
     event::{BatchNotifier, BatchStatus, LogEvent},
     internal_events::{
-        FileBytesReceived, FileEventsReceived, FileOpen, FileSourceInternalEventsEmitter,
+        FileBytesReceived, FileEventsReceived, FileNegativeAcknowledgementError, FileOpen,
+        FileSourceInternalEventsEmitter,
     },
     line_agg::{self, LineAgg},
     serde::bool_or_struct,
@@ -164,6 +165,7 @@ const fn default_lines() -> usize {
 
 #[derive(Debug)]
 pub(crate) struct FinalizerEntry {
+    pub(crate) file_name: String,
     pub(crate) file_id: FileFingerprint,
     pub(crate) offset: u64,
 }
@@ -349,6 +351,9 @@ pub fn file_source(
                     if status == BatchStatus::Delivered {
                         checkpoints.update(entry.file_id, entry.offset);
                     } else {
+                        emit!(FileNegativeAcknowledgementError {
+                            filename: &entry.file_name,
+                        });
                         failed_files.insert(entry.file_id);
                     }
                 }
@@ -426,11 +431,13 @@ pub fn file_source(
         let span2 = span.clone();
         let mut messages = messages.map(move |line| {
             let _enter = span2.enter();
-            let mut event = create_event(line.text, line.filename, &host_key, &hostname, &file_key);
+            let mut event =
+                create_event(line.text, &line.filename, &host_key, &hostname, &file_key);
             if let Some(finalizer) = &finalizer {
                 let (batch, receiver) = BatchNotifier::new_with_receiver();
                 event = event.with_batch_notifier(&batch);
                 let entry = FinalizerEntry {
+                    file_name: line.filename,
                     file_id: line.file_id,
                     offset: line.offset,
                 };
@@ -505,14 +512,14 @@ fn wrap_with_line_agg(
 
 fn create_event(
     line: Bytes,
-    file: String,
+    file: &str,
     host_key: &str,
     hostname: &Option<String>,
     file_key: &Option<String>,
 ) -> LogEvent {
     emit!(FileEventsReceived {
         count: 1,
-        file: &file,
+        file: file,
         byte_size: line.len(),
     });
 
@@ -671,14 +678,14 @@ mod tests {
     #[test]
     fn file_create_event() {
         let line = Bytes::from("hello world");
-        let file = "some_file.rs".to_string();
+        let file = "some_file.rs";
         let host_key = "host".to_string();
         let hostname = Some("Some.Machine".to_string());
         let file_key = Some("file".to_string());
 
         let log = create_event(line, file, &host_key, &hostname, &file_key);
 
-        assert_eq!(log["file"], "some_file.rs".into());
+        assert_eq!(log["file"], file.into());
         assert_eq!(log["host"], "Some.Machine".into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
         assert_eq!(log[log_schema().source_type_key()], "file".into());
