@@ -329,9 +329,10 @@ test-behavior: test-behavior-transforms test-behavior-formats test-behavior-conf
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
 test-integration: test-integration-aws test-integration-azure test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
+test-integration: test-integration-azure test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
 test-integration: test-integration-eventstoredb test-integration-fluent test-integration-gcp test-integration-humio test-integration-influxdb
-test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb_metrics test-integration-nats
-test-integration: test-integration-nginx test-integration-postgresql_metrics test-integration-prometheus test-integration-pulsar
+test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb test-integration-nats
+test-integration: test-integration-nginx test-integration-postgres test-integration-prometheus test-integration-pulsar
 test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent test-integration-datadog-logs
 test-integration: test-integration-datadog-traces test-integration-shutdown
 
@@ -350,18 +351,6 @@ test-integration-datadog-agent: ## Runs Datadog Agent integration tests
 	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml run --rm runner
 ifeq ($(AUTODESPAWN), true)
 	make test-integration-datadog-agent-cleanup
-endif
-
-.PHONY: test-integration-nats
-test-integration-nats: ## Runs NATS integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh nats stop
-	@scripts/setup_integration_env.sh nats start
-	sleep 10 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features nats-integration-tests --lib ::nats::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh nats stop
 endif
 
 test-integration-%-cleanup:

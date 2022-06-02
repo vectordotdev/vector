@@ -954,9 +954,9 @@ dependencies = [
 
 [[package]]
 name = "axum"
-version = "0.5.4"
+version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4af7447fc1214c1f3a1ace861d0216a6c8bb13965b64bbad9650f375b67689a"
+checksum = "ab2504b827a8bef941ba3dd64bdffe9cf56ca182908a147edd6189c95fbcae7d"
 dependencies = [
  "async-trait",
  "axum-core",
@@ -976,16 +976,16 @@ dependencies = [
  "sync_wrapper",
  "tokio",
  "tower",
- "tower-http 0.3.1",
+ "tower-http 0.3.3",
  "tower-layer",
  "tower-service",
 ]
 
 [[package]]
 name = "axum-core"
-version = "0.2.3"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3bdc19781b16e32f8a7200368a336fa4509d4b72ef15dd4e41df5290855ee1e6"
+checksum = "da31c0ed7b4690e2c78fe4b880d21cd7db04a346ebc658b4270251b695437f17"
 dependencies = [
  "async-trait",
  "bytes 1.1.0",
@@ -1019,7 +1019,7 @@ dependencies = [
  "serde_json",
  "thiserror",
  "url",
- "uuid 1.0.0",
+ "uuid 1.1.1",
 ]
 
 [[package]]
@@ -1041,7 +1041,7 @@ dependencies = [
  "serde_json",
  "thiserror",
  "url",
- "uuid 1.0.0",
+ "uuid 1.1.1",
 ]
 
 [[package]]
@@ -1067,7 +1067,7 @@ dependencies = [
  "sha2 0.10.2",
  "thiserror",
  "url",
- "uuid 1.0.0",
+ "uuid 1.1.1",
 ]
 
 [[package]]
@@ -1091,7 +1091,7 @@ dependencies = [
  "serde_json",
  "thiserror",
  "url",
- "uuid 1.0.0",
+ "uuid 1.1.1",
 ]
 
 [[package]]
@@ -1968,7 +1968,7 @@ dependencies = [
  "futures-core",
  "libc",
  "mio 0.8.2",
- "parking_lot 0.12.0",
+ "parking_lot 0.12.1",
  "signal-hook",
  "signal-hook-mio",
  "winapi 0.3.9",
@@ -2150,7 +2150,7 @@ checksum = "4c8858831f7781322e539ea39e72449c46b059638250c14344fec8d0aa6e539c"
 dependencies = [
  "cfg-if 1.0.0",
  "num_cpus",
- "parking_lot 0.12.0",
+ "parking_lot 0.12.1",
 ]
 
 [[package]]
@@ -2756,13 +2756,11 @@ checksum = "279fb028e20b3c4c320317955b77c5e0c9701f05a1d309905d6fc702cdc5053e"
 
 [[package]]
 name = "flate2"
-version = "1.0.23"
+version = "1.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b39522e96686d38f4bc984b9198e3a0613264abaebaff2c5c918bfa6b6da09af"
+checksum = "f82b0f4c27ad9f8bfd1f3208d882da2b09c301bc1c828fd3a00d0216d2fbbff6"
 dependencies = [
- "cfg-if 1.0.0",
  "crc32fast",
- "libc",
  "miniz_oxide",
 ]
 
@@ -3093,7 +3091,7 @@ dependencies = [
  "futures-timer",
  "no-std-compat",
  "nonzero_ext",
- "parking_lot 0.12.0",
+ "parking_lot 0.12.1",
  "rand 0.8.5",
  "smallvec",
 ]
@@ -3440,9 +3438,9 @@ dependencies = [
 
 [[package]]
 name = "http-body"
-version = "0.4.4"
+version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ff4f84919677303da5f147645dbea6b1881f368d03ac84e1dc09031ebd7b2c6"
+checksum = "d5f38f16d184e36f2408a55281cd658ecbd3ca05cce6d6510a176eca393e26d1"
 dependencies = [
  "bytes 1.1.0",
  "http",
@@ -3496,9 +3494,9 @@ checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
 
 [[package]]
 name = "hyper"
-version = "0.14.18"
+version = "0.14.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b26ae0a80afebe130861d90abf98e3814a4f28a4c6ffeb5ab8ebb2be311e0ef2"
+checksum = "42dc3c131584288d375f2d07f822b0cb012d8c6fb899a5b9fdb3cb7eb9b6004f"
 dependencies = [
  "bytes 1.1.0",
  "futures-channel",
@@ -3530,7 +3528,7 @@ dependencies = [
  "once_cell",
  "openssl",
  "openssl-sys",
- "parking_lot 0.12.0",
+ "parking_lot 0.12.1",
  "tokio",
  "tokio-openssl",
  "tower-layer",
@@ -3642,9 +3640,9 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "1.8.1"
+version = "1.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f647032dfaa1f8b6dc29bd3edb7bbef4861b8b8007ebb118d6db284fd59f6ee"
+checksum = "e6012d540c5baa3589337a98ce73408de9b5a25ec9fc2c6fd6be8f0d39e0ca5a"
 dependencies = [
  "autocfg",
  "hashbrown 0.11.2",
@@ -4043,7 +4041,7 @@ dependencies = [
  "json-patch",
  "k8s-openapi",
  "kube-client",
- "parking_lot 0.12.0",
+ "parking_lot 0.12.1",
  "pin-project",
  "serde",
  "serde_json",
@@ -4197,12 +4195,12 @@ checksum = "5284f00d480e1c39af34e72f8ad60b94f47007e3481cd3b731c1d67190ddc7b7"
 
 [[package]]
 name = "listenfd"
-version = "0.5.0"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c02b14f35d9f5f082fd0b1b34aa0ef32e3354c859c721d7f3325b3f79a42ba54"
+checksum = "14e4fcc00ff6731d94b70e16e71f43bda62883461f31230742e3bc6dddf12988"
 dependencies = [
  "libc",
- "uuid 0.8.2",
+ "uuid 1.1.1",
  "winapi 0.3.9",
 ]
 
@@ -4256,9 +4254,9 @@ dependencies = [
 
 [[package]]
 name = "lru"
-version = "0.7.5"
+version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32613e41de4c47ab04970c348ca7ae7382cf116625755af070b008a15516a889"
+checksum = "8015d95cb7b2ddd3c0d32ca38283ceb1eea09b4713ee380bceb942d85a244228"
 
 [[package]]
 name = "lru-cache"
@@ -4694,7 +4692,7 @@ dependencies = [
  "nkeys",
  "nuid",
  "once_cell",
- "parking_lot 0.12.0",
+ "parking_lot 0.12.1",
  "regex",
  "rustls 0.19.1",
  "rustls-native-certs 0.5.0",
@@ -5284,9 +5282,9 @@ dependencies = [
 
 [[package]]
 name = "parking_lot"
-version = "0.12.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87f5ec2493a61ac0506c0f4199f99070cbe83857b0337006a30f3e6719b8ef58"
+checksum = "3742b2c103b9f06bc9fff0a37ff4912935851bee6d36f3c02bcc755bcfec228f"
 dependencies = [
  "lock_api",
  "parking_lot_core 0.9.2",
@@ -6466,9 +6464,9 @@ dependencies = [
 
 [[package]]
 name = "rust_decimal"
-version = "1.23.1"
+version = "1.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22dc69eadbf0ee2110b8d20418c0c6edbaefec2811c4963dc17b6344e11fe0f8"
+checksum = "e2ee7337df68898256ad0d4af4aad178210d9e44d2ff900ce44064a97cd86530"
 dependencies = [
  "arrayvec 0.7.2",
  "num-traits",
@@ -6985,11 +6983,10 @@ dependencies = [
 
 [[package]]
 name = "serde_with"
-version = "1.13.0"
+version = "1.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b827f2113224f3f19a665136f006709194bdfdcb1fdc1e4b2b5cbac8e0cced54"
+checksum = "678b5a069e50bf00ecd22d0cd8ddf7c236f68581b03db652061ed5eb13a312ff"
 dependencies = [
- "rustversion",
  "serde",
  "serde_with_macros",
 ]
@@ -7328,7 +7325,7 @@ checksum = "213494b7a2b503146286049378ce02b482200519accc31872ee8be91fa820a08"
 dependencies = [
  "new_debug_unreachable",
  "once_cell",
- "parking_lot 0.12.0",
+ "parking_lot 0.12.1",
  "phf_shared",
  "precomputed-hash",
 ]
@@ -7614,9 +7611,9 @@ dependencies = [
 
 [[package]]
 name = "tikv-jemalloc-sys"
-version = "0.4.3+5.2.1-patched.2"
+version = "0.5.0+5.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1792ccb507d955b46af42c123ea8863668fae24d03721e40cad6a41773dbb49"
+checksum = "aeab4310214fe0226df8bfeb893a291a58b19682e8a07e1e1d4483ad4200d315"
 dependencies = [
  "cc",
  "fs_extra",
@@ -7625,9 +7622,9 @@ dependencies = [
 
 [[package]]
 name = "tikv-jemallocator"
-version = "0.4.3"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5b7bcecfafe4998587d636f9ae9d55eb9d0499877b88757767c346875067098"
+checksum = "20612db8a13a6c06d57ec83953694185a367e16945f66565e8028d2c0bd76979"
 dependencies = [
  "libc",
  "tikv-jemalloc-sys",
@@ -7691,7 +7688,7 @@ dependencies = [
  "mio 0.8.2",
  "num_cpus",
  "once_cell",
- "parking_lot 0.12.0",
+ "parking_lot 0.12.1",
  "pin-project-lite",
  "signal-hook-registry",
  "socket2",
@@ -7766,7 +7763,7 @@ dependencies = [
  "fallible-iterator",
  "futures 0.3.21",
  "log",
- "parking_lot 0.12.0",
+ "parking_lot 0.12.1",
  "percent-encoding",
  "phf",
  "pin-project-lite",
@@ -7979,9 +7976,9 @@ dependencies = [
 
 [[package]]
 name = "tower-http"
-version = "0.3.1"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7755f984aa46a9d50829dc84b6a674b2f3b8b4de47c0708923953b090d48acc"
+checksum = "7d342c6d58709c0a6d48d48dabbb62d4ef955cf5f0f3bbfd845838e7ae88dbae"
 dependencies = [
  "bitflags",
  "bytes 1.1.0",
@@ -8285,7 +8282,7 @@ dependencies = [
  "lazy_static",
  "log",
  "lru-cache",
- "parking_lot 0.12.0",
+ "parking_lot 0.12.1",
  "resolv-conf",
  "smallvec",
  "thiserror",
@@ -8564,9 +8561,9 @@ dependencies = [
 
 [[package]]
 name = "uuid"
-version = "1.0.0"
+version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8cfcd319456c4d6ea10087ed423473267e1a071f3bc0aa89f80d60997843c6f0"
+checksum = "c6d5d669b51467dcf7b2f1a796ce0f955f05f01cafda6c19d6e95f730df29238"
 dependencies = [
  "getrandom 0.2.6",
  "serde",
@@ -8612,7 +8609,7 @@ checksum = "f1bddf1187be692e79c5ffeab891132dfb0f236ed36a43c7ed39f1165ee20191"
 
 [[package]]
 name = "vector"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "approx",
  "arc-swap",
@@ -8636,8 +8633,10 @@ dependencies = [
  "aws-smithy-async",
  "aws-smithy-client",
  "aws-smithy-http",
+ "aws-smithy-http-tower",
  "aws-smithy-types",
  "aws-types",
+ "axum",
  "azure_core",
  "azure_identity",
  "azure_storage",
@@ -8682,6 +8681,7 @@ dependencies = [
  "hex",
  "hostname",
  "http",
+ "http-body",
  "hyper",
  "hyper-openssl",
  "hyper-proxy",
@@ -8781,7 +8781,7 @@ dependencies = [
  "tui",
  "typetag",
  "url",
- "uuid 1.0.0",
+ "uuid 1.1.1",
  "value",
  "vector-api-client",
  "vector-vrl-functions",
@@ -8813,7 +8813,7 @@ dependencies = [
  "tokio-stream",
  "tokio-tungstenite 0.17.1",
  "url",
- "uuid 1.0.0",
+ "uuid 1.1.1",
 ]
 
 [[package]]
@@ -8873,7 +8873,7 @@ dependencies = [
  "metrics-util",
  "num-traits",
  "once_cell",
- "parking_lot 0.12.0",
+ "parking_lot 0.12.1",
  "pin-project",
  "proptest",
  "quickcheck",
@@ -9144,7 +9144,7 @@ dependencies = [
  "uaparser",
  "url",
  "utf8-width",
- "uuid 1.0.0",
+ "uuid 1.1.1",
  "value",
  "vector_common",
  "vrl",

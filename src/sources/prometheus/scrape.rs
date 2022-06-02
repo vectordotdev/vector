@@ -236,6 +236,7 @@ async fn prometheus(
         let endpoint = url.to_string();
 
         let mut request = Request::get(&url)
+            .header(http::header::ACCEPT, "text/plain")
             .body(Body::empty())
             .expect("error creating request");
         if let Some(auth) = &config.auth {
@@ -428,6 +429,38 @@ mod test {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<PrometheusScrapeConfig>();
+    }
+
+    #[tokio::test]
+    async fn test_prometheus_sets_headers() {
+        let in_addr = next_addr();
+
+        let dummy_endpoint = warp::path!("metrics").and(warp::header::exact("Accept", "text/plain")).map(|| {
+            r#"
+                    promhttp_metric_handler_requests_total{endpoint="http://example.com", instance="localhost:9999", code="200"} 100 1612411516789
+                    "#
+        });
+
+        tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+
+        let config = PrometheusScrapeConfig {
+            endpoints: vec![format!("http://{}/metrics", in_addr)],
+            scrape_interval_secs: 1,
+            instance_tag: Some("instance".to_string()),
+            endpoint_tag: Some("endpoint".to_string()),
+            honor_labels: true,
+            query: None,
+            auth: None,
+            tls: None,
+        };
+
+        let events = run_and_assert_source_compliance(
+            config,
+            Duration::from_secs(1),
+            &HTTP_PULL_SOURCE_TAGS,
+        )
+        .await;
+        assert!(!events.is_empty());
     }
 
     #[tokio::test]

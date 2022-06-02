@@ -1,8 +1,4 @@
-use std::{
-    collections::HashMap,
-    convert::TryFrom,
-    io::{self},
-};
+use std::{collections::HashMap, convert::TryFrom, io};
 
 use bytes::Bytes;
 use chrono::Utc;
@@ -17,7 +13,7 @@ use snafu::ResultExt;
 use snafu::Snafu;
 use tower::ServiceBuilder;
 use uuid::Uuid;
-use vector_core::{event::Finalizable, ByteSizeOf};
+use vector_core::event::{EventFinalizers, Finalizable};
 
 use crate::{
     codecs::Encoder,
@@ -33,7 +29,7 @@ use crate::{
             config::{
                 build_healthcheck, GcsPredefinedAcl, GcsRetryLogic, GcsStorageClass, BASE_URL,
             },
-            service::{GcsMetadata, GcsRequest, GcsRequestSettings, GcsService},
+            service::{GcsRequest, GcsRequestSettings, GcsService},
             sink::GcsSink,
         },
         util::{
@@ -42,6 +38,7 @@ use crate::{
                 EncodingConfig, EncodingConfigWithFramingAdapter, StandardEncodings,
                 StandardEncodingsWithFramingMigrator, Transformer,
             },
+            metadata::{RequestMetadata, RequestMetadataBuilder},
             partitioner::KeyPartitioner,
             request_builder::EncodeResult,
             BulkSizeBasedDefaultBatchSettings, Compression, RequestBuilder, ServiceBuilderExt,
@@ -220,12 +217,12 @@ struct RequestSettings {
 }
 
 impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
-    type Metadata = GcsMetadata;
+    type Metadata = (String, EventFinalizers, RequestMetadataBuilder);
     type Events = Vec<Event>;
     type Encoder = (Transformer, Encoder<Framer>);
     type Payload = Bytes;
     type Request = GcsRequest;
-    type Error = io::Error; // TODO: this is ugly.
+    type Error = io::Error;
 
     fn compression(&self) -> Compression {
         self.compression
@@ -237,22 +234,18 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
 
     fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
         let (partition_key, mut events) = input;
+        let metadata_builder = RequestMetadata::builder(&events);
         let finalizers = events.take_finalizers();
 
-        let metadata = GcsMetadata {
-            key: partition_key,
-            count: events.len(),
-            byte_size: events.size_of(),
-            finalizers,
-        };
-        (metadata, events)
+        ((partition_key, finalizers, metadata_builder), events)
     }
 
     fn build_request(
         &self,
-        mut metadata: Self::Metadata,
+        metadata: Self::Metadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
+        let (key, finalizers, metadata_builder) = metadata;
         // TODO: pull the seconds from the last event
         let filename = {
             let seconds = Utc::now().format(&self.time_format);
@@ -265,14 +258,15 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
             }
         };
 
-        metadata.key = format!("{}{}.{}", metadata.key, filename, self.extension);
+        let key = format!("{}{}.{}", key, filename, self.extension);
 
+        let metadata = metadata_builder.build(&payload);
         let body = payload.into_payload();
 
-        trace!(message = "Sending events.", bytes = ?body.len(), events_len = ?metadata.count, key = ?metadata.key);
-
         GcsRequest {
+            key,
             body,
+            finalizers,
             settings: GcsRequestSettings {
                 acl: self.acl.clone(),
                 content_type: self.content_type.clone(),
@@ -356,13 +350,38 @@ fn make_header((name, value): (&String, &String)) -> crate::Result<(HeaderName, 
 
 #[cfg(test)]
 mod tests {
+    use futures_util::{future::ready, stream};
     use vector_core::partition::Partitioner;
+
+    use crate::test_util::{
+        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        http::{always_200_response, spawn_blackhole_http_server},
+    };
 
     use super::*;
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<GcsSinkConfig>();
+    }
+
+    #[tokio::test]
+    async fn component_spec_compliance() {
+        let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
+
+        let context = SinkContext::new_test();
+
+        let tls = TlsSettings::default();
+        let client =
+            HttpClient::new(tls, context.proxy()).expect("should not fail to create HTTP client");
+
+        let config = default_config(StandardEncodings::Json);
+        let sink = config
+            .build_sink(client, mock_endpoint.to_string(), None, context)
+            .expect("failed to build sink");
+
+        let event = Event::from("simple message");
+        run_and_assert_sink_compliance(sink, stream::once(ready(event)), &SINK_TAGS).await;
     }
 
     #[test]
@@ -413,15 +432,15 @@ mod tests {
     #[test]
     fn gcs_build_request() {
         let req = build_request(Some("ext"), false, Compression::None);
-        assert_eq!(req.metadata.key, "key/date.ext".to_string());
+        assert_eq!(req.key, "key/date.ext".to_string());
 
         let req = build_request(None, false, Compression::None);
-        assert_eq!(req.metadata.key, "key/date.log".to_string());
+        assert_eq!(req.key, "key/date.log".to_string());
 
         let req = build_request(None, false, Compression::gzip_default());
-        assert_eq!(req.metadata.key, "key/date.log.gz".to_string());
+        assert_eq!(req.key, "key/date.log.gz".to_string());
 
         let req = build_request(None, true, Compression::gzip_default());
-        assert_ne!(req.metadata.key, "key/date.log.gz".to_string());
+        assert_ne!(req.key, "key/date.log.gz".to_string());
     }
 }

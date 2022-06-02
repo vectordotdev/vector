@@ -1,3 +1,7 @@
+// TODO: In order to correctly assert component specification compliance, we would have to do some more advanced mocking
+// off the endpoint, which would include also providing a mock OAuth2 endpoint to allow for generating a token from the
+// mocked credentials. Let this TODO serve as a placeholder for doing that in the future.
+
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use futures::{sink::SinkExt, FutureExt};

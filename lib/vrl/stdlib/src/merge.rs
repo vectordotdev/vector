@@ -51,21 +51,6 @@ impl Function for Merge {
 
         Ok(Box::new(MergeFn { to, from, deep }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Resolved {
-        let to = arguments.required("to");
-        let mut to = to.try_object()?;
-        let from = arguments.required("from");
-        let from = from.try_object()?;
-        let deep = arguments
-            .optional("deep")
-            .map(|val| val.as_boolean().unwrap_or(false))
-            .unwrap_or_else(|| false);
-
-        merge_maps(&mut to, &from, deep);
-
-        Ok(to.into())
-    }
 }
 
 #[derive(Debug, Clone)]

@@ -67,6 +67,10 @@ pub trait RequestBuilder<Input> {
         &self,
         events: Self::Events,
     ) -> Result<EncodeResult<Self::Payload>, Self::Error> {
+        // TODO: Should we add enough bounds on `Self::Events` that we could automatically derive event count/event byte
+        // size, and then we could generate `BatchRequestMetadata` and pass it directly to `build_request`? That would
+        // obviate needing to wrap `payload` in `EncodeResult`, although practically speaking.. the name would be kind
+        // of clash-y with `Self::Metadata`.
         let mut compressor = Compressor::from(self.compression());
         let is_compressed = compressor.is_compressed();
         let _ = self.encoder().encode_input(events, &mut compressor)?;

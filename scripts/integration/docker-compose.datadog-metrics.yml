@@ -21,8 +21,6 @@ services:
       - "--"
       - "--nocapture"
     environment:
-      - cargogit:/usr/local/cargo/git
-      - cargoregistry:/usr/local/cargo/registry
       - TEST_DATADOG_API_KEY
     volumes:
       - ${PWD}:/code

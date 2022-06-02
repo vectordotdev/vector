@@ -5,7 +5,8 @@ use std::{
 };
 
 use bytes::{BufMut, BytesMut};
-use futures::{future, stream, FutureExt, SinkExt, TryFutureExt};
+use futures::{future, stream, SinkExt, TryFutureExt};
+use futures_util::FutureExt;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder;
 use tower::{Service, ServiceBuilder};
@@ -290,7 +291,13 @@ mod test {
     use {crate::sources::statsd::parser::parse, std::str::from_utf8};
 
     use super::*;
-    use crate::{event::Metric, test_util::*};
+    use crate::{
+        event::Metric,
+        test_util::{
+            components::{run_and_assert_sink_compliance, SINK_TAGS},
+            *,
+        },
+    };
 
     #[test]
     fn generate_config() {
@@ -518,7 +525,7 @@ mod test {
             }
         });
 
-        sink.run_events(events).await.unwrap();
+        run_and_assert_sink_compliance(sink, stream::iter(events), &SINK_TAGS).await;
 
         let messages = collect_n(rx, 1).await;
         assert_eq!(

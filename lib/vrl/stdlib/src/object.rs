@@ -51,11 +51,6 @@ impl Function for Object {
 
         Ok(Box::new(ObjectFn { value }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        object(value)
-    }
 }
 
 #[derive(Debug, Clone)]
