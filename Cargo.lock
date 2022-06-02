@@ -3683,7 +3683,7 @@ dependencies = [
 [[package]]
 name = "inkwell"
 version = "0.1.0"
-source = "git+https://github.com/pablosichert/inkwell?branch=orc2#e335e56c4f293a6e0ef22d062bce8483cf3ec6d0"
+source = "git+https://github.com/pablosichert/inkwell?branch=pablosichert/orc2#cd7b014d7c74a2383886b7e7b5982b9174ca3e87"
 dependencies = [
  "either",
  "inkwell_internals",
@@ -3696,7 +3696,7 @@ dependencies = [
 [[package]]
 name = "inkwell_internals"
 version = "0.5.0"
-source = "git+https://github.com/pablosichert/inkwell?branch=orc2#e335e56c4f293a6e0ef22d062bce8483cf3ec6d0"
+source = "git+https://github.com/pablosichert/inkwell?branch=pablosichert/orc2#cd7b014d7c74a2383886b7e7b5982b9174ca3e87"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4231,9 +4231,9 @@ dependencies = [
 
 [[package]]
 name = "llvm-sys"
-version = "130.0.3"
+version = "130.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95eb03b4f7ae21f48ef7c565a3e3aa22c50616aea64645fb1fd7f6f56b51c274"
+checksum = "bdb6ea20e8a348f6db0b43a7f009fa7d981d22edf4cbe2e0c7b2247dbb25be61"
 dependencies = [
  "cc",
  "lazy_static",

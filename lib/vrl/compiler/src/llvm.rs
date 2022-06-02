@@ -8,9 +8,9 @@ use inkwell::{
     module::Module,
     orc2::{
         lljit::{Function, LLJITBuilder, LLJIT},
-        CustomDefinitionGenerator, EvaluatedSymbol, JITDylib, JITTargetMachineBuilder,
-        JitDylibLookupFlags, LookupKind, MaterializationUnit, SymbolFlags, SymbolGenericFlag,
-        SymbolLookupFlags, SymbolMapPairs, SymbolStringPoolEntry, ThreadSafeContext,
+        CAPIDefinitionGenerator, DefinitionGenerator, EvaluatedSymbol, JITDylib,
+        JITDylibLookupFlags, JITTargetMachineBuilder, LookupKind, MaterializationUnit, SymbolFlags,
+        SymbolMapPairs, ThreadSafeContext, Wrapper,
     },
     passes::{PassManager, PassManagerBuilder},
     targets::{InitializationConfig, Target},
@@ -19,6 +19,7 @@ use inkwell::{
     OptimizationLevel,
 };
 use libc::{dlerror, dlsym};
+use llvm_sys::orc2::LLVMJITSymbolGenericFlags;
 use lookup::LookupBuf;
 use parser::ast::Ident;
 use std::{collections::HashMap, ffi::CStr, ops::Deref};
@@ -54,6 +55,8 @@ impl Compiler {
         let precompiled_functions = PrecompiledFunctions::new(&module);
         let context_ref = function.get_nth_param(0).unwrap().into_pointer_value();
         let result_ref = function.get_nth_param(1).unwrap().into_pointer_value();
+
+        module.strip_debug_info();
 
         for block in function.get_basic_blocks() {
             block.remove_from_function().unwrap();
@@ -124,7 +127,24 @@ impl Compiler {
 
         symbols.extend(precompiled::symbols().iter());
 
-        let definition_generator = Box::new(DefinitionGenerator { symbols });
+        lljit
+            .get_main_jit_dylib()
+            .define({
+                let flags = SymbolFlags::new(
+                    LLVMJITSymbolGenericFlags::LLVMJITSymbolGenericFlagsExported as u8
+                        | LLVMJITSymbolGenericFlags::LLVMJITSymbolGenericFlagsCallable as u8,
+                    0,
+                );
+                let symbol_string_pool_entry = lljit.mangle_and_intern("__rust_probestack");
+                let symbol =
+                    EvaluatedSymbol::new(symbols.remove("__rust_probestack").unwrap() as _, flags);
+                let symbols = SymbolMapPairs::from_iter([(symbol_string_pool_entry, symbol)]);
+
+                MaterializationUnit::from_absolute_symbols(symbols)
+            })
+            .map_err(|error| error.get_message().to_string())?;
+
+        let definition_generator = Box::new(Wrapper::new(CustomDefinitionGenerator { symbols }));
 
         Ok(Library::new(self.0, lljit, definition_generator))
     }
@@ -700,70 +720,86 @@ impl<'ctx> Context<'ctx> {
 }
 
 #[derive(Debug)]
-struct DefinitionGenerator {
+struct CustomDefinitionGenerator {
     symbols: HashMap<&'static str, usize>,
 }
 
-impl CustomDefinitionGenerator for DefinitionGenerator {
+impl CAPIDefinitionGenerator for CustomDefinitionGenerator {
     fn try_to_generate(
         &mut self,
+        _definition_generator: inkwell::orc2::DefinitionGeneratorRef,
+        _lookup_state: &mut inkwell::orc2::LookupState,
         _lookup_kind: LookupKind,
-        _dylib: JITDylib,
-        _dylib_lookup_flags: JitDylibLookupFlags,
-        symbol_entry: SymbolStringPoolEntry,
-        _symbol_lookup_flags: SymbolLookupFlags,
-    ) -> Result<MaterializationUnit, String> {
-        let symbol_name = symbol_entry.get_string();
-        #[cfg(target_os = "macos")]
-        let symbol_name = if symbol_name.to_string_lossy().starts_with('_') {
-            &symbol_name[1..]
-        } else {
-            symbol_name
-        };
+        jit_dylib: JITDylib,
+        _jit_dylib_lookup_flags: JITDylibLookupFlags,
+        c_lookup_set: inkwell::orc2::CLookupSet,
+    ) -> Result<(), LLVMError> {
+        for c_lookup in &*c_lookup_set {
+            let symbol_string_pool_entry = c_lookup.get_name();
+            let _symbol_flags = c_lookup.get_flags();
+            let symbol_name = symbol_string_pool_entry.get_string();
+            println!("resolving symbol: {:?}", symbol_name);
+            #[cfg(target_os = "macos")]
+            let symbol_name = if symbol_name.to_string_lossy().starts_with('_') {
+                &symbol_name[1..]
+            } else {
+                symbol_name
+            };
 
-        let address = self
-            .symbols
-            .remove(symbol_name.to_string_lossy().deref())
-            .map(|address| Ok(address))
-            .unwrap_or_else(|| {
-                let address = unsafe { dlsym(libc::RTLD_DEFAULT, symbol_name.as_ptr()) };
-                if address.is_null() {
-                    let error = unsafe { dlerror() };
-                    if !error.is_null() {
-                        let error = unsafe { CStr::from_ptr(error) };
-                        println!("resolving symbol {:?}, error: {:?}", symbol_name, error);
-                        return Err(error.to_string_lossy().to_string());
+            let address = self
+                .symbols
+                .remove(symbol_name.to_string_lossy().deref())
+                .map(|address| Ok(address))
+                .unwrap_or_else(|| {
+                    let address = unsafe { dlsym(libc::RTLD_DEFAULT, symbol_name.as_ptr()) };
+                    if address.is_null() {
+                        let error = unsafe { dlerror() };
+                        if !error.is_null() {
+                            let error = unsafe { CStr::from_ptr(error) };
+                            println!("resolving symbol {:?}, error: {:?}", symbol_name, error);
+                            return Err(LLVMError::new_string_error(&error.to_string_lossy()));
+                        }
                     }
-                }
 
-                Ok(address as _)
-            })?;
+                    Ok(address as _)
+                })?;
 
-        let flags = SymbolFlags::new(
-            &[SymbolGenericFlag::Exported, SymbolGenericFlag::Callable],
-            0,
-        );
+            let flags = SymbolFlags::new(
+                LLVMJITSymbolGenericFlags::LLVMJITSymbolGenericFlagsExported as u8
+                    | LLVMJITSymbolGenericFlags::LLVMJITSymbolGenericFlagsCallable as u8,
+                0,
+            );
 
-        std::mem::forget(symbol_entry.clone());
+            std::mem::forget(symbol_name.clone());
 
-        let symbol = EvaluatedSymbol::new(address as _, flags);
-        let symbols = SymbolMapPairs::from_iter([(symbol_entry, symbol)]);
-        Ok(MaterializationUnit::from_absolute_symbols(symbols))
+            let symbol = EvaluatedSymbol::new(address as _, flags);
+            let symbols = SymbolMapPairs::from_iter([(symbol_string_pool_entry, symbol)]);
+
+            jit_dylib.define(MaterializationUnit::from_absolute_symbols(symbols))?;
+        }
+
+        Ok(())
     }
 }
 
 #[derive(Debug)]
-pub struct Library<'jit>(ThreadSafeContext, LLJIT<'jit>, Box<DefinitionGenerator>);
+pub struct Library<'jit>(
+    ThreadSafeContext,
+    LLJIT<'jit>,
+    Box<Wrapper<'jit, CustomDefinitionGenerator>>,
+);
 
 impl<'jit> Library<'jit> {
     fn new(
         thread_safe_context: ThreadSafeContext,
         lljit: LLJIT<'jit>,
-        mut definition_generator: Box<DefinitionGenerator>,
+        mut definition_generator: Box<Wrapper<'jit, CustomDefinitionGenerator>>,
     ) -> Self {
         let dylib = lljit.get_main_jit_dylib();
-        dylib.add_generator(definition_generator.as_mut());
-
+        let generator = DefinitionGenerator::create_custom_capi_definition_generator(unsafe {
+            &mut *(definition_generator.as_mut() as *mut _)
+        });
+        dylib.add_generator(generator);
         Self(thread_safe_context, lljit, definition_generator)
     }
 

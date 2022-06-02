@@ -12,6 +12,8 @@ extern "Rust" {
     fn __rust_realloc(ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8;
 
     fn __rust_alloc_error_handler(size: usize, align: usize) -> !;
+
+    fn __rust_probestack();
 }
 
 #[cfg(target_os = "macos")]
@@ -28,6 +30,7 @@ pub fn symbols() -> HashMap<&'static str, usize> {
     symbols.insert("__rust_dealloc", __rust_dealloc as usize);
     symbols.insert("__rust_realloc", __rust_realloc as usize);
     symbols.insert("__rust_alloc_error_handler", __rust_realloc as usize);
+    symbols.insert("__rust_probestack", __rust_probestack as usize);
     #[cfg(target_os = "linux")]
     {
         symbols.insert("fstat64", libc::fstat64 as usize);

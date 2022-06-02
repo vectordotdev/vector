@@ -27,7 +27,7 @@ PRECOMPILED_DIR="$SCRIPT_DIR"
 PRECOMPILED_TARGET_DIR="$PRECOMPILED_DIR"/target
 PRECOMPILED_BUILD_DIR="$PRECOMPILED_TARGET_DIR"/"$TARGET"/"$PROFILE"
 
-RUSTFLAGS="--emit=llvm-bc -C relocation-model=pic" RUSTC_BOOTSTRAP=1 cargo build --manifest-path="$PRECOMPILED_DIR"/Cargo.toml $PROFILE_ARG --lib --target "$TARGET" --target-dir="$PRECOMPILED_TARGET_DIR" -Z build-std=std
+RUSTFLAGS="--emit=llvm-bc -C relocation-model=pic -C codegen-units=1 -C linker-plugin-lto" RUSTC_BOOTSTRAP=1 cargo build --manifest-path="$PRECOMPILED_DIR"/Cargo.toml $PROFILE_ARG --lib --target "$TARGET" --target-dir="$PRECOMPILED_TARGET_DIR" -Z build-std=std
 
 BC_EXCLUDE_PATTERN="(panic_abort|proc_macro).*\.bc"
 BC_FILES=$(ls "$PRECOMPILED_BUILD_DIR"/deps/*.bc | egrep -v -i "$BC_EXCLUDE_PATTERN")
