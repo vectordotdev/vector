@@ -1,15 +1,19 @@
-use crate::{compile_path_arg, is_legacy_metadata_path};
+use crate::{compile_path_arg, is_legacy_metadata_path, MetadataKey};
 use ::value::Value;
 use lookup::LookupBuf;
 use vrl::prelude::*;
 
 fn get_metadata_field(
     ctx: &mut Context,
-    path: &LookupBuf,
+    key: &MetadataKey,
 ) -> std::result::Result<Value, ExpressionError> {
-    let value = ctx.target().get_metadata(path)?.unwrap_or(Value::Null);
-
-    Ok(value)
+    Ok(match key {
+        MetadataKey::Legacy(key) => Value::from(ctx.target().get_secret(key)),
+        MetadataKey::Query(query) => ctx
+            .target()
+            .get_metadata(query.path())?
+            .unwrap_or(Value::Null),
+    })
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -23,7 +27,7 @@ impl Function for GetMetadataField {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "key",
-            kind: kind::BYTES,
+            kind: kind::ANY,
             required: true,
         }]
     }
@@ -31,7 +35,7 @@ impl Function for GetMetadataField {
     fn examples(&self) -> &'static [Example] {
         &[Example {
             title: "Get the datadog api key",
-            source: r#"get_metadata_field("datadog_api_key")"#,
+            source: r#"get_metadata_field(.datadog_api_key)"#,
             result: Ok("null"),
         }]
     }
@@ -42,65 +46,52 @@ impl Function for GetMetadataField {
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
-        let key_bytes = arguments
-            .required_literal("key")?
-            .to_value()
-            .as_bytes()
-            .cloned()
-            .expect("key not bytes");
-        let key = String::from_utf8_lossy(key_bytes.as_ref());
-        let lookup = compile_path_arg(key.as_ref())?;
+        // let key = if let Ok(Some(key)) = arguments.optional_enum("key", &super::legacy_keys()) {
+        //     let key = key
+        //         .try_bytes_utf8_lossy()
+        //         .expect("key not bytes")
+        //         .to_string();
+        //     MetadataKey::Legacy(key)
+        // } else {
+        //     let query = arguments.required_query("key")?;
+        //     MetadataKey::Query(query)
+        // };
 
-        Ok(Box::new(GetMetadataFieldFn { path: lookup }))
-    }
-
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("key", Some(expr)) => {
-                let key = expr
-                    .as_literal("key")?
-                    .try_bytes_utf8_lossy()
+        let key = if let Ok(Some(query)) = arguments.optional_query("key") {
+            MetadataKey::Query(query)
+        } else {
+            let key = arguments.required_enum("key", &super::legacy_keys())?;
+            MetadataKey::Legacy(
+                key.try_bytes_utf8_lossy()
                     .expect("key not bytes")
-                    .to_string();
-                let lookup: LookupBuf = compile_path_arg(&key)?;
-                Ok(Some(Box::new(lookup) as _))
-            }
-            _ => Ok(None),
-        }
+                    .to_string(),
+            )
+        };
+        Ok(Box::new(GetMetadataFieldFn { key }))
     }
 
     fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let path = args
-            .required_any("key")
-            .downcast_ref::<LookupBuf>()
-            .unwrap();
-        get_metadata_field(ctx, path)
+        panic!("VM is being removed.")
     }
 }
 
 #[derive(Debug, Clone)]
 struct GetMetadataFieldFn {
-    path: LookupBuf,
+    key: MetadataKey,
 }
 
 impl Expression for GetMetadataFieldFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        get_metadata_field(ctx, &self.path)
+        get_metadata_field(ctx, &self.key)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
-        if is_legacy_metadata_path(&self.path) {
-            // keep these as a string for backwards compatibility
-            return TypeDef::bytes().add_null().infallible();
+        match &self.key {
+            MetadataKey::Legacy(_) => TypeDef::bytes().add_null().infallible(),
+            MetadataKey::Query(query) => {
+                // TODO: use metadata schema when it exists to return a better value here
+                TypeDef::any().infallible()
+            }
         }
-
-        // TODO: use metadata schema when it exists to return a better value here
-        TypeDef::any().add_null().infallible()
     }
 }

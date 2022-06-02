@@ -8,7 +8,18 @@ pub mod set_semantic_meaning;
 
 use ::value::Value;
 use lookup::{Lookup, LookupBuf, SegmentBuf};
+use vrl::prelude::expression::Query;
 use vrl::prelude::*;
+
+pub(crate) fn legacy_keys() -> Vec<Value> {
+    vec![value!("datadog_api_key"), value!("splunk_hec_token")]
+}
+
+#[derive(Clone, Debug)]
+pub enum MetadataKey {
+    Legacy(String),
+    Query(Query),
+}
 
 pub const LEGACY_METADATA_KEYS: [&str; 2] = ["datadog_api_key", "splunk_hec_token"];
 
