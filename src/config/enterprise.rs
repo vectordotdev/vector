@@ -727,12 +727,14 @@ async fn report_serialized_config_to_datadog<'a>(
 
 #[cfg(all(test, feature = "enterprise-tests"))]
 mod test {
-    use std::{io::Write, net::TcpListener, path::PathBuf, str::FromStr, thread, time::Duration};
+    use std::{
+        collections::BTreeMap, io::Write, net::TcpListener, path::PathBuf, str::FromStr, thread,
+        time::Duration,
+    };
 
     use http::StatusCode;
     use indexmap::IndexMap;
     use indoc::formatdoc;
-    use std::collections::BTreeMap;
     use tokio::time::sleep;
     use value::Kind;
     use vector_common::btreemap;
