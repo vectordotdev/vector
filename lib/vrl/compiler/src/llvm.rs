@@ -683,6 +683,18 @@ impl<'ctx> Context<'ctx> {
         self.precompiled_functions.vrl_expression_function_call
     }
 
+    pub fn vrl_del_external(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_del_external
+    }
+
+    pub fn vrl_del_internal(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_del_internal
+    }
+
+    pub fn vrl_del_expression(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_del_expression
+    }
+
     pub fn optimize(&self) -> Result<(), String> {
         let function_pass_manager = PassManager::create(());
         function_pass_manager.add_function_inlining_pass();
@@ -892,6 +904,9 @@ pub struct PrecompiledFunctions<'ctx> {
     vrl_expression_query_target_external: PrecompiledFunction<'ctx, 3>,
     vrl_expression_query_target: PrecompiledFunction<'ctx, 2>,
     vrl_expression_function_call: PrecompiledFunction<'ctx, 2>,
+    vrl_del_external: PrecompiledFunction<'ctx, 3>,
+    vrl_del_internal: PrecompiledFunction<'ctx, 3>,
+    vrl_del_expression: PrecompiledFunction<'ctx, 3>,
 }
 
 impl<'ctx> PrecompiledFunctions<'ctx> {
@@ -1138,6 +1153,15 @@ impl<'ctx> PrecompiledFunctions<'ctx> {
             },
             vrl_expression_function_call: PrecompiledFunction {
                 function: module.get_function("vrl_expression_function_call").unwrap(),
+            },
+            vrl_del_internal: PrecompiledFunction {
+                function: module.get_function("vrl_del_internal").unwrap(),
+            },
+            vrl_del_external: PrecompiledFunction {
+                function: module.get_function("vrl_del_external").unwrap(),
+            },
+            vrl_del_expression: PrecompiledFunction {
+                function: module.get_function("vrl_del_expression").unwrap(),
             },
         }
     }

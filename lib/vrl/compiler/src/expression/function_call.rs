@@ -754,6 +754,10 @@ impl Expression for FunctionCall {
         state: (&mut LocalEnv, &mut ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
+        if self.ident == "del" {
+            return self.expr.emit_llvm(state, ctx);
+        }
+
         let stdlib_function = ctx.stdlib(self.function_id);
         let compiled_arguments = self.compile_arguments(stdlib_function, state.1)?;
 

@@ -15,6 +15,34 @@ struct Source {
 
 static SOURCES: &[Source] = &[
     Source {
+        name: "del returns deleted field",
+        target: "{}",
+        program: r#"del({"foo": "bar"}.foo)"#,
+    },
+    Source {
+        name: "del returns null for unknown field",
+        target: "{}",
+        program: r#"del({"foo": "bar"}.baz)"#,
+    },
+    Source {
+        name: "del external target",
+        target: "{}",
+        program: indoc! {r#"
+            . = { "foo": true, "bar": 10 }
+            del(.foo)
+            .
+        "#},
+    },
+    Source {
+        name: "del variable",
+        target: "{}",
+        program: indoc! {r#"
+            var = { "foo": true, "bar": 10 }
+            del(var.foo)
+            var
+        "#},
+    },
+    Source {
         name: "big_object",
         target: "{}",
         program: indoc! {r#"

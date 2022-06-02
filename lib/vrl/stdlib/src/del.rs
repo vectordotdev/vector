@@ -191,6 +191,83 @@ impl Expression for DelFn {
         }
         Ok(())
     }
+
+    fn emit_llvm<'ctx>(
+        &self,
+        state: (&mut vrl::state::LocalEnv, &mut vrl::state::ExternalEnv),
+        ctx: &mut vrl::llvm::Context<'ctx>,
+    ) -> std::result::Result<(), String> {
+        let query = &self.query;
+        let path = query.path();
+        let path_ref = ctx.into_lookup_buf_const_ref(path.clone());
+
+        let result_ref = ctx.result_ref();
+
+        if query.is_external() {
+            let vrl_del_external = ctx.vrl_del_external();
+            vrl_del_external.build_call(
+                ctx.builder(),
+                ctx.context_ref(),
+                ctx.builder().build_bitcast(
+                    path_ref,
+                    vrl_del_external
+                        .function
+                        .get_nth_param(1)
+                        .unwrap()
+                        .get_type()
+                        .into_pointer_type(),
+                    "cast",
+                ),
+                result_ref,
+            );
+        } else if let Some(ident) = query.variable_ident() {
+            let variable_ref = ctx.get_variable_ref(&ident);
+            let vrl_del_internal = ctx.vrl_del_internal();
+            vrl_del_internal.build_call(
+                ctx.builder(),
+                variable_ref,
+                ctx.builder().build_bitcast(
+                    path_ref,
+                    vrl_del_internal
+                        .function
+                        .get_nth_param(1)
+                        .unwrap()
+                        .get_type()
+                        .into_pointer_type(),
+                    "cast",
+                ),
+                result_ref,
+            );
+        } else if let Some(expr) = query.expression_target() {
+            let resolved_temp_ref = ctx.build_alloca_resolved("temp");
+            ctx.vrl_resolved_initialize()
+                .build_call(ctx.builder(), resolved_temp_ref);
+            ctx.set_result_ref(resolved_temp_ref);
+            expr.emit_llvm(state, ctx)?;
+            let vrl_del_expression = ctx.vrl_del_expression();
+            vrl_del_expression.build_call(
+                ctx.builder(),
+                resolved_temp_ref,
+                ctx.builder().build_bitcast(
+                    path_ref,
+                    vrl_del_expression
+                        .function
+                        .get_nth_param(1)
+                        .unwrap()
+                        .get_type()
+                        .into_pointer_type(),
+                    "cast",
+                ),
+                result_ref,
+            );
+            ctx.set_result_ref(result_ref);
+        } else {
+            ctx.vrl_resolved_set_null()
+                .build_call(ctx.builder(), result_ref);
+        }
+
+        Ok(())
+    }
 }
 
 impl fmt::Display for DelFn {

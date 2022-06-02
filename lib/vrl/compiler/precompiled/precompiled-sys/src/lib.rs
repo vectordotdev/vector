@@ -1109,3 +1109,41 @@ pub extern "C" fn vrl_expression_function_call(
         })
     }
 }
+
+#[no_mangle]
+pub extern "C" fn vrl_del_external(context: &mut Context, path: &LookupBuf, result: &mut Resolved) {
+    *result = Ok(context
+        .target
+        .target_remove(path, false)
+        .ok()
+        .flatten()
+        .unwrap_or(Value::Null))
+}
+
+#[no_mangle]
+pub extern "C" fn vrl_del_internal(
+    variable: &mut Resolved,
+    path: &LookupBuf,
+    result: &mut Resolved,
+) {
+    let value = variable.as_mut().unwrap();
+    let new_value = value.get_by_path(path).cloned();
+    value.remove_by_path(path, false);
+    *result = Ok(new_value.unwrap_or(Value::Null));
+}
+
+/// # Safety
+/// TODO.
+#[no_mangle]
+pub unsafe extern "C" fn vrl_del_expression(
+    expression: &mut Resolved,
+    path: &LookupBuf,
+    result: &mut Resolved,
+) {
+    let value = (expression as *mut Resolved)
+        .read()
+        .expect("expression must not contain an error");
+    // No need to do the actual deletion, as the expression is only
+    // available as an argument to the function.
+    *result = Ok(value.get_by_path(path).cloned().unwrap_or(Value::Null));
+}
