@@ -36,7 +36,7 @@ impl SourceOuter {
 pub trait SourceConfig: core::fmt::Debug + Send + Sync {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source>;
 
-    fn outputs(&self) -> Vec<Output>;
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output>;
 
     fn source_type(&self) -> &'static str;
 

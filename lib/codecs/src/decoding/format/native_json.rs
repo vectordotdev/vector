@@ -23,8 +23,11 @@ impl NativeJsonDeserializerConfig {
     }
 
     /// The schema produced by the deserializer.
-    pub fn schema_definition(&self) -> schema::Definition {
-        schema::Definition::empty().unknown_fields(Kind::json())
+    pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
+        match log_namespace {
+            LogNamespace::Vector => schema::Definition::empty().unknown_fields(Kind::json()),
+            LogNamespace::Legacy => schema::Definition::empty_object().unknown_fields(Kind::json()),
+        }
     }
 }
 
@@ -37,7 +40,7 @@ impl Deserializer for NativeJsonDeserializer {
     fn parse(
         &self,
         bytes: Bytes,
-        log_namespace: LogNamespace,
+        _log_namespace: LogNamespace,
     ) -> vector_core::Result<SmallVec<[Event; 1]>> {
         // It's common to receive empty frames when parsing NDJSON, since it
         // allows multiple empty newlines. We proceed without a warning here.
@@ -76,7 +79,7 @@ mod test {
         let json_array = json!([{ "log": json1 }, { "log": json2 }]);
         let input = Bytes::from(serde_json::to_vec(&json_array).unwrap());
 
-        let events = deserializer.parse(input).unwrap();
+        let events = deserializer.parse(input, LogNamespace::Legacy).unwrap();
 
         let event1 = Event::try_from(json1).unwrap();
         let event2 = Event::try_from(json2).unwrap();

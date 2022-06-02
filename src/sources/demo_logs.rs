@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tokio::time::{self, Duration};
 use tokio_util::codec::FramedRead;
+use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -223,7 +224,7 @@ impl SourceConfig for DemoLogsConfig {
         )))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.decoding.output_type())]
     }
 
@@ -247,8 +248,8 @@ impl SourceConfig for DemoLogsCompatConfig {
         self.0.build(cx).await
     }
 
-    fn outputs(&self) -> Vec<Output> {
-        self.0.outputs()
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        self.0.outputs(global_log_namespace)
     }
 
     fn source_type(&self) -> &'static str {

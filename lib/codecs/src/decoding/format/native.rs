@@ -27,7 +27,7 @@ impl NativeDeserializerConfig {
     }
 
     /// The schema produced by the deserializer.
-    pub fn schema_definition(&self) -> schema::Definition {
+    pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         schema::Definition::empty()
     }
 }
@@ -40,7 +40,7 @@ impl Deserializer for NativeDeserializer {
     fn parse(
         &self,
         bytes: Bytes,
-        log_namespace: LogNamespace,
+        _log_namespace: LogNamespace,
     ) -> vector_core::Result<SmallVec<[Event; 1]>> {
         if bytes.is_empty() {
             Ok(smallvec![])

@@ -30,6 +30,7 @@ use crate::{
     tls::TlsEnableableConfig,
 };
 use lookup::path;
+use vector_core::config::LogNamespace;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub(crate) struct LogplexConfig {
@@ -138,8 +139,8 @@ impl SourceConfig for LogplexCompatConfig {
         self.0.build(cx).await
     }
 
-    fn outputs(&self) -> Vec<Output> {
-        self.0.outputs()
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        self.0.outputs(global_log_namespace)
     }
 
     fn source_type(&self) -> &'static str {

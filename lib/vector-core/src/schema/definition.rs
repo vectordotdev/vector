@@ -12,6 +12,7 @@ use value::{
 /// a source/transform.
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct Definition {
+    // TODO: switch to Kind, since root isn't always an object anymore
     /// The collection of fields and their types stored in the event.
     collection: Collection<Field>,
 
@@ -84,12 +85,24 @@ impl Definition {
     /// Create an "empty" definition.
     ///
     /// This means no type information is known about the event.
+    #[deprecated]
     pub fn empty() -> Self {
         Self {
             collection: Collection::empty(),
             meaning: BTreeMap::default(),
             optional: BTreeSet::default(),
         }
+    }
+
+    /// An event with an object root, no known fields, and no unknown fields.
+    pub fn empty_object() -> Self {
+        // TODO: set the root to an object
+        Self::empty()
+    }
+
+    /// Any valid JSON type
+    pub fn json() -> Self {
+        Self::empty().unknown_fields(Kind::json())
     }
 
     /// Check if the definition is "empty", meaning:
@@ -105,8 +118,6 @@ impl Definition {
     ///
     /// # Panics
     ///
-    /// - Provided path is a root path (e.g. `.`).
-    /// - Provided path points to a root-level array (e.g. `.[0]`).
     /// - Provided path has one or more coalesced segments (e.g. `.(foo | bar)`).
     #[must_use]
     pub fn required_field(
@@ -117,12 +128,6 @@ impl Definition {
     ) -> Self {
         let mut path = path.into();
         let meaning = meaning.map(ToOwned::to_owned);
-
-        match path.get(0) {
-            None => panic!("must not be a root path"),
-            Some(segment) if segment.is_index() => panic!("must not start with an index"),
-            _ => {}
-        };
 
         let collection = kind
             .nest_at_path(

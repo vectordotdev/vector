@@ -10,6 +10,7 @@ use codecs::{
 };
 use pretty_assertions::assert_eq;
 use tokio_util::codec::Encoder;
+use vector_core::config::LogNamespace;
 
 #[test]
 fn roundtrip_native_fixtures() {
@@ -52,7 +53,9 @@ fn roundtrip_native_fixtures() {
         let json_buf = Bytes::from(json_buf);
 
         // Ensure that we can parse the json fixture successfully
-        let json_events = json_deserializer.parse(json_buf.clone()).unwrap();
+        let json_events = json_deserializer
+            .parse(json_buf.clone(), LogNamespace::Legacy)
+            .unwrap();
         assert_eq!(json_events.len(), 1);
 
         // Ensure that the parsed event is serialized to the same bytes
@@ -68,7 +71,9 @@ fn roundtrip_native_fixtures() {
         let proto_buf = Bytes::from(proto_buf);
 
         // Ensure that we can parse the proto fixture successfully
-        let proto_events = proto_deserializer.parse(proto_buf.clone()).unwrap();
+        let proto_events = proto_deserializer
+            .parse(proto_buf.clone(), LogNamespace::Legacy)
+            .unwrap();
         assert_eq!(proto_events.len(), 1);
 
         // Ensure that the parsed event is serialized to the same bytes

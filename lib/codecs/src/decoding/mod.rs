@@ -298,14 +298,16 @@ impl DeserializerConfig {
     }
 
     /// The schema produced by the deserializer.
-    pub fn schema_definition(&self) -> schema::Definition {
+    pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match self {
-            DeserializerConfig::Bytes => BytesDeserializerConfig.schema_definition(),
-            DeserializerConfig::Json => JsonDeserializerConfig.schema_definition(),
+            DeserializerConfig::Bytes => BytesDeserializerConfig.schema_definition(log_namespace),
+            DeserializerConfig::Json => JsonDeserializerConfig.schema_definition(log_namespace),
             #[cfg(feature = "syslog")]
-            DeserializerConfig::Syslog => SyslogDeserializerConfig.schema_definition(),
-            DeserializerConfig::Native => NativeDeserializerConfig.schema_definition(),
-            DeserializerConfig::NativeJson => NativeJsonDeserializerConfig.schema_definition(),
+            DeserializerConfig::Syslog => SyslogDeserializerConfig.schema_definition(log_namespace),
+            DeserializerConfig::Native => NativeDeserializerConfig.schema_definition(log_namespace),
+            DeserializerConfig::NativeJson => {
+                NativeJsonDeserializerConfig.schema_definition(log_namespace)
+            }
         }
     }
 }

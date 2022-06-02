@@ -1674,6 +1674,7 @@ dependencies = [
  "dyn-clone",
  "futures 0.3.21",
  "indoc",
+ "lookup",
  "memchr",
  "pretty_assertions",
  "prost 0.10.4",

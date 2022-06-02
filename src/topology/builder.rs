@@ -157,7 +157,7 @@ pub async fn build_pieces(
         debug!(component = %key, "Building new source.");
 
         let typetag = source.inner.source_type();
-        let source_outputs = source.inner.outputs();
+        let source_outputs = source.inner.outputs(config.global.log_namespace());
 
         let span = error_span!(
             "source",

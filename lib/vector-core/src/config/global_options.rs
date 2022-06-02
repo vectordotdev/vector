@@ -1,8 +1,7 @@
-use std::{fs::DirBuilder, path::PathBuf};
-
 use crate::config::LogNamespace;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use std::{fs::DirBuilder, path::PathBuf};
 use vector_common::TimeZone;
 
 use super::{proxy::ProxyConfig, AcknowledgementsConfig, LogSchema};
@@ -52,6 +51,13 @@ pub struct GlobalOptions {
 }
 
 impl GlobalOptions {
+    /// Gets the value of the globally configured log namespace, or the default if it wasn't set
+    pub fn log_namespace(&self) -> LogNamespace {
+        self.log_namespace
+            .map(|use_vector_namespace| use_vector_namespace.into())
+            .unwrap_or(LogNamespace::Legacy)
+    }
+
     /// Resolve the `data_dir` option in either the global or local config, and
     /// validate that it exists and is writable.
     ///

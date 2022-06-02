@@ -16,6 +16,7 @@ use lookup::lookup_v2::{parse_path, OwnedSegment};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
+use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use super::util::MultilineConfig;
@@ -188,8 +189,8 @@ impl SourceConfig for DockerCompatConfig {
         self.config.build(cx).await
     }
 
-    fn outputs(&self) -> Vec<Output> {
-        self.config.outputs()
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        self.config.outputs(log_namespace)
     }
 
     fn source_type(&self) -> &'static str {

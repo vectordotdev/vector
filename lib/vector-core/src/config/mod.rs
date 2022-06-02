@@ -13,7 +13,6 @@ pub use global_options::GlobalOptions;
 pub use id::ComponentKey;
 pub use log_schema::{init_log_schema, log_schema, LogSchema};
 use lookup::lookup_v2::{BorrowedSegment, Path};
-use lookup::path;
 use value::Value;
 
 use crate::schema;
@@ -206,8 +205,8 @@ impl Default for LogNamespace {
 }
 
 impl LogNamespace {
-    pub const VECTOR_DATA_KEY: &'static [BorrowedSegment<'static>; 1] =
-        &[BorrowedSegment::field("data")];
+    // pub const VECTOR_DATA_KEY: &'static [BorrowedSegment<'static>; 1] =
+    //     &[BorrowedSegment::field("data")];
     pub const VECTOR_METADATA_KEY: &'static [BorrowedSegment<'static>; 1] =
         &[BorrowedSegment::field("metadata")];
 
@@ -229,13 +228,12 @@ impl LogNamespace {
 
     pub fn new_log_from_data(&self, value: impl Into<Value>) -> LogEvent {
         match self {
-            LogNamespace::Vector => {
-                let mut log = LogEvent::default();
-                log.insert(Self::VECTOR_DATA_KEY, value);
-
-                log
-            }
-            LogNamespace::Legacy => LogEvent::from(value.into()),
+            LogNamespace::Vector | LogNamespace::Legacy => LogEvent::from(value.into()),
         }
+    }
+
+    // combine a global (self) and local value to get the actual namespace
+    pub fn merge(&self, override_value: Option<impl Into<LogNamespace>>) -> LogNamespace {
+        override_value.map(|x| x.into()).unwrap_or(*self)
     }
 }

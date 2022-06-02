@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 
+use crate::config::GlobalOptions;
 use indexmap::{set::IndexSet, IndexMap};
 
 use super::{
@@ -38,6 +39,7 @@ impl Graph {
         transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
         expansions: &IndexMap<String, Vec<String>>,
+        global: GlobalOptions,
     ) -> Result<Self, Vec<String>> {
         Self::new_inner(sources, transforms, sinks, expansions, false)
     }

@@ -19,6 +19,7 @@ use pretty_assertions::assert_eq;
 use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use value::Kind;
+use vector_core::config::LogNamespace;
 
 use crate::{
     common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
@@ -1448,7 +1449,7 @@ fn test_config_outputs() {
         };
 
         let mut outputs = config
-            .outputs()
+            .outputs(LogNamespace::Legacy)
             .into_iter()
             .map(|output| (output.port, output.log_schema_definition))
             .collect::<HashMap<_, _>>();

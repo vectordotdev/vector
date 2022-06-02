@@ -77,7 +77,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
     } = builder;
 
     let str_expansions = to_string_expansions(&expansions);
-    let graph = match Graph::new(&sources, &transforms, &sinks, &str_expansions) {
+    let graph = match Graph::new(&sources, &transforms, &sinks, &str_expansions, global) {
         Ok(graph) => graph,
         Err(graph_errors) => {
             errors.extend(graph_errors);

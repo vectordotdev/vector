@@ -149,7 +149,8 @@ impl SourceConfig for DatadogAgentConfig {
         }))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
         let definition = match self.decoding {
             // See: `LogMsg` struct.
             DeserializerConfig::Bytes => schema::Definition::empty()
@@ -160,22 +161,22 @@ impl SourceConfig for DatadogAgentConfig {
                 .required_field("service", Kind::bytes(), Some("service"))
                 .required_field("ddsource", Kind::bytes(), Some("source"))
                 .required_field("ddtags", Kind::bytes(), Some("tags"))
-                .merge(self.decoding.schema_definition()),
+                .merge(self.decoding.schema_definition(log_namespace)),
 
             // JSON deserializer can overwrite existing fields at runtime, so we have to treat
             // those events as if there is no known type details we can provide, other than the
             // details provided by the generic JSON schema definition.
-            DeserializerConfig::Json => self.decoding.schema_definition(),
+            DeserializerConfig::Json => self.decoding.schema_definition(log_namespace),
 
             // Syslog deserializer allows for arbritrary "structured data" that can overwrite
             // existing fields, similar to the JSON deserializer.
             //
             // See also: https://datatracker.ietf.org/doc/html/rfc5424#section-6.3
             #[cfg(feature = "sources-syslog")]
-            DeserializerConfig::Syslog => self.decoding.schema_definition(),
+            DeserializerConfig::Syslog => self.decoding.schema_definition(log_namespace),
 
-            DeserializerConfig::Native => self.decoding.schema_definition(),
-            DeserializerConfig::NativeJson => self.decoding.schema_definition(),
+            DeserializerConfig::Native => self.decoding.schema_definition(log_namespace),
+            DeserializerConfig::NativeJson => self.decoding.schema_definition(log_namespace),
         };
 
         if self.multiple_outputs {

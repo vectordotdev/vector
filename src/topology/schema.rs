@@ -273,7 +273,8 @@ pub(super) trait ComponentContainer {
 
 impl ComponentContainer for Config {
     fn source_outputs(&self, key: &ComponentKey) -> Option<Vec<Output>> {
-        self.source(key).map(|source| source.inner.outputs())
+        self.source(key)
+            .map(|source| source.inner.outputs(self.global.log_namespace()))
     }
 
     fn transform_inputs(&self, key: &ComponentKey) -> Option<&[OutputId]> {

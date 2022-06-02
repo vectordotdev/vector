@@ -264,10 +264,15 @@ pub fn update_config(config: &Config) {
                 // TODO(#10745): This is obviously wrong, but there are a lot of assumptions in the
                 // API modules about `output_type` as it's a sortable field, etc. This is a stopgap
                 // until we decide how we want to change the rest of the usages.
-                output_type: source.inner.outputs().pop().unwrap().ty,
+                output_type: source
+                    .inner
+                    .outputs(config.global.log_namespace())
+                    .pop()
+                    .unwrap()
+                    .ty,
                 outputs: source
                     .inner
-                    .outputs()
+                    .outputs(config.global.log_namespace())
                     .into_iter()
                     .map(|output| output.port.unwrap_or_else(|| DEFAULT_OUTPUT.to_string()))
                     .collect(),
