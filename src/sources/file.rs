@@ -519,7 +519,7 @@ fn create_event(
 ) -> LogEvent {
     emit!(FileEventsReceived {
         count: 1,
-        file: file,
+        file,
         byte_size: line.len(),
     });
 
