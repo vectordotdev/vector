@@ -6,8 +6,7 @@ use vrl::{
         ArgumentList, Compiled, CompiledArgument, Example, FunctionCompileContext, Parameter,
     },
     prelude::{
-        expression, DiagnosticMessage, FunctionArgument, Resolved, Result, TypeDef, VmArgumentList,
-        VrlValueConvert,
+        expression, DiagnosticMessage, FunctionArgument, Resolved, Result, TypeDef, VrlValueConvert,
     },
     state,
     value::kind,
@@ -15,7 +14,7 @@ use vrl::{
 };
 
 use crate::{
-    vrl_util::{self, add_index, evaluate_condition, index_from_args, EnrichmentTableRecord},
+    vrl_util::{self, add_index, evaluate_condition, index_from_args},
     Case, Condition, IndexHandle, TableRegistry, TableSearch,
 };
 
@@ -177,32 +176,6 @@ impl Function for GetEnrichmentTableRecord {
             }
             _ => Ok(None),
         }
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let condition = args.required("condition");
-        let condition = condition
-            .into_object()
-            .expect("condition should be an object");
-        let condition = condition
-            .iter()
-            .map(|(key, value)| evaluate_condition(key, value.clone()))
-            .collect::<Result<Vec<Condition>>>()?;
-
-        let record = args
-            .required_any("table")
-            .downcast_ref::<EnrichmentTableRecord>()
-            .unwrap();
-        let select = args.optional("select");
-
-        get_enrichment_table_record(
-            select,
-            &record.enrichment_tables,
-            &record.table,
-            record.case_sensitive,
-            &condition,
-            record.index,
-        )
     }
 }
 

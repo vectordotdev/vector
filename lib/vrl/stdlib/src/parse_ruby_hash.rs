@@ -61,11 +61,6 @@ impl Function for ParseRubyHash {
             required: true,
         }]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        parse_ruby_hash(value)
-    }
 }
 
 #[derive(Debug, Clone)]

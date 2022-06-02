@@ -8,7 +8,6 @@ use crate::{
     parser::Node,
     state::{ExternalEnv, LocalEnv},
     value::Kind,
-    vm::OpCode,
     Context, Expression, Span, TypeDef,
 };
 
@@ -47,17 +46,6 @@ impl Expression for Not {
         let fallible = self.inner.type_def(state).is_fallible();
 
         TypeDef::boolean().with_fallibility(fallible)
-    }
-
-    fn compile_to_vm(
-        &self,
-        vm: &mut crate::vm::Vm,
-        state: (&mut LocalEnv, &mut ExternalEnv),
-    ) -> std::result::Result<(), String> {
-        self.inner.compile_to_vm(vm, state)?;
-        vm.write_opcode(OpCode::Not);
-
-        Ok(())
     }
 }
 

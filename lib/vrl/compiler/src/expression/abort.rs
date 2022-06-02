@@ -2,7 +2,6 @@ use std::fmt;
 
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 use parser::ast::Node;
-use value::Value;
 
 use super::Expr;
 use crate::{
@@ -10,7 +9,6 @@ use crate::{
     state::{ExternalEnv, LocalEnv},
     value::Kind,
     value::VrlValueConvert,
-    vm::OpCode,
     Context, Expression, Span, TypeDef,
 };
 
@@ -69,30 +67,6 @@ impl Expression for Abort {
 
     fn type_def(&self, _: (&LocalEnv, &ExternalEnv)) -> TypeDef {
         TypeDef::null().infallible()
-    }
-
-    fn compile_to_vm(
-        &self,
-        vm: &mut crate::vm::Vm,
-        state: (&mut LocalEnv, &mut ExternalEnv),
-    ) -> Result<(), String> {
-        match &self.message {
-            None => {
-                // If there is no message, just write a Null to the stack which
-                // the abort instruction will use to know not to attach a message.
-                let nullidx = vm.add_constant(Value::Null);
-                vm.write_opcode(OpCode::Constant);
-                vm.write_primitive(nullidx);
-            }
-            Some(message) => message.compile_to_vm(vm, state)?,
-        }
-
-        vm.write_opcode(OpCode::Abort);
-
-        // The `Abort` `OpCode` needs the span of the expression to return in the abort error.
-        vm.write_primitive(self.span.start());
-        vm.write_primitive(self.span.end());
-        Ok(())
     }
 }
 

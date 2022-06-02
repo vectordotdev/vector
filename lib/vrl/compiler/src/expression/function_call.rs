@@ -14,7 +14,6 @@ use crate::{
     state::{ExternalEnv, LocalEnv},
     type_def::Details,
     value::Kind,
-    vm::{OpCode, VmFunctionClosure},
     Context, Expression, Function, Resolved, Span, TypeDef,
 };
 
@@ -464,6 +463,7 @@ impl<'a> Builder<'a> {
     }
 }
 
+#[allow(unused)] // will be used by LLVM runtime
 #[derive(Clone)]
 pub struct FunctionCall {
     abort_on_error: bool,
@@ -486,6 +486,7 @@ pub struct FunctionCall {
     arguments: Arc<Vec<Node<FunctionArgument>>>,
 }
 
+#[allow(unused)] // will be used by LLVM runtime
 impl FunctionCall {
     /// Takes the arguments passed and resolves them into the order they are defined
     /// in the function
@@ -666,85 +667,6 @@ impl Expression for FunctionCall {
         }
 
         type_def
-    }
-
-    fn compile_to_vm(
-        &self,
-        vm: &mut crate::vm::Vm,
-        (local, external): (&mut LocalEnv, &mut ExternalEnv),
-    ) -> Result<(), String> {
-        // Resolve the arguments so they are in the order defined in the function.
-        let args = match vm.function(self.function_id) {
-            Some(fun) => self.resolve_arguments(fun)?,
-            None => return Err(format!("Function {} not found.", self.function_id)),
-        };
-
-        // We take the external context, and pass it to the function compile context, this allows
-        // functions mutable access to external state, but keeps the internal compiler state behind
-        // an immutable reference, to ensure compiler state correctness.
-        let external_context = external.swap_external_context(AnyMap::new());
-
-        let mut compile_ctx =
-            FunctionCompileContext::new(self.span).with_external_context(external_context);
-
-        for (keyword, argument) in &args {
-            let fun = vm.function(self.function_id).unwrap();
-            let argument = argument.as_ref().map(|argument| argument.inner());
-
-            // Call `compile_argument` for functions that need to perform any compile time processing
-            // on the argument.
-            match fun
-                .compile_argument(&args, &mut compile_ctx, keyword, argument)
-                .map_err(|err| err.to_string())?
-            {
-                Some(stat) => {
-                    // The function has compiled this argument as a static.
-                    let stat = vm.add_static(stat);
-                    vm.write_opcode(OpCode::MoveStaticParameter);
-                    vm.write_primitive(stat);
-                }
-                None => match argument {
-                    Some(argument) => {
-                        // Compile the argument, `MoveParameter` will move the result of the expression onto the
-                        // parameter stack to be passed into the function.
-                        argument.compile_to_vm(vm, (local, external))?;
-                        vm.write_opcode(OpCode::MoveParameter);
-                    }
-                    None => {
-                        // The parameter hasn't been specified, so just move an empty parameter onto the
-                        // parameter stack.
-                        vm.write_opcode(OpCode::EmptyParameter);
-                    }
-                },
-            }
-        }
-
-        if let Some(FunctionClosure { variables, block }) = self.closure.as_ref().cloned() {
-            let mut closure_vm = crate::vm::Vm::new(vm.functions());
-            block.compile_to_vm(&mut closure_vm, (local, external))?;
-            closure_vm.write_opcode(OpCode::Return);
-
-            let closure = vm.write_closure(VmFunctionClosure {
-                vm: closure_vm,
-                variables,
-            });
-
-            vm.write_opcode(OpCode::MoveClosure);
-            vm.write_primitive(closure);
-        }
-
-        // Re-insert the external context into the compiler state.
-        let _ = external.swap_external_context(compile_ctx.into_external_context());
-
-        // Call the function with the given id.
-        vm.write_opcode(OpCode::Call);
-        vm.write_primitive(self.function_id);
-
-        // We need to write the spans for error reporting.
-        vm.write_primitive(self.span.start());
-        vm.write_primitive(self.span.end());
-
-        Ok(())
     }
 }
 
@@ -1229,14 +1151,6 @@ mod tests {
             _arguments: ArgumentList,
         ) -> crate::function::Compiled {
             Ok(Box::new(Fn))
-        }
-
-        fn call_by_vm(
-            &self,
-            _ctx: &mut Context,
-            _args: &mut crate::vm::VmArgumentList,
-        ) -> Result<value::Value, ExpressionError> {
-            unimplemented!()
         }
     }
 
