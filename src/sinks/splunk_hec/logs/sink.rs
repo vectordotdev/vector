@@ -37,6 +37,16 @@ pub struct HecLogsSink<S> {
     pub timestamp_key: String,
 }
 
+pub struct HecLogData<'a> {
+    pub sourcetype: Option<&'a Template>,
+    pub source: Option<&'a Template>,
+    pub index: Option<&'a Template>,
+    pub indexed_fields: &'a [String],
+    pub host_key: &'a str,
+    pub timestamp_nanos_key: Option<&'a String>,
+    pub timestamp_key: &'a str,
+}
+
 impl<S> HecLogsSink<S>
 where
     S: Service<HecRequest> + Send + 'static,
@@ -45,28 +55,20 @@ where
     S::Error: fmt::Debug + Into<crate::Error> + Send,
 {
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let sourcetype = self.sourcetype.as_ref();
-        let source = self.source.as_ref();
-        let index = self.index.as_ref();
-        let indexed_fields = self.indexed_fields.as_slice();
-        let host = self.host.as_ref();
-        let timestamp_nanos_key = self.timestamp_nanos_key.as_deref();
-        let timestamp_key = self.timestamp_key.as_ref();
-
         let builder_limit = NonZeroUsize::new(64);
+
+        let data = HecLogData {
+            sourcetype: self.sourcetype.as_ref(),
+            source: self.source.as_ref(),
+            index: self.index.as_ref(),
+            indexed_fields: self.indexed_fields.as_slice(),
+            host_key: self.host.as_ref(),
+            timestamp_nanos_key: self.timestamp_nanos_key.as_ref(),
+            timestamp_key: self.timestamp_key.as_ref(),
+        };
+
         let sink = input
-            .map(move |event| {
-                process_log(
-                    event,
-                    sourcetype,
-                    source,
-                    index,
-                    host,
-                    indexed_fields,
-                    timestamp_nanos_key,
-                    timestamp_key,
-                )
-            })
+            .map(move |event| process_log(event, &data))
             .batched_partitioned(EventPartitioner::default(), self.batch_settings)
             .request_builder(builder_limit, self.request_builder)
             .filter_map(|request| async move {
@@ -132,35 +134,31 @@ impl ByteSizeOf for HecLogsProcessedEventMetadata {
 
 pub type HecProcessedEvent = ProcessedEvent<LogEvent, HecLogsProcessedEventMetadata>;
 
-pub fn process_log(
-    event: Event,
-    sourcetype: Option<&Template>,
-    source: Option<&Template>,
-    index: Option<&Template>,
-    host_key: &str,
-    indexed_fields: &[String],
-    timestamp_nanos_key: Option<&str>,
-    timestamp_key: &str,
-) -> HecProcessedEvent {
+pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
     let event_byte_size = event.size_of();
     let mut log = event.into_log();
 
-    let sourcetype =
-        sourcetype.and_then(|sourcetype| render_template_string(sourcetype, &log, "sourcetype"));
+    let sourcetype = data
+        .sourcetype
+        .and_then(|sourcetype| render_template_string(sourcetype, &log, "sourcetype"));
 
-    let source = source.and_then(|source| render_template_string(source, &log, "source"));
+    let source = data
+        .source
+        .and_then(|source| render_template_string(source, &log, "source"));
 
-    let index = index.and_then(|index| render_template_string(index, &log, "index"));
+    let index = data
+        .index
+        .and_then(|index| render_template_string(index, &log, "index"));
 
-    let host = log.get(host_key).cloned();
+    let host = log.get(data.host_key).cloned();
 
-    let timestamp = if timestamp_key.is_empty() {
+    let timestamp = if data.timestamp_key.is_empty() {
         None
     } else {
-        match log.remove(timestamp_key) {
+        match log.remove(data.timestamp_key) {
             Some(Value::Timestamp(ts)) => {
                 // set nanos in log if valid timestamp in event and timestamp_nanos_key is configured
-                if let Some(key) = timestamp_nanos_key {
+                if let Some(key) = data.timestamp_nanos_key {
                     log.try_insert(path!(key), ts.timestamp_subsec_nanos() % 1_000_000);
                 }
                 Some((ts.timestamp_millis() as f64) / 1000f64)
@@ -181,7 +179,8 @@ pub fn process_log(
         }
     };
 
-    let fields = indexed_fields
+    let fields = data
+        .indexed_fields
         .iter()
         .filter_map(|field| log.get(field.as_str()).map(|value| (field, value.clone())))
         .collect::<LogEvent>();

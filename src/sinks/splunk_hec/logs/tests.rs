@@ -74,13 +74,15 @@ fn get_processed_event_timestamp(
 
     process_log(
         event,
-        sourcetype.as_ref(),
-        source.as_ref(),
-        index.as_ref(),
-        "host_key",
-        indexed_fields.as_slice(),
-        timestamp_nanos_key.as_deref(),
-        timestamp_key,
+        &super::sink::HecLogData {
+            sourcetype: sourcetype.as_ref(),
+            source: source.as_ref(),
+            index: index.as_ref(),
+            host_key: "host_key",
+            indexed_fields: indexed_fields.as_slice(),
+            timestamp_nanos_key: timestamp_nanos_key.as_ref(),
+            timestamp_key,
+        },
     )
 }
 
