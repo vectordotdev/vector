@@ -312,6 +312,7 @@ mod integration_tests {
             tls: None,
             timestamp_nanos_key: timestamp_nanos_key(),
             acknowledgements: Default::default(),
+            timestamp_key: Default::default(),
         }
     }
 

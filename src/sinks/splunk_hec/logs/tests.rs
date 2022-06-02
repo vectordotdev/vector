@@ -217,16 +217,19 @@ async fn splunk_passthrough_token() {
     )
 }
 
-fn get_hec_data_for_timestamp_test(timestamp: Option<Value>, timestamp_key: &str) -> HecEventJson {
-    let processed_event = get_processed_event_timestamp(timestamp, timestamp_key);
-    let encoder = HecLogsEncoder::Json;
-    let bytes = encoder.encode_event(processed_event).unwrap();
-    serde_json::from_slice::<HecEventJson>(&bytes[..]).unwrap()
-}
-
 #[test]
 fn splunk_encode_log_event_json_timestamps() {
     crate::test_util::trace_init();
+
+    fn get_hec_data_for_timestamp_test(
+        timestamp: Option<Value>,
+        timestamp_key: &str,
+    ) -> HecEventJson {
+        let processed_event = get_processed_event_timestamp(timestamp, timestamp_key);
+        let encoder = HecLogsEncoder::Json;
+        let bytes = encoder.encode_event(processed_event).unwrap();
+        serde_json::from_slice::<HecEventJson>(&bytes[..]).unwrap()
+    }
 
     // no timestamp_key is provided
     let mut hec_data = get_hec_data_for_timestamp_test(None, "");

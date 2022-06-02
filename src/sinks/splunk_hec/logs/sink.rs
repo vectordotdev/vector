@@ -14,6 +14,7 @@ use vector_core::{
 use super::request_builder::HecLogsRequestBuilder;
 use crate::{
     config::SinkContext,
+    internal_events::SplunkEventTimestampWarning,
     sinks::{
         splunk_hec::common::{render_template_string, request::HecRequest},
         util::{processed_event::ProcessedEvent, SinkBuilderExt},
@@ -165,14 +166,16 @@ pub fn process_log(
                 Some((ts.timestamp_millis() as f64) / 1000f64)
             }
             Some(value) => {
-                warn!(
-                    "timestamp_key is not valid timestamp: type is {}. Ignoring and allowing splunk to set timestamp.",
-                    value.kind_str()
-                );
+                emit!(SplunkEventTimestampWarning {
+                    message: &format!("timestamp_key is not valid timestamp: type is {}. Ignoring and allowing splunk to set timestamp.",
+                        value.kind_str())
+                });
                 None
             }
             None => {
-                warn!("No timestamp was not found. Allowing splunk to set timestamp.");
+                emit!(SplunkEventTimestampWarning {
+                    message: "No timestamp was not found. Allowing splunk to set timestamp."
+                });
                 None
             }
         }

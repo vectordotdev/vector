@@ -160,6 +160,16 @@ mod sink {
             decrement_gauge!("splunk_pending_acks", self.count);
         }
     }
+
+    pub struct SplunkEventTimestampWarning<'a> {
+        pub message: &'a str,
+    }
+
+    impl<'a> InternalEvent for SplunkEventTimestampWarning<'a> {
+        fn emit(self) {
+            warn!(message = %self.message);
+        }
+    }
 }
 
 #[cfg(feature = "sources-splunk_hec")]
