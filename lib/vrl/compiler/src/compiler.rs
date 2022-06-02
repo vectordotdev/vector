@@ -233,18 +233,7 @@ impl<'a> Compiler<'a> {
         // We can now start compiling the expressions within the block, which
         // will use the existing local state of the compiler, as blocks have
         // access to any state of their parent expressions.
-        let exprs = match self.compile_exprs(node.into_inner().into_iter(), external) {
-            Some(exprs) => exprs,
-            None => {
-                self.local = local_snapshot.merge_mutations(self.local.clone());
-                return None;
-            }
-        };
-
-        // Now that we've compiled the expressions, we pass them into the block,
-        // and also a copy of the local state, which includes any state added by
-        // the compiled expressions in the block.
-        let block = Block::new(exprs, self.local.clone());
+        let exprs = self.compile_exprs(node.into_inner().into_iter(), external);
 
         // Take the local state snapshot captured before we started compiling
         // the block, and merge back into it any mutations that happened to
@@ -252,7 +241,12 @@ impl<'a> Compiler<'a> {
         // local state to the updated snapshot.
         self.local = local_snapshot.merge_mutations(self.local.clone());
 
-        Some(block)
+        exprs.map(|exprs| {
+            // Now that we've compiled the expressions, we pass them into the block,
+            // and also a copy of the local state, which includes any state added by
+            // the compiled expressions in the block.
+            Block::new(exprs, self.local.clone())
+        })
     }
 
     fn compile_array(
