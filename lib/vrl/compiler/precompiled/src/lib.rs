@@ -13,12 +13,11 @@ extern "Rust" {
 
     fn __rust_alloc_error_handler(size: usize, align: usize) -> !;
 
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
     fn __rust_probestack();
-}
 
-#[cfg(target_os = "macos")]
-// https://github.com/rust-lang/rust/issues/59164
-extern "C" {
+    #[cfg(target_os = "macos")]
+    // https://github.com/rust-lang/rust/issues/59164
     fn __emutls_get_address(_control: *mut std::ffi::c_void) -> *mut std::ffi::c_void;
 }
 
@@ -30,6 +29,7 @@ pub fn symbols() -> HashMap<&'static str, usize> {
     symbols.insert("__rust_dealloc", __rust_dealloc as usize);
     symbols.insert("__rust_realloc", __rust_realloc as usize);
     symbols.insert("__rust_alloc_error_handler", __rust_realloc as usize);
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
     symbols.insert("__rust_probestack", __rust_probestack as usize);
     #[cfg(target_os = "linux")]
     {
