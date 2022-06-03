@@ -6,7 +6,7 @@ RUN apt-get update && \
 		rm -rf /var/lib/apt/lists/*
 
 # Build mold, a fast linker
-RUN git clone https://github.com/rui314/mold.git && cd mold && git checkout v1.1.1 && make -j"$(nproc)" && make install
+RUN git clone https://github.com/rui314/mold.git && cd mold && git checkout v1.2.1 && make -j"$(nproc)" && make install
 
 # Smoke test
 RUN ["/usr/local/bin/mold", "--version"]
