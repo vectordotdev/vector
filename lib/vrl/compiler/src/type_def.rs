@@ -399,3 +399,14 @@ pub(crate) struct Details {
     pub(crate) type_def: TypeDef,
     pub(crate) value: Option<Value>,
 }
+
+impl Details {
+    /// Returns the union of 2 possible states
+    pub(crate) fn merge(self, other: Self) -> Self {
+        // TODO: handle the value better
+        Self {
+            type_def: self.type_def.merge_deep(other.type_def),
+            value: None,
+        }
+    }
+}

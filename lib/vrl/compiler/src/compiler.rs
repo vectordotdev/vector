@@ -236,7 +236,7 @@ impl<'a> Compiler<'a> {
         let exprs = match self.compile_exprs(node.into_inner().into_iter(), external) {
             Some(exprs) => exprs,
             None => {
-                self.local = local_snapshot.merge_mutations(self.local.clone());
+                self.local = local_snapshot.apply_child_scope(self.local.clone());
                 return None;
             }
         };
@@ -250,7 +250,7 @@ impl<'a> Compiler<'a> {
         // the block, and merge back into it any mutations that happened to
         // state the snapshot was already tracking. Then, revert the compiler
         // local state to the updated snapshot.
-        self.local = local_snapshot.merge_mutations(self.local.clone());
+        self.local = local_snapshot.apply_child_scope(self.local.clone());
 
         Some(block)
     }
@@ -302,19 +302,35 @@ impl<'a> Compiler<'a> {
             .map_err(|err| self.diagnostics.push(Box::new(err)))
             .ok()?;
 
+        let original_snapshot = self.local.clone();
+
         let consequent = self.compile_block(consequent, external)?;
 
+        let consequent_snapshot = self.local.clone();
+
         match alternative {
-            Some(block) => Some(IfStatement {
-                predicate,
-                consequent,
-                alternative: Some(self.compile_block(block, external)?),
-            }),
-            None => Some(IfStatement {
-                predicate,
-                consequent,
-                alternative: None,
-            }),
+            Some(block) => {
+                self.local = original_snapshot;
+                let else_block = self.compile_block(block, external)?;
+
+                // locals must be the result of either the if or else block, but not the original snapshot
+                self.local = self.local.clone().merge(consequent_snapshot);
+
+                Some(IfStatement {
+                    predicate,
+                    consequent,
+                    alternative: Some(else_block),
+                })
+            }
+            None => {
+                // locals must be the result of either the if block or the original snapshot
+                self.local = self.local.clone().merge(original_snapshot);
+                Some(IfStatement {
+                    predicate,
+                    consequent,
+                    alternative: None,
+                })
+            }
         }
     }
 
