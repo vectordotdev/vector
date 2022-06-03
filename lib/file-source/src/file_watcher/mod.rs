@@ -2,6 +2,7 @@ use std::{
     fs::{self, File},
     io::{self, BufRead, Seek},
     path::PathBuf,
+    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -25,6 +26,7 @@ mod tests;
 /// longer exist.
 pub struct FileWatcher {
     pub path: PathBuf,
+    pub path_str: Arc<str>,
     findable: bool,
     reader: Box<dyn BufRead>,
     file_position: FilePosition,
@@ -50,7 +52,8 @@ impl FileWatcher {
         ignore_before: Option<DateTime<Utc>>,
         max_line_bytes: usize,
         line_delimiter: Bytes,
-    ) -> Result<FileWatcher, io::Error> {
+    ) -> Result<Self, io::Error> {
+        let path_str: Arc<str> = path.to_str().expect("not a valid path").into();
         let f = fs::File::open(&path)?;
         let (devno, ino) = (f.portable_dev()?, f.portable_ino()?);
         let metadata = f.metadata()?;
@@ -124,8 +127,9 @@ impl FileWatcher {
             .and_then(|diff| Instant::now().checked_sub(diff))
             .unwrap_or_else(Instant::now);
 
-        Ok(FileWatcher {
+        Ok(Self {
             path,
+            path_str,
             findable: true,
             reader,
             file_position,
@@ -141,6 +145,7 @@ impl FileWatcher {
     }
 
     pub fn update_path(&mut self, path: PathBuf) -> io::Result<()> {
+        let path_str: Arc<str> = path.to_str().expect("not a valid path").into();
         let file_handle = File::open(&path)?;
         if (file_handle.portable_dev()?, file_handle.portable_ino()?) != (self.devno, self.inode) {
             let mut reader = io::BufReader::new(fs::File::open(&path)?);
@@ -160,6 +165,7 @@ impl FileWatcher {
             self.inode = file_handle.portable_ino()?;
         }
         self.path = path;
+        self.path_str = path_str;
         Ok(())
     }
 

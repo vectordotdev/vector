@@ -252,7 +252,7 @@ where
 
                     lines.push(Line {
                         text: line,
-                        filename: watcher.path.to_str().expect("not a valid path").to_owned(),
+                        filename: Arc::clone(&watcher.path_str),
                         file_id,
                         offset: watcher.get_file_position(),
                     });
@@ -513,7 +513,7 @@ impl Default for TimingStats {
 #[derive(Debug)]
 pub struct Line {
     pub text: Bytes,
-    pub filename: String,
+    pub filename: Arc<str>,
     pub file_id: FileFingerprint,
     pub offset: u64,
 }

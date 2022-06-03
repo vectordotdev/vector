@@ -166,7 +166,7 @@ const fn default_lines() -> usize {
 
 #[derive(Debug)]
 pub(crate) struct FinalizerEntry {
-    pub(crate) file_name: String,
+    pub(crate) file_name: Arc<str>,
     pub(crate) file_id: FileFingerprint,
     pub(crate) offset: u64,
 }
