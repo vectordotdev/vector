@@ -340,9 +340,15 @@ impl<'a> Compiler<'a> {
                 // );
                 self.local = result;
 
-                if let Some(details) =
-                    Details::merge_optional(original_external, external.target().cloned())
-                {
+                let merged_details =
+                    Details::merge_optional(original_external.clone(), external.target().cloned());
+                println!(
+                    "Merging original: {:?} and if={:?} to make {:?}",
+                    original_external,
+                    external.target().cloned(),
+                    merged_details
+                );
+                if let Some(details) = merged_details {
                     external.update_target(details);
                 }
 

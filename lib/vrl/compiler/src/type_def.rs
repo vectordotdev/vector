@@ -416,7 +416,13 @@ impl Details {
     pub(crate) fn merge_optional(a: Option<Self>, b: Option<Self>) -> Option<Self> {
         match (a, b) {
             (Some(a), Some(b)) => Some(a.merge(b)),
-            (Some(x), None) | (None, Some(x)) => Some(x),
+            (Some(x), None) | (None, Some(x)) => {
+                // None for details can mean "any" type
+                Some(Details {
+                    type_def: TypeDef::any(),
+                    value: None,
+                })
+            }
             (None, None) => None,
         }
     }
