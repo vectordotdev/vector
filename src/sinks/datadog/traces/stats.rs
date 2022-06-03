@@ -3,6 +3,7 @@ use std::{collections::BTreeMap, time};
 use chrono::Utc;
 use prost::Message;
 use serde::{Deserialize, Serialize};
+use serde_bytes;
 
 use crate::{
     event::{TraceEvent, Value},
@@ -479,8 +480,10 @@ pub struct ClientGroupedStats {
     #[serde(rename(serialize = "Duration"))]
     pub duration: u64,
     #[serde(rename(serialize = "OkSummary"))]
+    #[serde(with = "serde_bytes")]
     pub ok_summary: Vec<u8>,
     #[serde(rename(serialize = "ErrorSummary"))]
+    #[serde(with = "serde_bytes")]
     pub error_summary: Vec<u8>,
     #[serde(rename(serialize = "Synthetics"))]
     pub synthetics: bool,
