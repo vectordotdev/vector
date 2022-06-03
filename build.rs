@@ -101,7 +101,7 @@ fn main() {
     {
         println!("cargo:rerun-if-changed=proto/dd_trace.proto");
         println!("cargo:rerun-if-changed=proto/dnstap.proto");
-        println!("cargo:rerun-if-changed=proto/ddsketch.proto");
+        println!("cargo:rerun-if-changed=proto/dd_metric.proto");
         println!("cargo:rerun-if-changed=proto/google/pubsub/v1/pubsub.proto");
         println!("cargo:rerun-if-changed=proto/vector.proto");
 
@@ -114,7 +114,7 @@ fn main() {
                 &[
                     "lib/vector-core/proto/event.proto",
                     "proto/dnstap.proto",
-                    "proto/ddsketch.proto",
+                    "proto/dd_metric.proto",
                     "proto/dd_trace.proto",
                     "proto/google/pubsub/v1/pubsub.proto",
                     "proto/vector.proto",
