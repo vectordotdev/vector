@@ -12,6 +12,7 @@ use serde::{
 };
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -65,23 +66,32 @@ impl From<Option<String>> for Namespace {
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
+/// Configuration for the `host_metrics` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug, Default)]
 pub struct HostMetricsConfig {
+    /// The interval between metric gathering, in seconds.
     #[serde(default = "default_scrape_interval")]
     pub scrape_interval_secs: f64,
 
     pub collectors: Option<Vec<Collector>>,
+
+    /// Overrides the default namespace for the metrics emitted by the source.
+    ///
+    /// By default, `host` is used.
     #[serde(default)]
     pub namespace: Namespace,
 
     #[cfg(target_os = "linux")]
     #[serde(default)]
     pub(crate) cgroups: cgroups::CGroupsConfig,
+
     #[serde(default)]
     pub disk: disk::DiskConfig,
+
     #[serde(default)]
     pub filesystem: filesystem::FilesystemConfig,
+
     #[serde(default)]
     pub network: network::NetworkConfig,
 }

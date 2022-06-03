@@ -66,7 +66,17 @@
 // able to get away with using a combination of `allOf` and `oneOf` where we define a subschema for the non-aliased
 // fields, and then a subschema using `oneOf`for each aliased field -- allowing it to match any of the possible field
 // names for that specific field -- and then combine them all with `allOf`, which keeps the schema as compact as
-// possible, I think, short of a new version of the specification coming out that adds native alias support for properties.
+// possible, I think, short of a new version of the specification coming out that adds native alias support for
+// properties.
+//
+// TODO: Add support for defining metadata on fields, since each field is defined as a schema unto itself, so we can
+// stash metadata in the extensions for each field the same as we do for structs.
+//
+// TODO: Add support for single value metadata entries, in addition to key/value, such that for things like field metadata, we
+// can essentially define flags i.e. `docs:templateable` as a metadata value for marking a field as working with
+// Vector's template syntax, since doing `templateable = true` is weird given that we never otherwise specifically
+// disable it. In other words, we want a way to define feature flags in metadata.
+
 use core::fmt;
 use core::marker::PhantomData;
 
@@ -84,6 +94,7 @@ pub mod schemars {
     pub use schemars::*;
 }
 
+mod external;
 mod stdlib;
 
 // Re-export of the `#[configurable_component]` and `#[derive(Configurable)]` proc macros.

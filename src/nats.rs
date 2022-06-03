@@ -1,6 +1,6 @@
 use nkeys::error::Error as NKeysError;
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use vector_config::configurable_component;
 
 use crate::tls::TlsEnableableConfig;
 
@@ -14,19 +14,36 @@ pub enum NatsConfigError {
     TlsMissingCert,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+/// Configuration for how Vector should authenticate to NATS.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(rename_all = "snake_case", tag = "strategy")]
 pub(crate) enum NatsAuthConfig {
+    /// Username and password authentication.
+    /// ([documentation](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/username_password))
     UserPassword {
+        #[configurable(derived)]
         user_password: NatsAuthUserPassword,
     },
+
+    /// Token authentication.
+    /// ([documentation](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/tokens))
     Token {
+        #[configurable(derived)]
         token: NatsAuthToken,
     },
+
+    /// Credentials file authentication.
+    /// ([documentation](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/jwt))
     CredentialsFile {
+        #[configurable(derived)]
         credentials_file: NatsAuthCredentialsFile,
     },
+
+    /// NKey authentication.
+    /// ([documentation](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/nkey_auth))
     Nkey {
+        #[configurable(derived)]
         nkey: NatsAuthNKey,
     },
 }
@@ -44,29 +61,45 @@ impl std::fmt::Display for NatsAuthConfig {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
+/// Username and password configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub(crate) struct NatsAuthUserPassword {
+    /// Username.
     pub(crate) user: String,
+
+    /// Password.
     pub(crate) password: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
+/// Token configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub(crate) struct NatsAuthToken {
+    /// Token.
     pub(crate) value: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
+/// Credentials file configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub(crate) struct NatsAuthCredentialsFile {
+    /// Path to credentials file.
     pub(crate) path: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
+/// NKeys configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub(crate) struct NatsAuthNKey {
+    /// User.
+    ///
+    /// This is equivalent to a public key.
     pub(crate) nkey: String,
+
+    /// Seed.
+    ///
+    /// This is equivalent to a private key.
     pub(crate) seed: String,
 }
 

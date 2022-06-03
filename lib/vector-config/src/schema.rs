@@ -1,7 +1,7 @@
 use std::{collections::BTreeSet, mem};
 
 use indexmap::IndexMap;
-use num_traits::{Bounded, ToPrimitive};
+use num_traits::{Bounded, ToPrimitive, Zero};
 use schemars::{
     gen::{SchemaGenerator, SchemaSettings},
     schema::{
@@ -9,7 +9,7 @@ use schemars::{
         SchemaObject, SingleOrVec, SubschemaValidation,
     },
 };
-use serde_json::{Map, Value};
+use serde_json::{Map, Number, Value};
 use vector_config_common::num::{NUMERIC_ENFORCED_LOWER_BOUND, NUMERIC_ENFORCED_UPPER_BOUND};
 
 use crate::{Configurable, Metadata};
@@ -153,9 +153,9 @@ pub fn generate_string_schema() -> SchemaObject {
     }
 }
 
-pub fn generate_number_schema<'de, N>() -> SchemaObject
+pub fn generate_number_schema<'de, N>(nonzero: bool) -> SchemaObject
 where
-    N: Configurable<'de> + Bounded + ToPrimitive,
+    N: Configurable<'de> + Bounded + ToPrimitive + Zero,
 {
     // Calculate the minimum/maximum for the given `N`, respecting the 2^53 limit we put on each of those values.
     let (minimum, maximum) = {
@@ -184,7 +184,7 @@ where
     };
 
     // We always set the minimum/maximum bound to the mechanical limits
-    SchemaObject {
+    let mut schema = SchemaObject {
         instance_type: Some(InstanceType::Number.into()),
         number: Some(Box::new(NumberValidation {
             minimum: Some(minimum),
@@ -192,7 +192,27 @@ where
             ..Default::default()
         })),
         ..Default::default()
+    };
+
+    // If the actual numeric type we're generating the schema for is a nonzero variant, we add an additional `not`
+    // subschema validation.
+    if nonzero {
+        let zero_num_unsigned = N::zero().to_u64().map(Into::into);
+        let zero_num_floating = N::zero().to_f64().and_then(Number::from_f64);
+        let zero_num = zero_num_unsigned
+            .or(zero_num_floating)
+            .expect("No usable integer type should be unrepresentable by both `u64` and `f64`.");
+
+        schema.subschemas = Some(Box::new(SubschemaValidation {
+            not: Some(Box::new(Schema::Object(SchemaObject {
+                const_value: Some(Value::Number(zero_num)),
+                ..Default::default()
+            }))),
+            ..Default::default()
+        }));
     }
+
+    schema
 }
 
 pub fn generate_array_schema<'de, T>(
@@ -209,6 +229,27 @@ where
         instance_type: Some(InstanceType::Array.into()),
         array: Some(Box::new(ArrayValidation {
             items: Some(SingleOrVec::Single(Box::new(element_schema.into()))),
+            ..Default::default()
+        })),
+        ..Default::default()
+    }
+}
+
+pub fn generate_set_schema<'de, T>(
+    gen: &mut SchemaGenerator,
+    metadata: Metadata<'de, T>,
+) -> SchemaObject
+where
+    T: Configurable<'de>,
+{
+    // We generate the schema for `T` itself, and then apply any of `T`'s metadata to the given schema.
+    let element_schema = T::generate_schema(gen, metadata);
+
+    SchemaObject {
+        instance_type: Some(InstanceType::Array.into()),
+        array: Some(Box::new(ArrayValidation {
+            items: Some(SingleOrVec::Single(Box::new(element_schema.into()))),
+            unique_items: Some(true),
             ..Default::default()
         })),
         ..Default::default()

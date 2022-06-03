@@ -98,13 +98,19 @@ static CLIENT_ID: Lazy<String> = Lazy::new(|| uuid::Uuid::new_v4().to_string());
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 pub struct PubsubConfig {
+    /// The project name from which to pull logs.
     pub project: String,
 
+    /// The subscription within the project which is configured to receive logs.
     pub subscription: String,
 
+    /// The endpoint from which to pull data.
     pub endpoint: Option<String>,
 
-    #[serde(default)]
+    /// Whether or not to load authentication credentials.
+    ///
+    /// Only used for tests.
+    #[serde(skip, default)]
     pub skip_authentication: bool,
 
     #[serde(flatten)]
@@ -113,9 +119,13 @@ pub struct PubsubConfig {
     #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
+    /// The acknowledgement deadline, in seconds, to use for this stream.
+    ///
+    /// Messages that are not acknowledged when this deadline expires may be retransmitted.
     #[serde(default = "default_ack_deadline")]
     pub ack_deadline_seconds: i32,
 
+    /// The amount of time, in seconds, to wait between retry attempts after an error.
     #[serde(default = "default_retry_delay")]
     pub retry_delay_seconds: f64,
 

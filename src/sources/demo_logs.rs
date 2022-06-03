@@ -272,7 +272,7 @@ impl SourceConfig for DemoLogsConfig {
 // TODO: Is this old enough now that we could actually remove it?
 #[configurable_component(source)]
 #[derive(Clone, Debug)]
-struct DemoLogsCompatConfig(#[configurable(transparent)] DemoLogsConfig);
+pub struct DemoLogsCompatConfig(#[configurable(transparent)] DemoLogsConfig);
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "generator")]

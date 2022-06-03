@@ -8895,6 +8895,7 @@ dependencies = [
 name = "vector_config"
 version = "0.1.0"
 dependencies = [
+ "encoding_rs",
  "indexmap",
  "num-traits",
  "schemars",

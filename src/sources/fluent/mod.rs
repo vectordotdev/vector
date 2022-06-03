@@ -470,6 +470,7 @@ mod tests {
     use bytes::BytesMut;
     use chrono::{DateTime, Utc};
     use rmp_serde::Serializer;
+    use serde::Serialize;
     use std::collections::BTreeMap;
     use tokio::{
         io::{AsyncReadExt, AsyncWriteExt},

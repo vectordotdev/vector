@@ -1,4 +1,3 @@
-use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 
 #[cfg(feature = "sources-apache_metrics")]
@@ -74,7 +73,7 @@ pub mod vector;
 
 pub(crate) mod util;
 
-use vector_config::Configurable;
+use vector_config::configurable_component;
 pub use vector_core::source::Source;
 
 /// Common build errors
@@ -85,7 +84,8 @@ enum BuildError {
 }
 
 /// Configurable sources in Vector.
-#[derive(Clone, Configurable, Deserialize, Serialize)]
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Sources {
     /// Apache HTTP Server (HTTPD) Metrics.
@@ -144,6 +144,10 @@ pub enum Sources {
     #[cfg(feature = "sources-gcp_pubsub")]
     GcpPubsub(#[configurable(derived)] gcp_pubsub::PubsubConfig),
 
+    /// Generator.
+    #[cfg(feature = "sources-demo_logs")]
+    Generator(#[configurable(derived)] demo_logs::DemoLogsCompatConfig),
+
     /// Heroku Logs.
     #[cfg(feature = "sources-heroku_logs")]
     HerokuLogs(#[configurable(derived)] heroku_logs::LogplexConfig),
@@ -175,6 +179,10 @@ pub enum Sources {
     /// Kubernetes Logs.
     #[cfg(feature = "sources-kubernetes_logs")]
     KubernetesLogs(#[configurable(derived)] kubernetes_logs::Config),
+
+    /// Heroku Logs.
+    #[cfg(feature = "sources-heroku_logs")]
+    Logplex(#[configurable(derived)] heroku_logs::LogplexCompatConfig),
 
     /// Logstash.
     #[cfg(all(feature = "sources-logstash"))]

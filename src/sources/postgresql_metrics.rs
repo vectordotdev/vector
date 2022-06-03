@@ -94,9 +94,13 @@ enum CollectError {
     QueryError { source: PgError },
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
-#[serde(deny_unknown_fields)]
+/// TLS configuration for connecting to PostgreSQL.
+#[configurable_component]
+#[derive(Clone, Debug)]
 struct PostgresqlMetricsTlsConfig {
+    /// Absolute path to an additional CA certificate file.
+    ///
+    /// The certficate must be in the DER or PEM (X.509) format.
     ca_file: PathBuf,
 }
 
@@ -105,16 +109,40 @@ struct PostgresqlMetricsTlsConfig {
 #[derive(Clone, Debug)]
 #[serde(default)]
 pub struct PostgresqlMetricsConfig {
+    /// A list of PostgreSQL instances to scrape.
+    ///
+    /// Each endpoint must be in the [Connection URI
+    /// format](https://www.postgresql.org/docs/current/libpq-connect.html#id-1.7.3.8.3.6).
     endpoints: Vec<String>,
 
+    /// A list of databases to match (by using [POSIX Regular
+    /// Expressions](https://www.postgresql.org/docs/current/functions-matching.html#FUNCTIONS-POSIX-REGEXP)) against
+    /// the `datname` column for which you want to collect metrics from.
+    ///
+    /// If not set, metrics are collected from all databases. Specifying `""` will include metrics where `datname` is
+    /// `NULL`.
+    ///
+    /// This can be used in conjunction with `exclude_databases`.
     include_databases: Option<Vec<String>>,
 
+    /// A list of databases to match (by using [POSIX Regular
+    /// Expressions](https://www.postgresql.org/docs/current/functions-matching.html#FUNCTIONS-POSIX-REGEXP)) against
+    /// the `datname` column for which you don’t want to collect metrics from.
+    ///
+    /// Specifying `""` will include metrics where `datname` is `NULL`.
+    ///
+    /// This can be used in conjunction with `include_databases`.
     exclude_databases: Option<Vec<String>>,
 
+    /// The interval between scrapes, in seconds.
     scrape_interval_secs: u64,
 
+    /// Overrides the default namespace for the metrics emitted by the source.
+    ///
+    /// By default, `postgresql` is used.
     namespace: String,
 
+    #[configurable(derived)]
     tls: Option<PostgresqlMetricsTlsConfig>,
 }
 

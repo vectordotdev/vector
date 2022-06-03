@@ -78,6 +78,7 @@ pub struct SimpleHttpConfig {
     #[serde(default)]
     query_parameters: Vec<String>,
 
+    #[configurable(derived)]
     auth: Option<HttpSourceAuthConfig>,
 
     /// Whether or not to treat the configured `path` as an absolute path.

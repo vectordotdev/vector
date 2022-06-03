@@ -29,22 +29,32 @@ enum BuildError {
     Subscribe { source: std::io::Error },
 }
 
+/// Configuration for the `nats` source.
 #[configurable_component(source)]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 pub struct NatsSourceConfig {
+    /// The NATS URL to connect to.
+    ///
+    /// The URL must take the form of `nats://server:port`.
     url: String,
 
+    /// A name assigned to the NATS connection.
     #[serde(alias = "name")]
     connection_name: String,
 
+    /// The NATS subject to publish messages to.
+    // TODO: We will eventually be able to add metadata on a per-field basis, such that we can add metadata for marking
+    // this field as being capable of using Vector's templating syntax.
     subject: String,
 
+    /// NATS Queue Group to join.
     queue: Option<String>,
 
     #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
+    #[configurable(derived)]
     auth: Option<NatsAuthConfig>,
 
     #[configurable(derived)]

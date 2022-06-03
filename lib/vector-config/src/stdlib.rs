@@ -1,4 +1,12 @@
-use std::{collections::HashMap, net::SocketAddr, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    net::SocketAddr,
+    num::{
+        NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI8, NonZeroU16, NonZeroU32, NonZeroU64,
+        NonZeroU8,
+    },
+    path::PathBuf,
+};
 
 use schemars::{gen::SchemaGenerator, schema::SchemaObject};
 use vector_config_common::validation::Validation;
@@ -6,7 +14,8 @@ use vector_config_common::validation::Validation;
 use crate::{
     schema::{
         finalize_schema, generate_array_schema, generate_bool_schema, generate_map_schema,
-        generate_number_schema, generate_optional_schema, generate_string_schema,
+        generate_number_schema, generate_optional_schema, generate_set_schema,
+        generate_string_schema,
     },
     Configurable, Metadata,
 };
@@ -70,7 +79,7 @@ macro_rules! impl_configuable_unsigned {
 			impl<'de> Configurable<'de> for $ty {
 				fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
                     $crate::__ensure_numeric_validation_bounds::<Self>(&overrides);
-					let mut schema = generate_number_schema::<Self>();
+					let mut schema = generate_number_schema::<Self>(false);
 					finalize_schema(gen, &mut schema, overrides);
 					schema
 				}
@@ -85,7 +94,39 @@ macro_rules! impl_configuable_signed {
 			impl<'de> Configurable<'de> for $ty {
 				fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
                     $crate::__ensure_numeric_validation_bounds::<Self>(&overrides);
-					let mut schema = generate_number_schema::<Self>();
+					let mut schema = generate_number_schema::<Self>(false);
+					finalize_schema(gen, &mut schema, overrides);
+					schema
+				}
+			}
+		)+
+	};
+}
+
+macro_rules! impl_configuable_nonzero_unsigned {
+	($($aty:ty => $ity:ty),+) => {
+		$(
+			impl<'de> Configurable<'de> for $aty {
+				fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
+                    let overrides = overrides.map_default_value(|n| n.get());
+                    $crate::__ensure_numeric_validation_bounds::<$ity>(&overrides);
+					let mut schema = generate_number_schema::<$ity>(true);
+					finalize_schema(gen, &mut schema, overrides);
+					schema
+				}
+			}
+		)+
+	};
+}
+
+macro_rules! impl_configuable_nonzero_signed {
+	($($aty:ty => $ity:ty),+) => {
+		$(
+			impl<'de> Configurable<'de> for $aty {
+				fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
+                    let overrides = overrides.map_default_value(|n| n.get());
+                    $crate::__ensure_numeric_validation_bounds::<$ity>(&overrides);
+					let mut schema = generate_number_schema::<$ity>(true);
 					finalize_schema(gen, &mut schema, overrides);
 					schema
 				}
@@ -96,11 +137,13 @@ macro_rules! impl_configuable_signed {
 
 impl_configuable_unsigned!(u8, u16, u32, u64);
 impl_configuable_signed!(i8, i16, i32, i64);
+impl_configuable_nonzero_unsigned!(NonZeroU8 => u8, NonZeroU16 => u16, NonZeroU32 => u32, NonZeroU64 => u64);
+impl_configuable_nonzero_signed!(NonZeroI8 => i8, NonZeroI16 => i16, NonZeroI32 => i32, NonZeroI64 => i64);
 
 impl<'de> Configurable<'de> for usize {
     fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
         crate::__ensure_numeric_validation_bounds::<Self>(&overrides);
-        let mut schema = generate_number_schema::<Self>();
+        let mut schema = generate_number_schema::<Self>(false);
         finalize_schema(gen, &mut schema, overrides);
         schema
     }
@@ -109,7 +152,7 @@ impl<'de> Configurable<'de> for usize {
 impl<'de> Configurable<'de> for f64 {
     fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
         crate::__ensure_numeric_validation_bounds::<Self>(&overrides);
-        let mut schema = generate_number_schema::<Self>();
+        let mut schema = generate_number_schema::<Self>(false);
         finalize_schema(gen, &mut schema, overrides);
         schema
     }
@@ -118,7 +161,7 @@ impl<'de> Configurable<'de> for f64 {
 impl<'de> Configurable<'de> for f32 {
     fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
         crate::__ensure_numeric_validation_bounds::<Self>(&overrides);
-        let mut schema = generate_number_schema::<Self>();
+        let mut schema = generate_number_schema::<Self>(false);
         finalize_schema(gen, &mut schema, overrides);
         schema
     }
@@ -167,6 +210,28 @@ where
         value_metadata.set_transparent();
 
         let mut schema = generate_map_schema(gen, value_metadata);
+        finalize_schema(gen, &mut schema, overrides);
+        schema
+    }
+}
+
+impl<'de, V> Configurable<'de> for HashSet<V>
+where
+    V: Configurable<'de> + Eq + std::hash::Hash,
+{
+    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
+        // We explicitly do not pass anything from the override metadata, because there's nothing to reasonably pass: if
+        // `V` is referencable, using the description for `HashSet<V>` likely makes no sense, nor would a default make
+        // sense, and so on.
+        //
+        // We do, however, set `V` to be "transparent", which means that during schema finalization, we will relax the
+        // rules we enforce, such as needing a description, knowing that they'll be enforced on the field using
+        // `HashSet<V>` itself, where carrying that description forward to `V` might literally make no sense, such as
+        // when `V` is a primitive type like an integer or string.
+        let mut value_metadata = V::metadata();
+        value_metadata.set_transparent();
+
+        let mut schema = generate_set_schema(gen, value_metadata);
         finalize_schema(gen, &mut schema, overrides);
         schema
     }

@@ -38,12 +38,16 @@ pub struct LogplexConfig {
     /// The address to listen for connections on.
     address: SocketAddr,
 
+    /// A list of URL query parameters to include in the log event.
+    ///
+    /// These will override any values included in the body with conflicting names.
     #[serde(default)]
     query_parameters: Vec<String>,
 
     #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
+    #[configurable(derived)]
     auth: Option<HttpSourceAuthConfig>,
 
     #[configurable(derived)]
@@ -141,8 +145,11 @@ impl SourceConfig for LogplexConfig {
 }
 
 // Add a compatibility alias to avoid breaking existing configs
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct LogplexCompatConfig(LogplexConfig);
+
+/// Configuration for the `logplex` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
+pub struct LogplexCompatConfig(#[configurable(transparent)] LogplexConfig);
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "logplex")]
