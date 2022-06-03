@@ -459,7 +459,59 @@ Prime numbers: 664579
 
 I happen to be writing at present on a Thinkpad and I'm running these
 experiments on the same device. What can account for these differences and can
-we control for them? _That_ question is what motivates the STABILIZER paper. The authors note that "
+we control for them? Well, one approach is to use a statistical approach to
+measuring the behavior of a program. On a modern computer these and other
+factors might influence how quickly a program runs, independent of the program
+being run:
+
+* branch misprediction
+* cache behavior
+* CPU frequency scaling
+* the location of the program in memory
+* scheduling by the kernel onto CPU cores
+* etc
+
+We can see above, for instance, that although the _same_ program is run it is
+given slightly different totals of memory pages by the kernel, which leads to
+slightly different page fault totals. In a short run this doesn't matter
+overmuch, but that will add up over time. What can be done? Well, first, we need
+tools that automatically re-run our programs a "statistically significant"
+number of times to understand what it's overall behavior is in the space of its
+probable behaviors. One of my favorites is [hyperfine][hyperfine].
+
+TODO demonstrate hyperfine, show it off in the context of is_prime and note that one problem is it doesn't work for long-running programs
+
+The STABILIZER paper argues that this is not totally sufficient:
+
+> Unfortunately, even when using current best practices (large numbers of runs
+> and a quiescent system), this approach is unsound. The problem is due to the
+> interaction between software and modern architectural features, especially
+> caches and branch predictors. These features are sensitive to the addresses of
+> the objects they manage. Because of the significant performance penalties
+> imposed by cache misses or branch mispredictions (e.g, due to aliasing), their
+> reliance on addresses makes software exquisitely sensitive to memory
+> layout. Small changes to code, adding or removing a stack variable, or
+> changing the order of heap allocations can have a ripple effect that alters
+> the placement in memory of every other function, stack frame, and heap object.
+>
+> The effect of these changes is unpredictable and substantial: [Mytkowicz et
+> al.][producing-wrong-data] show that just changing the size of environment
+> variables can trigger performance degradation as high as 300%; we find that
+> simply changing the link order of object files can cause performance to
+> decrease by up to 57%.
+
+The paper then goes on to describe a very clever, invasive system that
+automatically explores the memory layout space but does require you to specially
+compile your program to get it. Happily on a modern Linux system we _sort of_
+get some of the benefit through [ASLR](https://lwn.net/Articles/569635/)
+
+
+
+There are many, many factors that influence runtimes.
+
+
+method  _That_ question is what motivates the STABILIZER paper. The
+authors note that "
 
 ## Micro-Benchmarks
 
@@ -479,3 +531,34 @@ It might be worthwhile
 [dwarf]: https://dwarfstd.org/
 [rem]: https://doc.rust-lang.org/std/ops/trait.Rem.html
 [stabilizer]: https://people.cs.umass.edu/~emery/pubs/stabilizer-asplos13-draft.pdf
+[producing-wrong-data]: https://users.cs.northwestern.edu/~robby/courses/322-2013-spring/mytkowicz-wrong-data.pdf
+[aslr]: https://lwn.net/Articles/569635/
+[hyperfine]: https://github.com/sharkdp/hyperfine
+
+- - -
+
+DRAGONS
+
+Piece _might_ get up to chapter size following the A Week on the Concord and
+Merrimack Rivers model. Ben's thoughts:
+
+    Audience: Bottom up - Engineers, SREs, etc. The people actually using Vector. Hackernews types.
+    Takeaway: “Vector is the fastest. Making Vector fast requires way more engineering than I thought. Brian Troutwine is smart. I’ll just use Vector.” :sunglasses:
+    Goal: To establish Vector’s place in the market as the fastest.
+    Structure (less concerned about this, do what you think is best as long as it accomplishes the above):
+
+    Back story / problem - Who are you? Why are you writing this post? What can the reader expect to gain from reading?
+    Journey to becoming the fastest data router:
+
+    First and foremost - accurate signal and regression control (soak framework)
+    High impact changes that the soaks drove: batching, etc, etc,
+
+    Before / after performance results
+
+With this audience we could short cut some of the detail here, assume knowledge of:
+
+* profiler basics, skip to perf and how its signal doesn't lead to action but inference
+* measurement difficulty RE statisticall stability, long-running daemons
+* describe in detail regression detector, limitations
+* probably most interesting to do release over release comparisons, bisect interesting changes between
+  * issue with backward incompatibility, Luke has scraped data
