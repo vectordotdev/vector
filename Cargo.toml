@@ -129,7 +129,7 @@ vrl-cli = { path = "lib/vrl/cli", optional = true }
 
 # Tokio / Futures
 async-stream = { version = "0.3.3", default-features = false }
-async-trait = { version = "0.1.53", default-features = false }
+async-trait = { version = "0.1.56", default-features = false }
 futures = { version = "0.3.21", default-features = false, features = ["compat", "io-compat"], package = "futures" }
 tokio = { version = "1.18.2", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
