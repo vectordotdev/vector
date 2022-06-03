@@ -5,5 +5,3 @@ if .platform == "Apache2" || .platform == "Nginx" {
   if is_null(apache2) { apache2 = {} }
   .http = merge(object!(apache2), {})
 }
-
-
