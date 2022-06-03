@@ -360,6 +360,7 @@ impl AsyncWrite for MaybeTlsIncomingStream<TcpStream> {
     }
 }
 
+#[derive(Debug)]
 pub struct CertificateMetadata {
     pub country_name: Option<String>,
     pub state_or_province_name: Option<String>,

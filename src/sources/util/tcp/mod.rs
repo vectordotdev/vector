@@ -280,7 +280,10 @@ async fn handle_stream<T>(
     let certificate_metadata = socket
         .get_ref()
         .ssl_stream()
-        .and_then(|stream| stream.ssl().peer_certificate())
+        .and_then(|stream| {
+            dbg!(stream.ssl().peer_certificate());
+            stream.ssl().peer_certificate()
+        })
         .map(CertificateMetadata::from_x509);
 
     let reader = FramedRead::new(socket, source.decoder());
@@ -355,6 +358,7 @@ async fn handle_stream<T>(
                                     log.insert(&tls_peer_key[..], value::Value::from(metadata.clone()));
                                 }
                             }
+                            dbg!("No client certificate metadata");
                         }
 
                         source.handle_events(&mut events, peer_addr);
