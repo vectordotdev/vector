@@ -66,13 +66,6 @@ impl Function for Ceil {
         }]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let precision = args.optional("precision");
-
-        ceil(value, precision)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         Some(("vrl_fn_ceil", vrl_fn_ceil as _))
     }

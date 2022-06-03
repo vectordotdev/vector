@@ -133,36 +133,6 @@ impl Function for StartsWith {
         }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Resolved {
-        let value = arguments.required("value");
-        let substring = arguments.required("substring");
-        let case_sensitive = arguments
-            .optional("case_sensitive")
-            .map(|arg| arg.try_boolean())
-            .transpose()?
-            .unwrap_or(true);
-        let substring = {
-            let value = substring;
-            let string = value.try_bytes_utf8_lossy()?;
-
-            match case_sensitive {
-                true => string.into_owned(),
-                false => string.to_lowercase(),
-            }
-        };
-
-        let value = {
-            let string = value.try_bytes_utf8_lossy()?;
-
-            match case_sensitive {
-                true => string.into_owned(),
-                false => string.to_lowercase(),
-            }
-        };
-
-        Ok(value.starts_with(&substring).into())
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         Some(("vrl_fn_starts_with", vrl_fn_starts_with as _))
     }

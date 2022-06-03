@@ -115,11 +115,6 @@ impl Function for ParseGlog {
         }]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        parse_glog(value)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         // TODO
         None

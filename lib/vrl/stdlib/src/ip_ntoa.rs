@@ -47,11 +47,6 @@ impl Function for IpNtoa {
         Ok(Box::new(IpNtoaFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        ip_ntoa(value)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         // TODO
         None

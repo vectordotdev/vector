@@ -45,12 +45,6 @@ impl Function for DecodePercent {
         }]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-
-        decode_percent(value)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         Some(("vrl_fn_decode_percent", vrl_fn_decode_percent as _))
     }

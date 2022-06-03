@@ -78,11 +78,8 @@ impl Function for SetMetadataField {
         }
     }
 
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let key = args.required_any("key").downcast_ref::<String>().unwrap();
-
-        set_metadata_field(ctx, key, value)
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        Some(("vrl_fn_set_metadata_field", vrl_fn_set_metadata_field as _))
     }
 }
 
@@ -103,4 +100,10 @@ impl Expression for SetMetadataFieldFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::null().infallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_set_metadata_field(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }

@@ -52,11 +52,6 @@ impl Function for Boolean {
         Ok(Box::new(BooleanFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        boolean(value)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         Some(("vrl_fn_boolean", vrl_fn_boolean as _))
     }

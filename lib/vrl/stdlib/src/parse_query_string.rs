@@ -70,11 +70,6 @@ impl Function for ParseQueryString {
         }]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        parse_query_string(value)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         // TODO
         None

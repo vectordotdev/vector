@@ -102,16 +102,6 @@ impl Function for ToUnixTimestamp {
         }
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let unit = args
-            .optional_any("unit")
-            .map(|unit| *unit.downcast_ref::<Unit>().unwrap())
-            .unwrap_or_default();
-
-        to_unix_timestamp(value, unit)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         // TODO
         None

@@ -101,17 +101,6 @@ impl Function for Slice {
         Ok(Box::new(SliceFn { value, start, end }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let start = args.required("start").try_integer()?;
-        let end = args
-            .optional("end")
-            .map(|value| value.try_integer())
-            .transpose()?;
-
-        slice(start, end, value)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         // TODO
         None

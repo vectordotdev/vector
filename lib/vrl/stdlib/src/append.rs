@@ -51,13 +51,6 @@ impl Function for Append {
         Ok(Box::new(AppendFn { value, items }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let items = args.required("items");
-
-        append(value, items)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         Some(("vrl_fn_append", vrl_fn_append as _))
     }

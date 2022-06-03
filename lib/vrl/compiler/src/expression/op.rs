@@ -6,9 +6,8 @@ use value::Value;
 use crate::state::{ExternalEnv, LocalEnv};
 use crate::value::VrlValueArithmetic;
 use crate::{
-    expression::{self, Expr, Noop, Resolved},
+    expression::{self, Expr, Resolved},
     parser::{ast, Node},
-    vm::OpCode,
     Context, Expression, TypeDef,
 };
 
@@ -75,17 +74,6 @@ impl Op {
             rhs: Box::new(rhs),
             opcode,
         })
-    }
-
-    pub fn noop() -> Self {
-        let lhs = Box::new(Noop.into());
-        let rhs = Box::new(Noop.into());
-
-        Op {
-            lhs,
-            rhs,
-            opcode: ast::Opcode::Eq,
-        }
     }
 }
 
@@ -279,105 +267,6 @@ impl Expression for Op {
                 .fallible()
                 .with_kind(K::integer().or_float()),
         }
-    }
-
-    fn compile_to_vm(
-        &self,
-        vm: &mut crate::vm::Vm,
-        state: (&mut LocalEnv, &mut ExternalEnv),
-    ) -> Result<(), String> {
-        let (local, external) = state;
-
-        self.lhs.compile_to_vm(vm, (local, external))?;
-
-        let err_jump = if self.opcode != ast::Opcode::Err {
-            // For all Ops other than the Err op, we want to jump to the end of
-            // the statement if the lhs results in an error.
-            Some(vm.emit_jump(OpCode::JumpIfErr))
-        } else {
-            None
-        };
-
-        // Note, not all opcodes want the RHS evaluated straight away, so we
-        // only compile the rhs in each branch as necessary.
-        match self.opcode {
-            ast::Opcode::Mul => {
-                self.rhs.compile_to_vm(vm, (local, external))?;
-                vm.write_opcode(OpCode::Multiply);
-            }
-            ast::Opcode::Div => {
-                self.rhs.compile_to_vm(vm, (local, external))?;
-                vm.write_opcode(OpCode::Divide);
-            }
-            ast::Opcode::Add => {
-                self.rhs.compile_to_vm(vm, (local, external))?;
-                vm.write_opcode(OpCode::Add);
-            }
-            ast::Opcode::Sub => {
-                self.rhs.compile_to_vm(vm, (local, external))?;
-                vm.write_opcode(OpCode::Subtract);
-            }
-            ast::Opcode::Rem => {
-                self.rhs.compile_to_vm(vm, (local, external))?;
-                vm.write_opcode(OpCode::Rem);
-            }
-            ast::Opcode::Or => {
-                // Or is rewritten as an if statement to allow short circuiting.
-                let if_jump = vm.emit_jump(OpCode::JumpIfTruthy);
-                vm.write_opcode(OpCode::Pop);
-                self.rhs.compile_to_vm(vm, (local, external))?;
-                vm.patch_jump(if_jump);
-            }
-            ast::Opcode::And => {
-                // And is rewritten as an if statement to allow short circuiting
-                // JumpAndSwapIfFalsey will take any value from the stack that is falsey and
-                // replace it with False
-                let if_jump = vm.emit_jump(OpCode::JumpAndSwapIfFalsey);
-                self.rhs.compile_to_vm(vm, (local, external))?;
-                vm.write_opcode(OpCode::And);
-                vm.patch_jump(if_jump);
-            }
-            ast::Opcode::Err => {
-                // Err is rewritten as an if statement to allow short circuiting
-                let if_jump = vm.emit_jump(OpCode::JumpIfNotErr);
-                vm.write_opcode(OpCode::ClearError);
-                self.rhs.compile_to_vm(vm, (local, external))?;
-                vm.patch_jump(if_jump);
-            }
-            ast::Opcode::Ne => {
-                self.rhs.compile_to_vm(vm, (local, external))?;
-                vm.write_opcode(OpCode::NotEqual);
-            }
-            ast::Opcode::Eq => {
-                self.rhs.compile_to_vm(vm, (local, external))?;
-                vm.write_opcode(OpCode::Equal);
-            }
-            ast::Opcode::Ge => {
-                self.rhs.compile_to_vm(vm, (local, external))?;
-                vm.write_opcode(OpCode::GreaterEqual);
-            }
-            ast::Opcode::Gt => {
-                self.rhs.compile_to_vm(vm, (local, external))?;
-                vm.write_opcode(OpCode::Greater);
-            }
-            ast::Opcode::Le => {
-                self.rhs.compile_to_vm(vm, (local, external))?;
-                vm.write_opcode(OpCode::LessEqual);
-            }
-            ast::Opcode::Lt => {
-                self.rhs.compile_to_vm(vm, (local, external))?;
-                vm.write_opcode(OpCode::Less);
-            }
-            ast::Opcode::Merge => {
-                self.rhs.compile_to_vm(vm, (local, external))?;
-                vm.write_opcode(OpCode::Merge);
-            }
-        };
-
-        if let Some(err_jump) = err_jump {
-            vm.patch_jump(err_jump);
-        }
-        Ok(())
     }
 
     #[cfg(feature = "llvm")]
@@ -1060,10 +949,17 @@ mod tests {
         }
 
         divide_dynamic_rhs {
-            expr: |_| Op {
-                lhs: Box::new(Literal::from(1).into()),
-                rhs: Box::new(Variable::noop(Ident::new("foo")).into()),
-                opcode: Div,
+            expr: |(local, _): (&mut LocalEnv, &mut ExternalEnv)| {
+                local.insert_variable(Ident::new("foo"), crate::type_def::Details {
+                    type_def: TypeDef::null(),
+                    value: None,
+                });
+
+                Op {
+                    lhs: Box::new(Literal::from(1).into()),
+                    rhs: Box::new(Variable::new(Span::default(), Ident::new("foo"), local).unwrap().into()),
+                    opcode: Div,
+                }
             },
             want: TypeDef::float().fallible(),
         }

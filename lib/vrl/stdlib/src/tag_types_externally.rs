@@ -64,11 +64,6 @@ impl Function for TagTypesExternally {
         }]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        Ok(tag_type_externally(value))
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         // TODO
         None

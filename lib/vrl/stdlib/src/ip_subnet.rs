@@ -83,13 +83,6 @@ impl Function for IpSubnet {
         Ok(Box::new(IpSubnetFn { value, subnet }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let subnet = args.required("subnet");
-
-        ip_subnet(value, subnet)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         // TODO
         None

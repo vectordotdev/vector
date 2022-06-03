@@ -42,11 +42,6 @@ impl Function for Md5 {
         Ok(Box::new(Md5Fn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        md5(value)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         // TODO
         None

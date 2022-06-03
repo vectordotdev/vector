@@ -126,14 +126,6 @@ impl Function for ParseApacheLog {
         ]
     }
 
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let format = args.required_any("format").downcast_ref::<Bytes>().unwrap();
-        let timestamp_format = args.optional("timestamp_format");
-
-        parse_apache_log(value, timestamp_format, format, ctx)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         // TODO
         None

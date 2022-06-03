@@ -141,15 +141,6 @@ impl Function for FormatNumber {
         }]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let scale = args.optional("scale");
-        let decimal_separator = args.optional("decimal_separator");
-        let grouping_separator = args.optional("grouping_separator");
-
-        format_number(value, scale, grouping_separator, decimal_separator)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         // TODO
         None

@@ -64,11 +64,6 @@ impl Function for ParseSyslog {
         Ok(Box::new(ParseSyslogFn { value }))
     }
 
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        parse_syslog(value, ctx)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         // TODO
         None

@@ -32,10 +32,6 @@ impl Function for UuidV4 {
         Ok(Box::new(UuidV4Fn))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Resolved {
-        uuid_v4()
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         Some(("vrl_fn_uuid_v4", vrl_fn_uuid_v4 as _))
     }

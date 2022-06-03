@@ -162,20 +162,6 @@ impl Function for ParseGrok {
         }
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let remove_empty = args
-            .optional("remove_empty")
-            .unwrap_or(Value::Boolean(false));
-        let pattern = args
-            .required_any("pattern")
-            .downcast_ref::<Arc<grok::Pattern>>()
-            .unwrap()
-            .clone();
-
-        parse_grok(value, remove_empty, pattern)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         Some(("vrl_fn_parse_grok", vrl_fn_parse_grok as _))
     }

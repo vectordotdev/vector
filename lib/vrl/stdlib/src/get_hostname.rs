@@ -32,10 +32,6 @@ impl Function for GetHostname {
         }]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Resolved {
-        get_hostname()
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         // TODO
         None

@@ -4,7 +4,7 @@ use ::value::Value;
 use vrl::prelude::*;
 
 use crate::{
-    vrl_util::{self, add_index, evaluate_condition, index_from_args, EnrichmentTableRecord},
+    vrl_util::{self, add_index, evaluate_condition, index_from_args},
     Case, Condition, IndexHandle, TableRegistry, TableSearch,
 };
 
@@ -176,30 +176,11 @@ impl Function for FindEnrichmentTableRecords {
         }
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let condition = args.required("condition");
-        let condition = condition
-            .into_object()
-            .expect("condition should be an object");
-        let condition = condition
-            .iter()
-            .map(|(key, value)| evaluate_condition(key, value.clone()))
-            .collect::<Result<Vec<Condition>>>()?;
-
-        let record = args
-            .required_any("table")
-            .downcast_ref::<EnrichmentTableRecord>()
-            .unwrap();
-        let select = args.optional("select");
-
-        find_enrichment_table_records(
-            select,
-            &record.enrichment_tables,
-            &record.table,
-            record.case_sensitive,
-            &condition,
-            record.index,
-        )
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        Some((
+            "vrl_fn_find_enrichtment_table_records",
+            vrl_fn_find_enrichtment_table_records as _,
+        ))
     }
 }
 
@@ -248,6 +229,12 @@ impl Expression for FindEnrichmentTableRecordsFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::array(Collection::from_unknown(Kind::object(Collection::any()))).fallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_find_enrichtment_table_records(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

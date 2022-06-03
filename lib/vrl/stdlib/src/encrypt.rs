@@ -213,14 +213,6 @@ impl Function for Encrypt {
         }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let plaintext = args.required("plaintext");
-        let algorithm = args.required("algorithm");
-        let key = args.required("key");
-        let iv = args.required("iv");
-        encrypt(plaintext, algorithm, key, iv)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         Some(("vrl_fn_encrypt", vrl_fn_encrypt as _))
     }

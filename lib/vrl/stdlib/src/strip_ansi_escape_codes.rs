@@ -42,11 +42,6 @@ impl Function for StripAnsiEscapeCodes {
         Ok(Box::new(StripAnsiEscapeCodesFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        strip_ansi_escape_codes(value)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         // TODO
         None

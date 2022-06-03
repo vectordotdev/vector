@@ -30,7 +30,6 @@ pub use compiler::value::{VrlValueArithmetic, VrlValueConvert};
 // commonly used macros
 pub use compiler::{
     bench_function, expr, func_args, test_function, test_type_def, type_def, value,
-    vm::{VmArgumentList, VmFunctionClosure},
 };
 pub use diagnostic::DiagnosticMessage;
 pub use indoc::indoc;

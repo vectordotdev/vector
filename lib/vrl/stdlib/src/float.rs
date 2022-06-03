@@ -52,11 +52,6 @@ impl Function for Float {
         Ok(Box::new(FloatFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        float(value)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         Some(("vrl_fn_float", vrl_fn_float as _))
     }

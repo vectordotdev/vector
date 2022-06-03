@@ -185,17 +185,6 @@ impl Function for ParseJson {
         }
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let max_depth = args.optional("max_depth");
-
-        if let Some(max_depth) = max_depth {
-            parse_json_with_depth(value, max_depth)
-        } else {
-            parse_json(value)
-        }
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         Some(("vrl_fn_parse_json", vrl_fn_parse_json as _))
     }

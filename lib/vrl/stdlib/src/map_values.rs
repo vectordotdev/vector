@@ -101,20 +101,6 @@ impl Function for MapValues {
         })
     }
 
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
-        let value = args.required("value");
-        let recursive = args
-            .optional("recursive")
-            .map(|v| v.try_boolean())
-            .transpose()?
-            .unwrap_or_default();
-
-        let VmFunctionClosure { variables, vm } = args.closure();
-        let runner = closure::Runner::new(variables, |ctx| vm.interpret(ctx));
-
-        map_values(value, recursive, ctx, runner)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         // TODO
         None

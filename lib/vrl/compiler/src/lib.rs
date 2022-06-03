@@ -18,7 +18,6 @@ pub mod llvm;
 pub mod state;
 pub mod type_def;
 pub mod value;
-pub mod vm;
 
 use std::{fmt::Display, str::FromStr};
 
@@ -42,7 +41,6 @@ pub type Result<T> = std::result::Result<T, DiagnosticList>;
 #[serde(rename_all = "lowercase")]
 pub enum VrlRuntime {
     Ast,
-    Vm,
     Llvm,
 }
 
@@ -58,9 +56,8 @@ impl FromStr for VrlRuntime {
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
             "ast" => Ok(Self::Ast),
-            "vm" => Ok(Self::Vm),
             "llvm" => Ok(Self::Llvm),
-            _ => Err("runtime must be ast, vm or llvm."),
+            _ => Err("runtime must be ast or llvm."),
         }
     }
 }
@@ -72,7 +69,6 @@ impl Display for VrlRuntime {
             "{}",
             match self {
                 VrlRuntime::Ast => "ast",
-                VrlRuntime::Vm => "vm",
                 VrlRuntime::Llvm => "llvm",
             }
         )

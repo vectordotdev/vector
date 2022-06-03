@@ -82,17 +82,6 @@ impl Function for Contains {
         ]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let substring = args.required("substring");
-        let case_sensitive = args
-            .optional("case_sensitive")
-            .and_then(|value| value.try_boolean().ok())
-            .unwrap_or(true);
-
-        contains(value, substring, case_sensitive)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         Some(("vrl_fn_contains", vrl_fn_contains as _))
     }

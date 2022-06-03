@@ -243,7 +243,7 @@ releases: "0.22.0": {
 			scopes: ["socket source"]
 			description: """
 				The `socket` source now discards UDP frames greater than the configured `max_length` (when `mode
-				= "udp"`). Previously these were truncated rather than discarded, which did not the behavior when
+				= "udp"`). Previously these were truncated rather than discarded, which did not match the behavior when
 				`mode = "tcp"`. All `socket` source modes are now consistent with dropping messages greater than
 				`max_length`.
 				"""
@@ -257,7 +257,7 @@ releases: "0.22.0": {
 				representation: `native` and `native_json`. This makes it easier to send events between Vector instances
 				on transports like `kafka`. It also makes it possible to send metrics to Vector from an external process
 				(such as when using the `exec` source) without needing to use the `lua` transform to convert logs to
-				metrics. Previously, these generic sources (like `exec` or `http`) could only receieve logs. See the
+				metrics. Previously, these generic sources (like `exec` or `http`) could only receive logs. See the
 				[release highlight](/highlights/2022-03-31-native-event-codecs) for more about this new feature and how
 				to use it.
 				"""

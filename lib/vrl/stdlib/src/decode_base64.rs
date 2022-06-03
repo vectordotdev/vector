@@ -67,13 +67,6 @@ impl Function for DecodeBase64 {
         }]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let charset = args.optional("charset");
-
-        decode_base64(charset, value)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         Some(("vrl_fn_decode_base64", vrl_fn_decode_base64 as _))
     }

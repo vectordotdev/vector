@@ -68,9 +68,11 @@ impl Function for RemoveMetadataField {
         }
     }
 
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let key = args.required_any("key").downcast_ref::<String>().unwrap();
-        remove_metadata_field(ctx, key)
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        Some((
+            "vrl_fn_remove_metadata_field",
+            vrl_fn_remove_metadata_field as _,
+        ))
     }
 }
 
@@ -89,4 +91,10 @@ impl Expression for RemoveMetadataFieldFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::null().infallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_remove_metadata_field(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }

@@ -75,14 +75,6 @@ impl Function for EncodeBase64 {
         }]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let padding = args.optional("padding");
-        let charset = args.optional("charset");
-
-        encode_base64(value, padding, charset)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         Some(("vrl_fn_encode_base64", vrl_fn_encode_base64 as _))
     }

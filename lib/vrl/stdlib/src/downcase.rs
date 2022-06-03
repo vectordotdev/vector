@@ -40,11 +40,6 @@ impl Function for Downcase {
         }]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        downcase(value)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         Some(("vrl_fn_downcase", vrl_fn_downcase as _))
     }

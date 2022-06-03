@@ -47,10 +47,6 @@ impl Function for IsObject {
         Ok(Box::new(IsObjectFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        Ok(value!(args.required("value").is_object()))
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         // TODO
         None

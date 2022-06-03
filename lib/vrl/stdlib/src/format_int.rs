@@ -80,13 +80,6 @@ impl Function for FormatInt {
         ]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let base = args.optional("base");
-
-        format_int(value, base)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         Some(("vrl_fn_format_int", vrl_fn_format_int as _))
     }

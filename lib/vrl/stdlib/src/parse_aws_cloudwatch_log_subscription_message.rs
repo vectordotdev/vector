@@ -105,11 +105,6 @@ impl Function for ParseAwsCloudWatchLogSubscriptionMessage {
         }]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        parse_aws_cloudwatch_log_subscription_message(value)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         // TODO
         None

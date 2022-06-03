@@ -26,10 +26,6 @@ impl Function for Now {
         Ok(Box::new(NowFn))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Resolved {
-        Ok(Utc::now().into())
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         // TODO
         None

@@ -5,7 +5,7 @@ use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 
 use super::Block;
 use crate::{
-    expression::{levenstein, ExpressionError, FunctionArgument, Noop},
+    expression::{levenstein, ExpressionError, FunctionArgument},
     function::{
         closure::{self, VariableKind},
         ArgumentList, Example, FunctionClosure, FunctionCompileContext, Parameter,
@@ -15,7 +15,6 @@ use crate::{
     state::{ExternalEnv, LocalEnv},
     type_def::Details,
     value::Kind,
-    vm::{OpCode, VmFunctionClosure},
     Context, Expression, Function, Resolved, Span, TypeDef,
 };
 
@@ -465,6 +464,7 @@ impl<'a> Builder<'a> {
     }
 }
 
+#[allow(unused)] // will be used by LLVM runtime
 #[derive(Clone)]
 pub struct FunctionCall {
     abort_on_error: bool,
@@ -487,6 +487,7 @@ pub struct FunctionCall {
     arguments: Arc<Vec<Node<FunctionArgument>>>,
 }
 
+#[allow(unused)] // will be used by LLVM runtime
 impl FunctionCall {
     fn compile_arguments(
         &self,
@@ -536,22 +537,6 @@ impl FunctionCall {
         let _ = external_env.swap_external_context(compile_ctx.into_external_context());
 
         Ok(compiled_arguments)
-    }
-
-    pub fn noop() -> Self {
-        let expr = Box::new(Noop) as _;
-
-        Self {
-            abort_on_error: false,
-            expr,
-            maybe_fallible_arguments: false,
-            closure_fallible: false,
-            closure: None,
-            span: Span::default(),
-            ident: "noop",
-            arguments: Arc::new(Vec::new()),
-            function_id: 0,
-        }
     }
 
     pub fn arguments_fmt(&self) -> Vec<String> {
@@ -688,64 +673,6 @@ impl Expression for FunctionCall {
         }
 
         type_def
-    }
-
-    fn compile_to_vm(
-        &self,
-        vm: &mut crate::vm::Vm,
-        (local, external): (&mut LocalEnv, &mut ExternalEnv),
-    ) -> Result<(), String> {
-        let function = vm
-            .function(self.function_id)
-            .ok_or(format!("Function {} not found.", self.function_id))?;
-
-        let compiled_arguments = self.compile_arguments(function, external)?;
-
-        for (_, argument) in compiled_arguments {
-            match argument {
-                Some(CompiledArgument::Static(argument)) => {
-                    // The function has compiled this argument as a static.
-                    let argument = vm.add_static(argument);
-                    vm.write_opcode(OpCode::MoveStaticParameter);
-                    vm.write_primitive(argument);
-                }
-                Some(CompiledArgument::Dynamic(argument)) => {
-                    // Compile the argument, `MoveParameter` will move the result of the expression onto the
-                    // parameter stack to be passed into the function.
-                    argument.expression.compile_to_vm(vm, (local, external))?;
-                    vm.write_opcode(OpCode::MoveParameter);
-                }
-                None => {
-                    // The parameter hasn't been specified, so just move an empty parameter onto the
-                    // parameter stack.
-                    vm.write_opcode(OpCode::EmptyParameter);
-                }
-            }
-        }
-
-        if let Some(FunctionClosure { variables, block }) = self.closure.as_ref().cloned() {
-            let mut closure_vm = crate::vm::Vm::new(vm.functions());
-            block.compile_to_vm(&mut closure_vm, (local, external))?;
-            closure_vm.write_opcode(OpCode::Return);
-
-            let closure = vm.write_closure(VmFunctionClosure {
-                vm: closure_vm,
-                variables,
-            });
-
-            vm.write_opcode(OpCode::MoveClosure);
-            vm.write_primitive(closure);
-        }
-
-        // Call the function with the given id.
-        vm.write_opcode(OpCode::Call);
-        vm.write_primitive(self.function_id);
-
-        // We need to write the spans for error reporting.
-        vm.write_primitive(self.span.start());
-        vm.write_primitive(self.span.end());
-
-        Ok(())
     }
 
     #[cfg(feature = "llvm")]
@@ -1410,14 +1337,6 @@ mod tests {
             _arguments: ArgumentList,
         ) -> crate::function::Compiled {
             Ok(Box::new(Fn))
-        }
-
-        fn call_by_vm(
-            &self,
-            _ctx: &mut Context,
-            _args: &mut crate::vm::VmArgumentList,
-        ) -> Result<value::Value, ExpressionError> {
-            unimplemented!()
         }
 
         fn symbol(&self) -> Option<(&'static str, usize)> {

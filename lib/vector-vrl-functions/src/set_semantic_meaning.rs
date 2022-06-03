@@ -153,8 +153,11 @@ impl Function for SetSemanticMeaning {
         Ok(Box::new(SetSemanticMeaningFn))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Resolved {
-        Ok(Value::Null)
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        Some((
+            "vrl_fn_set_semantic_meaning",
+            vrl_fn_set_semantic_meaning as _,
+        ))
     }
 }
 
@@ -169,4 +172,10 @@ impl Expression for SetSemanticMeaningFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::null().infallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_set_semantic_meaning(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }

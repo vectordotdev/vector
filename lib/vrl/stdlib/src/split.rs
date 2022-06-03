@@ -90,14 +90,6 @@ impl Function for Split {
         }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let pattern = args.required("pattern");
-        let limit = args.optional("limit").unwrap_or_else(|| value!(999999999));
-
-        split(value, limit, pattern)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         // TODO
         None

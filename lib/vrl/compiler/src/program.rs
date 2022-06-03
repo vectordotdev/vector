@@ -2,7 +2,7 @@ use lookup::LookupBuf;
 
 use crate::{
     expression::{Block, Resolved},
-    state::{ExternalEnv, LocalEnv},
+    state::LocalEnv,
     Context, Expression,
 };
 
@@ -40,19 +40,10 @@ impl Program {
     /// Emit LLVM IR for the program.
     pub fn emit_llvm<'ctx>(
         &self,
-        state: (&mut LocalEnv, &mut ExternalEnv),
+        state: (&mut crate::state::LocalEnv, &mut crate::state::ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
         self.expressions.emit_llvm(state, ctx)
-    }
-
-    /// Compile the program down to the [`Vm`] runtime.
-    pub fn compile_to_vm(
-        &self,
-        vm: &mut crate::vm::Vm,
-        state: (&mut LocalEnv, &mut ExternalEnv),
-    ) -> Result<(), String> {
-        self.expressions.compile_to_vm(vm, state)
     }
 }
 

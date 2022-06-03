@@ -62,11 +62,6 @@ impl Function for Flatten {
         Ok(Box::new(FlattenFn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        flatten(value)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         Some(("vrl_fn_flatten", vrl_fn_flatten as _))
     }

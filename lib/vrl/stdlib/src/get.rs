@@ -136,13 +136,6 @@ impl Function for Get {
         Ok(Box::new(GetFn { value, path }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let path = args.required("path");
-
-        get(value, path)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         // TODO
         None

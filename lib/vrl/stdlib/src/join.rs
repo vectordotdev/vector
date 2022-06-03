@@ -62,13 +62,6 @@ impl Function for Join {
         }]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let separator = args.optional("separator");
-
-        join(value, separator)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         // TODO
         None

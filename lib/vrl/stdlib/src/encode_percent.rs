@@ -152,16 +152,6 @@ impl Function for EncodePercent {
         }
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let ascii_set = args
-            .required_any("ascii_set")
-            .downcast_ref::<Bytes>()
-            .expect("should be AsciiSet");
-
-        encode_percent(value, ascii_set)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         Some(("vrl_fn_encode_percent", vrl_fn_encode_percent as _))
     }

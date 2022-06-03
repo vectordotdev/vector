@@ -66,13 +66,6 @@ impl Function for Floor {
         }]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let precision = args.optional("precision");
-
-        floor(precision, value)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         Some(("vrl_fn_floor", vrl_fn_floor as _))
     }

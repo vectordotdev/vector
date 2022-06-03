@@ -22,12 +22,6 @@ use vrl_tests::{docs, Test};
 #[global_allocator]
 static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-/// A list of tests currently only working on the "AST" runtime.
-///
-/// This list should ideally be zero, but might not be if specific features
-/// haven't been released on the "VM" runtime yet.
-static AST_ONLY_TESTS: &[&str] = &["functions/type_def/return type definition"];
-
 #[derive(Parser, Debug)]
 #[clap(name = "VRL Tests", about = "Vector Remap Language Tests")]
 pub struct Cmd {
@@ -74,11 +68,7 @@ impl Cmd {
     }
 }
 
-fn should_run(name: &str, pat: &Option<String>, runtime: VrlRuntime) -> bool {
-    if matches!(runtime, VrlRuntime::Vm) && AST_ONLY_TESTS.contains(&name) {
-        return false;
-    }
-
+fn should_run(name: &str, pat: &Option<String>, _runtime: VrlRuntime) -> bool {
     if name == "tests/example.vrl" {
         return false;
     }
@@ -207,12 +197,10 @@ fn main() {
                 let run_start = Instant::now();
                 let result = run_vrl(
                     runtime,
-                    functions,
                     program,
                     &mut test,
                     timezone,
                     cmd.runtime,
-                    state,
                     test_enrichment,
                 );
                 let run_end = run_start.elapsed();
@@ -392,20 +380,13 @@ fn main() {
 #[allow(clippy::too_many_arguments)]
 fn run_vrl(
     mut runtime: Runtime,
-    functions: Vec<Box<dyn vrl::Function>>,
     program: vrl::Program,
     test: &mut Test,
     timezone: TimeZone,
     vrl_runtime: VrlRuntime,
-    mut state: vrl::state::ExternalEnv,
     test_enrichment: enrichment::TableRegistry,
 ) -> Result<Value, Terminate> {
     match vrl_runtime {
-        VrlRuntime::Vm => {
-            let vm = runtime.compile(functions, &program, &mut state).unwrap();
-            test_enrichment.finish_load();
-            runtime.run_vm(&vm, &mut test.object, &timezone)
-        }
         VrlRuntime::Ast => {
             test_enrichment.finish_load();
             runtime.resolve(&mut test.object, &program, &timezone)

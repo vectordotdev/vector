@@ -118,15 +118,6 @@ impl Function for Del {
         }
     }
 
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let query = args
-            .required_any("target")
-            .downcast_ref::<expression::Query>()
-            .unwrap();
-
-        del(query, ctx)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         None
     }

@@ -51,11 +51,6 @@ impl Function for Ipv6ToIpV4 {
         Ok(Box::new(Ipv6ToIpV4Fn { value }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        ipv6_to_ipv4(value)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         // TODO
         None

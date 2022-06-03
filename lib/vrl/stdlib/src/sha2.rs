@@ -102,16 +102,6 @@ impl Function for Sha2 {
         }
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let variant = args
-            .required_any("variant")
-            .downcast_ref::<Bytes>()
-            .unwrap();
-
-        sha2(value, variant)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         // TODO
         None

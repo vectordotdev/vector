@@ -57,13 +57,6 @@ impl Function for Includes {
         Ok(Box::new(IncludesFn { value, item }))
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let item = args.required("item");
-
-        includes(value, item)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         // TODO
         None

@@ -119,31 +119,6 @@ impl Function for EncodeKeyValue {
         ]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let fields = args.optional("fields_ordering");
-
-        let key_value_delimiter = args
-            .optional("key_value_delimiter")
-            .unwrap_or_else(|| Value::from("="));
-
-        let field_delimiter = args
-            .optional("field_delimiter")
-            .unwrap_or_else(|| Value::from(" "));
-
-        let flatten_boolean = args
-            .optional("flatten_boolean")
-            .unwrap_or_else(|| Value::from(false));
-
-        encode_key_value(
-            fields,
-            value,
-            key_value_delimiter,
-            field_delimiter,
-            flatten_boolean,
-        )
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         Some(("vrl_fn_encode_key_value", vrl_fn_encode_key_value as _))
     }

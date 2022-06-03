@@ -75,19 +75,6 @@ impl Expression for Predicate {
         type_def.with_fallibility(fallible)
     }
 
-    fn compile_to_vm(
-        &self,
-        vm: &mut crate::vm::Vm,
-        state: (&mut LocalEnv, &mut ExternalEnv),
-    ) -> std::result::Result<(), String> {
-        let (local, external) = state;
-
-        for inner in &self.inner {
-            inner.compile_to_vm(vm, (local, external))?;
-        }
-        Ok(())
-    }
-
     #[cfg(feature = "llvm")]
     fn emit_llvm<'ctx>(
         &self,

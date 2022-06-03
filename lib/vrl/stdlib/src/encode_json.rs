@@ -44,11 +44,6 @@ impl Function for EncodeJson {
         }]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        encode_json(value)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         Some(("vrl_fn_encode_json", vrl_fn_encode_json as _))
     }

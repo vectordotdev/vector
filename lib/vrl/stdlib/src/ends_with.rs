@@ -92,14 +92,6 @@ impl Function for EndsWith {
         ]
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let substring = args.required("substring");
-        let case_sensitive = args.optional("case_sensitive");
-
-        ends_with(value, substring, case_sensitive)
-    }
-
     fn symbol(&self) -> Option<(&'static str, usize)> {
         Some(("vrl_fn_ends_with", vrl_fn_ends_with as _))
     }
