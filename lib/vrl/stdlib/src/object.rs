@@ -53,8 +53,7 @@ impl Function for Object {
     }
 
     fn symbol(&self) -> Option<(&'static str, usize)> {
-        // TODO
-        None
+        Some(("vrl_fn_object", vrl_fn_object as _))
     }
 }
 
@@ -79,5 +78,11 @@ impl Expression for ObjectFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_object(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    let value = {
+        let mut moved = Value::Null;
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+
+    *result = object(value);
 }
