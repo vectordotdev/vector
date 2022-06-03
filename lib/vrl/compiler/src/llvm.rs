@@ -422,10 +422,6 @@ impl<'ctx> Context<'ctx> {
         self.precompiled_functions.vrl_btree_map_initialize
     }
 
-    pub fn vrl_resolved_swap(&self) -> PrecompiledFunction<'ctx, 2> {
-        self.precompiled_functions.vrl_resolved_swap
-    }
-
     pub fn vrl_resolved_drop(&self) -> PrecompiledFunction<'ctx, 1> {
         self.precompiled_functions.vrl_resolved_drop
     }
@@ -857,7 +853,6 @@ pub struct PrecompiledFunctions<'ctx> {
     vrl_static_initialize: PrecompiledFunction<'ctx, 1>,
     vrl_vec_initialize: PrecompiledFunction<'ctx, 2>,
     vrl_btree_map_initialize: PrecompiledFunction<'ctx, 2>,
-    vrl_resolved_swap: PrecompiledFunction<'ctx, 2>,
     vrl_resolved_drop: PrecompiledFunction<'ctx, 1>,
     vrl_optional_value_drop: PrecompiledFunction<'ctx, 1>,
     vrl_resolved_as_value: PrecompiledFunction<'ctx, 1>,
@@ -955,9 +950,6 @@ impl<'ctx> PrecompiledFunctions<'ctx> {
             },
             vrl_btree_map_initialize: PrecompiledFunction {
                 function: module.get_function("vrl_btree_map_initialize").unwrap(),
-            },
-            vrl_resolved_swap: PrecompiledFunction {
-                function: module.get_function("vrl_resolved_swap").unwrap(),
             },
             vrl_resolved_drop: PrecompiledFunction {
                 function: module.get_function("vrl_resolved_drop").unwrap(),

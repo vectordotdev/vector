@@ -681,22 +681,9 @@ impl Expression for FunctionCall {
         state: (&mut LocalEnv, &mut ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
-        use inkwell::values::BasicMetadataValueEnum;
-
-        let begin_block = ctx.context().append_basic_block(
-            ctx.function(),
-            &format!("function_call_{}_begin", self.ident),
-        );
-        ctx.builder().build_unconditional_branch(begin_block);
-        ctx.builder().position_at_end(begin_block);
-
         if ["del", "exists"].contains(&self.ident) {
             return self.expr.emit_llvm(state, ctx);
         }
-
-        let end_block = ctx
-            .context()
-            .append_basic_block(ctx.function(), &format!("function_call_{}_end", self.ident));
 
         let stdlib_function = ctx.stdlib(self.function_id);
         let compiled_arguments = self.compile_arguments(stdlib_function, state.1)?;
@@ -731,22 +718,48 @@ impl Expression for FunctionCall {
 
         let result_ref = ctx.result_ref();
 
-        let mut argument_refs = Vec::<BasicMetadataValueEnum<'ctx>>::new();
-        let mut optional_value_refs = Vec::new();
+        let mut argument_refs = Vec::new();
         let mut drop_calls = Vec::new();
 
-        for (keyword, argument) in &compiled_arguments {
+        for (keyword, argument) in compiled_arguments {
             let argument_name = format!("argument_{}", keyword);
             match argument {
                 Some(CompiledArgument::Static(argument)) => {
-                    let static_ref = ctx.builder().build_bitcast(
-                        ctx.into_const(argument, &argument_name).as_pointer_value(),
-                        ctx.static_ref_type(),
-                        "cast",
-                    );
+                    let static_ref = ctx
+                        .builder()
+                        .build_bitcast(
+                            ctx.into_const(argument, &argument_name).as_pointer_value(),
+                            ctx.static_ref_type(),
+                            "cast",
+                        )
+                        .into();
 
-                    argument_refs.push(static_ref.into());
-                    optional_value_refs.push(None);
+                    argument_refs.push(static_ref);
+                    drop_calls.push(vec![]);
+                }
+                Some(CompiledArgument::Dynamic(argument)) if argument.argument.required => {
+                    let resolved_ref = ctx.builder().build_alloca(
+                        ctx.resolved_ref_type()
+                            .get_element_type()
+                            .into_struct_type(),
+                        &argument_name,
+                    );
+                    ctx.vrl_resolved_initialize()
+                        .build_call(ctx.builder(), resolved_ref);
+
+                    ctx.set_result_ref(resolved_ref);
+                    argument.expression.emit_llvm((state.0, state.1), ctx)?;
+                    ctx.set_result_ref(result_ref);
+
+                    let value_ref = ctx
+                        .vrl_resolved_as_value()
+                        .build_call(ctx.builder(), resolved_ref)
+                        .try_as_basic_value()
+                        .left()
+                        .expect("result is not a basic value");
+
+                    argument_refs.push(value_ref.into());
+                    drop_calls.push(vec![(resolved_ref, ctx.vrl_resolved_drop())]);
                 }
                 Some(CompiledArgument::Dynamic(argument)) => {
                     let resolved_ref = ctx.builder().build_alloca(
@@ -757,25 +770,30 @@ impl Expression for FunctionCall {
                     );
                     ctx.vrl_resolved_initialize()
                         .build_call(ctx.builder(), resolved_ref);
+                    let optional_value_ref = ctx.builder().build_alloca(
+                        ctx.optional_value_ref_type()
+                            .get_element_type()
+                            .into_struct_type(),
+                        &argument_name,
+                    );
+                    ctx.vrl_optional_value_initialize()
+                        .build_call(ctx.builder(), optional_value_ref);
 
-                    let optional_value_ref = if !argument.argument.required {
-                        let optional_value_ref = ctx.builder().build_alloca(
-                            ctx.optional_value_ref_type()
-                                .get_element_type()
-                                .into_struct_type(),
-                            &argument_name,
-                        );
-                        ctx.vrl_optional_value_initialize()
-                            .build_call(ctx.builder(), optional_value_ref);
-                        drop_calls.push((optional_value_ref, ctx.vrl_optional_value_drop()));
-                        Some(optional_value_ref)
-                    } else {
-                        None
-                    };
+                    ctx.set_result_ref(resolved_ref);
+                    argument.expression.emit_llvm((state.0, state.1), ctx)?;
+                    ctx.set_result_ref(result_ref);
 
-                    argument_refs.push(resolved_ref.into());
-                    optional_value_refs.push(optional_value_ref);
-                    drop_calls.push((resolved_ref, ctx.vrl_resolved_drop()));
+                    ctx.vrl_resolved_as_value_to_optional_value().build_call(
+                        ctx.builder(),
+                        resolved_ref,
+                        optional_value_ref,
+                    );
+
+                    argument_refs.push(optional_value_ref.into());
+                    drop_calls.push(vec![
+                        (optional_value_ref, ctx.vrl_optional_value_drop()),
+                        (resolved_ref, ctx.vrl_resolved_drop()),
+                    ]);
                 }
                 None => {
                     let optional_value_ref = ctx.builder().build_alloca(
@@ -788,71 +806,8 @@ impl Expression for FunctionCall {
                         .build_call(ctx.builder(), optional_value_ref);
 
                     argument_refs.push(optional_value_ref.into());
-                    optional_value_refs.push(None);
-                    drop_calls.push((optional_value_ref, ctx.vrl_optional_value_drop()));
+                    drop_calls.push(vec![(optional_value_ref, ctx.vrl_optional_value_drop())]);
                 }
-            }
-        }
-
-        for (index, (_, argument)) in compiled_arguments.iter().enumerate() {
-            match argument {
-                Some(CompiledArgument::Static(_)) => {}
-                Some(CompiledArgument::Dynamic(argument)) => {
-                    let resolved_ref = argument_refs[index];
-
-                    ctx.set_result_ref(resolved_ref.into_pointer_value());
-                    argument.expression.emit_llvm((state.0, state.1), ctx)?;
-                    ctx.set_result_ref(result_ref);
-
-                    let type_def = argument.expression.type_def((state.0, state.1));
-                    if type_def.is_abortable() {
-                        let is_err = ctx
-                            .vrl_resolved_is_err()
-                            .build_call(ctx.builder(), resolved_ref)
-                            .try_as_basic_value()
-                            .left()
-                            .expect("result is not a basic value")
-                            .try_into()
-                            .expect("result is not an int value");
-
-                        let argument_next_block = ctx
-                            .context()
-                            .append_basic_block(ctx.function(), "function_call_argument_next");
-                        let argument_abort_block = ctx
-                            .context()
-                            .append_basic_block(ctx.function(), "function_call_argument_abort");
-                        ctx.builder().build_conditional_branch(
-                            is_err,
-                            argument_abort_block,
-                            argument_next_block,
-                        );
-
-                        ctx.builder().position_at_end(argument_abort_block);
-                        ctx.vrl_resolved_swap()
-                            .build_call(ctx.builder(), resolved_ref, result_ref);
-                        ctx.builder().build_unconditional_branch(end_block);
-
-                        ctx.builder().position_at_end(argument_next_block);
-                    }
-
-                    argument_refs[index] = if argument.argument.required {
-                        ctx.vrl_resolved_as_value()
-                            .build_call(ctx.builder(), resolved_ref)
-                            .try_as_basic_value()
-                            .left()
-                            .expect("result is not a basic value")
-                            .into()
-                    } else {
-                        let optional_value_ref = optional_value_refs[index].unwrap();
-                        ctx.vrl_resolved_as_value_to_optional_value().build_call(
-                            ctx.builder(),
-                            resolved_ref,
-                            optional_value_ref,
-                        );
-                        optional_value_ref.into()
-                    };
-                }
-                None => {}
             }
         }
 
@@ -891,11 +846,10 @@ impl Expression for FunctionCall {
 
         argument_refs.pop();
 
-        ctx.builder().build_unconditional_branch(end_block);
-        ctx.builder().position_at_end(end_block);
-
-        for (value_ref, drop_fn) in drop_calls {
-            drop_fn.build_call(ctx.builder(), value_ref);
+        for drop_calls in drop_calls {
+            for (value_ref, drop_fn) in drop_calls {
+                drop_fn.build_call(ctx.builder(), value_ref);
+            }
         }
 
         Ok(())
