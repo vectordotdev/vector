@@ -356,15 +356,15 @@ impl TypeDef {
         // implementation's `unknown`, which, when merging, would discard that type.
         //
         // see: https://github.com/vectordotdev/vector/blob/18415050b60b08197e8135b7659390256995e844/lib/vrl/compiler/src/type_def.rs#L428-L429
-        if !self.is_any() && other.is_any() {
-            // keep `self`'s `kind` definition
-        } else if self.is_any() && !other.is_any() {
-            // overwrite `self`'s `kind` definition with `others`'s
-            self.kind = other.kind;
-        } else {
-            // merge the two `kind`s
-            self.kind.merge(other.kind, strategy);
-        }
+        // if !self.is_any() && other.is_any() {
+        //     // keep `self`'s `kind` definition
+        // } else if self.is_any() && !other.is_any() {
+        //     // overwrite `self`'s `kind` definition with `others`'s
+        //     self.kind = other.kind;
+        // } else {
+        // merge the two `kind`s
+        self.kind.merge(other.kind, strategy);
+        // }
     }
 
     pub fn merge_overwrite(mut self, other: Self) -> Self {
@@ -419,5 +419,48 @@ impl Details {
             (Some(x), None) | (None, Some(x)) => Some(x),
             (None, None) => None,
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn merge_details_same_literal() {
+        let a = Details {
+            type_def: TypeDef::integer(),
+            value: Some(Value::from(5)),
+        };
+        let b = Details {
+            type_def: TypeDef::float(),
+            value: Some(Value::from(5)),
+        };
+        assert_eq!(
+            a.merge(b),
+            Details {
+                type_def: TypeDef::integer().add_float(),
+                value: Some(Value::from(5))
+            }
+        )
+    }
+
+    #[test]
+    fn merge_details_different_literal() {
+        let a = Details {
+            type_def: TypeDef::any(),
+            value: Some(Value::from(5)),
+        };
+        let b = Details {
+            type_def: TypeDef::object(Collection::empty()),
+            value: Some(Value::from(6)),
+        };
+        assert_eq!(
+            a.merge(b),
+            Details {
+                type_def: TypeDef::any(),
+                value: None
+            }
+        )
     }
 }

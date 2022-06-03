@@ -317,7 +317,7 @@ impl<'a> Compiler<'a> {
 
                 let else_block = self.compile_block(block, external)?;
 
-                // assignments must be the result of either the if or else block, but not the original snapshot
+                // assignments must be the result of either the if or else block, but not the original value
                 self.local = self.local.clone().merge(consequent_locals);
                 if let Some(details) =
                     Details::merge_optional(consequent_external, external.target().cloned())
@@ -332,8 +332,14 @@ impl<'a> Compiler<'a> {
                 })
             }
             None => {
-                // assignments must be the result of either the if block or the original snapshot
-                self.local = self.local.clone().merge(original_locals);
+                // assignments must be the result of either the if block or the original value
+                let result = self.local.clone().merge(original_locals.clone());
+                // println!(
+                //     "Merging original={:?} and if={:?} to make {:?}",
+                //     self.local, original_locals, result
+                // );
+                self.local = result;
+
                 if let Some(details) =
                     Details::merge_optional(original_external, external.target().cloned())
                 {
