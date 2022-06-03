@@ -62,7 +62,7 @@ components: sinks: datadog_metrics: {
 			common: false
 			description: """
 				Used as a namespace for metrics that don't have it.
-				A namespace will be prefixed to a metric's name with `.`.
+				A namespace will be prefixed to a metric's name separated by `.`.
 				"""
 			required: false
 			warnings: []
