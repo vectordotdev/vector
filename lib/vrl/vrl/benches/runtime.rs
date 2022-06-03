@@ -15,6 +15,11 @@ struct Source {
 
 static SOURCES: &[Source] = &[
     Source {
+        name: "syslog_regex_logs2metric_ddmetrics",
+        target: r#"{ "foo": "derp", "host": "foo.com" }"#,
+        program: r#". |= parse_regex!(.host, r'^(?P<hostname>[a-z]+)\.(?P<tld>[a-z]+)')"#,
+    },
+    Source {
         name: "splunk_transforms_splunk3_",
         target: "{}",
         program: indoc! {r#"

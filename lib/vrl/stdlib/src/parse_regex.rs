@@ -1,12 +1,17 @@
+use std::any::Any;
+
 use ::value::Value;
 use regex::Regex;
 use vrl::{function::Error, prelude::*};
 
 use crate::util;
 
-fn parse_regex(value: Value, numeric_groups: bool, pattern: &Regex) -> Resolved {
+fn parse_regex(value: Value, pattern: &Regex, numeric_groups: Option<Value>) -> Resolved {
     let bytes = value.try_bytes()?;
     let value = String::from_utf8_lossy(&bytes);
+    let numeric_groups = numeric_groups
+        .and_then(|numeric_groups| numeric_groups.try_boolean().ok())
+        .unwrap_or(true);
     let parsed = pattern
         .captures(&value)
         .map(|capture| util::capture_regex_to_map(pattern, capture, numeric_groups))
@@ -50,9 +55,7 @@ impl Function for ParseRegex {
     ) -> Compiled {
         let value = arguments.required("value");
         let pattern = arguments.required_regex("pattern")?;
-        let numeric_groups = arguments
-            .optional("numeric_groups")
-            .unwrap_or_else(|| expr!(false));
+        let numeric_groups = arguments.optional("numeric_groups");
 
         Ok(Box::new(ParseRegexFn {
             value,
@@ -112,8 +115,7 @@ impl Function for ParseRegex {
     }
 
     fn symbol(&self) -> Option<(&'static str, usize)> {
-        // TODO
-        None
+        Some(("vrl_fn_parse_regex", vrl_fn_parse_regex as _))
     }
 }
 
@@ -121,16 +123,20 @@ impl Function for ParseRegex {
 pub(crate) struct ParseRegexFn {
     value: Box<dyn Expression>,
     pattern: Regex,
-    numeric_groups: Box<dyn Expression>,
+    numeric_groups: Option<Box<dyn Expression>>,
 }
 
 impl Expression for ParseRegexFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let numeric_groups = self.numeric_groups.resolve(ctx)?;
+        let numeric_groups = self
+            .numeric_groups
+            .as_ref()
+            .map(|numeric_groups| numeric_groups.resolve(ctx))
+            .transpose()?;
         let pattern = &self.pattern;
 
-        parse_regex(value, numeric_groups.try_boolean()?, pattern)
+        parse_regex(value, pattern, numeric_groups)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
@@ -140,8 +146,25 @@ impl Expression for ParseRegexFn {
 
 #[inline(never)]
 #[no_mangle]
-pub extern "C" fn vrl_fn_parse_regex(value: &mut Value, result: &mut Resolved) {
-    todo!()
+pub extern "C" fn vrl_fn_parse_regex(
+    value: &mut Value,
+    pattern: &Box<dyn Any + Send + Sync>,
+    numeric_groups: &mut Option<Value>,
+    result: &mut Resolved,
+) {
+    let value = {
+        let mut moved = Value::Null;
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+    let pattern = pattern.downcast_ref::<Regex>().unwrap();
+    let numeric_groups = {
+        let mut moved = None;
+        std::mem::swap(numeric_groups, &mut moved);
+        moved
+    };
+
+    *result = parse_regex(value, pattern, numeric_groups);
 }
 
 #[cfg(test)]
