@@ -350,21 +350,7 @@ impl TypeDef {
 
     pub fn merge(&mut self, other: Self, strategy: merge::Strategy) {
         self.fallible |= other.fallible;
-
-        // NOTE: technically we shouldn't do this, but to keep backward compatibility with the
-        // "old" `Kind` implementation, we consider a type that is marked as "any" equal to the old
-        // implementation's `unknown`, which, when merging, would discard that type.
-        //
-        // see: https://github.com/vectordotdev/vector/blob/18415050b60b08197e8135b7659390256995e844/lib/vrl/compiler/src/type_def.rs#L428-L429
-        // if !self.is_any() && other.is_any() {
-        //     // keep `self`'s `kind` definition
-        // } else if self.is_any() && !other.is_any() {
-        //     // overwrite `self`'s `kind` definition with `others`'s
-        //     self.kind = other.kind;
-        // } else {
-        // merge the two `kind`s
         self.kind.merge(other.kind, strategy);
-        // }
     }
 
     pub fn merge_overwrite(mut self, other: Self) -> Self {

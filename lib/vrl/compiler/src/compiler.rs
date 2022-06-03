@@ -333,22 +333,11 @@ impl<'a> Compiler<'a> {
             }
             None => {
                 // assignments must be the result of either the if block or the original value
-                let result = self.local.clone().merge(original_locals.clone());
-                // println!(
-                //     "Merging original={:?} and if={:?} to make {:?}",
-                //     self.local, original_locals, result
-                // );
-                self.local = result;
+                self.local = self.local.clone().merge(original_locals.clone());
 
-                let merged_details =
-                    Details::merge_optional(original_external.clone(), external.target().cloned());
-                println!(
-                    "Merging original: {:?} and if={:?} to make {:?}",
-                    original_external,
-                    external.target().cloned(),
-                    merged_details
-                );
-                if let Some(details) = merged_details {
+                if let Some(details) =
+                    Details::merge_optional(original_external.clone(), external.target().cloned())
+                {
                     external.update_target(details);
                 }
 

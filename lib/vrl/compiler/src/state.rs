@@ -82,7 +82,7 @@ impl ExternalEnv {
                 type_def: kind.into(),
                 value: None,
             }),
-            custom: AnyMap::new(),
+            ..Default::default()
         }
     }
 
