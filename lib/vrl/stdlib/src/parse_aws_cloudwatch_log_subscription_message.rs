@@ -109,6 +109,11 @@ impl Function for ParseAwsCloudWatchLogSubscriptionMessage {
         let value = args.required("value");
         parse_aws_cloudwatch_log_subscription_message(value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -125,6 +130,15 @@ impl Expression for ParseAwsCloudWatchLogSubscriptionMessageFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::object(inner_kind()).fallible(/* message parsing error */)
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_parse_aws_cloudwatch_log_subscription_message(
+    value: &mut Value,
+    result: &mut Resolved,
+) {
+    todo!()
 }
 
 fn inner_kind() -> BTreeMap<Field, Kind> {

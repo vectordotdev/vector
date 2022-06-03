@@ -56,6 +56,11 @@ impl Function for ParseTokens {
         let value = args.required("value");
         parse_tokens(value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -72,6 +77,12 @@ impl Expression for ParseTokensFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::array(Collection::from_unknown(Kind::bytes()))
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_parse_tokens(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

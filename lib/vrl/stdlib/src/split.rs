@@ -97,6 +97,11 @@ impl Function for Split {
 
         split(value, limit, pattern)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -118,6 +123,12 @@ impl Expression for SplitFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::array(Collection::from_unknown(Kind::bytes())).infallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_split(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

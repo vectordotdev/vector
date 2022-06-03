@@ -195,6 +195,10 @@ impl Function for ParseJson {
             parse_json(value)
         }
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        Some(("vrl_fn_parse_json", vrl_fn_parse_json as _))
+    }
 }
 
 #[derive(Debug, Clone)]

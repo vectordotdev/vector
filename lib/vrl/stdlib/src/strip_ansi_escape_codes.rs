@@ -46,6 +46,11 @@ impl Function for StripAnsiEscapeCodes {
         let value = args.required("value");
         strip_ansi_escape_codes(value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -66,6 +71,12 @@ impl Expression for StripAnsiEscapeCodesFn {
         // occur.
         TypeDef::bytes().infallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_strip_ansi_escape_codes(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

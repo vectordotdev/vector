@@ -62,6 +62,11 @@ impl Function for FormatTimestamp {
 
         format_timestamp(format, value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -92,6 +97,12 @@ fn try_format(dt: &DateTime<Utc>, format: &str) -> Result<String> {
         .collect::<Result<Vec<_>>>()?;
 
     Ok(dt.format_with_items(items.into_iter()).to_string())
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_format_timestamp(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

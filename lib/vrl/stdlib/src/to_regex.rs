@@ -50,6 +50,11 @@ impl Function for ToRegex {
 
         to_regex(value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -66,6 +71,12 @@ impl Expression for ToRegexFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::regex().fallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_to_regex(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

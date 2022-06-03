@@ -45,6 +45,11 @@ impl Function for IsNullish {
         let value = args.required("value");
         is_nullish(value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -61,6 +66,12 @@ impl Expression for IsNullishFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().infallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_is_nullish(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

@@ -125,6 +125,11 @@ impl Function for ParseRegex {
 
         parse_regex(value, numeric_groups, pattern)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -146,6 +151,12 @@ impl Expression for ParseRegexFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::object(util::regex_kind(&self.pattern)).fallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_parse_regex(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

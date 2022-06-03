@@ -107,6 +107,11 @@ impl Function for Sha3 {
 
         sha3(value, variant)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -126,6 +131,12 @@ impl Expression for Sha3Fn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().infallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_sha3(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[inline]

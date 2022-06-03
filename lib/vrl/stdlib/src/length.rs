@@ -67,6 +67,11 @@ impl Function for Length {
         let value = args.required("value");
         length(value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -84,6 +89,12 @@ impl Expression for LengthFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::integer().infallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_length(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

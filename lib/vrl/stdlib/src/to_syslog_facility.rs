@@ -82,6 +82,11 @@ impl Function for ToSyslogFacility {
         let value = args.required("value");
         to_syslog_facility(value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -99,6 +104,12 @@ impl Expression for ToSyslogFacilityFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().fallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_to_syslog_facility(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

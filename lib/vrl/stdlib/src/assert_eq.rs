@@ -93,6 +93,10 @@ impl Function for AssertEq {
 
         assert_eq(left, right, message)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        Some(("vrl_fn_assert_eq", vrl_fn_assert_eq as _))
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -114,6 +118,33 @@ impl Expression for AssertEqFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().fallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_assert_eq(
+    left: &mut Value,
+    right: &mut Value,
+    message: &mut Option<Value>,
+    result: &mut Resolved,
+) {
+    let left = {
+        let mut moved = Value::Null;
+        std::mem::swap(left, &mut moved);
+        moved
+    };
+    let right = {
+        let mut moved = Value::Null;
+        std::mem::swap(right, &mut moved);
+        moved
+    };
+    let message = {
+        let mut moved = None;
+        std::mem::swap(message, &mut moved);
+        moved
+    };
+
+    *result = assert_eq(left, right, message);
 }
 
 #[cfg(test)]

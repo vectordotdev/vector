@@ -157,6 +157,11 @@ impl Function for Log {
             .unwrap_or_else(|| value!(1));
         log(rate_limit_secs, &info.level, value, info.span)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug)]
@@ -189,6 +194,12 @@ impl Expression for LogFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::null().infallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_log(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

@@ -48,6 +48,10 @@ impl Function for EncodeJson {
         let value = args.required("value");
         encode_json(value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        Some(("vrl_fn_encode_json", vrl_fn_encode_json as _))
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -64,6 +68,18 @@ impl Expression for EncodeJsonFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().infallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_encode_json(value: &mut Value, result: &mut Resolved) {
+    let value = {
+        let mut moved = Value::Null;
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+
+    *result = encode_json(value);
 }
 
 #[cfg(test)]

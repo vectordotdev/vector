@@ -165,6 +165,11 @@ impl Function for Remove {
 
         remove(path, compact, value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -198,6 +203,12 @@ impl Expression for RemoveFn {
 
         td
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_remove(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

@@ -55,6 +55,11 @@ impl Function for Ipv6ToIpV4 {
         let value = args.required("value");
         ipv6_to_ipv4(value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -71,6 +76,12 @@ impl Expression for Ipv6ToIpV4Fn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().fallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_ipv6_to_ipv4(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

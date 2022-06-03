@@ -81,6 +81,11 @@ impl Function for Round {
 
         round(precision, value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -100,6 +105,12 @@ impl Expression for RoundFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::integer().infallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_round(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

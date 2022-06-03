@@ -50,6 +50,11 @@ impl Function for IsString {
     fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
         Ok(value!(args.required("value").is_bytes()))
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -65,6 +70,12 @@ impl Expression for IsStringFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().infallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_is_string(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

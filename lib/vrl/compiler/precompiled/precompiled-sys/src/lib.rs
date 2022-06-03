@@ -193,6 +193,11 @@ pub extern "C" fn vrl_resolved_set_null(result: &mut Resolved) {
 }
 
 #[no_mangle]
+pub extern "C" fn vrl_resolved_set_false(result: &mut Resolved) {
+    *result = Ok(false.into())
+}
+
+#[no_mangle]
 pub extern "C" fn vrl_expression_abort(span: &Span, message: &Resolved, result: &mut Resolved) {
     let message = match message {
         Ok(Value::Null) => None,
@@ -1146,4 +1151,45 @@ pub unsafe extern "C" fn vrl_del_expression(
     // No need to do the actual deletion, as the expression is only
     // available as an argument to the function.
     *result = Ok(value.get_by_path(path).cloned().unwrap_or(Value::Null));
+}
+
+#[no_mangle]
+pub extern "C" fn vrl_exists_external(
+    context: &mut Context,
+    path: &LookupBuf,
+    result: &mut Resolved,
+) {
+    *result = Ok(context
+        .target
+        .target_get(path)
+        .ok()
+        .flatten()
+        .is_some()
+        .into())
+}
+
+#[no_mangle]
+pub extern "C" fn vrl_exists_internal(
+    variable: &mut Resolved,
+    path: &LookupBuf,
+    result: &mut Resolved,
+) {
+    let value = variable.as_mut().unwrap();
+    *result = Ok(value.get_by_path(path).is_some().into());
+}
+
+/// # Safety
+/// TODO.
+#[no_mangle]
+pub unsafe extern "C" fn vrl_exists_expression(
+    expression: &mut Resolved,
+    path: &LookupBuf,
+    result: &mut Resolved,
+) {
+    let value = (expression as *mut Resolved)
+        .read()
+        .expect("expression must not contain an error");
+    // No need to do the actual deletion, as the expression is only
+    // available as an argument to the function.
+    *result = Ok(value.get_by_path(path).is_some().into());
 }

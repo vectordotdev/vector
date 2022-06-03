@@ -147,6 +147,11 @@ impl Function for Redact {
 
         Ok(redact(value, filters, &redactor))
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 //-----------------------------------------------------------------------------
@@ -197,6 +202,12 @@ impl Expression for RedactFn {
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         self.value.type_def(state).infallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_redact(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 //-----------------------------------------------------------------------------

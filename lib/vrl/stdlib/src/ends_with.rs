@@ -1,22 +1,27 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn ends_with(value: Value, substring: Value, case_sensitive: bool) -> Resolved {
+fn ends_with(value: Value, substring: Value, case_sensitive: Option<Value>) -> Resolved {
+    let case_sensitive = case_sensitive
+        .and_then(|case_sensitive| case_sensitive.try_boolean().ok())
+        .unwrap_or(true);
+    let value = {
+        let string = value.try_bytes_utf8_lossy()?;
+
+        if case_sensitive {
+            string.into_owned()
+        } else {
+            string.to_lowercase()
+        }
+    };
     let substring = {
         let bytes = substring.try_bytes()?;
         let string = String::from_utf8_lossy(&bytes);
 
-        match case_sensitive {
-            true => string.into_owned(),
-            false => string.to_lowercase(),
-        }
-    };
-    let value = {
-        let string = value.try_bytes_utf8_lossy()?;
-
-        match case_sensitive {
-            true => string.into_owned(),
-            false => string.to_lowercase(),
+        if case_sensitive {
+            string.into_owned()
+        } else {
+            string.to_lowercase()
         }
     };
     Ok(value.ends_with(&substring).into())
@@ -58,7 +63,7 @@ impl Function for EndsWith {
     ) -> Compiled {
         let value = arguments.required("value");
         let substring = arguments.required("substring");
-        let case_sensitive = arguments.optional("case_sensitive").unwrap_or(expr!(true));
+        let case_sensitive = arguments.optional("case_sensitive");
 
         Ok(Box::new(EndsWithFn {
             value,
@@ -90,13 +95,13 @@ impl Function for EndsWith {
     fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
         let value = args.required("value");
         let substring = args.required("substring");
-        let case_sensitive = args
-            .optional("case_sensitive")
-            .map(|value| value.try_boolean())
-            .transpose()?
-            .unwrap_or(true);
+        let case_sensitive = args.optional("case_sensitive");
 
         ends_with(value, substring, case_sensitive)
+    }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        Some(("vrl_fn_ends_with", vrl_fn_ends_with as _))
     }
 }
 
@@ -104,15 +109,18 @@ impl Function for EndsWith {
 struct EndsWithFn {
     value: Box<dyn Expression>,
     substring: Box<dyn Expression>,
-    case_sensitive: Box<dyn Expression>,
+    case_sensitive: Option<Box<dyn Expression>>,
 }
 
 impl Expression for EndsWithFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let case_sensitive = self.case_sensitive.resolve(ctx)?;
-        let case_sensitive = case_sensitive.try_boolean()?;
-        let substring = self.substring.resolve(ctx)?;
         let value = self.value.resolve(ctx)?;
+        let substring = self.substring.resolve(ctx)?;
+        let case_sensitive = self
+            .case_sensitive
+            .as_ref()
+            .map(|case_sensitive| case_sensitive.resolve(ctx))
+            .transpose()?;
 
         ends_with(value, substring, case_sensitive)
     }
@@ -120,6 +128,33 @@ impl Expression for EndsWithFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().infallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_ends_with(
+    value: &mut Value,
+    substring: &mut Value,
+    case_sensitive: &mut Option<Value>,
+    result: &mut Resolved,
+) {
+    let value = {
+        let mut moved = Value::Null;
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+    let substring = {
+        let mut moved = Value::Null;
+        std::mem::swap(substring, &mut moved);
+        moved
+    };
+    let case_sensitive = {
+        let mut moved = None;
+        std::mem::swap(case_sensitive, &mut moved);
+        moved
+    };
+
+    *result = ends_with(value, substring, case_sensitive);
 }
 
 #[cfg(test)]

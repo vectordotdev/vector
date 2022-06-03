@@ -74,6 +74,11 @@ impl Function for ParseQueryString {
         let value = args.required("value");
         parse_query_string(value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -94,6 +99,12 @@ impl Expression for ParseQueryStringFn {
 
 fn inner_kind() -> Collection<Field> {
     Collection::from_unknown(Kind::bytes().or_array(Collection::any()))
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_parse_query_string(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

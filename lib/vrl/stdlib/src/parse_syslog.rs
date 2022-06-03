@@ -68,6 +68,11 @@ impl Function for ParseSyslog {
         let value = args.required("value");
         parse_syslog(value, ctx)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -85,6 +90,12 @@ impl Expression for ParseSyslogFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::object(inner_kind()).fallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_parse_syslog(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 /// Function used to resolve the year for syslog messages that don't include the

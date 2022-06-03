@@ -160,6 +160,10 @@ impl Function for Decrypt {
         let iv = args.required("iv");
         decrypt(ciphertext, algorithm, key, iv)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        Some(("vrl_fn_decrypt", vrl_fn_decrypt as _))
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -182,6 +186,39 @@ impl Expression for DecryptFn {
     fn type_def(&self, _state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().fallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_decrypt(
+    ciphertext: &mut Value,
+    algorithm: &mut Value,
+    key: &mut Value,
+    iv: &mut Value,
+    result: &mut Resolved,
+) {
+    let ciphertext = {
+        let mut moved = Value::Null;
+        std::mem::swap(ciphertext, &mut moved);
+        moved
+    };
+    let algorithm = {
+        let mut moved = Value::Null;
+        std::mem::swap(algorithm, &mut moved);
+        moved
+    };
+    let key = {
+        let mut moved = Value::Null;
+        std::mem::swap(key, &mut moved);
+        moved
+    };
+    let iv = {
+        let mut moved = Value::Null;
+        std::mem::swap(iv, &mut moved);
+        moved
+    };
+
+    *result = decrypt(ciphertext, algorithm, key, iv);
 }
 
 test_function![

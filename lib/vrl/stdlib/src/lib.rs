@@ -283,272 +283,274 @@ mod uuid_v4;
 // -----------------------------------------------------------------------------
 
 #[cfg(feature = "append")]
-pub use append::Append;
+pub use append::{vrl_fn_append, Append};
 #[cfg(feature = "assert")]
-pub use assert::Assert;
+pub use assert::{vrl_fn_assert, Assert};
 #[cfg(feature = "assert_eq")]
-pub use assert_eq::AssertEq;
+pub use assert_eq::{vrl_fn_assert_eq, AssertEq};
 #[cfg(feature = "boolean")]
-pub use boolean::Boolean;
+pub use boolean::{vrl_fn_boolean, Boolean};
 #[cfg(feature = "ceil")]
-pub use ceil::Ceil;
+pub use ceil::{vrl_fn_ceil, Ceil};
 #[cfg(feature = "compact")]
-pub use compact::Compact;
+pub use compact::{vrl_fn_compact, Compact};
 #[cfg(feature = "contains")]
-pub use contains::Contains;
+pub use contains::{vrl_fn_contains, Contains};
 #[cfg(feature = "decode_base64")]
-pub use decode_base64::DecodeBase64;
+pub use decode_base64::{vrl_fn_decode_base64, DecodeBase64};
 #[cfg(feature = "decode_percent")]
-pub use decode_percent::DecodePercent;
+pub use decode_percent::{vrl_fn_decode_percent, DecodePercent};
 #[cfg(feature = "decrypt")]
-pub use decrypt::Decrypt;
+pub use decrypt::{vrl_fn_decrypt, Decrypt};
 #[cfg(feature = "del")]
 pub use del::Del;
 #[cfg(feature = "downcase")]
 pub use downcase::{vrl_fn_downcase, Downcase};
 #[cfg(feature = "encode_base64")]
-pub use encode_base64::EncodeBase64;
+pub use encode_base64::{vrl_fn_encode_base64, EncodeBase64};
 #[cfg(feature = "encode_json")]
-pub use encode_json::EncodeJson;
+pub use encode_json::{vrl_fn_encode_json, EncodeJson};
 #[cfg(feature = "encode_key_value")]
-pub use encode_key_value::EncodeKeyValue;
+pub use encode_key_value::{vrl_fn_encode_key_value, EncodeKeyValue};
 #[cfg(feature = "encode_logfmt")]
-pub use encode_logfmt::EncodeLogfmt;
+pub use encode_logfmt::{vrl_fn_encode_logfmt, EncodeLogfmt};
 #[cfg(feature = "encode_percent")]
-pub use encode_percent::EncodePercent;
+pub use encode_percent::{vrl_fn_encode_percent, EncodePercent};
 #[cfg(feature = "encrypt")]
-pub use encrypt::Encrypt;
+pub use encrypt::{vrl_fn_encrypt, Encrypt};
 #[cfg(feature = "ends_with")]
-pub use ends_with::EndsWith;
+pub use ends_with::{vrl_fn_ends_with, EndsWith};
 #[cfg(feature = "exists")]
 pub use exists::Exists;
 #[cfg(feature = "find")]
-pub use find::Find;
+pub use find::{vrl_fn_find, Find};
 #[cfg(feature = "flatten")]
-pub use flatten::Flatten;
+pub use flatten::{vrl_fn_flatten, Flatten};
 #[cfg(feature = "float")]
-pub use float::Float;
+pub use float::{vrl_fn_float, Float};
 #[cfg(feature = "floor")]
-pub use floor::Floor;
+pub use floor::{vrl_fn_floor, Floor};
 #[cfg(feature = "for_each")]
-pub use for_each::ForEach;
+pub use for_each::{vrl_fn_for_each, ForEach};
 #[cfg(feature = "format_int")]
-pub use format_int::FormatInt;
+pub use format_int::{vrl_fn_format_int, FormatInt};
 #[cfg(feature = "format_number")]
-pub use format_number::FormatNumber;
+pub use format_number::{vrl_fn_format_number, FormatNumber};
 #[cfg(feature = "format_timestamp")]
-pub use format_timestamp::FormatTimestamp;
+pub use format_timestamp::{vrl_fn_format_timestamp, FormatTimestamp};
 #[cfg(feature = "get")]
 pub use get::{vrl_fn_get, Get};
 #[cfg(feature = "get_env_var")]
-pub use get_env_var::GetEnvVar;
+pub use get_env_var::{vrl_fn_get_env_var, GetEnvVar};
 #[cfg(feature = "get_hostname")]
-pub use get_hostname::GetHostname;
+pub use get_hostname::{vrl_fn_get_hostname, GetHostname};
 #[cfg(feature = "includes")]
-pub use includes::Includes;
+pub use includes::{vrl_fn_includes, Includes};
 #[cfg(feature = "integer")]
-pub use integer::Integer;
+pub use integer::{vrl_fn_integer, Integer};
 #[cfg(feature = "ip_aton")]
-pub use ip_aton::IpAton;
+pub use ip_aton::{vrl_fn_ip_aton, IpAton};
 #[cfg(feature = "ip_cidr_contains")]
-pub use ip_cidr_contains::IpCidrContains;
+pub use ip_cidr_contains::{vrl_fn_ip_cidr_contains, IpCidrContains};
 #[cfg(feature = "ip_ntoa")]
-pub use ip_ntoa::IpNtoa;
+pub use ip_ntoa::{vrl_fn_ip_ntoa, IpNtoa};
 #[cfg(feature = "ip_ntop")]
-pub use ip_ntop::IpNtop;
+pub use ip_ntop::{vrl_fn_ip_ntop, IpNtop};
 #[cfg(feature = "ip_pton")]
-pub use ip_pton::IpPton;
+pub use ip_pton::{vrl_fn_ip_pton, IpPton};
 #[cfg(feature = "ip_subnet")]
-pub use ip_subnet::IpSubnet;
+pub use ip_subnet::{vrl_fn_ip_subnet, IpSubnet};
 #[cfg(feature = "ip_to_ipv6")]
-pub use ip_to_ipv6::IpToIpv6;
+pub use ip_to_ipv6::{vrl_fn_ip_to_ipv6, IpToIpv6};
 #[cfg(feature = "ipv6_to_ipv4")]
-pub use ipv6_to_ipv4::Ipv6ToIpV4;
+pub use ipv6_to_ipv4::{vrl_fn_ipv6_to_ipv4, Ipv6ToIpV4};
 #[cfg(feature = "is_array")]
-pub use is_array::IsArray;
+pub use is_array::{vrl_fn_is_array, IsArray};
 #[cfg(feature = "is_boolean")]
-pub use is_boolean::IsBoolean;
+pub use is_boolean::{vrl_fn_is_boolean, IsBoolean};
 #[cfg(feature = "is_empty")]
-pub use is_empty::IsEmpty;
+pub use is_empty::{vrl_fn_is_empty, IsEmpty};
 #[cfg(feature = "is_float")]
-pub use is_float::IsFloat;
+pub use is_float::{vrl_fn_is_float, IsFloat};
 #[cfg(feature = "is_integer")]
-pub use is_integer::IsInteger;
+pub use is_integer::{vrl_fn_is_integer, IsInteger};
 #[cfg(feature = "is_json")]
-pub use is_json::IsJson;
+pub use is_json::{vrl_fn_is_json, IsJson};
 #[cfg(feature = "is_null")]
-pub use is_null::IsNull;
+pub use is_null::{vrl_fn_is_null, IsNull};
 #[cfg(feature = "is_nullish")]
-pub use is_nullish::IsNullish;
+pub use is_nullish::{vrl_fn_is_nullish, IsNullish};
 #[cfg(feature = "is_object")]
-pub use is_object::IsObject;
+pub use is_object::{vrl_fn_is_object, IsObject};
 #[cfg(feature = "is_regex")]
-pub use is_regex::IsRegex;
+pub use is_regex::{vrl_fn_is_regex, IsRegex};
 #[cfg(feature = "is_string")]
-pub use is_string::IsString;
+pub use is_string::{vrl_fn_is_string, IsString};
 #[cfg(feature = "is_timestamp")]
-pub use is_timestamp::IsTimestamp;
+pub use is_timestamp::{vrl_fn_is_timestamp, IsTimestamp};
 #[cfg(feature = "join")]
-pub use join::Join;
+pub use join::{vrl_fn_join, Join};
 #[cfg(feature = "length")]
-pub use length::Length;
+pub use length::{vrl_fn_length, Length};
 #[cfg(feature = "log")]
-pub use log::Log;
+pub use log::{vrl_fn_log, Log};
 #[cfg(feature = "map_keys")]
-pub use map_keys::MapKeys;
+pub use map_keys::{vrl_fn_map_keys, MapKeys};
 #[cfg(feature = "map_values")]
-pub use map_values::MapValues;
+pub use map_values::{vrl_fn_map_values, MapValues};
 #[cfg(feature = "match_any")]
-pub use match_any::MatchAny;
+pub use match_any::{vrl_fn_match_any, MatchAny};
 #[cfg(feature = "match_array")]
-pub use match_array::MatchArray;
+pub use match_array::{vrl_fn_match_array, MatchArray};
 #[cfg(feature = "match_datadog_query")]
-pub use match_datadog_query::MatchDatadogQuery;
+pub use match_datadog_query::{vrl_fn_match_datadog_query, MatchDatadogQuery};
 #[cfg(feature = "merge")]
 pub use merge::{vrl_fn_merge, Merge};
 #[cfg(feature = "now")]
-pub use now::Now;
+pub use now::{vrl_fn_now, Now};
 #[cfg(feature = "object")]
-pub use object::Object;
+pub use object::{vrl_fn_object, Object};
 #[cfg(feature = "only_fields")]
-pub use only_fields::OnlyFields;
+pub use only_fields::{vrl_fn_only_fields, OnlyFields};
 #[cfg(feature = "parse_apache_log")]
-pub use parse_apache_log::ParseApacheLog;
+pub use parse_apache_log::{vrl_fn_parse_apache_log, ParseApacheLog};
 #[cfg(feature = "parse_aws_alb_log")]
-pub use parse_aws_alb_log::ParseAwsAlbLog;
+pub use parse_aws_alb_log::{vrl_fn_parse_aws_alb_log, ParseAwsAlbLog};
 #[cfg(feature = "parse_aws_cloudwatch_log_subscription_message")]
-pub use parse_aws_cloudwatch_log_subscription_message::ParseAwsCloudWatchLogSubscriptionMessage;
+pub use parse_aws_cloudwatch_log_subscription_message::{
+    vrl_fn_parse_aws_cloudwatch_log_subscription_message, ParseAwsCloudWatchLogSubscriptionMessage,
+};
 #[cfg(feature = "parse_aws_vpc_flow_log")]
-pub use parse_aws_vpc_flow_log::ParseAwsVpcFlowLog;
+pub use parse_aws_vpc_flow_log::{vrl_fn_parse_aws_vpc_flow_log, ParseAwsVpcFlowLog};
 #[cfg(feature = "parse_common_log")]
-pub use parse_common_log::ParseCommonLog;
+pub use parse_common_log::{vrl_fn_parse_common_log, ParseCommonLog};
 #[cfg(feature = "parse_csv")]
-pub use parse_csv::ParseCsv;
+pub use parse_csv::{vrl_fn_parse_csv, ParseCsv};
 #[cfg(feature = "parse_duration")]
-pub use parse_duration::ParseDuration;
+pub use parse_duration::{vrl_fn_parse_duration, ParseDuration};
 #[cfg(feature = "parse_glog")]
-pub use parse_glog::ParseGlog;
+pub use parse_glog::{vrl_fn_parse_glog, ParseGlog};
 #[cfg(feature = "parse_grok")]
 pub use parse_grok::{vrl_fn_parse_grok, ParseGrok};
 #[cfg(feature = "parse_groks")]
 pub use parse_groks::{vrl_fn_parse_groks, ParseGroks};
 #[cfg(feature = "parse_int")]
-pub use parse_int::ParseInt;
+pub use parse_int::{vrl_fn_parse_int, ParseInt};
 #[cfg(feature = "parse_json")]
 pub use parse_json::{vrl_fn_parse_json, ParseJson};
 #[cfg(feature = "parse_key_value")]
-pub use parse_key_value::ParseKeyValue;
+pub use parse_key_value::{vrl_fn_parse_key_value, ParseKeyValue};
 #[cfg(feature = "parse_klog")]
-pub use parse_klog::ParseKlog;
+pub use parse_klog::{vrl_fn_parse_klog, ParseKlog};
 #[cfg(feature = "parse_linux_authorization")]
 pub use parse_linux_authorization::ParseLinuxAuthorization;
 #[cfg(feature = "parse_logfmt")]
 pub use parse_logfmt::ParseLogFmt;
 #[cfg(feature = "parse_nginx_log")]
-pub use parse_nginx_log::ParseNginxLog;
+pub use parse_nginx_log::{vrl_fn_parse_nginx_log, ParseNginxLog};
 #[cfg(feature = "parse_query_string")]
-pub use parse_query_string::ParseQueryString;
+pub use parse_query_string::{vrl_fn_parse_query_string, ParseQueryString};
 #[cfg(feature = "parse_regex")]
-pub use parse_regex::ParseRegex;
+pub use parse_regex::{vrl_fn_parse_regex, ParseRegex};
 #[cfg(feature = "parse_regex_all")]
-pub use parse_regex_all::ParseRegexAll;
+pub use parse_regex_all::{vrl_fn_parse_regex_all, ParseRegexAll};
 #[cfg(feature = "parse_ruby_hash")]
-pub use parse_ruby_hash::ParseRubyHash;
+pub use parse_ruby_hash::{vrl_fn_parse_ruby_hash, ParseRubyHash};
 #[cfg(feature = "parse_syslog")]
-pub use parse_syslog::ParseSyslog;
+pub use parse_syslog::{vrl_fn_parse_syslog, ParseSyslog};
 #[cfg(feature = "parse_timestamp")]
-pub use parse_timestamp::ParseTimestamp;
+pub use parse_timestamp::{vrl_fn_parse_timestamp, ParseTimestamp};
 #[cfg(feature = "parse_tokens")]
-pub use parse_tokens::ParseTokens;
+pub use parse_tokens::{vrl_fn_parse_tokens, ParseTokens};
 #[cfg(feature = "parse_url")]
-pub use parse_url::ParseUrl;
+pub use parse_url::{vrl_fn_parse_url, ParseUrl};
 #[cfg(feature = "parse_user_agent")]
-pub use parse_user_agent::ParseUserAgent;
+pub use parse_user_agent::{vrl_fn_parse_user_agent, ParseUserAgent};
 #[cfg(feature = "parse_xml")]
-pub use parse_xml::ParseXml;
+pub use parse_xml::{vrl_fn_parse_xml, ParseXml};
 #[cfg(feature = "push")]
-pub use push::Push;
+pub use push::{vrl_fn_push, Push};
 #[cfg(feature = "match")]
-pub use r#match::Match;
+pub use r#match::{vrl_fn_match, Match};
 #[cfg(feature = "random_bytes")]
-pub use random_bytes::RandomBytes;
+pub use random_bytes::{vrl_fn_random_bytes, RandomBytes};
 #[cfg(feature = "redact")]
-pub use redact::Redact;
+pub use redact::{vrl_fn_redact, Redact};
 #[cfg(feature = "remove")]
-pub use remove::Remove;
+pub use remove::{vrl_fn_remove, Remove};
 #[cfg(feature = "replace")]
-pub use replace::Replace;
+pub use replace::{vrl_fn_replace, Replace};
 #[cfg(feature = "reverse_dns")]
-pub use reverse_dns::ReverseDns;
+pub use reverse_dns::{vrl_fn_reverse_dns, ReverseDns};
 #[cfg(feature = "round")]
-pub use round::Round;
+pub use round::{vrl_fn_round, Round};
 #[cfg(feature = "set")]
-pub use set::Set;
+pub use set::{vrl_fn_set, Set};
 #[cfg(feature = "sha2")]
-pub use sha2::Sha2;
+pub use sha2::{vrl_fn_sha2, Sha2};
 #[cfg(feature = "sha3")]
-pub use sha3::Sha3;
+pub use sha3::{vrl_fn_sha3, Sha3};
 #[cfg(feature = "slice")]
-pub use slice::Slice;
+pub use slice::{vrl_fn_slice, Slice};
 #[cfg(feature = "split")]
-pub use split::Split;
+pub use split::{vrl_fn_split, Split};
 #[cfg(feature = "starts_with")]
 pub use starts_with::{vrl_fn_starts_with, StartsWith};
 #[cfg(feature = "string")]
 pub use string::{vrl_fn_string, String};
 #[cfg(feature = "strip_ansi_escape_codes")]
-pub use strip_ansi_escape_codes::StripAnsiEscapeCodes;
+pub use strip_ansi_escape_codes::{vrl_fn_strip_ansi_escape_codes, StripAnsiEscapeCodes};
 #[cfg(feature = "strip_whitespace")]
-pub use strip_whitespace::StripWhitespace;
+pub use strip_whitespace::{vrl_fn_strip_whitespace, StripWhitespace};
 #[cfg(feature = "strlen")]
-pub use strlen::Strlen;
+pub use strlen::{vrl_fn_strlen, Strlen};
 #[cfg(feature = "tag_types_externally")]
-pub use tag_types_externally::TagTypesExternally;
+pub use tag_types_externally::{vrl_fn_tag_types_externally, TagTypesExternally};
 #[cfg(feature = "tally")]
-pub use tally::Tally;
+pub use tally::{vrl_fn_tally, Tally};
 #[cfg(feature = "tally_value")]
-pub use tally_value::TallyValue;
+pub use tally_value::{vrl_fn_tally_value, TallyValue};
 #[cfg(feature = "timestamp")]
-pub use timestamp::Timestamp;
+pub use timestamp::{vrl_fn_timestamp, Timestamp};
 #[cfg(feature = "to_bool")]
-pub use to_bool::ToBool;
+pub use to_bool::{vrl_fn_to_bool, ToBool};
 #[cfg(feature = "to_float")]
-pub use to_float::ToFloat;
+pub use to_float::{vrl_fn_to_float, ToFloat};
 #[cfg(feature = "to_int")]
-pub use to_int::ToInt;
+pub use to_int::{vrl_fn_to_int, ToInt};
 #[cfg(feature = "to_regex")]
-pub use to_regex::ToRegex;
+pub use to_regex::{vrl_fn_to_regex, ToRegex};
 #[cfg(feature = "to_string")]
-pub use to_string::ToString;
+pub use to_string::{vrl_fn_to_string, ToString};
 #[cfg(feature = "to_syslog_facility")]
-pub use to_syslog_facility::ToSyslogFacility;
+pub use to_syslog_facility::{vrl_fn_to_syslog_facility, ToSyslogFacility};
 #[cfg(feature = "to_syslog_level")]
-pub use to_syslog_level::ToSyslogLevel;
+pub use to_syslog_level::{vrl_fn_to_syslog_level, ToSyslogLevel};
 #[cfg(feature = "to_syslog_severity")]
-pub use to_syslog_severity::ToSyslogSeverity;
+pub use to_syslog_severity::{vrl_fn_to_syslog_severity, ToSyslogSeverity};
 #[cfg(feature = "to_timestamp")]
-pub use to_timestamp::ToTimestamp;
+pub use to_timestamp::{vrl_fn_to_timestamp, ToTimestamp};
 #[cfg(feature = "to_unix_timestamp")]
-pub use to_unix_timestamp::ToUnixTimestamp;
+pub use to_unix_timestamp::{vrl_fn_to_unix_timestamp, ToUnixTimestamp};
 #[cfg(feature = "truncate")]
-pub use truncate::Truncate;
+pub use truncate::{vrl_fn_truncate, Truncate};
 #[cfg(feature = "type_def")]
-pub use type_def::TypeDef;
+pub use type_def::{vrl_fn_type_def, TypeDef};
 #[cfg(feature = "unique")]
-pub use unique::Unique;
+pub use unique::{vrl_fn_unique, Unique};
 #[cfg(feature = "unnest")]
-pub use unnest::Unnest;
+pub use unnest::{vrl_fn_unnest, Unnest};
 #[cfg(feature = "upcase")]
 pub use upcase::{vrl_fn_upcase, Upcase};
 #[cfg(feature = "uuid_v4")]
-pub use uuid_v4::{uuid_v4, UuidV4};
+pub use uuid_v4::{vrl_fn_uuid_v4, UuidV4};
 
 #[cfg(feature = "array")]
-pub use crate::array::Array;
+pub use crate::array::{vrl_fn_array, Array};
 #[cfg(feature = "md5")]
-pub use crate::md5::Md5;
+pub use crate::md5::{vrl_fn_md5, Md5};
 #[cfg(feature = "sha1")]
-pub use crate::sha1::Sha1;
+pub use crate::sha1::{vrl_fn_sha1, Sha1};
 
 pub fn all() -> Vec<Box<dyn vrl::Function>> {
     vec![

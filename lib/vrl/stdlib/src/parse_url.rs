@@ -77,6 +77,11 @@ impl Function for ParseUrl {
             .map(|url| url_to_value(url, default_known_ports))
     }
 
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
+
     fn compile(
         &self,
         _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
@@ -116,6 +121,12 @@ impl Expression for ParseUrlFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::object(inner_kind()).fallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_parse_url(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 fn url_to_value(url: Url, default_known_ports: bool) -> Value {

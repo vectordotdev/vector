@@ -29,6 +29,11 @@ impl Function for Now {
     fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Resolved {
         Ok(Utc::now().into())
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -42,4 +47,10 @@ impl Expression for NowFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::timestamp()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_now(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }

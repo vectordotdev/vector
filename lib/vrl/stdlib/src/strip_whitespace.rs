@@ -52,6 +52,11 @@ impl Function for StripWhitespace {
 
         Ok(value.try_bytes_utf8_lossy()?.trim().into())
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -69,6 +74,11 @@ impl Expression for StripWhitespaceFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().infallible()
     }
+}
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_strip_whitespace(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

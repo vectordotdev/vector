@@ -55,6 +55,11 @@ impl Function for TypeDef {
     fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Resolved {
         Err("function not supported in VM runtime.".into())
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -70,4 +75,10 @@ impl Expression for TypeDefFn {
     fn type_def(&self, _state: (&state::LocalEnv, &state::ExternalEnv)) -> VrlTypeDef {
         VrlTypeDef::any().infallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_type_def(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }

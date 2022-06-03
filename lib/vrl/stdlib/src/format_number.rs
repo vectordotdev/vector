@@ -149,6 +149,11 @@ impl Function for FormatNumber {
 
         format_number(value, scale, grouping_separator, decimal_separator)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -186,6 +191,11 @@ impl Expression for FormatNumberFn {
     }
 }
 
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_format_number(value: &mut Value, result: &mut Resolved) {
+    todo!()
+}
 #[cfg(test)]
 mod tests {
     use super::*;

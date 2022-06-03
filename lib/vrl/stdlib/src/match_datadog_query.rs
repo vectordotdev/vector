@@ -121,6 +121,11 @@ impl Function for MatchDatadogQuery {
         Ok(filter.0.run(&value).into())
     }
 
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
         &[
             Parameter {
@@ -159,6 +164,12 @@ impl Expression for MatchDatadogQueryFn {
 
 fn type_def() -> TypeDef {
     TypeDef::boolean().infallible()
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_match_datadog_query(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[derive(Default, Clone)]

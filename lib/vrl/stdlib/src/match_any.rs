@@ -114,6 +114,11 @@ impl Function for MatchAny {
 
         match_any(value, pattern)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -131,6 +136,12 @@ impl Expression for MatchAnyFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().infallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_match_any(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

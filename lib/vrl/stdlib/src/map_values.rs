@@ -114,6 +114,11 @@ impl Function for MapValues {
 
         map_values(value, recursive, ctx, runner)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -144,6 +149,12 @@ impl Expression for MapValuesFn {
         recursive_type_def(&mut value, closure.kind().clone(), true);
         value.with_fallibility(closure.is_fallible())
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_map_values(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 fn recursive_type_def(from: &mut Kind, to: Kind, root: bool) {

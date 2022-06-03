@@ -66,6 +66,10 @@ impl Function for Flatten {
         let value = args.required("value");
         flatten(value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        Some(("vrl_fn_flatten", vrl_fn_flatten as _))
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -87,6 +91,18 @@ impl Expression for FlattenFn {
             TypeDef::object(Collection::any())
         }
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_flatten(value: &mut Value, result: &mut Resolved) {
+    let value = {
+        let mut moved = Value::Null;
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+
+    *result = flatten(value);
 }
 
 /// An iterator to walk over maps allowing us to flatten nested maps to a single level.

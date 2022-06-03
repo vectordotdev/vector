@@ -111,6 +111,11 @@ impl Function for ToUnixTimestamp {
 
         to_unix_timestamp(value, unit)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -179,6 +184,12 @@ impl Expression for ToUnixTimestampFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::integer().infallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_to_unix_timestamp(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

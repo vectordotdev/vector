@@ -53,6 +53,11 @@ impl Function for ReverseDns {
         let value = args.required("value");
         reverse_dns(value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -69,6 +74,12 @@ impl Expression for ReverseDnsFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().fallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_reverse_dns(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

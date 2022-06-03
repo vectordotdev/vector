@@ -88,6 +88,11 @@ impl Function for ParseCommonLog {
 
         parse_common_log(value, timestamp_format, ctx)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -111,6 +116,12 @@ impl Expression for ParseCommonLogFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::object(inner_kind()).fallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_parse_common_log(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 fn inner_kind() -> BTreeMap<Field, Kind> {

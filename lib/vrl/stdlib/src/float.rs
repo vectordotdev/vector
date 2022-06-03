@@ -56,6 +56,10 @@ impl Function for Float {
         let value = args.required("value");
         float(value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        Some(("vrl_fn_float", vrl_fn_float as _))
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -73,4 +77,16 @@ impl Expression for FloatFn {
 
         TypeDef::float().with_fallibility(non_float)
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_float(value: &mut Value, result: &mut Resolved) {
+    let value = {
+        let mut moved = Value::Null;
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+
+    *result = float(value);
 }

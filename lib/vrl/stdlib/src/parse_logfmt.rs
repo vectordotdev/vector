@@ -74,4 +74,8 @@ impl Function for ParseLogFmt {
             whitespace,
         )
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        super::parse_key_value::ParseKeyValue.symbol()
+    }
 }

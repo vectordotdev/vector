@@ -195,6 +195,10 @@ impl Function for ParseGroks {
         Ok(v)
     }
 
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        Some(("vrl_fn_parse_groks", vrl_fn_parse_groks as _))
+    }
+
     fn compile(
         &self,
         _state: (&mut state::LocalEnv, &mut state::ExternalEnv),

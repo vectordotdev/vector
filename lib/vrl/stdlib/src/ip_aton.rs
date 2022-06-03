@@ -50,6 +50,11 @@ impl Function for IpAton {
         let value = args.required("value");
         ip_aton(value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -66,6 +71,12 @@ impl Expression for IpAtonFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::integer().fallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_ip_aton(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

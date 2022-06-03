@@ -50,6 +50,11 @@ impl Function for IsRegex {
     fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
         Ok(value!(args.required("value").is_regex()))
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -65,6 +70,12 @@ impl Expression for IsRegexFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().infallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_is_regex(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

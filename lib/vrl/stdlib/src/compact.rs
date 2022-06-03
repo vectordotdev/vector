@@ -156,6 +156,10 @@ impl Function for Compact {
 
         compact(recursive, null, string, object, array, nullish, value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        Some(("vrl_fn_compact", vrl_fn_compact as _))
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -253,6 +257,57 @@ impl Expression for CompactFn {
             TypeDef::object(Collection::any())
         }
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_compact(
+    value: &mut Value,
+    recursive: &mut Option<Value>,
+    null: &mut Option<Value>,
+    string: &mut Option<Value>,
+    object: &mut Option<Value>,
+    array: &mut Option<Value>,
+    nullish: &mut Option<Value>,
+    result: &mut Resolved,
+) {
+    let value = {
+        let mut moved = Value::Null;
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+    let recursive = {
+        let mut moved = None;
+        std::mem::swap(recursive, &mut moved);
+        moved
+    };
+    let null = {
+        let mut moved = None;
+        std::mem::swap(null, &mut moved);
+        moved
+    };
+    let string = {
+        let mut moved = None;
+        std::mem::swap(string, &mut moved);
+        moved
+    };
+    let object = {
+        let mut moved = None;
+        std::mem::swap(object, &mut moved);
+        moved
+    };
+    let array = {
+        let mut moved = None;
+        std::mem::swap(array, &mut moved);
+        moved
+    };
+    let nullish = {
+        let mut moved = None;
+        std::mem::swap(nullish, &mut moved);
+        moved
+    };
+
+    *result = compact(recursive, null, string, object, array, nullish, value);
 }
 
 /// Compact the value if we are recursing - otherwise, just return the value untouched.

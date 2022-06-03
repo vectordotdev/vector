@@ -72,6 +72,10 @@ impl Function for Floor {
 
         floor(precision, value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        Some(("vrl_fn_floor", vrl_fn_floor as _))
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -98,6 +102,27 @@ impl Expression for FloorFn {
             _ => Kind::integer().or_float().into(),
         }
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_floor(
+    value: &mut Value,
+    precision: &mut Option<Value>,
+    result: &mut Resolved,
+) {
+    let value = {
+        let mut moved = Value::Null;
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+    let precision = {
+        let mut moved = None;
+        std::mem::swap(precision, &mut moved);
+        moved
+    };
+
+    *result = floor(precision, value);
 }
 
 #[cfg(test)]

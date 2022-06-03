@@ -76,6 +76,11 @@ impl Function for IsEmpty {
         let value = args.required("value");
         is_empty(value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -92,6 +97,12 @@ impl Expression for IsEmptyFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().infallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_is_empty(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

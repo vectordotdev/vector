@@ -220,6 +220,10 @@ impl Function for Encrypt {
         let iv = args.required("iv");
         encrypt(plaintext, algorithm, key, iv)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        Some(("vrl_fn_encrypt", vrl_fn_encrypt as _))
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -242,6 +246,39 @@ impl Expression for EncryptFn {
     fn type_def(&self, _state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().fallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_encrypt(
+    plaintext: &mut Value,
+    algorithm: &mut Value,
+    key: &mut Value,
+    iv: &mut Value,
+    result: &mut Resolved,
+) {
+    let plaintext = {
+        let mut moved = Value::Null;
+        std::mem::swap(plaintext, &mut moved);
+        moved
+    };
+    let algorithm = {
+        let mut moved = Value::Null;
+        std::mem::swap(algorithm, &mut moved);
+        moved
+    };
+    let key = {
+        let mut moved = Value::Null;
+        std::mem::swap(key, &mut moved);
+        moved
+    };
+    let iv = {
+        let mut moved = Value::Null;
+        std::mem::swap(iv, &mut moved);
+        moved
+    };
+
+    *result = encrypt(plaintext, algorithm, key, iv);
 }
 
 #[cfg(test)]

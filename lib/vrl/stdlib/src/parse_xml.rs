@@ -207,6 +207,11 @@ impl Function for ParseXml {
 
         parse_xml(value, options)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -283,6 +288,12 @@ impl Expression for ParseXmlFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         type_def()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_parse_xml(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 fn type_def() -> TypeDef {

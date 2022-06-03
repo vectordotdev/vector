@@ -57,6 +57,10 @@ impl Function for Append {
 
         append(value, items)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        Some(("vrl_fn_append", vrl_fn_append as _))
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -78,6 +82,23 @@ impl Expression for AppendFn {
             .type_def(state)
             .merge_append(self.items.type_def(state))
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_append(value: &mut Value, items: &mut Value, result: &mut Resolved) {
+    let value = {
+        let mut moved = Value::Null;
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+    let items = {
+        let mut moved = Value::Null;
+        std::mem::swap(items, &mut moved);
+        moved
+    };
+
+    *result = append(value, items);
 }
 
 #[cfg(test)]

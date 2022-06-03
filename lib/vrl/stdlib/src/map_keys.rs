@@ -115,6 +115,11 @@ impl Function for MapKeys {
 
         map_keys(value, recursive, ctx, runner)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -143,4 +148,10 @@ impl Expression for MapKeysFn {
             .type_def(ctx)
             .with_fallibility(self.closure.block.type_def(ctx).is_fallible())
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_map_keys(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }

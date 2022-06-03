@@ -111,6 +111,11 @@ impl Function for Sha2 {
 
         sha2(value, variant)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -130,6 +135,12 @@ impl Expression for Sha2Fn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().infallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_sha2(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[inline]

@@ -87,10 +87,14 @@ impl Function for Contains {
         let substring = args.required("substring");
         let case_sensitive = args
             .optional("case_sensitive")
-            .map(|value| value.try_boolean().unwrap_or(true))
+            .and_then(|value| value.try_boolean().ok())
             .unwrap_or(true);
 
         contains(value, substring, case_sensitive)
+    }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        Some(("vrl_fn_contains", vrl_fn_contains as _))
     }
 }
 
@@ -113,6 +117,39 @@ impl Expression for ContainsFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().infallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_contains(
+    value: &mut Value,
+    substring: &mut Value,
+    case_sensitive: &mut Option<Value>,
+    result: &mut Resolved,
+) {
+    let value = {
+        let mut moved = Value::Null;
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+    let substring = {
+        let mut moved = Value::Null;
+        std::mem::swap(substring, &mut moved);
+        moved
+    };
+    let case_sensitive = {
+        let mut moved = None;
+        std::mem::swap(case_sensitive, &mut moved);
+        moved
+    };
+
+    *result = contains(
+        value,
+        substring,
+        case_sensitive
+            .and_then(|value| value.try_boolean().ok())
+            .unwrap_or(true),
+    );
 }
 
 #[cfg(test)]

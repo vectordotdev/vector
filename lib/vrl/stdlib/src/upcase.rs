@@ -44,6 +44,11 @@ impl Function for Upcase {
         let value = args.required("value");
         upcase(value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -71,7 +76,7 @@ pub extern "C" fn vrl_fn_upcase(value: &mut Value, resolved: &mut Resolved) {
         moved
     };
 
-    *resolved = (|| Ok(value.try_bytes_utf8_lossy()?.to_uppercase().into()))();
+    *resolved = upcase(value);
 }
 
 #[cfg(test)]

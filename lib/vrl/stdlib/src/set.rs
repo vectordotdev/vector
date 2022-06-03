@@ -140,6 +140,11 @@ impl Function for Set {
 
         set(path, value, data)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -173,6 +178,12 @@ impl Expression for SetFn {
 
         td
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_set(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

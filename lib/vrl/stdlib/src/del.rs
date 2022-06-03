@@ -126,6 +126,10 @@ impl Function for Del {
 
         del(query, ctx)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        None
+    }
 }
 
 #[derive(Debug, Clone)]

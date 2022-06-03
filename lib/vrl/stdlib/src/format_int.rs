@@ -86,6 +86,10 @@ impl Function for FormatInt {
 
         format_int(value, base)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        Some(("vrl_fn_format_int", vrl_fn_format_int as _))
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -110,6 +114,27 @@ impl Expression for FormatIntFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::integer().fallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_format_int(
+    value: &mut Value,
+    base: &mut Option<Value>,
+    result: &mut Resolved,
+) {
+    let value = {
+        let mut moved = Value::Null;
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+    let base = {
+        let mut moved = None;
+        std::mem::swap(base, &mut moved);
+        moved
+    };
+
+    *result = format_int(value, base);
 }
 
 // Formats x in the provided radix

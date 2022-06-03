@@ -56,6 +56,11 @@ impl Function for Timestamp {
         let value = args.required("value");
         timestamp(value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -74,4 +79,10 @@ impl Expression for TimestampFn {
 
         TypeDef::timestamp().with_fallibility(non_timestamp)
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_timestamp(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }

@@ -73,6 +73,10 @@ impl Function for DecodeBase64 {
 
         decode_base64(charset, value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        Some(("vrl_fn_decode_base64", vrl_fn_decode_base64 as _))
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -94,6 +98,27 @@ impl Expression for DecodeBase64Fn {
         // advance: https://docs.rs/base64/0.13.0/base64/enum.DecodeError.html
         TypeDef::bytes().fallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_decode_base64(
+    value: &mut Value,
+    charset: &mut Option<Value>,
+    result: &mut Resolved,
+) {
+    let value = {
+        let mut moved = Value::Null;
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+    let charset = {
+        let mut moved = None;
+        std::mem::swap(charset, &mut moved);
+        moved
+    };
+
+    *result = decode_base64(charset, value);
 }
 
 #[cfg(test)]

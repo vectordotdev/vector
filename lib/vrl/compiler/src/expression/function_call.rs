@@ -754,8 +754,7 @@ impl Expression for FunctionCall {
         state: (&mut LocalEnv, &mut ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
     ) -> Result<(), String> {
-        println!("compiling function call to {}", self.ident);
-        if self.ident == "del" {
+        if ["del", "exists"].contains(&self.ident) {
             return self.expr.emit_llvm(state, ctx);
         }
 
@@ -1418,6 +1417,10 @@ mod tests {
             _ctx: &mut Context,
             _args: &mut crate::vm::VmArgumentList,
         ) -> Result<value::Value, ExpressionError> {
+            unimplemented!()
+        }
+
+        fn symbol(&self) -> Option<(&'static str, usize)> {
             unimplemented!()
         }
     }

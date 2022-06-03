@@ -66,6 +66,11 @@ impl Function for Merge {
 
         Ok(to.into())
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]

@@ -68,6 +68,11 @@ impl Function for Join {
 
         join(value, separator)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -91,6 +96,12 @@ impl Expression for JoinFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().fallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_join(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

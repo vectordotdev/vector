@@ -44,6 +44,10 @@ impl Function for Downcase {
         let value = args.required("value");
         downcase(value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        Some(("vrl_fn_downcase", vrl_fn_downcase as _))
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -71,10 +75,7 @@ pub extern "C" fn vrl_fn_downcase(value: &mut Value, resolved: &mut Resolved) {
         moved
     };
 
-    *resolved = (|| {
-        let bytes = value.try_bytes()?;
-        Ok(String::from_utf8_lossy(&bytes).to_lowercase().into())
-    })();
+    *resolved = downcase(value);
 }
 
 #[cfg(test)]

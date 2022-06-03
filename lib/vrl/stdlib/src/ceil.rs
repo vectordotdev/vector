@@ -72,6 +72,10 @@ impl Function for Ceil {
 
         ceil(value, precision)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        Some(("vrl_fn_ceil", vrl_fn_ceil as _))
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -98,6 +102,27 @@ impl Expression for CeilFn {
             _ => Kind::integer().or_float().into(),
         }
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_ceil(
+    value: &mut Value,
+    precision: &mut Option<Value>,
+    result: &mut Resolved,
+) {
+    let value = {
+        let mut moved = Value::Null;
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+    let precision = {
+        let mut moved = None;
+        std::mem::swap(precision, &mut moved);
+        moved
+    };
+
+    *result = ceil(value, precision);
 }
 
 #[cfg(test)]

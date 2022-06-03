@@ -92,6 +92,10 @@ impl Function for ForEach {
 
         for_each(value, ctx, runner)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        Some(("vrl_fn_for_each", vrl_fn_for_each as _))
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -114,4 +118,10 @@ impl Expression for ForEachFn {
 
         TypeDef::null().with_fallibility(fallible)
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_for_each(value: &mut Value, result: &mut Resolved) {
+    todo!();
 }

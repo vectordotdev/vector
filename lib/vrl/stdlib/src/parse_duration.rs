@@ -111,6 +111,11 @@ impl Function for ParseDuration {
 
         parse_duration(value, unit)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -130,6 +135,12 @@ impl Expression for ParseDurationFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::float().fallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_parse_duration(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

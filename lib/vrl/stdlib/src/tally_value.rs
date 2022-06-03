@@ -55,6 +55,11 @@ impl Function for TallyValue {
 
         tally_value(array, value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -74,6 +79,12 @@ impl Expression for TallyValueFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::integer().infallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_tally_value(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

@@ -143,6 +143,10 @@ impl Function for EncodeKeyValue {
             flatten_boolean,
         )
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        Some(("vrl_fn_encode_key_value", vrl_fn_encode_key_value as _))
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -190,6 +194,51 @@ impl Expression for EncodeKeyValueFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().with_fallibility(self.fields.is_some())
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_encode_key_value(
+    value: &mut Value,
+    fields_ordering: &mut Option<Value>,
+    key_value_delimiter: &mut Option<Value>,
+    field_delimiter: &mut Option<Value>,
+    flatten_boolean: &mut Option<Value>,
+    result: &mut Resolved,
+) {
+    let value = {
+        let mut moved = Value::Null;
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+    let fields_ordering = {
+        let mut moved = None;
+        std::mem::swap(fields_ordering, &mut moved);
+        moved
+    };
+    let key_value_delimiter = {
+        let mut moved = None;
+        std::mem::swap(key_value_delimiter, &mut moved);
+        moved
+    };
+    let field_delimiter = {
+        let mut moved = None;
+        std::mem::swap(field_delimiter, &mut moved);
+        moved
+    };
+    let flatten_boolean = {
+        let mut moved = None;
+        std::mem::swap(flatten_boolean, &mut moved);
+        moved
+    };
+
+    *result = encode_key_value(
+        fields_ordering,
+        value,
+        key_value_delimiter.unwrap_or_else(|| Value::from("=")),
+        field_delimiter.unwrap_or_else(|| Value::from(" ")),
+        flatten_boolean.unwrap_or_else(|| Value::from(false)),
+    );
 }
 
 #[cfg(test)]

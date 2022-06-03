@@ -119,6 +119,11 @@ impl Function for ParseGlog {
         let value = args.required("value");
         parse_glog(value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -135,6 +140,12 @@ impl Expression for ParseGlogFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::object(inner_kind()).fallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_parse_glog(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 fn inner_kind() -> BTreeMap<Field, Kind> {

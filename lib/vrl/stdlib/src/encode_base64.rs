@@ -82,6 +82,10 @@ impl Function for EncodeBase64 {
 
         encode_base64(value, padding, charset)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        Some(("vrl_fn_encode_base64", vrl_fn_encode_base64 as _))
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -103,6 +107,33 @@ impl Expression for EncodeBase64Fn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().infallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_encode_base64(
+    value: &mut Value,
+    padding: &mut Option<Value>,
+    charset: &mut Option<Value>,
+    result: &mut Resolved,
+) {
+    let value = {
+        let mut moved = Value::Null;
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+    let padding = {
+        let mut moved = None;
+        std::mem::swap(padding, &mut moved);
+        moved
+    };
+    let charset = {
+        let mut moved = None;
+        std::mem::swap(charset, &mut moved);
+        moved
+    };
+
+    *result = encode_base64(value, padding, charset);
 }
 
 #[cfg(test)]

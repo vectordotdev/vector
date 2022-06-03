@@ -56,6 +56,11 @@ impl Function for Integer {
         let value = args.required("value");
         int(value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -73,4 +78,10 @@ impl Expression for IntegerFn {
 
         TypeDef::integer().with_fallibility(non_integer)
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_integer(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }

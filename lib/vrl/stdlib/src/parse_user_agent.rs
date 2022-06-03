@@ -220,6 +220,11 @@ impl Function for ParseUserAgent {
 
         Ok((parser.fun)(&string))
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 struct ParserMode {
@@ -254,6 +259,12 @@ impl fmt::Debug for ParseUserAgentFn {
             self.value, self.mode
         )
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_parse_user_agent(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

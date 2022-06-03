@@ -56,6 +56,10 @@ impl Function for Array {
         let value = args.required("value");
         array(value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        Some(("vrl_fn_array", vrl_fn_array as _))
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -74,4 +78,16 @@ impl Expression for ArrayFn {
             .fallible_unless(Kind::array(Collection::any()))
             .restrict_array()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_array(value: &mut Value, result: &mut Resolved) {
+    let value = {
+        let mut moved = Value::Null;
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+
+    *result = array(value);
 }

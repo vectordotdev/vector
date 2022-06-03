@@ -72,6 +72,10 @@ impl Function for Find {
 
         find(value, pattern, from)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        Some(("vrl_fn_find", vrl_fn_find as _))
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -132,6 +136,33 @@ impl Expression for FindFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::integer().infallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_find(
+    value: &mut Value,
+    pattern: &mut Value,
+    from: &mut Option<Value>,
+    result: &mut Resolved,
+) {
+    let value = {
+        let mut moved = Value::Null;
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+    let pattern = {
+        let mut moved = Value::Null;
+        std::mem::swap(pattern, &mut moved);
+        moved
+    };
+    let from = {
+        let mut moved = None;
+        std::mem::swap(from, &mut moved);
+        moved
+    };
+
+    *result = find(value, pattern, from);
 }
 
 #[cfg(test)]

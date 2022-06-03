@@ -235,6 +235,11 @@ impl Function for ToTimestamp {
 
         to_timestamp(value, unit)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -306,6 +311,12 @@ impl Expression for ToTimestampFn {
             .fallible_unless(Kind::timestamp())
             .with_kind(Kind::timestamp())
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_to_timestamp(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

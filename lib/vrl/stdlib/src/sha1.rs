@@ -46,6 +46,11 @@ impl Function for Sha1 {
         let value = args.required("value");
         sha1(value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -62,6 +67,12 @@ impl Expression for Sha1Fn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().infallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_sha1(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

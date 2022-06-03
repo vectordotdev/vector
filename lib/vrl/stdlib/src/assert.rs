@@ -84,6 +84,10 @@ impl Function for Assert {
 
         assert(condition, message, None)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        Some(("vrl_fn_assert", vrl_fn_assert as _))
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -110,4 +114,25 @@ impl fmt::Display for AssertFn {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("")
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_assert(
+    condition: &mut Value,
+    message: &mut Option<Value>,
+    result: &mut Resolved,
+) {
+    let condition = {
+        let mut moved = Value::Null;
+        std::mem::swap(condition, &mut moved);
+        moved
+    };
+    let message = {
+        let mut moved = None;
+        std::mem::swap(message, &mut moved);
+        moved
+    };
+
+    *result = assert(condition, message, None);
 }

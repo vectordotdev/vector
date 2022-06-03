@@ -56,6 +56,11 @@ impl Function for Object {
         let value = args.required("value");
         object(value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -74,4 +79,10 @@ impl Expression for ObjectFn {
             .fallible_unless(Kind::object(Collection::any()))
             .restrict_object()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_object(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }

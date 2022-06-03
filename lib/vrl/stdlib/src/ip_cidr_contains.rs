@@ -85,6 +85,11 @@ impl Function for IpCidrContains {
 
         ip_cidr_contains(value, cidr)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -104,6 +109,12 @@ impl Expression for IpCidrContainsFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().fallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_ip_cidr_contains(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

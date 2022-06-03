@@ -63,6 +63,11 @@ impl Function for Match {
 
         match_(value, pattern)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -82,6 +87,12 @@ impl Expression for MatchFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().infallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_match(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

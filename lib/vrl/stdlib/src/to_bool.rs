@@ -164,6 +164,11 @@ impl Function for ToBool {
 
         to_bool(value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -189,6 +194,12 @@ impl Expression for ToBoolFn {
                 || td.contains_regex(),
         )
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_to_bool(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

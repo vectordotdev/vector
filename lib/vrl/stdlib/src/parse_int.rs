@@ -94,6 +94,11 @@ impl Function for ParseInt {
 
         parse_int(value, base)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -117,6 +122,12 @@ impl Expression for ParseIntFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::integer().fallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_parse_int(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

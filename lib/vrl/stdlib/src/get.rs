@@ -142,6 +142,11 @@ impl Function for Get {
 
         get(value, path)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]

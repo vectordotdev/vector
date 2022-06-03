@@ -50,6 +50,10 @@ impl Function for DecodePercent {
 
         decode_percent(value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        Some(("vrl_fn_decode_percent", vrl_fn_decode_percent as _))
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -67,6 +71,18 @@ impl Expression for DecodePercentFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().infallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_decode_percent(value: &mut Value, result: &mut Resolved) {
+    let value = {
+        let mut moved = Value::Null;
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+
+    *result = decode_percent(value);
 }
 
 #[cfg(test)]

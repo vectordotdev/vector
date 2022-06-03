@@ -122,6 +122,11 @@ impl Function for ParseNginxLog {
 
         parse_nginx_log(value, timestamp_format, format, ctx)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 fn regex_for_format(format: &[u8]) -> &Regex {
@@ -177,6 +182,12 @@ impl Expression for ParseNginxLogFn {
         })
         .fallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_parse_nginx_log(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 fn kind_combined() -> BTreeMap<Field, Kind> {

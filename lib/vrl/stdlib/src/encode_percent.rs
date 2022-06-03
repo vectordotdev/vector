@@ -1,3 +1,5 @@
+use std::any::Any;
+
 use ::value::Value;
 use percent_encoding::{utf8_percent_encode, AsciiSet};
 use vrl::prelude::*;
@@ -159,6 +161,10 @@ impl Function for EncodePercent {
 
         encode_percent(value, ascii_set)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        Some(("vrl_fn_encode_percent", vrl_fn_encode_percent as _))
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -176,6 +182,23 @@ impl Expression for EncodePercentFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_encode_percent(
+    value: &mut Value,
+    ascii_set: &Box<dyn Any + Send + Sync>,
+    result: &mut Resolved,
+) {
+    let value = {
+        let mut moved = Value::Null;
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+    let ascii_set = ascii_set.downcast_ref::<Bytes>().unwrap();
+
+    *result = encode_percent(value, ascii_set);
 }
 
 #[cfg(test)]

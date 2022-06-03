@@ -81,4 +81,38 @@ impl Function for EncodeLogfmt {
             flatten_boolean,
         )
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        Some(("vrl_fn_encode_logfmt", vrl_fn_encode_logfmt as _))
+    }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_encode_logfmt(
+    value: &mut Value,
+    fields_ordering: &mut Option<Value>,
+    result: &mut Resolved,
+) {
+    let value = {
+        let mut moved = Value::Null;
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+    let fields_ordering = {
+        let mut moved = None;
+        std::mem::swap(fields_ordering, &mut moved);
+        moved
+    };
+    let key_value_delimiter = Value::from("=");
+    let field_delimiter = Value::from(" ");
+    let flatten_boolean = Value::from(true);
+
+    *result = super::encode_key_value::encode_key_value(
+        fields_ordering,
+        value,
+        key_value_delimiter,
+        field_delimiter,
+        flatten_boolean,
+    );
 }

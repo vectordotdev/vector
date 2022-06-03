@@ -111,6 +111,11 @@ impl Function for Slice {
 
         slice(start, end, value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -141,6 +146,12 @@ impl Expression for SliceFn {
             _ => td.add_bytes().add_array(Collection::any()),
         }
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_slice(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

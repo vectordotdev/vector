@@ -35,6 +35,17 @@ impl Function for GetHostname {
     fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Resolved {
         get_hostname()
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_get_hostname(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[derive(Debug, Clone)]

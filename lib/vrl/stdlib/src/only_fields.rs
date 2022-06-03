@@ -35,6 +35,11 @@ impl Function for OnlyFields {
 
         Ok(Box::new(OnlyFieldsFn { paths }))
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -63,6 +68,12 @@ impl Expression for OnlyFieldsFn {
             ..Default::default()
         }
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_only_fields(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

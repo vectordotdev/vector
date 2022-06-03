@@ -162,6 +162,10 @@ impl Function for StartsWith {
 
         Ok(value.starts_with(&substring).into())
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        Some(("vrl_fn_starts_with", vrl_fn_starts_with as _))
+    }
 }
 
 #[derive(Debug, Clone)]

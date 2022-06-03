@@ -60,6 +60,11 @@ impl Function for Tally {
         let value = args.required("value");
         tally(value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -76,6 +81,12 @@ impl Expression for TallyFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::object(Collection::from_unknown(Kind::integer())).fallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_tally(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

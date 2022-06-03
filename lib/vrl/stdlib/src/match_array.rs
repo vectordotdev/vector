@@ -87,6 +87,11 @@ impl Function for MatchArray {
 
         match_array(value, pattern, all)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -112,6 +117,12 @@ impl Expression for MatchArrayFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().infallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_match_array(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

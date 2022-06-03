@@ -66,6 +66,11 @@ impl Function for ParseRubyHash {
         let value = args.required("value");
         parse_ruby_hash(value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -82,6 +87,12 @@ impl Expression for ParseRubyHashFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::object(Collection::from_unknown(inner_kinds())).fallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_parse_ruby_hash(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 fn inner_kinds() -> Kind {

@@ -46,6 +46,11 @@ impl Function for Strlen {
         let value = args.required("value");
         strlen(value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -63,6 +68,12 @@ impl Expression for StrlenFn {
     fn type_def(&self, _state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::integer().infallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_strlen(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

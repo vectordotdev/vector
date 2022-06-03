@@ -136,6 +136,11 @@ impl Function for Unnest {
 
         unnest(path, &root, ctx)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -177,6 +182,12 @@ impl Expression for UnnestFn {
             Target::Container(c) => invert_array_at_path(&c.type_def(state), self.path.path()),
         }
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_unnest(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 /// Assuming path points at an Array, this will take the typedefs for that array,

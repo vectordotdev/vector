@@ -49,4 +49,8 @@ impl Function for ParseLinuxAuthorization {
         let value = args.required("value");
         super::parse_syslog::parse_syslog(value, ctx)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        super::parse_syslog::ParseSyslog.symbol()
+    }
 }

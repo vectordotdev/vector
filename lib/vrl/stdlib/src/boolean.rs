@@ -56,6 +56,10 @@ impl Function for Boolean {
         let value = args.required("value");
         boolean(value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        Some(("vrl_fn_boolean", vrl_fn_boolean as _))
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -73,4 +77,16 @@ impl Expression for BooleanFn {
 
         TypeDef::boolean().with_fallibility(non_boolean)
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_boolean(value: &mut Value, result: &mut Resolved) {
+    let value = {
+        let mut moved = Value::Null;
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+
+    *result = boolean(value);
 }

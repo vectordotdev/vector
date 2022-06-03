@@ -146,6 +146,11 @@ impl Function for IsJson {
             None => is_json(value),
         }
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -162,6 +167,12 @@ impl Expression for IsJsonFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().infallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_is_json(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[derive(Clone, Debug)]

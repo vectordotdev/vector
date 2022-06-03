@@ -161,6 +161,8 @@ pub trait Function: Send + Sync + fmt::Debug {
     fn closure(&self) -> Option<closure::Definition> {
         None
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)>;
 }
 
 // -----------------------------------------------------------------------------

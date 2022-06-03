@@ -68,6 +68,11 @@ impl Function for TagTypesExternally {
         let value = args.required("value");
         Ok(tag_type_externally(value))
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -90,6 +95,12 @@ impl Expression for TagTypesExternallyFn {
             _ => TypeDef::object(Collection::any()),
         }
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_tag_types_externally(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 fn tag_type_externally(value: Value) -> Value {

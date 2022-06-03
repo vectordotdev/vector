@@ -118,6 +118,11 @@ impl Function for ToInt {
 
         to_int(value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -142,6 +147,12 @@ impl Expression for ToIntFn {
                 || td.contains_regex(),
         )
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_to_int(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

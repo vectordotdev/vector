@@ -56,6 +56,11 @@ impl Function for String {
         let value = arguments.required("value");
         string(value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]

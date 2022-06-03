@@ -41,6 +41,14 @@ impl Compiler {
         stdlib: Vec<Box<dyn StdlibFunction>>,
         mut symbols: HashMap<&'static str, usize>,
     ) -> Result<Library<'a>, String> {
+        symbols.extend(precompiled::symbols().iter());
+
+        for function in &stdlib {
+            if let Some((symbol, address)) = function.symbol() {
+                symbols.insert(symbol, address);
+            }
+        }
+
         let context = self.0.context();
         let buffer =
             MemoryBuffer::create_from_memory_range(precompiled::LLVM_BITCODE, "precompiled");
@@ -125,26 +133,27 @@ impl Compiler {
             .add_module(&dylib, self.0.create_module(context.consume()))
             .unwrap();
 
-        symbols.extend(precompiled::symbols().iter());
-
         lljit
             .get_main_jit_dylib()
             .define({
-                let flags = SymbolFlags::new(
-                    LLVMJITSymbolGenericFlags::LLVMJITSymbolGenericFlagsExported as u8
-                        | LLVMJITSymbolGenericFlags::LLVMJITSymbolGenericFlagsCallable as u8,
-                    0,
-                );
-                let symbol_string_pool_entry = lljit.mangle_and_intern("__rust_probestack");
-                let symbol =
-                    EvaluatedSymbol::new(symbols.remove("__rust_probestack").unwrap() as _, flags);
-                let symbols = SymbolMapPairs::from_iter([(symbol_string_pool_entry, symbol)]);
+                let symbol_map_pairs =
+                    SymbolMapPairs::from_iter(symbols.into_iter().map(|(symbol, address)| {
+                        let symbol_string_pool_entry = lljit.mangle_and_intern(symbol);
+                        let flags = SymbolFlags::new(
+                            LLVMJITSymbolGenericFlags::LLVMJITSymbolGenericFlagsExported as u8
+                                | LLVMJITSymbolGenericFlags::LLVMJITSymbolGenericFlagsCallable
+                                    as u8,
+                            0,
+                        );
+                        let evaluated_symbol = EvaluatedSymbol::new(address as _, flags);
+                        (symbol_string_pool_entry, evaluated_symbol)
+                    }));
 
-                MaterializationUnit::from_absolute_symbols(symbols)
+                MaterializationUnit::from_absolute_symbols(symbol_map_pairs)
             })
             .map_err(|error| error.get_message().to_string())?;
 
-        let definition_generator = Box::new(Wrapper::new(CustomDefinitionGenerator { symbols }));
+        let definition_generator = Box::new(Wrapper::new(CustomDefinitionGenerator));
 
         Ok(Library::new(self.0, lljit, definition_generator))
     }
@@ -466,6 +475,10 @@ impl<'ctx> Context<'ctx> {
         self.precompiled_functions.vrl_resolved_set_null
     }
 
+    pub fn vrl_resolved_set_false(&self) -> PrecompiledFunction<'ctx, 1> {
+        self.precompiled_functions.vrl_resolved_set_false
+    }
+
     pub fn vrl_expression_abort(&self) -> PrecompiledFunction<'ctx, 3> {
         self.precompiled_functions.vrl_expression_abort
     }
@@ -695,6 +708,18 @@ impl<'ctx> Context<'ctx> {
         self.precompiled_functions.vrl_del_expression
     }
 
+    pub fn vrl_exists_external(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_exists_external
+    }
+
+    pub fn vrl_exists_internal(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_exists_internal
+    }
+
+    pub fn vrl_exists_expression(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions.vrl_exists_expression
+    }
+
     pub fn optimize(&self) -> Result<(), String> {
         let function_pass_manager = PassManager::create(());
         function_pass_manager.add_function_inlining_pass();
@@ -732,9 +757,7 @@ impl<'ctx> Context<'ctx> {
 }
 
 #[derive(Debug)]
-struct CustomDefinitionGenerator {
-    symbols: HashMap<&'static str, usize>,
-}
+struct CustomDefinitionGenerator;
 
 impl CAPIDefinitionGenerator for CustomDefinitionGenerator {
     fn try_to_generate(
@@ -758,23 +781,15 @@ impl CAPIDefinitionGenerator for CustomDefinitionGenerator {
                 symbol_name
             };
 
-            let address = self
-                .symbols
-                .remove(symbol_name.to_string_lossy().deref())
-                .map(|address| Ok(address))
-                .unwrap_or_else(|| {
-                    let address = unsafe { dlsym(libc::RTLD_DEFAULT, symbol_name.as_ptr()) };
-                    if address.is_null() {
-                        let error = unsafe { dlerror() };
-                        if !error.is_null() {
-                            let error = unsafe { CStr::from_ptr(error) };
-                            println!("resolving symbol {:?}, error: {:?}", symbol_name, error);
-                            return Err(LLVMError::new_string_error(&error.to_string_lossy()));
-                        }
-                    }
-
-                    Ok(address as _)
-                })?;
+            let address = unsafe { dlsym(libc::RTLD_DEFAULT, symbol_name.as_ptr()) };
+            if address.is_null() {
+                let error = unsafe { dlerror() };
+                if !error.is_null() {
+                    let error = unsafe { CStr::from_ptr(error) };
+                    println!("resolving symbol {:?}, error: {:?}", symbol_name, error);
+                    return Err(LLVMError::new_string_error(&error.to_string_lossy()));
+                }
+            }
 
             let flags = SymbolFlags::new(
                 LLVMJITSymbolGenericFlags::LLVMJITSymbolGenericFlagsExported as u8
@@ -851,6 +866,7 @@ pub struct PrecompiledFunctions<'ctx> {
     vrl_vec_insert: PrecompiledFunction<'ctx, 3>,
     vrl_btree_map_insert: PrecompiledFunction<'ctx, 4>,
     vrl_resolved_set_null: PrecompiledFunction<'ctx, 1>,
+    vrl_resolved_set_false: PrecompiledFunction<'ctx, 1>,
     vrl_expression_abort: PrecompiledFunction<'ctx, 3>,
     vrl_expression_assignment_target_insert_internal_path: PrecompiledFunction<'ctx, 3>,
     vrl_expression_assignment_target_insert_external: PrecompiledFunction<'ctx, 3>,
@@ -907,6 +923,9 @@ pub struct PrecompiledFunctions<'ctx> {
     vrl_del_external: PrecompiledFunction<'ctx, 3>,
     vrl_del_internal: PrecompiledFunction<'ctx, 3>,
     vrl_del_expression: PrecompiledFunction<'ctx, 3>,
+    vrl_exists_external: PrecompiledFunction<'ctx, 3>,
+    vrl_exists_internal: PrecompiledFunction<'ctx, 3>,
+    vrl_exists_expression: PrecompiledFunction<'ctx, 3>,
 }
 
 impl<'ctx> PrecompiledFunctions<'ctx> {
@@ -972,6 +991,9 @@ impl<'ctx> PrecompiledFunctions<'ctx> {
             },
             vrl_resolved_set_null: PrecompiledFunction {
                 function: module.get_function("vrl_resolved_set_null").unwrap(),
+            },
+            vrl_resolved_set_false: PrecompiledFunction {
+                function: module.get_function("vrl_resolved_set_false").unwrap(),
             },
             vrl_expression_abort: PrecompiledFunction {
                 function: module.get_function("vrl_expression_abort").unwrap(),
@@ -1162,6 +1184,15 @@ impl<'ctx> PrecompiledFunctions<'ctx> {
             },
             vrl_del_expression: PrecompiledFunction {
                 function: module.get_function("vrl_del_expression").unwrap(),
+            },
+            vrl_exists_internal: PrecompiledFunction {
+                function: module.get_function("vrl_exists_internal").unwrap(),
+            },
+            vrl_exists_external: PrecompiledFunction {
+                function: module.get_function("vrl_exists_external").unwrap(),
+            },
+            vrl_exists_expression: PrecompiledFunction {
+                function: module.get_function("vrl_exists_expression").unwrap(),
             },
         }
     }

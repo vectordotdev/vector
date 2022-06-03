@@ -130,6 +130,11 @@ impl Function for ParseRegexAll {
 
         parse_regex_all(value, numeric_groups, pattern)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -154,6 +159,12 @@ impl Expression for ParseRegexAllFn {
         ))
         .fallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_parse_regex_all(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

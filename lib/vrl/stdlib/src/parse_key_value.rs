@@ -189,6 +189,11 @@ impl Function for ParseKeyValue {
             whitespace,
         )
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -266,6 +271,12 @@ impl Expression for ParseKeyValueFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::object(Collection::any()).fallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_parse_key_value(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 fn parse<'a>(

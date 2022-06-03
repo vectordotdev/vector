@@ -109,6 +109,11 @@ impl Function for ToString {
 
         to_string(value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -129,6 +134,12 @@ impl Expression for ToStringFn {
         TypeDef::bytes()
             .with_fallibility(td.contains_array() || td.contains_object() || td.contains_regex())
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_to_string(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

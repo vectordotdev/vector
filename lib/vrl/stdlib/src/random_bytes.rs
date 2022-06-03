@@ -65,6 +65,11 @@ impl Function for RandomBytes {
         let length = args.required("length");
         random_bytes(length)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 fn get_length(value: Value) -> std::result::Result<usize, &'static str> {
@@ -101,4 +106,10 @@ impl Expression for RandomBytesFn {
             }
         }
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_random_bytes(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }

@@ -81,6 +81,11 @@ impl Function for ParseCsv {
 
         parse_csv(value, delimiter)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -100,6 +105,12 @@ impl Expression for ParseCsvFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::array(inner_kind()).fallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_parse_csv(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[inline]

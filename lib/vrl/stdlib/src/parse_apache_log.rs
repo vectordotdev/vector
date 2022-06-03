@@ -133,6 +133,11 @@ impl Function for ParseApacheLog {
 
         parse_apache_log(value, timestamp_format, format, ctx)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -163,6 +168,12 @@ impl Expression for ParseApacheLogFn {
         })
         .fallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_parse_apache_log(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 fn kind_common() -> BTreeMap<Field, Kind> {

@@ -64,6 +64,11 @@ impl Function for ParseTimestamp {
         let format = args.required("format");
         parse_timestamp(value, format, ctx)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -82,6 +87,12 @@ impl Expression for ParseTimestampFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::timestamp().fallible(/* always fallible because the format needs to be parsed at runtime */)
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_parse_timestamp(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

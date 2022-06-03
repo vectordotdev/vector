@@ -47,6 +47,11 @@ impl Function for Unique {
         let value = args.required("value");
         unique(value)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -63,6 +68,12 @@ impl Expression for UniqueFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::array(Collection::any())
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_unique(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]

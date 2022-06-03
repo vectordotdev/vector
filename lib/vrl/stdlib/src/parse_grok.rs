@@ -175,6 +175,10 @@ impl Function for ParseGrok {
 
         parse_grok(value, remove_empty, pattern)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        Some(("vrl_fn_parse_grok", vrl_fn_parse_grok as _))
+    }
 }
 
 #[derive(Clone, Debug)]

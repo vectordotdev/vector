@@ -63,6 +63,11 @@ impl Function for Push {
 
         push(list, item)
     }
+
+    fn symbol(&self) -> Option<(&'static str, usize)> {
+        // TODO
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -87,6 +92,12 @@ impl Expression for PushFn {
 
         self.value.type_def(state).merge_append(item).infallible()
     }
+}
+
+#[inline(never)]
+#[no_mangle]
+pub extern "C" fn vrl_fn_push(value: &mut Value, result: &mut Resolved) {
+    todo!()
 }
 
 #[cfg(test)]
