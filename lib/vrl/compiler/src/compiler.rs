@@ -2,6 +2,7 @@ use diagnostic::{DiagnosticList, DiagnosticMessage, Severity, Span};
 use lookup::LookupBuf;
 use parser::ast::{self, Node, QueryTarget};
 
+use crate::type_def::Details;
 use crate::{
     expression::*,
     program::ProgramInfo,
@@ -302,19 +303,27 @@ impl<'a> Compiler<'a> {
             .map_err(|err| self.diagnostics.push(Box::new(err)))
             .ok()?;
 
-        let original_snapshot = self.local.clone();
+        let original_locals = self.local.clone();
+        let original_external = external.target().cloned();
 
         let consequent = self.compile_block(consequent, external)?;
 
-        let consequent_snapshot = self.local.clone();
-
         match alternative {
             Some(block) => {
-                self.local = original_snapshot;
+                let consequent_locals = self.local.clone();
+                let consequent_external = external.target().cloned();
+
+                self.local = original_locals;
+
                 let else_block = self.compile_block(block, external)?;
 
-                // locals must be the result of either the if or else block, but not the original snapshot
-                self.local = self.local.clone().merge(consequent_snapshot);
+                // assignments must be the result of either the if or else block, but not the original snapshot
+                self.local = self.local.clone().merge(consequent_locals);
+                if let Some(details) =
+                    Details::merge_optional(consequent_external, external.target().cloned())
+                {
+                    external.update_target(details);
+                }
 
                 Some(IfStatement {
                     predicate,
@@ -323,8 +332,14 @@ impl<'a> Compiler<'a> {
                 })
             }
             None => {
-                // locals must be the result of either the if block or the original snapshot
-                self.local = self.local.clone().merge(original_snapshot);
+                // assignments must be the result of either the if block or the original snapshot
+                self.local = self.local.clone().merge(original_locals);
+                if let Some(details) =
+                    Details::merge_optional(original_external, external.target().cloned())
+                {
+                    external.update_target(details);
+                }
+
                 Some(IfStatement {
                     predicate,
                     consequent,

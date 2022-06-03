@@ -403,10 +403,21 @@ pub(crate) struct Details {
 impl Details {
     /// Returns the union of 2 possible states
     pub(crate) fn merge(self, other: Self) -> Self {
-        // TODO: handle the value better
         Self {
             type_def: self.type_def.merge_deep(other.type_def),
-            value: None,
+            value: if self.value == other.value {
+                self.value
+            } else {
+                None
+            },
+        }
+    }
+
+    pub(crate) fn merge_optional(a: Option<Self>, b: Option<Self>) -> Option<Self> {
+        match (a, b) {
+            (Some(a), Some(b)) => Some(a.merge(b)),
+            (Some(x), None) | (None, Some(x)) => Some(x),
+            (None, None) => None,
         }
     }
 }
