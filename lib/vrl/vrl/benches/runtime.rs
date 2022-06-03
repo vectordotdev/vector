@@ -15,6 +15,34 @@ struct Source {
 
 static SOURCES: &[Source] = &[
     Source {
+        name: "splunk_transforms_splunk3_",
+        target: "{}",
+        program: indoc! {r#"
+            # deletes unnecessary fields
+            del(.attrs.c2cComponent)
+            del(.attrs.c2cGroup)
+
+            # renames fields to fit current state in splunk
+            .attrs.type = del(.attrs.c2cContainerType)
+            .attrs.partition = del(.attrs.c2cPartition)
+            .attrs.role = del(.attrs.c2cRole)
+            .attrs.service = del(.attrs.c2cService)
+            .attrs.stage = del(.attrs.c2cStage)
+            .attrs.version = del(.attrs.c2cVersion)
+            if exists(.message) {
+                .line = del(.message)
+            }
+
+            .host = join!([.attrs.partition, .attrs.stage, "platform", .attrs.c2cRuntimePlatformName], separator: "-")
+            .splunk_source = join!([.splunk_source, .task_id], separator: "_")
+
+            del(.task_id)
+            del(.lx_version)
+            del(.source_type)
+            del(.attrs.c2cRuntimePlatformName)
+        "#},
+    },
+    Source {
         name: "del returns deleted field",
         target: "{}",
         program: r#"del({"foo": "bar"}.foo)"#,

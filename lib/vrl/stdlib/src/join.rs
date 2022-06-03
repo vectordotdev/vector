@@ -63,8 +63,7 @@ impl Function for Join {
     }
 
     fn symbol(&self) -> Option<(&'static str, usize)> {
-        // TODO
-        None
+        Some(("vrl_fn_join", vrl_fn_join as _))
     }
 }
 
@@ -93,8 +92,23 @@ impl Expression for JoinFn {
 
 #[inline(never)]
 #[no_mangle]
-pub extern "C" fn vrl_fn_join(value: &mut Value, result: &mut Resolved) {
-    todo!()
+pub extern "C" fn vrl_fn_join(
+    value: &mut Value,
+    separator: &mut Option<Value>,
+    result: &mut Resolved,
+) {
+    let value = {
+        let mut moved = Value::Null;
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+    let separator = {
+        let mut moved = None;
+        std::mem::swap(separator, &mut moved);
+        moved
+    };
+
+    *result = join(value, separator)
 }
 
 #[cfg(test)]

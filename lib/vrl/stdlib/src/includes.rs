@@ -58,8 +58,7 @@ impl Function for Includes {
     }
 
     fn symbol(&self) -> Option<(&'static str, usize)> {
-        // TODO
-        None
+        Some(("vrl_fn_includes", vrl_fn_includes as _))
     }
 }
 
@@ -84,8 +83,19 @@ impl Expression for IncludesFn {
 
 #[inline(never)]
 #[no_mangle]
-pub extern "C" fn vrl_fn_includes(value: &mut Value, result: &mut Resolved) {
-    todo!()
+pub extern "C" fn vrl_fn_includes(value: &mut Value, item: &mut Value, result: &mut Resolved) {
+    let value = {
+        let mut moved = Value::Null;
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+    let item = {
+        let mut moved = Value::Null;
+        std::mem::swap(item, &mut moved);
+        moved
+    };
+
+    *result = includes(value, item);
 }
 
 #[cfg(test)]
