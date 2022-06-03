@@ -73,6 +73,11 @@ pub unsafe extern "C" fn vrl_btree_map_initialize(vec: &mut Vec<(String, Value)>
     );
 }
 
+#[no_mangle]
+pub extern "C" fn vrl_resolved_swap(from: &mut Resolved, to: &mut Resolved) {
+    std::mem::swap(from, to);
+}
+
 /// # Safety
 /// TODO.
 #[no_mangle]

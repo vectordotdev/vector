@@ -530,15 +530,14 @@ where
                 expr.emit_llvm((state.0, state.1), ctx)?;
 
                 if expr.type_def((state.0, state.1)).is_abortable() {
-                    let is_err = {
-                        ctx.vrl_resolved_is_err()
-                            .build_call(ctx.builder(), ctx.result_ref())
-                            .try_as_basic_value()
-                            .left()
-                            .expect("result is not a basic value")
-                            .try_into()
-                            .expect("result is not an int value")
-                    };
+                    let is_err = ctx
+                        .vrl_resolved_is_err()
+                        .build_call(ctx.builder(), ctx.result_ref())
+                        .try_as_basic_value()
+                        .left()
+                        .expect("result is not a basic value")
+                        .try_into()
+                        .expect("result is not an int value");
 
                     let assignment_single_is_ok_block = ctx
                         .context()

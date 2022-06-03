@@ -82,15 +82,14 @@ impl Expression for Block {
 
         for expr in &self.inner {
             expr.emit_llvm((state.0, state.1), ctx)?;
-            let is_err = {
-                ctx.vrl_resolved_is_err()
-                    .build_call(ctx.builder(), ctx.result_ref())
-                    .try_as_basic_value()
-                    .left()
-                    .expect("result is not a basic value")
-                    .try_into()
-                    .expect("result is not an int value")
-            };
+            let is_err = ctx
+                .vrl_resolved_is_err()
+                .build_call(ctx.builder(), ctx.result_ref())
+                .try_as_basic_value()
+                .left()
+                .expect("result is not a basic value")
+                .try_into()
+                .expect("result is not an int value");
 
             let block_next_block = ctx.context().append_basic_block(function, "block_next");
             ctx.builder()
