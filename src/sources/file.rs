@@ -6,8 +6,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use file_source::{
     paths_provider::glob::{Glob, MatchOptions},
-    Checkpointer, Event as FileEvent, FileFingerprint, FileServer, FingerprintStrategy,
-    Fingerprinter, Line, ReadFrom,
+    Checkpointer, FileFingerprint, FileServer, FingerprintStrategy, Fingerprinter, Line, ReadFrom,
 };
 use futures::{FutureExt, Stream, StreamExt, TryFutureExt};
 use regex::bytes::Regex;
@@ -374,35 +373,26 @@ pub fn file_source(
         let mut encoding_decoder = encoding_charset.map(Decoder::new);
 
         // sizing here is just a guess
-        let (tx, rx) = futures::channel::mpsc::channel::<Vec<FileEvent>>(2);
+        let (tx, rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
         let rx = rx
             .map(futures::stream::iter)
             .flatten()
-            .map(move |event| match event {
-                FileEvent::Line(mut line) => {
-                    emit!(FileBytesReceived {
-                        byte_size: line.text.len(),
-                        file: &line.filename,
-                    });
-                    (!failed_files
-                        .lock()
-                        .expect("Poisoned lock on failed files set")
-                        .contains(&line.file_id))
-                    .then(|| {
-                        // transcode each line from the file's encoding charset to utf8
-                        if let Some(d) = &mut encoding_decoder {
-                            line.text = d.decode_to_utf8(line.text);
-                        }
-                        line
-                    })
-                }
-                FileEvent::Open(file_id) | FileEvent::Close(file_id) => {
-                    failed_files
-                        .lock()
-                        .expect("Poisoned lock on failed files set")
-                        .remove(&file_id);
-                    None
-                }
+            .map(move |mut line| {
+                emit!(FileBytesReceived {
+                    byte_size: line.text.len(),
+                    file: &line.filename,
+                });
+                (!failed_files
+                    .lock()
+                    .expect("Poisoned lock on failed files set")
+                    .contains(&line.file_id))
+                .then(|| {
+                    // transcode each line from the file's encoding charset to utf8
+                    if let Some(d) = &mut encoding_decoder {
+                        line.text = d.decode_to_utf8(line.text);
+                    }
+                    line
+                })
             })
             .map(futures::stream::iter)
             .flatten();
