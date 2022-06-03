@@ -129,7 +129,7 @@ impl HumioLogsConfig {
                 indexer_acknowledgements_enabled: false,
                 ..Default::default()
             },
-            timestamp_key: self.timestamp_key.clone(),
+            timestamp_key: timestamp_key(),
         }
     }
 }
@@ -400,8 +400,8 @@ mod integration_tests {
         let search_query = format!(r#"message="{}""#, message);
 
         // events are not available to search API immediately
-        // poll up 20 times for event to show up
-        for _ in 0..20usize {
+        // poll up 200 times for event to show up
+        for _ in 0..200usize {
             let res = client
                 .post(&search_url)
                 .json(&json!({

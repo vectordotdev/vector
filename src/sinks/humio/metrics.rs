@@ -102,7 +102,7 @@ impl SinkConfig for HumioMetricsConfig {
             tls: self.tls.clone(),
             timestamp_nanos_key: None,
             acknowledgements: Default::default(),
-            timestamp_key: "timestamp".to_string(),
+            timestamp_key: "timestamp".to_string(), // hard coded as humio expects this format so no sense in making it configurable
         };
 
         let (sink, healthcheck) = sink.clone().build(cx).await?;
