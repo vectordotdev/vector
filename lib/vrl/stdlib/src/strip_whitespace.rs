@@ -1,5 +1,9 @@
 use vrl::prelude::*;
 
+fn strip_whitespace(value: Value) -> Resolved {
+    Ok(value.try_bytes_utf8_lossy()?.trim().into())
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct StripWhitespace;
 
@@ -48,8 +52,7 @@ impl Function for StripWhitespace {
     }
 
     fn symbol(&self) -> Option<(&'static str, usize)> {
-        // TODO
-        None
+        Some(("vrl_fn_strip_whitespace", vrl_fn_strip_whitespace as _))
     }
 }
 
@@ -62,7 +65,7 @@ impl Expression for StripWhitespaceFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 
-        Ok(value.try_bytes_utf8_lossy()?.trim().into())
+        strip_whitespace(value)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
@@ -72,7 +75,13 @@ impl Expression for StripWhitespaceFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_strip_whitespace(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    let value = {
+        let mut moved = Value::Null;
+        std::mem::swap(value, &mut moved);
+        moved
+    };
+
+    *result = strip_whitespace(value);
 }
 
 #[cfg(test)]
