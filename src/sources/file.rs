@@ -542,6 +542,7 @@ fn create_event(
 #[cfg(test)]
 mod tests {
     use std::{
+        cmp::{max, min},
         collections::HashSet,
         fs::{self, File},
         future::Future,
@@ -1143,7 +1144,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn file_start_position_server_restart_negative_acknowledgement() {
+    async fn file_start_position_negative_acknowledgement() {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
@@ -1152,24 +1153,57 @@ mod tests {
 
         let path = dir.path().join("file");
         let orig: Vec<String> = (0..10).map(|n| format!("line #{:03}", n)).collect();
-        let line_len = orig[0].len();
+        let line_len = orig[0].len() as u64 + 1;
 
         // First time server runs it picks up existing lines.
         let received =
-            run_file_source(&config, false, Nack(2), slow_write(&path, &orig, 100)).await;
+            run_file_source(&config, false, Nack(2), slow_write(&path, &orig, 100, 1)).await;
         let lines = extract_messages_string(received);
         let checkpoints = read_checkpoints(&dir);
         assert_eq!(checkpoints.len(), 1);
-        assert_eq!(checkpoints[0].position, line_len as u64 * 2 + 2);
+        assert_eq!(checkpoints[0].position, line_len * 2);
         assert_eq!(&lines, &orig[0..3]);
     }
 
-    async fn slow_write(filename: &Path, lines: &[String], millis: u64) {
-        let mut file = File::create(filename).unwrap();
+    #[tokio::test]
+    async fn file_start_position_negative_acknowledgement_multi_file() {
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            ..test_default_file_config(&dir)
+        };
+
+        let path = dir.path().join("file");
+        let orig: Vec<String> = (0..10).map(|n| format!("line #{:03}", n)).collect();
+        let line_len = orig[0].len() as u64 + 1;
+
+        // First time server runs it picks up existing lines.
+        let received =
+            run_file_source(&config, false, Nack(2), slow_write(&path, &orig, 100, 2)).await;
+        let lines = extract_messages_string(received);
+        let checkpoints = read_checkpoints(&dir);
+        assert_eq!(checkpoints.len(), 2);
+        assert_eq!(
+            min(checkpoints[0].position, checkpoints[1].position),
+            line_len * 2
+        );
+        assert_eq!(
+            max(checkpoints[0].position, checkpoints[1].position),
+            line_len * 5
+        );
+        assert_eq!(lines.len(), 8);
+        assert_eq!(&lines[..3], &orig[..3]);
+        assert_eq!(&lines[3..], &orig[5..]);
+    }
+
+    async fn slow_write(filename: &Path, lines: &[String], millis: u64, files: usize) {
         let duration = Duration::from_millis(millis);
-        for line in lines {
-            sleep(duration).await;
-            writeln!(&mut file, "{}", line).unwrap();
+        for lines in lines.chunks(lines.len() / files) {
+            let mut file = File::create(filename).unwrap();
+            for line in lines {
+                writeln!(&mut file, "{}", line).unwrap();
+                sleep(duration).await;
+            }
         }
         sleep_500_millis().await;
     }
