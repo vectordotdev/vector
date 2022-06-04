@@ -139,7 +139,6 @@ remap: expressions: assignment: {
 				.parsed, .err = parse_json("malformed")
 				"""#
 			output: log: {
-				parsed: null
 				err:    #"function call error for "parse_json" at (16:39): unable to parse json: expected value at line 1 column 1"#
 			}
 		},

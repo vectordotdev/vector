@@ -85,6 +85,17 @@ impl TypeDef {
         Self { fallible, kind }
     }
 
+    /// Sets the type specified at path to `new_type`.
+    /// The new type is returned.
+    pub fn with_path_type_set(&self, path: &Lookup<'_>, new_type: TypeDef) -> TypeDef {
+        if path.is_root() {
+            new_type
+        } else {
+            let nested_type = new_type.for_path(path);
+            self.clone().merge_overwrite(nested_type)
+        }
+    }
+
     pub fn for_path(self, path: &Lookup<'_>) -> TypeDef {
         let fallible = self.fallible;
         let kind = self

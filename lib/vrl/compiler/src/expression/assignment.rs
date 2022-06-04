@@ -61,7 +61,7 @@ impl Assignment {
                 let target = Target::try_from(target.into_inner())?;
                 let value = expr.as_value();
 
-                target.insert_type_def(local, external, type_def, value);
+                target.insert_type_def(local, external, type_def, value, false);
 
                 Variant::Single {
                     target,
@@ -112,14 +112,14 @@ impl Assignment {
                 let default_value = type_def.default_value();
                 let value = expr.as_value();
 
-                ok.insert_type_def(local, external, type_def, value);
+                ok.insert_type_def(local, external, type_def, value, true);
 
                 // "err" target is assigned `null` or a string containing the
                 // error message.
                 let err = Target::try_from(err.into_inner())?;
                 let type_def = TypeDef::bytes().add_null().infallible();
 
-                err.insert_type_def(local, external, type_def, None);
+                err.insert_type_def(local, external, type_def, None, false);
 
                 Variant::Infallible {
                     ok,
@@ -200,59 +200,75 @@ impl Target {
         &self,
         local: &mut LocalEnv,
         external: &mut ExternalEnv,
-        type_def: TypeDef,
+        new_type_def: TypeDef,
         value: Option<Value>,
+        // true if the new type should be merged with the original type
+        merge_with_original: bool,
     ) {
-        use Target::*;
-
-        fn set_type_def(
-            current_type_def: &TypeDef,
+        fn updated_type(
+            old: Option<&Details>,
             new_type_def: TypeDef,
             path: &LookupBuf,
-        ) -> TypeDef {
-            // If the assignment is onto root or has no path (root variable assignment), use the
-            // new type def, otherwise merge the type defs.
-            if path.is_root() {
-                new_type_def
-            } else {
-                current_type_def.clone().merge_overwrite(new_type_def)
+            new_value: Option<Value>,
+            merge: bool,
+        ) -> Details {
+            let type_def = match old {
+                None => {
+                    let nested_new_type = new_type_def.for_path(&path.to_lookup());
+                    if merge {
+                        nested_new_type.merge_deep(TypeDef::null())
+                    } else {
+                        nested_new_type
+                    }
+                }
+                Some(&Details { ref type_def, .. }) => {
+                    let new_type_def = if merge {
+                        new_type_def.merge_deep(type_def.clone())
+                    } else {
+                        new_type_def
+                    };
+                    type_def.with_path_type_set(&path.to_lookup(), new_type_def)
+                }
+            };
+            Details {
+                type_def,
+                value: new_value,
             }
         }
 
         match self {
-            Noop => {}
-            Internal(ident, path) => {
-                let td = match path.is_root() {
-                    true => type_def,
-                    false => type_def.for_path(&path.to_lookup()),
-                };
-
-                let type_def = match local.variable(ident) {
-                    None => td,
-                    Some(&Details { ref type_def, .. }) => set_type_def(type_def, td, path),
-                };
-
-                let details = Details { type_def, value };
-
-                local.insert_variable(ident.clone(), details);
+            Self::Noop => {}
+            Self::Internal(ident, path) => {
+                local.insert_variable(
+                    ident.clone(),
+                    updated_type(
+                        local.variable(ident),
+                        new_type_def,
+                        path,
+                        value,
+                        merge_with_original,
+                    ),
+                );
             }
 
-            External(path) => {
-                let td = match path.is_root() {
-                    true => type_def,
-                    false => type_def.for_path(&path.to_lookup()),
-                };
-
-                let type_def = match external.target() {
-                    None => td,
-                    Some(&Details { ref type_def, .. }) => set_type_def(type_def, td, path),
-                };
-
-                let details = Details { type_def, value };
-
-                external.update_target(details);
+            Self::External(path) => {
+                external.update_target(updated_type(
+                    external.target(),
+                    new_type_def,
+                    path,
+                    value,
+                    merge_with_original,
+                ));
             }
         }
+    }
+
+    fn get_type_def(&self, local: &mut LocalEnv, external: &mut ExternalEnv) -> Option<TypeDef> {
+        // match self {
+        //     Self::Noop => None,
+        //     Self::Internal(ident, path) => local.variable(),
+        // }
+        unimplemented!()
     }
 
     fn insert(&self, value: Value, ctx: &mut Context) {
@@ -394,7 +410,7 @@ where
                     value
                 }
                 Err(error) => {
-                    ok.insert(default.clone(), ctx);
+                    // ok.insert(default.clone(), ctx);
                     let value = Value::from(error.to_string());
                     err.insert(value.clone(), ctx);
                     value

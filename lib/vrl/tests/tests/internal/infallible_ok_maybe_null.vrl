@@ -3,4 +3,4 @@
 
 .foo # any
 .foo, err = to_string(.foo) # string (empty or "bar")
-.foo = upcase(.foo) # string
+.foo = upcase!(.foo) # string
