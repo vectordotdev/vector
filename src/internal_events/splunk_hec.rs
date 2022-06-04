@@ -161,13 +161,28 @@ mod sink {
         }
     }
 
-    pub struct SplunkEventTimestampWarning<'a> {
-        pub message: &'a str,
+    pub struct SplunkEventTimestampInvalidType<'a> {
+        pub r#type: &'a str,
     }
 
-    impl<'a> InternalEvent for SplunkEventTimestampWarning<'a> {
+    impl<'a> InternalEvent for SplunkEventTimestampInvalidType<'a> {
         fn emit(self) {
-            warn!(message = %self.message);
+            warn!(
+                message = "Timestamp was an unexpected type. Defaulting to splunk for timestamp",
+                invalid_type = self.r#type,
+                internal_log_rate_secs = 10
+            );
+        }
+    }
+
+    pub struct SplunkEventTimestampMissing;
+
+    impl InternalEvent for SplunkEventTimestampMissing {
+        fn emit(self) {
+            warn!(
+                message = "Timestamp was not found. Defaulting to splunk for timestamp",
+                internal_log_rate_secs = 10
+            );
         }
     }
 }
