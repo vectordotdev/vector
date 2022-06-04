@@ -158,10 +158,10 @@ impl Expression for UnnestFn {
         use expression::Target;
 
         match self.path.target() {
-            Target::External => match state.1.target_kind().cloned().map(TypeDef::from) {
-                Some(root_type_def) => invert_array_at_path(&root_type_def, self.path.path()),
-                None => self.path.type_def(state).restrict_array().add_null(),
-            },
+            Target::External => invert_array_at_path(
+                &TypeDef::from(state.1.target_kind().clone()),
+                self.path.path(),
+            ),
             Target::Internal(v) => invert_array_at_path(&v.type_def(state), self.path.path()),
             Target::FunctionCall(f) => invert_array_at_path(&f.type_def(state), self.path.path()),
             Target::Container(c) => invert_array_at_path(&c.type_def(state), self.path.path()),

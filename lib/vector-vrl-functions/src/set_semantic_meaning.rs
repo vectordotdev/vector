@@ -95,13 +95,10 @@ impl Function for SetSemanticMeaning {
 
         let exists = state
             .target_kind()
-            .map(|kind| {
-                kind.find_at_path(&path.to_lookup())
-                    .ok()
-                    .flatten()
-                    .is_some()
-            })
-            .unwrap_or_default();
+            .find_at_path(&path.to_lookup())
+            .ok()
+            .flatten()
+            .is_some();
 
         // Reject assigning meaning to non-existing field.
         if !exists {

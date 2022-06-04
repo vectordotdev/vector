@@ -242,13 +242,10 @@ impl Target {
                     true => type_def,
                     false => type_def.for_path(&path.to_lookup()),
                 };
-
-                let type_def = match external.target() {
-                    None => td,
-                    Some(&Details { ref type_def, .. }) => set_type_def(type_def, td, path),
+                let details = Details {
+                    type_def: set_type_def(&external.target().type_def, td, path),
+                    value,
                 };
-
-                let details = Details { type_def, value };
 
                 external.update_target(details);
             }

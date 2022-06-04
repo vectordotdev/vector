@@ -150,8 +150,8 @@ impl TransformConfig for RemapConfig {
 
                 state
                     .target_kind()
-                    .cloned()
-                    .and_then(Kind::into_object)
+                    .clone()
+                    .into_object()
                     .map(schema::Definition::from)
                     .map(|mut def| {
                         for (id, path) in meaning {
