@@ -7,7 +7,7 @@ use crate::{
     expression::*,
     program::ProgramInfo,
     state::{ExternalEnv, LocalEnv},
-    Function, Program,
+    Function, Program, TypeDef,
 };
 
 pub(crate) type Diagnostics = Vec<Box<dyn DiagnosticMessage>>;
@@ -319,9 +319,11 @@ impl<'a> Compiler<'a> {
 
                 // assignments must be the result of either the if or else block, but not the original value
                 self.local = self.local.clone().merge(consequent_locals);
-                if let Some(details) =
-                    Details::merge_optional(consequent_external, external.target().cloned())
-                {
+                if let Some(details) = Details::merge_optional(
+                    consequent_external,
+                    external.target().cloned(),
+                    TypeDef::any(),
+                ) {
                     external.update_target(details);
                 }
 
@@ -335,9 +337,11 @@ impl<'a> Compiler<'a> {
                 // assignments must be the result of either the if block or the original value
                 self.local = self.local.clone().merge(original_locals);
 
-                if let Some(details) =
-                    Details::merge_optional(original_external, external.target().cloned())
-                {
+                if let Some(details) = Details::merge_optional(
+                    original_external,
+                    external.target().cloned(),
+                    TypeDef::any(),
+                ) {
                     external.update_target(details);
                 }
 
