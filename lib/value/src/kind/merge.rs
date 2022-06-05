@@ -164,7 +164,7 @@ mod tests {
             },
         ) in HashMap::from([
             (
-                "any object",
+                "object field with unknown",
                 TestCase {
                     this: Kind::object(Collection::any()),
                     other: Kind::object(BTreeMap::from([("x".into(), Kind::integer())])),
