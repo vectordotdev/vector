@@ -60,6 +60,10 @@ impl Assignment {
                 let expr = expr.into_inner();
                 let target = Target::try_from(target.into_inner())?;
                 let value = expr.as_value();
+                println!(
+                    "Type Def for assignment: {:?}",
+                    type_def.kind().debug_info()
+                );
 
                 target.insert_type_def(local, external, type_def, value);
 
@@ -200,7 +204,7 @@ impl Target {
         &self,
         local: &mut LocalEnv,
         external: &mut ExternalEnv,
-        type_def: TypeDef,
+        new_type_def: TypeDef,
         value: Option<Value>,
     ) {
         use Target::*;
@@ -210,26 +214,33 @@ impl Target {
             new_type_def: TypeDef,
             path: &LookupBuf,
         ) -> TypeDef {
-            // If the assignment is onto root or has no path (root variable assignment), use the
-            // new type def, otherwise merge the type defs.
-            if path.is_root() {
-                new_type_def
-            } else {
-                current_type_def.clone().merge_overwrite(new_type_def)
-            }
+            current_type_def
+                .clone()
+                .with_type_set_at_path(&path.to_lookup(), new_type_def)
+            // // If the assignment is onto root or has no path (root variable assignment), use the
+            // // new type def, otherwise merge the type defs.
+            // if path.is_root() {
+            //     new_type_def
+            // } else {
+            //     println!("Current type def: {:?}", current_type_def);
+            //     println!("Merge with... {:?}", new_type_def);
+            //     current_type_def.clone().merge_overwrite(new_type_def)
+            // }
         }
 
         match self {
             Noop => {}
             Internal(ident, path) => {
                 let td = match path.is_root() {
-                    true => type_def,
-                    false => type_def.for_path(&path.to_lookup()),
+                    true => new_type_def.clone(),
+                    false => new_type_def.clone().for_path(&path.to_lookup()),
                 };
 
                 let type_def = match local.variable(ident) {
                     None => td,
-                    Some(&Details { ref type_def, .. }) => set_type_def(type_def, td, path),
+                    Some(&Details { ref type_def, .. }) => {
+                        set_type_def(type_def, new_type_def, path)
+                    }
                 };
 
                 let details = Details { type_def, value };
@@ -239,14 +250,17 @@ impl Target {
 
             External(path) => {
                 let td = match path.is_root() {
-                    true => type_def,
-                    false => type_def.for_path(&path.to_lookup()),
+                    true => new_type_def.clone(),
+                    false => new_type_def.clone().for_path(&path.to_lookup()),
                 };
                 let details = Details {
-                    type_def: set_type_def(&external.target().type_def, td, path),
+                    type_def: set_type_def(&external.target().type_def, new_type_def, path),
                     value,
                 };
-
+                println!(
+                    "Updating target with: {:?}",
+                    details.type_def.kind().debug_info()
+                );
                 external.update_target(details);
             }
         }

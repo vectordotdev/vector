@@ -28,7 +28,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use lookup::Lookup;
+use lookup::{Look, Lookup};
 use value::{
     kind::{
         merge,
@@ -351,6 +351,14 @@ impl TypeDef {
     pub fn merge(&mut self, other: Self, strategy: merge::Strategy) {
         self.fallible |= other.fallible;
         self.kind.merge(other.kind, strategy);
+    }
+
+    pub fn with_type_set_at_path(mut self, path: &Lookup, other: Self) -> Self {
+        if path.is_root() {
+            other
+        } else {
+            self.merge_overwrite(other.for_path(path))
+        }
     }
 
     pub fn merge_overwrite(mut self, other: Self) -> Self {

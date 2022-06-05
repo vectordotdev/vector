@@ -1,13 +1,13 @@
 //! All types related to merging one [`Kind`] into another.
 
+use crate::kind::Unknown;
 use std::{collections::BTreeMap, ops::BitOr};
 
 use super::{Collection, Kind};
 
 impl Kind {
-
     /// Merge a Kind and Unknown together
-    pub fn merge_unknown(&mut self, unknown: &Unknown) {
+    pub fn merge_with_unknown(&mut self, unknown: &Unknown) {
         // The current (incorrect) behavior is to ignore the unknown
         // This is intentionally left blank. It should be implemented.
     }
@@ -174,14 +174,17 @@ mod tests {
                 "any object",
                 TestCase {
                     this: Kind::object(Collection::any()),
-                    other: Kind::object(BTreeMap::from([
-                        ("x".into(), Kind::integer()),
-                    ])),
+                    other: Kind::object(BTreeMap::from([("x".into(), Kind::integer())])),
                     strategy: Strategy {
                         depth: Depth::Deep,
                         indices: Indices::Keep,
                     },
-                    merged: Kind::object(Collection::any()),
+                    merged: {
+                        let mut collection =
+                            Collection::from(BTreeMap::from([("x".into(), Kind::any())]));
+                        collection.set_unknown(Kind::any());
+                        Kind::object(collection)
+                    },
                 },
             ),
             (

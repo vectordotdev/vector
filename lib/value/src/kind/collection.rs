@@ -32,7 +32,7 @@ pub struct Collection<T: Ord> {
     unknown: Option<Unknown>,
 }
 
-impl<T: Ord> Collection<T> {
+impl<T: Ord + std::fmt::Debug> Collection<T> {
     /// Create a new collection from its parts.
     #[must_use]
     pub(super) fn from_parts(known: BTreeMap<T, Kind>, unknown: impl Into<Option<Kind>>) -> Self {
@@ -220,35 +220,27 @@ impl<T: Ord> Collection<T> {
     ///
     /// - Both `Unknown`s are merged, similar to merging two `Kind`s.
     pub fn merge(&mut self, mut other: Self, strategy: merge::Strategy) {
-        let mut new_known = BTreeMap::new();
-
-        for (key, self_kind) in self.known {
-            match other.known.get(key) {
-                Some(other_kind) => {
-                    if strategy.depth.is_shallow() {
-                        new_known.insert(key, other_kind);
-                    } else {
-                        let mut merged_kind = self_kind.clone();
-                        merged_kind.merge(other_kind, strategy);
-                        new_known.insert(key, merged_kind);
-                    }
-                },
-                None => {
-                    // items in self but not other. Merge self type with unknown of other
-
+        for (key, self_kind) in &mut self.known {
+            if let Some(other_kind) = other.known.remove(key) {
+                if strategy.depth.is_shallow() {
+                    *self_kind = other_kind;
+                } else {
+                    self_kind.merge(other_kind, strategy);
                 }
+            } else if let Some(other_unknown) = other.unknown() {
+                self_kind.merge(other_unknown.to_kind().into_owned(), strategy);
             }
         }
 
-        self.known
-            .iter_mut()
-            .for_each(|(key, self_kind)| match other.known.remove(key) {
-                Some(other_kind) if strategy.depth.is_shallow() => *self_kind = other_kind,
-                Some(other_kind) => self_kind.merge(other_kind, strategy),
-                _ => {}
-            });
-
-        self.known.extend(other.known);
+        let self_unknown_kind = self.unknown().map(|unknown| unknown.to_kind().into_owned());
+        if let Some(self_unknown_kind) = self_unknown_kind {
+            for (key, mut other_kind) in other.known {
+                other_kind.merge(self_unknown_kind.clone(), strategy);
+                self.known_mut().insert(key, other_kind);
+            }
+        } else {
+            self.known.extend(other.known);
+        }
 
         match (self.unknown.as_mut(), other.unknown) {
             (None, Some(rhs)) => self.unknown = Some(rhs),
