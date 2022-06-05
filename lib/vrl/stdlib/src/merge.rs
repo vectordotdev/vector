@@ -74,7 +74,7 @@ impl Expression for MergeFn {
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         self.to
             .type_def(state)
-            .merge_shallow(self.from.type_def(state))
+            .merge_overwrite(self.from.type_def(state))
     }
 }
 

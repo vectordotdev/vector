@@ -321,17 +321,6 @@ impl TypeDef {
         self
     }
 
-    pub fn merge_shallow(mut self, other: Self) -> Self {
-        self.merge(
-            other,
-            merge::Strategy {
-                depth: merge::Depth::Shallow,
-                indices: merge::Indices::Keep,
-            },
-        );
-        self
-    }
-
     /// Merge two type definitions.
     ///
     /// When merging arrays, the elements of `other` are *appended* to the elements of `self`.
