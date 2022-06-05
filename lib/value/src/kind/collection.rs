@@ -228,14 +228,20 @@ impl<T: Ord + std::fmt::Debug> Collection<T> {
                     self_kind.merge(other_kind, strategy);
                 }
             } else if let Some(other_unknown) = other.unknown() {
-                self_kind.merge(other_unknown.to_kind().into_owned(), strategy);
+                if strategy.depth.is_shallow() {
+                    *self_kind = other_unknown.to_kind().into_owned();
+                } else {
+                    self_kind.merge(other_unknown.to_kind().into_owned(), strategy);
+                }
             }
         }
 
         let self_unknown_kind = self.unknown().map(|unknown| unknown.to_kind().into_owned());
         if let Some(self_unknown_kind) = self_unknown_kind {
             for (key, mut other_kind) in other.known {
-                other_kind.merge(self_unknown_kind.clone(), strategy);
+                if !strategy.depth.is_shallow() {
+                    other_kind.merge(self_unknown_kind.clone(), strategy);
+                }
                 self.known_mut().insert(key, other_kind);
             }
         } else {

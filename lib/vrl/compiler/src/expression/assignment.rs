@@ -60,10 +60,6 @@ impl Assignment {
                 let expr = expr.into_inner();
                 let target = Target::try_from(target.into_inner())?;
                 let value = expr.as_value();
-                println!(
-                    "Type Def for assignment: {:?}",
-                    type_def.kind().debug_info()
-                );
 
                 target.insert_type_def(local, external, type_def, value);
 
@@ -257,10 +253,6 @@ impl Target {
                     type_def: set_type_def(&external.target().type_def, new_type_def, path),
                     value,
                 };
-                println!(
-                    "Updating target with: {:?}",
-                    details.type_def.kind().debug_info()
-                );
                 external.update_target(details);
             }
         }
