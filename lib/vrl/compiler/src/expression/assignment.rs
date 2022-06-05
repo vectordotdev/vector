@@ -213,15 +213,6 @@ impl Target {
             current_type_def
                 .clone()
                 .with_type_set_at_path(&path.to_lookup(), new_type_def)
-            // // If the assignment is onto root or has no path (root variable assignment), use the
-            // // new type def, otherwise merge the type defs.
-            // if path.is_root() {
-            //     new_type_def
-            // } else {
-            //     println!("Current type def: {:?}", current_type_def);
-            //     println!("Merge with... {:?}", new_type_def);
-            //     current_type_def.clone().merge_overwrite(new_type_def)
-            // }
         }
 
         match self {
@@ -245,15 +236,10 @@ impl Target {
             }
 
             External(path) => {
-                let td = match path.is_root() {
-                    true => new_type_def.clone(),
-                    false => new_type_def.clone().for_path(&path.to_lookup()),
-                };
-                let details = Details {
+                external.update_target(Details {
                     type_def: set_type_def(&external.target().type_def, new_type_def, path),
                     value,
-                };
-                external.update_target(details);
+                });
             }
         }
     }

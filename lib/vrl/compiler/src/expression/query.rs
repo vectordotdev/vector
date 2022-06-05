@@ -1,10 +1,7 @@
 use std::fmt;
 
 use lookup::LookupBuf;
-use value::{
-    kind::{remove, Collection},
-    Kind, Value,
-};
+use value::{kind::remove, Kind, Value};
 
 use crate::{
     expression::{Container, Resolved, Variable},
@@ -66,7 +63,7 @@ impl Query {
         &self,
         external: &mut ExternalEnv,
     ) -> Result<Option<Kind>, remove::Error> {
-        let mut target = external.target_mut();
+        let target = external.target_mut();
         let value = target.value.clone();
         let mut type_def = target.type_def.clone();
 

@@ -2,12 +2,11 @@ use diagnostic::{DiagnosticList, DiagnosticMessage, Severity, Span};
 use lookup::LookupBuf;
 use parser::ast::{self, Node, QueryTarget};
 
-use crate::type_def::Details;
 use crate::{
     expression::*,
     program::ProgramInfo,
     state::{ExternalEnv, LocalEnv},
-    Function, Program, TypeDef,
+    Function, Program,
 };
 
 pub(crate) type Diagnostics = Vec<Box<dyn DiagnosticMessage>>;
@@ -330,11 +329,7 @@ impl<'a> Compiler<'a> {
             None => {
                 // assignments must be the result of either the if block or the original value
                 self.local = self.local.clone().merge(original_locals);
-                println!("Original: {:?}", original_external.type_def.kind().debug_info());
-                println!("If Block: {:?}", external.target().type_def.debug_info());
-                let merged = original_external.merge(external.target().clone());
-                println!("Merged: {:?}", merged.type_def.debug_info());
-                external.update_target(merged);
+                external.update_target(original_external.merge(external.target().clone()));
 
                 Some(IfStatement {
                     predicate,
