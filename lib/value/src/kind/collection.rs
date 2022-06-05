@@ -213,12 +213,33 @@ impl<T: Ord> Collection<T> {
     /// - If a field exists in both collections, their `Kind`s are merged, or the `other` fields
     ///   are used (depending on the configured [`Strategy`](merge::Strategy)).
     ///
-    /// - If a field exists in one but not the other, the field is used.
+    /// - If a field exists in one but not the other, the field is merged with the "unknown"
+    ///   of the other if it exists, or just the field is used otherwise.
     ///
     /// For *unknown fields or indices*:
     ///
     /// - Both `Unknown`s are merged, similar to merging two `Kind`s.
     pub fn merge(&mut self, mut other: Self, strategy: merge::Strategy) {
+        let mut new_known = BTreeMap::new();
+
+        for (key, self_kind) in self.known {
+            match other.known.get(key) {
+                Some(other_kind) => {
+                    if strategy.depth.is_shallow() {
+                        new_known.insert(key, other_kind);
+                    } else {
+                        let mut merged_kind = self_kind.clone();
+                        merged_kind.merge(other_kind, strategy);
+                        new_known.insert(key, merged_kind);
+                    }
+                },
+                None => {
+                    // items in self but not other. Merge self type with unknown of other
+
+                }
+            }
+        }
+
         self.known
             .iter_mut()
             .for_each(|(key, self_kind)| match other.known.remove(key) {

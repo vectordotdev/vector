@@ -330,7 +330,11 @@ impl<'a> Compiler<'a> {
             None => {
                 // assignments must be the result of either the if block or the original value
                 self.local = self.local.clone().merge(original_locals);
-                external.update_target(original_external.merge(external.target().clone()));
+                println!("Original: {:?}", original_external.type_def.kind().debug_info());
+                println!("If Block: {:?}", external.target().type_def.debug_info());
+                let merged = original_external.merge(external.target().clone());
+                println!("Merged: {:?}", merged.type_def.debug_info());
+                external.update_target(merged);
 
                 Some(IfStatement {
                     predicate,
