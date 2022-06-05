@@ -166,7 +166,7 @@ pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
             }
             Some(value) => {
                 emit!(SplunkEventTimestampInvalidType {
-                    r#type: &value.kind_str()
+                    r#type: value.kind_str()
                 });
                 None
             }
