@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use futures_util::{stream::BoxStream, StreamExt};
 use tower::Service;
 use vector_core::{
+    config::log_schema,
     event::{Event, LogEvent, Value},
     partition::Partitioner,
     sink::StreamSink,
@@ -14,8 +15,6 @@ use vector_core::{
 use super::request_builder::HecLogsRequestBuilder;
 use crate::{
     config::SinkContext,
-    internal_events::SplunkEventTimestampInvalidType,
-    internal_events::SplunkEventTimestampMissing,
     internal_events::TemplateRenderingError,
     sinks::{
         splunk_hec::common::{render_template_string, request::HecRequest, EndpointTarget},
@@ -23,7 +22,6 @@ use crate::{
     },
     template::Template,
 };
-use lookup::path;
 
 pub struct HecLogsSink<S> {
     pub context: SinkContext,
@@ -36,17 +34,6 @@ pub struct HecLogsSink<S> {
     pub indexed_fields: Vec<String>,
     pub host: String,
     pub timestamp_nanos_key: Option<String>,
-    pub timestamp_key: String,
-}
-
-pub struct HecLogData<'a> {
-    pub sourcetype: Option<&'a Template>,
-    pub source: Option<&'a Template>,
-    pub index: Option<&'a Template>,
-    pub indexed_fields: &'a [String],
-    pub host_key: &'a str,
-    pub timestamp_nanos_key: Option<&'a String>,
-    pub timestamp_key: &'a str,
     pub metadata: HashMap<String, Template>,
     pub endpoint_target: EndpointTarget,
 }
@@ -66,20 +53,21 @@ where
         let host = self.host.as_ref();
         let timestamp_nanos_key = self.timestamp_nanos_key.as_deref();
         let endpoint_target = self.endpoint_target;
+
         let builder_limit = NonZeroUsize::new(64);
-
-        let data = HecLogData {
-            sourcetype: self.sourcetype.as_ref(),
-            source: self.source.as_ref(),
-            index: self.index.as_ref(),
-            indexed_fields: self.indexed_fields.as_slice(),
-            host_key: self.host.as_ref(),
-            timestamp_nanos_key: self.timestamp_nanos_key.as_ref(),
-            timestamp_key: self.timestamp_key.as_ref(),
-        };
-
         let sink = input
-            .map(move |event| process_log(event, &data))
+            .map(move |event| {
+                process_log(
+                    event,
+                    sourcetype,
+                    source,
+                    index,
+                    host,
+                    indexed_fields,
+                    timestamp_nanos_key,
+                    endpoint_target,
+                )
+            })
             .batched_partitioned(
                 EventPartitioner::new(self.metadata.clone()),
                 self.batch_settings,
@@ -190,7 +178,7 @@ pub struct HecLogsProcessedEventMetadata {
     pub source: Option<String>,
     pub index: Option<String>,
     pub host: Option<Value>,
-    pub timestamp: Option<f64>,
+    pub timestamp: f64,
     pub fields: LogEvent,
     pub endpoint_target: EndpointTarget,
 }
@@ -207,50 +195,40 @@ impl ByteSizeOf for HecLogsProcessedEventMetadata {
 
 pub type HecProcessedEvent = ProcessedEvent<LogEvent, HecLogsProcessedEventMetadata>;
 
-pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
+pub fn process_log(
+    event: Event,
+    sourcetype: Option<&Template>,
+    source: Option<&Template>,
+    index: Option<&Template>,
+    host_key: &str,
+    indexed_fields: &[String],
+    timestamp_nanos_key: Option<&str>,
+    endpoint_target: EndpointTarget,
+) -> HecProcessedEvent {
     let event_byte_size = event.size_of();
     let mut log = event.into_log();
 
-    let sourcetype = data
-        .sourcetype
-        .and_then(|sourcetype| render_template_string(sourcetype, &log, "sourcetype"));
+    let sourcetype =
+        sourcetype.and_then(|sourcetype| render_template_string(sourcetype, &log, "sourcetype"));
 
-    let source = data
-        .source
-        .and_then(|source| render_template_string(source, &log, "source"));
+    let source = source.and_then(|source| render_template_string(source, &log, "source"));
 
-    let index = data
-        .index
-        .and_then(|index| render_template_string(index, &log, "index"));
+    let index = index.and_then(|index| render_template_string(index, &log, "index"));
 
-    let host = log.get(data.host_key).cloned();
+    let host = log.get(host_key).cloned();
 
-    let timestamp = if data.timestamp_key.is_empty() {
-        None
-    } else {
-        match log.remove(data.timestamp_key) {
-            Some(Value::Timestamp(ts)) => {
-                // set nanos in log if valid timestamp in event and timestamp_nanos_key is configured
-                if let Some(key) = data.timestamp_nanos_key {
-                    log.try_insert(path!(key), ts.timestamp_subsec_nanos() % 1_000_000);
-                }
-                Some((ts.timestamp_millis() as f64) / 1000f64)
-            }
-            Some(value) => {
-                emit!(SplunkEventTimestampInvalidType {
-                    r#type: value.kind_str()
-                });
-                None
-            }
-            None => {
-                emit!(SplunkEventTimestampMissing {});
-                None
-            }
-        }
+    let timestamp = match log.remove(log_schema().timestamp_key()) {
+        Some(Value::Timestamp(ts)) => ts,
+        _ => chrono::Utc::now(),
     };
 
-    let fields = data
-        .indexed_fields
+    if let Some(key) = timestamp_nanos_key {
+        log.try_insert_flat(key, timestamp.timestamp_subsec_nanos() % 1_000_000);
+    }
+
+    let timestamp = (timestamp.timestamp_millis() as f64) / 1000f64;
+
+    let fields = indexed_fields
         .iter()
         .filter_map(|field| log.get(field.as_str()).map(|value| (field, value.clone())))
         .collect::<LogEvent>();
