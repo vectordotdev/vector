@@ -457,7 +457,7 @@ sources-logs = [
   "sources-kubernetes_logs",
   "sources-logstash",
   "sources-nats",
-  "sources-otel_log",
+  "sources-opentelemetry",
   "sources-redis",
   "sources-socket",
   "sources-splunk_hec",
@@ -473,7 +473,6 @@ sources-metrics = [
   "sources-internal_metrics",
   "sources-mongodb_metrics",
   "sources-nginx_metrics",
-  "sources-otel_log",
   "sources-postgresql_metrics",
   "sources-prometheus",
   "sources-statsd",
@@ -506,7 +505,7 @@ sources-logstash = ["listenfd", "tokio-util/net", "sources-utils-tcp-keepalive",
 sources-mongodb_metrics = ["mongodb"]
 sources-nats = ["nats", "nkeys"]
 sources-nginx_metrics = ["nom"]
-sources-otel_log = ["sources-vector", "otel_proto"]
+sources-opentelemetry = ["sources-vector", "otel_proto"]
 sources-postgresql_metrics = ["postgres-openssl", "tokio-postgres"]
 sources-prometheus = ["prometheus-parser", "sinks-prometheus", "sources-http", "sources-utils-http"]
 sources-redis= ["redis"]

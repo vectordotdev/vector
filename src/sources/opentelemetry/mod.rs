@@ -4,5 +4,5 @@ use crate::config::SourceDescription;
 use log::OpentelemetryLogConfig;
 
 inventory::submit! {
-    SourceDescription::new::<OpentelemetryLogConfig>("otel_log")
+    SourceDescription::new::<OpentelemetryLogConfig>("opentelemetry")
 }
