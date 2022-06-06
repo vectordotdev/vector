@@ -54,7 +54,6 @@ pub use unix_stream::build_unix_stream_source;
 #[cfg(any(
     feature = "sources-utils-tls",
     feature = "sources-vector",
-    feature = "sources-otel_log",
     feature = "sources-gcp_pubsub"
 ))]
 pub use wrappers::{AfterRead, AfterReadExt};

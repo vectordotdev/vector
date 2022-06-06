@@ -75,11 +75,10 @@ impl From<PBValue> for Value {
             PBValue::ArrayValue(arr) => Value::Array(
                 arr.values
                     .into_iter()
-                    .filter_map(|av| av.value)
-                    .map(|v| v.into())
+                    .map(|av| av.value.map(Into::into).unwrap_or(Value::Null))
                     .collect::<Vec<Value>>(),
             ),
-            PBValue::KvlistValue(arr) => kv_list_2_value(arr.values),
+            PBValue::KvlistValue(arr) => kv_list_into_value(arr.values),
         }
     }
 }
@@ -89,27 +88,23 @@ struct ResourceLog {
     log_record: LogRecord,
 }
 
-fn kv_list_2_value(arr: Vec<KeyValue>) -> Value {
+fn kv_list_into_value(arr: Vec<KeyValue>) -> Value {
     Value::Object(
         arr.into_iter()
-            .filter_map(|kv| kv.value.map(|av| (kv.key, av)))
-            .fold(BTreeMap::default(), |mut acc, (k, av)| {
-                if let Some(v) = av.value {
-                    acc.insert(k, v.into());
-                }
-                acc
-            }),
+            .filter_map(|kv| kv.value.map(|av| (kv.key, av.value.map(Into::into).unwrap_or(Value::Null))))
+            .collect::<BTreeMap<String, Value>>()
     )
 }
 
 impl From<ResourceLog> for Event {
     fn from(rl: ResourceLog) -> Self {
         let mut le = LogEvent::default();
-        // resource
         if let Some(resource) = rl.resource {
-            le.insert(RESOURCE_KEY, kv_list_2_value(resource.attributes));
+            le.insert(RESOURCE_KEY, kv_list_into_value(resource.attributes));
         }
-        le.insert(ATTRIBUTES_KEY, kv_list_2_value(rl.log_record.attributes));
+        if rl.log_record.attributes.len() > 0 {
+            le.insert(ATTRIBUTES_KEY, kv_list_into_value(rl.log_record.attributes));
+        }
         if let Some(v) = rl.log_record.body.and_then(|av| av.value) {
             le.insert(log_schema().message_key(), v);
         }
@@ -117,14 +112,18 @@ impl From<ResourceLog> for Event {
             log_schema().timestamp_key(),
             rl.log_record.time_unix_nano as i64,
         );
-        le.insert(
-            TRACE_ID_KEY,
-            Value::Bytes(Bytes::from(hex::encode(rl.log_record.trace_id))),
-        );
-        le.insert(
-            SPAN_ID_KEY,
-            Value::Bytes(Bytes::from(hex::encode(rl.log_record.span_id))),
-        );
+        if rl.log_record.trace_id.len() > 0 {
+            le.insert(
+                TRACE_ID_KEY,
+                Value::Bytes(Bytes::from(hex::encode(rl.log_record.trace_id))),
+            );
+        }
+        if rl.log_record.span_id.len() > 0 {
+            le.insert(
+                SPAN_ID_KEY,
+                Value::Bytes(Bytes::from(hex::encode(rl.log_record.span_id))),
+            );
+        }
         le.insert(SEVERITY_TEXT_KEY, rl.log_record.severity_text);
         le.insert(SEVERITY_NUMBER_KEY, rl.log_record.severity_number as i64);
         le.into()

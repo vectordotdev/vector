@@ -44,7 +44,7 @@ impl GenerateConfig for OpentelemetryLogConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "otel_log")]
+#[typetag::serde(name = "opentelemetry")]
 impl SourceConfig for OpentelemetryLogConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let tls_settings = MaybeTlsSettings::from_config(&self.tls, true)?;
@@ -67,7 +67,7 @@ impl SourceConfig for OpentelemetryLogConfig {
     }
 
     fn source_type(&self) -> &'static str {
-        "otel_log"
+        "opentelemetry"
     }
 
     fn resources(&self) -> Vec<Resource> {
