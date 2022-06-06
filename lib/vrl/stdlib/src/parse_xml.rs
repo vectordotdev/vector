@@ -190,23 +190,6 @@ impl Function for ParseXml {
             },
         ]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-
-        let options = ParseOptions {
-            trim: args.optional("trim"),
-            include_attr: args.optional("include_attr"),
-            attr_prefix: args.optional("attr_prefix"),
-            text_key: args.optional("text_key"),
-            always_use_text_key: args.optional("always_use_text_key"),
-            parse_bool: args.optional("parse_bool"),
-            parse_null: args.optional("parse_null"),
-            parse_number: args.optional("parse_number"),
-        };
-
-        parse_xml(value, options)
-    }
 }
 
 #[derive(Debug, Clone)]

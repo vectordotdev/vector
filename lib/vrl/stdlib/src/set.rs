@@ -132,14 +132,6 @@ impl Function for Set {
 
         Ok(Box::new(SetFn { value, path, data }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let path = args.required("path");
-        let data = args.required("data");
-
-        set(path, value, data)
-    }
 }
 
 #[derive(Debug, Clone)]

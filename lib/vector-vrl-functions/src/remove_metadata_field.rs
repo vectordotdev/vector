@@ -1,6 +1,5 @@
 use crate::{get_metadata_key, MetadataKey};
 use ::value::Value;
-use lookup::LookupBuf;
 use vrl::prelude::*;
 
 fn remove_metadata_field(
@@ -48,10 +47,6 @@ impl Function for RemoveMetadataField {
     ) -> Compiled {
         let key = get_metadata_key(&mut arguments)?;
         Ok(Box::new(RemoveMetadataFieldFn { key }))
-    }
-
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        panic!("VM being removed")
     }
 }
 

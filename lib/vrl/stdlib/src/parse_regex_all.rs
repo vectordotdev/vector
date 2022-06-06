@@ -115,21 +115,6 @@ impl Function for ParseRegexAll {
             _ => Ok(None),
         }
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let pattern = args
-            .required_any("pattern")
-            .downcast_ref::<regex::Regex>()
-            .ok_or("no pattern")?;
-        let value = args.required("value");
-        let numeric_groups = args
-            .optional("numeric_groups")
-            .map(|value| value.try_boolean())
-            .transpose()?
-            .unwrap_or(false);
-
-        parse_regex_all(value, numeric_groups, pattern)
-    }
 }
 
 #[derive(Debug, Clone)]

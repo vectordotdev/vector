@@ -1,7 +1,5 @@
-use crate::{get_metadata_key, is_legacy_metadata_path, MetadataKey};
+use crate::{get_metadata_key, MetadataKey};
 use ::value::Value;
-use lookup::LookupBuf;
-use std::collections::VecDeque;
 use vrl::prelude::*;
 
 fn set_metadata_field(
@@ -78,10 +76,6 @@ impl Function for SetMetadataField {
             key,
             value: Box::new(value),
         }))
-    }
-
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        panic!("why are you still here")
     }
 }
 

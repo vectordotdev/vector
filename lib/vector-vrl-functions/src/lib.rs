@@ -7,7 +7,7 @@ pub mod set_secret;
 pub mod set_semantic_meaning;
 
 use ::value::Value;
-use lookup::{Lookup, LookupBuf, SegmentBuf};
+use lookup::{LookupBuf, SegmentBuf};
 use vrl::prelude::expression::Query;
 use vrl::prelude::*;
 

@@ -42,11 +42,6 @@ impl Function for Unique {
             required: true,
         }]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        unique(value)
-    }
 }
 
 #[derive(Debug, Clone)]

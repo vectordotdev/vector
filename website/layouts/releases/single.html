@@ -120,7 +120,7 @@
                   <span class="prose dark:prose-dark">
                     Thanks to
                     {{ range .contributors}}
-                    <a href="https://github.com/{{ . }}" rel="noopener" target="_blank">{{ . }}</a>
+                    <a href="https://github.com/{{ replace . "@" "" }}" rel="noopener" target="_blank">{{ . }}</a>
                     {{ end }}
                     for contributing this change!
                   </span>

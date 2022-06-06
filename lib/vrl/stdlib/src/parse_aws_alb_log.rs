@@ -52,11 +52,6 @@ impl Function for ParseAwsAlbLog {
             required: true,
         }]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        parse_aws_alb_log(value)
-    }
 }
 
 #[derive(Debug, Clone)]

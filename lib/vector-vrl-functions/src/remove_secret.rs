@@ -41,10 +41,6 @@ impl Function for RemoveSecret {
         let key = arguments.required("key");
         Ok(Box::new(RemoveSecretFn { key }))
     }
-
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        remove_secret(ctx, args.required("key"))
-    }
 }
 
 #[derive(Debug, Clone)]

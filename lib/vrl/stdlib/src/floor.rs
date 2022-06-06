@@ -65,13 +65,6 @@ impl Function for Floor {
             result: Ok("9.0"),
         }]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let precision = args.optional("precision");
-
-        floor(precision, value)
-    }
 }
 
 #[derive(Clone, Debug)]

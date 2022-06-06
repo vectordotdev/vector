@@ -69,11 +69,6 @@ impl Function for ParseQueryString {
             required: true,
         }]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        parse_query_string(value)
-    }
 }
 
 #[derive(Debug, Clone)]

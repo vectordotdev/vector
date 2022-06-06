@@ -1,6 +1,5 @@
-use crate::{get_metadata_key, is_legacy_metadata_path, MetadataKey};
+use crate::{get_metadata_key, MetadataKey};
 use ::value::Value;
-use lookup::LookupBuf;
 use vrl::prelude::*;
 
 fn get_metadata_field(
@@ -49,10 +48,6 @@ impl Function for GetMetadataField {
         let key = get_metadata_key(&mut arguments)?;
         Ok(Box::new(GetMetadataFieldFn { key }))
     }
-
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        panic!("VM is being removed.")
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -68,7 +63,7 @@ impl Expression for GetMetadataFieldFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         match &self.key {
             MetadataKey::Legacy(_) => TypeDef::bytes().add_null().infallible(),
-            MetadataKey::Query(query) => {
+            MetadataKey::Query(_query) => {
                 // TODO: use metadata schema when it exists to return a better value here
                 TypeDef::any().infallible()
             }

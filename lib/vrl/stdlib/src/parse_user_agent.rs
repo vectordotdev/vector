@@ -209,19 +209,9 @@ impl Function for ParseUserAgent {
             _ => Ok(None),
         }
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let string = value.try_bytes_utf8_lossy()?;
-        let parser = args
-            .required_any("mode")
-            .downcast_ref::<ParserMode>()
-            .ok_or("no parser mode")?;
-
-        Ok((parser.fun)(&string))
-    }
 }
 
+#[allow(dead_code)] // will be used by LLVM runtime
 struct ParserMode {
     fun: Box<dyn Fn(&str) -> Value + Send + Sync>,
 }

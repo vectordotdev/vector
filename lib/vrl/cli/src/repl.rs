@@ -16,13 +16,10 @@ use rustyline::{
 };
 use value::Secrets;
 use vector_common::TimeZone;
+
 use vector_vrl_functions::vrl_functions;
 use vrl::prelude::BTreeMap;
-use vrl::{
-    diagnostic::Formatter,
-    state::{self, ExternalEnv},
-    Runtime, Target, VrlRuntime,
-};
+use vrl::{diagnostic::Formatter, state, Runtime, Target, VrlRuntime};
 
 // Create a list of all possible error values for potential docs lookup
 static ERRORS: Lazy<Vec<String>> = Lazy::new(|| {
@@ -185,15 +182,7 @@ fn execute(
     timezone: &TimeZone,
     vrl_runtime: VrlRuntime,
 ) -> Result<Value, String> {
-    let mut state = ExternalEnv::default();
-
     match vrl_runtime {
-        VrlRuntime::Vm => {
-            let vm = runtime.compile(stdlib::all(), &program, &mut state)?;
-            runtime
-                .run_vm(&vm, object, timezone)
-                .map_err(|err| err.to_string())
-        }
         VrlRuntime::Ast => runtime
             .resolve(object, &program, timezone)
             .map_err(|err| err.to_string()),

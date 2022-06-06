@@ -44,10 +44,6 @@ impl Function for GetSecret {
         let key = arguments.required("key");
         Ok(Box::new(GetSecretFn { key }))
     }
-
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        get_secret(ctx, args.required("key"))
-    }
 }
 
 #[derive(Debug, Clone)]

@@ -55,10 +55,6 @@ impl Function for SetSecret {
         let secret = arguments.required("secret");
         Ok(Box::new(SetSecretFn { key, secret }))
     }
-
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        set_secret(ctx, args.required("key"), args.required("secret"))
-    }
 }
 
 #[derive(Debug, Clone)]
