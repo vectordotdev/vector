@@ -77,13 +77,6 @@ impl Function for SetMetadataField {
             _ => Ok(None),
         }
     }
-
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let key = args.required_any("key").downcast_ref::<String>().unwrap();
-
-        set_metadata_field(ctx, key, value)
-    }
 }
 
 #[derive(Debug, Clone)]

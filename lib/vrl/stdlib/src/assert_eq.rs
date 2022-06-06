@@ -85,14 +85,6 @@ impl Function for AssertEq {
             message,
         }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let left = args.required("left");
-        let right = args.required("right");
-        let message = args.optional("message");
-
-        assert_eq(left, right, message)
-    }
 }
 
 #[derive(Debug, Clone)]

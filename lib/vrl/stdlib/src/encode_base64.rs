@@ -74,14 +74,6 @@ impl Function for EncodeBase64 {
             result: Ok("c29tZSBzdHJpbmcgdmFsdWU"),
         }]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let padding = args.optional("padding");
-        let charset = args.optional("charset");
-
-        encode_base64(value, padding, charset)
-    }
 }
 
 #[derive(Clone, Debug)]

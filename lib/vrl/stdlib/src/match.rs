@@ -56,13 +56,6 @@ impl Function for Match {
 
         Ok(Box::new(MatchFn { value, pattern }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let pattern = args.required("pattern");
-
-        match_(value, pattern)
-    }
 }
 
 #[derive(Debug, Clone)]

@@ -12,6 +12,8 @@ mod encoding_config;
 pub mod finalizer;
 #[cfg(all(unix, feature = "sources-dnstap"))]
 pub mod framestream;
+#[cfg(feature = "sources-vector")]
+pub mod grpc;
 #[cfg(any(
     feature = "sources-utils-http-auth",
     feature = "sources-utils-http-encoding",

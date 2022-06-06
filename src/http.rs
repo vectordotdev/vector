@@ -257,7 +257,7 @@ impl Auth {
 }
 
 pub fn get_http_scheme_from_uri(uri: &Uri) -> &'static str {
-    // If there's no scheme, we just use "http" since it provides the most semantic relevance without inadvertantly
+    // If there's no scheme, we just use "http" since it provides the most semantic relevance without inadvertently
     // implying things it can't know i.e. returning "https" when we're not actually sure HTTPS was used.
     uri.scheme_str().map_or("http", |scheme| match scheme {
         "http" => "http",

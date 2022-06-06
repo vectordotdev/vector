@@ -31,10 +31,6 @@ impl Function for GetHostname {
             result: Ok("true"),
         }]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Resolved {
-        get_hostname()
-    }
 }
 
 #[derive(Debug, Clone)]

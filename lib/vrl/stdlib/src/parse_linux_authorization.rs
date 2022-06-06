@@ -44,9 +44,4 @@ impl Function for ParseLinuxAuthorization {
         // The parse_linux_authorization function is just an alias for parse_syslog
         Ok(Box::new(ParseSyslogFn { value }))
     }
-
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        super::parse_syslog::parse_syslog(value, ctx)
-    }
 }

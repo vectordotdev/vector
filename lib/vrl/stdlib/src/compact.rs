@@ -144,18 +144,6 @@ impl Function for Compact {
             nullish,
         }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let recursive = args.optional("recursive");
-        let null = args.optional("null");
-        let string = args.optional("string");
-        let object = args.optional("object");
-        let array = args.optional("array");
-        let nullish = args.optional("nullish");
-
-        compact(recursive, null, string, object, array, nullish, value)
-    }
 }
 
 #[derive(Debug, Clone)]
