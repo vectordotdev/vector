@@ -1687,6 +1687,7 @@ dependencies = [
  "value",
  "vector_common",
  "vector_config",
+ "vector_config_macros",
  "vector_core",
 ]
 
