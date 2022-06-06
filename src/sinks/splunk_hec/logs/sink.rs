@@ -65,7 +65,6 @@ where
         let indexed_fields = self.indexed_fields.as_slice();
         let host = self.host.as_ref();
         let timestamp_nanos_key = self.timestamp_nanos_key.as_deref();
-        let metadata = self.metadata.clone();
         let endpoint_target = self.endpoint_target;
         let builder_limit = NonZeroUsize::new(64);
 

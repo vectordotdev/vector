@@ -13,7 +13,7 @@ use crate::{
     config::{SinkConfig, SinkContext},
     sinks::{
         splunk_hec::{
-            common::timestamp_key,
+            common::{timestamp_key, EndpointTarget},
             logs::{config::HecLogsSinkConfig, encoder::HecLogsEncoder, sink::process_log},
         },
         util::{test::build_test_server, Compression},
@@ -82,6 +82,7 @@ fn get_processed_event_timestamp(
             indexed_fields: indexed_fields.as_slice(),
             timestamp_nanos_key: timestamp_nanos_key.as_ref(),
             timestamp_key,
+            endpoint_target: EndpointTarget::Event,
         },
     )
 }
@@ -186,6 +187,8 @@ async fn splunk_passthrough_token() {
         acknowledgements: Default::default(),
         timestamp_nanos_key: None,
         timestamp_key: log_schema().timestamp_key().into(),
+        endpoint_target: EndpointTarget::Event,
+        metadata: Default::default(),
     };
     let cx = SinkContext::new_test();
 

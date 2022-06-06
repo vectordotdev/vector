@@ -236,7 +236,7 @@ mod tests {
             HttpRequestBuilder::new(String::from(endpoint), String::from(token), compression);
 
         let request = http_request_builder
-            .build_request(events.clone(), "/services/collector/event", None)
+            .build_request(events.clone(), "/services/collector/event", None, None)
             .unwrap();
 
         assert_eq!(
@@ -269,7 +269,7 @@ mod tests {
             HttpRequestBuilder::new(String::from(endpoint), String::from(token), compression);
 
         let request = http_request_builder
-            .build_request(events.clone(), "/services/collector/event", None)
+            .build_request(events.clone(), "/services/collector/event", None, None)
             .unwrap();
 
         assert_eq!(
@@ -305,7 +305,7 @@ mod tests {
             HttpRequestBuilder::new(String::from(endpoint), String::from(token), compression);
 
         let err = http_request_builder
-            .build_request(events, "/services/collector/event", None)
+            .build_request(events, "/services/collector/event", None, None)
             .unwrap_err();
         assert_eq!(err.to_string(), "URI parse error: invalid format")
     }
