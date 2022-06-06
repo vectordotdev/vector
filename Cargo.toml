@@ -260,7 +260,7 @@ logfmt = { version = "0.0.2", default-features = false, optional = true }
 lru = { version = "0.7.6", default-features = false, optional = true }
 maxminddb = { version = "0.23.0", default-features = false, optional = true }
 md-5 = { version = "0.10", default-features = false, optional = true }
-mongodb = { version = "2.2.1", default-features = false, features = ["tokio-runtime"], optional = true }
+mongodb = { version = "2.2.2", default-features = false, features = ["tokio-runtime"], optional = true }
 nats = { version = "0.20.1", default-features = false, optional = true }
 nkeys = { version = "0.2.0", default-features = false, optional = true }
 nom = { version = "7.1.1", default-features = false, optional = true }
