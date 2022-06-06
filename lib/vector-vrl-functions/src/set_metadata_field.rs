@@ -1,4 +1,4 @@
-use crate::{compile_path_arg, is_legacy_metadata_path};
+use crate::{get_metadata_key, is_legacy_metadata_path, MetadataKey};
 use ::value::Value;
 use lookup::LookupBuf;
 use std::collections::VecDeque;
@@ -6,11 +6,19 @@ use vrl::prelude::*;
 
 fn set_metadata_field(
     ctx: &mut Context,
-    path: &LookupBuf,
+    key: &MetadataKey,
     value: Value,
 ) -> std::result::Result<Value, ExpressionError> {
-    ctx.target_mut().set_metadata(path, value)?;
-    Ok(Value::Null)
+    Ok(match key {
+        MetadataKey::Legacy(key) => {
+            let str_value = value.as_str().expect("must be a string");
+            Value::from(ctx.target_mut().insert_secret(key, str_value.as_ref()))
+        }
+        MetadataKey::Query(query) => {
+            ctx.target_mut().remove_metadata(query.path())?;
+            Value::Null
+        }
+    })
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -50,93 +58,43 @@ impl Function for SetMetadataField {
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
-        let key = arguments
-            .required_literal("key")?
-            .to_value()
-            .as_bytes()
-            .cloned()
-            .expect("key not bytes");
-        let key = String::from_utf8_lossy(key.as_ref());
-        let path = compile_path_arg(key.as_ref())?;
+        let key = get_metadata_key(&mut arguments)?;
         let value = arguments.required_expr("value");
 
-        // backwards compat until schemas are supported for metadata. Make sure the "legacy"
-        // fields stay as string or null
-        if is_legacy_metadata_path(&path) {
-            let type_def = value.type_def((state.0, state.1));
-            if !TypeDef::bytes().add_null().is_superset(&type_def) {
+        // for backwards compatibility, make sure value is a string when using legacy.
+        if matches!(key, MetadataKey::Legacy(_)) {
+            if !value.type_def((&state.0, &state.1)).is_bytes() {
                 return Err(vrl::function::Error::UnexpectedExpression {
-                    keyword: "key",
-                    expected: "string or null",
-                    expr: value,
+                    keyword: "value",
+                    // value: value.clone(),
+                    expected: "string",
+                    expr: value.clone(),
                 }
                 .into());
             }
         }
-        if path.len() > 1
-            && is_legacy_metadata_path(&LookupBuf::from(VecDeque::from([path
-                .segments
-                .front()
-                .unwrap()
-                .clone()])))
-        {
-            return Err(vrl::function::Error::InvalidArgument {
-                keyword: "key",
-                value: Value::Bytes(Bytes::from(key.as_bytes().to_vec())),
-                error: "Cannot write to this path.",
-            }
-            .into());
-        }
 
         Ok(Box::new(SetMetadataFieldFn {
-            path,
+            key,
             value: Box::new(value),
         }))
     }
 
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("key", Some(expr)) => {
-                let key = expr
-                    .as_literal("key")?
-                    .try_bytes_utf8_lossy()
-                    .expect("key not bytes")
-                    .to_string();
-                let lookup = compile_path_arg(&key)?;
-
-                Ok(Some(Box::new(lookup) as _))
-            }
-            _ => Ok(None),
-        }
-    }
-
     fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let path = args
-            .required_any("key")
-            .downcast_ref::<LookupBuf>()
-            .unwrap();
-
-        set_metadata_field(ctx, path, value)
+        panic!("why are you still here")
     }
 }
 
 #[derive(Debug, Clone)]
 struct SetMetadataFieldFn {
-    path: LookupBuf,
+    key: MetadataKey,
     value: Box<dyn Expression>,
 }
 
 impl Expression for SetMetadataFieldFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        set_metadata_field(ctx, &self.path, value)
+        set_metadata_field(ctx, &self.key, value)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

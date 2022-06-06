@@ -444,9 +444,35 @@ impl ArgumentList {
         self.closure = Some(closure);
     }
 
-    fn optional_expr(&mut self, keyword: &'static str) -> Option<Expr> {
-        self.arguments.remove(keyword)
+    pub(crate) fn optional_expr(&mut self, keyword: &'static str) -> Option<Expr> {
+        self.arguments.get(keyword).cloned()
     }
+
+    // pub (crate) fn try_query_expr(expr: Expr) -> Result<Option<crate::expression::Query>, Error>
+
+    // pub(crate) fn try_literal(
+    //     expr: Expr,
+    //     keyword: &'static str,
+    // ) -> Result<crate::expression::Literal, Error> {
+    //     match expr {
+    //         Expr::Literal(literal) => Ok(literal),
+    //         Expr::Variable(var) if var.value().is_some() => {
+    //             match var.value().unwrap().clone().into() {
+    //                 Expr::Literal(literal) => Ok(literal),
+    //                 expr => Err(Error::UnexpectedExpression {
+    //                     keyword,
+    //                     expected: "literal",
+    //                     expr,
+    //                 }),
+    //             }
+    //         }
+    //         expr => Err(Error::UnexpectedExpression {
+    //             keyword,
+    //             expected: "literal",
+    //             expr,
+    //         }),
+    //     }
+    // }
 
     pub fn required_expr(&mut self, keyword: &'static str) -> Expr {
         required(self.optional_expr(keyword))

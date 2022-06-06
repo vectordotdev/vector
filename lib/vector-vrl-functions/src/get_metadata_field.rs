@@ -1,4 +1,4 @@
-use crate::{compile_path_arg, is_legacy_metadata_path, MetadataKey};
+use crate::{get_metadata_key, is_legacy_metadata_path, MetadataKey};
 use ::value::Value;
 use lookup::LookupBuf;
 use vrl::prelude::*;
@@ -46,27 +46,7 @@ impl Function for GetMetadataField {
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
-        // let key = if let Ok(Some(key)) = arguments.optional_enum("key", &super::legacy_keys()) {
-        //     let key = key
-        //         .try_bytes_utf8_lossy()
-        //         .expect("key not bytes")
-        //         .to_string();
-        //     MetadataKey::Legacy(key)
-        // } else {
-        //     let query = arguments.required_query("key")?;
-        //     MetadataKey::Query(query)
-        // };
-
-        let key = if let Ok(Some(query)) = arguments.optional_query("key") {
-            MetadataKey::Query(query)
-        } else {
-            let key = arguments.required_enum("key", &super::legacy_keys())?;
-            MetadataKey::Legacy(
-                key.try_bytes_utf8_lossy()
-                    .expect("key not bytes")
-                    .to_string(),
-            )
-        };
+        let key = get_metadata_key(&mut arguments)?;
         Ok(Box::new(GetMetadataFieldFn { key }))
     }
 

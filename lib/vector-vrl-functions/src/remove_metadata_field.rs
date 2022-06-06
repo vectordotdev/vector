@@ -1,14 +1,19 @@
-use crate::compile_path_arg;
+use crate::{get_metadata_key, MetadataKey};
 use ::value::Value;
 use lookup::LookupBuf;
 use vrl::prelude::*;
 
 fn remove_metadata_field(
     ctx: &mut Context,
-    path: &LookupBuf,
+    key: &MetadataKey,
 ) -> std::result::Result<Value, ExpressionError> {
-    ctx.target_mut().remove_metadata(path)?;
-    Ok(Value::Null)
+    Ok(match key {
+        MetadataKey::Legacy(key) => Value::from(ctx.target_mut().remove_secret(key)),
+        MetadataKey::Query(query) => {
+            ctx.target_mut().remove_metadata(query.path())?;
+            Value::Null
+        }
+    })
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -41,56 +46,23 @@ impl Function for RemoveMetadataField {
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
-        let key_bytes = arguments
-            .required_literal("key")?
-            .to_value()
-            .as_bytes()
-            .cloned()
-            .expect("key not bytes");
-        let key = String::from_utf8_lossy(key_bytes.as_ref());
-        let path = compile_path_arg(key.as_ref())?;
-
-        Ok(Box::new(RemoveMetadataFieldFn { path }))
-    }
-
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("key", Some(expr)) => {
-                let key = expr
-                    .as_literal("key")?
-                    .try_bytes_utf8_lossy()
-                    .expect("key not bytes")
-                    .to_string();
-                let lookup = compile_path_arg(&key)?;
-                Ok(Some(Box::new(lookup) as _))
-            }
-            _ => Ok(None),
-        }
+        let key = get_metadata_key(&mut arguments)?;
+        Ok(Box::new(RemoveMetadataFieldFn { key }))
     }
 
     fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let path = args
-            .required_any("key")
-            .downcast_ref::<LookupBuf>()
-            .unwrap();
-        remove_metadata_field(ctx, path)
+        panic!("VM being removed")
     }
 }
 
 #[derive(Debug, Clone)]
 struct RemoveMetadataFieldFn {
-    path: LookupBuf,
+    key: MetadataKey,
 }
 
 impl Expression for RemoveMetadataFieldFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        remove_metadata_field(ctx, &self.path)
+        remove_metadata_field(ctx, &self.key)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

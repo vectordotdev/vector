@@ -47,14 +47,18 @@ pub fn vrl_functions() -> Vec<Box<dyn vrl::Function>> {
     ]
 }
 
-fn compile_path_arg(path: &str) -> std::result::Result<LookupBuf, Box<dyn DiagnosticMessage>> {
-    match Lookup::from_str(path) {
-        Ok(lookup) => Ok(lookup.into()),
-        Err(_) => Err(vrl::function::Error::InvalidArgument {
-            keyword: "key",
-            value: Value::Bytes(Bytes::from(path.as_bytes().to_vec())),
-            error: "Invalid path",
-        }
-        .into()),
-    }
+fn get_metadata_key(
+    arguments: &mut ArgumentList,
+) -> std::result::Result<MetadataKey, Box<dyn DiagnosticMessage>> {
+    let key = if let Ok(Some(query)) = arguments.optional_query("key") {
+        MetadataKey::Query(query)
+    } else {
+        let key = arguments.required_enum("key", &legacy_keys())?;
+        MetadataKey::Legacy(
+            key.try_bytes_utf8_lossy()
+                .expect("key not bytes")
+                .to_string(),
+        )
+    };
+    Ok(key)
 }
