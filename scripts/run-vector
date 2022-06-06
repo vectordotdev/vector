@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+import argparse, os, tomlkit
+
+args = argparse.ArgumentParser(description='Run `vector` with the minimum set of feature flags for a given config.')
+args.add_argument('--debug', dest='mode', action='store_const', const='--debug', default='--debug',
+                  help='Run in debug mode (default)')
+args.add_argument('--release', dest='mode', action='store_const', const='--release',
+                  help='Run in release mode')
+args.add_argument('config', help='Configuration file')
+args.add_argument('args', nargs='*', help='Extra options to `vector`')
+args = args.parse_args()
+print(args)
+exit()
+
+# Extract the set of features for a particular key from the config,
+# using the mapping to rewrite component names to their feature names.
+def get_features(config, key, mapping):
+  components = set( component['type'] for component in config.get(key, {}).values() )
+  components = set( mapping.get(component, component) for component in components )
+  return set( f'{key}-{component}' for component in components )
+
+with open(args.config, 'rb') as fh:
+  config = tomlkit.load(fh)
+
+# Mapping of source names to feature names.
+source_feature_map = {
+  'generator': 'demo_logs',
+  'logplex': 'heroku_logs',
+  'prometheus_scrape': 'prometheus',
+  'prometheus_remote_write': 'prometheus',
+}
+
+# Mapping of transform names to feature names.
+transform_feature_map = {
+  'sampler': 'sample',
+  'swimlanes': 'route',
+}
+
+# Mapping of sink names to feature names.
+sink_feature_map = {
+  'gcp_pubsub': 'gcp',
+  'gcp_cloud_storage': 'gcp',
+  'gcp_stackdriver_logs': 'gcp',
+  'gcp_stackdriver_metrics': 'gcp',
+  'prometheus_exporter': 'prometheus',
+  'prometheus_remote_write': 'prometheus',
+  'splunk_hec_logs': 'splunk_hec',
+}
+
+features = get_features(config, 'sources', source_feature_map) \
+  .union(get_features(config, 'transforms', transform_feature_map)) \
+  .union(get_features(config, 'sinks', sink_feature_map))
+
+features = ','.join(features)
+os.execlp('cargo', 'cargo', 'run', args.mode, '--no-default-features', '--features', features, '--',
+          '--config', args.config, *args.args)
