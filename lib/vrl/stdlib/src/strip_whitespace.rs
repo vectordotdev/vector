@@ -46,12 +46,6 @@ impl Function for StripWhitespace {
 
         Ok(Box::new(StripWhitespaceFn { value }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-
-        Ok(value.try_bytes_utf8_lossy()?.trim().into())
-    }
 }
 
 #[derive(Debug, Clone)]

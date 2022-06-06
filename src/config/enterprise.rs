@@ -421,14 +421,12 @@ fn setup_logs_reporting(
         source: Some(format!(
             r#"
             .ddsource = "vector"
-            .vector = {{
-                "configuration_key": "{configuration_key}",
-                "configuration_version_hash": "{configuration_version_hash}",
-                "version": "{vector_version}",
-                "arch": "{build_arch}",
-                "os": "{build_os}",
-                "vendor": "{build_vendor}"
-            }}
+            .vector.configuration_key = "{configuration_key}"
+            .vector.configuration_version_hash = "{configuration_version_hash}"
+            .vector.version = "{vector_version}"
+            .vector.arch = "{build_arch}"
+            .vector.os = "{build_os}"
+            .vector.vendor = "{build_vendor}"
             {}
         "#,
             custom_logs_tags_vrl,

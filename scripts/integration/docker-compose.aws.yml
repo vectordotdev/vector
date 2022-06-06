@@ -61,6 +61,7 @@ services:
       - backend
     volumes:
       - ${PWD}:/code
+      - target:/code/target
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
 
@@ -68,5 +69,6 @@ networks:
   backend: {}
 
 volumes:
+  target: {}
   cargogit: {}
   cargoregistry: {}

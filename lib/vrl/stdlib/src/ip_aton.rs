@@ -45,11 +45,6 @@ impl Function for IpAton {
 
         Ok(Box::new(IpAtonFn { value }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        ip_aton(value)
-    }
 }
 
 #[derive(Debug, Clone)]

@@ -50,6 +50,7 @@ services:
       - public
     volumes:
       - ${PWD}:/code
+      - target:/code/target
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
 
@@ -58,5 +59,6 @@ networks:
   proxy: {}
 
 volumes:
+  target: {}
   cargogit: {}
   cargoregistry: {}
