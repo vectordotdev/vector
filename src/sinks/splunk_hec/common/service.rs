@@ -259,6 +259,7 @@ mod tests {
                 build_http_batch_service,
                 request::HecRequest,
                 service::{HecAckResponseBody, HecService, HttpRequestBuilder},
+                EndpointTarget,
             },
             util::Compression,
         },
@@ -280,7 +281,7 @@ mod tests {
         let http_service = build_http_batch_service(
             client.clone(),
             Arc::clone(&http_request_builder),
-            Data::Event,
+            EndpointTarget::Event,
         );
         HecService::new(
             BoxService::new(http_service),
@@ -299,6 +300,7 @@ mod tests {
             events_byte_size,
             finalizers: EventFinalizers::default(),
             passthrough_token: None,
+            metadata: Default::default(),
         }
     }
 

@@ -12,7 +12,10 @@ use super::sink::HecProcessedEvent;
 use crate::{
     config::{SinkConfig, SinkContext},
     sinks::{
-        splunk_hec::logs::{config::HecLogsSinkConfig, encoder::HecLogsEncoder, sink::process_log},
+        splunk_hec::{
+            common::EndpointTarget,
+            logs::{config::HecLogsSinkConfig, encoder::HecLogsEncoder, sink::process_log},
+        },
         util::{test::build_test_server, Compression},
     },
     template::Template,
@@ -52,7 +55,7 @@ fn get_processed_event() -> HecProcessedEvent {
     event.as_mut_log().insert("event_field1", "test_value1");
     event.as_mut_log().insert("event_field2", "test_value2");
     event.as_mut_log().insert("key", "value");
-    event.as_mut_log().insert("int_val", 123);
+    event.as_mut_log().insert("int_val", 123_isize);
     event.as_mut_log().insert(
         log_schema().timestamp_key(),
         Utc.timestamp_nanos(1638366107111456123),
@@ -72,6 +75,7 @@ fn get_processed_event() -> HecProcessedEvent {
         "host_key",
         indexed_fields.as_slice(),
         timestamp_nanos_key.as_deref(),
+        EndpointTarget::Event,
     )
 }
 
@@ -165,6 +169,8 @@ async fn splunk_passthrough_token() {
         tls: None,
         acknowledgements: Default::default(),
         timestamp_nanos_key: None,
+        endpoint_target: EndpointTarget::Event,
+        metadata: Default::default(),
     };
     let cx = SinkContext::new_test();
 

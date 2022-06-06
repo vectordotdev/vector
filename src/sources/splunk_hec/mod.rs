@@ -1066,6 +1066,8 @@ mod tests {
             tls: None,
             acknowledgements: Default::default(),
             timestamp_nanos_key: None,
+            endpoint_target: Default::default(),
+            metadata: Default::default(),
         }
         .build(SinkContext::new_test())
         .await

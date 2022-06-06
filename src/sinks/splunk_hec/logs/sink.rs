@@ -52,7 +52,6 @@ where
         let indexed_fields = self.indexed_fields.as_slice();
         let host = self.host.as_ref();
         let timestamp_nanos_key = self.timestamp_nanos_key.as_deref();
-        let metadata = self.metadata.clone();
         let endpoint_target = self.endpoint_target;
 
         let builder_limit = NonZeroUsize::new(64);
@@ -66,7 +65,6 @@ where
                     host,
                     indexed_fields,
                     timestamp_nanos_key,
-                    metadata.clone(),
                     endpoint_target,
                 )
             })
@@ -205,7 +203,6 @@ pub fn process_log(
     host_key: &str,
     indexed_fields: &[String],
     timestamp_nanos_key: Option<&str>,
-    metadata: HashMap<String, Template>,
     endpoint_target: EndpointTarget,
 ) -> HecProcessedEvent {
     let event_byte_size = event.size_of();
