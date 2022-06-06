@@ -105,7 +105,7 @@ impl From<ResourceLog> for Event {
         if let Some(resource) = rl.resource {
             le.insert(RESOURCE_KEY, kv_list_into_value(resource.attributes));
         }
-        if rl.log_record.attributes.len() > 0 {
+        if !rl.log_record.attributes.is_empty() {
             le.insert(ATTRIBUTES_KEY, kv_list_into_value(rl.log_record.attributes));
         }
         if let Some(v) = rl.log_record.body.and_then(|av| av.value) {
@@ -115,13 +115,13 @@ impl From<ResourceLog> for Event {
             log_schema().timestamp_key(),
             rl.log_record.time_unix_nano as i64,
         );
-        if rl.log_record.trace_id.len() > 0 {
+        if !rl.log_record.trace_id.is_empty() {
             le.insert(
                 TRACE_ID_KEY,
                 Value::Bytes(Bytes::from(hex::encode(rl.log_record.trace_id))),
             );
         }
-        if rl.log_record.span_id.len() > 0 {
+        if !rl.log_record.span_id.is_empty() {
             le.insert(
                 SPAN_ID_KEY,
                 Value::Bytes(Bytes::from(hex::encode(rl.log_record.span_id))),
