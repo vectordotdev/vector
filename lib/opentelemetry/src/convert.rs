@@ -91,8 +91,11 @@ struct ResourceLog {
 fn kv_list_into_value(arr: Vec<KeyValue>) -> Value {
     Value::Object(
         arr.into_iter()
-            .filter_map(|kv| kv.value.map(|av| (kv.key, av.value.map(Into::into).unwrap_or(Value::Null))))
-            .collect::<BTreeMap<String, Value>>()
+            .filter_map(|kv| {
+                kv.value
+                    .map(|av| (kv.key, av.value.map(Into::into).unwrap_or(Value::Null)))
+            })
+            .collect::<BTreeMap<String, Value>>(),
     )
 }
 
