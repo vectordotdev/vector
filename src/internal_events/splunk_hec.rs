@@ -168,7 +168,8 @@ mod sink {
     impl<'a> InternalEvent for SplunkEventTimestampInvalidType<'a> {
         fn emit(self) {
             warn!(
-                message = "Timestamp was an unexpected type. Defaulting to splunk for timestamp.",
+                message =
+                    "Timestamp was an unexpected type. Deferring to Splunk to set the timestamp.",
                 invalid_type = self.r#type,
                 internal_log_rate_secs = 10
             );
@@ -180,7 +181,7 @@ mod sink {
     impl InternalEvent for SplunkEventTimestampMissing {
         fn emit(self) {
             warn!(
-                message = "Timestamp was not found. Defaulting to splunk for timestamp.",
+                message = "Timestamp was not found. Deferring to Splunk to set the timestamp.",
                 internal_log_rate_secs = 10
             );
         }
