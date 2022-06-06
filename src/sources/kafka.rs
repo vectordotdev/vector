@@ -185,7 +185,7 @@ async fn kafka_source(
         tokio::select! {
             _ = &mut shutdown => break,
             entry = ack_stream.next() => if let Some((status, entry)) = entry {
-                handle_ack(&mut topics, status, entry,&consumer);
+                handle_ack(&mut topics, status, entry, &consumer);
             },
             message = stream.next() => match message {
                 None => break,  // WHY?
@@ -299,13 +299,13 @@ fn parse_stream<'a>(
     keys: Keys<'a>,
     topics: &Topics,
 ) -> Option<(usize, impl Stream<Item = Event> + 'a)> {
+    if topics.failed.contains(msg.topic()) {
+        return None;
+    }
+
     let payload = msg.payload()?; // skip messages with empty payload
 
     let rmsg = ReceivedMessage::from(msg);
-
-    if topics.failed.contains(&rmsg.topic) {
-        return None;
-    }
 
     let payload = Cursor::new(Bytes::copy_from_slice(payload));
 
