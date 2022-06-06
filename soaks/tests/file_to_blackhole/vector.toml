@@ -9,7 +9,7 @@ type = "internal_metrics"
 
 [sources.file]
 type = "file"
-include = ["/var/lib/vector/file_gen/*.log"]
+include = ["/tmp/file-gen-*.log"]
 
 ##
 ## Sinks
