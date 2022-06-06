@@ -46,7 +46,6 @@ pub fn configurable_component_impl(args: TokenStream, item: TokenStream) -> Toke
     let input = parse_macro_input!(item as DeriveInput);
     let derived = quote! {
         #[derive(::vector_config_macros::Configurable, ::serde::Serialize, ::serde::Deserialize)]
-        #[serde(deny_unknown_fields)]
         #component_type
         #input
     };
