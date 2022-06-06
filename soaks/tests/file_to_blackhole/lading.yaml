@@ -5,5 +5,5 @@ generator:
     duplicates: 4
     variant: "Ascii"
     bytes_per_second: "100Mb"
-    maximum_bytes_per_file: "1Gb"
-    maximum_prebuild_cache_size_bytes: "4Gb"
+    maximum_bytes_per_file: "100Mb"
+    maximum_prebuild_cache_size_bytes: "400Mb"
