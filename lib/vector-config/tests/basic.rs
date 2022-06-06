@@ -186,8 +186,7 @@ pub struct AdvancedSinkConfig {
     #[configurable(derived)]
     #[serde(default = "default_advanced_sink_batch")]
     batch: BatchConfig,
-    #[configurable(derived)]
-    #[deprecated]
+    #[configurable(deprecated, derived)]
     #[serde(default = "default_advanced_sink_encoding")]
     encoding: Encoding,
     /// Overridden TLS description.

@@ -82,7 +82,7 @@ pub struct FileConfig {
     /// Whether or not to start reading from the beginning of a new file.
     ///
     /// DEPRECATED: This is a deprecated option -- replaced by `ignore_checkpoints`/`read_from` -- and should be removed.
-    #[deprecated]
+    #[configurable(deprecated)]
     pub start_at_beginning: Option<bool>,
 
     /// Whether or not to ignore existing checkpoints when determining where to start reading a file.
@@ -133,13 +133,13 @@ pub struct FileConfig {
     /// String value used to identify the start of a multi-line message.
     ///
     /// DEPRECATED: This is a deprecated option -- replaced by `multiline` -- and should be removed.
-    #[deprecated]
+    #[configurable(deprecated)]
     pub message_start_indicator: Option<String>,
 
     /// How long to wait for more data when aggregating a multi-line message, in milliseconds.
     ///
     /// DEPRECATED: This is a deprecated option -- replaced by `multiline` -- and should be removed.
-    #[deprecated]
+    #[configurable(deprecated)]
     pub multi_line_timeout: u64,
 
     /// Multiline parsing configuration.

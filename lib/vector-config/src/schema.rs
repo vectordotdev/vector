@@ -118,7 +118,7 @@ pub fn convert_to_flattened_schema(primary: &mut SchemaObject, mut subschemas: V
     // First, we replace the primary schema with an empty schema, because we need to push it the actual primary schema
     // into the list of `allOf` schemas. This is due to the fact that it's not valid to "extend" a schema using `allOf`,
     // so everything has to be in there.
-    let primary_subschema = mem::replace(primary, SchemaObject::default());
+    let primary_subschema = mem::take(primary);
     subschemas.insert(0, primary_subschema);
 
     let all_of_schemas = subschemas.into_iter().map(Schema::Object).collect();

@@ -39,7 +39,7 @@ pub enum DataTypeConfig {
     List,
 
     /// The `channel` data type.
-    /// 
+    ///
     /// This is based on Redis' Pub/Sub capabilities.
     Channel,
 }
@@ -98,7 +98,7 @@ pub struct RedisSourceConfig {
     list: Option<ListOption>,
 
     /// The Redis URL to connect to.
-    /// 
+    ///
     /// The URL must take the form of `protocol://server:port/db` where the `protocol` can either be `redis` or `rediss` for connections secured via TLS.
     url: String,
 

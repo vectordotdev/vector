@@ -59,7 +59,7 @@ impl<'a> Field<'a> {
     }
 
     pub fn deprecated(&self) -> bool {
-        self.attrs.deprecated
+        self.attrs.deprecated.is_present()
     }
 
     pub fn validation(&self) -> &[Validation] {
@@ -82,8 +82,7 @@ struct Attributes {
     description: Option<String>,
     derived: Flag,
     transparent: Flag,
-    #[darling(skip)]
-    deprecated: bool,
+    deprecated: Flag,
     #[darling(skip)]
     visible: bool,
     #[darling(skip)]
@@ -101,11 +100,6 @@ impl Attributes {
         // Derive any of the necessary fields from the `serde` side of things.
         self.visible = !field.attrs.skip_deserializing() || !field.attrs.skip_serializing();
         self.flatten = field.attrs.flatten();
-
-        // Parse any forwarded attributes that `darling` left us.
-        self.deprecated = forwarded_attrs
-            .iter()
-            .any(|a| a.path.is_ident("deprecated"));
 
         // We additionally attempt to extract a title/description from the forwarded doc attributes, if they exist.
         // Whether we extract both a title and description, or just description, is documented in more detail in

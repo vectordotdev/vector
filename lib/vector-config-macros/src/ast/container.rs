@@ -1,4 +1,8 @@
-use darling::{error::Accumulator, util::path_to_string, FromAttributes, FromMeta};
+use darling::{
+    error::Accumulator,
+    util::{path_to_string, Flag},
+    FromAttributes, FromMeta,
+};
 use serde_derive_internals::{ast as serde_ast, Ctxt, Derive};
 use syn::{DeriveInput, ExprPath, Generics, Ident, NestedMeta};
 
@@ -172,7 +176,7 @@ impl<'a> Container<'a> {
     }
 
     pub fn deprecated(&self) -> bool {
-        self.attrs.deprecated
+        self.attrs.deprecated.is_present()
     }
 
     pub fn metadata(&self) -> impl Iterator<Item = &(String, String)> {
@@ -189,19 +193,13 @@ impl<'a> Container<'a> {
 struct Attributes {
     title: Option<String>,
     description: Option<String>,
-    #[darling(skip)]
-    deprecated: bool,
+    deprecated: Flag,
     #[darling(multiple)]
     metadata: Vec<Metadata>,
 }
 
 impl Attributes {
     fn finalize(mut self, forwarded_attrs: &[syn::Attribute]) -> darling::Result<Self> {
-        // Parse any forwarded attributes that `darling` left us.
-        self.deprecated = forwarded_attrs
-            .iter()
-            .any(|a| a.path.is_ident("deprecated"));
-
         // We additionally attempt to extract a title/description from the forwarded doc attributes, if they exist.
         // Whether we extract both a title and description, or just description, is documented in more detail in
         // `try_extract_doc_title_description` itself.

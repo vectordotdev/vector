@@ -30,7 +30,7 @@ const SOURCE_NAME: &str = "prometheus_remote_write";
 #[derive(Clone, Debug)]
 pub struct PrometheusRemoteWriteConfig {
     /// The address to accept connections on.
-    /// 
+    ///
     /// The address _must_ include a port.
     address: SocketAddr,
 

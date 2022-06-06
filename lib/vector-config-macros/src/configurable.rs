@@ -167,9 +167,7 @@ fn generate_named_struct_field(
             if container.default_value().is_none() && field.default_value().is_none() {
                 Some(quote! {
                     if !#field_as_configurable::is_optional() {
-                        if !required.insert(#field_key.to_string()) {
-                            panic!(#field_already_contained);
-                        }
+                        assert!(required.insert(#field_key.to_string()), #field_already_contained);
                     }
                 })
             } else {

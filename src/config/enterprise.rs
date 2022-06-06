@@ -29,8 +29,7 @@ use crate::{
         util::retries::ExponentialBackoff,
     },
     sources::{
-        host_metrics::HostMetricsConfig,
-        internal_logs::InternalLogsConfig,
+        host_metrics::HostMetricsConfig, internal_logs::InternalLogsConfig,
         internal_metrics::InternalMetricsConfig,
     },
     transforms::remap::RemapConfig,

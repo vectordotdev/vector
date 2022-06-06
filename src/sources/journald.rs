@@ -95,7 +95,7 @@ pub struct JournaldConfig {
     ///
     /// If empty or not present, all units are accepted. Unit names lacking a "." will have ".service" appended to make them a valid service unit name.
     // TODO: Why isn't this just an alias on `include_units`?
-    #[deprecated]
+    #[configurable(deprecated)]
     pub units: Vec<String>,
 
     /// The list of unit names to monitor.
@@ -144,7 +144,7 @@ pub struct JournaldConfig {
     ///
     /// Has no effect unless the value of the field is already an integer.
     #[serde(default)]
-    #[deprecated]
+    #[configurable(deprecated)]
     remap_priority: bool,
 }
 

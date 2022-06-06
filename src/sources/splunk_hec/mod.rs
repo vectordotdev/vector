@@ -65,7 +65,7 @@ pub struct SplunkConfig {
     /// it was communicating with the Splunk HEC endpoint directly.
     ///
     /// If _not_ supplied, the `Authorization` header will be ignored and requests will not be authenticated.
-    #[deprecated]
+    #[configurable(deprecated)]
     token: Option<String>,
 
     /// Optional list of valid authorization tokens.
