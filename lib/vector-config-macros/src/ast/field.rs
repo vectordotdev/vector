@@ -131,7 +131,7 @@ impl Attributes {
             && self.visible
             && !self.flatten
         {
-            return Err(err_field_missing_description(&field.original.ident));
+            return Err(err_field_missing_description(&field.original));
         }
 
         Ok(self)

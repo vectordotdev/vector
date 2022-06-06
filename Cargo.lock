@@ -8889,6 +8889,7 @@ dependencies = [
  "snafu",
  "tracing 0.1.34",
  "value",
+ "vector_config",
 ]
 
 [[package]]

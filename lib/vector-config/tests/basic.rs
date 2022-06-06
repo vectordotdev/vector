@@ -7,6 +7,7 @@
 use std::{
     collections::HashMap,
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
+    num::NonZeroU64,
     path::PathBuf,
 };
 
@@ -25,9 +26,9 @@ pub struct SpecialDuration(#[configurable(transparent)] u64);
 pub struct BatchConfig {
     /// The maximum number of events in a batch before it is flushed.
     #[configurable(validation(range(max = 100000)))]
-    max_events: Option<u64>,
+    max_events: Option<NonZeroU64>,
     /// The maximum number of bytes in a batch before it is flushed.
-    max_bytes: Option<u64>,
+    max_bytes: Option<NonZeroU64>,
     /// The maximum amount of time a batch can exist before it is flushed.
     timeout: Option<SpecialDuration>,
 }
@@ -35,7 +36,7 @@ pub struct BatchConfig {
 impl Default for BatchConfig {
     fn default() -> Self {
         Self {
-            max_events: Some(1000),
+            max_events: Some(NonZeroU64::new(1000).expect("must be nonzero")),
             max_bytes: None,
             timeout: Some(SpecialDuration(10)),
         }
@@ -152,10 +153,10 @@ pub struct SimpleSinkConfig {
     meaningless_field: String,
 }
 
-const fn default_simple_sink_batch() -> BatchConfig {
+fn default_simple_sink_batch() -> BatchConfig {
     BatchConfig {
-        max_events: Some(10000),
-        max_bytes: Some(16_000_000),
+        max_events: Some(NonZeroU64::new(10000).expect("must be nonzero")),
+        max_bytes: Some(NonZeroU64::new(16_000_000).expect("must be nonzero")),
         timeout: Some(SpecialDuration(5)),
     }
 }
@@ -196,10 +197,10 @@ pub struct AdvancedSinkConfig {
     tags: HashMap<String, String>,
 }
 
-const fn default_advanced_sink_batch() -> BatchConfig {
+fn default_advanced_sink_batch() -> BatchConfig {
     BatchConfig {
-        max_events: Some(5678),
-        max_bytes: Some(36_000_000),
+        max_events: Some(NonZeroU64::new(5678).expect("must be nonzero")),
+        max_bytes: Some(NonZeroU64::new(36_000_000).expect("must be nonzero")),
         timeout: Some(SpecialDuration(15)),
     }
 }

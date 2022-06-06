@@ -44,14 +44,14 @@ use unix::{statsd_unix, UnixConfig};
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum StatsdConfig {
     /// Listen on TCP.
-    Tcp(TcpConfig),
+    Tcp(#[configurable(derived)] TcpConfig),
 
     /// Listen on UDP.
-    Udp(UdpConfig),
+    Udp(#[configurable(derived)] UdpConfig),
 
     /// Listen on UDS. (Unix domain socket)
     #[cfg(unix)]
-    Unix(UnixConfig),
+    Unix(#[configurable(derived)] UnixConfig),
 }
 
 /// UDP configuration for the `statsd` source.
@@ -79,7 +79,7 @@ impl UdpConfig {
 /// TCP configuration for the `statsd` source.
 #[configurable_component]
 #[derive(Clone, Debug)]
-struct TcpConfig {
+pub struct TcpConfig {
     /// The address to listen for connections on.
     address: SocketListenAddr,
 

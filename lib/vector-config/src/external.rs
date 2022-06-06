@@ -11,7 +11,7 @@ impl<'de> Configurable<'de> for &'static encoding_rs::Encoding {
     // Standard standard is a living standard, so... :thinkies:
 
     fn referencable_name() -> Option<&'static str> {
-        Some("Encoding")
+        Some("encoding_rs::Encoding")
     }
 
     fn description() -> Option<&'static str> {

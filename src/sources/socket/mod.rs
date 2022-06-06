@@ -32,19 +32,19 @@ pub struct SocketConfig {
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum Mode {
     /// Listen on TCP.
-    Tcp(tcp::TcpConfig),
+    Tcp(#[configurable(derived)] tcp::TcpConfig),
 
     /// Listen on UDP.
-    Udp(udp::UdpConfig),
+    Udp(#[configurable(derived)] udp::UdpConfig),
 
     /// Listen on UDS, in datagram mode. (Unix domain socket)
     #[cfg(unix)]
-    UnixDatagram(unix::UnixConfig),
+    UnixDatagram(#[configurable(derived)] unix::UnixConfig),
 
     /// Listen on UDS, in stream mode. (Unix domain socket)
     #[cfg(unix)]
     #[serde(alias = "unix")]
-    UnixStream(unix::UnixConfig),
+    UnixStream(#[configurable(derived)] unix::UnixConfig),
 }
 
 impl SocketConfig {

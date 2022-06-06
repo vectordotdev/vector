@@ -3,8 +3,9 @@ use std::path::{Path, PathBuf};
 use rdkafka::{consumer::ConsumerContext, ClientConfig, ClientContext, Statistics};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use vector_config::configurable_component;
 
-use crate::{internal_events::KafkaStatisticsReceived, tls::TlsConfig};
+use crate::{internal_events::KafkaStatisticsReceived, tls::TlsEnableableConfig};
 
 #[derive(Debug, Snafu)]
 enum KafkaError {
@@ -24,25 +25,32 @@ pub(crate) enum KafkaCompression {
     Zstd,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+/// Kafka authentication configuration.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct KafkaAuthConfig {
+    #[configurable(derived)]
     pub(crate) sasl: Option<KafkaSaslConfig>,
-    pub(crate) tls: Option<KafkaTlsConfig>,
+
+    #[configurable(derived)]
+    pub(crate) tls: Option<TlsEnableableConfig>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+/// /// Options for SASL/SCRAM authentication support.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct KafkaSaslConfig {
+    /// Enable SASL/SCRAM authentication to the remote (not supported on Windows at this time).
     pub(crate) enabled: Option<bool>,
-    pub(crate) username: Option<String>,
-    pub(crate) password: Option<String>,
-    pub(crate) mechanism: Option<String>,
-}
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub(crate) struct KafkaTlsConfig {
-    pub(crate) enabled: Option<bool>,
-    #[serde(flatten)]
-    pub(crate) options: TlsConfig,
+    /// The Kafka SASL/SCRAM authentication username.
+    pub(crate) username: Option<String>,
+
+    /// The Kafka SASL/SCRAM authentication password.
+    pub(crate) password: Option<String>,
+
+    /// The Kafka SASL/SCRAM mechanisms.
+    pub(crate) mechanism: Option<String>,
 }
 
 impl KafkaAuthConfig {

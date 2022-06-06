@@ -53,10 +53,10 @@ pub struct VectorConfigV2 {
 #[serde(untagged)]
 pub enum VectorConfig {
     /// Configuration for version one.
-    V1(VectorConfigV1),
+    V1(#[configurable(derived)] VectorConfigV1),
 
     /// Configuration for version two.
-    V2(VectorConfigV2),
+    V2(#[configurable(derived)] VectorConfigV2),
 }
 
 inventory::submit! {

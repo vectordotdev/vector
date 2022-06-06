@@ -53,13 +53,18 @@
 // then multiline parsing is disabled". Including that description on `MultilineConfig` itself is kind of weird because
 // it forces that on everyone else using it, where, in some cases, it may not be optional at all.
 //
-// TODO: It's not clear what happens if we schemafy identically-named types i.e. `some::mod::Foo` and
-// `another::mod::Foo` since we use the type's ident, not its full path, to generate its referencable name. This is good
-// because the full names would be ugly as hell and offer little value but it means that we need all types, including
-// transitive types, to have unique names... and we can't check this at develop-time, only compile-time. :thinkies:
+// TODO: Right now, we're manually generating a referencable name where it makes sense by appending the module path to
+// the ident for structs/enums, and by crafting the name by hand for anything like stdlib impls, or impls on external
+// types.
 //
-// TODO: When we implement `Configurable` for all the `NonZero*` types, we should make sure they have default metadata
-// that specifies a validation of having to be a minimum of 1.
+// We do this because technically `std::any::type_name` says that it doesn't provide a stable interface for getting the
+// fully-qualified path of a type, which we would need (in general, regardless of whether or not we used that function)
+// because we don't want definition types totally changing name between compiler versions, etc.
+//
+// This is obviously also tricky from a re-export standpoint i.e. what is the referencable name of a type that uses the
+// derive macros for `Configurable` but is exporter somewhere entirely different? The path would refer to the source nol
+// matter what, as it's based on how `std::module_path!()` works. Technically speaking, that's still correct from a "we
+// shouldn't create duplicate schemas for T" standpoint, but could manifest as a non-obvious divergence.
 //
 // TODO: We need to figure out how to handle aliases. Looking previously, it seemed like we might need to do some very
 // ugly combinatorial explosion stuff to define a schema per perumtation of all aliased fields in a config. We might be
@@ -80,7 +85,7 @@
 use core::fmt;
 use core::marker::PhantomData;
 
-use num_traits::{Bounded, ToPrimitive};
+use num::ConfigurableNumber;
 use serde::{Deserialize, Serialize};
 
 pub mod schema;
@@ -95,6 +100,7 @@ pub mod schemars {
 }
 
 mod external;
+mod num;
 mod stdlib;
 
 // Re-export of the `#[configurable_component]` and `#[derive(Configurable)]` proc macros.
@@ -370,7 +376,7 @@ where
 #[doc(hidden)]
 pub fn __ensure_numeric_validation_bounds<'de, N>(metadata: &Metadata<'de, N>)
 where
-    N: Configurable<'de> + Bounded + ToPrimitive,
+    N: Configurable<'de> + ConfigurableNumber,
 {
     // In `Validation::ensure_conformance`, we do some checks on any supplied numeric bounds to try and ensure they're
     // no larger than the largest f64 value where integer/floasting-point conversions are still lossless.  What we
@@ -381,12 +387,8 @@ where
     // We simply check the given metadata for any numeric validation bounds, and ensure they do not exceed the
     // mechanical limits of the given numeric type `N`.  If they do, we panic, which is not as friendly as a contextual
     // compile-time error emitted from the `Configurable` derive macro... but we're working with what we've got here.
-    let mechanical_min_bound = N::min_value()
-        .to_f64()
-        .expect("`Configurable` does not support numbers larger than an f64 representation");
-    let mechanical_max_bound = N::max_value()
-        .to_f64()
-        .expect("`Configurable` does not support numbers larger than an f64 representation");
+    let mechanical_min_bound = N::get_enforced_min_bound();
+    let mechanical_max_bound = N::get_enforced_max_bound();
 
     for validation in metadata.validations() {
         if let validation::Validation::Range { minimum, maximum } = validation {

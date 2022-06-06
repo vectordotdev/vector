@@ -73,13 +73,13 @@ impl<'de> Configurable<'de> for String {
 }
 
 // Numbers.
-macro_rules! impl_configuable_unsigned {
+macro_rules! impl_configuable_numeric {
 	($($ty:ty),+) => {
 		$(
 			impl<'de> Configurable<'de> for $ty {
 				fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
                     $crate::__ensure_numeric_validation_bounds::<Self>(&overrides);
-					let mut schema = generate_number_schema::<Self>(false);
+					let mut schema = generate_number_schema::<Self>();
 					finalize_schema(gen, &mut schema, overrides);
 					schema
 				}
@@ -88,84 +88,10 @@ macro_rules! impl_configuable_unsigned {
 	};
 }
 
-macro_rules! impl_configuable_signed {
-	($($ty:ty),+) => {
-		$(
-			impl<'de> Configurable<'de> for $ty {
-				fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
-                    $crate::__ensure_numeric_validation_bounds::<Self>(&overrides);
-					let mut schema = generate_number_schema::<Self>(false);
-					finalize_schema(gen, &mut schema, overrides);
-					schema
-				}
-			}
-		)+
-	};
-}
-
-macro_rules! impl_configuable_nonzero_unsigned {
-	($($aty:ty => $ity:ty),+) => {
-		$(
-			impl<'de> Configurable<'de> for $aty {
-				fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
-                    let overrides = overrides.map_default_value(|n| n.get());
-                    $crate::__ensure_numeric_validation_bounds::<$ity>(&overrides);
-					let mut schema = generate_number_schema::<$ity>(true);
-					finalize_schema(gen, &mut schema, overrides);
-					schema
-				}
-			}
-		)+
-	};
-}
-
-macro_rules! impl_configuable_nonzero_signed {
-	($($aty:ty => $ity:ty),+) => {
-		$(
-			impl<'de> Configurable<'de> for $aty {
-				fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
-                    let overrides = overrides.map_default_value(|n| n.get());
-                    $crate::__ensure_numeric_validation_bounds::<$ity>(&overrides);
-					let mut schema = generate_number_schema::<$ity>(true);
-					finalize_schema(gen, &mut schema, overrides);
-					schema
-				}
-			}
-		)+
-	};
-}
-
-impl_configuable_unsigned!(u8, u16, u32, u64);
-impl_configuable_signed!(i8, i16, i32, i64);
-impl_configuable_nonzero_unsigned!(NonZeroU8 => u8, NonZeroU16 => u16, NonZeroU32 => u32, NonZeroU64 => u64);
-impl_configuable_nonzero_signed!(NonZeroI8 => i8, NonZeroI16 => i16, NonZeroI32 => i32, NonZeroI64 => i64);
-
-impl<'de> Configurable<'de> for usize {
-    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
-        crate::__ensure_numeric_validation_bounds::<Self>(&overrides);
-        let mut schema = generate_number_schema::<Self>(false);
-        finalize_schema(gen, &mut schema, overrides);
-        schema
-    }
-}
-
-impl<'de> Configurable<'de> for f64 {
-    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
-        crate::__ensure_numeric_validation_bounds::<Self>(&overrides);
-        let mut schema = generate_number_schema::<Self>(false);
-        finalize_schema(gen, &mut schema, overrides);
-        schema
-    }
-}
-
-impl<'de> Configurable<'de> for f32 {
-    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
-        crate::__ensure_numeric_validation_bounds::<Self>(&overrides);
-        let mut schema = generate_number_schema::<Self>(false);
-        finalize_schema(gen, &mut schema, overrides);
-        schema
-    }
-}
+impl_configuable_numeric!(
+    u8, u16, u32, u64, usize, i8, i16, i32, i64, isize, f32, f64, NonZeroU8, NonZeroU16,
+    NonZeroU32, NonZeroU64, NonZeroI8, NonZeroI16, NonZeroI32, NonZeroI64
+);
 
 // Arrays and maps.
 impl<'de, T> Configurable<'de> for Vec<T>
@@ -240,7 +166,7 @@ where
 // Additional types that do not map directly to scalars.
 impl<'de> Configurable<'de> for SocketAddr {
     fn referencable_name() -> Option<&'static str> {
-        Some("SocketAddr")
+        Some("stdlib::SocketAddr")
     }
 
     fn description() -> Option<&'static str> {
@@ -259,7 +185,7 @@ impl<'de> Configurable<'de> for SocketAddr {
 
 impl<'de> Configurable<'de> for PathBuf {
     fn referencable_name() -> Option<&'static str> {
-        Some("PathBuf")
+        Some("stdlib::PathBuf")
     }
 
     fn description() -> Option<&'static str> {

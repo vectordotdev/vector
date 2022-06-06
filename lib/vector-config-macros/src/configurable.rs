@@ -58,7 +58,7 @@ pub fn derive_configurable_impl(input: TokenStream) -> TokenStream {
             #[allow(unused_qualifications)]
             impl #impl_generics ::vector_config::Configurable<#clt> for #name #ty_generics #where_clause {
                 fn referencable_name() -> Option<&'static str> {
-                    Some(#ref_name)
+                    Some(std::concat!(std::module_path!(), "::", #ref_name))
                 }
 
                 #metadata_fn

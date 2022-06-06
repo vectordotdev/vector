@@ -1,7 +1,6 @@
 use std::{collections::BTreeSet, mem};
 
 use indexmap::IndexMap;
-use num_traits::{Bounded, ToPrimitive, Zero};
 use schemars::{
     gen::{SchemaGenerator, SchemaSettings},
     schema::{
@@ -9,10 +8,9 @@ use schemars::{
         SchemaObject, SingleOrVec, SubschemaValidation,
     },
 };
-use serde_json::{Map, Number, Value};
-use vector_config_common::num::{NUMERIC_ENFORCED_LOWER_BOUND, NUMERIC_ENFORCED_UPPER_BOUND};
+use serde_json::{Map, Value};
 
-use crate::{Configurable, Metadata};
+use crate::{num::ConfigurableNumber, Configurable, Metadata};
 
 /// Finalizes the schema by ensuring all metadata is applied and registering it in the generator.
 ///
@@ -153,37 +151,15 @@ pub fn generate_string_schema() -> SchemaObject {
     }
 }
 
-pub fn generate_number_schema<'de, N>(nonzero: bool) -> SchemaObject
+pub fn generate_number_schema<'de, N>() -> SchemaObject
 where
-    N: Configurable<'de> + Bounded + ToPrimitive + Zero,
+    N: Configurable<'de> + ConfigurableNumber,
 {
-    // Calculate the minimum/maximum for the given `N`, respecting the 2^53 limit we put on each of those values.
-    let (minimum, maximum) = {
-        let enforced_minimum = NUMERIC_ENFORCED_LOWER_BOUND;
-        let enforced_maximum = NUMERIC_ENFORCED_UPPER_BOUND;
-        let mechanical_minimum = N::min_value()
-            .to_f64()
-            .expect("`Configurable` does not support numbers larger than an f64 representation");
-        let mechanical_maximum = N::max_value()
-            .to_f64()
-            .expect("`Configurable` does not support numbers larger than an f64 representation");
+    let minimum = N::get_enforced_min_bound();
+    let maximum = N::get_enforced_max_bound();
 
-        let calculated_minimum = if mechanical_minimum < enforced_minimum {
-            enforced_minimum
-        } else {
-            mechanical_minimum
-        };
-
-        let calculated_maximum = if mechanical_maximum > enforced_maximum {
-            enforced_maximum
-        } else {
-            mechanical_maximum
-        };
-
-        (calculated_minimum, calculated_maximum)
-    };
-
-    // We always set the minimum/maximum bound to the mechanical limits
+    // We always set the minimum/maximum bound to the mechanical limits. Any additional constraining as part of field
+    // validators will overwrite these limits.
     let mut schema = SchemaObject {
         instance_type: Some(InstanceType::Number.into()),
         number: Some(Box::new(NumberValidation {
@@ -194,18 +170,13 @@ where
         ..Default::default()
     };
 
-    // If the actual numeric type we're generating the schema for is a nonzero variant, we add an additional `not`
-    // subschema validation.
-    if nonzero {
-        let zero_num_unsigned = N::zero().to_u64().map(Into::into);
-        let zero_num_floating = N::zero().to_f64().and_then(Number::from_f64);
-        let zero_num = zero_num_unsigned
-            .or(zero_num_floating)
-            .expect("No usable integer type should be unrepresentable by both `u64` and `f64`.");
-
+    // If the actual numeric type we're generating the schema for is a nonzero variant, and its constrain can't be
+    // represently solely by the normal minimum/maximum bounds, we explicitly add an exclusion for the appropriate zero
+    // value of the given numeric type.
+    if N::requires_nonzero_exclusion() {
         schema.subschemas = Some(Box::new(SubschemaValidation {
             not: Some(Box::new(Schema::Object(SchemaObject {
-                const_value: Some(Value::Number(zero_num)),
+                const_value: Some(Value::Number(N::get_encoded_zero_value())),
                 ..Default::default()
             }))),
             ..Default::default()
