@@ -1,0 +1,62 @@
+data_dir = "/var/lib/vector"
+
+##
+## Sources
+##
+
+[sources.internal_metrics]
+type = "internal_metrics"
+
+[sources.datadog_agent]
+type = "datadog_agent"
+acknowledgements = true
+address = "0.0.0.0:8282"
+
+##
+## Transforms
+##
+
+[transforms.remap]
+type = "remap"
+inputs = ["datadog_agent"]
+source = '''
+status = string(.custom.http.status_category) ?? string(.custom.level) ?? string(.status) ?? ""
+status = downcase(status)
+if status == "" {
+    .status = 6
+} else {
+    if starts_with(status, "f") || starts_with(status, "emerg") {
+        .status = 0
+    } else if starts_with(status, "a") {
+        .status = 1
+    } else if starts_with(status, "c") {
+        .status = 2
+    } else if starts_with(status, "e") {
+        .status = 3
+    } else if starts_with(status, "w") {
+        .status = 4
+    } else if starts_with(status, "n") {
+        .status = 5
+    } else if starts_with(status, "i") {
+        .status = 6
+    } else if starts_with(status, "d") || starts_with(status, "trace") || starts_with(status, "verbose") {
+        .status = 7
+    } else if starts_with(status, "o") || starts_with(status, "s") || status == "ok" || status == "success" {
+        .status = 8
+    }
+}
+'''
+
+##
+## Sinks
+##
+
+[sinks.prometheus]
+type = "prometheus_exporter"
+inputs = ["internal_metrics"]
+address = "0.0.0.0:9090"
+
+[sinks.blackhole]
+type = "blackhole"
+print_interval_secs = 0
+inputs = ["remap"]
