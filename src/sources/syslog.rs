@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use tokio::net::UdpSocket;
 use tokio_util::udp::UdpFramed;
+use vector_core::config::LogNamespace;
 
 use crate::codecs::Decoder;
 #[cfg(unix)]
@@ -164,7 +165,7 @@ impl SourceConfig for SyslogConfig {
         }
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 

@@ -161,7 +161,7 @@ impl SourceConfig for DockerLogsConfig {
         }))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -190,7 +190,7 @@ impl SourceConfig for DockerCompatConfig {
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
-        self.config.outputs(log_namespace)
+        self.config.outputs(global_log_namespace)
     }
 
     fn source_type(&self) -> &'static str {

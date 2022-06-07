@@ -2,6 +2,7 @@ use std::cmp;
 
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use serde::{Deserialize, Serialize};
+use vector_core::config::LogNamespace;
 
 use crate::aws::create_client;
 use crate::codecs::DecodingConfig;
@@ -77,7 +78,7 @@ impl SourceConfig for AwsSqsConfig {
         ))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.decoding.output_type())]
     }
 

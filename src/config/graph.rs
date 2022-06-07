@@ -39,9 +39,9 @@ impl Graph {
         transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
         expansions: &IndexMap<String, Vec<String>>,
-        global: GlobalOptions,
+        global: &GlobalOptions,
     ) -> Result<Self, Vec<String>> {
-        Self::new_inner(sources, transforms, sinks, expansions, false)
+        Self::new_inner(sources, transforms, sinks, expansions, false, global)
     }
 
     pub fn new_unchecked(
@@ -49,8 +49,10 @@ impl Graph {
         transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
         expansions: &IndexMap<String, Vec<String>>,
+        global: &GlobalOptions,
     ) -> Self {
-        Self::new_inner(sources, transforms, sinks, expansions, true).expect("errors ignored")
+        Self::new_inner(sources, transforms, sinks, expansions, true, global)
+            .expect("errors ignored")
     }
 
     fn new_inner(
@@ -59,6 +61,7 @@ impl Graph {
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
         expansions: &IndexMap<String, Vec<String>>,
         ignore_errors: bool,
+        global: &GlobalOptions,
     ) -> Result<Self, Vec<String>> {
         let mut graph = Graph::default();
         let mut errors = Vec::new();
@@ -68,7 +71,7 @@ impl Graph {
             graph.nodes.insert(
                 id.clone(),
                 Node::Source {
-                    outputs: config.inner.outputs(),
+                    outputs: config.inner.outputs(global.log_namespace()),
                 },
             );
         }

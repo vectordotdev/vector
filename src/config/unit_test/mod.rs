@@ -365,6 +365,7 @@ async fn build_unit_test(
         &transform_only_config.transforms,
         &transform_only_config.sinks,
         &expansions,
+        transform_only_config.global,
     );
     let test = test.resolve_outputs(&transform_only_graph, &expansions)?;
 
@@ -387,6 +388,7 @@ async fn build_unit_test(
         &expanded_config.transforms,
         &expanded_config.sinks,
         &expansions,
+        &expanded_config.global,
     );
 
     let mut valid_components = get_relevant_test_components(
@@ -418,6 +420,7 @@ async fn build_unit_test(
         &config_builder.transforms,
         &config_builder.sinks,
         &expansions,
+        &config_builder.global,
     );
     let valid_inputs = graph.input_map()?;
     for (_, transform) in config_builder.transforms.iter_mut() {

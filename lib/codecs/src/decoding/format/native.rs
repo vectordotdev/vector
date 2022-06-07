@@ -27,7 +27,7 @@ impl NativeDeserializerConfig {
     }
 
     /// The schema produced by the deserializer.
-    pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
+    pub fn schema_definition(&self, _log_namespace: LogNamespace) -> schema::Definition {
         schema::Definition::empty()
     }
 }

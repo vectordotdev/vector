@@ -11,6 +11,7 @@ use http::StatusCode;
 use lookup::path;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Decoder as _;
+use vector_core::config::LogNamespace;
 use warp::http::{HeaderMap, HeaderValue};
 
 use crate::{
@@ -205,7 +206,7 @@ impl SourceConfig for SimpleHttpConfig {
         )
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(
             self.decoding
                 .as_ref()

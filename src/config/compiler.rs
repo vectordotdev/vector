@@ -178,10 +178,13 @@ pub(crate) fn expand_globs(config: &mut ConfigBuilder) {
         .sources
         .iter()
         .flat_map(|(key, s)| {
-            s.inner.outputs().into_iter().map(|output| OutputId {
-                component: key.clone(),
-                port: output.port,
-            })
+            s.inner
+                .outputs(config.global.log_namespace())
+                .into_iter()
+                .map(|output| OutputId {
+                    component: key.clone(),
+                    port: output.port,
+                })
         })
         .chain(config.transforms.iter().flat_map(|(key, t)| {
             t.inner
