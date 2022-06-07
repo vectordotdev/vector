@@ -5,6 +5,7 @@ use http::Uri;
 use hyper::{Body, Request};
 use serde::{Deserialize, Serialize};
 use tokio_stream::wrappers::IntervalStream;
+use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use self::types::Stats;

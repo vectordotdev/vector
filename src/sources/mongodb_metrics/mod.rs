@@ -28,6 +28,7 @@ use crate::{
 
 mod types;
 use types::{CommandBuildInfo, CommandIsMaster, CommandServerStatus, NodeType};
+use vector_core::config::LogNamespace;
 
 macro_rules! tags {
     ($tags:expr) => { $tags.clone() };

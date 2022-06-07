@@ -8,6 +8,7 @@ use futures::{stream::StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tokio_util::io::StreamReader;
+use vector_core::config::LogNamespace;
 
 use super::util::MultilineConfig;
 use crate::aws::create_client;

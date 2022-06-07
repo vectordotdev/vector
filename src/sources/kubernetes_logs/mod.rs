@@ -64,6 +64,7 @@ use self::pod_metadata_annotator::PodMetadataAnnotator;
 use futures::{future::FutureExt, stream::StreamExt};
 use k8s_paths_provider::K8sPathsProvider;
 use lifecycle::Lifecycle;
+use vector_core::config::LogNamespace;
 
 /// The key we use for `file` field.
 const FILE_KEY: &str = "file";

@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::{sync::oneshot, task::spawn_blocking};
 use tracing::{Instrument, Span};
+use vector_core::config::LogNamespace;
 
 use super::util::{finalizer::OrderedFinalizer, EncodingConfig, MultilineConfig};
 use crate::{

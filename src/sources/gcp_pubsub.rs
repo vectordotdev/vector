@@ -14,6 +14,7 @@ use tonic::{
     transport::{Certificate, Channel, ClientTlsConfig, Endpoint, Identity},
     Code, Request, Status,
 };
+use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use crate::{

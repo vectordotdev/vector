@@ -30,6 +30,7 @@ use crate::{
 mod parser;
 
 pub use parser::ParseError;
+use vector_core::config::LogNamespace;
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 struct ApacheMetricsConfig {

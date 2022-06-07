@@ -365,7 +365,7 @@ async fn build_unit_test(
         &transform_only_config.transforms,
         &transform_only_config.sinks,
         &expansions,
-        transform_only_config.global,
+        &transform_only_config.global,
     );
     let test = test.resolve_outputs(&transform_only_graph, &expansions)?;
 

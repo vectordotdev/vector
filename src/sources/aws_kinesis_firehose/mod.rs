@@ -4,6 +4,7 @@ use codecs::decoding::{DeserializerConfig, FramingConfig};
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use tracing::Span;
+use vector_core::config::LogNamespace;
 use warp::Filter;
 
 use crate::{

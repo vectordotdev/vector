@@ -9,6 +9,7 @@ use rmp_serde::{decode, Deserializer};
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use tokio_util::codec::Decoder;
+use vector_core::config::LogNamespace;
 
 use super::util::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{

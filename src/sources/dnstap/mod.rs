@@ -18,6 +18,7 @@ pub use parser::{parse_dnstap_data, DnstapParser};
 pub mod schema;
 use dnsmsg_parser::{dns_message, dns_message_parser};
 pub use schema::DnstapEventSchema;
+use vector_core::config::LogNamespace;
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct DnstapConfig {

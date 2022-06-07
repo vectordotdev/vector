@@ -24,6 +24,7 @@ use crate::{
 
 pub mod parser;
 use parser::NginxStubStatus;
+use vector_core::config::LogNamespace;
 
 macro_rules! counter {
     ($value:expr) => {

@@ -38,6 +38,7 @@ use crate::{
     SourceSender,
 };
 use lookup::path;
+use vector_core::config::LogNamespace;
 
 pub mod sized_bytes_codec;
 

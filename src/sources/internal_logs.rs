@@ -2,6 +2,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use futures::{stream, StreamExt};
 use serde::{Deserialize, Serialize};
+use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use crate::{

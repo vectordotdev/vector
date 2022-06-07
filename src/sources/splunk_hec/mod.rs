@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{de::Read as JsonRead, Deserializer, Value as JsonValue};
 use snafu::Snafu;
 use tracing::Span;
+use vector_core::config::LogNamespace;
 use vector_core::{event::BatchNotifier, ByteSizeOf};
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 

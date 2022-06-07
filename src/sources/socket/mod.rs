@@ -5,6 +5,7 @@ mod unix;
 
 use codecs::NewlineDelimitedDecoderConfig;
 use serde::{Deserialize, Serialize};
+use vector_core::config::LogNamespace;
 
 #[cfg(unix)]
 use crate::serde::default_framing_message_based;
