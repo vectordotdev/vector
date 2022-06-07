@@ -1265,6 +1265,21 @@ components: sources: internal_metrics: {
 		}
 	}
 
+	how_it_works: {
+		unique_series: {
+			title: "Sending metrics from multiple Vector instances"
+			body: """
+				When sending `internal_metrics` from multiple Vector instances
+				to the same destination, you will typically want to tag the
+				metrics with a tag that is unique to the Vector instance sending
+				the metrics to avoid the metric series conflicting. The
+				`tags.host_key` option can be used for this, but you can also
+				use a subsequent `remap` transform to add a different unique
+				tag from the environment.
+				"""
+		}
+	}
+
 	telemetry: metrics: {
 		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
 		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
