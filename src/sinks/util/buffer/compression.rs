@@ -106,13 +106,13 @@ impl<'de> de::Deserialize<'de> for Compression {
                 let mut algorithm = None;
                 let mut level = None;
 
-                while let Some(key) = map.next_key()? {
-                    match key {
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
                         "algorithm" => {
                             if algorithm.is_some() {
                                 return Err(de::Error::duplicate_field("algorithm"));
                             }
-                            algorithm = Some(map.next_value::<&str>()?);
+                            algorithm = Some(map.next_value::<String>()?);
                         }
                         "level" => {
                             if level.is_some() {
@@ -150,11 +150,14 @@ impl<'de> de::Deserialize<'de> for Compression {
                                 }
                             });
                         }
-                        _ => return Err(de::Error::unknown_field(key, &["algorithm", "level"])),
+                        _ => return Err(de::Error::unknown_field(&key, &["algorithm", "level"])),
                     };
                 }
 
-                match algorithm.ok_or_else(|| de::Error::missing_field("algorithm"))? {
+                match algorithm
+                    .ok_or_else(|| de::Error::missing_field("algorithm"))?
+                    .as_str()
+                {
                     "none" => match level {
                         Some(_) => Err(de::Error::unknown_field("level", &[])),
                         None => Ok(Compression::None),
@@ -303,6 +306,23 @@ mod test {
             let deserialized: Result<Compression, _> = serde_json::from_str(source);
             let error = deserialized.expect_err("invalid source");
             assert_eq!(error.to_string().as_str(), *result);
+        }
+    }
+
+    #[test]
+    fn from_and_to_value() {
+        let fixtures_valid = [
+            Compression::None,
+            Compression::Gzip(flate2::Compression::default()),
+            Compression::Gzip(flate2::Compression::new(7)),
+            Compression::Zlib(flate2::Compression::best()),
+            Compression::Zlib(flate2::Compression::new(7)),
+        ];
+
+        for v in fixtures_valid {
+            // Check serialize-deserialize round trip with defaults
+            let value = serde_json::to_value(v).unwrap();
+            serde_json::from_value::<Compression>(value).unwrap();
         }
     }
 }
