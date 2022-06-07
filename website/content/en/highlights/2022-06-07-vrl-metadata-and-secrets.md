@@ -27,6 +27,8 @@ To replace the existing functionality these provided, new "secret" functions hav
 - `remove_secret`
 
 These functions allow storage of arbitrary secrets, and should now be used instead of the metadata functions.
+They securely store a map of string keys to string values.
+
 All of these changes were backwards compatible. Secrets that were previously stored using the metadata functions
 will still be used by sinks, and will also be accessible through the new secret functions. It is encouraged
 to upgrade to the secret functions immediately.
@@ -58,4 +60,5 @@ get_metadata_field(.)
 These changes are forming the basis for many future plans we have. These include:
 
 - Adding special syntax to access metadata. Right now you have to use the metadata functions, but we'd like to improve that even more
--
+- Expanding VRL type definition support to metadata. Right now values may be more difficult to work with since they are lacking type definitions
+- Add more security around secret storage, such as potentially encryption at rest.
