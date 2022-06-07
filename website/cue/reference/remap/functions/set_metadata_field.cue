@@ -10,9 +10,9 @@ remap: functions: set_metadata_field: {
 	arguments: [
 		{
 			name:        "key"
-			description: "The path of the value to set in the metadata. This must be a VRL path string literal."
+			description: "The path of the value to set in the metadata. This must be a VRL query."
 			required:    true
-			type: ["string"]
+			type: ["query"]
 		},
 		{
 			name:        "value"
@@ -30,7 +30,7 @@ remap: functions: set_metadata_field: {
 			title: "Sets arbitrary metadata on an event."
 			source: #"""
 				value = {"message": "Any VRL type can be used"}
-				set_metadata_field("nested.foo.bar", value)
+				set_metadata_field(nested.foo.bar, value)
 				"""#
 			return: "null"
 		},
