@@ -82,39 +82,13 @@ pub trait ClientBuilder {
     fn build(client: aws_smithy_client::Client, config: &aws_types::SdkConfig) -> Self::Client;
 }
 
-pub async fn create_client<T: ClientBuilder>(
-    auth: &AwsAuthentication,
-    region: Option<Region>,
-    endpoint: Option<Endpoint>,
+pub async fn create_smithy_client<T: ClientBuilder>(
+    region: Region,
     proxy: &ProxyConfig,
     tls_options: &Option<TlsConfig>,
     is_sink: bool,
-) -> crate::Result<T::Client> {
-    let retry_config = RetryConfig::disabled();
-
-    // The default credentials chains will look for a region if not given but we'd like to
-    // error up front if later SDK calls will fail due to lack of region configuration
-    let region = match region {
-        Some(region) => Ok(region),
-        None => aws_config::default_provider::region::default_provider()
-            .region()
-            .await
-            .ok_or("Could not determine region from Vector configuration or default providers"),
-    }?;
-
-    // Build the configuration first.
-    let mut config_builder = SdkConfig::builder()
-        .credentials_provider(auth.credentials_provider(region.clone()).await?)
-        .region(region.clone())
-        .retry_config(retry_config.clone());
-
-    if let Some(endpoint_override) = endpoint {
-        config_builder = config_builder.endpoint_resolver(endpoint_override);
-    }
-
-    let config = config_builder.build();
-
-    // Now build the client.
+    retry_config: RetryConfig,
+) -> crate::Result<aws_smithy_client::Client> {
     let tls_settings = MaybeTlsSettings::tls_client(tls_options)?;
 
     let connector = if proxy.enabled {
@@ -138,7 +112,49 @@ pub async fn create_client<T: ClientBuilder>(
         .sleep_impl(Some(Arc::new(TokioSleep)));
     client_builder.set_retry_config(retry_config.into());
 
-    let client = client_builder.build();
+    Ok(client_builder.build())
+}
+
+pub async fn resolve_region(region: Option<Region>) -> crate::Result<Region> {
+    match region {
+        Some(region) => Ok(region),
+        None => aws_config::default_provider::region::default_provider()
+            .region()
+            .await
+            .ok_or_else(|| {
+                "Could not determine region from Vector configuration or default providers".into()
+            }),
+    }
+}
+
+pub async fn create_client<T: ClientBuilder>(
+    auth: &AwsAuthentication,
+    region: Option<Region>,
+    endpoint: Option<Endpoint>,
+    proxy: &ProxyConfig,
+    tls_options: &Option<TlsConfig>,
+    is_sink: bool,
+) -> crate::Result<T::Client> {
+    let retry_config = RetryConfig::disabled();
+
+    // The default credentials chains will look for a region if not given but we'd like to
+    // error up front if later SDK calls will fail due to lack of region configuration
+    let region = resolve_region(region).await?;
+
+    // Build the configuration first.
+    let mut config_builder = SdkConfig::builder()
+        .credentials_provider(auth.credentials_provider(region.clone()).await?)
+        .region(region.clone())
+        .retry_config(retry_config.clone());
+
+    if let Some(endpoint_override) = endpoint {
+        config_builder = config_builder.endpoint_resolver(endpoint_override);
+    }
+
+    let config = config_builder.build();
+
+    let client =
+        create_smithy_client::<T>(region, proxy, tls_options, is_sink, retry_config).await?;
 
     Ok(T::build(client, &config))
 }

@@ -350,21 +350,7 @@ impl TypeDef {
 
     pub fn merge(&mut self, other: Self, strategy: merge::Strategy) {
         self.fallible |= other.fallible;
-
-        // NOTE: technically we shouldn't do this, but to keep backward compatibility with the
-        // "old" `Kind` implementation, we consider a type that is marked as "any" equal to the old
-        // implementation's `unknown`, which, when merging, would discard that type.
-        //
-        // see: https://github.com/vectordotdev/vector/blob/18415050b60b08197e8135b7659390256995e844/lib/vrl/compiler/src/type_def.rs#L428-L429
-        if !self.is_any() && other.is_any() {
-            // keep `self`'s `kind` definition
-        } else if self.is_any() && !other.is_any() {
-            // overwrite `self`'s `kind` definition with `others`'s
-            self.kind = other.kind;
-        } else {
-            // merge the two `kind`s
-            self.kind.merge(other.kind, strategy);
-        }
+        self.kind.merge(other.kind, strategy);
     }
 
     pub fn merge_overwrite(mut self, other: Self) -> Self {
@@ -398,4 +384,76 @@ impl From<TypeDef> for Kind {
 pub(crate) struct Details {
     pub(crate) type_def: TypeDef,
     pub(crate) value: Option<Value>,
+}
+
+impl Details {
+    /// Returns the union of 2 possible states
+    pub(crate) fn merge(self, other: Self) -> Self {
+        Self {
+            type_def: self.type_def.merge_deep(other.type_def),
+            value: if self.value == other.value {
+                self.value
+            } else {
+                None
+            },
+        }
+    }
+
+    pub(crate) fn merge_optional(
+        a: Option<Self>,
+        b: Option<Self>,
+        none_type: TypeDef,
+    ) -> Option<Self> {
+        match (a, b) {
+            (Some(a), Some(b)) => Some(a.merge(b)),
+            (Some(_), None) | (None, Some(_)) => Some(Details {
+                type_def: none_type,
+                value: None,
+            }),
+            (None, None) => None,
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn merge_details_same_literal() {
+        let a = Details {
+            type_def: TypeDef::integer(),
+            value: Some(Value::from(5)),
+        };
+        let b = Details {
+            type_def: TypeDef::float(),
+            value: Some(Value::from(5)),
+        };
+        assert_eq!(
+            a.merge(b),
+            Details {
+                type_def: TypeDef::integer().add_float(),
+                value: Some(Value::from(5))
+            }
+        )
+    }
+
+    #[test]
+    fn merge_details_different_literal() {
+        let a = Details {
+            type_def: TypeDef::any(),
+            value: Some(Value::from(5)),
+        };
+        let b = Details {
+            type_def: TypeDef::object(Collection::empty()),
+            value: Some(Value::from(6)),
+        };
+        assert_eq!(
+            a.merge(b),
+            Details {
+                type_def: TypeDef::any(),
+                value: None
+            }
+        )
+    }
 }

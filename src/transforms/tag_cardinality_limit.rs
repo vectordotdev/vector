@@ -52,7 +52,7 @@ pub struct BloomFilterConfig {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(tag = "limit_exceeded_action", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum LimitExceededAction {
     DropTag,
     DropEvent,

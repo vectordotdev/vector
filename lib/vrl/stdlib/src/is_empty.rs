@@ -71,11 +71,6 @@ impl Function for IsEmpty {
 
         Ok(Box::new(IsEmptyFn { value }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        is_empty(value)
-    }
 }
 
 #[derive(Debug, Clone)]

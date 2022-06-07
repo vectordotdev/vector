@@ -157,14 +157,6 @@ impl Function for Remove {
             compact,
         }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let path = args.required("path");
-        let compact = args.optional("compact").unwrap_or_else(|| value!(false));
-
-        remove(path, compact, value)
-    }
 }
 
 #[derive(Debug, Clone)]

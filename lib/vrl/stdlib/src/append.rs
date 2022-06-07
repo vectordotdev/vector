@@ -50,13 +50,6 @@ impl Function for Append {
 
         Ok(Box::new(AppendFn { value, items }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let items = args.required("items");
-
-        append(value, items)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -76,7 +69,8 @@ impl Expression for AppendFn {
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         self.value
             .type_def(state)
-            .merge_append(self.items.type_def(state))
+            .restrict_array()
+            .merge_append(self.items.type_def(state).restrict_array())
     }
 }
 
