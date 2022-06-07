@@ -13,16 +13,27 @@
 #   = learn more about error code 100 at https://errors.vrl.dev/100
 #   = see language documentation at https://vrl.dev
 #
-# error[E111]: fallible predicate
-#   ┌─ :4:4
+# error[E110]: fallible predicate
+#   ┌─ :4:15
 #   │
 # 4 │ if parse_grok(.message, "%{GREEDYDATA:parsed}") != null {
-#   │    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-#   │    │
-#   │    this predicate can result in runtime error
-#   │    handle the error case to ensure runtime success
+#   │               ^^^^^^^^
+#   │               │
+#   │               this expression resolves to any
+#   │               but the parameter "value" expects the exact type string
 #   │
+#   = try: ensuring an appropriate type at runtime
+#   =
+#   =     .message = string!(.message)
+#   =     parse_grok(.message, "%{GREEDYDATA:parsed}")
+#   =
+#   = try: coercing to an appropriate type and specifying a default value as a fallback in case coercion fails
+#   =
+#   =     .message = to_string(.message) ?? "default"
+#   =     parse_grok(.message, "%{GREEDYDATA:parsed}")
+#   =
 #   = see documentation about error handling at https://errors.vrl.dev/#handling
+#   = learn more about error code 110 at https://errors.vrl.dev/110
 #   = see language documentation at https://vrl.dev
 #
 # error[E100]: unhandled error
