@@ -1,17 +1,10 @@
 //! All types related to merging one [`Kind`] into another.
 
-use crate::kind::Unknown;
 use std::{collections::BTreeMap, ops::BitOr};
 
 use super::{Collection, Kind};
 
 impl Kind {
-    /// Merge a Kind and Unknown together
-    pub fn merge_with_unknown(&mut self, unknown: &Unknown) {
-        // The current (incorrect) behavior is to ignore the unknown
-        // This is intentionally left blank. It should be implemented.
-    }
-
     /// Merge `other` into `self`, using the provided `Strategy`.
     pub fn merge(&mut self, other: Self, strategy: Strategy) {
         self.bytes = self.bytes.or(other.bytes);

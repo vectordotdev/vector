@@ -1,9 +1,9 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use anymap::AnyMap;
-use value::kind::Collection;
 use value::{Kind, Value};
 
+use crate::value::Collection;
 use crate::{parser::ast::Ident, type_def::Details};
 
 /// Local environment, limited to a given scope.
