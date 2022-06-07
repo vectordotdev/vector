@@ -1,7 +1,11 @@
 use std::collections::HashMap;
 
-use crate::config::{ComponentKey, Config, Output, OutputId};
 pub(super) use crate::schema::Definition;
+
+use crate::{
+    config::{ComponentKey, Config, Output, OutputId, SinkOuter},
+    topology,
+};
 
 /// Create a new [`Definition`] by recursively merging all provided inputs into a given component.
 ///
@@ -66,9 +70,8 @@ pub(super) fn merged_definition(
             let source_definition = match maybe_source_definition {
                 Some(source_definition) => source_definition,
                 // If we find no match, it means the topology is misconfigured. This is a fatal
-                // error, but other parts of the topology builder deal with this state, so we
-                // ignore it.
-                None => continue,
+                // error, but other parts of the topology builder deal with this state.
+                None => unreachable!("source output misconfigured"),
             };
 
             definition = definition.merge(source_definition);
@@ -90,11 +93,14 @@ pub(super) fn merged_definition(
                     if output.port == input.port {
                         // For transforms, a `None` schema definition is equal to "pass-through merged
                         // input schemas".
-                        output.log_schema_definition.clone()
+                        Some(output.log_schema_definition.clone())
                     } else {
                         None
                     }
-                });
+                })
+                // If we find no match, it means the topology is misconfigured. This is a fatal
+                // error, but other parts of the topology builder deal with this state.
+                .expect("transform output misconfigured");
 
             let transform_definition = match maybe_transform_definition {
                 Some(transform_definition) => transform_definition,
@@ -110,6 +116,147 @@ pub(super) fn merged_definition(
     cache.insert(inputs.to_vec(), definition.clone());
 
     definition
+}
+
+/// Get a list of definitions from individual pipelines feeding into a component.
+///
+/// For example, given the following topology:
+///
+///   Source 1 -> Transform 1                ->
+///   Source 2 -> Transform 2                ->
+///            -> Transform 3 ->
+///            -> Transform 4 -> Transform 5 -> Sink 1
+///
+/// In this example, if we ask for the definitions received by `Sink 1`, we'd receive four
+/// definitions, one for each route leading into `Sink 1`, with the route going through `Transform
+/// 5` being expanded into two individual routes (So1 -> T3 -> T5 -> Si1 AND So1 -> T4 -> T5 ->
+/// Si1).
+pub(super) fn expanded_definitions(
+    inputs: &[OutputId],
+    config: &dyn ComponentContainer,
+    cache: &mut HashMap<Vec<OutputId>, Vec<Definition>>,
+) -> Vec<Definition> {
+    // Try to get the definition from the cache.
+    if let Some(definitions) = cache.get(inputs) {
+        return definitions.clone();
+    }
+
+    let mut definitions = vec![];
+    let mut merged_cache = HashMap::default();
+
+    for input in inputs {
+        let key = &input.component;
+
+        // If the input is a source, it'll always have schema definition attached, even if it is an
+        // "empty" schema.
+        if let Some(outputs) = config.source_outputs(key) {
+            // After getting the source matching to the given input, we need to further narrow the
+            // actual output of the source feeding into this input, and then get the definition
+            // belonging to that output.
+            let maybe_source_definition = outputs.iter().find_map(|output| {
+                if output.port == input.port {
+                    Some(
+                        output
+                            .log_schema_definition
+                            .clone()
+                            // For sources, a `None` schema definition is equal to an "empty" definition.
+                            .unwrap_or_else(Definition::empty),
+                    )
+                } else {
+                    None
+                }
+            });
+
+            let source_definition = match maybe_source_definition {
+                Some(source_definition) => source_definition,
+                // If we find no match, it means the topology is misconfigured. This is a fatal
+                // error, but other parts of the topology builder deal with this state.
+                None => unreachable!("source output misconfigured"),
+            };
+
+            definitions.push(source_definition);
+
+        // A transform can receive from multiple inputs, and each input needs to be expanded to
+        // a new pipeline.
+        } else if let Some(inputs) = config.transform_inputs(key) {
+            let merged_definition = merged_definition(inputs, config, &mut merged_cache);
+
+            let maybe_transform_definition = config
+                .transform_outputs(key, &merged_definition)
+                .expect("already found inputs")
+                .iter()
+                .find_map(|output| {
+                    if output.port == input.port {
+                        Some(output.log_schema_definition.clone())
+                    } else {
+                        None
+                    }
+                })
+                // If we find no match, it means the topology is misconfigured. This is a fatal
+                // error, but other parts of the topology builder deal with this state.
+                .expect("transform output misconfigured");
+
+            // We need to iterate over the individual inputs of a transform, as we are expected to
+            // expand each input into its own pipeline.
+            for input in inputs {
+                let mut expanded_definitions = match &maybe_transform_definition {
+                    // If the transform defines its own schema definition, we no longer care about
+                    // any upstream definitions, and use the transform definition instead.
+                    Some(transform_definition) => vec![transform_definition.clone()],
+
+                    // If the transform does not define its own schema definition, we need to
+                    // recursively call this function in case upstream components expand into
+                    // multiple pipelines.
+                    None => expanded_definitions(&[input.clone()], config, cache),
+                };
+
+                // Append whatever number of additional pipelines we created to the existing
+                // pipeline definitions.
+                definitions.append(&mut expanded_definitions);
+            }
+        }
+    }
+
+    cache.insert(inputs.to_vec(), definitions.clone());
+
+    definitions
+}
+
+pub(super) fn validate_sink_expectations(
+    key: &ComponentKey,
+    sink: &SinkOuter<OutputId>,
+    config: &topology::Config,
+) -> Result<(), Vec<String>> {
+    let mut errors = vec![];
+
+    // Get the schema against which we need to validate the schemas of the components feeding into
+    // this sink.
+    let input = sink.inner.input();
+    let requirement = input.schema_requirement();
+
+    // Get all pipeline definitions feeding into this sink.
+    let mut cache = HashMap::default();
+    let definitions = expanded_definitions(&sink.inputs, config, &mut cache);
+
+    // Validate each individual definition against the sink requirement.
+    for definition in definitions {
+        if let Err(err) = requirement.validate(&definition) {
+            errors.append(
+                &mut err
+                    .errors()
+                    .to_vec()
+                    .into_iter()
+                    .map(|err| format!("schema error in component {}: {}", key, err))
+                    .collect(),
+            );
+        }
+    }
+
+    if !errors.is_empty() {
+        return Err(errors);
+    }
+
+    Ok(())
 }
 
 pub(super) trait ComponentContainer {
@@ -149,6 +296,7 @@ mod tests {
     use std::collections::HashMap;
 
     use indexmap::IndexMap;
+    use pretty_assertions::assert_eq;
     use value::Kind;
     use vector_core::config::{DataType, Output};
 
@@ -266,6 +414,301 @@ mod tests {
                 .collect::<Vec<_>>();
 
             let got = merged_definition(&inputs, &case, &mut HashMap::default());
+            assert_eq!(got, case.want, "{}", title);
+        }
+    }
+
+    #[test]
+    fn test_expanded_definition() {
+        struct TestCase {
+            inputs: Vec<(&'static str, Option<String>)>,
+            sources: IndexMap<&'static str, Vec<Output>>,
+            transforms: IndexMap<&'static str, (Vec<OutputId>, Vec<Output>)>,
+            want: Vec<Definition>,
+        }
+
+        impl ComponentContainer for TestCase {
+            fn source_outputs(&self, key: &ComponentKey) -> Option<Vec<Output>> {
+                self.sources.get(key.id()).cloned()
+            }
+
+            fn transform_inputs(&self, key: &ComponentKey) -> Option<&[OutputId]> {
+                self.transforms.get(key.id()).map(|v| v.0.as_slice())
+            }
+
+            fn transform_outputs(
+                &self,
+                key: &ComponentKey,
+                _merged_definition: &Definition,
+            ) -> Option<Vec<Output>> {
+                self.transforms.get(key.id()).cloned().map(|v| v.1)
+            }
+        }
+
+        for (title, case) in HashMap::from([
+            (
+                "no inputs",
+                TestCase {
+                    inputs: vec![],
+                    sources: IndexMap::default(),
+                    transforms: IndexMap::default(),
+                    want: vec![],
+                },
+            ),
+            (
+                "single input, source with empty schema",
+                TestCase {
+                    inputs: vec![("foo", None)],
+                    sources: IndexMap::from([("foo", vec![Output::default(DataType::all())])]),
+                    transforms: IndexMap::default(),
+                    want: vec![Definition::empty()],
+                },
+            ),
+            (
+                "single input, source with schema",
+                TestCase {
+                    inputs: vec![("source-foo", None)],
+                    sources: IndexMap::from([(
+                        "source-foo",
+                        vec![Output::default(DataType::all()).with_schema_definition(
+                            Definition::empty().required_field(
+                                "foo",
+                                Kind::integer().or_bytes(),
+                                Some("foo bar"),
+                            ),
+                        )],
+                    )]),
+                    transforms: IndexMap::default(),
+                    want: vec![Definition::empty().required_field(
+                        "foo",
+                        Kind::integer().or_bytes(),
+                        Some("foo bar"),
+                    )],
+                },
+            ),
+            (
+                "multiple inputs, sources with schema",
+                TestCase {
+                    inputs: vec![("source-foo", None), ("source-bar", None)],
+                    sources: IndexMap::from([
+                        (
+                            "source-foo",
+                            vec![Output::default(DataType::all()).with_schema_definition(
+                                Definition::empty().required_field(
+                                    "foo",
+                                    Kind::integer().or_bytes(),
+                                    Some("foo bar"),
+                                ),
+                            )],
+                        ),
+                        (
+                            "source-bar",
+                            vec![Output::default(DataType::all()).with_schema_definition(
+                                Definition::empty().required_field(
+                                    "foo",
+                                    Kind::timestamp(),
+                                    Some("baz qux"),
+                                ),
+                            )],
+                        ),
+                    ]),
+                    transforms: IndexMap::default(),
+                    want: vec![
+                        Definition::empty().required_field(
+                            "foo",
+                            Kind::integer().or_bytes(),
+                            Some("foo bar"),
+                        ),
+                        Definition::empty().required_field(
+                            "foo",
+                            Kind::timestamp(),
+                            Some("baz qux"),
+                        ),
+                    ],
+                },
+            ),
+            (
+                "transform overrides source",
+                TestCase {
+                    inputs: vec![("source-bar", None), ("transform-baz", None)],
+                    sources: IndexMap::from([
+                        (
+                            "source-foo",
+                            vec![Output::default(DataType::all()).with_schema_definition(
+                                Definition::empty().required_field(
+                                    "foo",
+                                    Kind::boolean(),
+                                    Some("foo"),
+                                ),
+                            )],
+                        ),
+                        (
+                            "source-bar",
+                            vec![Output::default(DataType::all()).with_schema_definition(
+                                Definition::empty().required_field(
+                                    "bar",
+                                    Kind::integer(),
+                                    Some("bar"),
+                                ),
+                            )],
+                        ),
+                    ]),
+                    transforms: IndexMap::from([(
+                        "transform-baz",
+                        (
+                            vec![OutputId::from("source-foo")],
+                            vec![Output::default(DataType::all()).with_schema_definition(
+                                Definition::empty().required_field(
+                                    "baz",
+                                    Kind::regex(),
+                                    Some("baz"),
+                                ),
+                            )],
+                        ),
+                    )]),
+                    want: vec![
+                        Definition::empty().required_field("bar", Kind::integer(), Some("bar")),
+                        Definition::empty().required_field("baz", Kind::regex(), Some("baz")),
+                    ],
+                },
+            ),
+            //   Source 1 -> Transform 1                ->
+            //   Source 2 -> Transform 2                ->
+            //            -> Transform 3 ->
+            //            -> Transform 4 -> Transform 5 -> Sink 1
+            (
+                "complex topology",
+                TestCase {
+                    inputs: vec![
+                        ("Transform 1", None),
+                        ("Transform 2", None),
+                        ("Transform 5", None),
+                    ],
+                    sources: IndexMap::from([
+                        (
+                            "Source 1",
+                            vec![Output::default(DataType::all()).with_schema_definition(
+                                Definition::empty().required_field(
+                                    "source-1",
+                                    Kind::boolean(),
+                                    Some("source-1"),
+                                ),
+                            )],
+                        ),
+                        (
+                            "Source 2",
+                            vec![Output::default(DataType::all()).with_schema_definition(
+                                Definition::empty().required_field(
+                                    "source-2",
+                                    Kind::integer(),
+                                    Some("source-2"),
+                                ),
+                            )],
+                        ),
+                    ]),
+                    transforms: IndexMap::from([
+                        (
+                            "Transform 1",
+                            (
+                                vec![OutputId::from("Source 1")],
+                                vec![Output::default(DataType::all()).with_schema_definition(
+                                    Definition::empty().required_field(
+                                        "transform-1",
+                                        Kind::regex(),
+                                        None,
+                                    ),
+                                )],
+                            ),
+                        ),
+                        (
+                            "Transform 2",
+                            (
+                                vec![OutputId::from("Source 2")],
+                                vec![Output::default(DataType::all()).with_schema_definition(
+                                    Definition::empty().required_field(
+                                        "transform-2",
+                                        Kind::float().or_null(),
+                                        Some("transform-2"),
+                                    ),
+                                )],
+                            ),
+                        ),
+                        (
+                            "Transform 3",
+                            (
+                                vec![OutputId::from("Source 2")],
+                                vec![Output::default(DataType::all()).with_schema_definition(
+                                    Definition::empty().required_field(
+                                        "transform-3",
+                                        Kind::integer(),
+                                        Some("transform-3"),
+                                    ),
+                                )],
+                            ),
+                        ),
+                        (
+                            "Transform 4",
+                            (
+                                vec![OutputId::from("Source 2")],
+                                vec![Output::default(DataType::all()).with_schema_definition(
+                                    Definition::empty().required_field(
+                                        "transform-4",
+                                        Kind::timestamp().or_bytes(),
+                                        Some("transform-4"),
+                                    ),
+                                )],
+                            ),
+                        ),
+                        (
+                            "Transform 5",
+                            (
+                                vec![OutputId::from("Transform 3"), OutputId::from("Transform 4")],
+                                vec![Output::default(DataType::all()).with_schema_definition(
+                                    Definition::empty().required_field(
+                                        "transform-5",
+                                        Kind::boolean(),
+                                        Some("transform-5"),
+                                    ),
+                                )],
+                            ),
+                        ),
+                    ]),
+                    want: vec![
+                        // Pipeline 1
+                        Definition::empty().required_field("transform-1", Kind::regex(), None),
+                        // Pipeline 2
+                        Definition::empty().required_field(
+                            "transform-2",
+                            Kind::float().or_null(),
+                            Some("transform-2"),
+                        ),
+                        // Pipeline 3
+                        Definition::empty().required_field(
+                            "transform-5",
+                            Kind::boolean(),
+                            Some("transform-5"),
+                        ),
+                        // Pipeline 4
+                        Definition::empty().required_field(
+                            "transform-5",
+                            Kind::boolean(),
+                            Some("transform-5"),
+                        ),
+                    ],
+                },
+            ),
+        ]) {
+            let inputs = case
+                .inputs
+                .iter()
+                .cloned()
+                .map(|(key, port)| OutputId {
+                    component: key.into(),
+                    port,
+                })
+                .collect::<Vec<_>>();
+
+            let got = expanded_definitions(&inputs, &case, &mut HashMap::default());
             assert_eq!(got, case.want, "{}", title);
         }
     }

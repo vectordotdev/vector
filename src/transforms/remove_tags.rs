@@ -74,7 +74,7 @@ impl FunctionTransform for RemoveTags {
 
 #[cfg(test)]
 mod tests {
-    use vector_common::btreemap;
+    use std::collections::BTreeMap;
 
     use super::*;
     use crate::{
@@ -94,14 +94,15 @@ mod tests {
             MetricKind::Incremental,
             MetricValue::Counter { value: 10.0 },
         )
-        .with_tags(Some(btreemap! {
-            "env" => "production",
-            "region" => "us-east-1",
-            "host" => "127.0.0.1",
-        }));
-        let expected = metric
-            .clone()
-            .with_tags(Some(btreemap! {"env" => "production"}));
+        .with_tags(Some(BTreeMap::from([
+            (String::from("env"), String::from("production")),
+            (String::from("region"), String::from("us-east-1")),
+            (String::from("host"), String::from("127.0.0.1")),
+        ])));
+        let expected = metric.clone().with_tags(Some(BTreeMap::from([(
+            String::from("env"),
+            String::from("production"),
+        )])));
 
         let mut transform = RemoveTags::new(vec!["region".into(), "host".into()]);
         let metric = transform_one(&mut transform, metric.into())
@@ -118,7 +119,10 @@ mod tests {
             MetricKind::Incremental,
             MetricValue::Counter { value: 10.0 },
         )
-        .with_tags(Some(btreemap! {"env" => "production"}));
+        .with_tags(Some(BTreeMap::from([(
+            String::from("env"),
+            String::from("production"),
+        )])));
         let expected = metric.clone().with_tags(None);
 
         let mut transform = RemoveTags::new(vec!["env".into()]);

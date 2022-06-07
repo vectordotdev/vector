@@ -1581,15 +1581,15 @@ See [motivation](#motivation).
     Vector's Github actions.
 - Finalize the `kubernetes` source.
   - Audit the code and ensure the base is high-quality and correct.
-  - Merge in the `kubernetes_pod_matadata` transform.
+  - Merge in the `kubernetes_pod_metadata` transform.
   - Implement origin filtering.
   - Merge split logs [pr#2134].
   - Use the `log_schema.kubernetes_key` setting for context fields.
     See [issue#1867].
 - Add `kubernetes` source reference documentation.
-- Prepare Heml Chart.
+- Prepare Helm Chart.
 - Prepare YAML deployment config.
-- Prepare Heml Chart Repository.
+- Prepare Helm Chart Repository.
 - Integrate kubernetes configuration snapshotting into the release process.
 - Add Kubernetes setup/integration guide.
 - Release `0.10.0` and announce.

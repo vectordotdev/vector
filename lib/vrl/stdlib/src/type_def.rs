@@ -51,10 +51,6 @@ impl Function for TypeDef {
 
         Ok(Box::new(TypeDefFn { type_def }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Resolved {
-        Err("function not supported in VM runtime.".into())
-    }
 }
 
 #[derive(Debug, Clone)]

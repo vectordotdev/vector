@@ -17,16 +17,9 @@ mode = "tcp"
 ## Transforms
 ##
 
-[transforms.remap]
-type = "remap"
-inputs = ["syslog"]
-source = """
-    . = parse_syslog!(.message)
-"""
-
 [transforms.log2metric]
 type = "log_to_metric"
-inputs = ["remap"]
+inputs = ["syslog"]
 
     [[transforms.log2metric.metrics]]
     type = "gauge"

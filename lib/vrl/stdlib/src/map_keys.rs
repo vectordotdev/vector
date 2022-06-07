@@ -101,20 +101,6 @@ impl Function for MapKeys {
             is_iterator: true,
         })
     }
-
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
-        let value = args.required("value");
-        let recursive = args
-            .optional("recursive")
-            .map(|v| v.try_boolean())
-            .transpose()?
-            .unwrap_or_default();
-
-        let VmFunctionClosure { variables, vm } = args.closure();
-        let runner = closure::Runner::new(variables, |ctx| vm.interpret(ctx));
-
-        map_keys(value, recursive, ctx, runner)
-    }
 }
 
 #[derive(Debug, Clone)]

@@ -6,18 +6,6 @@ use vector_core::internal_event::InternalEvent;
 use super::prelude::{error_stage, error_type, io_error_code};
 
 #[derive(Debug)]
-pub struct NatsEventSendSuccess {
-    pub(crate) byte_size: usize,
-}
-
-impl InternalEvent for NatsEventSendSuccess {
-    fn emit(self) {
-        trace!(message = "Processed one event.");
-        counter!("component_sent_bytes_total", self.byte_size as u64);
-    }
-}
-
-#[derive(Debug)]
 pub struct NatsEventSendError {
     pub error: Error,
 }

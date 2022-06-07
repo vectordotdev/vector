@@ -22,7 +22,8 @@ pub struct HecData {
     #[serde(flatten)]
     pub event: HecEvent,
     pub fields: LogEvent,
-    pub time: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub time: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub host: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -34,7 +35,7 @@ pub struct HecData {
 }
 
 impl HecData {
-    pub const fn new(event: HecEvent, fields: LogEvent, time: f64) -> Self {
+    pub const fn new(event: HecEvent, fields: LogEvent, time: Option<f64>) -> Self {
         Self {
             event,
             fields,

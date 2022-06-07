@@ -39,11 +39,6 @@ impl Function for Upcase {
 
         Ok(Box::new(UpcaseFn { value }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        upcase(value)
-    }
 }
 
 #[derive(Debug, Clone)]

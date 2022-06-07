@@ -12,6 +12,15 @@ use vector_buffers::EventCount;
 use super::{Event, EventDataEq, EventMutRef, EventRef, LogEvent, Metric, TraceEvent};
 use crate::ByteSizeOf;
 
+/// The type alias for an array of `LogEvent` elements.
+pub type LogArray = Vec<LogEvent>;
+
+/// The type alias for an array of `TraceEvent` elements.
+pub type TraceArray = Vec<TraceEvent>;
+
+/// The type alias for an array of `Metric` elements.
+pub type MetricArray = Vec<Metric>;
+
 /// The core trait to abstract over any type that may work as an array
 /// of events. This is effectively the same as the standard
 /// `IntoIterator<Item = Event>` implementations, but that would
@@ -89,12 +98,6 @@ impl EventContainer for Metric {
     }
 }
 
-/// The type alias for an array of `LogEvent` elements.
-pub type LogArray = Vec<LogEvent>;
-
-/// The type alias for an array of `TraceEvent` elements.
-pub type TraceArray = Vec<TraceEvent>;
-
 impl EventContainer for LogArray {
     type IntoIter = iter::Map<vec::IntoIter<LogEvent>, fn(LogEvent) -> Event>;
 
@@ -106,9 +109,6 @@ impl EventContainer for LogArray {
         self.into_iter().map(Into::into)
     }
 }
-
-/// The type alias for an array of `Metric` elements.
-pub type MetricArray = Vec<Metric>;
 
 impl EventContainer for MetricArray {
     type IntoIter = iter::Map<vec::IntoIter<Metric>, fn(Metric) -> Event>;
@@ -181,6 +181,24 @@ impl From<Event> for EventArray {
             Event::Metric(metric) => Self::Metrics(vec![metric]),
             Event::Trace(trace) => Self::Traces(vec![trace]),
         }
+    }
+}
+
+impl From<LogEvent> for EventArray {
+    fn from(log: LogEvent) -> Self {
+        Event::from(log).into()
+    }
+}
+
+impl From<Metric> for EventArray {
+    fn from(metric: Metric) -> Self {
+        Event::from(metric).into()
+    }
+}
+
+impl From<TraceEvent> for EventArray {
+    fn from(trace: TraceEvent) -> Self {
+        Event::from(trace).into()
     }
 }
 

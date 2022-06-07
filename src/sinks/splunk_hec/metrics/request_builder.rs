@@ -6,7 +6,7 @@ use vector_core::event::{EventFinalizers, Finalizable};
 use super::{encoder::HecMetricsEncoder, sink::HecProcessedEvent};
 use crate::sinks::{
     splunk_hec::common::request::HecRequest,
-    util::{Compression, RequestBuilder},
+    util::{request_builder::EncodeResult, Compression, RequestBuilder},
 };
 
 pub struct HecMetricsRequestBuilder {
@@ -48,10 +48,14 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<HecProcessedEvent>)> for HecMetricsRe
         )
     }
 
-    fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
+    fn build_request(
+        &self,
+        metadata: Self::Metadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
         let (events_count, events_byte_size, finalizers, passthrough_token) = metadata;
         HecRequest {
-            body: payload,
+            body: payload.into_payload(),
             finalizers,
             events_count,
             events_byte_size,

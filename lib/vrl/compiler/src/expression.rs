@@ -6,7 +6,7 @@ use value::Value;
 
 use crate::{
     state::{ExternalEnv, LocalEnv},
-    vm, Context, Span, TypeDef,
+    Context, Span, TypeDef,
 };
 
 #[cfg(feature = "expr-abort")]
@@ -78,15 +78,6 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     ///
     /// An expression is allowed to fail, which aborts the running program.
     fn resolve(&self, ctx: &mut Context) -> Resolved;
-
-    /// Compile the expression to bytecode that can be interpreted by the VM.
-    fn compile_to_vm(
-        &self,
-        _vm: &mut vm::Vm,
-        _state: (&mut LocalEnv, &mut ExternalEnv),
-    ) -> Result<(), String> {
-        Ok(())
-    }
 
     /// Resolve an expression to a value without any context, if possible.
     ///
@@ -313,37 +304,6 @@ impl Expression for Expr {
             Abort(v) => v.type_def(state),
         }
     }
-
-    fn compile_to_vm(
-        &self,
-        vm: &mut crate::vm::Vm,
-        state: (&mut LocalEnv, &mut ExternalEnv),
-    ) -> Result<(), String> {
-        use Expr::*;
-
-        // Pass the call on to the contained expression.
-        match self {
-            #[cfg(feature = "expr-literal")]
-            Literal(v) => v.compile_to_vm(vm, state),
-            Container(v) => v.compile_to_vm(vm, state),
-            #[cfg(feature = "expr-if_statement")]
-            IfStatement(v) => v.compile_to_vm(vm, state),
-            #[cfg(feature = "expr-op")]
-            Op(v) => v.compile_to_vm(vm, state),
-            #[cfg(feature = "expr-assignment")]
-            Assignment(v) => v.compile_to_vm(vm, state),
-            #[cfg(feature = "expr-query")]
-            Query(v) => v.compile_to_vm(vm, state),
-            #[cfg(feature = "expr-function_call")]
-            FunctionCall(v) => v.compile_to_vm(vm, state),
-            Variable(v) => v.compile_to_vm(vm, state),
-            Noop(v) => v.compile_to_vm(vm, state),
-            #[cfg(feature = "expr-unary")]
-            Unary(v) => v.compile_to_vm(vm, state),
-            #[cfg(feature = "expr-abort")]
-            Abort(v) => v.compile_to_vm(vm, state),
-        }
-    }
 }
 
 impl fmt::Display for Expr {
@@ -501,6 +461,12 @@ pub enum Error {
 
     #[error("expression type unavailable")]
     Missing { span: Span, feature: &'static str },
+}
+
+/// Details about a fallible expression in a chain of expressions.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct FallibleInfo {
+    pub(crate) span: Span,
 }
 
 impl DiagnosticMessage for Error {

@@ -11,7 +11,6 @@ use crate::{
     parser::ast::Ident,
     state::{ExternalEnv, LocalEnv},
     type_def::Details,
-    vm::{self, OpCode},
     Context, Expression, TypeDef,
 };
 
@@ -39,6 +38,13 @@ impl Query {
 
     pub fn is_external(&self) -> bool {
         matches!(self.target, Target::External)
+    }
+
+    pub fn as_variable(&self) -> Option<&Variable> {
+        match &self.target {
+            Target::Internal(variable) => Some(variable),
+            _ => None,
+        }
     }
 
     pub fn variable_ident(&self) -> Option<&Ident> {
@@ -120,63 +126,16 @@ impl Expression for Query {
         use Target::*;
 
         match &self.target {
-            External => {
-                // `.` path must be an object
-                //
-                // TODO: make sure to enforce this
-                if self.path.is_root() {
-                    return TypeDef::object(Collection::any()).infallible();
-                }
-
-                match state.1.target() {
-                    None => TypeDef::any().infallible(),
-                    Some(details) => details.clone().type_def.at_path(&self.path.to_lookup()),
-                }
-            }
+            External => match state.1.target() {
+                None if self.path().is_root() => TypeDef::object(Collection::any()).infallible(),
+                None => TypeDef::any().infallible(),
+                Some(details) => details.clone().type_def.at_path(&self.path.to_lookup()),
+            },
 
             Internal(variable) => variable.type_def(state).at_path(&self.path.to_lookup()),
             FunctionCall(call) => call.type_def(state).at_path(&self.path.to_lookup()),
             Container(container) => container.type_def(state).at_path(&self.path.to_lookup()),
         }
-    }
-
-    fn compile_to_vm(
-        &self,
-        vm: &mut crate::vm::Vm,
-        state: (&mut LocalEnv, &mut ExternalEnv),
-    ) -> Result<(), String> {
-        // Write the target depending on what target we are trying to retrieve.
-        let variable = match &self.target {
-            Target::External => {
-                vm.write_opcode(OpCode::GetPath);
-                vm::Variable::External(self.path.clone())
-            }
-            Target::Internal(variable) => {
-                vm.write_opcode(OpCode::GetPath);
-                vm::Variable::Internal(variable.ident().clone(), self.path.clone())
-            }
-            Target::FunctionCall(call) => {
-                // Write the code to call the function.
-                call.compile_to_vm(vm, state)?;
-
-                // Then retrieve the given path from the returned value that has been pushed on the stack
-                vm.write_opcode(OpCode::GetPath);
-                vm::Variable::Stack(self.path.clone())
-            }
-            Target::Container(container) => {
-                // Write the code to create the container onto the stack.
-                container.compile_to_vm(vm, state)?;
-
-                // Then retrieve the given path from the returned value that has been pushed on the stack
-                vm.write_opcode(OpCode::GetPath);
-                vm::Variable::Stack(self.path.clone())
-            }
-        };
-
-        let target = vm.get_target(&variable);
-        vm.write_primitive(target);
-
-        Ok(())
     }
 }
 

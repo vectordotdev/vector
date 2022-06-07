@@ -1,3 +1,5 @@
+pub mod sort;
+
 use std::cmp::Ordering;
 
 use vector_core::event::metric::{Metric, MetricValue, Sample};

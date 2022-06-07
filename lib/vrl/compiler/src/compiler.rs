@@ -1,12 +1,13 @@
 use diagnostic::{DiagnosticList, DiagnosticMessage, Severity, Span};
 use lookup::LookupBuf;
-use parser::ast::{self, Node};
+use parser::ast::{self, Node, QueryTarget};
 
+use crate::type_def::Details;
 use crate::{
     expression::*,
     program::ProgramInfo,
     state::{ExternalEnv, LocalEnv},
-    Function, Program,
+    Function, Program, TypeDef,
 };
 
 pub(crate) type Diagnostics = Vec<Box<dyn DiagnosticMessage>>;
@@ -19,6 +20,20 @@ pub(crate) struct Compiler<'a> {
     local: LocalEnv,
     external_queries: Vec<LookupBuf>,
     external_assignments: Vec<LookupBuf>,
+
+    /// A list of variables that are missing, because the rhs expression of the
+    /// assignment failed to compile.
+    ///
+    /// This list allows us to avoid printing "undefined variable" compilation
+    /// errors when the reason for it being undefined is another compiler error.
+    skip_missing_query_target: Vec<(QueryTarget, LookupBuf)>,
+
+    /// Track which expression in a chain of expressions is fallible.
+    ///
+    /// It is possible for this state to switch from `None`, to `Some(T)` and
+    /// back to `None`, if the parent expression of a fallible expression
+    /// nullifies the fallibility of that expression.
+    fallible_expression_error: Option<FallibleInfo>,
 }
 
 impl<'a> Compiler<'a> {
@@ -31,6 +46,8 @@ impl<'a> Compiler<'a> {
             local: LocalEnv::default(),
             external_queries: vec![],
             external_assignments: vec![],
+            skip_missing_query_target: vec![],
+            fallible_expression_error: None,
         }
     }
 
@@ -84,24 +101,23 @@ impl<'a> Compiler<'a> {
 
         nodes
             .into_iter()
-            .filter_map(|node| {
-                let span = node.span();
+            .filter_map(|node| match node.into_inner() {
+                Expr(expr) => {
+                    self.fallible_expression_error = None;
 
-                match node.into_inner() {
-                    Expr(expr) => {
-                        let expr = self.compile_expr(expr, external);
-                        if expr.type_def((&self.local, external)).is_fallible() {
-                            use crate::expression::Error;
-                            let err = Error::Fallible { span };
-                            self.diagnostics.push(Box::new(err));
-                        }
+                    let expr = self.compile_expr(expr, external)?;
 
-                        Some(expr)
+                    if let Some(info) = self.fallible_expression_error.take() {
+                        let error = crate::expression::Error::Fallible { span: info.span };
+
+                        self.diagnostics.push(Box::new(error) as _);
                     }
-                    Error(err) => {
-                        self.handle_parser_error(err);
-                        None
-                    }
+
+                    Some(expr)
+                }
+                Error(err) => {
+                    self.handle_parser_error(err);
+                    None
                 }
             })
             .collect()
@@ -111,37 +127,52 @@ impl<'a> Compiler<'a> {
         &mut self,
         nodes: impl IntoIterator<Item = Node<ast::Expr>>,
         external: &mut ExternalEnv,
-    ) -> Vec<Expr> {
+    ) -> Option<Vec<Expr>> {
         nodes
             .into_iter()
             .map(|node| self.compile_expr(node, external))
-            .collect()
+            .collect::<Option<_>>()
     }
 
-    fn compile_expr(&mut self, node: Node<ast::Expr>, external: &mut ExternalEnv) -> Expr {
+    fn compile_expr(&mut self, node: Node<ast::Expr>, external: &mut ExternalEnv) -> Option<Expr> {
         use ast::Expr::*;
 
-        match node.into_inner() {
+        let span = node.span();
+
+        let expr = match node.into_inner() {
             Literal(node) => self.compile_literal(node, external),
-            Container(node) => self.compile_container(node, external).into(),
-            IfStatement(node) => self.compile_if_statement(node, external).into(),
-            Op(node) => self.compile_op(node, external).into(),
-            Assignment(node) => self.compile_assignment(node, external).into(),
-            Query(node) => self.compile_query(node, external).into(),
-            FunctionCall(node) => self.compile_function_call(node, external).into(),
-            Variable(node) => self.compile_variable(node, external).into(),
-            Unary(node) => self.compile_unary(node, external).into(),
-            Abort(node) => self.compile_abort(node, external).into(),
+            Container(node) => self.compile_container(node, external).map(Into::into),
+            IfStatement(node) => self.compile_if_statement(node, external).map(Into::into),
+            Op(node) => self.compile_op(node, external).map(Into::into),
+            Assignment(node) => self.compile_assignment(node, external).map(Into::into),
+            Query(node) => self.compile_query(node, external).map(Into::into),
+            FunctionCall(node) => self.compile_function_call(node, external).map(Into::into),
+            Variable(node) => self.compile_variable(node, external).map(Into::into),
+            Unary(node) => self.compile_unary(node, external).map(Into::into),
+            Abort(node) => self.compile_abort(node, external).map(Into::into),
+        }?;
+
+        // If the previously compiled expression is fallible, _and_ we are
+        // currently not tracking any existing fallible expression in the chain
+        // of expressions, then this is the first expression within that chain
+        // that can cause the entire chain to be fallible.
+        if expr.type_def((&self.local, external)).is_fallible()
+            && self.fallible_expression_error.is_none()
+        {
+            self.fallible_expression_error = Some(FallibleInfo { span });
         }
+
+        Some(expr)
     }
 
     #[cfg(feature = "expr-literal")]
-    fn compile_literal(&mut self, node: Node<ast::Literal>, external: &mut ExternalEnv) -> Expr {
+    fn compile_literal(
+        &mut self,
+        node: Node<ast::Literal>,
+        external: &mut ExternalEnv,
+    ) -> Option<Expr> {
         use ast::Literal::*;
         use bytes::Bytes;
-        use chrono::{TimeZone, Utc};
-        use literal::ErrorVariant::*;
-        use ordered_float::NotNan;
 
         let (span, lit) = node.take();
 
@@ -172,51 +203,49 @@ impl<'a> Compiler<'a> {
             Null => Ok(Literal::Null),
         };
 
-        let literal = literal.unwrap_or_else(|err| {
-            let value = match &err.variant {
-                #[allow(clippy::trivial_regex)]
-                InvalidRegex(_) => regex::Regex::new("").unwrap().into(),
-                InvalidTimestamp(..) => Utc.timestamp(0, 0).into(),
-                NanFloat => NotNan::new(0.0).unwrap().into(),
-            };
-
-            self.diagnostics.push(Box::new(err));
-            value
-        });
-
-        literal.into()
+        literal
+            .map(Into::into)
+            .map_err(|err| self.diagnostics.push(Box::new(err)))
+            .ok()
     }
 
     #[cfg(not(feature = "expr-literal"))]
-    fn compile_literal(&mut self, node: Node<ast::Literal>, _: &mut ExternalEnv) -> Expr {
+    fn compile_literal(&mut self, node: Node<ast::Literal>, _: &mut ExternalEnv) -> Option<Expr> {
         self.handle_missing_feature_error(node.span(), "expr-literal")
-            .into()
     }
 
     fn compile_container(
         &mut self,
         node: Node<ast::Container>,
         external: &mut ExternalEnv,
-    ) -> Container {
+    ) -> Option<Container> {
         use ast::Container::*;
 
         let variant = match node.into_inner() {
-            Group(node) => self.compile_group(*node, external).into(),
-            Block(node) => self.compile_block(node, external).into(),
-            Array(node) => self.compile_array(node, external).into(),
-            Object(node) => self.compile_object(node, external).into(),
+            Group(node) => self.compile_group(*node, external)?.into(),
+            Block(node) => self.compile_block(node, external)?.into(),
+            Array(node) => self.compile_array(node, external)?.into(),
+            Object(node) => self.compile_object(node, external)?.into(),
         };
 
-        Container::new(variant)
+        Some(Container::new(variant))
     }
 
-    fn compile_group(&mut self, node: Node<ast::Group>, external: &mut ExternalEnv) -> Group {
-        let expr = self.compile_expr(node.into_inner().into_inner(), external);
+    fn compile_group(
+        &mut self,
+        node: Node<ast::Group>,
+        external: &mut ExternalEnv,
+    ) -> Option<Group> {
+        let expr = self.compile_expr(node.into_inner().into_inner(), external)?;
 
-        Group::new(expr)
+        Some(Group::new(expr))
     }
 
-    fn compile_block(&mut self, node: Node<ast::Block>, external: &mut ExternalEnv) -> Block {
+    fn compile_block(
+        &mut self,
+        node: Node<ast::Block>,
+        external: &mut ExternalEnv,
+    ) -> Option<Block> {
         // We get a copy of the current local state, so that we can use it to
         // remove any *new* state added in the block, as that state is lexically
         // scoped to the block, and must not be visible to the rest of the
@@ -226,7 +255,13 @@ impl<'a> Compiler<'a> {
         // We can now start compiling the expressions within the block, which
         // will use the existing local state of the compiler, as blocks have
         // access to any state of their parent expressions.
-        let exprs = self.compile_exprs(node.into_inner().into_iter(), external);
+        let exprs = match self.compile_exprs(node.into_inner().into_iter(), external) {
+            Some(exprs) => exprs,
+            None => {
+                self.local = local_snapshot.apply_child_scope(self.local.clone());
+                return None;
+            }
+        };
 
         // Now that we've compiled the expressions, we pass them into the block,
         // and also a copy of the local state, which includes any state added by
@@ -237,27 +272,39 @@ impl<'a> Compiler<'a> {
         // the block, and merge back into it any mutations that happened to
         // state the snapshot was already tracking. Then, revert the compiler
         // local state to the updated snapshot.
-        self.local = local_snapshot.merge_mutations(self.local.clone());
+        self.local = local_snapshot.apply_child_scope(self.local.clone());
 
-        block
+        Some(block)
     }
 
-    fn compile_array(&mut self, node: Node<ast::Array>, external: &mut ExternalEnv) -> Array {
-        let exprs = self.compile_exprs(node.into_inner().into_iter(), external);
+    fn compile_array(
+        &mut self,
+        node: Node<ast::Array>,
+        external: &mut ExternalEnv,
+    ) -> Option<Array> {
+        let exprs = self.compile_exprs(node.into_inner().into_iter(), external)?;
 
-        Array::new(exprs)
+        Some(Array::new(exprs))
     }
 
-    fn compile_object(&mut self, node: Node<ast::Object>, external: &mut ExternalEnv) -> Object {
+    fn compile_object(
+        &mut self,
+        node: Node<ast::Object>,
+        external: &mut ExternalEnv,
+    ) -> Option<Object> {
         use std::collections::BTreeMap;
 
-        let exprs = node
+        let (keys, exprs): (Vec<String>, Vec<Option<Expr>>) = node
             .into_inner()
             .into_iter()
             .map(|(k, expr)| (k.into_inner(), self.compile_expr(expr, external)))
-            .collect::<BTreeMap<_, _>>();
+            .unzip();
 
-        Object::new(exprs)
+        let exprs = exprs.into_iter().collect::<Option<Vec<_>>>()?;
+
+        Some(Object::new(
+            keys.into_iter().zip(exprs).collect::<BTreeMap<_, _>>(),
+        ))
     }
 
     #[cfg(feature = "expr-if_statement")]
@@ -265,33 +312,75 @@ impl<'a> Compiler<'a> {
         &mut self,
         node: Node<ast::IfStatement>,
         external: &mut ExternalEnv,
-    ) -> IfStatement {
+    ) -> Option<IfStatement> {
         let ast::IfStatement {
             predicate,
             consequent,
             alternative,
         } = node.into_inner();
 
-        let predicate = match self.compile_predicate(predicate, external) {
-            Ok(v) => v,
-            Err(err) => {
-                self.diagnostics.push(Box::new(err));
-                return IfStatement::noop();
+        let predicate = self
+            .compile_predicate(predicate, external)?
+            .map_err(|err| self.diagnostics.push(Box::new(err)))
+            .ok()?;
+
+        let original_locals = self.local.clone();
+        let original_external = external.target().cloned();
+
+        let consequent = self.compile_block(consequent, external)?;
+
+        match alternative {
+            Some(block) => {
+                let consequent_locals = self.local.clone();
+                let consequent_external = external.target().cloned();
+
+                self.local = original_locals;
+
+                let else_block = self.compile_block(block, external)?;
+
+                // assignments must be the result of either the if or else block, but not the original value
+                self.local = self.local.clone().merge(consequent_locals);
+                if let Some(details) = Details::merge_optional(
+                    consequent_external,
+                    external.target().cloned(),
+                    TypeDef::any(),
+                ) {
+                    external.update_target(details);
+                }
+
+                Some(IfStatement {
+                    predicate,
+                    consequent,
+                    alternative: Some(else_block),
+                })
             }
-        };
+            None => {
+                // assignments must be the result of either the if block or the original value
+                self.local = self.local.clone().merge(original_locals);
 
-        let consequent = self.compile_block(consequent, external);
-        let alternative = alternative.map(|block| self.compile_block(block, external));
+                if let Some(details) = Details::merge_optional(
+                    original_external,
+                    external.target().cloned(),
+                    TypeDef::any(),
+                ) {
+                    external.update_target(details);
+                }
 
-        IfStatement {
-            predicate,
-            consequent,
-            alternative,
+                Some(IfStatement {
+                    predicate,
+                    consequent,
+                    alternative: None,
+                })
+            }
         }
     }
 
     #[cfg(not(feature = "expr-if_statement"))]
-    fn compile_if_statement(&mut self, node: Node<ast::IfStatement>, _: &mut ExternalEnv) -> Noop {
+    fn compile_if_statement(
+        &mut self,
+        node: Node<ast::IfStatement>,
+        _: &mut ExternalEnv,
+    ) -> Option<Expr> {
         self.handle_missing_feature_error(node.span(), "expr-if_statement")
     }
 
@@ -300,42 +389,49 @@ impl<'a> Compiler<'a> {
         &mut self,
         node: Node<ast::Predicate>,
         external: &mut ExternalEnv,
-    ) -> predicate::Result {
+    ) -> Option<predicate::Result> {
         use ast::Predicate::*;
 
         let (span, predicate) = node.take();
 
         let exprs = match predicate {
-            One(node) => vec![self.compile_expr(*node, external)],
-            Many(nodes) => self.compile_exprs(nodes, external),
+            One(node) => vec![self.compile_expr(*node, external)?],
+            Many(nodes) => self.compile_exprs(nodes, external)?,
         };
 
-        Predicate::new(
+        Some(Predicate::new(
             Node::new(span, exprs),
             (&self.local, external),
-            &mut self.diagnostics,
-        )
+            self.fallible_expression_error,
+        ))
     }
 
     #[cfg(feature = "expr-op")]
-    fn compile_op(&mut self, node: Node<ast::Op>, external: &mut ExternalEnv) -> Op {
+    fn compile_op(&mut self, node: Node<ast::Op>, external: &mut ExternalEnv) -> Option<Op> {
+        use parser::ast::Opcode;
+
         let op = node.into_inner();
         let ast::Op(lhs, opcode, rhs) = op;
 
         let lhs_span = lhs.span();
-        let lhs = Node::new(lhs_span, self.compile_expr(*lhs, external));
+        let lhs = Node::new(lhs_span, self.compile_expr(*lhs, external)?);
+
+        // If we're using error-coalescing, we need to negate any tracked
+        // fallibility error state for the lhs expression.
+        if opcode.inner() == &Opcode::Err {
+            self.fallible_expression_error = None;
+        }
 
         let rhs_span = rhs.span();
-        let rhs = Node::new(rhs_span, self.compile_expr(*rhs, external));
+        let rhs = Node::new(rhs_span, self.compile_expr(*rhs, external)?);
 
-        Op::new(lhs, opcode, rhs, (&mut self.local, external)).unwrap_or_else(|err| {
-            self.diagnostics.push(Box::new(err));
-            Op::noop()
-        })
+        Op::new(lhs, opcode, rhs, (&mut self.local, external))
+            .map_err(|err| self.diagnostics.push(Box::new(err)))
+            .ok()
     }
 
     #[cfg(not(feature = "expr-op"))]
-    fn compile_op(&mut self, node: Node<ast::Op>, _: &mut ExternalEnv) -> Noop {
+    fn compile_op(&mut self, node: Node<ast::Op>, _: &mut ExternalEnv) -> Option<Expr> {
         self.handle_missing_feature_error(node.span(), "expr-op")
     }
 
@@ -347,8 +443,8 @@ impl<'a> Compiler<'a> {
         target: &Node<ast::AssignmentTarget>,
         expr: Box<Node<ast::Expr>>,
         external: &mut ExternalEnv,
-    ) -> Box<Node<Expr>> {
-        Box::new(Node::new(
+    ) -> Option<Box<Node<Expr>>> {
+        Some(Box::new(Node::new(
             span,
             Expr::Op(self.compile_op(
                 Node::new(
@@ -360,8 +456,8 @@ impl<'a> Compiler<'a> {
                     ),
                 ),
                 external,
-            )),
-        ))
+            )?),
+        )))
     }
 
     #[cfg(feature = "expr-assignment")]
@@ -369,7 +465,7 @@ impl<'a> Compiler<'a> {
         &mut self,
         node: Node<ast::Assignment>,
         external: &mut ExternalEnv,
-    ) -> Assignment {
+    ) -> Option<Assignment> {
         use assignment::Variant;
         use ast::{Assignment::*, AssignmentOp};
         use value::Value;
@@ -382,14 +478,18 @@ impl<'a> Compiler<'a> {
 
                 match op {
                     AssignmentOp::Assign => {
-                        let expr = Box::new(
-                            expr.map(|node| self.compile_expr(Node::new(span, node), external)),
-                        );
+                        let expr = self
+                            .compile_expr(*expr, external)
+                            .map(|expr| Box::new(Node::new(span, expr)))
+                            .or_else(|| {
+                                self.skip_missing_assignment_target(target.clone().into_inner());
+                                None
+                            })?;
 
                         Node::new(span, Variant::Single { target, expr })
                     }
                     AssignmentOp::Merge => {
-                        let expr = self.rewrite_to_merge(span, &target, expr, external);
+                        let expr = self.rewrite_to_merge(span, &target, expr, external)?;
                         Node::new(span, Variant::Single { target, expr })
                     }
                 }
@@ -397,11 +497,17 @@ impl<'a> Compiler<'a> {
             Infallible { ok, err, op, expr } => {
                 let span = expr.span();
 
-                match op {
+                let node = match op {
                     AssignmentOp::Assign => {
-                        let expr = Box::new(
-                            expr.map(|node| self.compile_expr(Node::new(span, node), external)),
-                        );
+                        let expr = self
+                            .compile_expr(*expr, external)
+                            .map(|expr| Box::new(Node::new(span, expr)))
+                            .or_else(|| {
+                                self.skip_missing_assignment_target(ok.clone().into_inner());
+                                self.skip_missing_assignment_target(err.clone().into_inner());
+                                None
+                            })?;
+
                         let node = Variant::Infallible {
                             ok,
                             err,
@@ -411,7 +517,7 @@ impl<'a> Compiler<'a> {
                         Node::new(span, node)
                     }
                     AssignmentOp::Merge => {
-                        let expr = self.rewrite_to_merge(span, &ok, expr, external);
+                        let expr = self.rewrite_to_merge(span, &ok, expr, external)?;
                         let node = Variant::Infallible {
                             ok,
                             err,
@@ -421,14 +527,25 @@ impl<'a> Compiler<'a> {
 
                         Node::new(span, node)
                     }
-                }
+                };
+
+                // If the RHS expression is marked as fallible, the "infallible"
+                // assignment nullifies this fallibility, and thus no error
+                // should be emitted.
+                self.fallible_expression_error = None;
+
+                node
             }
         };
 
-        let assignment = Assignment::new(node, &mut self.local, external).unwrap_or_else(|err| {
-            self.diagnostics.push(Box::new(err));
-            Assignment::noop()
-        });
+        let assignment = Assignment::new(
+            node,
+            &mut self.local,
+            external,
+            self.fallible_expression_error,
+        )
+        .map_err(|err| self.diagnostics.push(Box::new(err)))
+        .ok()?;
 
         // Track any potential external target assignments within the program.
         //
@@ -440,19 +557,35 @@ impl<'a> Compiler<'a> {
             }
         }
 
-        assignment
+        Some(assignment)
     }
 
     #[cfg(not(feature = "expr-assignment"))]
-    fn compile_assignment(&mut self, node: Node<ast::Assignment>, _: &mut ExternalEnv) -> Noop {
+    fn compile_assignment(
+        &mut self,
+        node: Node<ast::Assignment>,
+        _: &mut ExternalEnv,
+    ) -> Option<Expr> {
         self.handle_missing_feature_error(node.span(), "expr-assignment")
     }
 
     #[cfg(feature = "expr-query")]
-    fn compile_query(&mut self, node: Node<ast::Query>, external: &mut ExternalEnv) -> Query {
+    fn compile_query(
+        &mut self,
+        node: Node<ast::Query>,
+        external: &mut ExternalEnv,
+    ) -> Option<Query> {
         let ast::Query { target, path } = node.into_inner();
+
+        if self
+            .skip_missing_query_target
+            .contains(&(target.clone().into_inner(), path.clone().into_inner()))
+        {
+            return None;
+        }
+
         let path = path.into_inner();
-        let target = self.compile_query_target(target, external);
+        let target = self.compile_query_target(target, external)?;
 
         // Track any potential external target queries within the program.
         //
@@ -462,11 +595,11 @@ impl<'a> Compiler<'a> {
             self.external_queries.push(path.clone())
         }
 
-        Query::new(target, path)
+        Some(Query::new(target, path))
     }
 
     #[cfg(not(feature = "expr-query"))]
-    fn compile_query(&mut self, node: Node<ast::Query>, _: &mut ExternalEnv) -> Noop {
+    fn compile_query(&mut self, node: Node<ast::Query>, _: &mut ExternalEnv) -> Option<Expr> {
         self.handle_missing_feature_error(node.span(), "expr-query")
     }
 
@@ -475,26 +608,28 @@ impl<'a> Compiler<'a> {
         &mut self,
         node: Node<ast::QueryTarget>,
         external: &mut ExternalEnv,
-    ) -> query::Target {
+    ) -> Option<query::Target> {
         use ast::QueryTarget::*;
 
         let span = node.span();
 
-        match node.into_inner() {
+        let target = match node.into_inner() {
             External => Target::External,
             Internal(ident) => {
-                let variable = self.compile_variable(Node::new(span, ident), external);
+                let variable = self.compile_variable(Node::new(span, ident), external)?;
                 Target::Internal(variable)
             }
             Container(container) => {
-                let container = self.compile_container(Node::new(span, container), external);
+                let container = self.compile_container(Node::new(span, container), external)?;
                 Target::Container(container)
             }
             FunctionCall(call) => {
-                let call = self.compile_function_call(Node::new(span, call), external);
+                let call = self.compile_function_call(Node::new(span, call), external)?;
                 Target::FunctionCall(call)
             }
-        }
+        };
+
+        Some(target)
     }
 
     #[cfg(feature = "expr-function_call")]
@@ -502,7 +637,7 @@ impl<'a> Compiler<'a> {
         &mut self,
         node: Node<ast::FunctionCall>,
         external: &mut ExternalEnv,
-    ) -> FunctionCall {
+    ) -> Option<FunctionCall> {
         let call_span = node.span();
         let ast::FunctionCall {
             ident,
@@ -520,8 +655,13 @@ impl<'a> Compiler<'a> {
 
         let arguments = arguments
             .into_iter()
-            .map(|node| Node::new(node.span(), self.compile_function_argument(node, external)))
-            .collect();
+            .map(|node| {
+                Some(Node::new(
+                    node.span(),
+                    self.compile_function_argument(node, external)?,
+                ))
+            })
+            .collect::<Option<_>>()?;
 
         if abort_on_error {
             self.fallible = true;
@@ -556,19 +696,24 @@ impl<'a> Compiler<'a> {
         )
         // Then, we compile the closure block, and compile the final
         // function-call expression, including the attached closure.
+        .map_err(|err| self.diagnostics.push(Box::new(err)))
+        .ok()
         .and_then(|builder| {
-            let block = closure_block.map(|block| {
-                let span = block.span();
-                let block = self.compile_block(block, external);
+            let block = match closure_block {
+                None => None,
+                Some(block) => {
+                    let span = block.span();
+                    match self.compile_block(block, external) {
+                        Some(block) => Some(Node::new(span, block)),
+                        None => return None,
+                    }
+                }
+            };
 
-                Node::new(span, block)
-            });
-
-            builder.compile(&mut self.local, external, block, local_snapshot)
-        })
-        .unwrap_or_else(|err| {
-            self.diagnostics.push(Box::new(err));
-            FunctionCall::noop()
+            builder
+                .compile(&mut self.local, external, block, local_snapshot)
+                .map_err(|err| self.diagnostics.push(Box::new(err)))
+                .ok()
         })
     }
 
@@ -577,10 +722,11 @@ impl<'a> Compiler<'a> {
         &mut self,
         node: Node<ast::FunctionArgument>,
         external: &mut ExternalEnv,
-    ) -> FunctionArgument {
+    ) -> Option<FunctionArgument> {
         let ast::FunctionArgument { ident, expr } = node.into_inner();
-        let expr = Node::new(expr.span(), self.compile_expr(expr, external));
-        FunctionArgument::new(ident, expr)
+        let expr = Node::new(expr.span(), self.compile_expr(expr, external)?);
+
+        Some(FunctionArgument::new(ident, expr))
     }
 
     #[cfg(not(feature = "expr-function_call"))]
@@ -588,40 +734,51 @@ impl<'a> Compiler<'a> {
         &mut self,
         node: Node<ast::FunctionCall>,
         _: &mut ExternalEnv,
-    ) -> Noop {
+    ) -> Option<Noop> {
         // Guard against `dead_code` lint, to avoid having to sprinkle
         // attributes all over the place.
         let _ = self.fns;
 
-        self.handle_missing_feature_error(node.span(), "expr-function_call")
+        self.handle_missing_feature_error(node.span(), "expr-function_call");
+        None
     }
 
     fn compile_variable(
         &mut self,
         node: Node<ast::Ident>,
         _external: &mut ExternalEnv,
-    ) -> Variable {
+    ) -> Option<Variable> {
         let (span, ident) = node.take();
 
-        Variable::new(span, ident.clone(), &self.local).unwrap_or_else(|err| {
-            self.diagnostics.push(Box::new(err));
-            Variable::noop(ident)
-        })
+        if self
+            .skip_missing_query_target
+            .contains(&(QueryTarget::Internal(ident.clone()), LookupBuf::root()))
+        {
+            return None;
+        }
+
+        Variable::new(span, ident, &self.local)
+            .map_err(|err| self.diagnostics.push(Box::new(err)))
+            .ok()
     }
 
     #[cfg(feature = "expr-unary")]
-    fn compile_unary(&mut self, node: Node<ast::Unary>, external: &mut ExternalEnv) -> Unary {
+    fn compile_unary(
+        &mut self,
+        node: Node<ast::Unary>,
+        external: &mut ExternalEnv,
+    ) -> Option<Unary> {
         use ast::Unary::*;
 
         let variant = match node.into_inner() {
-            Not(node) => self.compile_not(node, external).into(),
+            Not(node) => self.compile_not(node, external)?.into(),
         };
 
-        Unary::new(variant)
+        Some(Unary::new(variant))
     }
 
     #[cfg(not(feature = "expr-unary"))]
-    fn compile_unary(&mut self, node: Node<ast::Unary>, _: &mut ExternalEnv) -> Noop {
+    fn compile_unary(&mut self, node: Node<ast::Unary>, _: &mut ExternalEnv) -> Option<Expr> {
         use ast::Unary::*;
 
         let span = match node.into_inner() {
@@ -632,33 +789,38 @@ impl<'a> Compiler<'a> {
     }
 
     #[cfg(feature = "expr-unary")]
-    fn compile_not(&mut self, node: Node<ast::Not>, external: &mut ExternalEnv) -> Not {
+    fn compile_not(&mut self, node: Node<ast::Not>, external: &mut ExternalEnv) -> Option<Not> {
         let (not, expr) = node.into_inner().take();
 
-        let node = Node::new(expr.span(), self.compile_expr(*expr, external));
+        let node = Node::new(expr.span(), self.compile_expr(*expr, external)?);
 
-        Not::new(node, not.span(), (&self.local, external)).unwrap_or_else(|err| {
-            self.diagnostics.push(Box::new(err));
-            Not::noop()
-        })
+        Not::new(node, not.span(), (&self.local, external))
+            .map_err(|err| self.diagnostics.push(Box::new(err)))
+            .ok()
     }
 
     #[cfg(feature = "expr-abort")]
-    fn compile_abort(&mut self, node: Node<ast::Abort>, external: &mut ExternalEnv) -> Abort {
+    fn compile_abort(
+        &mut self,
+        node: Node<ast::Abort>,
+        external: &mut ExternalEnv,
+    ) -> Option<Abort> {
         self.abortable = true;
         let (span, abort) = node.take();
-        let message = abort
-            .message
-            .map(|expr| Node::new(expr.span(), self.compile_expr(*expr, external)));
+        let message = match abort.message {
+            Some(node) => Some(
+                (*node).map_option(|expr| self.compile_expr(Node::new(span, expr), external))?,
+            ),
+            None => None,
+        };
 
-        Abort::new(span, message, (&self.local, external)).unwrap_or_else(|err| {
-            self.diagnostics.push(Box::new(err));
-            Abort::noop(span)
-        })
+        Abort::new(span, message, (&self.local, external))
+            .map_err(|err| self.diagnostics.push(Box::new(err)))
+            .ok()
     }
 
     #[cfg(not(feature = "expr-abort"))]
-    fn compile_abort(&mut self, node: Node<ast::Abort>, _: &mut ExternalEnv) -> Noop {
+    fn compile_abort(&mut self, node: Node<ast::Abort>, _: &mut ExternalEnv) -> Option<Expr> {
         self.handle_missing_feature_error(node.span(), "expr-abort")
     }
 
@@ -667,10 +829,29 @@ impl<'a> Compiler<'a> {
     }
 
     #[allow(dead_code)]
-    fn handle_missing_feature_error(&mut self, span: Span, feature: &'static str) -> Noop {
+    fn handle_missing_feature_error(&mut self, span: Span, feature: &'static str) -> Option<Expr> {
         self.diagnostics
             .push(Box::new(Error::Missing { span, feature }));
 
-        Noop
+        None
+    }
+
+    #[cfg(feature = "expr-assignment")]
+    fn skip_missing_assignment_target(&mut self, target: ast::AssignmentTarget) {
+        let query = match target {
+            ast::AssignmentTarget::Noop => return,
+            ast::AssignmentTarget::Query(ast::Query { target, path }) => {
+                (target.into_inner(), path.into_inner())
+            }
+            ast::AssignmentTarget::Internal(ident, path) => (
+                QueryTarget::Internal(ident),
+                path.unwrap_or_else(LookupBuf::root),
+            ),
+            ast::AssignmentTarget::External(path) => {
+                (QueryTarget::External, path.unwrap_or_else(LookupBuf::root))
+            }
+        };
+
+        self.skip_missing_query_target.push(query);
     }
 }
