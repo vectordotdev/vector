@@ -76,6 +76,7 @@ impl Expression for Literal {
         &self,
         _: (&mut LocalEnv, &mut ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
+        _: &mut Vec<crate::llvm::BasicBlock<'ctx>>,
     ) -> Result<(), String> {
         let function = ctx.function();
         let literal_begin_block = ctx.context().append_basic_block(function, "literal_begin");

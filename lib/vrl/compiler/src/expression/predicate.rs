@@ -80,9 +80,12 @@ impl Expression for Predicate {
         &self,
         state: (&mut LocalEnv, &mut ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
+        function_call_abort_stack: &mut Vec<crate::llvm::BasicBlock<'ctx>>,
     ) -> std::result::Result<(), String> {
         for inner in &self.inner {
-            inner.emit_llvm((state.0, state.1), ctx)?;
+            let mut abort_stack = Vec::new();
+            inner.emit_llvm((state.0, state.1), ctx, &mut abort_stack)?;
+            function_call_abort_stack.extend(abort_stack);
         }
         Ok(())
     }

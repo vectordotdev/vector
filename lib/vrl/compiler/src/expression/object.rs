@@ -68,6 +68,7 @@ impl Expression for Object {
         &self,
         state: (&mut LocalEnv, &mut ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
+        function_call_abort_stack: &mut Vec<crate::llvm::BasicBlock<'ctx>>,
     ) -> Result<(), String> {
         let function = ctx.function();
         let begin_block = ctx.context().append_basic_block(function, "object_begin");
@@ -104,23 +105,9 @@ impl Expression for Object {
         for (index, (_, expression)) in self.inner.iter().enumerate() {
             let value_ref = value_refs[index];
             ctx.set_result_ref(value_ref);
-            expression.emit_llvm((state.0, state.1), ctx)?;
-            let type_def = expression.type_def((state.0, state.1));
-            if type_def.is_abortable() {
-                let is_err = ctx
-                    .vrl_resolved_is_err()
-                    .build_call(ctx.builder(), value_ref)
-                    .try_as_basic_value()
-                    .left()
-                    .expect("result is not a basic value")
-                    .try_into()
-                    .expect("result is not an int value");
-
-                let insert_block = ctx.context().append_basic_block(function, "object_insert");
-                ctx.builder()
-                    .build_conditional_branch(is_err, end_block, insert_block);
-                ctx.builder().position_at_end(insert_block);
-            }
+            let mut abort_stack = Vec::new();
+            expression.emit_llvm((state.0, state.1), ctx, &mut abort_stack)?;
+            function_call_abort_stack.extend(abort_stack);
         }
 
         for (index, (key, _)) in self.inner.iter().enumerate() {

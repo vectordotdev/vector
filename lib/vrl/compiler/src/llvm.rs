@@ -24,6 +24,8 @@ use lookup::LookupBuf;
 use parser::ast::Ident;
 use std::{collections::HashMap, ffi::CStr, ops::Deref};
 
+pub use inkwell::basic_block::BasicBlock;
+
 static VRL_EXECUTE_SYMBOL: &str = "vrl_execute";
 
 pub struct Compiler(ThreadSafeContext);
@@ -70,8 +72,10 @@ impl Compiler {
             block.remove_from_function().unwrap();
         }
 
-        let start = context.append_basic_block(function, "start");
-        builder.position_at_end(start);
+        let start_block = context.append_basic_block(function, "start");
+        builder.position_at_end(start_block);
+
+        let end_block = context.append_basic_block(function, "end");
 
         let mut context = Context {
             stdlib,
@@ -79,8 +83,10 @@ impl Compiler {
             module,
             builder,
             function,
+            end_block,
             precompiled_functions,
             context_ref,
+            global_result_ref: result_ref,
             result_ref,
             variable_map: Default::default(),
             variables: Default::default(),
@@ -90,7 +96,15 @@ impl Compiler {
             lookup_bufs: Default::default(),
         };
 
-        program.emit_llvm(state, &mut context)?;
+        let mut abort_stack = Vec::new();
+        program.emit_llvm(state, &mut context, &mut abort_stack)?;
+        context.builder().build_unconditional_branch(end_block);
+        for abort_block in abort_stack {
+            context.builder().position_at_end(abort_block);
+            context.builder().build_unconditional_branch(end_block);
+        }
+
+        context.builder().position_at_end(end_block);
 
         for variable_ref in &context.variables {
             context
@@ -165,8 +179,10 @@ pub struct Context<'ctx> {
     module: Module<'ctx>,
     builder: inkwell::builder::Builder<'ctx>,
     function: FunctionValue<'ctx>,
+    end_block: BasicBlock<'ctx>,
     precompiled_functions: PrecompiledFunctions<'ctx>,
     context_ref: PointerValue<'ctx>,
+    global_result_ref: PointerValue<'ctx>,
     result_ref: PointerValue<'ctx>,
     variable_map: HashMap<Ident, usize>,
     variables: Vec<PointerValue<'ctx>>,
@@ -197,8 +213,16 @@ impl<'ctx> Context<'ctx> {
         self.function
     }
 
+    pub fn end_block(&self) -> BasicBlock<'ctx> {
+        self.end_block
+    }
+
     pub fn context_ref(&self) -> inkwell::values::PointerValue<'ctx> {
         self.context_ref
+    }
+
+    pub fn global_result_ref(&self) -> inkwell::values::PointerValue<'ctx> {
+        self.global_result_ref
     }
 
     pub fn result_ref(&self) -> inkwell::values::PointerValue<'ctx> {
@@ -420,6 +444,10 @@ impl<'ctx> Context<'ctx> {
 
     pub fn vrl_btree_map_initialize(&self) -> PrecompiledFunction<'ctx, 2> {
         self.precompiled_functions.vrl_btree_map_initialize
+    }
+
+    pub fn vrl_resolved_swap(&self) -> PrecompiledFunction<'ctx, 2> {
+        self.precompiled_functions.vrl_resolved_swap
     }
 
     pub fn vrl_resolved_drop(&self) -> PrecompiledFunction<'ctx, 1> {
@@ -692,8 +720,9 @@ impl<'ctx> Context<'ctx> {
         self.precompiled_functions.vrl_expression_query_target
     }
 
-    pub fn vrl_expression_function_call(&self) -> PrecompiledFunction<'ctx, 2> {
-        self.precompiled_functions.vrl_expression_function_call
+    pub fn vrl_expression_function_call_abort(&self) -> PrecompiledFunction<'ctx, 3> {
+        self.precompiled_functions
+            .vrl_expression_function_call_abort
     }
 
     pub fn vrl_del_external(&self) -> PrecompiledFunction<'ctx, 3> {
@@ -853,6 +882,7 @@ pub struct PrecompiledFunctions<'ctx> {
     vrl_static_initialize: PrecompiledFunction<'ctx, 1>,
     vrl_vec_initialize: PrecompiledFunction<'ctx, 2>,
     vrl_btree_map_initialize: PrecompiledFunction<'ctx, 2>,
+    vrl_resolved_swap: PrecompiledFunction<'ctx, 2>,
     vrl_resolved_drop: PrecompiledFunction<'ctx, 1>,
     vrl_optional_value_drop: PrecompiledFunction<'ctx, 1>,
     vrl_resolved_as_value: PrecompiledFunction<'ctx, 1>,
@@ -919,7 +949,7 @@ pub struct PrecompiledFunctions<'ctx> {
     vrl_expression_op_and_falsy: PrecompiledFunction<'ctx, 2>,
     vrl_expression_query_target_external: PrecompiledFunction<'ctx, 3>,
     vrl_expression_query_target: PrecompiledFunction<'ctx, 2>,
-    vrl_expression_function_call: PrecompiledFunction<'ctx, 2>,
+    vrl_expression_function_call_abort: PrecompiledFunction<'ctx, 3>,
     vrl_del_external: PrecompiledFunction<'ctx, 3>,
     vrl_del_internal: PrecompiledFunction<'ctx, 3>,
     vrl_del_expression: PrecompiledFunction<'ctx, 3>,
@@ -950,6 +980,9 @@ impl<'ctx> PrecompiledFunctions<'ctx> {
             },
             vrl_btree_map_initialize: PrecompiledFunction {
                 function: module.get_function("vrl_btree_map_initialize").unwrap(),
+            },
+            vrl_resolved_swap: PrecompiledFunction {
+                function: module.get_function("vrl_resolved_swap").unwrap(),
             },
             vrl_resolved_drop: PrecompiledFunction {
                 function: module.get_function("vrl_resolved_drop").unwrap(),
@@ -1173,8 +1206,10 @@ impl<'ctx> PrecompiledFunctions<'ctx> {
             vrl_expression_query_target: PrecompiledFunction {
                 function: module.get_function("vrl_expression_query_target").unwrap(),
             },
-            vrl_expression_function_call: PrecompiledFunction {
-                function: module.get_function("vrl_expression_function_call").unwrap(),
+            vrl_expression_function_call_abort: PrecompiledFunction {
+                function: module
+                    .get_function("vrl_expression_function_call_abort")
+                    .unwrap(),
             },
             vrl_del_internal: PrecompiledFunction {
                 function: module.get_function("vrl_del_internal").unwrap(),

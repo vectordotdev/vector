@@ -191,6 +191,7 @@ impl Expression for DelFn {
         &self,
         state: (&mut vrl::state::LocalEnv, &mut vrl::state::ExternalEnv),
         ctx: &mut vrl::llvm::Context<'ctx>,
+        function_call_abort_stack: &mut Vec<vrl::llvm::BasicBlock<'ctx>>,
     ) -> std::result::Result<(), String> {
         let query = &self.query;
         let path = query.path();
@@ -238,7 +239,9 @@ impl Expression for DelFn {
             ctx.vrl_resolved_initialize()
                 .build_call(ctx.builder(), resolved_temp_ref);
             ctx.set_result_ref(resolved_temp_ref);
-            expr.emit_llvm(state, ctx)?;
+            let mut error_stack = Vec::new();
+            expr.emit_llvm(state, ctx, &mut error_stack)?;
+            function_call_abort_stack.extend(error_stack);
             let vrl_del_expression = ctx.vrl_del_expression();
             vrl_del_expression.build_call(
                 ctx.builder(),

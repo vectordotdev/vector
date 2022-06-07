@@ -25,6 +25,7 @@ impl Expression for Noop {
         &self,
         _: (&mut LocalEnv, &mut ExternalEnv),
         _: &mut crate::llvm::Context<'ctx>,
+        _: &mut Vec<crate::llvm::BasicBlock<'ctx>>,
     ) -> Result<(), String> {
         Ok(())
     }

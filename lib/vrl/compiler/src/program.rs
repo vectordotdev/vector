@@ -42,8 +42,10 @@ impl Program {
         &self,
         state: (&mut crate::state::LocalEnv, &mut crate::state::ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
+        function_call_abort_stack: &mut Vec<crate::llvm::BasicBlock<'ctx>>,
     ) -> Result<(), String> {
-        self.expressions.emit_llvm(state, ctx)
+        self.expressions
+            .emit_llvm(state, ctx, function_call_abort_stack)
     }
 }
 

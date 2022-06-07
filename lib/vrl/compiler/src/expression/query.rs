@@ -143,6 +143,7 @@ impl Expression for Query {
         &self,
         state: (&mut LocalEnv, &mut ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
+        function_call_abort_stack: &mut Vec<crate::llvm::BasicBlock<'ctx>>,
     ) -> Result<(), String> {
         let result_ref = ctx.result_ref();
         let path_name = format!("{}", self.path);
@@ -150,6 +151,7 @@ impl Expression for Query {
             .into_const(self.path.clone(), &path_name)
             .as_pointer_value();
 
+        let mut abort_stack = Vec::new();
         match &self.target {
             Target::External => {
                 let vrl_expression_query_target_external =
@@ -172,10 +174,11 @@ impl Expression for Query {
 
                 return Ok(());
             }
-            Target::Internal(variable) => variable.emit_llvm(state, ctx)?,
-            Target::FunctionCall(call) => call.emit_llvm(state, ctx)?,
-            Target::Container(container) => container.emit_llvm(state, ctx)?,
+            Target::Internal(variable) => variable.emit_llvm(state, ctx, &mut abort_stack)?,
+            Target::FunctionCall(call) => call.emit_llvm(state, ctx, &mut abort_stack)?,
+            Target::Container(container) => container.emit_llvm(state, ctx, &mut abort_stack)?,
         };
+        function_call_abort_stack.extend(abort_stack);
 
         let vrl_expression_query_target = ctx.vrl_expression_query_target();
         vrl_expression_query_target.build_call(

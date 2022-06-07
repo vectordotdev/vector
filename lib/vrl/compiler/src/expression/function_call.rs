@@ -576,11 +576,8 @@ impl Expression for FunctionCall {
 
                 ExpressionError::Error {
                     message: format!(
-                        r#"function call error for "{}" at ({}:{}): {}"#,
-                        self.ident,
-                        self.span.start(),
-                        self.span.end(),
-                        message
+                        r#"function call error for "{}" at {}: {}"#,
+                        self.ident, self.span, message
                     ),
                     labels,
                     notes,
@@ -669,7 +666,7 @@ impl Expression for FunctionCall {
         }
 
         if self.abort_on_error {
-            type_def = type_def.with_fallibility(false).abortable();
+            type_def = type_def.with_fallibility(false);
         }
 
         type_def
@@ -680,9 +677,10 @@ impl Expression for FunctionCall {
         &self,
         state: (&mut LocalEnv, &mut ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
+        function_call_abort_stack: &mut Vec<crate::llvm::BasicBlock<'ctx>>,
     ) -> Result<(), String> {
         if ["del", "exists"].contains(&self.ident) {
-            return self.expr.emit_llvm(state, ctx);
+            return self.expr.emit_llvm(state, ctx, function_call_abort_stack);
         }
 
         let stdlib_function = ctx.stdlib(self.function_id);
@@ -748,7 +746,11 @@ impl Expression for FunctionCall {
                         .build_call(ctx.builder(), resolved_ref);
 
                     ctx.set_result_ref(resolved_ref);
-                    argument.expression.emit_llvm((state.0, state.1), ctx)?;
+                    let mut abort_stack = Vec::new();
+                    argument
+                        .expression
+                        .emit_llvm((state.0, state.1), ctx, &mut abort_stack)?;
+                    function_call_abort_stack.extend(abort_stack);
                     ctx.set_result_ref(result_ref);
 
                     let value_ref = ctx
@@ -780,7 +782,11 @@ impl Expression for FunctionCall {
                         .build_call(ctx.builder(), optional_value_ref);
 
                     ctx.set_result_ref(resolved_ref);
-                    argument.expression.emit_llvm((state.0, state.1), ctx)?;
+                    let mut abort_stack = Vec::new();
+                    argument
+                        .expression
+                        .emit_llvm((state.0, state.1), ctx, &mut abort_stack)?;
+                    function_call_abort_stack.extend(abort_stack);
                     ctx.set_result_ref(result_ref);
 
                     ctx.vrl_resolved_as_value_to_optional_value().build_call(
@@ -811,28 +817,63 @@ impl Expression for FunctionCall {
             }
         }
 
-        argument_refs.push(ctx.result_ref().into());
+        argument_refs.push(result_ref.into());
 
         ctx.builder()
             .build_call(function, &argument_refs, self.ident);
 
-        let type_def = self.expr.type_def((state.0, state.1));
-        if type_def.is_fallible() {
-            let error = format!(
-                r#"function call error for "{}" at ({}:{})"#,
-                self.ident,
-                self.span.start(),
-                self.span.end()
+        for drop_calls in drop_calls {
+            for (value_ref, drop_fn) in drop_calls {
+                drop_fn.build_call(ctx.builder(), value_ref);
+            }
+        }
+
+        if self.abort_on_error {
+            let is_error = ctx
+                .vrl_resolved_is_err()
+                .build_call(ctx.builder(), result_ref)
+                .try_as_basic_value()
+                .left()
+                .expect("result is not a basic value")
+                .try_into()
+                .expect("result is not an int value");
+
+            let function_call_resume_block = ctx
+                .context()
+                .append_basic_block(ctx.function(), "function_call_resume");
+            let function_call_abort_block = ctx
+                .context()
+                .append_basic_block(ctx.function(), "function_call_abort");
+            ctx.builder().build_conditional_branch(
+                is_error,
+                function_call_abort_block,
+                function_call_resume_block,
             );
 
-            let error_ref = ctx.into_const(error.clone(), &error).as_pointer_value();
+            ctx.builder().position_at_end(function_call_abort_block);
+            ctx.vrl_resolved_swap()
+                .build_call(ctx.builder(), result_ref, ctx.global_result_ref());
 
-            let vrl_expression_function_call = ctx.vrl_expression_function_call();
-            vrl_expression_function_call.build_call(
+            function_call_abort_stack.push(function_call_abort_block);
+            ctx.builder().position_at_end(function_call_resume_block);
+        }
+
+        let current_block = ctx.builder().get_insert_block().unwrap();
+
+        for abort_block in function_call_abort_stack {
+            ctx.builder().position_at_end(*abort_block);
+            let ident_ref = ctx
+                .into_const(self.ident.to_owned(), self.ident)
+                .as_pointer_value();
+            let span_ref = ctx
+                .into_const(self.span, &self.span.to_string())
+                .as_pointer_value();
+            let vrl_expression_function_call_abort = ctx.vrl_expression_function_call_abort();
+            vrl_expression_function_call_abort.build_call(
                 ctx.builder(),
                 ctx.builder().build_bitcast(
-                    error_ref,
-                    vrl_expression_function_call
+                    ident_ref,
+                    vrl_expression_function_call_abort
                         .function
                         .get_nth_param(0)
                         .unwrap()
@@ -840,17 +881,21 @@ impl Expression for FunctionCall {
                         .into_pointer_type(),
                     "cast",
                 ),
-                result_ref,
+                ctx.builder().build_bitcast(
+                    span_ref,
+                    vrl_expression_function_call_abort
+                        .function
+                        .get_nth_param(1)
+                        .unwrap()
+                        .get_type()
+                        .into_pointer_type(),
+                    "cast",
+                ),
+                ctx.global_result_ref(),
             );
         }
 
-        argument_refs.pop();
-
-        for drop_calls in drop_calls {
-            for (value_ref, drop_fn) in drop_calls {
-                drop_fn.build_call(ctx.builder(), value_ref);
-            }
-        }
+        ctx.builder().position_at_end(current_block);
 
         Ok(())
     }

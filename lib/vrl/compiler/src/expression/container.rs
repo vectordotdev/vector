@@ -64,14 +64,15 @@ impl Expression for Container {
         &self,
         state: (&mut LocalEnv, &mut ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
+        function_call_abort_stack: &mut Vec<crate::llvm::BasicBlock<'ctx>>,
     ) -> Result<(), String> {
         use Variant::*;
 
         match &self.variant {
-            Group(v) => v.emit_llvm(state, ctx),
-            Block(v) => v.emit_llvm(state, ctx),
-            Array(v) => v.emit_llvm(state, ctx),
-            Object(v) => v.emit_llvm(state, ctx),
+            Group(v) => v.emit_llvm(state, ctx, function_call_abort_stack),
+            Block(v) => v.emit_llvm(state, ctx, function_call_abort_stack),
+            Array(v) => v.emit_llvm(state, ctx, function_call_abort_stack),
+            Object(v) => v.emit_llvm(state, ctx, function_call_abort_stack),
         }
     }
 }

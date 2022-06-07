@@ -71,6 +71,7 @@ impl Expression for Block {
         &self,
         state: (&mut LocalEnv, &mut ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
+        function_call_abort_stack: &mut Vec<crate::llvm::BasicBlock<'ctx>>,
     ) -> Result<(), String> {
         let function = ctx.function();
         let block_begin_block = ctx.context().append_basic_block(function, "block_begin");
@@ -78,10 +79,12 @@ impl Expression for Block {
         ctx.builder().position_at_end(block_begin_block);
 
         let block_end_block = ctx.context().append_basic_block(function, "block_end");
-        let block_error_block = ctx.context().append_basic_block(function, "block_error");
+        let block_abort_block = ctx.context().append_basic_block(function, "block_error");
 
         for expr in &self.inner {
-            expr.emit_llvm((state.0, state.1), ctx)?;
+            let mut abort_stack = Vec::new();
+            expr.emit_llvm((state.0, state.1), ctx, &mut abort_stack)?;
+            function_call_abort_stack.extend(abort_stack);
             let is_err = {
                 ctx.vrl_resolved_is_err()
                     .build_call(ctx.builder(), ctx.result_ref())
@@ -94,13 +97,13 @@ impl Expression for Block {
 
             let block_next_block = ctx.context().append_basic_block(function, "block_next");
             ctx.builder()
-                .build_conditional_branch(is_err, block_error_block, block_next_block);
+                .build_conditional_branch(is_err, block_abort_block, block_next_block);
             ctx.builder().position_at_end(block_next_block);
         }
 
         let block_next_block = ctx.builder().get_insert_block().unwrap();
 
-        ctx.builder().position_at_end(block_error_block);
+        ctx.builder().position_at_end(block_abort_block);
         ctx.builder().build_unconditional_branch(block_end_block);
 
         ctx.builder().position_at_end(block_next_block);

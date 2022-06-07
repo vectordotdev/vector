@@ -55,18 +55,22 @@ impl Expression for Not {
         &self,
         state: (&mut LocalEnv, &mut ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
+        function_call_abort_stack: &mut Vec<crate::llvm::BasicBlock<'ctx>>,
     ) -> std::result::Result<(), String> {
         let function = ctx.function();
         let not_begin_block = ctx.context().append_basic_block(function, "not_begin");
         ctx.builder().build_unconditional_branch(not_begin_block);
         ctx.builder().position_at_end(not_begin_block);
 
-        self.inner.emit_llvm((state.0, state.1), ctx)?;
+        let mut abort_stack = Vec::new();
+        self.inner
+            .emit_llvm((state.0, state.1), ctx, &mut abort_stack)?;
+        function_call_abort_stack.extend(abort_stack);
 
         let not_end_block = ctx.context().append_basic_block(function, "not_end");
 
         let type_def = self.inner.type_def((state.0, state.1));
-        if type_def.is_fallible() || type_def.is_abortable() {
+        if type_def.is_fallible() {
             let is_err = ctx
                 .vrl_resolved_is_err()
                 .build_call(ctx.builder(), ctx.result_ref())

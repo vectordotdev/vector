@@ -44,6 +44,7 @@ impl Expression for IfStatement {
         &self,
         state: (&mut LocalEnv, &mut ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
+        function_call_abort_stack: &mut Vec<crate::llvm::BasicBlock<'ctx>>,
     ) -> Result<(), String> {
         let function = ctx.function();
         let if_statement_begin_block = ctx
@@ -60,7 +61,10 @@ impl Expression for IfStatement {
             .build_call(ctx.builder(), predicate_ref);
 
         ctx.set_result_ref(predicate_ref);
-        self.predicate.emit_llvm((state.0, state.1), ctx)?;
+        let mut abort_stack = Vec::new();
+        self.predicate
+            .emit_llvm((state.0, state.1), ctx, &mut abort_stack)?;
+        function_call_abort_stack.extend(abort_stack);
         ctx.set_result_ref(result_ref);
 
         let is_true = ctx
@@ -90,12 +94,17 @@ impl Expression for IfStatement {
             .build_conditional_branch(is_true, if_branch_block, else_branch_block);
 
         ctx.builder().position_at_end(if_branch_block);
-        self.consequent.emit_llvm((state.0, state.1), ctx)?;
+        let mut abort_stack = Vec::new();
+        self.consequent
+            .emit_llvm((state.0, state.1), ctx, &mut abort_stack)?;
+        function_call_abort_stack.extend(abort_stack);
         ctx.builder().build_unconditional_branch(end_block);
 
         ctx.builder().position_at_end(else_branch_block);
         if let Some(alternative) = &self.alternative {
-            alternative.emit_llvm((state.0, state.1), ctx)?;
+            let mut abort_stack = Vec::new();
+            alternative.emit_llvm((state.0, state.1), ctx, &mut abort_stack)?;
+            function_call_abort_stack.extend(abort_stack);
         } else {
             ctx.vrl_resolved_set_null()
                 .build_call(ctx.builder(), result_ref);

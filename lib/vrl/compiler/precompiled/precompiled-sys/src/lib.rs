@@ -1,7 +1,8 @@
 use bytes::{BufMut, BytesMut};
 use std::{any::Any, collections::BTreeMap};
 use vrl_core::{
-    Context, Error, ExpressionError, LookupBuf, Resolved, Span, Target, Value, VrlValueArithmetic,
+    Context, Error, ExpressionError, Label, LookupBuf, Resolved, Span, Target, Value,
+    VrlValueArithmetic,
 };
 
 // We only want to precompile the stub for this function, and therefore don't
@@ -71,6 +72,11 @@ pub unsafe extern "C" fn vrl_btree_map_initialize(vec: &mut Vec<(String, Value)>
             vec
         },
     );
+}
+
+#[no_mangle]
+pub extern "C" fn vrl_resolved_swap(x: &mut Resolved, y: &mut Resolved) {
+    std::mem::swap(x, y);
 }
 
 /// # Safety
@@ -1097,21 +1103,38 @@ pub extern "C" fn vrl_expression_query_target(path: &LookupBuf, result: &mut Res
 }
 
 #[no_mangle]
-pub extern "C" fn vrl_expression_function_call(
-    #[allow(clippy::ptr_arg)] error: &String,
+pub extern "C" fn vrl_expression_function_call_abort(
+    #[allow(clippy::ptr_arg)] ident: &String,
+    span: &Span,
     result: &mut Resolved,
 ) {
-    if let Err(ExpressionError::Error {
-        message,
-        labels,
-        notes,
-    }) = result
-    {
-        *result = Err(ExpressionError::Error {
-            message: format!(r#"{}: {}"#, error, message),
-            labels: std::mem::take(labels),
-            notes: std::mem::take(notes),
-        })
+    let error = {
+        let mut moved = Ok(Value::Null);
+        std::mem::swap(result, &mut moved);
+        moved
+    };
+
+    match error {
+        Err(ExpressionError::Error {
+            message,
+            mut labels,
+            notes,
+        }) => {
+            labels.push(Label::primary(message.clone(), span));
+
+            *result = Err(ExpressionError::Error {
+                message: format!(
+                    r#"function call error for "{}" at {}: {}"#,
+                    ident, span, message
+                ),
+                labels,
+                notes,
+            })
+        }
+        _ => panic!(
+            r#"expected value "{:?}" to be an ExpressionError::Error"#,
+            result
+        ),
     }
 }
 

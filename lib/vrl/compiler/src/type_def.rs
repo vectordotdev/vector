@@ -337,14 +337,6 @@ impl TypeDef {
         !self.is_fallible()
     }
 
-    pub fn is_abortable(&self) -> bool {
-        self.abortable
-    }
-
-    pub fn is_unabortable(&self) -> bool {
-        !self.is_abortable()
-    }
-
     /// Set the type definition to be fallible if its kind is not contained
     /// within the provided kind.
     pub fn fallible_unless(mut self, kind: impl Into<Kind>) -> Self {

@@ -85,6 +85,7 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
         &self,
         _: (&mut LocalEnv, &mut ExternalEnv),
         _: &mut crate::llvm::Context<'ctx>,
+        _: &mut Vec<crate::llvm::BasicBlock<'ctx>>,
     ) -> Result<(), String> {
         Err("Called `emit_llvm` on an expression which is not supposed to emit LLVM IR".into())
     }
@@ -320,21 +321,22 @@ impl Expression for Expr {
         &self,
         state: (&mut LocalEnv, &mut ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
+        function_call_abort_stack: &mut Vec<crate::llvm::BasicBlock<'ctx>>,
     ) -> Result<(), String> {
         use Expr::*;
 
         match self {
-            Literal(v) => v.emit_llvm(state, ctx),
-            Container(v) => v.emit_llvm(state, ctx),
-            IfStatement(v) => v.emit_llvm(state, ctx),
-            Op(v) => v.emit_llvm(state, ctx),
-            Assignment(v) => v.emit_llvm(state, ctx),
-            Query(v) => v.emit_llvm(state, ctx),
-            FunctionCall(v) => v.emit_llvm(state, ctx),
-            Variable(v) => v.emit_llvm(state, ctx),
-            Noop(v) => v.emit_llvm(state, ctx),
-            Unary(v) => v.emit_llvm(state, ctx),
-            Abort(v) => v.emit_llvm(state, ctx),
+            Literal(v) => v.emit_llvm(state, ctx, function_call_abort_stack),
+            Container(v) => v.emit_llvm(state, ctx, function_call_abort_stack),
+            IfStatement(v) => v.emit_llvm(state, ctx, function_call_abort_stack),
+            Op(v) => v.emit_llvm(state, ctx, function_call_abort_stack),
+            Assignment(v) => v.emit_llvm(state, ctx, function_call_abort_stack),
+            Query(v) => v.emit_llvm(state, ctx, function_call_abort_stack),
+            FunctionCall(v) => v.emit_llvm(state, ctx, function_call_abort_stack),
+            Variable(v) => v.emit_llvm(state, ctx, function_call_abort_stack),
+            Noop(v) => v.emit_llvm(state, ctx, function_call_abort_stack),
+            Unary(v) => v.emit_llvm(state, ctx, function_call_abort_stack),
+            Abort(v) => v.emit_llvm(state, ctx, function_call_abort_stack),
         }
     }
 }

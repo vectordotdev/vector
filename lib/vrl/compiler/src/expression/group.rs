@@ -33,8 +33,9 @@ impl Expression for Group {
         &self,
         state: (&mut LocalEnv, &mut ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
+        function_call_abort_stack: &mut Vec<crate::llvm::BasicBlock<'ctx>>,
     ) -> Result<(), String> {
-        self.inner.emit_llvm(state, ctx)
+        self.inner.emit_llvm(state, ctx, function_call_abort_stack)
     }
 }
 

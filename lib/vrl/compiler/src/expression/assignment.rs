@@ -166,8 +166,10 @@ impl Expression for Assignment {
         &self,
         state: (&mut LocalEnv, &mut ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
+        function_call_abort_stack: &mut Vec<crate::llvm::BasicBlock<'ctx>>,
     ) -> Result<(), String> {
-        self.variant.emit_llvm(state, ctx)
+        self.variant
+            .emit_llvm(state, ctx, function_call_abort_stack)
     }
 }
 
@@ -512,6 +514,7 @@ where
         &self,
         state: (&mut LocalEnv, &mut ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
+        function_call_abort_stack: &mut Vec<crate::llvm::BasicBlock<'ctx>>,
     ) -> Result<(), String> {
         match self {
             Variant::Single { target, expr } => {
@@ -527,31 +530,7 @@ where
                     .context()
                     .append_basic_block(function, "assignment_single_end");
 
-                expr.emit_llvm((state.0, state.1), ctx)?;
-
-                if expr.type_def((state.0, state.1)).is_abortable() {
-                    let is_err = {
-                        ctx.vrl_resolved_is_err()
-                            .build_call(ctx.builder(), ctx.result_ref())
-                            .try_as_basic_value()
-                            .left()
-                            .expect("result is not a basic value")
-                            .try_into()
-                            .expect("result is not an int value")
-                    };
-
-                    let assignment_single_is_ok_block = ctx
-                        .context()
-                        .append_basic_block(function, "assignment_single_is_ok");
-
-                    ctx.builder().build_conditional_branch(
-                        is_err,
-                        assignment_single_end_block,
-                        assignment_single_is_ok_block,
-                    );
-
-                    ctx.builder().position_at_end(assignment_single_is_ok_block);
-                }
+                expr.emit_llvm((state.0, state.1), ctx, function_call_abort_stack)?;
 
                 target.emit_llvm_insert(ctx)?;
 
@@ -581,7 +560,7 @@ where
                     .build_call(ctx.builder(), result_temp_ref);
 
                 ctx.set_result_ref(result_temp_ref);
-                expr.emit_llvm(state, ctx)?;
+                expr.emit_llvm(state, ctx, function_call_abort_stack)?;
 
                 let is_ok = {
                     ctx.vrl_resolved_is_ok()

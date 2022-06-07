@@ -14,7 +14,7 @@ mod target;
 
 pub use arithmetic::VrlValueArithmetic;
 pub use convert::VrlValueConvert;
-pub use diagnostic::Span;
+pub use diagnostic::{Label, Span};
 pub use error::Error;
 pub use expression::{ExpressionError, Resolved};
 pub use lookup::LookupBuf;

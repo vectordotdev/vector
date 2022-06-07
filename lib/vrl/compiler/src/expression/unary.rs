@@ -44,11 +44,12 @@ impl Expression for Unary {
         &self,
         state: (&mut LocalEnv, &mut ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
+        function_call_abort_stack: &mut Vec<crate::llvm::BasicBlock<'ctx>>,
     ) -> Result<(), String> {
         use Variant::*;
 
         match &self.variant {
-            Not(v) => v.emit_llvm(state, ctx),
+            Not(v) => v.emit_llvm(state, ctx, function_call_abort_stack),
         }
     }
 }

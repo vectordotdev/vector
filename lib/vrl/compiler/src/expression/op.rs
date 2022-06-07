@@ -274,6 +274,7 @@ impl Expression for Op {
         &self,
         state: (&mut LocalEnv, &mut ExternalEnv),
         ctx: &mut crate::llvm::Context<'ctx>,
+        function_call_abort_stack: &mut Vec<crate::llvm::BasicBlock<'ctx>>,
     ) -> Result<(), String> {
         let lhs_def = self.lhs.type_def((state.0, state.1));
         let rhs_def = self.rhs.type_def((state.0, state.1));
@@ -325,7 +326,10 @@ impl Expression for Op {
                     .build_call(ctx.builder(), lhs_resolved_ref);
 
                 ctx.set_result_ref(lhs_resolved_ref);
-                self.lhs.emit_llvm((state.0, state.1), ctx)?;
+                let mut abort_stack = Vec::new();
+                self.lhs
+                    .emit_llvm((state.0, state.1), ctx, &mut abort_stack)?;
+                function_call_abort_stack.extend(abort_stack);
 
                 let lhs_value_ref = ctx
                     .vrl_resolved_as_value()
@@ -339,7 +343,10 @@ impl Expression for Op {
                     .build_call(ctx.builder(), rhs_resolved_ref);
 
                 ctx.set_result_ref(rhs_resolved_ref);
-                self.rhs.emit_llvm((state.0, state.1), ctx)?;
+                let mut abort_stack = Vec::new();
+                self.rhs
+                    .emit_llvm((state.0, state.1), ctx, &mut abort_stack)?;
+                function_call_abort_stack.extend(abort_stack);
 
                 let rhs_value_ref = ctx
                     .vrl_resolved_as_value()
@@ -520,7 +527,10 @@ impl Expression for Op {
                 ctx.set_result_ref(result_ref);
             }
             ast::Opcode::Or => {
-                self.lhs.emit_llvm((state.0, state.1), ctx)?;
+                let mut abort_stack = Vec::new();
+                self.lhs
+                    .emit_llvm((state.0, state.1), ctx, &mut abort_stack)?;
+                function_call_abort_stack.extend(abort_stack);
 
                 let op_or_end_block = ctx.context().append_basic_block(function, "op_or_end");
 
@@ -541,7 +551,10 @@ impl Expression for Op {
                 );
 
                 ctx.builder().position_at_end(op_or_falsy_block);
-                self.rhs.emit_llvm((state.0, state.1), ctx)?;
+                let mut abort_stack = Vec::new();
+                self.rhs
+                    .emit_llvm((state.0, state.1), ctx, &mut abort_stack)?;
+                function_call_abort_stack.extend(abort_stack);
                 ctx.builder().build_unconditional_branch(op_or_end_block);
 
                 ctx.builder().position_at_end(op_or_end_block);
@@ -552,7 +565,10 @@ impl Expression for Op {
                     .build_call(ctx.builder(), lhs_resolved_ref);
 
                 ctx.set_result_ref(lhs_resolved_ref);
-                self.lhs.emit_llvm((state.0, state.1), ctx)?;
+                let mut abort_stack = Vec::new();
+                self.lhs
+                    .emit_llvm((state.0, state.1), ctx, &mut abort_stack)?;
+                function_call_abort_stack.extend(abort_stack);
 
                 let op_and_end_block = ctx.context().append_basic_block(function, "op_and_end");
 
@@ -579,7 +595,10 @@ impl Expression for Op {
                 ctx.vrl_resolved_initialize()
                     .build_call(ctx.builder(), lhs_resolved_ref);
                 ctx.set_result_ref(lhs_resolved_ref);
-                self.rhs.emit_llvm((state.0, state.1), ctx)?;
+                let mut abort_stack = Vec::new();
+                self.rhs
+                    .emit_llvm((state.0, state.1), ctx, &mut abort_stack)?;
+                function_call_abort_stack.extend(abort_stack);
                 ctx.vrl_expression_op_and_truthy().build_call(
                     ctx.builder(),
                     lhs_resolved_ref,
@@ -599,7 +618,10 @@ impl Expression for Op {
                 ctx.builder().position_at_end(op_and_end_block);
             }
             ast::Opcode::Err => {
-                self.lhs.emit_llvm((state.0, state.1), ctx)?;
+                let mut abort_stack = Vec::new();
+                self.lhs
+                    .emit_llvm((state.0, state.1), ctx, &mut abort_stack)?;
+                function_call_abort_stack.extend(abort_stack);
 
                 let op_err_end_block = ctx.context().append_basic_block(function, "op_err_end");
 
@@ -617,7 +639,10 @@ impl Expression for Op {
                     .build_conditional_branch(is_err, op_err_err_block, op_err_end_block);
 
                 ctx.builder().position_at_end(op_err_err_block);
-                self.rhs.emit_llvm((state.0, state.1), ctx)?;
+                let mut abort_stack = Vec::new();
+                self.rhs
+                    .emit_llvm((state.0, state.1), ctx, &mut abort_stack)?;
+                function_call_abort_stack.extend(abort_stack);
                 ctx.builder().build_unconditional_branch(op_err_end_block);
 
                 ctx.builder().position_at_end(op_err_end_block);
