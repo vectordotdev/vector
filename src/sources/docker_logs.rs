@@ -50,7 +50,7 @@ static CONSOLE: Lazy<Bytes> = Lazy::new(|| "console".into());
 /// Configuration for the `docker_logs` source.
 #[configurable_component(source)]
 #[derive(Clone, Debug)]
-#[serde(default)]
+#[serde(deny_unknown_fields, default)]
 pub struct DockerLogsConfig {
     /// Overrides the name of the log field used to add the current hostname to each event.
     ///
@@ -60,7 +60,7 @@ pub struct DockerLogsConfig {
     #[serde(default = "host_key")]
     host_key: String,
 
-    /// The Docker host to connect to.
+    /// Docker host to connect to.
     ///
     /// Use an HTTPS URL to enable TLS encryption.
     ///
@@ -109,15 +109,15 @@ pub struct DockerLogsConfig {
     /// By default, `"_partial"` is used.
     partial_event_marker_field: Option<String>,
 
-    /// Whether or not to automatically merge partial events.
+    /// Enables automatic merging of partial events.
     auto_partial_merge: bool,
 
     /// The amount of time, in seconds, to wait before retrying after an error.
     retry_backoff_secs: u64,
 
-    /// Multiline parsing configuration.
+    /// Multiline aggregation configuration.
     ///
-    /// If not specified, multiline parsing is disabled.
+    /// If not specified, multiline aggregation is disabled.
     multiline: Option<MultilineConfig>,
 
     #[configurable(derived)]

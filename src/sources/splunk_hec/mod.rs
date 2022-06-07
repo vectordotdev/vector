@@ -51,7 +51,7 @@ pub const SOURCETYPE: &str = "splunk_sourcetype";
 /// Configuration for the `splunk_hec` source.
 #[configurable_component(source)]
 #[derive(Clone, Debug)]
-#[serde(default)]
+#[serde(deny_unknown_fields, default)]
 pub struct SplunkConfig {
     /// The address to listen for connections on.
     ///

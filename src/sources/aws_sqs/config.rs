@@ -18,6 +18,7 @@ use crate::{
 #[configurable_component(source)]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
+#[serde(deny_unknown_fields)]
 pub struct AwsSqsConfig {
     #[serde(flatten)]
     pub region: RegionOrEndpoint,

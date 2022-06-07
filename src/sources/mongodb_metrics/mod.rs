@@ -75,6 +75,7 @@ enum CollectError {
 /// Configuration for the `mongodb_metrics` source.
 #[configurable_component(source)]
 #[derive(Clone, Debug, Default)]
+#[serde(deny_unknown_fields)]
 pub struct MongoDbMetricsConfig {
     /// A list of MongoDB instances to scrape.
     ///

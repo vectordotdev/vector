@@ -21,6 +21,7 @@ use crate::{
 /// Unix domain socket configuration for the `socket` source.
 #[configurable_component]
 #[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct UnixConfig {
     /// The Unix socket path.
     ///

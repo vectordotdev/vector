@@ -83,12 +83,12 @@ type Matches = HashMap<String, HashSet<String>>;
 /// Configuration for the `journald` source.
 #[configurable_component(source)]
 #[derive(Clone, Debug, Default)]
-#[serde(default)]
+#[serde(deny_unknown_fields, default)]
 pub struct JournaldConfig {
-    /// Whether or not to only include future entries.
+    /// Only include entries that appended to the journal after Vector starts reading it.
     pub since_now: Option<bool>,
 
-    /// Whether or not to only include entries from the current boot.
+    /// Only include entries that occurred after the current boot of the system.
     pub current_boot_only: Option<bool>,
 
     /// The list of unit names to monitor.
@@ -98,22 +98,22 @@ pub struct JournaldConfig {
     #[configurable(deprecated)]
     pub units: Vec<String>,
 
-    /// The list of unit names to monitor.
+    /// A list of unit names to monitor.
     ///
     /// If empty or not present, all units are accepted. Unit names lacking a "." will have ".service" appended to make them a valid service unit name.
     pub include_units: Vec<String>,
 
-    /// The list of unit names to exclude from monitoring.
+    /// A list of unit names to exclude from monitoring.
     ///
     /// Unit names lacking a "." will have ".service" appended to make them a valid service unit name.
     pub exclude_units: Vec<String>,
 
-    /// This list contains sets of field/value pairs to monitor.
+    /// A list of sets of field/value pairs to monitor.
     ///
     /// If empty or not present, all journal fields are accepted. If `include_units` is specified, it will be merged into this list.
     pub include_matches: Matches,
 
-    /// This list contains sets of field/value pairs that, if any are present in a journal entry, will cause the entry to be excluded from this source.
+    /// A list of sets of field/value pairs that, if any are present in a journal entry, will cause the entry to be excluded from this source.
     ///
     /// If `exclude_units` is specified, it will be merged into this list.
     pub exclude_matches: Matches,
@@ -140,7 +140,7 @@ pub struct JournaldConfig {
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
 
-    /// Whether or not to remap the `PRIORITY` field from an integer to string value.
+    /// Enables remapping the `PRIORITY` field from an integer to string value.
     ///
     /// Has no effect unless the value of the field is already an integer.
     #[serde(default)]

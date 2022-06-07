@@ -36,20 +36,28 @@ pub(crate) struct KafkaAuthConfig {
     pub(crate) tls: Option<TlsEnableableConfig>,
 }
 
-/// /// Options for SASL/SCRAM authentication support.
+/// Configuration for SASL authentication when interacting with Kafka.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 pub(crate) struct KafkaSaslConfig {
-    /// Enable SASL/SCRAM authentication to the remote (not supported on Windows at this time).
+    /// Enables SASL authentication.
+    ///
+    /// Only `PLAIN` and `SCRAM`-based mechanisms are supported when configuring SASL authentication via `sasl.*`. For
+    /// other mechanisms, `librdkafka_options.*` must be used directly to configure other `librdkafka`-specific values
+    /// i.e. `sasl.kerberos.*` and so on.
+    ///
+    /// See the [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for details.
+    ///
+    /// SASL authentication is not supported on Windows.
     pub(crate) enabled: Option<bool>,
 
-    /// The Kafka SASL/SCRAM authentication username.
+    /// The SASL username.
     pub(crate) username: Option<String>,
 
-    /// The Kafka SASL/SCRAM authentication password.
+    /// The SASL password.
     pub(crate) password: Option<String>,
 
-    /// The Kafka SASL/SCRAM mechanisms.
+    /// The SASL mechanism to use.
     pub(crate) mechanism: Option<String>,
 }
 

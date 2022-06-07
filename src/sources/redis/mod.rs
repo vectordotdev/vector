@@ -47,7 +47,7 @@ pub enum DataTypeConfig {
 /// Options for the Redis `list` data type.
 #[configurable_component]
 #[derive(Copy, Clone, Debug, Default, Derivative, Eq, PartialEq)]
-#[serde(rename_all = "lowercase")]
+#[serde(deny_unknown_fields, rename_all = "lowercase")]
 pub struct ListOption {
     #[configurable(derived)]
     method: Method,
@@ -89,6 +89,7 @@ impl From<&redis::ConnectionInfo> for ConnectionInfo {
 /// Configuration for the `redis` source.
 #[configurable_component(source)]
 #[derive(Clone, Debug, Derivative)]
+#[serde(deny_unknown_fields)]
 pub struct RedisSourceConfig {
     /// The Redis data type (`list` or `channel`) to use.
     #[serde(default)]

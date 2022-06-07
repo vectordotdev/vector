@@ -16,7 +16,7 @@ use crate::event::{Event, LogEvent};
 /// Configuration for how the events are annotated with `Pod` metadata.
 #[configurable_component]
 #[derive(Clone, Debug)]
-#[serde(default)]
+#[serde(deny_unknown_fields, default)]
 pub struct FieldsSpec {
     /// Event field for Pod name.
     pub pod_name: String,

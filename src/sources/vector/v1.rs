@@ -24,6 +24,7 @@ use crate::{
 /// Configuration for version one of the `vector` source.
 #[configurable_component]
 #[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct VectorConfig {
     /// The address to listen for connections on.
     ///

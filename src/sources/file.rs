@@ -62,7 +62,7 @@ enum BuildError {
 /// Configuration for the `file` source.
 #[configurable_component(source)]
 #[derive(Clone, Debug, PartialEq)]
-#[serde(default)]
+#[serde(deny_unknown_fields, default)]
 pub struct FileConfig {
     /// Array of file patterns to include. [Globbing](https://vector.dev/docs/reference/configuration/sources/file/#globbing) is supported.
     pub include: Vec<PathBuf>,
@@ -142,9 +142,9 @@ pub struct FileConfig {
     #[configurable(deprecated)]
     pub multi_line_timeout: u64,
 
-    /// Multiline parsing configuration.
+    /// Multiline aggregation configuration.
     ///
-    /// If not specified, multiline parsing is disabled.
+    /// If not specified, multiline aggregation is disabled.
     pub multiline: Option<MultilineConfig>,
 
     /// An approximate limit on the amount of data read from a single file at a given time.

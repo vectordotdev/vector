@@ -15,7 +15,6 @@ use super::{
 };
 
 const ERR_NO_ENUM_TUPLES: &str = "enum variants cannot be tuples (multiple unnamed fields)";
-const ERR_NO_ENUM_NEWTYPE_INTERNAL_TAG: &str = "newtype variants (i.e. `enum SomeEnum { SomeVariant(T) }`) cannot be used with tag-only mode as the type inside may or may not support embedding the tag field";
 const ERR_NO_ENUM_VARIANT_DESCRIPTION: &str = "enum variants must have a description i.e. `/// This is a description` or `#[configurable(description = \"This is a description...\")]`";
 const ERR_ENUM_UNTAGGED_DUPLICATES: &str = "enum variants must be unique in style/shape when in untagged mode i.e. there cannot be multiple unit variants, or tuple variants with the same fields, etc";
 const ERR_NO_UNIT_STRUCTS: &str = "unit structs are not supported by `Configurable`";

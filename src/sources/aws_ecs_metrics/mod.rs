@@ -47,6 +47,7 @@ pub enum Version {
 /// Configuration for the `aws_ecs_metrics` source.
 #[configurable_component(source)]
 #[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct AwsEcsMetricsSourceConfig {
     /// Base URI of the task metadata endpoint.
     ///

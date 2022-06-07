@@ -44,7 +44,7 @@ pub mod sized_bytes_codec;
 /// Configuration for the `exec` source.
 #[configurable_component]
 #[derive(Clone, Debug)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct ExecConfig {
     #[configurable(derived)]
     pub mode: Mode,
@@ -80,7 +80,7 @@ pub struct ExecConfig {
 /// Mode of operation for running the command.
 #[configurable_component]
 #[derive(Clone, Copy, Debug)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Mode {
     /// The command is run on a schedule.
     Scheduled,
@@ -92,6 +92,7 @@ pub enum Mode {
 /// Configuration options for scheduled commands.
 #[configurable_component]
 #[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct ScheduledConfig {
     /// The interval, in seconds, between scheduled command runs.
     ///
@@ -103,6 +104,7 @@ pub struct ScheduledConfig {
 /// Configuration options for streaming commands.
 #[configurable_component]
 #[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct StreamingConfig {
     /// Whether or not the command should be rerun if the command exits.
     #[serde(default = "default_respawn_on_exit")]

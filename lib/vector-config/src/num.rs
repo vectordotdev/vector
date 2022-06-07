@@ -7,10 +7,6 @@ use serde_json::Number;
 use vector_config_common::num::{NUMERIC_ENFORCED_LOWER_BOUND, NUMERIC_ENFORCED_UPPER_BOUND};
 
 /// A numeric type that can be represented correctly in a JSON Schema document.
-///
-/// `N` must be an integral numeric type i.e. `f64`, `u8`, `i32`, and so on. The numeric type is parameterized in this
-/// way to allow generating the schema for wrapper types such as `NonZeroU64`, where the overall type must be
-/// represented as `NonZeroU64` but the integeral numeric type that we're constraining against is `u64`.
 pub trait ConfigurableNumber {
     /// The integral numeric type.
     ///

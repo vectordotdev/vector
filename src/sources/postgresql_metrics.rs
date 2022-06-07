@@ -94,9 +94,10 @@ enum CollectError {
     QueryError { source: PgError },
 }
 
-/// TLS configuration for connecting to PostgreSQL.
+/// Configuration of TLS when connecting to PostgreSQL.
 #[configurable_component]
 #[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 struct PostgresqlMetricsTlsConfig {
     /// Absolute path to an additional CA certificate file.
     ///
@@ -107,7 +108,7 @@ struct PostgresqlMetricsTlsConfig {
 /// Configuration for the `postgresql_metrics` source.
 #[configurable_component(source)]
 #[derive(Clone, Debug)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct PostgresqlMetricsConfig {
     /// A list of PostgreSQL instances to scrape.
     ///

@@ -16,7 +16,7 @@ use crate::{
 #[configurable_component(source)]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
-#[serde(default)]
+#[serde(deny_unknown_fields, default)]
 pub struct InternalMetricsConfig {
     /// The interval between metric gathering, in seconds.
     #[derivative(Default(value = "2.0"))]
@@ -42,7 +42,7 @@ impl InternalMetricsConfig {
 #[configurable_component]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
-#[serde(default)]
+#[serde(deny_unknown_fields, default)]
 pub struct TagsConfig {
     /// Sets the name of the tag to use to add the current hostname to each metric.
     ///

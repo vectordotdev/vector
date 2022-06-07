@@ -21,21 +21,22 @@ pub enum Error {
     NoHost,
 }
 
-/// TLS options to connect to the Docker daemon.
+/// Configuration of TLS when connecting to the Docker daemon.
 ///
 /// Only relevant when connecting to Docker via an HTTPS URL.
 ///
 /// If not configured, Vector will try to use environment variable `DOCKER_CERT_PATH` and then` DOCKER_CONFIG`. If both environment variables are absent, Vector will try to read certificates in `~/.docker/`.
 #[configurable_component]
 #[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct DockerTlsConfig {
-    /// Path to CA certificate file.
+    /// Path to the CA certificate file.
     ca_file: PathBuf,
 
-    /// Path to TLS certificate file.
+    /// Path to the TLS certificate file.
     crt_file: PathBuf,
 
-    /// Path to TLS key file.
+    /// Path to the TLS key file.
     key_file: PathBuf,
 }
 

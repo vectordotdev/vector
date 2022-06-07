@@ -52,7 +52,7 @@ pub enum GcpError {
     BuildHttpClient { source: HttpError },
 }
 
-/// Authentication configuration for GCP services.
+/// Configuration of the authentication strategy for interacting with GCP services.
 // TODO: We're duplicating the "either this or that" verbiage for each field because this struct gets flattened into the
 // component config types, which means all that's carried over are the fields, not the type itself.
 //

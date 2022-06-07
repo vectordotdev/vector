@@ -23,7 +23,7 @@ use crate::{
 /// Configuration for the `stdin` source.
 #[configurable_component(source)]
 #[derive(Clone, Debug)]
-#[serde(default)]
+#[serde(deny_unknown_fields, default)]
 pub struct StdinConfig {
     /// The maximum buffer size, in bytes, of incoming messages.
     ///

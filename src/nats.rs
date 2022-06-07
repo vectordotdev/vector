@@ -14,7 +14,7 @@ pub enum NatsConfigError {
     TlsMissingCert,
 }
 
-/// Configuration for how Vector should authenticate to NATS.
+/// Configuration of the authentication strategy when interacting with NATS.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(rename_all = "snake_case", tag = "strategy")]
@@ -64,6 +64,7 @@ impl std::fmt::Display for NatsAuthConfig {
 /// Username and password configuration.
 #[configurable_component]
 #[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct NatsAuthUserPassword {
     /// Username.
     pub(crate) user: String,
@@ -75,6 +76,7 @@ pub(crate) struct NatsAuthUserPassword {
 /// Token configuration.
 #[configurable_component]
 #[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct NatsAuthToken {
     /// Token.
     pub(crate) value: String,
@@ -83,6 +85,7 @@ pub(crate) struct NatsAuthToken {
 /// Credentials file configuration.
 #[configurable_component]
 #[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct NatsAuthCredentialsFile {
     /// Path to credentials file.
     pub(crate) path: String,
@@ -91,15 +94,16 @@ pub(crate) struct NatsAuthCredentialsFile {
 /// NKeys configuration.
 #[configurable_component]
 #[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct NatsAuthNKey {
     /// User.
     ///
-    /// This is equivalent to a public key.
+    /// Conceptually, this is equivalent to a public key.
     pub(crate) nkey: String,
 
     /// Seed.
     ///
-    /// This is equivalent to a private key.
+    /// Conceptually, this is equivalent to a private key.
     pub(crate) seed: String,
 }
 

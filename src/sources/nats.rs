@@ -33,6 +33,7 @@ enum BuildError {
 #[configurable_component(source)]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
+#[serde(deny_unknown_fields)]
 pub struct NatsSourceConfig {
     /// The NATS URL to connect to.
     ///

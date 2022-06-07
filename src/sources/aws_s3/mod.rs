@@ -68,7 +68,7 @@ enum Strategy {
 // Maybe showing defaults at all, when there are required properties, doesn't actually make sense? :thinkies:
 #[configurable_component(source)]
 #[derive(Clone, Debug, Default)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct AwsS3Config {
     #[serde(flatten)]
     region: RegionOrEndpoint,
@@ -92,9 +92,9 @@ pub struct AwsS3Config {
     #[serde(default)]
     auth: AwsAuthentication,
 
-    /// Multiline parsing configuration.
+    /// Multiline aggregation configuration.
     ///
-    /// If not specified, multiline parsing is disabled.
+    /// If not specified, multiline aggregation is disabled.
     multiline: Option<MultilineConfig>,
 
     #[configurable(derived)]

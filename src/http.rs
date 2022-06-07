@@ -209,13 +209,13 @@ impl<B> fmt::Debug for HttpClient<B> {
     }
 }
 
-/// Authentication strategy for requests.
+/// Configuration of the authentication strategy for HTTP requests.
 ///
 /// HTTP authentication should almost always be used with HTTPS only, as the authentication credentials are passed as an
 /// HTTP header without any additional encryption beyond what is provided by the transport itself.
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
-#[serde(rename_all = "snake_case", tag = "strategy")]
+#[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
 pub enum Auth {
     /// Basic authentication.
     ///

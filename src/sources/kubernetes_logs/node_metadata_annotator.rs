@@ -12,7 +12,7 @@ use crate::event::{Event, LogEvent};
 /// Configuration for how the events are annotated with Node metadata.
 #[configurable_component]
 #[derive(Clone, Debug)]
-#[serde(default)]
+#[serde(deny_unknown_fields, default)]
 pub struct FieldsSpec {
     /// Event field for Node labels.
     pub node_labels: String,

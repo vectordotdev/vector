@@ -28,6 +28,7 @@ use crate::{
 /// UDP configuration for the `socket` source.
 #[configurable_component]
 #[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct UdpConfig {
     /// The address to listen for messages on.
     address: SocketAddr,

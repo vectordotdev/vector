@@ -56,6 +56,7 @@ enum NginxError {
 /// Configuration for the `nginx_metrics` source.
 #[configurable_component(source)]
 #[derive(Clone, Debug, Default)]
+#[serde(deny_unknown_fields)]
 pub struct NginxMetricsConfig {
     /// A list of NGINX instances to scrape.
     ///

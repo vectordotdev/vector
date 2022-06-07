@@ -170,7 +170,7 @@ where
         ..Default::default()
     };
 
-    // If the actual numeric type we're generating the schema for is a nonzero variant, and its constrain can't be
+    // If the actual numeric type we're generating the schema for is a nonzero variant, and its constraint can't be
     // represently solely by the normal minimum/maximum bounds, we explicitly add an exclusion for the appropriate zero
     // value of the given numeric type.
     if N::requires_nonzero_exclusion() {

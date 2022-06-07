@@ -24,26 +24,29 @@ pub enum AwsAuthentication {
         /// The AWS secret access key.
         secret_access_key: String,
     },
+
     /// Authenticate using credentials stored in a file.
     ///
-    /// Optionally, specifies a credentials profile to use.
+    /// Additionally, the specific credential profile to use can be set.
     File {
         /// Path to the credentials file.
         credentials_file: String,
         /// The credentials profile to use.
         profile: Option<String>,
     },
-    /// Assumes the given role ARN.
+
+    /// Assume the given role ARN.
     Role {
         /// The ARN of the role to assume.
         assume_role: String,
         /// Timeout for assuming the role, in seconds.
         load_timeout_secs: Option<u64>,
     },
-    /// Default authentication strategy which tries a variety of substrategies in a chained fallback fashion.
+
+    /// Default authentication strategy which tries a variety of substrategies in a one-after-the-other fashion.
     #[derivative(Default)]
     Default {
-        /// Timeout for successfully loading credentials, in seconds.
+        /// Timeout for successfully loading any credentials, in seconds.
         load_timeout_secs: Option<u64>,
     },
 }

@@ -97,6 +97,7 @@ static CLIENT_ID: Lazy<String> = Lazy::new(|| uuid::Uuid::new_v4().to_string());
 #[configurable_component(source)]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
+#[serde(deny_unknown_fields)]
 pub struct PubsubConfig {
     /// The project name from which to pull logs.
     pub project: String,
@@ -107,7 +108,7 @@ pub struct PubsubConfig {
     /// The endpoint from which to pull data.
     pub endpoint: Option<String>,
 
-    /// Whether or not to load authentication credentials.
+    /// Disables the loading of authentication credentials.
     ///
     /// Only used for tests.
     #[serde(skip, default)]

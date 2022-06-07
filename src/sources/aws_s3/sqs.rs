@@ -47,6 +47,7 @@ static SUPPORTED_S3S_EVENT_VERSION: Lazy<semver::VersionReq> =
 #[configurable_component]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
+#[serde(deny_unknown_fields)]
 pub(super) struct Config {
     /// The URL of the SQS queue to poll for bucket notifications.
     pub(super) queue_url: String,

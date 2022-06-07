@@ -14,12 +14,12 @@ use bytes::{Bytes, BytesMut};
 use futures::{Stream, StreamExt};
 use pin_project::pin_project;
 use regex::bytes::Regex;
-use serde::{Deserialize, Serialize};
 use tokio_util::time::delay_queue::{DelayQueue, Key};
-use vector_config::Configurable;
+use vector_config::configurable_component;
 
-/// The mode of operation of the line aggregator.
-#[derive(Clone, Configurable, Copy, Debug, Hash, Deserialize, PartialEq, Serialize)]
+/// Mode of operation of the line aggregator.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Hash, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum Mode {
     /// All consecutive lines matching this pattern are included in the group.
@@ -30,7 +30,7 @@ pub enum Mode {
     /// whitespace) indicates that it is an extension of the proceeding line.
     ContinueThrough,
 
-    /// All consecutive lines matching this pattern, plus one additional line,  are included in the group.
+    /// All consecutive lines matching this pattern, plus one additional line, are included in the group.
     ///
     /// This is useful in cases where a log message ends with a continuation marker, such as a backslash, indicating
     /// that the following line is part of the same message.
@@ -47,21 +47,23 @@ pub enum Mode {
     HaltWith,
 }
 
-/// Configuration parameters of the line aggregator.
-#[derive(Debug, Clone)]
+/// Configuration of multi-line aggregation.
+#[derive(Clone, Debug)]
 pub struct Config {
-    /// The regular expression pattern for detecting the beginning of the message.
+    /// Regular expression pattern that is used to match the start of a new message.
     pub start_pattern: Regex,
-    /// The regular expression pattern used for evaluating whether the current line should be aggregated or if
-    /// aggregation should stop.
+
+    /// Regular expression pattern that is used to determine whether or not more lines should be read.
     ///
-    /// Configured in tandem with `mode` to define the overall aggregation behavior.
+    /// This setting must be configured in conjunction with `mode`.
     pub condition_pattern: Regex,
-    /// The mode of aggregation.
+
+    /// Aggregation mode.
     ///
-    /// Configured in tandem with `condition_pattern` to define the overall aggregation behavior.
+    /// This setting must be configured in conjunction with `condition_pattern`.
     pub mode: Mode,
-    /// The maximum time to wait for subsequent lines to be received and evaluated for aggregation.
+
+    /// The maximum amount of time to wait for the next additional line, in milliseconds.
     ///
     /// Once this timeout is reached, the buffered message is guaranteed to be flushed, even if incomplete.
     pub timeout: Duration,

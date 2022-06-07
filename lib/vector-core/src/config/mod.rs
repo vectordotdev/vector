@@ -141,11 +141,11 @@ impl Output {
     }
 }
 
-/// Acknowledgement configuration.
+/// Configuration of acknowledgement behavior.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct AcknowledgementsConfig {
-    /// Whether or not acknowledgements should be enabled.
+    /// Enables end-to-end acknowledgements.
     enabled: Option<bool>,
 }
 

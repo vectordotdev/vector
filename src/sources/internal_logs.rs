@@ -16,6 +16,7 @@ use crate::{
 /// Configuration for the `internal_logs` source.
 #[configurable_component(source)]
 #[derive(Clone, Debug, Default)]
+#[serde(deny_unknown_fields)]
 pub struct InternalLogsConfig {
     /// Overrides the name of the log field used to add the current hostname to each event.
     ///

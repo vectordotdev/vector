@@ -82,6 +82,7 @@ pub(self) struct FilterList {
 #[configurable_component(source)]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
+#[serde(deny_unknown_fields)]
 pub struct HostMetricsConfig {
     /// The interval between metric gathering, in seconds.
     #[serde(default = "default_scrape_interval")]

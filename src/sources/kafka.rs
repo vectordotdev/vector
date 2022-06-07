@@ -52,6 +52,7 @@ enum BuildError {
 #[configurable_component(source)]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
+#[serde(deny_unknown_fields)]
 pub struct KafkaSourceConfig {
     /// A comma-separated list of Kafka bootstrap servers.
     ///
