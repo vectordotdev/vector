@@ -27,6 +27,13 @@ pub(crate) struct Compiler<'a> {
     /// This list allows us to avoid printing "undefined variable" compilation
     /// errors when the reason for it being undefined is another compiler error.
     skip_missing_query_target: Vec<(QueryTarget, LookupBuf)>,
+
+    /// Track which expression in a chain of expressions is fallible.
+    ///
+    /// It is possible for this state to switch from `None`, to `Some(T)` and
+    /// back to `None`, if the parent expression of a fallible expression
+    /// nullifies the fallibility of that expression.
+    fallible_expression_error: Option<FallibleInfo>,
 }
 
 impl<'a> Compiler<'a> {
@@ -40,6 +47,7 @@ impl<'a> Compiler<'a> {
             external_queries: vec![],
             external_assignments: vec![],
             skip_missing_query_target: vec![],
+            fallible_expression_error: None,
         }
     }
 
@@ -93,24 +101,23 @@ impl<'a> Compiler<'a> {
 
         nodes
             .into_iter()
-            .filter_map(|node| {
-                let span = node.span();
+            .filter_map(|node| match node.into_inner() {
+                Expr(expr) => {
+                    self.fallible_expression_error = None;
 
-                match node.into_inner() {
-                    Expr(expr) => {
-                        let expr = self.compile_expr(expr, external)?;
-                        if expr.type_def((&self.local, external)).is_fallible() {
-                            use crate::expression::Error;
-                            let err = Error::Fallible { span };
-                            self.diagnostics.push(Box::new(err));
-                        }
+                    let expr = self.compile_expr(expr, external)?;
 
-                        Some(expr)
+                    if let Some(info) = self.fallible_expression_error.take() {
+                        let error = crate::expression::Error::Fallible { span: info.span };
+
+                        self.diagnostics.push(Box::new(error) as _);
                     }
-                    Error(err) => {
-                        self.handle_parser_error(err);
-                        None
-                    }
+
+                    Some(expr)
+                }
+                Error(err) => {
+                    self.handle_parser_error(err);
+                    None
                 }
             })
             .collect()
@@ -130,7 +137,9 @@ impl<'a> Compiler<'a> {
     fn compile_expr(&mut self, node: Node<ast::Expr>, external: &mut ExternalEnv) -> Option<Expr> {
         use ast::Expr::*;
 
-        match node.into_inner() {
+        let span = node.span();
+
+        let expr = match node.into_inner() {
             Literal(node) => self.compile_literal(node, external),
             Container(node) => self.compile_container(node, external).map(Into::into),
             IfStatement(node) => self.compile_if_statement(node, external).map(Into::into),
@@ -141,7 +150,19 @@ impl<'a> Compiler<'a> {
             Variable(node) => self.compile_variable(node, external).map(Into::into),
             Unary(node) => self.compile_unary(node, external).map(Into::into),
             Abort(node) => self.compile_abort(node, external).map(Into::into),
+        }?;
+
+        // If the previously compiled expression is fallible, _and_ we are
+        // currently not tracking any existing fallible expression in the chain
+        // of expressions, then this is the first expression within that chain
+        // that can cause the entire chain to be fallible.
+        if expr.type_def((&self.local, external)).is_fallible()
+            && self.fallible_expression_error.is_none()
+        {
+            self.fallible_expression_error = Some(FallibleInfo { span });
         }
+
+        Some(expr)
     }
 
     #[cfg(feature = "expr-literal")]
@@ -381,16 +402,25 @@ impl<'a> Compiler<'a> {
         Some(Predicate::new(
             Node::new(span, exprs),
             (&self.local, external),
+            self.fallible_expression_error,
         ))
     }
 
     #[cfg(feature = "expr-op")]
     fn compile_op(&mut self, node: Node<ast::Op>, external: &mut ExternalEnv) -> Option<Op> {
+        use parser::ast::Opcode;
+
         let op = node.into_inner();
         let ast::Op(lhs, opcode, rhs) = op;
 
         let lhs_span = lhs.span();
         let lhs = Node::new(lhs_span, self.compile_expr(*lhs, external)?);
+
+        // If we're using error-coalescing, we need to negate any tracked
+        // fallibility error state for the lhs expression.
+        if opcode.inner() == &Opcode::Err {
+            self.fallible_expression_error = None;
+        }
 
         let rhs_span = rhs.span();
         let rhs = Node::new(rhs_span, self.compile_expr(*rhs, external)?);
@@ -467,7 +497,7 @@ impl<'a> Compiler<'a> {
             Infallible { ok, err, op, expr } => {
                 let span = expr.span();
 
-                match op {
+                let node = match op {
                     AssignmentOp::Assign => {
                         let expr = self
                             .compile_expr(*expr, external)
@@ -497,13 +527,25 @@ impl<'a> Compiler<'a> {
 
                         Node::new(span, node)
                     }
-                }
+                };
+
+                // If the RHS expression is marked as fallible, the "infallible"
+                // assignment nullifies this fallibility, and thus no error
+                // should be emitted.
+                self.fallible_expression_error = None;
+
+                node
             }
         };
 
-        let assignment = Assignment::new(node, &mut self.local, external)
-            .map_err(|err| self.diagnostics.push(Box::new(err)))
-            .ok()?;
+        let assignment = Assignment::new(
+            node,
+            &mut self.local,
+            external,
+            self.fallible_expression_error,
+        )
+        .map_err(|err| self.diagnostics.push(Box::new(err)))
+        .ok()?;
 
         // Track any potential external target assignments within the program.
         //

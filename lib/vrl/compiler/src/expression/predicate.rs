@@ -4,7 +4,7 @@ use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 use value::Value;
 
 use crate::{
-    expression::{Expr, Resolved},
+    expression::{Expr, FallibleInfo, Resolved},
     parser::Node,
     state::{ExternalEnv, LocalEnv},
     value::Kind,
@@ -19,17 +19,21 @@ pub struct Predicate {
 }
 
 impl Predicate {
-    pub fn new(node: Node<Vec<Expr>>, state: (&LocalEnv, &ExternalEnv)) -> Result {
+    pub(crate) fn new(
+        node: Node<Vec<Expr>>,
+        state: (&LocalEnv, &ExternalEnv),
+        fallible_predicate: Option<FallibleInfo>,
+    ) -> Result {
         let (span, exprs) = node.take();
         let type_def = exprs
             .last()
             .map(|expr| expr.type_def(state))
             .unwrap_or_else(TypeDef::null);
 
-        if type_def.is_fallible() {
+        if let Some(info) = fallible_predicate {
             return Err(Error {
                 variant: ErrorVariant::Fallible,
-                span,
+                span: info.span,
             });
         }
 
@@ -118,7 +122,7 @@ impl fmt::Debug for Predicate {
 // -----------------------------------------------------------------------------
 
 #[derive(Debug)]
-pub struct Error {
+pub(crate) struct Error {
     pub(crate) variant: ErrorVariant,
 
     span: Span,
