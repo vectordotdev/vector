@@ -670,7 +670,7 @@ impl Finalizer {
                 // We have either received the first negative
                 // acknowledgement, or the `OrderedFinalizer` has
                 // bailed out for some reason. In both cases, we need
-                // to cause the send loop above top stop, and so we do
+                // to cause the send loop above to stop, and so we do
                 // not need to handle any further status events.
                 // Simply send the trigger and exit this task
                 let _ = trigger.send(());
