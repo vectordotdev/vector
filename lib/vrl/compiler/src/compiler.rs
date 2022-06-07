@@ -237,7 +237,7 @@ impl<'a> Compiler<'a> {
         // the block, and merge back into it any mutations that happened to
         // state the snapshot was already tracking. Then, revert the compiler
         // local state to the updated snapshot.
-        self.local = local_snapshot.merge_mutations(self.local.clone());
+        self.local = local_snapshot.apply_child_scope(self.local.clone());
 
         block
     }
@@ -266,6 +266,8 @@ impl<'a> Compiler<'a> {
         node: Node<ast::IfStatement>,
         external: &mut ExternalEnv,
     ) -> IfStatement {
+        use crate::type_def::{Details, TypeDef};
+
         let ast::IfStatement {
             predicate,
             consequent,
@@ -280,13 +282,54 @@ impl<'a> Compiler<'a> {
             }
         };
 
-        let consequent = self.compile_block(consequent, external);
-        let alternative = alternative.map(|block| self.compile_block(block, external));
+        let original_locals = self.local.clone();
+        let original_external = external.target().cloned();
 
-        IfStatement {
-            predicate,
-            consequent,
-            alternative,
+        let consequent = self.compile_block(consequent, external);
+
+        match alternative {
+            Some(block) => {
+                let consequent_locals = self.local.clone();
+                let consequent_external = external.target().cloned();
+
+                self.local = original_locals;
+
+                let else_block = self.compile_block(block, external);
+
+                // assignments must be the result of either the if or else block, but not the original value
+                self.local = self.local.clone().merge(consequent_locals);
+                if let Some(details) = Details::merge_optional(
+                    consequent_external,
+                    external.target().cloned(),
+                    TypeDef::any(),
+                ) {
+                    external.update_target(details);
+                }
+
+                IfStatement {
+                    predicate,
+                    consequent,
+                    alternative: Some(else_block),
+                }
+            }
+            None => {
+                // assignments must be the result of either the if block or the original value
+                self.local = self.local.clone().merge(original_locals);
+
+                if let Some(details) = Details::merge_optional(
+                    original_external,
+                    external.target().cloned(),
+                    TypeDef::any(),
+                ) {
+                    external.update_target(details);
+                }
+
+                IfStatement {
+                    predicate,
+                    consequent,
+                    alternative: None,
+                }
+            }
         }
     }
 
