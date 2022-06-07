@@ -12,7 +12,7 @@ use vector_core::{
 
 use crate::{
     codecs::Encoder,
-    event::Event,
+    event::{Event, Finalizable},
     sinks::util::{encoding::Transformer, StreamSink},
 };
 
@@ -33,6 +33,7 @@ where
             let event_byte_size = event.size_of();
             self.transformer.transform(&mut event);
 
+            let finalizers = event.take_finalizers();
             let mut bytes = BytesMut::new();
             self.encoder.encode(event, &mut bytes).map_err(|_| {
                 // Error is handled by `Encoder`.
@@ -44,6 +45,7 @@ where
                 error!(message = "Error writing to output. Stopping sink.", %error);
             })?;
 
+            drop(finalizers);
             self.acker.ack(1);
 
             emit!(EventsSent {
