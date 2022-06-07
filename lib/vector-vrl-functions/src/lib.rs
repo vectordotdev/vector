@@ -7,7 +7,6 @@ pub mod set_secret;
 pub mod set_semantic_meaning;
 
 use ::value::Value;
-use lookup::{LookupBuf, SegmentBuf};
 use vrl::prelude::expression::Query;
 use vrl::prelude::*;
 
@@ -22,18 +21,6 @@ pub enum MetadataKey {
 }
 
 pub const LEGACY_METADATA_KEYS: [&str; 2] = ["datadog_api_key", "splunk_hec_token"];
-
-pub fn is_legacy_metadata_path(path: &LookupBuf) -> bool {
-    if path.segments.len() != 1 {
-        return false;
-    }
-    if let Some(SegmentBuf::Field(field)) = path.segments.front() {
-        if LEGACY_METADATA_KEYS.contains(&field.name.as_str()) {
-            return true;
-        }
-    }
-    false
-}
 
 pub fn vrl_functions() -> Vec<Box<dyn vrl::Function>> {
     vec![
