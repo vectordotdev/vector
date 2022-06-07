@@ -14,6 +14,7 @@ pub(crate) fn legacy_keys() -> Vec<Value> {
     vec![value!("datadog_api_key"), value!("splunk_hec_token")]
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug)]
 pub enum MetadataKey {
     Legacy(String),
