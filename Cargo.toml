@@ -239,7 +239,7 @@ flate2 = { version = "1.0.24", default-features = false, features = ["default"] 
 futures-util = { version = "0.3.21", default-features = false }
 glob = { version = "0.3.0", default-features = false }
 governor = { version = "0.4.1", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
-grok = { version = "1.2.0", default-features = false, optional = true }
+grok = { version = "2.0.0", default-features = false, optional = true }
 h2 = { version = "0.3.13", default-features = false, optional = true }
 hash_hasher = { version = "2.0.0", default-features = false, optional  = true }
 headers = { version = "0.3.6", default-features = false }
