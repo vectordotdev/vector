@@ -33,6 +33,8 @@ use crate::{
     SourceSender,
 };
 
+const POISONED_FAILED_LOCK: &str = "Poisoned lock on failed files set";
+
 #[derive(Debug, Snafu)]
 enum BuildError {
     #[snafu(display("data_dir option required, but not given here or globally"))]
@@ -327,6 +329,13 @@ pub fn file_source(
     let message_start_indicator = config.message_start_indicator.clone();
     let multi_line_timeout = config.multi_line_timeout;
 
+    // The `failed_files` set contains `FileFingerprint`s, provided by
+    // the file server, of all files that have received a negative
+    // acknowledgements. This set is shared between the finalizer
+    // task, which both holds back checkpointer updates if an
+    // identifier is present and adds entries on negative
+    // acknowledgements, and the main file server handling task, which
+    // holds back further events from files in the set.
     let failed_files: Arc<Mutex<HashSet<FileFingerprint>>> = Default::default();
     let (finalizer, shutdown_checkpointer) = if acknowledgements {
         // The shutdown sent in to the finalizer is the global
@@ -343,9 +352,8 @@ pub fn file_source(
         tokio::spawn(async move {
             while let Some((status, entry)) = ack_stream.next().await {
                 // Don't update the checkpointer on file streams after failed acks
-                let mut failed_files = failed_files
-                    .lock()
-                    .expect("Poisoned lock on failed files set");
+                let mut failed_files = failed_files.lock().expect(POISONED_FAILED_LOCK);
+                // Hold back updates for failed files
                 if !failed_files.contains(&entry.file_id) {
                     if status == BatchStatus::Delivered {
                         checkpoints.update(entry.file_id, entry.offset);
@@ -382,11 +390,12 @@ pub fn file_source(
                     byte_size: line.text.len(),
                     file: &line.filename,
                 });
-                (!failed_files
+                let failed = failed_files
                     .lock()
-                    .expect("Poisoned lock on failed files set")
-                    .contains(&line.file_id))
-                .then(|| {
+                    .expect(POISONED_FAILED_LOCK)
+                    .contains(&line.file_id);
+                // Drop the incoming data if the file received a negative acknowledgement.
+                (!failed).then(|| {
                     // transcode each line from the file's encoding charset to utf8
                     if let Some(d) = &mut encoding_decoder {
                         line.text = d.decode_to_utf8(line.text);
