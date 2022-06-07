@@ -5,7 +5,7 @@ use lookup::LookupBuf;
 use value::Value;
 
 use crate::{
-    expression::{Expr, Resolved},
+    expression::{Expr, FallibleInfo, Resolved},
     parser::{
         ast::{self, Ident},
         Node,
@@ -26,6 +26,7 @@ impl Assignment {
         node: Node<Variant<Node<ast::AssignmentTarget>, Node<Expr>>>,
         local: &mut LocalEnv,
         external: &mut ExternalEnv,
+        fallible_rhs: Option<FallibleInfo>,
     ) -> Result<Self, Error> {
         let (_, variant) = node.take();
 
@@ -37,13 +38,13 @@ impl Assignment {
                 let type_def = expr.type_def((local, external));
 
                 // Fallible expressions require infallible assignment.
-                if type_def.is_fallible() {
+                if let Some(info) = fallible_rhs {
                     return Err(Error {
                         variant: ErrorVariant::FallibleAssignment(
                             target.to_string(),
                             expr.to_string(),
                         ),
-                        expr_span,
+                        expr_span: info.span,
                         assignment_span,
                     });
                 }

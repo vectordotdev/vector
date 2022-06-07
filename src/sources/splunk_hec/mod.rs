@@ -988,6 +988,7 @@ mod tests {
         config::{log_schema, SinkConfig, SinkContext, SourceConfig, SourceContext},
         event::Event,
         sinks::{
+            splunk_hec::common::timestamp_key,
             splunk_hec::logs::{config::HecLogsSinkConfig, encoder::HecLogsEncoder},
             util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
             Healthcheck, VectorSink,
@@ -1066,6 +1067,7 @@ mod tests {
             tls: None,
             acknowledgements: Default::default(),
             timestamp_nanos_key: None,
+            timestamp_key: timestamp_key(),
         }
         .build(SinkContext::new_test())
         .await

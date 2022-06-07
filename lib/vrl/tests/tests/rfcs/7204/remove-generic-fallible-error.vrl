@@ -1,0 +1,62 @@
+# result:
+#
+# error[E100]: unhandled error
+#   ┌─ :2:1
+#   │
+# 2 │ to_string(.foo)
+#   │ ^^^^^^^^^^^^^^^
+#   │ │
+#   │ expression can result in runtime error
+#   │ handle the error case to ensure runtime success
+#   │
+#   = see documentation about error handling at https://errors.vrl.dev/#handling
+#   = learn more about error code 100 at https://errors.vrl.dev/100
+#   = see language documentation at https://vrl.dev
+#
+# error[E111]: fallible predicate
+#   ┌─ :4:4
+#   │
+# 4 │ if parse_grok(.message, "%{GREEDYDATA:parsed}") != null {
+#   │    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#   │    │
+#   │    this predicate can result in runtime error
+#   │    handle the error case to ensure runtime success
+#   │
+#   = see documentation about error handling at https://errors.vrl.dev/#handling
+#   = see language documentation at https://vrl.dev
+#
+# error[E100]: unhandled error
+#   ┌─ :8:1
+#   │
+# 8 │ "foo" + .bar + .baz[1]
+#   │ ^^^^^^^^^^^^
+#   │ │
+#   │ expression can result in runtime error
+#   │ handle the error case to ensure runtime success
+#   │
+#   = see documentation about error handling at https://errors.vrl.dev/#handling
+#   = learn more about error code 100 at https://errors.vrl.dev/100
+#   = see language documentation at https://vrl.dev
+#
+# error[E100]: unhandled error
+#    ┌─ :10:5
+#    │
+# 10 │ 5 + to_int(.foo)
+#    │     ^^^^^^^^^^^^
+#    │     │
+#    │     expression can result in runtime error
+#    │     handle the error case to ensure runtime success
+#    │
+#    = see documentation about error handling at https://errors.vrl.dev/#handling
+#    = learn more about error code 100 at https://errors.vrl.dev/100
+#    = see language documentation at https://vrl.dev
+
+to_string(.foo)
+
+if parse_grok(.message, "%{GREEDYDATA:parsed}") != null {
+  true
+}
+
+"foo" + .bar + .baz[1]
+
+5 + to_int(.foo)

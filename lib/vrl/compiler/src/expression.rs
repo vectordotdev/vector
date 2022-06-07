@@ -463,6 +463,12 @@ pub enum Error {
     Missing { span: Span, feature: &'static str },
 }
 
+/// Details about a fallible expression in a chain of expressions.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct FallibleInfo {
+    pub(crate) span: Span,
+}
+
 impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
         use Error::*;
