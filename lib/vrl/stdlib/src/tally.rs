@@ -55,11 +55,6 @@ impl Function for Tally {
             required: true,
         }]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        tally(value)
-    }
 }
 
 #[derive(Debug, Clone)]

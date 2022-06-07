@@ -84,14 +84,6 @@ impl Function for ForEach {
             is_iterator: true,
         })
     }
-
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
-        let value = args.required("value");
-        let VmFunctionClosure { variables, vm } = args.closure();
-        let runner = closure::Runner::new(variables, |ctx| vm.interpret(ctx));
-
-        for_each(value, ctx, runner)
-    }
 }
 
 #[derive(Debug, Clone)]

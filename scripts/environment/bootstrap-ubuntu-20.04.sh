@@ -120,7 +120,7 @@ apt clean
 
 # Install mold, because the system linker wastes a bunch of time.
 TEMP=$(mktemp -d)
-MOLD_VERSION=1.2.0
+MOLD_VERSION=1.2.1
 MOLD_TARGET=mold-${MOLD_VERSION}-x86_64-linux
 curl -fsSL "https://github.com/rui314/mold/releases/download/v${MOLD_VERSION}/${MOLD_TARGET}.tar.gz" \
      --output "$TEMP/${MOLD_TARGET}.tar.gz"

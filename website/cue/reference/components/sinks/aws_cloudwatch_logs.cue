@@ -39,7 +39,7 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 			proxy: enabled: true
 			request: {
 				enabled: true
-				headers: false
+				headers: true
 			}
 			tls: {
 				enabled:                true

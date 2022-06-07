@@ -31,10 +31,6 @@ impl Function for UuidV4 {
     ) -> Compiled {
         Ok(Box::new(UuidV4Fn))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Resolved {
-        uuid_v4()
-    }
 }
 
 #[derive(Debug, Clone, Copy)]
