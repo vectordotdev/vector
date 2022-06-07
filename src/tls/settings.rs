@@ -25,11 +25,18 @@ use super::{
 const PEM_START_MARKER: &str = "-----BEGIN ";
 
 #[cfg(test)]
-pub const TEST_PEM_CA_PATH: &str = "tests/data/Vector_CA.crt";
+pub const TEST_PEM_CA_PATH: &str = "tests/data/ca/certs/ca.cert.pem";
 #[cfg(test)]
-pub const TEST_PEM_CRT_PATH: &str = "tests/data/localhost.crt";
+pub const TEST_PEM_CRT_PATH: &str =
+    "tests/data/ca/intermediate_server/certs/localhost-chain.cert.pem";
 #[cfg(test)]
-pub const TEST_PEM_KEY_PATH: &str = "tests/data/localhost.key";
+pub const TEST_PEM_KEY_PATH: &str = "tests/data/ca/intermediate_server/private/localhost.key.pem";
+#[cfg(test)]
+pub const TEST_PEM_CLIENT_CRT_PATH: &str =
+    "tests/data/ca/intermediate_client/certs/localhost-chain.cert.pem";
+#[cfg(test)]
+pub const TEST_PEM_CLIENT_KEY_PATH: &str =
+    "tests/data/ca/intermediate_client/private/localhost.key.pem";
 
 /// Standard TLS options with an `enabled` flag
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -508,9 +515,11 @@ fn open_read(filename: &Path, note: &'static str) -> Result<(Vec<u8>, PathBuf)> 
 mod test {
     use super::*;
 
-    const TEST_PKCS12_PATH: &str = "tests/data/localhost.p12";
-    const TEST_PEM_CRT_BYTES: &[u8] = include_bytes!("../../tests/data/localhost.crt");
-    const TEST_PEM_KEY_BYTES: &[u8] = include_bytes!("../../tests/data/localhost.key");
+    const TEST_PKCS12_PATH: &str = "tests/data/ca/intermediate_server/private/localhost.p12";
+    const TEST_PEM_CRT_BYTES: &[u8] =
+        include_bytes!("../../tests/data/ca/intermediate_server/certs/localhost.cert.pem");
+    const TEST_PEM_KEY_BYTES: &[u8] =
+        include_bytes!("../../tests/data/ca/intermediate_server/private/localhost.key.pem");
 
     #[test]
     fn from_options_pkcs12() {
@@ -568,7 +577,8 @@ mod test {
     #[test]
     fn from_options_inline_ca() {
         let ca =
-            String::from_utf8(include_bytes!("../../tests/data/Vector_CA.crt").to_vec()).unwrap();
+            String::from_utf8(include_bytes!("../../tests/data/ca/certs/ca.cert.pem").to_vec())
+                .unwrap();
         let options = TlsConfig {
             ca_file: Some(ca.into()),
             ..Default::default()
@@ -582,7 +592,9 @@ mod test {
     #[test]
     fn from_options_intermediate_ca() {
         let options = TlsConfig {
-            ca_file: Some("tests/data/Chain_with_intermediate.crt".into()),
+            ca_file: Some(
+                "tests/data/ca/intermediate_server/certs/intermediate_server.cert.pem".into(),
+            ),
             ..Default::default()
         };
         let settings = TlsSettings::from_options(&Some(options))

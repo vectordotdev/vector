@@ -40,7 +40,7 @@ impl VectorConfig {
     #[cfg(test)]
     #[allow(unused)] // this test function is not always used in test, breaking
                      // our check-component-features run
-    pub fn set_tls(&mut self, config: Option<TlsEnableableConfig>) {
+    pub fn set_tls(&mut self, config: Option<TlsSourceConfig>) {
         self.tls = config;
     }
 

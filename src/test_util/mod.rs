@@ -173,9 +173,7 @@ pub async fn send_lines_tls(
     }
 
     if let Some(cert_file) = client_cert.into() {
-        connector
-            .set_certificate_file(cert_file, SslFiletype::PEM)
-            .unwrap();
+        connector.set_certificate_chain_file(cert_file).unwrap();
     }
 
     if let Some(key_file) = client_key.into() {

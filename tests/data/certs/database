@@ -1,6 +1,0 @@
-V	210903215410Z		1000	unknown	/C=US/ST=New York/L=Brooklyn/O=Timber.io/CN=Timber.io Vector Test Intermediate CA
-V	300906143023Z		1001	unknown	/C=US/ST=New York/L=Brooklyn/O=Timber.io/CN=Timber.io Vector Test Intermediate CA 2
-V	300906143538Z		1002	unknown	/C=US/ST=New York/L=Brooklyn/O=Timber.io/CN=localhost
-V	310425175131Z		1003	unknown	/C=US/ST=New York/L=Brooklyn/O=Timber.io/OU=TLS Tests/CN=localhost
-V	320603182908Z		1004	unknown	/C=US/ST=New York/L=Brooklyn/O=Timber.io/OU=TLS Tests/CN=test client
-V	320603211442Z		1005	unknown	/C=US/ST=New York/L=Brooklyn/O=Timber.io/CN=test client
