@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, time};
+use std::collections::BTreeMap;
 
 use chrono::Utc;
 use prost::Message;
@@ -232,11 +232,14 @@ impl Bucket {
             gs.top_level_hits += weight;
         });
         gs.hits += weight;
-        let duration = match span.get("duration") {
+        let error = match span.get("error") {
             Some(Value::Integer(val)) => *val,
             _ => 0,
         };
-        let error = match span.get("error") {
+        if error != 0 {
+            gs.errors += weight;
+        }
+        let duration = match span.get("duration") {
             Some(Value::Integer(val)) => *val,
             _ => 0,
         };
@@ -250,17 +253,13 @@ impl Bucket {
 }
 
 struct Aggregator {
-    bucket: Bucket,
+    buckets: BTreeMap<u64, Bucket>,
 }
 
 impl Aggregator {
     fn new() -> Self {
         Self {
-            bucket: Bucket {
-                start: (Utc::now() - chrono::Duration::seconds(10)).timestamp_nanos() as u64,
-                duration: time::Duration::from_secs(10).as_nanos() as u64, // This is fixed now, we assume a static 10 sec windows
-                data: BTreeMap::new(),
-            },
+            buckets: BTreeMap::new(),
         }
     }
 
@@ -304,11 +303,30 @@ impl Aggregator {
         payload_aggkey: PayloadAggregationKey,
     ) {
         let aggkey = AggregationKey::new_aggregation_from_span(span, payload_aggkey);
-        self.bucket.add(span, weight, is_top, aggkey);
+        let start = match span.get("start") {
+            Some(Value::Timestamp(val)) => val.timestamp_nanos(),
+            _ => Utc::now().timestamp_nanos(),
+        };
+        // 10 seconds bucket
+        let btime = (start - start % 10_000_000_000) as u64;
+        match self.buckets.get_mut(&btime) {
+            Some(b) => {
+                b.add(span, weight, is_top, aggkey);
+            }
+            None => {
+                let mut b = Bucket {
+                    start: btime,
+                    duration: 10_000_000_000, // 10 secs in nanosecs
+                    data: BTreeMap::new(),
+                };
+                b.add(span, weight, is_top, aggkey);
+                self.buckets.insert(btime, b);
+            }
+        }
     }
 
     fn get_client_stats_payload(&self) -> Vec<ClientStatsPayload> {
-        let client_stats_buckets = self.bucket.export();
+        let client_stats_buckets = self.export_buckets();
 
         client_stats_buckets
             .into_iter()
@@ -318,17 +336,34 @@ impl Aggregator {
                     hostname: payload_aggkey.hostname,
                     container_id: payload_aggkey.container_id,
                     version: payload_aggkey.version,
-                    stats: vec![csb],
-                    service: "".to_string(),           // already set in stats
-                    agent_aggregation: "".to_string(), // unsure about what is does
-                    sequence: 0,                       // not set by the agent
-                    runtime_id: "".to_string(), // TODO: bring that value from traces if relevant (TBC)
-                    lang: "".to_string(), // TODO: bring that value from traces if relevant (TBC)
-                    tracer_version: "".to_string(), // TODO: bring that value from traces if relevant (TBC)
-                    tags: vec![],                   // empty on purpose
+                    stats: csb,
+                    service: "".to_string(), // not set by the trace-agent, already set in stats
+                    agent_aggregation: "".to_string(), // not set by the trace-agent
+                    sequence: 0,             // not set by the trace-agent
+                    runtime_id: "".to_string(), // not set by the trace-agent
+                    lang: "".to_string(),    //not set by the trace-agent
+                    tracer_version: "".to_string(), // not set by the trace-agent
+                    tags: vec![],            // not set by the trace-agent
                 }
             })
             .collect::<Vec<ClientStatsPayload>>()
+    }
+
+    fn export_buckets(&self) -> BTreeMap<PayloadAggregationKey, Vec<ClientStatsBucket>> {
+        let mut m = BTreeMap::<PayloadAggregationKey, Vec<ClientStatsBucket>>::new();
+        self.buckets.values().for_each(|b| {
+            b.export().into_iter().for_each(|(payload_key, csb)| {
+                match m.get_mut(&payload_key) {
+                    None => {
+                        m.insert(payload_key.clone(), vec![csb]);
+                    }
+                    Some(s) => {
+                        s.push(csb);
+                    }
+                };
+            })
+        });
+        m
     }
 }
 
@@ -412,86 +447,86 @@ pub(crate) fn compute_apm_stats(key: &PartitionKey, traces: &[TraceEvent]) -> St
 // See this https://github.com/DataDog/datadog-agent/blob/b5bed4d/pkg/trace/pb/stats_gen.go for the reference go code
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
 pub(crate) struct StatsPayload {
-    #[serde(rename(serialize = "AgentHostname"))]
-    agent_hostname: String,
-    #[serde(rename(serialize = "AgentEnv"))]
-    agent_env: String,
-    #[serde(rename(serialize = "Stats"))]
-    stats: Vec<ClientStatsPayload>,
-    #[serde(rename(serialize = "AgentVersion"))]
-    agent_version: String,
-    #[serde(rename(serialize = "ClientComputed"))]
-    client_computed: bool,
+    #[serde(rename = "AgentHostname")]
+    pub(crate) agent_hostname: String,
+    #[serde(rename = "AgentEnv")]
+    pub(crate) agent_env: String,
+    #[serde(rename = "Stats")]
+    pub(crate) stats: Vec<ClientStatsPayload>,
+    #[serde(rename = "AgentVersion")]
+    pub(crate) agent_version: String,
+    #[serde(rename = "ClientComputed")]
+    pub(crate) client_computed: bool,
 }
 
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
-pub struct ClientStatsPayload {
-    #[serde(rename(serialize = "Hostname"))]
-    pub hostname: String,
-    #[serde(rename(serialize = "Env"))]
-    pub env: String,
-    #[serde(rename(serialize = "Version"))]
-    pub version: String,
-    #[serde(rename(serialize = "Stats"))]
-    pub stats: Vec<ClientStatsBucket>,
-    #[serde(rename(serialize = "Lang"))]
-    pub lang: String,
-    #[serde(rename(serialize = "TracerVersion"))]
-    pub tracer_version: String,
-    #[serde(rename(serialize = "RuntimeID"))]
-    pub runtime_id: String,
-    #[serde(rename(serialize = "Sequence"))]
-    pub sequence: u64,
-    #[serde(rename(serialize = "AgentAggregation"))]
-    pub agent_aggregation: String,
-    #[serde(rename(serialize = "Service"))]
-    pub service: String,
-    #[serde(rename(serialize = "ContainerID"))]
-    pub container_id: String,
-    #[serde(rename(serialize = "Tags"))]
-    pub tags: Vec<String>,
+pub(crate) struct ClientStatsPayload {
+    #[serde(rename = "Hostname")]
+    pub(crate) hostname: String,
+    #[serde(rename = "Env")]
+    pub(crate) env: String,
+    #[serde(rename = "Version")]
+    pub(crate) version: String,
+    #[serde(rename = "Stats")]
+    pub(crate) stats: Vec<ClientStatsBucket>,
+    #[serde(rename = "Lang")]
+    pub(crate) lang: String,
+    #[serde(rename = "TracerVersion")]
+    pub(crate) tracer_version: String,
+    #[serde(rename = "RuntimeID")]
+    pub(crate) runtime_id: String,
+    #[serde(rename = "Sequence")]
+    pub(crate) sequence: u64,
+    #[serde(rename = "AgentAggregation")]
+    pub(crate) agent_aggregation: String,
+    #[serde(rename = "Service")]
+    pub(crate) service: String,
+    #[serde(rename = "ContainerID")]
+    pub(crate) container_id: String,
+    #[serde(rename = "Tags")]
+    pub(crate) tags: Vec<String>,
 }
 
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
-pub struct ClientStatsBucket {
-    #[serde(rename(serialize = "Start"))]
-    pub start: u64,
-    #[serde(rename(serialize = "Duration"))]
-    pub duration: u64,
-    #[serde(rename(serialize = "Stats"))]
-    pub stats: Vec<ClientGroupedStats>,
-    #[serde(rename(serialize = "AgentTimeShift"))]
-    pub agent_time_shift: i64,
+pub(crate) struct ClientStatsBucket {
+    #[serde(rename = "Start")]
+    pub(crate) start: u64,
+    #[serde(rename = "Duration")]
+    pub(crate) duration: u64,
+    #[serde(rename = "Stats")]
+    pub(crate) stats: Vec<ClientGroupedStats>,
+    #[serde(rename = "AgentTimeShift")]
+    pub(crate) agent_time_shift: i64,
 }
 
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
-pub struct ClientGroupedStats {
-    #[serde(rename(serialize = "Service"))]
-    pub service: String,
-    #[serde(rename(serialize = "Name"))]
-    pub name: String,
-    #[serde(rename(serialize = "Resource"))]
-    pub resource: String,
-    #[serde(rename(serialize = "HTTPStatusCode"))]
-    pub http_status_code: u32,
-    #[serde(rename(serialize = "Type"))]
-    pub r#type: String,
-    #[serde(rename(serialize = "DBType"))]
-    pub db_type: String,
-    #[serde(rename(serialize = "Hits"))]
-    pub hits: u64,
-    #[serde(rename(serialize = "Errors"))]
-    pub errors: u64,
-    #[serde(rename(serialize = "Duration"))]
-    pub duration: u64,
-    #[serde(rename(serialize = "OkSummary"))]
+pub(crate) struct ClientGroupedStats {
+    #[serde(rename = "Service")]
+    pub(crate) service: String,
+    #[serde(rename = "Name")]
+    pub(crate) name: String,
+    #[serde(rename = "Resource")]
+    pub(crate) resource: String,
+    #[serde(rename = "HTTPStatusCode")]
+    pub(crate) http_status_code: u32,
+    #[serde(rename = "Type")]
+    pub(crate) r#type: String,
+    #[serde(rename = "DBType")]
+    pub(crate) db_type: String,
+    #[serde(rename = "Hits")]
+    pub(crate) hits: u64,
+    #[serde(rename = "Errors")]
+    pub(crate) errors: u64,
+    #[serde(rename = "Duration")]
+    pub(crate) duration: u64,
+    #[serde(rename = "OkSummary")]
     #[serde(with = "serde_bytes")]
-    pub ok_summary: Vec<u8>,
-    #[serde(rename(serialize = "ErrorSummary"))]
+    pub(crate) ok_summary: Vec<u8>,
+    #[serde(rename = "ErrorSummary")]
     #[serde(with = "serde_bytes")]
-    pub error_summary: Vec<u8>,
-    #[serde(rename(serialize = "Synthetics"))]
-    pub synthetics: bool,
-    #[serde(rename(serialize = "TopLevelHits"))]
-    pub top_level_hits: u64,
+    pub(crate) error_summary: Vec<u8>,
+    #[serde(rename = "Synthetics")]
+    pub(crate) synthetics: bool,
+    #[serde(rename = "TopLevelHits")]
+    pub(crate) top_level_hits: u64,
 }
