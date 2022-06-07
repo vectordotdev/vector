@@ -11,10 +11,10 @@ remap: functions: get_metadata_field: {
 		{
 			name: "key"
 			description: """
-				The path of the value to look up in the metadata. This must be a VRL query.
+				The path of the value to look up in the metadata. This must be a VRL path.
 				"""
 			required: true
-			type: ["query"]
+			type: ["path"]
 		},
 	]
 	internal_failure_reasons: [

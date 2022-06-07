@@ -10,9 +10,9 @@ remap: functions: set_metadata_field: {
 	arguments: [
 		{
 			name:        "key"
-			description: "The path of the value to set in the metadata. This must be a VRL query."
+			description: "The path of the value to set in the metadata. This must be a VRL path."
 			required:    true
-			type: ["query"]
+			type: ["path"]
 		},
 		{
 			name:        "value"

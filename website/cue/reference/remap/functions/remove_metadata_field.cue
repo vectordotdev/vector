@@ -10,10 +10,10 @@ remap: functions: remove_metadata_field: {
 		{
 			name: "key"
 			description: """
-				The path to the metadata value to remove. This must be a VRL query.
+				The path to the metadata value to remove. This must be a VRL path.
 				"""
 			required: true
-			type: ["query"]
+			type: ["path"]
 		},
 	]
 	internal_failure_reasons: [
