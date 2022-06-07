@@ -39,7 +39,7 @@ const fn default_shutdown_timeout_secs() -> u64 {
 impl VectorConfig {
     #[cfg(test)]
     #[allow(unused)] // this test function is not always used in test, breaking
-                     // our cargo-hack run
+                     // our check-component-features run
     pub fn set_tls(&mut self, config: Option<TlsEnableableConfig>) {
         self.tls = config;
     }
@@ -290,7 +290,7 @@ mod test {
         wait_for_tcp(addr).await;
 
         let mut stream = TcpStream::connect(&addr).await.unwrap();
-        stream.write(b"hello world \n").await.unwrap();
+        stream.write_all(b"hello world \n").await.unwrap();
 
         tokio::time::sleep(Duration::from_secs(2)).await;
         stream.shutdown().await.unwrap();

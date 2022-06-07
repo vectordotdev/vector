@@ -1,13 +1,9 @@
-use std::fmt;
-
-use value::Value;
-
 use crate::{
     expression::{Expr, Resolved},
     state::{ExternalEnv, LocalEnv},
-    vm::OpCode,
     Context, Expression, TypeDef,
 };
+use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Block {
@@ -68,43 +64,6 @@ impl Expression for Block {
         let type_def = type_defs.pop().unwrap_or_else(TypeDef::null);
 
         type_def.with_fallibility(fallible)
-    }
-
-    fn compile_to_vm(
-        &self,
-        vm: &mut crate::vm::Vm,
-        state: (&mut LocalEnv, &mut ExternalEnv),
-    ) -> Result<(), String> {
-        let (local, external) = state;
-        let mut jumps = Vec::new();
-
-        // An empty block should resolve to Null.
-        if self.inner.is_empty() {
-            let null = vm.add_constant(Value::Null);
-            vm.write_opcode(OpCode::Constant);
-            vm.write_primitive(null);
-        }
-
-        let mut expressions = self.inner.iter().peekable();
-
-        while let Some(expr) = expressions.next() {
-            // Write each of the inner expressions
-            expr.compile_to_vm(vm, (local, external))?;
-
-            if expressions.peek().is_some() {
-                // At the end of each statement (apart from the last one) we need to clean up
-                // This involves popping the value remaining on the stack, and jumping to the end
-                // of the block if we are in error.
-                jumps.push(vm.emit_jump(OpCode::EndStatement));
-            }
-        }
-
-        // Update all the jumps to jump to the end of the block.
-        for jump in jumps {
-            vm.patch_jump(jump);
-        }
-
-        Ok(())
     }
 }
 

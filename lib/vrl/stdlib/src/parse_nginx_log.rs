@@ -114,14 +114,6 @@ impl Function for ParseNginxLog {
             _ => Ok(None),
         }
     }
-
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let format = args.required_any("format").downcast_ref::<Bytes>().unwrap();
-        let timestamp_format = args.optional("timestamp_format");
-
-        parse_nginx_log(value, timestamp_format, format, ctx)
-    }
 }
 
 fn regex_for_format(format: &[u8]) -> &Regex {
@@ -204,9 +196,12 @@ fn kind_error() -> BTreeMap<Field, Kind> {
         ("tid".into(), Kind::integer()),
         ("cid".into(), Kind::integer()),
         ("message".into(), Kind::bytes()),
+        ("excess".into(), Kind::float().or_null()),
+        ("zone".into(), Kind::bytes().or_null()),
         ("client".into(), Kind::bytes().or_null()),
         ("server".into(), Kind::bytes().or_null()),
         ("request".into(), Kind::bytes().or_null()),
+        ("upstream".into(), Kind::bytes().or_null()),
         ("host".into(), Kind::bytes().or_null()),
         ("port".into(), Kind::bytes().or_null()),
     ])
@@ -355,6 +350,28 @@ mod tests {
                 "server" => "test.local",
                 "request" => "GET / HTTP/2.0",
                 "upstream" => "http://127.0.0.1:80/",
+            }),
+            tdef: TypeDef::object(kind_error()).fallible(),
+        }
+
+        error_rate_limit {
+            args: func_args![
+                value: r#"2022/05/30 20:56:22 [error] 7164#7164: *38068741 limiting requests, excess: 50.416 by zone "api_access_token", client: 10.244.0.0, server: test.local, request: "GET / HTTP/2.0", host: "127.0.0.1:8080""#,
+                format: "error"
+            ],
+            want: Ok(btreemap! {
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2022-05-30T20:56:22Z").unwrap().into()),
+                "severity" => "error",
+                "pid" => 7164,
+                "tid" => 7164,
+                "cid" => 38068741,
+                "message" => "limiting requests",
+                "excess" => 50.416,
+                "zone" => "api_access_token",
+                "client" => "10.244.0.0",
+                "server" => "test.local",
+                "request" => "GET / HTTP/2.0",
+                "host" => "127.0.0.1:8080",
             }),
             tdef: TypeDef::object(kind_error()).fallible(),
         }

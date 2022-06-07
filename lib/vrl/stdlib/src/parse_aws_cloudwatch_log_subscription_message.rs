@@ -104,11 +104,6 @@ impl Function for ParseAwsCloudWatchLogSubscriptionMessage {
             required: true,
         }]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        parse_aws_cloudwatch_log_subscription_message(value)
-    }
 }
 
 #[derive(Debug, Clone)]

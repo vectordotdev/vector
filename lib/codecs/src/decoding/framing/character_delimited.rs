@@ -113,7 +113,7 @@ impl Decoder for CharacterDelimitedDecoder {
                         let frame = buf.split_to(next_delimiter_idx).freeze();
                         trace!(
                             message = "Decoding the frame.",
-                            bytes_proccesed = frame.len()
+                            bytes_processed = frame.len()
                         );
                         buf.advance(1); // scoot past the delimiter
                         return Ok(Some(frame));

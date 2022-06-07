@@ -88,18 +88,13 @@ fn simple_span() -> BTreeMap<String, Value> {
 pub fn simple_trace_event() -> TraceEvent {
     let mut t = TraceEvent::default();
     t.insert("language", "a_language");
+    t.insert("agent_version", "1.23456");
     t.insert("host", "a_host");
     t.insert("env", "an_env");
     t.insert("trace_id", Value::Integer(123));
+    t.insert("target_tps", Value::Integer(10));
+    t.insert("error_tps", Value::Integer(5));
     t.insert("spans", Value::Array(vec![Value::from(simple_span())]));
-    t.insert(
-        "start_time".to_string(),
-        Value::from(Utc.timestamp_nanos(1_431_648_000_000_002i64)),
-    );
-    t.insert(
-        "end_time".to_string(),
-        Value::from(Utc.timestamp_nanos(1_431_648_000_000_003i64)),
-    );
     t
 }
 
@@ -125,14 +120,7 @@ async fn smoke() {
     t.metadata_mut()
         .set_datadog_api_key(Some(Arc::from("a_key")));
 
-    let mut tr = TraceEvent::from(simple_span());
-    tr.insert("host", "a_host");
-    tr.insert("env", "an_env");
-    tr.insert("language", "a_language");
-    tr.metadata_mut()
-        .set_datadog_api_key(Some(Arc::from("a_key")));
-
-    let events = vec![Event::Trace(t), Event::Trace(tr)];
+    let events = vec![Event::Trace(t)];
     let rx = start_test(BatchStatus::Delivered, StatusCode::OK, events).await;
 
     // We only take 1 elements as the trace & the APM transaction shall be
@@ -146,20 +134,14 @@ async fn smoke() {
         "application/x-protobuf"
     );
     assert_eq!(parts.headers.get("DD-API-KEY").unwrap(), "a_key");
-    assert_eq!(
-        parts.headers.get("X-Datadog-Reported-Languages").unwrap(),
-        "a_language"
-    );
 
     let mut decoded_payload = dd_proto::TracePayload::decode(body).unwrap();
-    assert_eq!(decoded_payload.traces.len(), 1);
-    assert_eq!(decoded_payload.transactions.len(), 1);
+    assert_eq!(decoded_payload.tracer_payloads.len(), 1);
     assert_eq!(decoded_payload.host_name, "a_host");
     assert_eq!(decoded_payload.env, "an_env");
-    let mut trace = decoded_payload.traces.pop().unwrap();
-    assert_eq!(trace.start_time, 1_431_648_000_000_002);
-    assert_eq!(trace.end_time, 1_431_648_000_000_003);
-    assert_eq!(trace.trace_id, 123);
-    validate_simple_span(trace.spans.pop().unwrap());
-    validate_simple_span(decoded_payload.transactions.pop().unwrap());
+    let mut tracer_payload = decoded_payload.tracer_payloads.pop().unwrap();
+    assert_eq!(tracer_payload.chunks.len(), 1);
+    let mut chunk = tracer_payload.chunks.pop().unwrap();
+    assert_eq!(chunk.spans.len(), 1);
+    validate_simple_span(chunk.spans.pop().unwrap());
 }

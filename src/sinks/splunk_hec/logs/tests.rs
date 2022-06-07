@@ -12,7 +12,10 @@ use super::sink::HecProcessedEvent;
 use crate::{
     config::{SinkConfig, SinkContext},
     sinks::{
-        splunk_hec::logs::{config::HecLogsSinkConfig, encoder::HecLogsEncoder, sink::process_log},
+        splunk_hec::{
+            common::timestamp_key,
+            logs::{config::HecLogsSinkConfig, encoder::HecLogsEncoder, sink::process_log},
+        },
         util::{test::build_test_server, Compression},
     },
     template::Template,
@@ -21,7 +24,7 @@ use crate::{
 
 #[derive(Deserialize, Debug)]
 struct HecEventJson {
-    time: f64,
+    time: Option<f64>,
     event: BTreeMap<String, serde_json::Value>,
     fields: BTreeMap<String, String>,
     source: Option<String>,
@@ -41,7 +44,10 @@ struct HecEventText {
     host: Option<String>,
 }
 
-fn get_processed_event() -> HecProcessedEvent {
+fn get_processed_event_timestamp(
+    timestamp: Option<Value>,
+    timestamp_key: &str,
+) -> HecProcessedEvent {
     let mut event = Event::from("hello world");
     event
         .as_mut_log()
@@ -53,10 +59,12 @@ fn get_processed_event() -> HecProcessedEvent {
     event.as_mut_log().insert("event_field2", "test_value2");
     event.as_mut_log().insert("key", "value");
     event.as_mut_log().insert("int_val", 123);
-    event.as_mut_log().insert(
-        log_schema().timestamp_key(),
-        Utc.timestamp_nanos(1638366107111456123),
-    );
+
+    if timestamp.is_some() {
+        event.as_mut_log().insert(timestamp_key, timestamp);
+    } else {
+        event.as_mut_log().remove(timestamp_key);
+    }
 
     let sourcetype = Template::try_from("{{ event_sourcetype }}".to_string()).ok();
     let source = Template::try_from("{{ event_source }}".to_string()).ok();
@@ -66,12 +74,24 @@ fn get_processed_event() -> HecProcessedEvent {
 
     process_log(
         event,
-        sourcetype.as_ref(),
-        source.as_ref(),
-        index.as_ref(),
-        "host_key",
-        indexed_fields.as_slice(),
-        timestamp_nanos_key.as_deref(),
+        &super::sink::HecLogData {
+            sourcetype: sourcetype.as_ref(),
+            source: source.as_ref(),
+            index: index.as_ref(),
+            host_key: "host_key",
+            indexed_fields: indexed_fields.as_slice(),
+            timestamp_nanos_key: timestamp_nanos_key.as_ref(),
+            timestamp_key,
+        },
+    )
+}
+
+fn get_processed_event() -> HecProcessedEvent {
+    get_processed_event_timestamp(
+        Some(value::Value::Timestamp(
+            Utc.timestamp_nanos(1638366107111456123),
+        )),
+        &timestamp_key(),
     )
 }
 
@@ -121,7 +141,7 @@ fn splunk_encode_log_event_json() {
 
     assert_eq!(hec_data.fields.get("event_field1").unwrap(), "test_value1");
 
-    assert_eq!(hec_data.time, 1638366107.111);
+    assert_eq!(hec_data.time, Some(1638366107.111));
     assert_eq!(
         event.get("ts_nanos_key").unwrap(),
         &serde_json::Value::from(456123)
@@ -165,6 +185,7 @@ async fn splunk_passthrough_token() {
         tls: None,
         acknowledgements: Default::default(),
         timestamp_nanos_key: None,
+        timestamp_key: log_schema().timestamp_key().into(),
     };
     let cx = SinkContext::new_test();
 
@@ -196,4 +217,31 @@ async fn splunk_passthrough_token() {
             "Splunk token"
         ]
     )
+}
+
+#[test]
+fn splunk_encode_log_event_json_timestamps() {
+    crate::test_util::trace_init();
+
+    fn get_hec_data_for_timestamp_test(
+        timestamp: Option<Value>,
+        timestamp_key: &str,
+    ) -> HecEventJson {
+        let processed_event = get_processed_event_timestamp(timestamp, timestamp_key);
+        let encoder = HecLogsEncoder::Json;
+        let bytes = encoder.encode_event(processed_event).unwrap();
+        serde_json::from_slice::<HecEventJson>(&bytes[..]).unwrap()
+    }
+
+    // no timestamp_key is provided
+    let mut hec_data = get_hec_data_for_timestamp_test(None, "");
+    assert_eq!(hec_data.time, None);
+
+    // timestamp_key is provided but timestamp is not valid type
+    hec_data = get_hec_data_for_timestamp_test(Some(value::Value::Integer(0)), &timestamp_key());
+    assert_eq!(hec_data.time, None);
+
+    // timestamp_key is provided but no timestamp in the event
+    let hec_data = get_hec_data_for_timestamp_test(None, &timestamp_key());
+    assert_eq!(hec_data.time, None);
 }
