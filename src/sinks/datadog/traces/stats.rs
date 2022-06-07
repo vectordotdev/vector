@@ -128,7 +128,7 @@ impl GroupedStats {
 fn encode_sketch(agent_sketch: &AgentDDSketch) -> Vec<u8> {
     let index_mapping = ddsketch_full::IndexMapping {
         gamma: agent_sketch.gamma(),
-        index_offset: 0.0,
+        index_offset: agent_sketch.bin_index_offset() as f64,
         interpolation: ddsketch_full::index_mapping::Interpolation::None as i32,
     };
 
