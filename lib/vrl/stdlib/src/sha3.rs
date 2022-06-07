@@ -97,16 +97,6 @@ impl Function for Sha3 {
             _ => Ok(None),
         }
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let variant = args
-            .required_any("variant")
-            .downcast_ref::<Bytes>()
-            .unwrap();
-
-        sha3(value, variant)
-    }
 }
 
 #[derive(Debug, Clone)]

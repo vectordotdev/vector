@@ -133,19 +133,6 @@ impl Function for IsJson {
             _ => Ok(None),
         }
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let variant = args.optional_any("variant");
-
-        match variant {
-            Some(variant) => {
-                let variant = variant.downcast_ref::<Bytes>().unwrap();
-                is_json_with_variant(value, variant)
-            }
-            None => is_json(value),
-        }
-    }
 }
 
 #[derive(Clone, Debug)]

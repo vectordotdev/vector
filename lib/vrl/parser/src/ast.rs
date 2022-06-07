@@ -37,6 +37,14 @@ impl<T> Node<T> {
         }
     }
 
+    pub fn map_option<R>(self, mut f: impl FnMut(T) -> Option<R>) -> Option<Node<R>> {
+        let Node { span, node } = self;
+
+        let node = f(node)?;
+
+        Some(Node { span, node })
+    }
+
     pub fn new(span: Span, node: T) -> Self {
         Self { span, node }
     }
