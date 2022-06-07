@@ -62,11 +62,6 @@ impl Function for ParseGroks {
                 required: true,
             },
             Parameter {
-                keyword: "remove_empty",
-                kind: kind::BOOLEAN,
-                required: false,
-            },
-            Parameter {
                 keyword: "aliases",
                 kind: kind::OBJECT,
                 required: false,
@@ -221,15 +216,7 @@ impl Function for ParseGroks {
         let grok_rules = parse_grok_rules::parse_grok_rules(&patterns, aliases)
             .map_err(|e| Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticMessage>)?;
 
-        let remove_empty = arguments
-            .optional("remove_empty")
-            .unwrap_or_else(|| expr!(false));
-
-        Ok(Box::new(ParseGrokFn {
-            value,
-            grok_rules,
-            remove_empty,
-        }))
+        Ok(Box::new(ParseGrokFn { value, grok_rules }))
     }
 }
 
@@ -237,16 +224,14 @@ impl Function for ParseGroks {
 struct ParseGrokFn {
     value: Box<dyn Expression>,
     grok_rules: Vec<GrokRule>,
-    remove_empty: Box<dyn Expression>,
 }
 
 impl Expression for ParseGrokFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let bytes = value.try_bytes_utf8_lossy()?;
-        let remove_empty = self.remove_empty.resolve(ctx)?.try_boolean()?;
 
-        let v = parse_grok::parse_grok(bytes.as_ref(), &self.grok_rules, remove_empty)
+        let v = parse_grok::parse_grok(bytes.as_ref(), &self.grok_rules)
             .map_err(|err| format!("unable to parse grok: {}", err))?;
 
         Ok(v)
@@ -306,17 +291,6 @@ mod test {
                 "timestamp" => "2020-10-02T23:22:12.223222Z",
                 "level" => "",
             })),
-            tdef: TypeDef::object(Collection::any()).fallible(),
-        }
-
-        remove_empty {
-            args: func_args![ value: "2020-10-02T23:22:12.223222Z",
-                              patterns: vec!["(%{TIMESTAMP_ISO8601:timestamp}|%{LOGLEVEL:level})"],
-                              remove_empty: true,
-            ],
-            want: Ok(Value::from(
-                btreemap! { "timestamp" => "2020-10-02T23:22:12.223222Z" },
-            )),
             tdef: TypeDef::object(Collection::any()).fallible(),
         }
 

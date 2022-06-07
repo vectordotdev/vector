@@ -6,17 +6,14 @@ use vrl::{
     prelude::*,
 };
 
-fn parse_grok(value: Value, remove_empty: Value, pattern: Arc<grok::Pattern>) -> Resolved {
+fn parse_grok(value: Value, pattern: Arc<grok::Pattern>) -> Resolved {
     let bytes = value.try_bytes_utf8_lossy()?;
-    let remove_empty = remove_empty.try_boolean()?;
     match pattern.match_against(&bytes) {
         Some(matches) => {
             let mut result = BTreeMap::new();
 
             for (name, value) in matches.iter() {
-                if !remove_empty || !value.is_empty() {
-                    result.insert(name.to_string(), Value::from(value));
-                }
+                result.insert(name.to_string(), Value::from(value));
             }
 
             Ok(Value::from(result))
@@ -77,11 +74,6 @@ impl Function for ParseGrok {
                 kind: kind::BYTES,
                 required: true,
             },
-            Parameter {
-                keyword: "remove_empty",
-                kind: kind::BOOLEAN,
-                required: false,
-            },
         ]
     }
 
@@ -119,21 +111,13 @@ impl Function for ParseGrok {
             .expect("grok pattern not bytes")
             .into_owned();
 
-        let mut grok = grok::Grok::with_patterns();
+        let mut grok = grok::Grok::with_default_patterns();
         let pattern =
             Arc::new(grok.compile(&pattern, true).map_err(|e| {
                 Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticMessage>
             })?);
 
-        let remove_empty = arguments
-            .optional("remove_empty")
-            .unwrap_or_else(|| expr!(false));
-
-        Ok(Box::new(ParseGrokFn {
-            value,
-            pattern,
-            remove_empty,
-        }))
+        Ok(Box::new(ParseGrokFn { value, pattern }))
     }
 
     fn compile_argument(
@@ -151,7 +135,7 @@ impl Function for ParseGrok {
                     .expect("grok pattern not bytes")
                     .into_owned();
 
-                let mut grok = grok::Grok::with_patterns();
+                let mut grok = grok::Grok::with_default_patterns();
                 let pattern = Arc::new(grok.compile(&pattern, true).map_err(|e| {
                     Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticMessage>
                 })?);
@@ -169,16 +153,14 @@ struct ParseGrokFn {
 
     // Wrapping pattern in an Arc, as cloning the pattern could otherwise be expensive.
     pattern: Arc<grok::Pattern>,
-    remove_empty: Box<dyn Expression>,
 }
 
 impl Expression for ParseGrokFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let remove_empty = self.remove_empty.resolve(ctx)?;
         let pattern = self.pattern.clone();
 
-        parse_grok(value, remove_empty, pattern)
+        parse_grok(value, pattern)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
@@ -232,19 +214,7 @@ mod test {
                               pattern: "(%{TIMESTAMP_ISO8601:timestamp}|%{LOGLEVEL:level})"],
             want: Ok(Value::from(btreemap! {
                 "timestamp" => "2020-10-02T23:22:12.223222Z",
-                "level" => "",
             })),
-            tdef: TypeDef::object(Collection::any()).fallible(),
-        }
-
-        remove_empty {
-            args: func_args![ value: "2020-10-02T23:22:12.223222Z",
-                              pattern: "(%{TIMESTAMP_ISO8601:timestamp}|%{LOGLEVEL:level})",
-                              remove_empty: true,
-            ],
-            want: Ok(Value::from(
-                btreemap! { "timestamp" => "2020-10-02T23:22:12.223222Z" },
-            )),
             tdef: TypeDef::object(Collection::any()).fallible(),
         }
     ];
