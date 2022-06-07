@@ -10,7 +10,8 @@ fn set_metadata_field(
     Ok(match key {
         MetadataKey::Legacy(key) => {
             let str_value = value.as_str().expect("must be a string");
-            Value::from(ctx.target_mut().insert_secret(key, str_value.as_ref()))
+            ctx.target_mut().insert_secret(key, str_value.as_ref());
+            Value::Null
         }
         MetadataKey::Query(query) => {
             ctx.target_mut().remove_metadata(query.path())?;
@@ -60,16 +61,13 @@ impl Function for SetMetadataField {
         let value = arguments.required_expr("value");
 
         // for backwards compatibility, make sure value is a string when using legacy.
-        if matches!(key, MetadataKey::Legacy(_)) {
-            if !value.type_def((&state.0, &state.1)).is_bytes() {
-                return Err(vrl::function::Error::UnexpectedExpression {
-                    keyword: "value",
-                    // value: value.clone(),
-                    expected: "string",
-                    expr: value.clone(),
-                }
-                .into());
+        if matches!(key, MetadataKey::Legacy(_)) && !value.type_def((state.0, state.1)).is_bytes() {
+            return Err(vrl::function::Error::UnexpectedExpression {
+                keyword: "value",
+                expected: "string",
+                expr: value,
             }
+            .into());
         }
 
         Ok(Box::new(SetMetadataFieldFn {

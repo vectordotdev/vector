@@ -7,7 +7,10 @@ fn remove_metadata_field(
     key: &MetadataKey,
 ) -> std::result::Result<Value, ExpressionError> {
     Ok(match key {
-        MetadataKey::Legacy(key) => Value::from(ctx.target_mut().remove_secret(key)),
+        MetadataKey::Legacy(key) => {
+            ctx.target_mut().remove_secret(key);
+            Value::Null
+        }
         MetadataKey::Query(query) => {
             ctx.target_mut().remove_metadata(query.path())?;
             Value::Null
