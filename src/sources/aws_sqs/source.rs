@@ -11,9 +11,10 @@ use tokio::{pin, select, time::Duration};
 use crate::{
     codecs::Decoder,
     event::{BatchNotifier, BatchStatus},
+    finalizer::UnorderedFinalizer,
     internal_events::{EndpointBytesReceived, SqsMessageDeleteError, StreamClosedError},
     shutdown::ShutdownSignal,
-    sources::util::{self, finalizer::UnorderedFinalizer},
+    sources::util,
     SourceSender,
 };
 

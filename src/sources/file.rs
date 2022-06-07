@@ -13,7 +13,7 @@ use snafu::{ResultExt, Snafu};
 use tokio::{sync::oneshot, task::spawn_blocking};
 use tracing::{Instrument, Span};
 
-use super::util::{finalizer::OrderedFinalizer, EncodingConfig, MultilineConfig};
+use super::util::{EncodingConfig, MultilineConfig};
 use crate::{
     config::{
         log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext,
@@ -21,6 +21,7 @@ use crate::{
     },
     encoding_transcode::{Decoder, Encoder},
     event::{BatchNotifier, BatchStatus, LogEvent},
+    finalizer::OrderedFinalizer,
     internal_events::{
         FileBytesReceived, FileEventsReceived, FileOpen, FileSourceInternalEventsEmitter,
     },

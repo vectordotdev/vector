@@ -22,7 +22,6 @@ use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 use vector_core::ByteSizeOf;
 
-use super::util::finalizer::OrderedFinalizer;
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{
@@ -30,6 +29,7 @@ use crate::{
         SourceDescription,
     },
     event::{BatchNotifier, BatchStatus, Event, Value},
+    finalizer::OrderedFinalizer,
     internal_events::{
         KafkaBytesReceived, KafkaEventsReceived, KafkaNegativeAcknowledgmentError,
         KafkaOffsetUpdateError, KafkaReadError, StreamClosedError,

@@ -20,6 +20,7 @@ use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, Event, MaybeAsLogMut, Value},
+    finalizer::{EmptyStream, UnorderedFinalizer},
     gcp::{GcpAuthConfig, GcpCredentials, Scope, PUBSUB_URL},
     internal_events::{
         BytesReceived, GcpPubsubConnectError, GcpPubsubReceiveError, GcpPubsubStreamingPullError,
@@ -28,7 +29,6 @@ use crate::{
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     sources::util,
-    sources::util::finalizer::{EmptyStream, UnorderedFinalizer},
     tls::{TlsConfig, TlsSettings},
     SourceSender,
 };

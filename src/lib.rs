@@ -34,6 +34,15 @@ pub mod dns;
 #[cfg(feature = "docker")]
 pub mod docker;
 pub mod expiring_hash_map;
+#[cfg(any(
+    feature = "sources-aws_sqs",
+    feature = "sources-file",
+    feature = "sources-gcp_pubsub",
+    feature = "sources-journald",
+    feature = "sources-kafka",
+    feature = "sources-splunk_hec"
+))]
+pub mod finalizer;
 pub mod generate;
 #[macro_use]
 #[allow(unreachable_pub)]

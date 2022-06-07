@@ -39,13 +39,13 @@ use crate::{
         SourceDescription,
     },
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent, Value},
+    finalizer::OrderedFinalizer,
     internal_events::{
         BytesReceived, JournaldInvalidRecordError, JournaldNegativeAcknowledgmentError,
         OldEventsReceived,
     },
     serde::bool_or_struct,
     shutdown::ShutdownSignal,
-    sources::util::finalizer::OrderedFinalizer,
     SourceSender,
 };
 

@@ -17,8 +17,8 @@ use warp::Rejection;
 
 use super::ApiError;
 use crate::{
-    config::AcknowledgementsConfig, event::BatchStatus, shutdown::ShutdownSignal,
-    sources::util::finalizer::UnorderedFinalizer,
+    config::AcknowledgementsConfig, event::BatchStatus, finalizer::UnorderedFinalizer,
+    shutdown::ShutdownSignal,
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
