@@ -314,11 +314,9 @@ fn cpu_metrics(
                 ("throttled_periods_total", throttling_data.throttled_periods),
                 (
                     "throttled_time_seconds_total",
-                    if let Some(throttled_time) = throttling_data.throttled_time {
-                        Some(throttled_time / 1_000_000_000.0)
-                    } else {
-                        None
-                    },
+                    throttling_data
+                        .throttled_time
+                        .map(|throttled_time| throttled_time / 1_000_000_000.0),
                 ),
             ]
             .iter()
