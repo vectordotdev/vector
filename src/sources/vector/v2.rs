@@ -91,6 +91,7 @@ async fn handle_batch_status(receiver: Option<BatchStatusReceiver>) -> Result<()
 /// Configuration for version two of the `vector` source.
 #[configurable_component]
 #[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct VectorConfig {
     /// The address to listen for connections on.
     ///

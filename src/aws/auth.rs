@@ -4,23 +4,23 @@ use aws_config::{
     default_provider::credentials::DefaultCredentialsChain, sts::AssumeRoleProviderBuilder,
 };
 use aws_types::{credentials::SharedCredentialsProvider, region::Region, Credentials};
-use serde::{Deserialize, Serialize};
-use vector_config::Configurable;
+use vector_config::configurable_component;
 
 // matches default load timeout from the SDK as of 0.10.1, but lets us confidently document the
 // default rather than relying on the SDK default to not change
 const DEFAULT_LOAD_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Configuration of the authentication strategy for interacting with AWS services.
-#[derive(Clone, Configurable, Debug, Derivative, Deserialize, Serialize)]
+#[configurable_component]
+#[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
-#[serde(untagged)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, untagged)]
 pub enum AwsAuthentication {
     /// Authenticate using a fixed access key and secret pair.
     Static {
         /// The AWS access key ID.
         access_key_id: String,
+
         /// The AWS secret access key.
         secret_access_key: String,
     },
@@ -31,6 +31,7 @@ pub enum AwsAuthentication {
     File {
         /// Path to the credentials file.
         credentials_file: String,
+
         /// The credentials profile to use.
         profile: Option<String>,
     },
@@ -39,6 +40,7 @@ pub enum AwsAuthentication {
     Role {
         /// The ARN of the role to assume.
         assume_role: String,
+
         /// Timeout for assuming the role, in seconds.
         load_timeout_secs: Option<u64>,
     },
@@ -111,6 +113,7 @@ async fn default_credentials_provider(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize, Clone, Debug)]
     struct ComponentConfig {
