@@ -52,3 +52,10 @@ set_metadata_field(.foo.baz, {"msg": "Any VRL type is supported"})
 get_metadata_field(.)
 
 ```
+
+## Future Plans
+
+These changes are forming the basis for many future plans we have. These include:
+
+- Adding special syntax to access metadata. Right now you have to use the metadata functions, but we'd like to improve that even more
+-
