@@ -238,10 +238,23 @@ fn handle_ack(
                 partition: entry.partition,
                 offset: entry.offset,
             });
-            // Try to unsubscribe from the named topic
+            // Try to unsubscribe from the named topic. Note that the
+            // subscribed topics list could be missing the named topic
+            // for two reasons:
+            // 1. Multiple batches of events from the same topic could
+            // be flight and all receive a negative acknowledgement,
+            // in which case it will only be present for the first
+            // response.
+            // 2. The topic list may contain wildcards, in which case
+            // there may not be an exact match for the topic name.
             if topics.subscribed.remove(&entry.topic) {
                 let topics: Vec<&str> = topics.subscribed.iter().map(|s| s.as_str()).collect();
-                // Ignore error, as we ignore output from the topic below anyways
+                // There is no direct way to unsubscribe from a named
+                // topic, as the unsubscribe library function drops
+                // all topics. The subscribe function, however,
+                // replaces the list of subscriptions, from which we
+                // have removed the topic above.  Ignore any errors,
+                // as we drop output from the topic below anyways.
                 let _ = consumer.subscribe(&topics);
             }
             // Don't update the offset after a failed ack
