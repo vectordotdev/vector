@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     io::Cursor,
     sync::Arc,
 };
@@ -31,8 +31,8 @@ use crate::{
     },
     event::{BatchNotifier, BatchStatus, Event, Value},
     internal_events::{
-        KafkaBytesReceived, KafkaEventsReceived, KafkaOffsetUpdateError, KafkaReadError,
-        StreamClosedError,
+        KafkaBytesReceived, KafkaEventsReceived, KafkaNegativeAcknowledgmentError,
+        KafkaOffsetUpdateError, KafkaReadError, StreamClosedError,
     },
     kafka::{KafkaAuthConfig, KafkaStatisticsContext},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
@@ -179,17 +179,13 @@ async fn kafka_source(
     let mut stream = consumer.stream();
     let keys = Keys::from(log_schema(), &config);
 
+    let mut topics = Topics::new(&config);
+
     loop {
         tokio::select! {
             _ = &mut shutdown => break,
             entry = ack_stream.next() => if let Some((status, entry)) = entry {
-                if status == BatchStatus::Delivered {
-                    if let Err(error) =
-                        consumer.store_offset(&entry.topic, entry.partition, entry.offset)
-                    {
-                        emit!(KafkaOffsetUpdateError { error });
-                    }
-                }
+                handle_ack(&mut topics, status, entry, &consumer);
             },
             message = stream.next() => match message {
                 None => break,  // WHY?
@@ -202,7 +198,7 @@ async fn kafka_source(
                         partition: msg.partition(),
                     });
 
-                    parse_message(msg, decoder.clone(), keys, &finalizer, &mut out, &consumer).await;
+                    parse_message(msg, &decoder, keys, &finalizer, &mut out, &consumer, &topics).await;
                 }
             },
         }
@@ -211,15 +207,72 @@ async fn kafka_source(
     Ok(())
 }
 
+struct Topics {
+    subscribed: HashSet<String>,
+    failed: HashSet<String>,
+}
+
+impl Topics {
+    fn new(config: &KafkaSourceConfig) -> Self {
+        Self {
+            subscribed: config.topics.iter().cloned().collect(),
+            failed: Default::default(),
+        }
+    }
+}
+
+fn handle_ack(
+    topics: &mut Topics,
+    status: BatchStatus,
+    entry: FinalizerEntry,
+    consumer: &StreamConsumer<KafkaStatisticsContext>,
+) {
+    if !topics.failed.contains(&entry.topic) {
+        if status == BatchStatus::Delivered {
+            if let Err(error) = consumer.store_offset(&entry.topic, entry.partition, entry.offset) {
+                emit!(KafkaOffsetUpdateError { error });
+            }
+        } else {
+            emit!(KafkaNegativeAcknowledgmentError {
+                topic: &entry.topic,
+                partition: entry.partition,
+                offset: entry.offset,
+            });
+            // Try to unsubscribe from the named topic. Note that the
+            // subscribed topics list could be missing the named topic
+            // for two reasons:
+            // 1. Multiple batches of events from the same topic could
+            // be flight and all receive a negative acknowledgement,
+            // in which case it will only be present for the first
+            // response.
+            // 2. The topic list may contain wildcards, in which case
+            // there may not be an exact match for the topic name.
+            if topics.subscribed.remove(&entry.topic) {
+                let topics: Vec<&str> = topics.subscribed.iter().map(|s| s.as_str()).collect();
+                // There is no direct way to unsubscribe from a named
+                // topic, as the unsubscribe library function drops
+                // all topics. The subscribe function, however,
+                // replaces the list of subscriptions, from which we
+                // have removed the topic above.  Ignore any errors,
+                // as we drop output from the topic below anyways.
+                let _ = consumer.subscribe(&topics);
+            }
+            // Don't update the offset after a failed ack
+            topics.failed.insert(entry.topic);
+        }
+    }
+}
+
 async fn parse_message(
     msg: BorrowedMessage<'_>,
-    decoder: Decoder,
+    decoder: &Decoder,
     keys: Keys<'_>,
     finalizer: &Option<OrderedFinalizer<FinalizerEntry>>,
     out: &mut SourceSender,
     consumer: &Arc<StreamConsumer<KafkaStatisticsContext>>,
+    topics: &Topics,
 ) {
-    if let Some((count, mut stream)) = parse_stream(&msg, decoder, keys) {
+    if let Some((count, mut stream)) = parse_stream(&msg, decoder, keys, topics) {
         match finalizer {
             Some(finalizer) => {
                 let (batch, receiver) = BatchNotifier::new_with_receiver();
@@ -255,16 +308,21 @@ async fn parse_message(
 // Turn the received message into a stream of parsed events.
 fn parse_stream<'a>(
     msg: &BorrowedMessage<'a>,
-    decoder: Decoder,
+    decoder: &Decoder,
     keys: Keys<'a>,
+    topics: &Topics,
 ) -> Option<(usize, impl Stream<Item = Event> + 'a)> {
+    if topics.failed.contains(msg.topic()) {
+        return None;
+    }
+
     let payload = msg.payload()?; // skip messages with empty payload
 
     let rmsg = ReceivedMessage::from(msg);
 
     let payload = Cursor::new(Bytes::copy_from_slice(payload));
 
-    let mut stream = FramedRead::new(payload, decoder);
+    let mut stream = FramedRead::new(payload, decoder.clone());
     let (count, _) = stream.size_hint();
     let stream = stream! {
         while let Some(result) = stream.next().await {
@@ -501,7 +559,6 @@ mod integration_test {
         util::Timeout,
         Offset, TopicPartitionList,
     };
-    use vector_core::event::EventStatus;
 
     use super::{test::*, *};
     use crate::{
@@ -523,7 +580,7 @@ mod integration_test {
     }
 
     async fn send_events(
-        topic: String,
+        topic: &str,
         count: usize,
         key: &str,
         text: &str,
@@ -535,7 +592,7 @@ mod integration_test {
 
         for i in 0..count {
             let text = format!("{} {}", text, i);
-            let record = FutureRecord::to(&topic)
+            let record = FutureRecord::to(topic)
                 .payload(&text)
                 .key(key)
                 .timestamp(timestamp)
@@ -549,15 +606,22 @@ mod integration_test {
 
     #[tokio::test]
     async fn consumes_event_with_acknowledgements() {
-        consume_event(true).await;
+        send_receive(true, 10).await;
     }
 
     #[tokio::test]
     async fn consumes_event_without_acknowledgements() {
-        consume_event(false).await;
+        send_receive(false, 10).await;
     }
 
-    async fn consume_event(acknowledgements: bool) {
+    #[tokio::test]
+    async fn handles_negative_acknowledgements() {
+        send_receive(true, 2).await;
+    }
+
+    async fn send_receive(acknowledgements: bool, receive_count: usize) {
+        const SEND_COUNT: usize = 10;
+
         let topic = format!("test-topic-{}", random_string(10));
         let group_id = format!("test-group-{}", random_string(10));
         let now = Utc::now();
@@ -565,8 +629,8 @@ mod integration_test {
         let config = make_config(&topic, &group_id);
 
         send_events(
-            topic.clone(),
-            10,
+            &topic,
+            SEND_COUNT,
             "my key",
             "my message",
             now.timestamp_millis(),
@@ -577,7 +641,7 @@ mod integration_test {
 
         let events = assert_source_compliance(&["protocol", "topic", "partition"], async move {
             let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
-            let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+            let (tx, rx) = SourceSender::new_test_error_after(receive_count);
             let consumer = create_consumer(&config).unwrap();
             tokio::spawn(kafka_source(
                 config,
@@ -587,7 +651,7 @@ mod integration_test {
                 tx,
                 acknowledgements,
             ));
-            let events = collect_n(rx, 10).await;
+            let events = collect_n(rx, SEND_COUNT).await;
             // Yield to the finalization task to let it collect the
             // batch status receivers before signalling the shutdown.
             tokio::task::yield_now().await;
@@ -610,10 +674,10 @@ mod integration_test {
             tpl.find_partition(&topic, 0)
                 .expect("TPL is missing topic")
                 .offset(),
-            Offset::from_raw(10)
+            Offset::from_raw(receive_count as i64)
         );
 
-        assert_eq!(events.len(), 10);
+        assert_eq!(events.len(), SEND_COUNT);
         for (i, event) in events.into_iter().enumerate() {
             assert_eq!(
                 event.as_log()[log_schema().message_key()],

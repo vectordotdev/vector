@@ -135,12 +135,15 @@ where
         }
 
         let rate_limit_key_values = {
+            let mut keys = RateLimitedSpanKeys::default();
+            event.record(&mut keys);
+
             let scope = ctx
                 .lookup_current()
                 .into_iter()
                 .flat_map(|span| span.scope().from_root());
 
-            scope.fold(RateLimitedSpanKeys::default(), |mut keys, span| {
+            scope.fold(keys, |mut keys, span| {
                 let extensions = span.extensions();
                 if let Some(span_keys) = extensions.get::<RateLimitedSpanKeys>() {
                     keys.merge(span_keys);
@@ -498,6 +501,70 @@ mod test {
                             message =
                                 format!("Hello {} on line_number {}!", key, line_number).as_str(),
                             internal_log_rate_secs = 1
+                        );
+                    }
+                }
+                MockClock::advance(Duration::from_millis(100));
+            }
+        });
+
+        let events = events.lock().unwrap();
+
+        assert_eq!(
+            *events,
+            vec![
+                "Hello foo on line_number 1!",
+                "Hello foo on line_number 2!",
+                "Hello bar on line_number 1!",
+                "Hello bar on line_number 2!",
+                "Internal log [Hello foo on line_number 1!] is being rate limited.",
+                "Internal log [Hello foo on line_number 2!] is being rate limited.",
+                "Internal log [Hello bar on line_number 1!] is being rate limited.",
+                "Internal log [Hello bar on line_number 2!] is being rate limited.",
+                "Internal log [Hello foo on line_number 1!] has been rate limited 9 times.",
+                "Hello foo on line_number 1!",
+                "Internal log [Hello foo on line_number 2!] has been rate limited 9 times.",
+                "Hello foo on line_number 2!",
+                "Internal log [Hello bar on line_number 1!] has been rate limited 9 times.",
+                "Hello bar on line_number 1!",
+                "Internal log [Hello bar on line_number 2!] has been rate limited 9 times.",
+                "Hello bar on line_number 2!",
+                "Internal log [Hello foo on line_number 1!] is being rate limited.",
+                "Internal log [Hello foo on line_number 2!] is being rate limited.",
+                "Internal log [Hello bar on line_number 1!] is being rate limited.",
+                "Internal log [Hello bar on line_number 2!] is being rate limited.",
+                "Internal log [Hello foo on line_number 1!] has been rate limited 9 times.",
+                "Hello foo on line_number 1!",
+                "Internal log [Hello foo on line_number 2!] has been rate limited 9 times.",
+                "Hello foo on line_number 2!",
+                "Internal log [Hello bar on line_number 1!] has been rate limited 9 times.",
+                "Hello bar on line_number 1!",
+                "Internal log [Hello bar on line_number 2!] has been rate limited 9 times.",
+                "Hello bar on line_number 2!",
+            ]
+            .into_iter()
+            .map(std::borrow::ToOwned::to_owned)
+            .collect::<Vec<String>>()
+        );
+    }
+
+    #[test]
+    fn rate_limit_by_event_key() {
+        let events: Arc<Mutex<Vec<String>>> = Default::default();
+
+        let recorder = RecordingLayer::new(Arc::clone(&events));
+        let sub =
+            tracing_subscriber::registry::Registry::default().with(RateLimitedLayer::new(recorder));
+        tracing::subscriber::with_default(sub, || {
+            for _ in 0..21 {
+                for key in &["foo", "bar"] {
+                    for line_number in &[1, 2] {
+                        info!(
+                            message =
+                                format!("Hello {} on line_number {}!", key, line_number).as_str(),
+                            internal_log_rate_secs = 1,
+                            component_id = &key,
+                            vrl_line_number = &line_number
                         );
                     }
                 }

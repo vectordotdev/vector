@@ -152,7 +152,7 @@ impl Expression for Op {
             Or => lhs_def.merge_deep(rhs_def),
 
             // ... | ...
-            Merge => lhs_def.merge_deep(rhs_def),
+            Merge => lhs_def.merge_overwrite(rhs_def),
 
             // null && ...
             And if lhs_def.is_null() => rhs_def
