@@ -2,7 +2,7 @@ use lookup::LookupBuf;
 
 use crate::{
     expression::{Block, Resolved},
-    state::{ExternalEnv, LocalEnv},
+    state::LocalEnv,
     Context, Expression,
 };
 
@@ -34,15 +34,6 @@ impl Program {
     /// Resolve the program to its final [`Value`].
     pub fn resolve(&self, ctx: &mut Context) -> Resolved {
         self.expressions.resolve(ctx)
-    }
-
-    /// Compile the program down to the [`Vm`] runtime.
-    pub fn compile_to_vm(
-        &self,
-        vm: &mut crate::vm::Vm,
-        state: (&mut LocalEnv, &mut ExternalEnv),
-    ) -> Result<(), String> {
-        self.expressions.compile_to_vm(vm, state)
     }
 }
 

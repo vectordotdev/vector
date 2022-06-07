@@ -87,13 +87,6 @@ impl Function for ParseInt {
 
         Ok(Box::new(ParseIntFn { value, base }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let base = args.optional("base");
-
-        parse_int(value, base)
-    }
 }
 
 #[derive(Debug, Clone)]

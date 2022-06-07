@@ -1,17 +1,27 @@
 # object: { "message": "{\"field\": \"value\"}" }
 # result:
 #
-# error[E100]: unhandled error
-#   ┌─ :4:1
+# error[E110]: invalid argument type
+#   ┌─ :4:6
 #   │
 # 4 │ sha3(result.message)
-#   │ ^^^^^^^^^^^^^^^^^^^^
-#   │ │
-#   │ expression can result in runtime error
-#   │ handle the error case to ensure runtime success
+#   │      ^^^^^^^^^^^^^^
+#   │      │
+#   │      this expression resolves to one of integer, float, boolean, null, array, object or string
+#   │      but the parameter "value" expects the exact type string
 #   │
+#   = try: ensuring an appropriate type at runtime
+#   =
+#   =     result.message = string!(result.message)
+#   =     sha3(result.message)
+#   =
+#   = try: coercing to an appropriate type and specifying a default value as a fallback in case coercion fails
+#   =
+#   =     result.message = to_string(result.message) ?? "default"
+#   =     sha3(result.message)
+#   =
 #   = see documentation about error handling at https://errors.vrl.dev/#handling
-#   = learn more about error code 100 at https://errors.vrl.dev/100
+#   = learn more about error code 110 at https://errors.vrl.dev/110
 #   = see language documentation at https://vrl.dev
 
 .message = to_string!(.message)

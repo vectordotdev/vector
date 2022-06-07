@@ -58,22 +58,6 @@ impl Expression for Container {
             Object(v) => v.type_def(state),
         }
     }
-
-    fn compile_to_vm(
-        &self,
-        vm: &mut crate::vm::Vm,
-        state: (&mut LocalEnv, &mut ExternalEnv),
-    ) -> Result<(), String> {
-        use Variant::*;
-
-        // Pass the call on to the contained expression.
-        match &self.variant {
-            Group(v) => v.compile_to_vm(vm, state),
-            Block(v) => v.compile_to_vm(vm, state),
-            Array(v) => v.compile_to_vm(vm, state),
-            Object(v) => v.compile_to_vm(vm, state),
-        }
-    }
 }
 
 impl fmt::Display for Container {

@@ -72,15 +72,6 @@ impl Function for ParseCsv {
             },
         ]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let delimiter = args
-            .optional("delimiter")
-            .unwrap_or_else(|| Value::from(","));
-
-        parse_csv(value, delimiter)
-    }
 }
 
 #[derive(Debug, Clone)]

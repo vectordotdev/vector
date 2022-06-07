@@ -172,26 +172,6 @@ impl Function for ParseGroks {
         }
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let bytes = value.try_bytes_utf8_lossy()?;
-
-        let remove_empty = args
-            .optional("remove_empty")
-            .map(|v| v.as_boolean().unwrap_or(false))
-            .unwrap_or(false);
-
-        let grok_rules = args
-            .required_any("patterns")
-            .downcast_ref::<Vec<GrokRule>>()
-            .unwrap();
-
-        let v = parse_grok::parse_grok(bytes.as_ref(), grok_rules, remove_empty)
-            .map_err(|e| format!("unable to parse grok: {}", e))?;
-
-        Ok(v)
-    }
-
     fn compile(
         &self,
         _state: (&mut state::LocalEnv, &mut state::ExternalEnv),

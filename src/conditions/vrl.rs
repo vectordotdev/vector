@@ -1,9 +1,7 @@
-use std::sync::Arc;
-
 use serde::{Deserialize, Serialize};
 use value::Value;
 use vector_common::TimeZone;
-use vrl::{diagnostic::Formatter, Program, Runtime, Vm, VrlRuntime};
+use vrl::{diagnostic::Formatter, Program, Runtime, VrlRuntime};
 
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription, Conditional},
@@ -67,14 +65,6 @@ impl ConditionConfig for VrlConfig {
         }
 
         match self.runtime {
-            VrlRuntime::Vm => {
-                let vm = Arc::new(Runtime::default().compile(functions, &program, &mut state)?);
-                Ok(Condition::VrlVm(VrlVm {
-                    program,
-                    source: self.source.clone(),
-                    vm,
-                }))
-            }
             VrlRuntime::Ast => Ok(Condition::Vrl(Vrl {
                 program,
                 source: self.source.clone(),
@@ -163,84 +153,6 @@ impl Conditional for Vrl {
 }
 
 //------------------------------------------------------------------------------
-
-#[derive(Debug, Clone)]
-pub struct VrlVm {
-    pub(super) program: Program,
-    pub(super) source: String,
-    pub(super) vm: Arc<Vm>,
-}
-
-impl VrlVm {
-    fn run(&self, event: &Event) -> vrl::RuntimeResult {
-        // TODO(jean): This clone exists until vrl-lang has an "immutable"
-        // mode.
-        //
-        // For now, mutability in reduce "vrl ends-when conditions" is
-        // allowed, but it won't mutate the original event, since we cloned it
-        // here.
-        //
-        // Having first-class immutability support in the language allows for
-        // more performance (one less clone), and boot-time errors when a
-        // program wants to mutate its events.
-        //
-        // see: https://github.com/vectordotdev/vector/issues/4744
-        let mut target = VrlTarget::new(event.clone(), self.program.info());
-        // TODO: use timezone from remap config
-        let timezone = TimeZone::default();
-
-        Runtime::default().run_vm(&self.vm, &mut target, &timezone)
-    }
-}
-
-impl Conditional for VrlVm {
-    fn check(&self, event: &Event) -> bool {
-        self.run(event)
-            .map(|value| match value {
-                Value::Boolean(boolean) => boolean,
-                _ => false,
-            })
-            .unwrap_or_else(|err| {
-                emit!(VrlConditionExecutionError {
-                    error: err.to_string().as_ref()
-                });
-                false
-            })
-    }
-
-    fn check_with_context(&self, event: &Event) -> Result<(), String> {
-        let value = self.run(event).map_err(|err| match err {
-            vrl::Terminate::Abort(err) => {
-                let err = Formatter::new(
-                    &self.source,
-                    vrl::diagnostic::Diagnostic::from(
-                        Box::new(err) as Box<dyn vrl::diagnostic::DiagnosticMessage>
-                    ),
-                )
-                .colored()
-                .to_string();
-                format!("source execution aborted: {}", err)
-            }
-            vrl::Terminate::Error(err) => {
-                let err = Formatter::new(
-                    &self.source,
-                    vrl::diagnostic::Diagnostic::from(
-                        Box::new(err) as Box<dyn vrl::diagnostic::DiagnosticMessage>
-                    ),
-                )
-                .colored()
-                .to_string();
-                format!("source execution failed: {}", err)
-            }
-        })?;
-
-        match value {
-            Value::Boolean(v) if v => Ok(()),
-            Value::Boolean(v) if !v => Err("source execution resolved to false".into()),
-            _ => Err("source execution resolved to a non-boolean value".into()),
-        }
-    }
-}
 
 #[cfg(test)]
 mod test {

@@ -27,14 +27,6 @@ impl Expression for Group {
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
         self.inner.type_def(state)
     }
-
-    fn compile_to_vm(
-        &self,
-        vm: &mut crate::vm::Vm,
-        state: (&mut LocalEnv, &mut ExternalEnv),
-    ) -> Result<(), String> {
-        self.inner.compile_to_vm(vm, state)
-    }
 }
 
 impl fmt::Display for Group {
