@@ -67,7 +67,12 @@ struct PayloadAggregationKey {
 impl PayloadAggregationKey {
     fn with_span_context(self, span: &BTreeMap<String, Value>) -> Self {
         PayloadAggregationKey {
-            env: span.get("meta").and_then(|m| m.as_object()).and_then(|m| m.get("env")).map(|s| s.to_string_lossy()).unwrap_or(self.env),
+            env: span
+                .get("meta")
+                .and_then(|m| m.as_object())
+                .and_then(|m| m.get("env"))
+                .map(|s| s.to_string_lossy())
+                .unwrap_or(self.env),
             hostname: self.hostname,
             version: self.version,
             container_id: self.container_id,
