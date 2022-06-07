@@ -15,20 +15,20 @@ struct BlockIoStat {
 
 #[derive(Deserialize)]
 struct BlockIoStats {
-    io_merged_recursive: Vec<BlockIoStat>,
-    io_queue_recursive: Vec<BlockIoStat>,
-    io_service_bytes_recursive: Vec<BlockIoStat>,
-    io_service_time_recursive: Vec<BlockIoStat>,
-    io_serviced_recursive: Vec<BlockIoStat>,
-    io_time_recursive: Vec<BlockIoStat>,
-    io_wait_time_recursive: Vec<BlockIoStat>,
-    sectors_recursive: Vec<BlockIoStat>,
+    io_merged_recursive: Option<Vec<BlockIoStat>>,
+    io_queue_recursive: Option<Vec<BlockIoStat>>,
+    io_service_bytes_recursive: Option<Vec<BlockIoStat>>,
+    io_service_time_recursive: Option<Vec<BlockIoStat>>,
+    io_serviced_recursive: Option<Vec<BlockIoStat>>,
+    io_time_recursive: Option<Vec<BlockIoStat>>,
+    io_wait_time_recursive: Option<Vec<BlockIoStat>>,
+    sectors_recursive: Option<Vec<BlockIoStat>>,
 }
 
 #[derive(Deserialize)]
 struct CpuUsage {
     total_usage: f64,
-    percpu_usage: Vec<f64>,
+    percpu_usage: Option<Vec<f64>>,
     usage_in_usermode: f64,
     usage_in_kernelmode: f64,
 }
@@ -52,42 +52,42 @@ struct CpuStats {
 struct MemoryExtStats {
     active_anon: f64,
     active_file: f64,
-    cache: f64,
-    dirty: f64,
+    cache: Option<f64>,
+    dirty: Option<f64>,
     inactive_anon: f64,
     inactive_file: f64,
-    mapped_file: f64,
+    mapped_file: Option<f64>,
     pgfault: f64,
     pgmajfault: f64,
-    pgpgin: f64,
-    pgpgout: f64,
-    rss: f64,
-    rss_huge: f64,
+    pgpgin: Option<f64>,
+    pgpgout: Option<f64>,
+    rss: Option<f64>,
+    rss_huge: Option<f64>,
     unevictable: f64,
-    writeback: f64,
-    total_active_anon: f64,
-    total_active_file: f64,
-    total_cache: f64,
-    total_dirty: f64,
-    total_inactive_anon: f64,
-    total_inactive_file: f64,
-    total_mapped_file: f64,
-    total_pgfault: f64,
-    total_pgmajfault: f64,
-    total_pgpgin: f64,
-    total_pgpgout: f64,
-    total_rss: f64,
-    total_rss_huge: f64,
-    total_unevictable: f64,
-    total_writeback: f64,
-    hierarchical_memory_limit: f64,
-    hierarchical_memsw_limit: f64,
+    writeback: Option<f64>,
+    total_active_anon: Option<f64>,
+    total_active_file: Option<f64>,
+    total_cache: Option<f64>,
+    total_dirty: Option<f64>,
+    total_inactive_anon: Option<f64>,
+    total_inactive_file: Option<f64>,
+    total_mapped_file: Option<f64>,
+    total_pgfault: Option<f64>,
+    total_pgmajfault: Option<f64>,
+    total_pgpgin: Option<f64>,
+    total_pgpgout: Option<f64>,
+    total_rss: Option<f64>,
+    total_rss_huge: Option<f64>,
+    total_unevictable: Option<f64>,
+    total_writeback: Option<f64>,
+    hierarchical_memory_limit: Option<f64>,
+    hierarchical_memsw_limit: Option<f64>,
 }
 
 #[derive(Deserialize)]
 struct MemoryStats {
     usage: f64,
-    max_usage: f64,
+    max_usage: Option<f64>,
     limit: f64,
     stats: MemoryExtStats,
 }
@@ -168,86 +168,102 @@ fn blkio_metrics(
 ) -> Vec<Metric> {
     let mut metrics = vec![];
 
-    metrics.extend(blkio.io_merged_recursive.iter().map(|s| {
-        counter(
-            "blkio",
-            "recursive_io_merged_total",
-            namespace.clone(),
-            timestamp,
-            s.value,
-            blkio_tags(s, tags),
-        )
-    }));
-    metrics.extend(blkio.io_queue_recursive.iter().map(|s| {
-        counter(
-            "blkio",
-            "recursive_io_queued_total",
-            namespace.clone(),
-            timestamp,
-            s.value,
-            blkio_tags(s, tags),
-        )
-    }));
-    metrics.extend(blkio.io_service_bytes_recursive.iter().map(|s| {
-        counter(
-            "blkio",
-            "recursive_io_service_bytes_total",
-            namespace.clone(),
-            timestamp,
-            s.value,
-            blkio_tags(s, tags),
-        )
-    }));
-    metrics.extend(blkio.io_service_time_recursive.iter().map(|s| {
-        counter(
-            "blkio",
-            "recursive_io_service_time_seconds_total",
-            namespace.clone(),
-            timestamp,
-            s.value / 1_000_000_000.0,
-            blkio_tags(s, tags),
-        )
-    }));
-    metrics.extend(blkio.io_serviced_recursive.iter().map(|s| {
-        counter(
-            "blkio",
-            "recursive_io_serviced_total",
-            namespace.clone(),
-            timestamp,
-            s.value,
-            blkio_tags(s, tags),
-        )
-    }));
-    metrics.extend(blkio.io_time_recursive.iter().map(|s| {
-        counter(
-            "blkio",
-            "recursive_io_time_seconds_total",
-            namespace.clone(),
-            timestamp,
-            s.value / 1_000.0,
-            blkio_tags(s, tags),
-        )
-    }));
-    metrics.extend(blkio.io_wait_time_recursive.iter().map(|s| {
-        counter(
-            "blkio",
-            "recursive_io_wait_time_seconds_total",
-            namespace.clone(),
-            timestamp,
-            s.value / 1_000_000_000.0,
-            blkio_tags(s, tags),
-        )
-    }));
-    metrics.extend(blkio.sectors_recursive.iter().map(|s| {
-        counter(
-            "blkio",
-            "recursive_sectors_total",
-            namespace.clone(),
-            timestamp,
-            s.value,
-            blkio_tags(s, tags),
-        )
-    }));
+    if let Some(io_merged_recursive) = &blkio.io_merged_recursive {
+        metrics.extend(io_merged_recursive.iter().map(|s| {
+            counter(
+                "blkio",
+                "recursive_io_merged_total",
+                namespace.clone(),
+                timestamp,
+                s.value,
+                blkio_tags(s, tags),
+            )
+        }));
+    }
+    if let Some(io_queue_recursive) = &blkio.io_queue_recursive {
+        metrics.extend(io_queue_recursive.iter().map(|s| {
+            counter(
+                "blkio",
+                "recursive_io_queued_total",
+                namespace.clone(),
+                timestamp,
+                s.value,
+                blkio_tags(s, tags),
+            )
+        }));
+    }
+    if let Some(io_service_bytes_recursive) = &blkio.io_service_bytes_recursive {
+        metrics.extend(io_service_bytes_recursive.iter().map(|s| {
+            counter(
+                "blkio",
+                "recursive_io_service_bytes_total",
+                namespace.clone(),
+                timestamp,
+                s.value,
+                blkio_tags(s, tags),
+            )
+        }));
+    }
+    if let Some(io_service_time_recursive) = &blkio.io_service_time_recursive {
+        metrics.extend(io_service_time_recursive.iter().map(|s| {
+            counter(
+                "blkio",
+                "recursive_io_service_time_seconds_total",
+                namespace.clone(),
+                timestamp,
+                s.value / 1_000_000_000.0,
+                blkio_tags(s, tags),
+            )
+        }));
+    }
+    if let Some(io_serviced_recursive) = &blkio.io_serviced_recursive {
+        metrics.extend(io_serviced_recursive.iter().map(|s| {
+            counter(
+                "blkio",
+                "recursive_io_serviced_total",
+                namespace.clone(),
+                timestamp,
+                s.value,
+                blkio_tags(s, tags),
+            )
+        }));
+    }
+    if let Some(io_time_recursive) = &blkio.io_time_recursive {
+        metrics.extend(io_time_recursive.iter().map(|s| {
+            counter(
+                "blkio",
+                "recursive_io_time_seconds_total",
+                namespace.clone(),
+                timestamp,
+                s.value / 1_000.0,
+                blkio_tags(s, tags),
+            )
+        }));
+    }
+    if let Some(io_wait_time_recursive) = &blkio.io_wait_time_recursive {
+        metrics.extend(io_wait_time_recursive.iter().map(|s| {
+            counter(
+                "blkio",
+                "recursive_io_wait_time_seconds_total",
+                namespace.clone(),
+                timestamp,
+                s.value / 1_000_000_000.0,
+                blkio_tags(s, tags),
+            )
+        }));
+    }
+    if let Some(sectors_recursive) = &blkio.sectors_recursive {
+        metrics.extend(sectors_recursive.iter().map(|s| {
+            counter(
+                "blkio",
+                "recursive_sectors_total",
+                namespace.clone(),
+                timestamp,
+                s.value,
+                blkio_tags(s, tags),
+            )
+        }));
+    }
 
     metrics
 }
@@ -302,21 +318,23 @@ fn cpu_metrics(
         }),
     );
 
-    metrics.extend((0..cpu.online_cpus).filter_map(|index| {
-        cpu.cpu_usage.percpu_usage.get(index).map(|value| {
-            let mut tags = tags.clone();
-            tags.insert("cpu".into(), index.to_string());
+    if let Some(percpu_usage) = &cpu.cpu_usage.percpu_usage {
+        metrics.extend((0..cpu.online_cpus).filter_map(|index| {
+            percpu_usage.get(index).map(|value| {
+                let mut tags = tags.clone();
+                tags.insert("cpu".into(), index.to_string());
 
-            counter(
-                "cpu",
-                "usage_percpu_jiffies_total",
-                namespace.clone(),
-                timestamp,
-                *value,
-                tags,
-            )
-        })
-    }));
+                counter(
+                    "cpu",
+                    "usage_percpu_jiffies_total",
+                    namespace.clone(),
+                    timestamp,
+                    *value,
+                    tags,
+                )
+            })
+        }));
+    }
 
     metrics
 }
@@ -332,46 +350,79 @@ fn memory_metrics(
     metrics.extend(
         vec![
             ("used_bytes", memory.usage),
-            ("max_used_bytes", memory.max_usage),
+            ("max_used_bytes", memory.max_usage.unwrap_or_default()),
             ("limit_bytes", memory.limit),
             ("active_anonymous_bytes", memory.stats.active_anon),
             ("active_file_bytes", memory.stats.active_file),
-            ("cache_bytes", memory.stats.cache),
-            ("dirty_bytes", memory.stats.dirty),
+            ("cache_bytes", memory.stats.cache.unwrap_or_default()),
+            ("dirty_bytes", memory.stats.dirty.unwrap_or_default()),
             ("inactive_anonymous_bytes", memory.stats.inactive_anon),
             ("inactive_file_bytes", memory.stats.inactive_file),
-            ("mapped_file_bytes", memory.stats.mapped_file),
-            ("rss_bytes", memory.stats.rss),
-            ("rss_hugepages_bytes", memory.stats.rss_huge),
+            (
+                "mapped_file_bytes",
+                memory.stats.mapped_file.unwrap_or_default(),
+            ),
+            ("rss_bytes", memory.stats.rss.unwrap_or_default()),
+            (
+                "rss_hugepages_bytes",
+                memory.stats.rss_huge.unwrap_or_default(),
+            ),
             ("unevictable_bytes", memory.stats.unevictable),
-            ("writeback_bytes", memory.stats.writeback),
+            (
+                "writeback_bytes",
+                memory.stats.writeback.unwrap_or_default(),
+            ),
             (
                 "total_active_anonymous_bytes",
-                memory.stats.total_active_anon,
+                memory.stats.total_active_anon.unwrap_or_default(),
             ),
-            ("total_active_file_bytes", memory.stats.total_active_file),
-            ("total_cache_bytes", memory.stats.total_cache),
-            ("total_dirty_bytes", memory.stats.total_dirty),
+            (
+                "total_active_file_bytes",
+                memory.stats.total_active_file.unwrap_or_default(),
+            ),
+            (
+                "total_cache_bytes",
+                memory.stats.total_cache.unwrap_or_default(),
+            ),
+            (
+                "total_dirty_bytes",
+                memory.stats.total_dirty.unwrap_or_default(),
+            ),
             (
                 "total_inactive_anonymous_bytes",
-                memory.stats.total_inactive_anon,
+                memory.stats.total_inactive_anon.unwrap_or_default(),
             ),
             (
                 "total_inactive_file_bytes",
-                memory.stats.total_inactive_file,
+                memory.stats.total_inactive_file.unwrap_or_default(),
             ),
-            ("total_mapped_file_bytes", memory.stats.total_mapped_file),
-            ("total_rss_bytes", memory.stats.total_rss),
-            ("total_rss_hugepages_bytes", memory.stats.total_rss_huge),
-            ("total_unevictable_bytes", memory.stats.total_unevictable),
-            ("total_writeback_bytes", memory.stats.total_writeback),
+            (
+                "total_mapped_file_bytes",
+                memory.stats.total_mapped_file.unwrap_or_default(),
+            ),
+            (
+                "total_rss_bytes",
+                memory.stats.total_rss.unwrap_or_default(),
+            ),
+            (
+                "total_rss_hugepages_bytes",
+                memory.stats.total_rss_huge.unwrap_or_default(),
+            ),
+            (
+                "total_unevictable_bytes",
+                memory.stats.total_unevictable.unwrap_or_default(),
+            ),
+            (
+                "total_writeback_bytes",
+                memory.stats.total_writeback.unwrap_or_default(),
+            ),
             (
                 "hierarchical_memory_limit_bytes",
-                memory.stats.hierarchical_memory_limit,
+                memory.stats.hierarchical_memory_limit.unwrap_or_default(),
             ),
             (
                 "hierarchical_memsw_limit_bytes",
-                memory.stats.hierarchical_memsw_limit,
+                memory.stats.hierarchical_memsw_limit.unwrap_or_default(),
             ),
         ]
         .iter()
@@ -391,12 +442,30 @@ fn memory_metrics(
         vec![
             ("page_faults_total", memory.stats.pgfault),
             ("major_faults_total", memory.stats.pgmajfault),
-            ("page_charged_total", memory.stats.pgpgin),
-            ("page_uncharged_total", memory.stats.pgpgout),
-            ("total_page_faults_total", memory.stats.total_pgfault),
-            ("total_major_faults_total", memory.stats.total_pgmajfault),
-            ("total_page_charged_total", memory.stats.total_pgpgin),
-            ("total_page_uncharged_total", memory.stats.total_pgpgout),
+            (
+                "page_charged_total",
+                memory.stats.pgpgin.unwrap_or_default(),
+            ),
+            (
+                "page_uncharged_total",
+                memory.stats.pgpgout.unwrap_or_default(),
+            ),
+            (
+                "total_page_faults_total",
+                memory.stats.total_pgfault.unwrap_or_default(),
+            ),
+            (
+                "total_major_faults_total",
+                memory.stats.total_pgmajfault.unwrap_or_default(),
+            ),
+            (
+                "total_page_charged_total",
+                memory.stats.total_pgpgin.unwrap_or_default(),
+            ),
+            (
+                "total_page_uncharged_total",
+                memory.stats.total_pgpgout.unwrap_or_default(),
+            ),
         ]
         .iter()
         .map(|(name, value)| {
