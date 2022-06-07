@@ -244,7 +244,7 @@ h2 = { version = "0.3.13", default-features = false, optional = true }
 hash_hasher = { version = "2.0.0", default-features = false, optional  = true }
 headers = { version = "0.3.6", default-features = false }
 hostname = { version = "0.3.1", default-features = false }
-http = { version = "0.2.6", default-features = false }
+http = { version = "0.2.8", default-features = false }
 http-body = { version = "0.4.5", default-features = false }
 hyper = { version = "0.14.19", default-features = false, features = ["client", "runtime", "http1", "http2", "server", "stream"] }
 hyper-openssl = { version = "0.9.2", default-features = false }

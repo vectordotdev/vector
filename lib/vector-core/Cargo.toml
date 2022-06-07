@@ -21,7 +21,7 @@ float_eq = { version = "1.0", default-features = false }
 futures = { version = "0.3.21", default-features = false, features = ["std"] }
 futures-util = { version = "0.3.21", default-features = false, features = ["std"] }
 headers = { version = "0.3.7", default-features = false }
-http = { version = "0.2.7", default-features = false }
+http = { version = "0.2.8", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
 indexmap = { version = "~1.8.2", default-features = false, features = ["serde"] }
 lookup = { path = "../lookup", features = ["arbitrary"] }
