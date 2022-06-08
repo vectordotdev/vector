@@ -1,13 +1,13 @@
 # result:
 #
 # error[E100]: unhandled error
-#   ┌─ :2:1
+#   ┌─ :2:5
 #   │
 # 2 │ 5 + to_int(.foo)
-#   │ ^^^^^^^^^^^^^^^^
-#   │ │
-#   │ expression can result in runtime error
-#   │ handle the error case to ensure runtime success
+#   │     ^^^^^^^^^^^^
+#   │     │
+#   │     expression can result in runtime error
+#   │     handle the error case to ensure runtime success
 #   │
 #   = see documentation about error handling at https://errors.vrl.dev/#handling
 #   = learn more about error code 100 at https://errors.vrl.dev/100

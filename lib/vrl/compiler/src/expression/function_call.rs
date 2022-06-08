@@ -19,7 +19,7 @@ use crate::{
 
 pub(crate) struct Builder<'a> {
     abort_on_error: bool,
-    maybe_fallible_arguments: bool,
+    arguments_with_unknown_type_validity: Vec<(Parameter, Node<FunctionArgument>)>,
     call_span: Span,
     ident_span: Span,
     function_id: usize,
@@ -87,7 +87,7 @@ impl<'a> Builder<'a> {
         let mut index = 0;
         let mut list = ArgumentList::default();
 
-        let mut maybe_fallible_arguments = false;
+        let mut arguments_with_unknown_type_validity = vec![];
         for node in &arguments {
             let (argument_span, argument) = node.clone().take();
 
@@ -137,7 +137,7 @@ impl<'a> Builder<'a> {
                     argument_span,
                 });
             } else if !param_kind.is_superset(expr_kind) {
-                maybe_fallible_arguments = true;
+                arguments_with_unknown_type_validity.push((*parameter, node.clone()));
             }
 
             // Check if the argument is infallible.
@@ -352,7 +352,7 @@ impl<'a> Builder<'a> {
 
         Ok(Self {
             abort_on_error,
-            maybe_fallible_arguments,
+            arguments_with_unknown_type_validity,
             call_span,
             ident_span,
             function_id,
@@ -369,6 +369,7 @@ impl<'a> Builder<'a> {
         external: &mut ExternalEnv,
         closure_block: Option<Node<Block>>,
         mut local_snapshot: LocalEnv,
+        fallible_expression_error: &mut Option<Box<dyn DiagnosticMessage>>,
     ) -> Result<FunctionCall, Error> {
         let mut closure_fallible = false;
         let mut closure = None;
@@ -433,13 +434,40 @@ impl<'a> Builder<'a> {
         // We consider this an error at compile-time, because it makes the
         // resulting program incorrectly convey this function call might fail.
         if self.abort_on_error
-            && !self.maybe_fallible_arguments
+            && self.arguments_with_unknown_type_validity.is_empty()
             && !expr.type_def((local, external)).is_fallible()
         {
             return Err(Error::AbortInfallible {
                 ident_span,
                 abort_span: Span::new(ident_span.end(), ident_span.end() + 1),
             });
+        }
+
+        // The function is expected to abort at boot-time if any error occurred,
+        // and one or more arguments are of an invalid type, so we'll return the
+        // appropriate error.
+        if let Some((parameter, argument)) =
+            self.arguments_with_unknown_type_validity.first().cloned()
+        {
+            if !self.abort_on_error {
+                let error = Error::InvalidArgumentKind {
+                    function_ident: self.function.identifier(),
+                    abort_on_error: self.abort_on_error,
+                    arguments_fmt: self
+                        .arguments
+                        .iter()
+                        .map(|arg| arg.inner().to_string())
+                        .collect::<Vec<_>>(),
+                    parameter,
+                    got: argument.expr().type_def((local, external)).into(),
+                    argument: argument.clone().into_inner(),
+                    argument_span: argument
+                        .keyword_span()
+                        .unwrap_or_else(|| argument.expr_span()),
+                };
+
+                *fallible_expression_error = Some(Box::new(error) as _);
+            }
         }
 
         // Update the state if necessary.
@@ -452,7 +480,7 @@ impl<'a> Builder<'a> {
         Ok(FunctionCall {
             abort_on_error: self.abort_on_error,
             expr,
-            maybe_fallible_arguments: self.maybe_fallible_arguments,
+            arguments_with_unknown_type_validity: self.arguments_with_unknown_type_validity,
             closure_fallible,
             closure,
             span: call_span,
@@ -468,7 +496,7 @@ impl<'a> Builder<'a> {
 pub struct FunctionCall {
     abort_on_error: bool,
     expr: Box<dyn Expression>,
-    maybe_fallible_arguments: bool,
+    arguments_with_unknown_type_validity: Vec<(Parameter, Node<FunctionArgument>)>,
     closure_fallible: bool,
     closure: Option<FunctionClosure>,
 
@@ -642,7 +670,7 @@ impl Expression for FunctionCall {
         // For the second event, only the `slice` function succeeds.
         // For the third event, both functions fail.
         //
-        if self.maybe_fallible_arguments {
+        if !self.arguments_with_unknown_type_validity.is_empty() {
             type_def = type_def.with_fallibility(true);
         }
 
@@ -1185,7 +1213,13 @@ mod tests {
             None,
         )
         .unwrap()
-        .compile(&mut local, &mut external, None, LocalEnv::default())
+        .compile(
+            &mut local,
+            &mut external,
+            None,
+            LocalEnv::default(),
+            &mut None,
+        )
         .unwrap()
     }
 

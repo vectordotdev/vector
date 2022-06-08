@@ -22,7 +22,7 @@ FROM docker.io/debian:bullseye-slim@sha256:b0d53c872fd640c2af2608ba1e693cfc7dede
 RUN apt-get update && apt-get dist-upgrade -y && apt-get -y --no-install-recommends install zlib1g ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=lading /usr/bin/lading /usr/bin/lading
 COPY --from=builder /vector/vector /usr/bin/vector
-RUN mkdir -p /var/lib/vector
+RUN mkdir --parents --mode=0777 /var/lib/vector
 
 # Smoke test
 RUN ["/usr/bin/lading", "--help"]
