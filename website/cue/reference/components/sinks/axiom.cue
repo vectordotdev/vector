@@ -23,12 +23,7 @@ components: sinks: axiom: {
 				max_bytes:    1_048_576
 				timeout_secs: 1.0
 			}
-			compression: {
-				enabled: true
-				default: "gzip"
-				algorithms: ["none", "gzip"]
-				levels: ["none", "fast", "default", "best", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-			}
+			compression: enabled: false
 			encoding: {
 				enabled: true
 				codec: enabled: false
@@ -89,20 +84,24 @@ components: sinks: axiom: {
 		}
 		url: {
 			description: "Your Axiom URL (only required if not Axiom Cloud)"
+			common:      false
 			required:    false
-			warnings: []
+			warnings:    []
 			type: string: {
 				examples: ["https://cloud.axiom.co", "${AXIOM_URL}"]
 				syntax: "literal"
+			  default:     ""
 			}
 		}
 		org_id: {
 			description: "Your Axiom Org ID (only required for personal tokens)"
+			common:      false
 			required:    false
-			warnings: []
+			warnings:    []
 			type: string: {
 				examples: ["xxxx", "${AXIOM_ORG_ID}"]
 				syntax: "literal"
+			  default:     ""
 			}
 		}
 	}
@@ -110,6 +109,18 @@ components: sinks: axiom: {
 	input: {
 		logs: true
 		metrics: null
+		traces: true
+	}
+
+	how_it_works: {
+		setup: {
+			title: "Setup"
+			body:  """
+				1. Register for a free account at [cloud.axiom.co](\(urls.axiom_cloud))
+
+				2. Once registered, create a new dataset and create an API token for it
+				"""
+		}
 	}
 
 	telemetry: metrics: {

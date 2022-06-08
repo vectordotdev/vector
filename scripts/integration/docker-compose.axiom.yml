@@ -1,7 +1,7 @@
 version: "3"
 
 services:
-  postgres: 
+  postgres:
     image: postgres:13-alpine
     environment:
       POSTGRES_USER: axiom
