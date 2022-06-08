@@ -12,9 +12,8 @@ use value::{
 /// a source/transform.
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct Definition {
-    // TODO: switch to Kind, since root isn't always an object anymore
-    /// The collection of fields and their types stored in the event.
-    collection: Collection<Field>,
+    /// The type of the event
+    kind: Kind,
 
     /// Semantic meaning assigned to fields within the collection.
     ///
@@ -88,7 +87,7 @@ impl Definition {
     #[deprecated]
     pub fn empty() -> Self {
         Self {
-            collection: Collection::empty(),
+            kind: Kind::object(Collection::empty()),
             meaning: BTreeMap::default(),
             optional: BTreeSet::default(),
         }
@@ -254,6 +253,11 @@ impl Definition {
             self.meaning.insert(other_id, meaning);
         }
 
+        self.kind.merge(merge::Strategy {
+            depth: merge::Depth::Deep,
+            indices: merge::Indices::Keep,
+        })
+
         self.collection.merge(
             other.collection,
             merge::Strategy {
@@ -294,24 +298,29 @@ impl Definition {
             })
     }
 
+    // this assumes the root is an object, which is no longer true
+    #[deprecated]
     pub fn collection(&self) -> &Collection<Field> {
-        &self.collection
+        panic!()
+        // &self.collection
     }
 }
 
+// TODO: this should be deleted. It assumes an object root
 impl From<Collection<Field>> for Definition {
     fn from(collection: Collection<Field>) -> Self {
         Self {
-            collection,
+            kind: Kind::object(collection),
             meaning: BTreeMap::default(),
             optional: BTreeSet::default(),
         }
     }
 }
 
+// TODO: can this be deleted?
 impl From<Definition> for Kind {
     fn from(definition: Definition) -> Self {
-        let mut kind: Self = definition.collection.into();
+        let mut kind: Self = definition.kind;
 
         for optional in &definition.optional {
             kind.insert_at_path(
