@@ -210,9 +210,9 @@ impl Target {
                 let type_def = match local.variable(ident) {
                     None => {
                         if path.is_root() {
-                            new_type_def.clone()
+                            new_type_def
                         } else {
-                            new_type_def.clone().for_path(&path.to_lookup())
+                            new_type_def.for_path(&path.to_lookup())
                         }
                     }
                     Some(&Details { ref type_def, .. }) => type_def
