@@ -42,7 +42,6 @@ static TAG_METRICS_KEY: &str = "#datadog_tag_metrics";
 static TAG_LOGS_KEY: &str = "#datadog_tag_logs";
 static FILTER_METRICS_KEY: &str = "#datadog_filter_metrics";
 static PIPELINES_NAMESPACE_METRICS_KEY: &str = "#datadog_pipelines_namespace_metrics";
-static METERING_METRICS_KEY: &str = "#datadog_metering_metrics";
 static INTERNAL_METRICS_KEY: &str = "#datadog_internal_metrics";
 static INTERNAL_LOGS_KEY: &str = "#datadog_internal_logs";
 static DATADOG_METRICS_KEY: &str = "#datadog_metrics";
@@ -476,7 +475,6 @@ fn setup_metrics_reporting(
     let filter_metrics_id = OutputId::from(ComponentKey::from(FILTER_METRICS_KEY));
     let pipelines_namespace_metrics_id =
         OutputId::from(ComponentKey::from(PIPELINES_NAMESPACE_METRICS_KEY));
-    let metering_metrics_id = OutputId::from(ComponentKey::from(METERING_METRICS_KEY));
     let datadog_metrics_id = ComponentKey::from(DATADOG_METRICS_KEY);
 
     // Create internal sources for host and internal metrics. We're using distinct sources here and
@@ -526,17 +524,6 @@ fn setup_metrics_reporting(
         ..Default::default()
     };
 
-    let metering_metrics = RemapConfig {
-        source: Some(
-            r#"
-            .namespace = "datadog.observability_pipelines"
-            .name = "billed_bytes_total"
-        "#
-            .to_string(),
-        ),
-        ..Default::default()
-    };
-
     // Create a Datadog metrics sink to consume and emit internal + host metrics.
     let datadog_metrics = DatadogMetricsConfig {
         default_api_key: api_key,
@@ -567,22 +554,13 @@ fn setup_metrics_reporting(
 
     config.transforms.insert(
         pipelines_namespace_metrics_id.component.clone(),
-        TransformOuter::new(vec![filter_metrics_id.clone()], pipelines_namespace_metrics),
-    );
-
-    config.transforms.insert(
-        metering_metrics_id.component.clone(),
-        TransformOuter::new(vec![filter_metrics_id], metering_metrics),
+        TransformOuter::new(vec![filter_metrics_id], pipelines_namespace_metrics),
     );
 
     config.sinks.insert(
         datadog_metrics_id,
         SinkOuter::new(
-            vec![
-                tag_metrics_id,
-                pipelines_namespace_metrics_id,
-                metering_metrics_id,
-            ],
+            vec![tag_metrics_id, pipelines_namespace_metrics_id],
             Box::new(datadog_metrics),
         ),
     );
