@@ -1,4 +1,4 @@
-// Copied from https://github.com/DataDog/sketches-go/blob/master/ddsketch/pb/ddsketch.proto
+// Copied from https://github.com/DataDog/sketches-go/blob/0a92170/ddsketch/pb/ddsketch.proto
 
 syntax = "proto3";
 

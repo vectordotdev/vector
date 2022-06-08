@@ -10,23 +10,13 @@ use prost::Message;
 use rmp_serde;
 use vector_core::event::{BatchNotifier, BatchStatus, Event};
 
+use super::{dd_proto, ddsketch_full, stats::StatsPayload, DatadogTracesConfig};
 use crate::{
     config::SinkConfig,
     event::{TraceEvent, Value},
-    sinks::{
-        datadog::traces::{stats::StatsPayload, DatadogTracesConfig},
-        util::test::{build_test_server_status, load_sink},
-    },
+    sinks::util::test::{build_test_server_status, load_sink},
     test_util::{map_event_batch_stream, next_addr},
 };
-
-mod dd_proto {
-    include!(concat!(env!("OUT_DIR"), "/dd_trace.rs"));
-}
-
-mod ddsketch_full {
-    include!(concat!(env!("OUT_DIR"), "/ddsketch_full.rs"));
-}
 
 /// Submit traces to a dummy http server
 async fn start_test(

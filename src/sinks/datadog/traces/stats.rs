@@ -5,15 +5,11 @@ use prost::Message;
 use serde::{Deserialize, Serialize};
 use serde_bytes;
 
+use super::{ddsketch_full, sink::PartitionKey};
 use crate::{
     event::{TraceEvent, Value},
     metrics::AgentDDSketch,
-    sinks::datadog::traces::sink::PartitionKey,
 };
-
-mod ddsketch_full {
-    include!(concat!(env!("OUT_DIR"), "/ddsketch_full.rs"));
-}
 
 const TOP_LEVEL_KEY: &str = "_top_level";
 const SAMPLING_RATE_KEY: &str = "_sample_rate";
@@ -37,19 +33,19 @@ impl AggregationKey {
                 service: span
                     .get("service")
                     .map(|v| v.to_string_lossy())
-                    .unwrap_or_else(|| "".into()),
+                    .unwrap_or_default(),
                 name: span
                     .get("name")
                     .map(|v| v.to_string_lossy())
-                    .unwrap_or_else(|| "".into()),
+                    .unwrap_or_default(),
                 resource: span
                     .get("resource")
                     .map(|v| v.to_string_lossy())
-                    .unwrap_or_else(|| "".into()),
+                    .unwrap_or_default(),
                 ty: span
                     .get("type")
                     .map(|v| v.to_string_lossy())
-                    .unwrap_or_else(|| "".into()),
+                    .unwrap_or_default(),
                 status_code: 0,
             },
         }
@@ -308,7 +304,7 @@ impl Aggregator {
             _ => Utc::now().timestamp_nanos(),
         };
         // 10 seconds bucket
-        let btime = (start - start % 10_000_000_000) as u64;
+        let btime = (start - (start % 10_000_000_000)) as u64;
         match self.buckets.get_mut(&btime) {
             Some(b) => {
                 b.add(span, weight, is_top, aggkey);
@@ -446,87 +442,61 @@ pub(crate) fn compute_apm_stats(key: &PartitionKey, traces: &[TraceEvent]) -> St
 // Stats struct come from .proto and field name are set to match go
 // See this https://github.com/DataDog/datadog-agent/blob/b5bed4d/pkg/trace/pb/stats_gen.go for the reference go code
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "PascalCase")]
 pub(crate) struct StatsPayload {
-    #[serde(rename = "AgentHostname")]
     pub(crate) agent_hostname: String,
-    #[serde(rename = "AgentEnv")]
     pub(crate) agent_env: String,
-    #[serde(rename = "Stats")]
     pub(crate) stats: Vec<ClientStatsPayload>,
-    #[serde(rename = "AgentVersion")]
     pub(crate) agent_version: String,
-    #[serde(rename = "ClientComputed")]
     pub(crate) client_computed: bool,
 }
 
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "PascalCase")]
 pub(crate) struct ClientStatsPayload {
-    #[serde(rename = "Hostname")]
     pub(crate) hostname: String,
-    #[serde(rename = "Env")]
     pub(crate) env: String,
-    #[serde(rename = "Version")]
     pub(crate) version: String,
-    #[serde(rename = "Stats")]
     pub(crate) stats: Vec<ClientStatsBucket>,
-    #[serde(rename = "Lang")]
     pub(crate) lang: String,
-    #[serde(rename = "TracerVersion")]
     pub(crate) tracer_version: String,
     #[serde(rename = "RuntimeID")]
     pub(crate) runtime_id: String,
-    #[serde(rename = "Sequence")]
     pub(crate) sequence: u64,
-    #[serde(rename = "AgentAggregation")]
     pub(crate) agent_aggregation: String,
-    #[serde(rename = "Service")]
     pub(crate) service: String,
     #[serde(rename = "ContainerID")]
     pub(crate) container_id: String,
-    #[serde(rename = "Tags")]
     pub(crate) tags: Vec<String>,
 }
 
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "PascalCase")]
 pub(crate) struct ClientStatsBucket {
-    #[serde(rename = "Start")]
     pub(crate) start: u64,
-    #[serde(rename = "Duration")]
     pub(crate) duration: u64,
-    #[serde(rename = "Stats")]
     pub(crate) stats: Vec<ClientGroupedStats>,
-    #[serde(rename = "AgentTimeShift")]
     pub(crate) agent_time_shift: i64,
 }
 
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "PascalCase")]
 pub(crate) struct ClientGroupedStats {
-    #[serde(rename = "Service")]
     pub(crate) service: String,
-    #[serde(rename = "Name")]
     pub(crate) name: String,
-    #[serde(rename = "Resource")]
     pub(crate) resource: String,
     #[serde(rename = "HTTPStatusCode")]
     pub(crate) http_status_code: u32,
-    #[serde(rename = "Type")]
     pub(crate) r#type: String,
     #[serde(rename = "DBType")]
     pub(crate) db_type: String,
-    #[serde(rename = "Hits")]
     pub(crate) hits: u64,
-    #[serde(rename = "Errors")]
     pub(crate) errors: u64,
-    #[serde(rename = "Duration")]
     pub(crate) duration: u64,
-    #[serde(rename = "OkSummary")]
     #[serde(with = "serde_bytes")]
     pub(crate) ok_summary: Vec<u8>,
-    #[serde(rename = "ErrorSummary")]
     #[serde(with = "serde_bytes")]
     pub(crate) error_summary: Vec<u8>,
-    #[serde(rename = "Synthetics")]
     pub(crate) synthetics: bool,
-    #[serde(rename = "TopLevelHits")]
     pub(crate) top_level_hits: u64,
 }

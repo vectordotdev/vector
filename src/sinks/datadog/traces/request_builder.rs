@@ -8,18 +8,15 @@ use vector_core::event::{EventFinalizers, Finalizable};
 
 use super::{
     config::{DatadogTracesEndpoint, DatadogTracesEndpointConfiguration},
+    dd_proto,
     service::TraceApiRequest,
+    sink::PartitionKey,
+    stats,
 };
 use crate::{
     event::{Event, TraceEvent, Value},
-    sinks::{
-        datadog::traces::{sink::PartitionKey, stats},
-        util::{Compression, Compressor, IncrementalRequestBuilder},
-    },
+    sinks::util::{Compression, Compressor, IncrementalRequestBuilder},
 };
-mod dd_proto {
-    include!(concat!(env!("OUT_DIR"), "/dd_trace.rs"));
-}
 
 #[derive(Debug, Snafu)]
 pub enum RequestBuilderError {
