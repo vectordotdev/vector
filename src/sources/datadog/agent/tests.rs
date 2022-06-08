@@ -31,8 +31,8 @@ use crate::{
     schema,
     serde::{default_decoding, default_framing_message_based},
     sources::datadog::agent::{
-        logs::decode_log_body, metrics::DatadogSeriesRequest, DatadogAgentConfig,
-        DatadogAgentSource, LogMsg, LOGS, METRICS, TRACES,
+        ddmetric_proto, ddtrace_proto, logs::decode_log_body, metrics::DatadogSeriesRequest,
+        DatadogAgentConfig, DatadogAgentSource, LogMsg, LOGS, METRICS, TRACES,
     },
     test_util::{
         components::{assert_source_compliance, HTTP_PUSH_SOURCE_TAGS},
@@ -40,14 +40,6 @@ use crate::{
     },
     SourceSender,
 };
-
-mod dd_metrics_proto {
-    include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
-}
-
-mod dd_traces_proto {
-    include!(concat!(env!("OUT_DIR"), "/dd_trace.rs"));
-}
 
 fn test_logs_schema_definition() -> schema::Definition {
     schema::Definition::empty().required_field(
@@ -822,12 +814,12 @@ async fn decode_sketches() {
         );
 
         let mut buf = Vec::new();
-        let sketch = dd_metrics_proto::sketch_payload::Sketch {
+        let sketch = ddmetric_proto::sketch_payload::Sketch {
             metric: "dd_sketch".to_string(),
             tags: vec!["foo:bar".to_string(), "foobar".to_string()],
             host: "a_host".to_string(),
             distributions: Vec::new(),
-            dogsketches: vec![dd_metrics_proto::sketch_payload::sketch::Dogsketch {
+            dogsketches: vec![ddmetric_proto::sketch_payload::sketch::Dogsketch {
                 ts: 1542182950,
                 cnt: 2,
                 min: 16.0,
@@ -839,7 +831,7 @@ async fn decode_sketches() {
             }],
         };
 
-        let sketch_payload = dd_metrics_proto::SketchPayload {
+        let sketch_payload = ddmetric_proto::SketchPayload {
             metadata: None,
             sketches: vec![sketch],
         };
@@ -920,7 +912,7 @@ async fn decode_traces() {
 
         let mut buf_v1 = Vec::new();
 
-        let span = dd_traces_proto::Span {
+        let span = ddtrace_proto::Span {
             service: "a_service".to_string(),
             name: "a_name".to_string(),
             resource: "a_resource".to_string(),
@@ -936,14 +928,14 @@ async fn decode_traces() {
             meta_struct: BTreeMap::new(),
         };
 
-        let trace = dd_traces_proto::ApiTrace {
+        let trace = ddtrace_proto::ApiTrace {
             trace_id: 123u64,
             spans: vec![span.clone()],
             start_time: 1_431_648_000_000_001i64,
             end_time: 1_431_649_000_000_001i64,
         };
 
-        let payload_v1 = dd_traces_proto::TracePayload {
+        let payload_v1 = ddtrace_proto::TracePayload {
             host_name: "a_hostname".to_string(),
             env: "an_environment".to_string(),
             traces: vec![trace],
@@ -960,7 +952,7 @@ async fn decode_traces() {
 
         let mut buf_v2 = Vec::new();
 
-        let chunk = dd_traces_proto::TraceChunk {
+        let chunk = ddtrace_proto::TraceChunk {
             priority: 42i32,
             origin: "an_origin".to_string(),
             dropped_trace: false,
@@ -968,7 +960,7 @@ async fn decode_traces() {
             tags: BTreeMap::from_iter([("a".to_string(), "tag".to_string())].into_iter()),
         };
 
-        let tracer_payload = dd_traces_proto::TracerPayload {
+        let tracer_payload = ddtrace_proto::TracerPayload {
             container_id: "an_id".to_string(),
             language_name: "plop".to_string(),
             language_version: "v33".to_string(),
@@ -978,7 +970,7 @@ async fn decode_traces() {
             app_version: "v314".to_string(),
         };
 
-        let payload_v2 = dd_traces_proto::TracePayload {
+        let payload_v2 = ddtrace_proto::TracePayload {
             host_name: "a_hostname".to_string(),
             env: "env".to_string(),
             traces: vec![],

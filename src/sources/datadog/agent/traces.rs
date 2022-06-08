@@ -13,15 +13,13 @@ use crate::{
     event::{Event, TraceEvent, Value},
     internal_events::EventsReceived,
     sources::{
-        datadog::agent::{self, handle_request, ApiKeyQueryParams, DatadogAgentSource},
+        datadog::agent::{
+            self, ddtrace_proto, handle_request, ApiKeyQueryParams, DatadogAgentSource,
+        },
         util::ErrorMessage,
     },
     SourceSender,
 };
-
-mod dd_proto {
-    include!(concat!(env!("OUT_DIR"), "/dd_trace.rs"));
-}
 
 pub(crate) fn build_warp_filter(
     acknowledgements: bool,
@@ -106,7 +104,7 @@ fn handle_dd_trace_payload(
     lang: Option<&String>,
     source: &DatadogAgentSource,
 ) -> crate::Result<Vec<Event>> {
-    let decoded_payload = dd_proto::TracePayload::decode(frame)?;
+    let decoded_payload = ddtrace_proto::TracePayload::decode(frame)?;
     if decoded_payload.tracer_payloads.is_empty() {
         debug!("Older trace payload decoded.");
         handle_dd_trace_payload_v0(decoded_payload, api_key, lang, source)
@@ -118,7 +116,7 @@ fn handle_dd_trace_payload(
 
 /// Decode Datadog newer protobuf schema
 fn handle_dd_trace_payload_v1(
-    decoded_payload: dd_proto::TracePayload,
+    decoded_payload: ddtrace_proto::TracePayload,
     api_key: Option<Arc<str>>,
     source: &DatadogAgentSource,
 ) -> crate::Result<Vec<Event>> {
@@ -169,7 +167,7 @@ fn handle_dd_trace_payload_v1(
     Ok(enriched_events)
 }
 
-fn convert_dd_tracer_payload(payload: dd_proto::TracerPayload) -> Vec<TraceEvent> {
+fn convert_dd_tracer_payload(payload: ddtrace_proto::TracerPayload) -> Vec<TraceEvent> {
     payload
         .chunks
         .into_iter()
@@ -200,7 +198,7 @@ fn convert_dd_tracer_payload(payload: dd_proto::TracerPayload) -> Vec<TraceEvent
 
 // Decode Datadog older protobuf schema
 fn handle_dd_trace_payload_v0(
-    decoded_payload: dd_proto::TracePayload,
+    decoded_payload: ddtrace_proto::TracePayload,
     api_key: Option<Arc<str>>,
     lang: Option<&String>,
     source: &DatadogAgentSource,
@@ -266,7 +264,7 @@ fn handle_dd_trace_payload_v0(
     Ok(enriched_events)
 }
 
-fn convert_span(dd_span: dd_proto::Span) -> BTreeMap<String, Value> {
+fn convert_span(dd_span: ddtrace_proto::Span) -> BTreeMap<String, Value> {
     let mut span = BTreeMap::<String, Value>::new();
     span.insert("service".into(), Value::from(dd_span.service));
     span.insert("name".into(), Value::from(dd_span.name));
