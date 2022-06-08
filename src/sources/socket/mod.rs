@@ -232,6 +232,7 @@ impl SourceConfig for SocketConfig {
 mod test {
     use std::{
         collections::HashMap,
+        future::ready,
         net::{SocketAddr, UdpSocket},
         sync::{
             atomic::{AtomicBool, Ordering},
@@ -275,7 +276,7 @@ mod test {
         test_util::{
             collect_n, collect_n_limited,
             components::{assert_source_compliance, SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS},
-            next_addr, random_string, send_lines, send_lines_tls, wait_for_tcp,
+            next_addr, random_string, send_lines, send_lines_tls, wait_for, wait_for_tcp,
         },
         tls::{self, TlsConfig, TlsEnableableConfig},
         SourceSender,
@@ -1113,9 +1114,25 @@ mod test {
             .unwrap();
         tokio::spawn(server);
 
-        let meta = std::fs::metadata(in_path).unwrap();
-        // S_IFSOCK   0140000   socket
-        assert_eq!(0o140555, meta.permissions().mode());
+        wait_for(|| {
+            match std::fs::metadata(&in_path) {
+                Ok(meta) => {
+                    match meta.permissions().mode() {
+                        // S_IFSOCK   0140000   socket
+                        0o140421 => ready(true),
+                        perm => {
+                            println!("socket has different permissions: {:?}", perm);
+                            ready(false)
+                        }
+                    }
+                }
+                Err(_) => {
+                    println!("socket doesn't exist yet");
+                    ready(false)
+                }
+            }
+        })
+        .await;
     }
 
     ////////////// UNIX STREAM TESTS //////////////
@@ -1219,8 +1236,24 @@ mod test {
             .unwrap();
         tokio::spawn(server);
 
-        let meta = std::fs::metadata(in_path).unwrap();
-        // S_IFSOCK   0140000   socket
-        assert_eq!(0o140421, meta.permissions().mode());
+        wait_for(|| {
+            match std::fs::metadata(&in_path) {
+                Ok(meta) => {
+                    match meta.permissions().mode() {
+                        // S_IFSOCK   0140000   socket
+                        0o140421 => ready(true),
+                        perm => {
+                            println!("socket has different permissions: {:?}", perm);
+                            ready(false)
+                        }
+                    }
+                }
+                Err(_) => {
+                    println!("socket doesn't exist yet");
+                    ready(false)
+                }
+            }
+        })
+        .await;
     }
 }
