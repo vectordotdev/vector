@@ -71,9 +71,13 @@ impl RequestBuilder<(Option<Partitioned>, Vec<HecProcessedEvent>)> for HecLogsRe
         )
     }
 
-    fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
+    fn build_request(
+        &self,
+        metadata: Self::Metadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
         HecRequest {
-            body: payload,
+            body: payload.into_payload(),
             finalizers: metadata.finalizers,
             events_count: metadata.events_count,
             events_byte_size: metadata.events_byte_size,
@@ -82,7 +86,13 @@ impl RequestBuilder<(Option<Partitioned>, Vec<HecProcessedEvent>)> for HecLogsRe
         }
     }
 
-    fn encode_events(&self, events: Self::Events) -> Result<Self::Payload, Self::Error> {
+    /*
+    TODO: Why was this needed?
+
+    fn encode_events(
+        &self,
+        events: Self::Events,
+    ) -> Result<EncodeResult<Self::Payload>, Self::Error> {
         use crate::sinks::util::encoding::Encoder;
 
         let mut compressor = crate::sinks::util::Compressor::from(self.compression());
@@ -91,4 +101,5 @@ impl RequestBuilder<(Option<Partitioned>, Vec<HecProcessedEvent>)> for HecLogsRe
         let payload = compressor.into_inner().freeze();
         Ok(payload)
     }
+    */
 }
