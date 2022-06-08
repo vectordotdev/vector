@@ -21,13 +21,6 @@ use crate::Value;
 ///
 /// This struct tracks the known states a type can have. By allowing one type to have multiple
 /// states, the type definition can be progressively refined.
-///
-/// At the start, a type is in the "any" state, meaning its type can be any of the valid states, as
-/// more information becomes available, states can be removed, until one state is left.
-///
-/// A state without any type information (e.g. all fields are `None`) indicates no type information
-/// can be inferred from the value. This is usually a programming error, but it's a valid state for
-/// this library to expose.
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
 pub struct Kind {
     // NOTE: The internal API uses `Option` over `bool` for primitive types, as it makes internal
