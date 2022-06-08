@@ -370,7 +370,7 @@ fn memory_metrics(
     namespace: &Option<String>,
     tags: &BTreeMap<String, String>,
 ) -> Vec<Metric> {
-    let mut metrics = vec![];
+    let mut metrics = Vec::with_capacity(35);
 
     metrics.extend(
         [
