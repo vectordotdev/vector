@@ -18,7 +18,6 @@ interpreted as described in [RFC 2119].
     - [`endpoint(s)`](#endpoints)
 - [Instrumentation](#instrumentation)
   - [Events](#events)
-    - [ComponentBilled](#componentbilled)
     - [ComponentBytesReceived](#componentbytesreceived)
     - [ComponentBytesSent](#componentbytessent)
     - [ComponentEventsReceived](#componenteventsreceived)
@@ -103,26 +102,6 @@ events:
   reasons, but the resulting telemetry state MUST be equivalent to emitting
   individual events. For example, emitting the `EventsReceived` event for 10
   events MUST increment the `component_received_events_total` counter by 10.
-
-#### ComponentBilled
-
-*Sources* MUST emit a `ComponentBilled` event that repsents the billing of
-enterprise customers.
-
-- Emission
-  - MUST emit only if the `enterprise.enabled` config option is set to `true`.
-  - MUST emit immediatley before the creation of Vector events and after
-    decompression and filtering of raw bytes.
-- Properties
-  - `byte_size` - REQUIRED, number of raw bytes received that will be turned
-    into Vector events.
-- Metrics
-  - MUST increment the `component_billed_bytes_total` counter by the defined
-    value with the defined properties as metric tags.
-- Logs
-  - MUST log a `Bytes billed.` message at the `trace` level with the defined
-    properties as key-value pairs.
-  - MUST NOT be rate limited.
 
 #### ComponentBytesReceived
 
