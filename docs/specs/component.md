@@ -124,6 +124,11 @@ network usage for the source.
       MUST be set to `true`. 
   - `framed` - REQUIRED, `true` if the `byte_size` represents framed bytes,
     `false` if not. See `bytes_size` for framing details.
+  - `url` - REQUIRED, the URL of the upstream source.
+    - For HTTP, MUST not include the query string, only the host and path.
+      (i.e., `http://<host>:<port>/<path>`)
+    - For sockets, the full socket URL (i.e., `tcp://<address>:<port>`)
+    - For files, MUST be the full file url (i.e., `file://<path>`)
 - Metrics
   - MUST increment the `component_received_bytes_total` counter by the defined
     value with the defined properties as metric tags.
@@ -153,6 +158,11 @@ for the sink.
       MUST be set to `true`. 
   - `framed` - REQUIRED, `true` if the `byte_size` represents framed bytes,
     `false` if not. See `bytes_size` for framing details.
+  - `url` - REQUIRED, the URL of the downstream destination.
+    - For HTTP, MUST not include the query string, only the host and path.
+      (i.e., `http://<host>:<port>/<path>`)
+    - For sockets, the full socket URL (i.e., `tcp://<address>:<port>`)
+    - For files, MUST be the full file url (i.e., `file://<path>`)
 - Metrics
   - MUST increment the `component_sent_bytes_total` counter by the defined value
     with the defined properties as metric tags.
