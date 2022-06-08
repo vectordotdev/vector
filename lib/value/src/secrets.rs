@@ -44,4 +44,35 @@ impl Secrets {
     pub fn remove(&mut self, key: &str) {
         self.secrets.remove(&key.to_owned());
     }
+
+    /// Merged both together. If there are collisions, the value from `self` is kept.
+    pub fn merge(&mut self, other: &Self) {
+        for (key, value) in &other.secrets {
+            if !self.secrets.contains_key(key) {
+                self.secrets.insert(key.clone(), value.clone());
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::Secrets;
+
+    #[test]
+    fn test_merge() {
+        let mut a = Secrets::new();
+        a.insert("key-a", "value-a1");
+        a.insert("key-b", "value-b1");
+
+        let mut b = Secrets::new();
+        b.insert("key-b", "value-b2");
+        b.insert("key-c", "value-c2");
+
+        a.merge(&b);
+
+        assert_eq!(a.get("key-a").unwrap().as_ref(), "value-a1");
+        assert_eq!(a.get("key-b").unwrap().as_ref(), "value-b1");
+        assert_eq!(a.get("key-c").unwrap().as_ref(), "value-c2");
+    }
 }
