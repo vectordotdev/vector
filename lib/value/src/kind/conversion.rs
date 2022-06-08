@@ -54,14 +54,11 @@ impl Kind {
     /// Returns `Kind`, with non-primitive states removed.
     ///
     /// That is, it returns `self,` but removes the `object` and `array` states.
-    ///
-    /// Returns `None` if no primitive states are set.
     #[must_use]
-    pub fn to_primitives(mut self) -> Option<Self> {
-        self.remove_array().ok()?;
-        self.remove_object().ok()?;
-
-        Some(self)
+    pub fn to_primitives(mut self) -> Self {
+        self.remove_array();
+        self.remove_object();
+        self
     }
 }
 

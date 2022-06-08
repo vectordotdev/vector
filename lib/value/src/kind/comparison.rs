@@ -31,12 +31,6 @@ impl Kind {
             && self.contains_object()
     }
 
-    /// Returns `true` if only primitive type states are valid.
-    #[must_use]
-    pub const fn is_primitive(&self) -> bool {
-        !self.is_empty() && !self.is_collection()
-    }
-
     /// Returns `true` if only collection type states are valid.
     #[must_use]
     pub const fn is_collection(&self) -> bool {
@@ -299,20 +293,6 @@ impl Kind {
         }
 
         false
-    }
-
-    /// Check for the "empty" state of a type.
-    #[must_use]
-    pub const fn is_empty(&self) -> bool {
-        !self.contains_bytes()
-            && !self.contains_integer()
-            && !self.contains_float()
-            && !self.contains_boolean()
-            && !self.contains_timestamp()
-            && !self.contains_regex()
-            && !self.contains_null()
-            && !self.contains_array()
-            && !self.contains_object()
     }
 }
 
