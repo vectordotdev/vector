@@ -422,7 +422,7 @@ fn extract_weigth_from_root_span(spans: &[&BTreeMap<String, Value>]) -> f64 {
         .values()
         .next()
         .unwrap_or_else(|| {
-            debug!("Root span was not found");
+            debug!("Root span was not found.");
             &1.0
         })
 }
