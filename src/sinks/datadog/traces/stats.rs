@@ -53,7 +53,7 @@ impl AggregationKey {
                     .get("meta")
                     .and_then(|m| m.as_object())
                     .and_then(|m| m.get(TAG_STATUS_CODE))
-                    // the meta is supposed to be a string/string map
+                    // the meta field is supposed to be a string/string map
                     .and_then(|s| s.to_string_lossy().parse::<u32>().ok())
                     .unwrap_or_default(),
                 synthetics,
@@ -244,6 +244,8 @@ impl Bucket {
         }
     }
 
+    /// Update a bucket with a new span. Computed statistics include the number of hits and the actual distribution of
+    /// execution time, with isolated measurements for spans flagged as errored and spans without error.
     fn update(span: &BTreeMap<String, Value>, weight: f64, is_top: bool, gs: &mut GroupedStats) {
         is_top.then(|| {
             gs.top_level_hits += weight;
@@ -270,6 +272,8 @@ impl Bucket {
 }
 
 struct Aggregator {
+    // The key represent the timestamp (in nanoseconds) of the begining of the time window (that last 10 seconds) on
+    // which the associated bucket will calculate statistics.
     buckets: BTreeMap<u64, Bucket>,
 }
 
@@ -280,13 +284,15 @@ impl Aggregator {
         }
     }
 
+    /// This implementation uses https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/concentrator.go#L148-L184
+    /// as a basis. It takes a trace, iterates over its constituting spans and upon matching conditions it updates statistics (mostly using the top level span).
     fn handle_trace(&mut self, partition_key: &PartitionKey, trace: &TraceEvent) {
         let spans = match trace.get("spans") {
             Some(Value::Array(v)) => v.iter().filter_map(|s| s.as_object()).collect(),
             _ => vec![],
         };
 
-        let weigth = extract_weigth_from_root_span(&spans);
+        let weight = extract_weight_from_root_span(&spans);
         let payload_aggkey = PayloadAggregationKey {
             env: partition_key.env.clone().unwrap_or_default(),
             hostname: partition_key.hostname.clone().unwrap_or_default(),
@@ -311,10 +317,13 @@ impl Aggregator {
             {
                 return;
             }
-            self.handle_span(span, weigth, is_top, synthetics, payload_aggkey.clone());
+            self.handle_span(span, weight, is_top, synthetics, payload_aggkey.clone());
         });
     }
 
+    /// This implementation uses https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/statsraw.go#L147-L182
+    /// as a basis. It uses a key constructed using various span/trace properties (see `AggregationKey`) and aggregates some statistics, per fixed 10 seconds
+    /// window.
     fn handle_span(
         &mut self,
         span: &BTreeMap<String, Value>,
@@ -398,11 +407,13 @@ fn metric_flag(span: &BTreeMap<String, Value>, key: &str) -> bool {
         .unwrap_or(false)
 }
 
-fn extract_weigth_from_root_span(spans: &[&BTreeMap<String, Value>]) -> f64 {
+/// This extract the relative weight sfrom the top level span (i.e. the span that does not have
+/// a parent). The weigth calculation is borrowed from https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/weight.go#L17-L26.
+fn extract_weight_from_root_span(spans: &[&BTreeMap<String, Value>]) -> f64 {
     if spans.is_empty() {
         return 1.0;
     }
-    let mut parent_id_to_child_weigth = BTreeMap::<i64, f64>::new();
+    let mut parent_id_to_child_weight = BTreeMap::<i64, f64>::new();
     let mut span_ids = Vec::<i64>::new();
     for s in spans.iter() {
         let parent_id = match s.get("parent_id") {
@@ -432,18 +443,18 @@ fn extract_weigth_from_root_span(spans: &[&BTreeMap<String, Value>]) -> f64 {
             return sample_rate;
         }
         span_ids.push(span_id);
-        parent_id_to_child_weigth.insert(parent_id, sample_rate);
+        parent_id_to_child_weight.insert(parent_id, sample_rate);
     }
     // We remove all span that do have a parent
     span_ids.iter().for_each(|id| {
-        parent_id_to_child_weigth.remove(id);
+        parent_id_to_child_weight.remove(id);
     });
     // There should be only one value remaining, the weigth from the root span
-    if parent_id_to_child_weigth.len() != 1 {
+    if parent_id_to_child_weight.len() != 1 {
         debug!("Didn't reliably find the root span.");
     }
 
-    *parent_id_to_child_weigth
+    *parent_id_to_child_weight
         .values()
         .next()
         .unwrap_or_else(|| {
@@ -456,16 +467,20 @@ pub(crate) fn compute_apm_stats(key: &PartitionKey, traces: &[TraceEvent]) -> St
     let mut aggregator = Aggregator::new();
     traces.iter().for_each(|t| aggregator.handle_trace(key, t));
     StatsPayload {
-        agent_hostname: key.hostname.clone().unwrap_or_else(|| "".to_string()),
-        agent_env: key.env.clone().unwrap_or_else(|| "".to_string()),
+        agent_hostname: key.hostname.clone().unwrap_or_default(),
+        agent_env: key.env.clone().unwrap_or_default(),
         stats: aggregator.get_client_stats_payload(),
-        agent_version: key.agent_version.clone().unwrap_or_else(|| "".to_string()),
+        agent_version: key.agent_version.clone().unwrap_or_default(),
         client_computed: false,
     }
 }
 
-// Stats struct come from .proto and field name are set to match go
-// See this https://github.com/DataDog/datadog-agent/blob/b5bed4d/pkg/trace/pb/stats_gen.go for the reference go code
+// On the agent side APM Stats payload are encoded into the messagepack format using this
+// go code https://github.com/DataDog/datadog-agent/blob/b5bed4d/pkg/trace/pb/stats_gen.go.
+// Note that this code is generated from code itself generate from this .proto file
+// https://github.com/DataDog/datadog-agent/blob/dc2f202/pkg/trace/pb/stats.proto.
+// All the subsequent struct are dedicated to be used with rmp_serde and the fields names
+// exactly match the ones of the go code.
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase")]
 pub(crate) struct StatsPayload {
