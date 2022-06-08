@@ -118,7 +118,7 @@ creation of Vector events.
     - For HTTP-based protocols, the total number of raw bytes in the HTTP body,
       as typically represented by the `Content-Length` header.
     - For UDP, TCP, and Unix protocols, the total number of raw bytes received
-      from the socket excluding the delimiter.
+      from the socket excluding framing/delimiters.
     - For files, the total number of raw bytes read from the file excluding the
       delimiter.
   - `protocol` - REQUIRED, the protocol used to send the bytes. MUST be one of
