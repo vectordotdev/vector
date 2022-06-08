@@ -117,18 +117,21 @@ mod test {
 #[cfg(feature = "axiom-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use chrono::{DateTime, Duration, Utc};
+    use chrono::{DateTime, Utc};
     use futures::stream;
     use http::StatusCode;
     use std::env;
-    use tokio::time::sleep;
+    use tokio::time::{sleep, Duration};
     use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
     use super::*;
     use crate::{
         config::SinkContext,
         sinks::axiom::AxiomConfig,
-        test_util::components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+        test_util::{
+            components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+            wait_for_duration,
+        },
     };
 
     #[tokio::test]
@@ -138,16 +141,18 @@ mod integration_tests {
         let client = reqwest::Client::builder().build().unwrap();
 
         // Wait until deployment is ready
-        let sleep_duration = Duration::milliseconds(1000).to_std().unwrap();
-        for _ in 0..30 {
-            if let Ok(res) = client.get(url.clone()).send().await {
-                if res.status() == StatusCode::OK {
-                    break;
-                }
-            }
-
-            sleep(sleep_duration).await;
-        }
+        wait_for_duration(
+            || async {
+                client
+                    .get(url.clone())
+                    .send()
+                    .await
+                    .map(|res| res.status() == StatusCode::OK)
+                    .unwrap_or(false)
+            },
+            Duration::from_secs(30),
+        )
+        .await;
 
         // Axiom credentials
         let email = "info@axiom.co".to_string();
