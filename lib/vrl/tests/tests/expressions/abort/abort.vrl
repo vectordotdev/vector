@@ -1,4 +1,4 @@
-# result: { "foo": true}
+# result: { "foo": true }
 
 .foo = true
 .return = abort

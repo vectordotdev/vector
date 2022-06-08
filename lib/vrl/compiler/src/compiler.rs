@@ -68,10 +68,6 @@ impl<'a> Compiler<'a> {
     ) -> Result<(Program, DiagnosticList), DiagnosticList> {
         let mut expressions = self.compile_root_exprs(ast, external);
 
-        if expressions.is_empty() {
-            expressions.push(Expr::Noop(Noop));
-        }
-
         let (errors, warnings): (Vec<_>, Vec<_>) =
             self.diagnostics.into_iter().partition(|diagnostic| {
                 matches!(diagnostic.severity(), Severity::Bug | Severity::Error)
