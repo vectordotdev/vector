@@ -232,7 +232,7 @@ impl Definition {
         for path in other.optional {
             if self.is_optional_field(&path)
                 || self
-                    .collection
+                    .kind
                     .find_known_at_path(&mut path.to_lookup())
                     .ok()
                     .flatten()
@@ -253,13 +253,8 @@ impl Definition {
             self.meaning.insert(other_id, meaning);
         }
 
-        self.kind.merge(merge::Strategy {
-            depth: merge::Depth::Deep,
-            indices: merge::Indices::Keep,
-        })
-
-        self.collection.merge(
-            other.collection,
+        self.kind.merge(
+            other.kind,
             merge::Strategy {
                 depth: merge::Depth::Deep,
                 indices: merge::Indices::Keep,
