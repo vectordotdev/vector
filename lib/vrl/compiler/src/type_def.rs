@@ -342,6 +342,14 @@ impl TypeDef {
         self.kind.merge(other.kind, strategy);
     }
 
+    pub fn with_type_set_at_path(self, path: &Lookup, other: Self) -> Self {
+        if path.is_root() {
+            other
+        } else {
+            self.merge_overwrite(other.for_path(path))
+        }
+    }
+
     pub fn merge_overwrite(mut self, other: Self) -> Self {
         self.merge(
             other,
@@ -385,21 +393,6 @@ impl Details {
             } else {
                 None
             },
-        }
-    }
-
-    pub(crate) fn merge_optional(
-        a: Option<Self>,
-        b: Option<Self>,
-        none_type: TypeDef,
-    ) -> Option<Self> {
-        match (a, b) {
-            (Some(a), Some(b)) => Some(a.merge(b)),
-            (Some(_), None) | (None, Some(_)) => Some(Details {
-                type_def: none_type,
-                value: None,
-            }),
-            (None, None) => None,
         }
     }
 }
