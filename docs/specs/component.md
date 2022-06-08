@@ -109,25 +109,21 @@ of these events:
 #### ComponentBytesReceived
 
 *Sources* MUST emit a `ComponentBytesReceived` event that represents the
-reception of *raw event bytes*. It MUST emit immediately after receiving
-bytes from the upstream source and before decompression, filtering, and the
-creation of Vector events.
+reception of *raw network bytes*. This event is intended to reflect the raw
+network usage for the source.
 
 - Emission
-  - MUST emit immediately after receiving bytes from the upstream source,
-    before decompression, filtering, and the creation of Vector events.
+  - MUST emit immediately after reception of raw network bytes.
+  - MUST emit *before* mutation of the bytes, such as decryption, decompression,
+    and filtering.
 - Properties
-  - `byte_size` - REQUIRED, number of raw event bytes received.
-    - For HTTP-based protocols, the total number of raw bytes in the HTTP body,
-      as typically represented by the `Content-Length` header.
-    - For UDP, TCP, and Unix protocols, the total number of raw bytes received
-      from the socket excluding framing/delimiters.
-    - For files, the total number of raw bytes read from the file excluding the
-      delimiter.
-  - `protocol` - REQUIRED, the protocol used to send the bytes. MUST be one of
-    `tcp`, `udp`, `unix`, `http`, `https`, `file`, etc.)
-  - `http_path` - OPTIONAL, the HTTP path, excluding query strings.
-  - `socket` - OPTIONAL, the socket number that bytes were received from.
+  - `byte_size` - REQUIRED, number of raw bytes received.
+    - SHOULD be the total number of raw network bytes received *including*
+      framing (headers, delimiters, etc.). If If this is not possible due to a
+      client limitation, then the framed bytes MUST be used and the `framed` tag
+      MUST be set to `true`. 
+  - `framed` - REQUIRED, `true` if the `byte_size` represents framed bytes,
+    `false` if not. See `bytes_size` for framing details.
 - Metrics
   - MUST increment the `component_received_bytes_total` counter by the defined
     value with the defined properties as metric tags.
@@ -138,27 +134,25 @@ creation of Vector events.
 
 #### ComponentBytesSent
 
-*Sinks* MUST emit a `ComponentBytesSent` that represents the number of
-*raw event bytes* sent downstream.
+*Sinks* MUST emit a `ComponentBytesSent` that represents the emission of
+*raw network bytes*. This event is intended to reflect the raw network usage
+for the sink.
 
 - Emission
-  - MUST emit immediately after *successful* transmission the bytes.
-  - MUST emit before compression.
+  - MUST emit immediately after transmission of raw network bytes regardless
+    if the transmission was successful or not.
+  - MUST emit *after* mutation of the bytes, such as decryption, decompression,
+    and filtering.
   - MUST NOT emit for pull-based sinks since they do not send data. For
     example, the `prometheus_exporter` sink MUST NOT emit this event.
 - Properties
-  - `byte_size`
-    - For UDP, TCP, and Unix protocols, the total number of bytes placed on the
-      socket excluding the delimiter.
-    - For HTTP-based protocols, the total number of bytes in the HTTP body, as
-      represented by the `Content-Length` header.
-    - For files, the total number of bytes written to the file excluding the
-      delimiter.
-  - `protocol` - The protocol used to send the bytes (i.e., `tcp`, `udp`,
-    `unix`, `http`, `https`, `file`, etc.)
-  - `endpoint` - If relevant, the endpoint that the bytes were sent to. For
-    HTTP, this MUST be the host and path only, excluding the query string.
-  - `file` - If relevant, the absolute path of the file.
+  - `byte_size` - REQUIRED, number of raw bytes sent.
+    - SHOULD be the total number of raw network bytes sent *including*
+      framing (headers, delimiters, etc.). If If this is not possible due to a
+      client limitation, then the framed bytes MUST be used and the `framed` tag
+      MUST be set to `true`. 
+  - `framed` - REQUIRED, `true` if the `byte_size` represents framed bytes,
+    `false` if not. See `bytes_size` for framing details.
 - Metrics
   - MUST increment the `component_sent_bytes_total` counter by the defined value
     with the defined properties as metric tags.
