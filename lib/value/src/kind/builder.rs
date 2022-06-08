@@ -417,16 +417,3 @@ impl Kind {
         self.object.take().is_some()
     }
 }
-
-/// The error triggered by any of [`Kind`]s `remove_*` methods, if the call to that method would
-/// leave the `Kind` in an empty state.
-#[derive(Debug)]
-pub struct EmptyKindError;
-
-impl std::fmt::Display for EmptyKindError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("invalid empty type state variant")
-    }
-}
-
-impl std::error::Error for EmptyKindError {}

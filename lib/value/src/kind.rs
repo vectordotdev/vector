@@ -13,7 +13,6 @@ pub mod remove;
 
 use std::collections::BTreeMap;
 
-pub use builder::EmptyKindError;
 pub use collection::{Collection, Field, Index, Unknown};
 
 use crate::Value;
