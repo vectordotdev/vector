@@ -90,24 +90,20 @@ impl std::fmt::Display for Kind {
             kinds.push("object");
         }
 
-        let last = kinds.remove(0);
-
         if kinds.is_empty() {
-            return last.fmt(f);
+            kinds.push("never");
         }
-
-        let mut kinds = kinds.into_iter().peekable();
-
-        while let Some(kind) = kinds.next() {
-            kind.fmt(f)?;
-
-            if kinds.peek().is_some() {
-                f.write_str(", ")?;
+        let len = kinds.len();
+        for (i, kind) in kinds.into_iter().enumerate() {
+            if i != 0 {
+                if i == len - 1 {
+                    f.write_str(" or ")?;
+                } else {
+                    f.write_str(", ")?;
+                }
             }
+            kind.fmt(f)?;
         }
-
-        f.write_str(" or ")?;
-        last.fmt(f)?;
 
         Ok(())
     }

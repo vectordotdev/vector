@@ -199,6 +199,22 @@ impl Kind {
         }
     }
 
+    /// The "never" type state.
+    #[must_use]
+    pub const fn never() -> Self {
+        Self {
+            bytes: None,
+            integer: None,
+            float: None,
+            boolean: None,
+            timestamp: None,
+            regex: None,
+            null: None,
+            array: None,
+            object: None,
+        }
+    }
+
     /// The "array" type state.
     #[must_use]
     pub fn array(collection: impl Into<Collection<Index>>) -> Self {
