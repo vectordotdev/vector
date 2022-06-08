@@ -82,6 +82,7 @@ fn get_processed_event_timestamp(
             indexed_fields: indexed_fields.as_slice(),
             timestamp_nanos_key: timestamp_nanos_key.as_ref(),
             timestamp_key,
+            metadata: Default::default(),
             endpoint_target: EndpointTarget::Event,
         },
     )

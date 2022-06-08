@@ -8,8 +8,7 @@ use crate::{
     sinks::{
         splunk_hec::{
             common::{
-                timestamp_key,
-                acknowledgements::HecClientAcknowledgementsConfig, EndpointTarget,
+                acknowledgements::HecClientAcknowledgementsConfig, timestamp_key, EndpointTarget,
                 SplunkHecDefaultBatchSettings,
             },
             logs::config::HecLogsSinkConfig,
