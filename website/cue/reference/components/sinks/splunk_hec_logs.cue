@@ -79,6 +79,19 @@ components: sinks: splunk_hec_logs: {
 				examples: ["https://http-inputs-hec.splunkcloud.com", "https://hec.splunk.com:8088", "http://example.com"]
 			}
 		}
+		endpoint_target: {
+			description: "The Splunk endpoint to send to."
+			required:    false
+			warnings: []
+			type: string: {
+				default: "event"
+				enum: {
+					event: "Event endpoint"
+					raw:   "Raw endpoint"
+				}
+				syntax: "literal"
+			}
+		}
 		host_key: {
 			common:      true
 			description: """
@@ -133,8 +146,21 @@ components: sinks: splunk_hec_logs: {
 				syntax: "template"
 			}
 		}
+		metadata: {
+			description: """
+				 A set of fields that can be sent as metadata. The value is templatable, which enables
+				 you to attach dynamic data to the event.
+				"""
+			required: false
+			type: object: {
+				examples: [
+					{
+						"host": "{{ hostname }}"
+					},
+				]
+			}
+		}
 	}
-
 	input: {
 		logs:    true
 		metrics: null
