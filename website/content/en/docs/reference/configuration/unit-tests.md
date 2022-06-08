@@ -37,12 +37,6 @@ You can also specify multiple configuration files to test:
 vector test /etc/vector/pipeline1.toml /etc/vector/pipeline2.toml
 ```
 
-Glob patterns are also supported:
-
-```bash
-vector test /etc/vector/*.toml
-```
-
 Specifying multiple files is useful if you want to, for example, keep your unit tests in a separate
 file from your pipeline configuration. Vector always treats multiple files as a single, unified
 configuration.

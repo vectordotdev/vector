@@ -3,12 +3,11 @@ use lookup::LookupBuf;
 use parser::ast::{self, Node, QueryTarget};
 
 use crate::parser::ast::RootExpr;
-use crate::type_def::Details;
 use crate::{
     expression::*,
     program::ProgramInfo,
     state::{ExternalEnv, LocalEnv},
-    Function, Program, TypeDef,
+    Function, Program,
 };
 
 pub(crate) type Diagnostics = Vec<Box<dyn DiagnosticMessage>>;
@@ -244,7 +243,7 @@ impl<'a> Compiler<'a> {
                             // an expression that has the "never" type is a terminating expression
                             if type_def.is_never() {
                                 terminated_state =
-                                    Some((self.local.clone(), external.target().cloned()))
+                                    Some((self.local.clone(), external.target().clone()))
                             }
                         }
                     }
@@ -255,9 +254,7 @@ impl<'a> Compiler<'a> {
 
         if let Some((local, details)) = terminated_state {
             self.local = local;
-            if let Some(details) = details {
-                external.update_target(details);
-            }
+            external.update_target(details);
         }
 
         if node_exprs.is_empty() {
@@ -350,14 +347,14 @@ impl<'a> Compiler<'a> {
             .ok()?;
 
         let original_locals = self.local.clone();
-        let original_external = external.target().cloned();
+        let original_external = external.target().clone();
 
         let consequent = self.compile_block(consequent, external)?;
 
         match alternative {
             Some(block) => {
                 let consequent_locals = self.local.clone();
-                let consequent_external = external.target().cloned();
+                let consequent_external = external.target().clone();
 
                 self.local = original_locals;
 
@@ -365,13 +362,7 @@ impl<'a> Compiler<'a> {
 
                 // assignments must be the result of either the if or else block, but not the original value
                 self.local = self.local.clone().merge(consequent_locals);
-                if let Some(details) = Details::merge_optional(
-                    consequent_external,
-                    external.target().cloned(),
-                    TypeDef::any(),
-                ) {
-                    external.update_target(details);
-                }
+                external.update_target(consequent_external.merge(external.target().clone()));
 
                 Some(IfStatement {
                     predicate,
@@ -382,14 +373,7 @@ impl<'a> Compiler<'a> {
             None => {
                 // assignments must be the result of either the if block or the original value
                 self.local = self.local.clone().merge(original_locals);
-
-                if let Some(details) = Details::merge_optional(
-                    original_external,
-                    external.target().cloned(),
-                    TypeDef::any(),
-                ) {
-                    external.update_target(details);
-                }
+                external.update_target(original_external.merge(external.target().clone()));
 
                 Some(IfStatement {
                     predicate,

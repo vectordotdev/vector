@@ -1,10 +1,7 @@
 use std::fmt;
 
 use lookup::LookupBuf;
-use value::{
-    kind::{remove, Collection},
-    Kind, Value,
-};
+use value::{kind::remove, Kind, Value};
 
 use crate::{
     expression::{Container, Resolved, Variable},
@@ -66,23 +63,20 @@ impl Query {
         &self,
         external: &mut ExternalEnv,
     ) -> Result<Option<Kind>, remove::Error> {
-        if let Some(ref mut target) = external.target().as_mut() {
-            let value = target.value.clone();
-            let mut type_def = target.type_def.clone();
+        let target = external.target_mut();
+        let value = target.value.clone();
+        let mut type_def = target.type_def.clone();
 
-            let result = type_def.remove_at_path(
-                &self.path.to_lookup(),
-                remove::Strategy {
-                    coalesced_path: remove::CoalescedPath::Reject,
-                },
-            );
+        let result = type_def.remove_at_path(
+            &self.path.to_lookup(),
+            remove::Strategy {
+                coalesced_path: remove::CoalescedPath::Reject,
+            },
+        );
 
-            external.update_target(Details { type_def, value });
+        external.update_target(Details { type_def, value });
 
-            return result;
-        }
-
-        Ok(None)
+        result
     }
 }
 
@@ -126,12 +120,12 @@ impl Expression for Query {
         use Target::*;
 
         match &self.target {
-            External => match state.1.target() {
-                None if self.path().is_root() => TypeDef::object(Collection::any()).infallible(),
-                None => TypeDef::any().infallible(),
-                Some(details) => details.clone().type_def.at_path(&self.path.to_lookup()),
-            },
-
+            External => state
+                .1
+                .target()
+                .clone()
+                .type_def
+                .at_path(&self.path.to_lookup()),
             Internal(variable) => variable.type_def(state).at_path(&self.path.to_lookup()),
             FunctionCall(call) => call.type_def(state).at_path(&self.path.to_lookup()),
             Container(container) => container.type_def(state).at_path(&self.path.to_lookup()),

@@ -201,57 +201,38 @@ impl Target {
         &self,
         local: &mut LocalEnv,
         external: &mut ExternalEnv,
-        type_def: TypeDef,
+        new_type_def: TypeDef,
         value: Option<Value>,
     ) {
-        use Target::*;
-
-        fn set_type_def(
-            current_type_def: &TypeDef,
-            new_type_def: TypeDef,
-            path: &LookupBuf,
-        ) -> TypeDef {
-            // If the assignment is onto root or has no path (root variable assignment), use the
-            // new type def, otherwise merge the type defs.
-            if path.is_root() {
-                new_type_def
-            } else {
-                current_type_def.clone().merge_overwrite(new_type_def)
-            }
-        }
-
         match self {
-            Noop => {}
-            Internal(ident, path) => {
-                let td = match path.is_root() {
-                    true => type_def,
-                    false => type_def.for_path(&path.to_lookup()),
-                };
-
+            Self::Noop => {}
+            Self::Internal(ident, path) => {
                 let type_def = match local.variable(ident) {
-                    None => td,
-                    Some(&Details { ref type_def, .. }) => set_type_def(type_def, td, path),
+                    None => {
+                        if path.is_root() {
+                            new_type_def
+                        } else {
+                            new_type_def.for_path(&path.to_lookup())
+                        }
+                    }
+                    Some(&Details { ref type_def, .. }) => type_def
+                        .clone()
+                        .with_type_set_at_path(&path.to_lookup(), new_type_def),
                 };
 
                 let details = Details { type_def, value };
-
                 local.insert_variable(ident.clone(), details);
             }
 
-            External(path) => {
-                let td = match path.is_root() {
-                    true => type_def,
-                    false => type_def.for_path(&path.to_lookup()),
-                };
-
-                let type_def = match external.target() {
-                    None => td,
-                    Some(&Details { ref type_def, .. }) => set_type_def(type_def, td, path),
-                };
-
-                let details = Details { type_def, value };
-
-                external.update_target(details);
+            Self::External(path) => {
+                external.update_target(Details {
+                    type_def: external
+                        .target()
+                        .type_def
+                        .clone()
+                        .with_type_set_at_path(&path.to_lookup(), new_type_def),
+                    value,
+                });
             }
         }
     }
