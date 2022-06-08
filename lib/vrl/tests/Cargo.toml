@@ -24,7 +24,7 @@ serde_json = "1"
 tracing-subscriber = { version = "0.3.11", default-features = false, features = ["fmt"] }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
-snmalloc-rs = { version = "0.3.0" }
+snmalloc-rs = { version = "0.3.1" }
 
 [features]
 default = []
