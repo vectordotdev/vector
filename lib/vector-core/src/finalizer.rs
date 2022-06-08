@@ -12,23 +12,13 @@ use crate::shutdown::ShutdownSignal;
 /// event batch identifiers from a source in a single background task
 /// *in the order they are received from the source*, using
 /// `FinalizerSet`.
-#[cfg(any(
-    feature = "sources-file",
-    feature = "sources-journald",
-    feature = "sources-kafka",
-))]
-pub(crate) type OrderedFinalizer<T> = FinalizerSet<T, FuturesOrdered<FinalizerFuture<T>>>;
+pub type OrderedFinalizer<T> = FinalizerSet<T, FuturesOrdered<FinalizerFuture<T>>>;
 
 /// The `UnorderedFinalizer` framework produces a stream of
 /// acknowledged event batch identifiers from a source in a single
 /// background task *in the order that finalization happens on the
 /// event batches*, using `FinalizerSet`.
-#[cfg(any(
-    feature = "sources-aws_sqs",
-    feature = "sources-splunk_hec",
-    feature = "sources-gcp_pubsub"
-))]
-pub(crate) type UnorderedFinalizer<T> = FinalizerSet<T, FuturesUnordered<FinalizerFuture<T>>>;
+pub type UnorderedFinalizer<T> = FinalizerSet<T, FuturesUnordered<FinalizerFuture<T>>>;
 
 /// The `FinalizerSet` framework here is a mechanism for creating a
 /// stream of acknowledged (finalized) event batch identifiers from a
@@ -38,7 +28,7 @@ pub(crate) type UnorderedFinalizer<T> = FinalizerSet<T, FuturesUnordered<Finaliz
 /// stream of acknowledgements that comes out, extracting just the
 /// identifier and sending that into the returned stream. The type `T`
 /// is the source-specific data associated with each entry.
-pub(crate) struct FinalizerSet<T, S> {
+pub struct FinalizerSet<T, S> {
     sender: Option<UnboundedSender<(BatchStatusReceiver, T)>>,
     _phantom: PhantomData<S>,
 }
@@ -50,7 +40,7 @@ where
 {
     /// Produce a finalizer set along with the output stream of
     /// received acknowledged batch identifiers.
-    pub(crate) fn new(shutdown: ShutdownSignal) -> (Self, impl Stream<Item = (BatchStatus, T)>) {
+    pub fn new(shutdown: ShutdownSignal) -> (Self, impl Stream<Item = (BatchStatus, T)>) {
         let (todo_tx, todo_rx) = mpsc::unbounded_channel();
         (
             Self {
@@ -70,8 +60,7 @@ where
     /// stream of acknowledged identifiers. In the case the finalizer
     /// is not to be used, a special empty stream is returned that is
     /// always pending and so never wakes.
-    #[cfg(any(feature = "sources-gcp_pubsub", feature = "sources-kafka"))]
-    pub(crate) fn maybe_new(
+    pub fn maybe_new(
         maybe: bool,
         shutdown: ShutdownSignal,
     ) -> (
@@ -86,7 +75,7 @@ where
         }
     }
 
-    pub(crate) fn add(&self, entry: T, receiver: BatchStatusReceiver) {
+    pub fn add(&self, entry: T, receiver: BatchStatusReceiver) {
         if let Some(sender) = &self.sender {
             if let Err(error) = sender.send((receiver, entry)) {
                 error!(message = "FinalizerSet task ended prematurely.", %error);
@@ -115,7 +104,7 @@ where
         let this = self.project();
         if !*this.is_shutdown {
             if this.shutdown.poll_unpin(ctx).is_ready() {
-                *this.is_shutdown = true
+                *this.is_shutdown = true;
             }
             // Only poll for new entries until shutdown is flagged.
             // Loop over all the ready new entries at once.
@@ -153,7 +142,7 @@ where
     }
 }
 
-pub(crate) trait FuturesSet<Fut: Future>: Stream<Item = Fut::Output> {
+pub trait FuturesSet<Fut: Future>: Stream<Item = Fut::Output> {
     fn is_empty(&self) -> bool;
     fn push(&mut self, future: Fut);
 }
@@ -164,7 +153,7 @@ impl<Fut: Future> FuturesSet<Fut> for FuturesOrdered<Fut> {
     }
 
     fn push(&mut self, future: Fut) {
-        Self::push(self, future)
+        Self::push(self, future);
     }
 }
 
@@ -174,12 +163,12 @@ impl<Fut: Future> FuturesSet<Fut> for FuturesUnordered<Fut> {
     }
 
     fn push(&mut self, future: Fut) {
-        Self::push(self, future)
+        Self::push(self, future);
     }
 }
 
 #[pin_project::pin_project]
-pub(crate) struct FinalizerFuture<T> {
+pub struct FinalizerFuture<T> {
     receiver: BatchStatusReceiver,
     entry: Option<T>,
 }

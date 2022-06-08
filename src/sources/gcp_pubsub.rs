@@ -14,7 +14,7 @@ use tonic::{
     transport::{Certificate, Channel, ClientTlsConfig, Endpoint, Identity},
     Code, Request, Status,
 };
-use vector_core::ByteSizeOf;
+use vector_core::{finalizer::EmptyStream, finalizer::UnorderedFinalizer, ByteSizeOf};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -28,7 +28,6 @@ use crate::{
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     sources::util,
-    sources::util::finalizer::{EmptyStream, UnorderedFinalizer},
     tls::{TlsConfig, TlsSettings},
     SourceSender,
 };

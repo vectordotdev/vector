@@ -29,20 +29,24 @@
 pub mod config;
 pub mod event;
 pub mod fanout;
+pub mod finalizer;
 pub mod metrics;
+pub mod partition;
 pub mod schema;
+pub mod serde;
+pub mod shutdown;
 pub mod sink;
 pub mod source;
+pub mod stream;
 #[cfg(test)]
 mod test_util;
-pub mod transform;
-pub use vector_buffers as buffers;
-pub mod partition;
-pub mod serde;
-pub mod stream;
 pub mod time;
+pub mod transform;
+pub mod trigger;
+
 use std::path::PathBuf;
 
+pub use vector_buffers as buffers;
 #[cfg(any(test, feature = "test"))]
 pub use vector_common::event_test_util;
 pub use vector_common::{byte_size_of::ByteSizeOf, internal_event};
