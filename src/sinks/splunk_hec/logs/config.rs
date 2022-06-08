@@ -14,8 +14,7 @@ use crate::{
             acknowledgements::HecClientAcknowledgementsConfig,
             build_healthcheck, build_http_batch_service, create_client, host_key,
             service::{HecService, HttpRequestBuilder},
-            timestamp_key, SplunkHecDefaultBatchSettings,
-            EndpointTarget,
+            timestamp_key, EndpointTarget, SplunkHecDefaultBatchSettings,
         },
         util::{
             encoding::EncodingConfig, http::HttpRetryLogic, BatchConfig, Compression,

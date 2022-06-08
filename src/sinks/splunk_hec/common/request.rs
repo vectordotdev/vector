@@ -1,4 +1,4 @@
-use std::{sync::Arc, collections::HashMap};
+use std::{collections::HashMap, sync::Arc};
 
 use bytes::Bytes;
 use vector_core::{
