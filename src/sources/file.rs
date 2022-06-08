@@ -1,4 +1,6 @@
-use std::{convert::TryInto, path::PathBuf, time::Duration};
+use std::{
+    collections::HashSet, convert::TryInto, path::PathBuf, sync::Arc, sync::Mutex, time::Duration,
+};
 
 use bytes::Bytes;
 use chrono::Utc;
@@ -23,13 +25,16 @@ use crate::{
     encoding_transcode::{Decoder, Encoder},
     event::{BatchNotifier, BatchStatus, LogEvent},
     internal_events::{
-        FileBytesReceived, FileEventsReceived, FileOpen, FileSourceInternalEventsEmitter,
+        FileBytesReceived, FileEventsReceived, FileNegativeAcknowledgementError, FileOpen,
+        FileSourceInternalEventsEmitter,
     },
     line_agg::{self, LineAgg},
     serde::bool_or_struct,
     shutdown::ShutdownSignal,
     SourceSender,
 };
+
+const POISONED_FAILED_LOCK: &str = "Poisoned lock on failed files set";
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -162,6 +167,7 @@ const fn default_lines() -> usize {
 
 #[derive(Debug)]
 pub(crate) struct FinalizerEntry {
+    pub(crate) file_name: String,
     pub(crate) file_id: FileFingerprint,
     pub(crate) offset: u64,
 }
@@ -324,6 +330,14 @@ pub fn file_source(
     let message_start_indicator = config.message_start_indicator.clone();
     let multi_line_timeout = config.multi_line_timeout;
 
+    // The `failed_files` set contains `FileFingerprint`s, provided by
+    // the file server, of all files that have received a negative
+    // acknowledgements. This set is shared between the finalizer
+    // task, which both holds back checkpointer updates if an
+    // identifier is present and adds entries on negative
+    // acknowledgements, and the main file server handling task, which
+    // holds back further events from files in the set.
+    let failed_files: Arc<Mutex<HashSet<FileFingerprint>>> = Default::default();
     let (finalizer, shutdown_checkpointer) = if acknowledgements {
         // The shutdown sent in to the finalizer is the global
         // shutdown handle used to tell it to stop accepting new batch
@@ -335,10 +349,21 @@ pub fn file_source(
         // checkpoints until all the acks have come in.
         let (send_shutdown, shutdown2) = oneshot::channel::<()>();
         let checkpoints = checkpointer.view();
+        let failed_files = Arc::clone(&failed_files);
         tokio::spawn(async move {
             while let Some((status, entry)) = ack_stream.next().await {
-                if status == BatchStatus::Delivered {
-                    checkpoints.update(entry.file_id, entry.offset);
+                // Don't update the checkpointer on file streams after failed acks
+                let mut failed_files = failed_files.lock().expect(POISONED_FAILED_LOCK);
+                // Hold back updates for failed files
+                if !failed_files.contains(&entry.file_id) {
+                    if status == BatchStatus::Delivered {
+                        checkpoints.update(entry.file_id, entry.offset);
+                    } else {
+                        emit!(FileNegativeAcknowledgementError {
+                            filename: &entry.file_name,
+                        });
+                        failed_files.insert(entry.file_id);
+                    }
                 }
             }
             send_shutdown.send(())
@@ -366,13 +391,21 @@ pub fn file_source(
                     byte_size: line.text.len(),
                     file: &line.filename,
                 });
-                // transcode each line from the file's encoding charset to utf8
-                line.text = match encoding_decoder.as_mut() {
-                    Some(d) => d.decode_to_utf8(line.text),
-                    None => line.text,
-                };
-                line
-            });
+                let failed = failed_files
+                    .lock()
+                    .expect(POISONED_FAILED_LOCK)
+                    .contains(&line.file_id);
+                // Drop the incoming data if the file received a negative acknowledgement.
+                (!failed).then(|| {
+                    // transcode each line from the file's encoding charset to utf8
+                    if let Some(d) = &mut encoding_decoder {
+                        line.text = d.decode_to_utf8(line.text);
+                    }
+                    line
+                })
+            })
+            .map(futures::stream::iter)
+            .flatten();
 
         let messages: Box<dyn Stream<Item = Line> + Send + std::marker::Unpin> =
             if let Some(ref multiline_config) = multiline_config {
@@ -398,11 +431,13 @@ pub fn file_source(
         let span2 = span.clone();
         let mut messages = messages.map(move |line| {
             let _enter = span2.enter();
-            let mut event = create_event(line.text, line.filename, &host_key, &hostname, &file_key);
+            let mut event =
+                create_event(line.text, &line.filename, &host_key, &hostname, &file_key);
             if let Some(finalizer) = &finalizer {
                 let (batch, receiver) = BatchNotifier::new_with_receiver();
                 event = event.with_batch_notifier(&batch);
                 let entry = FinalizerEntry {
+                    file_name: line.filename,
                     file_id: line.file_id,
                     offset: line.offset,
                 };
@@ -477,14 +512,14 @@ fn wrap_with_line_agg(
 
 fn create_event(
     line: Bytes,
-    file: String,
+    file: &str,
     host_key: &str,
     hostname: &Option<String>,
     file_key: &Option<String>,
 ) -> LogEvent {
     emit!(FileEventsReceived {
         count: 1,
-        file: &file,
+        file,
         byte_size: line.len(),
     });
 
@@ -507,15 +542,17 @@ fn create_event(
 #[cfg(test)]
 mod tests {
     use std::{
+        cmp::{max, min},
         collections::HashSet,
         fs::{self, File},
         future::Future,
-        io::{Seek, Write},
+        io::{Read, Seek, Write},
+        path::Path,
     };
 
     use encoding_rs::UTF_16LE;
     use pretty_assertions::assert_eq;
-    use tempfile::tempdir;
+    use tempfile::{tempdir, TempDir};
     use tokio::time::{sleep, timeout, Duration};
 
     use super::*;
@@ -532,7 +569,7 @@ mod tests {
         crate::test_util::test_generate_config::<FileConfig>();
     }
 
-    fn test_default_file_config(dir: &tempfile::TempDir) -> file::FileConfig {
+    fn test_default_file_config(dir: &TempDir) -> file::FileConfig {
         file::FileConfig {
             fingerprint: FingerprintConfig::Checksum {
                 bytes: Some(8),
@@ -642,14 +679,14 @@ mod tests {
     #[test]
     fn file_create_event() {
         let line = Bytes::from("hello world");
-        let file = "some_file.rs".to_string();
+        let file = "some_file.rs";
         let host_key = "host".to_string();
         let hostname = Some("Some.Machine".to_string());
         let file_key = Some("file".to_string());
 
         let log = create_event(line, file, &host_key, &hostname, &file_key);
 
-        assert_eq!(log["file"], "some_file.rs".into());
+        assert_eq!(log["file"], file.into());
         assert_eq!(log["host"], "Some.Machine".into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
         assert_eq!(log[log_schema().source_type_key()], "file".into());
@@ -909,16 +946,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn file_file_key_acknowledged() {
-        file_file_key(Acks).await
+    async fn file_key_acknowledged() {
+        file_key(Acks).await
     }
 
     #[tokio::test]
-    async fn file_file_key_nonacknowledged() {
-        file_file_key(NoAcks).await
+    async fn file_key_nonacknowledged() {
+        file_key(NoAcks).await
     }
 
-    async fn file_file_key(acks: AckingMode) {
+    async fn file_key(acks: AckingMode) {
         // Default
         {
             let dir = tempdir().unwrap();
@@ -1104,6 +1141,95 @@ mod tests {
         let received = run_file_source(&config, false, Unfinalized, sleep_500_millis()).await;
         let lines = extract_messages_string(received);
         assert_eq!(lines, vec!["the line"]);
+    }
+
+    #[tokio::test]
+    async fn file_start_position_negative_acknowledgement() {
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            ..test_default_file_config(&dir)
+        };
+
+        let path = dir.path().join("file");
+        let orig: Vec<String> = (0..10).map(|n| format!("line #{:03}", n)).collect();
+        let line_len = orig[0].len() as u64 + 1;
+
+        // First time server runs it picks up existing lines.
+        let received =
+            run_file_source(&config, false, Nack(2), slow_write(&path, &orig, 100, 1)).await;
+        let lines = extract_messages_string(received);
+        let checkpoints = read_checkpoints(&dir);
+        assert_eq!(checkpoints.len(), 1);
+        assert_eq!(checkpoints[0].position, line_len * 2);
+        assert_eq!(&lines, &orig[0..3]);
+    }
+
+    #[tokio::test]
+    async fn file_start_position_negative_acknowledgement_multi_file() {
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            ..test_default_file_config(&dir)
+        };
+
+        let path = dir.path().join("file");
+        let orig: Vec<String> = (0..10).map(|n| format!("line #{:03}", n)).collect();
+        let line_len = orig[0].len() as u64 + 1;
+
+        // First time server runs it picks up existing lines.
+        let received =
+            run_file_source(&config, false, Nack(2), slow_write(&path, &orig, 100, 2)).await;
+        let lines = extract_messages_string(received);
+        let checkpoints = read_checkpoints(&dir);
+        assert_eq!(checkpoints.len(), 2);
+        assert_eq!(
+            min(checkpoints[0].position, checkpoints[1].position),
+            line_len * 2
+        );
+        assert_eq!(
+            max(checkpoints[0].position, checkpoints[1].position),
+            line_len * 5
+        );
+        assert_eq!(lines.len(), 8);
+        assert_eq!(&lines[..3], &orig[..3]);
+        assert_eq!(&lines[3..], &orig[5..]);
+    }
+
+    async fn slow_write(filename: &Path, lines: &[String], millis: u64, files: usize) {
+        let duration = Duration::from_millis(millis);
+        for lines in lines.chunks(lines.len() / files) {
+            let mut file = File::create(filename).unwrap();
+            for line in lines {
+                writeln!(&mut file, "{}", line).unwrap();
+                sleep(duration).await;
+            }
+        }
+        sleep_500_millis().await;
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct Checkpoint {
+        // fingerprint: JsonValue,
+        // modified: String,
+        position: u64,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct Checkpoints {
+        version: String,
+        checkpoints: Vec<Checkpoint>,
+    }
+
+    fn read_checkpoints(dir: &TempDir) -> Vec<Checkpoint> {
+        let mut filename = dir.path().to_path_buf();
+        filename.push(file_source::CHECKPOINT_FILE_NAME);
+        let mut file = File::open(filename).unwrap();
+        let mut buf = String::new();
+        file.read_to_string(&mut buf).unwrap();
+        let checkpoints: Checkpoints = serde_json::from_str(&buf).unwrap();
+        assert_eq!(&checkpoints.version, "1");
+        checkpoints.checkpoints
     }
 
     #[tokio::test]
@@ -1659,6 +1785,7 @@ mod tests {
         NoAcks,      // No acknowledgement handling and no finalization
         Unfinalized, // Acknowledgement handling but no finalization
         Acks,        // Full acknowledgements and proper finalization
+        Nack(usize), // Error acknowledgement after N events
     }
     use AckingMode::*;
 
@@ -1669,40 +1796,50 @@ mod tests {
         inner: impl Future<Output = ()>,
     ) -> Vec<Event> {
         assert_source_compliance(&FILE_SOURCE_TAGS, async move {
-            let (tx, rx) = if acking_mode == Acks {
-                let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
-                (tx, rx.boxed())
-            } else {
-                let (tx, rx) = SourceSender::new_test();
-                (tx, rx.boxed())
+            let (tx, rx) = match acking_mode {
+                Acks => {
+                    let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+                    (tx, rx.boxed())
+                }
+                NoAcks | Unfinalized => {
+                    let (tx, rx) = SourceSender::new_test();
+                    (tx, rx.boxed())
+                }
+                Nack(after) => {
+                    let (tx, rx) = SourceSender::new_test_error_after(after);
+                    (tx, rx.boxed())
+                }
             };
 
             let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
             let data_dir = config.data_dir.clone().unwrap();
             let acks = !matches!(acking_mode, NoAcks);
 
+            // Run the collector concurrent to the file source, to execute finalizers.
+            let collector = if acking_mode == Unfinalized {
+                tokio::spawn(
+                rx.take_until(tokio::time::sleep(Duration::from_secs(5)))
+                    .collect::<Vec<_>>())
+            } else {
+                tokio::spawn(async {
+                    timeout(Duration::from_secs(5), rx.collect::<Vec<_>>())
+                        .await
+                        .expect(
+                            "Unclosed channel: may indicate file-server could not shutdown gracefully.",
+                        )
+                })
+            };
             tokio::spawn(file::file_source(config, data_dir, shutdown, tx, acks));
 
             inner.await;
 
             drop(trigger_shutdown);
 
-            let result = if acking_mode == Unfinalized {
-                rx.take_until(tokio::time::sleep(Duration::from_secs(5)))
-                    .collect::<Vec<_>>()
-                    .await
-            } else {
-                timeout(Duration::from_secs(5), rx.collect::<Vec<_>>())
-                    .await
-                    .expect(
-                        "Unclosed channel: may indicate file-server could not shutdown gracefully.",
-                    )
-            };
             if wait_shutdown {
                 shutdown_done.await;
             }
 
-            result
+            collector.await.expect("Collector task failed")
         })
         .await
     }
