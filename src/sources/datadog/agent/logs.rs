@@ -114,11 +114,18 @@ pub(crate) fn decode_log_body(
                             namespace.insert_metadata(log, path!("ddsource"), ddsource.clone());
                             namespace.insert_metadata(log, path!("ddtags"), ddtags.clone());
 
-                            log.try_insert(
+                            // TODO: don't use log schema keys for Vector namespace
+                            namespace.insert_vector_metadata(
+                                log,
                                 path!(source.log_schema_source_type_key),
                                 Bytes::from("datadog_agent"),
                             );
-                            log.try_insert(path!(source.log_schema_timestamp_key), now);
+                            namespace.insert_vector_metadata(
+                                log,
+                                path!(source.log_schema_timestamp_key),
+                                now,
+                            );
+
                             if let Some(k) = &api_key {
                                 log.metadata_mut().set_datadog_api_key(Arc::clone(k));
                             }

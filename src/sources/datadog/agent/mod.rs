@@ -95,6 +95,7 @@ inventory::submit! {
 impl SourceConfig for DatadogAgentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let log_namespace = cx.log_namespace(self.log_namespace);
+
         let logs_schema_definition = cx
             .schema_definitions
             .get(&Some(LOGS.to_owned()))

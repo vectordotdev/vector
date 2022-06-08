@@ -13,6 +13,7 @@ pub use global_options::GlobalOptions;
 pub use id::ComponentKey;
 pub use log_schema::{init_log_schema, log_schema, LogSchema};
 use lookup::lookup_v2::{BorrowedSegment, Path};
+use lookup::path;
 use value::Value;
 
 use crate::schema;
@@ -225,6 +226,18 @@ impl LogNamespace {
             LogNamespace::Legacy => {
                 log.try_insert(key, value);
             }
+        }
+    }
+
+    pub fn insert_vector_metadata<'a>(
+        &self,
+        log: &mut LogEvent,
+        key: impl Path<'a>,
+        value: impl Into<Value>,
+    ) {
+        match self {
+            LogNamespace::Vector => self.insert_metadata(log, path!("vector").concat(key), value),
+            LogNamespace::Legacy => self.insert_metadata(log, key, value),
         }
     }
 

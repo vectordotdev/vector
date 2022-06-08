@@ -67,7 +67,6 @@ impl Decoder {
         };
 
         let byte_size = frame.len();
-
         // Parse structured events from the byte frame.
         self.deserializer
             .parse(frame, self.log_namespace)

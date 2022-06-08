@@ -19,6 +19,7 @@ impl DecodingConfig {
     /// Creates a new `DecodingConfig` with the provided `FramingConfig` and
     /// `DeserializerConfig`.
     pub const fn new(framing: FramingConfig, decoding: DeserializerConfig) -> Self {
+        //TODO: make log namespace a mandatory param
         Self {
             framing,
             decoding,
@@ -34,7 +35,7 @@ impl DecodingConfig {
         // Build the deserializer.
         let deserializer = self.decoding.build();
 
-        Decoder::new(framer, deserializer)
+        Decoder::new(framer, deserializer).with_log_namespace(self.log_namespace)
     }
 
     /// Sets the path prefix where all deserialized data will be placed
