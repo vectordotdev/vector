@@ -15,4 +15,5 @@ default = ["expressions"]
 expressions = [
   "expr-abort",
 ]
+test = []
 expr-abort = []

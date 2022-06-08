@@ -35,7 +35,7 @@ fn set(path: Value, mut value: Value, data: Value) -> Resolved {
             .into())
         }
     };
-    value.target_insert(&path, data)?;
+    value.insert_by_path(&path, data);
     Ok(value)
 }
 

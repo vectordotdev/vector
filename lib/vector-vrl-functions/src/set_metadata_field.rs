@@ -1,14 +1,23 @@
+use crate::{get_metadata_key, MetadataKey};
 use ::value::Value;
 use vrl::prelude::*;
 
 fn set_metadata_field(
     ctx: &mut Context,
-    key: &str,
+    key: &MetadataKey,
     value: Value,
 ) -> std::result::Result<Value, ExpressionError> {
-    let value = value.try_bytes_utf8_lossy()?.to_string();
-    ctx.target_mut().set_metadata(key, value)?;
-    Ok(Value::Null)
+    Ok(match key {
+        MetadataKey::Legacy(key) => {
+            let str_value = value.as_str().expect("must be a string");
+            ctx.target_mut().insert_secret(key, str_value.as_ref());
+            Value::Null
+        }
+        MetadataKey::Query(query) => {
+            ctx.target_mut().remove_metadata(query.path())?;
+            Value::Null
+        }
+    })
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -28,7 +37,7 @@ impl Function for SetMetadataField {
             },
             Parameter {
                 keyword: "value",
-                kind: kind::BYTES,
+                kind: kind::ANY,
                 required: true,
             },
         ]
@@ -44,53 +53,40 @@ impl Function for SetMetadataField {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
-        let key = arguments
-            .required_enum("key", &super::keys())?
-            .try_bytes_utf8_lossy()
-            .expect("key not bytes")
-            .to_string();
-        let value = arguments.required("value");
+        let key = get_metadata_key(&mut arguments)?;
+        let value = arguments.required_expr("value");
 
-        Ok(Box::new(SetMetadataFieldFn { key, value }))
-    }
-
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("key", Some(expr)) => {
-                let key = expr
-                    .as_enum("key", super::keys())?
-                    .try_bytes_utf8_lossy()
-                    .expect("key not bytes")
-                    .to_string();
-                Ok(Some(Box::new(key) as _))
+        // for backwards compatibility, make sure value is a string when using legacy.
+        if matches!(key, MetadataKey::Legacy(_)) && !value.type_def((state.0, state.1)).is_bytes() {
+            return Err(vrl::function::Error::UnexpectedExpression {
+                keyword: "value",
+                expected: "string",
+                expr: value,
             }
-            _ => Ok(None),
+            .into());
         }
+
+        Ok(Box::new(SetMetadataFieldFn {
+            key,
+            value: Box::new(value),
+        }))
     }
 }
 
 #[derive(Debug, Clone)]
 struct SetMetadataFieldFn {
-    key: String,
+    key: MetadataKey,
     value: Box<dyn Expression>,
 }
 
 impl Expression for SetMetadataFieldFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let key = &self.key;
-
-        set_metadata_field(ctx, key, value)
+        set_metadata_field(ctx, &self.key, value)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

@@ -36,7 +36,7 @@ fn remove(path: Value, compact: Value, mut value: Value) -> Resolved {
         }
     };
     let compact = compact.try_boolean()?;
-    value.target_remove(&path, compact)?;
+    value.remove_by_path(&path, compact);
     Ok(value)
 }
 

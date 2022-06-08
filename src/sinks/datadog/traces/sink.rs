@@ -50,7 +50,7 @@ impl Partitioner for EventPartitioner {
                 panic!("unexpected log");
             }
             Event::Trace(t) => PartitionKey {
-                api_key: item.metadata().datadog_api_key().clone(),
+                api_key: item.metadata().datadog_api_key(),
                 env: t.get("env").map(|s| s.to_string_lossy()),
                 hostname: t.get(log_schema().host_key()).map(|s| s.to_string_lossy()),
                 agent_version: t.get("agent_version").map(|s| s.to_string_lossy()),
