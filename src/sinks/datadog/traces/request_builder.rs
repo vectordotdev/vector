@@ -98,7 +98,7 @@ impl IncrementalRequestBuilder<(PartitionKey, Vec<Event>)> for DatadogTracesRequ
             .filter_map(|e| e.try_into_trace())
             .collect::<Vec<TraceEvent>>();
 
-        results.push(get_apm_stats_request(
+        results.push(build_apm_stats_request(
             &key,
             &traces_event,
             self.compression,
@@ -396,7 +396,7 @@ impl DatadogTracesEncoder {
     }
 }
 
-fn get_apm_stats_request(
+fn build_apm_stats_request(
     key: &PartitionKey,
     events: &[TraceEvent],
     compression: Compression,

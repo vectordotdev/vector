@@ -149,7 +149,7 @@ fn encode_sketch(agent_sketch: &AgentDDSketch) -> Vec<u8> {
         interpolation: ddsketch_full::index_mapping::Interpolation::None as i32,
     };
 
-    // zeroes depicts the number of value that falled around zero based on the sketch local accuracy
+    // zeroes depicts the number of values that falled around zero based on the sketch local accuracy
     // positives and negatives stores are repectively storing positive and negative values using the
     // exact same mechanism.
     let (positives, negatives, zeroes) = convert_stores(agent_sketch);
@@ -198,6 +198,7 @@ fn convert_stores(agent_sketch: &AgentDDSketch) -> (BTreeMap<i32, f64>, BTreeMap
     (positives, negatives, zeroes)
 }
 
+/// Stores statistics for various `AggregationKey` in a given time window
 struct Bucket {
     start: u64,
     duration: u64,
@@ -322,8 +323,8 @@ impl Aggregator {
     }
 
     /// This implementation uses https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/statsraw.go#L147-L182
-    /// as a basis. It uses a key constructed using various span/trace properties (see `AggregationKey`) and aggregates some statistics, per fixed 10 seconds
-    /// window.
+    /// as a basis. It uses a key constructed using various span/trace properties (see `AggregationKey`)
+    /// and aggregates some statistics per key over 10 seconds windows.
     fn handle_span(
         &mut self,
         span: &BTreeMap<String, Value>,
@@ -367,13 +368,15 @@ impl Aggregator {
                     container_id: payload_aggkey.container_id,
                     version: payload_aggkey.version,
                     stats: csb,
-                    service: "".to_string(), // not set by the trace-agent, already set in stats
-                    agent_aggregation: "".to_string(), // not set by the trace-agent
-                    sequence: 0,             // not set by the trace-agent
-                    runtime_id: "".to_string(), // not set by the trace-agent
-                    lang: "".to_string(),    //not set by the trace-agent
-                    tracer_version: "".to_string(), // not set by the trace-agent
-                    tags: vec![],            // not set by the trace-agent
+                    // All the following fields are left unset by the trace-agent:
+                    // https://github.com/DataDog/datadog-agent/blob/42e72dd/pkg/trace/stats/concentrator.go#L216-L227
+                    service: "".to_string(),
+                    agent_aggregation: "".to_string(),
+                    sequence: 0,
+                    runtime_id: "".to_string(),
+                    lang: "".to_string(),
+                    tracer_version: "".to_string(),
+                    tags: vec![],
                 }
             })
             .collect::<Vec<ClientStatsPayload>>()
