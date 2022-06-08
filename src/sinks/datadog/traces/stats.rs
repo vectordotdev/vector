@@ -11,10 +11,12 @@ use crate::{
     metrics::AgentDDSketch,
 };
 
-const TOP_LEVEL_KEY: &str = "_top_level";
-const SAMPLING_RATE_KEY: &str = "_sample_rate";
 const MEASURED_KEY: &str = "_dd.measured";
 const PARTIAL_VERSION_KEY: &str = "_dd.partial_version";
+const SAMPLING_RATE_KEY: &str = "_sample_rate";
+const TAG_STATUS_CODE: &str = "http.status_code";
+const TAG_SYNTHETICS: &str = "synthetics";
+const TOP_LEVEL_KEY: &str = "_top_level";
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 struct AggregationKey {
@@ -26,6 +28,7 @@ impl AggregationKey {
     fn new_aggregation_from_span(
         span: &BTreeMap<String, Value>,
         payload_key: PayloadAggregationKey,
+        synthetics: bool,
     ) -> Self {
         AggregationKey {
             payload_key: payload_key.with_span_context(span),
@@ -46,7 +49,14 @@ impl AggregationKey {
                     .get("type")
                     .map(|v| v.to_string_lossy())
                     .unwrap_or_default(),
-                status_code: 0,
+                status_code: span
+                    .get("meta")
+                    .and_then(|m| m.as_object())
+                    .and_then(|m| m.get(TAG_STATUS_CODE))
+                    // the meta is supposed to be a string/string map
+                    .and_then(|s| s.to_string_lossy().parse::<u32>().ok())
+                    .unwrap_or_default(),
+                synthetics,
             },
         }
     }
@@ -83,6 +93,7 @@ struct BucketAggregationKey {
     resource: String,
     ty: String,
     status_code: u32,
+    synthetics: bool,
 }
 
 struct GroupedStats {
@@ -119,7 +130,7 @@ impl GroupedStats {
             duration: self.duration.round() as u64,
             ok_summary: encode_sketch(&self.ok_distribution),
             error_summary: encode_sketch(&self.err_distribution),
-            synthetics: false,
+            synthetics: key.bucket_key.synthetics,
             top_level_hits: self.top_level_hits.round() as u64,
         }
     }
@@ -127,32 +138,42 @@ impl GroupedStats {
 
 /// Convert agent sketch variant to ./proto/dd_sketch_full.proto
 fn encode_sketch(agent_sketch: &AgentDDSketch) -> Vec<u8> {
+    // AgentDDSketch partitions the set of real numbers into intervals like [gamma^(n), gamma^(n+1)[,
     let index_mapping = ddsketch_full::IndexMapping {
+        // This is the gamma value used to build the aforementioned partition scheme
         gamma: agent_sketch.gamma(),
+        // This offset is applied to the powers of gamma to adjust sketch accuracy
         index_offset: agent_sketch.bin_index_offset() as f64,
+        // Interpolation::None is the interpolation type as there is no interpolation when using the
+        // aforementioned partition scheme
         interpolation: ddsketch_full::index_mapping::Interpolation::None as i32,
     };
 
+    // zeroes depicts the number of value that falled around zero based on the sketch local accuracy
+    // positives and negatives stores are repectively storing positive and negative values using the
+    // exact same mechanism.
     let (positives, negatives, zeroes) = convert_stores(agent_sketch);
     let positives_store = ddsketch_full::Store {
         bin_counts: positives,
-        contiguous_bin_counts: Vec::new(),
-        contiguous_bin_index_offset: 0,
+        contiguous_bin_counts: Vec::new(), // Empty as this not used for the current interpolation (Interpolation::None)
+        contiguous_bin_index_offset: 0, // Empty as this not used for the current interpolation (Interpolation::None)
     };
     let negatives_store = ddsketch_full::Store {
         bin_counts: negatives,
-        contiguous_bin_counts: Vec::new(),
-        contiguous_bin_index_offset: 0,
+        contiguous_bin_counts: Vec::new(), // Empty as this not used for the current interpolation (Interpolation::None)
+        contiguous_bin_index_offset: 0, // Empty as this not used for the current interpolation (Interpolation::None)
     };
-    let s = ddsketch_full::DdSketch {
+    ddsketch_full::DdSketch {
         mapping: Some(index_mapping),
         positive_values: Some(positives_store),
         negative_values: Some(negatives_store),
         zero_count: zeroes,
-    };
-    s.encode_to_vec()
+    }
+    .encode_to_vec()
 }
 
+/// Split negative and positive values from an AgentDDSketch, also extract the number of values
+/// that were accounted as 0.0.
 fn convert_stores(agent_sketch: &AgentDDSketch) -> (BTreeMap<i32, f64>, BTreeMap<i32, f64>, f64) {
     let mut positives = BTreeMap::<i32, f64>::new();
     let mut negatives = BTreeMap::<i32, f64>::new();
@@ -278,7 +299,10 @@ impl Aggregator {
                 .map(|v| v.to_string_lossy())
                 .unwrap_or_default(),
         };
-
+        let synthetics = trace
+            .get("origin")
+            .map(|v| v.to_string_lossy().starts_with(TAG_SYNTHETICS))
+            .unwrap_or(false);
         spans.iter().for_each(|span| {
             let is_top = metric_flag(span, TOP_LEVEL_KEY);
             if !(is_top
@@ -287,7 +311,7 @@ impl Aggregator {
             {
                 return;
             }
-            self.handle_span(span, weigth, is_top, payload_aggkey.clone());
+            self.handle_span(span, weigth, is_top, synthetics, payload_aggkey.clone());
         });
     }
 
@@ -296,9 +320,10 @@ impl Aggregator {
         span: &BTreeMap<String, Value>,
         weight: f64,
         is_top: bool,
+        synthetics: bool,
         payload_aggkey: PayloadAggregationKey,
     ) {
-        let aggkey = AggregationKey::new_aggregation_from_span(span, payload_aggkey);
+        let aggkey = AggregationKey::new_aggregation_from_span(span, payload_aggkey, synthetics);
         let start = match span.get("start") {
             Some(Value::Timestamp(val)) => val.timestamp_nanos(),
             _ => Utc::now().timestamp_nanos(),
