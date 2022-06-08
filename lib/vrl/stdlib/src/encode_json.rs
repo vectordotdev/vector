@@ -43,11 +43,6 @@ impl Function for EncodeJson {
             result: Ok(r#"s'{"another":[1,2,3],"field":"value"}'"#),
         }]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        encode_json(value)
-    }
 }
 
 #[derive(Clone, Debug)]

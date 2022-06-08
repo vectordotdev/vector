@@ -12,14 +12,11 @@ use futures::StreamExt;
 use roaring::RoaringTreemap;
 use serde::{Deserialize, Serialize};
 use tokio::time::interval;
-use vector_core::event::BatchStatusReceiver;
+use vector_core::{event::BatchStatusReceiver, finalizer::UnorderedFinalizer};
 use warp::Rejection;
 
 use super::ApiError;
-use crate::{
-    config::AcknowledgementsConfig, event::BatchStatus, shutdown::ShutdownSignal,
-    sources::util::finalizer::UnorderedFinalizer,
-};
+use crate::{config::AcknowledgementsConfig, event::BatchStatus, shutdown::ShutdownSignal};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(default)]

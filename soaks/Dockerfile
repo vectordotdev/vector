@@ -25,7 +25,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 COPY --from=lading /usr/bin/lading /usr/bin/lading
 COPY --from=builder /vector/vector /usr/bin/vector
-RUN mkdir -p /var/lib/vector
+RUN mkdir --parents --mode=0777 /var/lib/vector
 
 # Smoke test
 RUN ["/usr/bin/lading", "--help"]

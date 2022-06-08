@@ -5,7 +5,6 @@ use value::Value;
 use crate::{
     expression::{Expr, Resolved},
     state::{ExternalEnv, LocalEnv},
-    vm::OpCode,
     Context, Expression, TypeDef,
 };
 
@@ -63,28 +62,6 @@ impl Expression for Array {
             .collect::<BTreeMap<_, _>>();
 
         TypeDef::array(collection).with_fallibility(fallible)
-    }
-
-    fn compile_to_vm(
-        &self,
-        vm: &mut crate::vm::Vm,
-        state: (&mut LocalEnv, &mut ExternalEnv),
-    ) -> Result<(), String> {
-        let (local, external) = state;
-
-        // Evaluate each of the elements of the array, the result of each
-        // will be added to the stack.
-        for value in self.inner.iter().rev() {
-            value.compile_to_vm(vm, (local, external))?;
-        }
-
-        vm.write_opcode(OpCode::CreateArray);
-
-        // Add the length of the array as a primitive so the VM knows how
-        // many elements to move into the array.
-        vm.write_primitive(self.inner.len());
-
-        Ok(())
     }
 }
 

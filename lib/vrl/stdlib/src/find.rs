@@ -64,14 +64,6 @@ impl Function for Find {
             from,
         }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let pattern = args.required("pattern");
-        let from = args.optional("from");
-
-        find(value, pattern, from)
-    }
 }
 
 #[derive(Debug, Clone)]

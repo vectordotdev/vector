@@ -36,12 +36,14 @@ services:
       - RUST_BACKTRACE=1
     volumes:
       - ${PWD}:/code
+      - target:/code/target
       - /var/run/docker.sock:/var/run/docker.sock
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
       - dnstap-sockets:/run/bind/socket
 
 volumes:
+  target: {}
   cargogit: {}
   cargoregistry: {}
   dnstap-sockets: {}

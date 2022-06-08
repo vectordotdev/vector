@@ -67,11 +67,6 @@ impl Function for RemoveMetadataField {
             _ => Ok(None),
         }
     }
-
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let key = args.required_any("key").downcast_ref::<String>().unwrap();
-        remove_metadata_field(ctx, key)
-    }
 }
 
 #[derive(Debug, Clone)]

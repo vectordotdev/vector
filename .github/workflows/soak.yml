@@ -343,7 +343,7 @@ jobs:
 
     steps:
       - name: Set up Python3
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v4
         with:
           python-version: "3.10.2"
 
@@ -382,7 +382,7 @@ jobs:
 
     steps:
       - name: Set up Python3
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v4
         with:
           python-version: "3.10.2"
 
@@ -421,7 +421,7 @@ jobs:
 
     steps:
       - name: Set up Python3
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v4
         with:
           python-version: "3.10.2"
 
@@ -475,7 +475,7 @@ jobs:
 
     steps:
       - name: Set up Python3
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v4
         with:
           python-version: "3.10.2"
 
@@ -513,7 +513,7 @@ jobs:
 
     steps:
       - name: Set up Python3
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v4
         with:
           python-version: "3.10.2"
 

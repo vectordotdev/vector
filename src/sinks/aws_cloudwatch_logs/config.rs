@@ -1,10 +1,14 @@
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
+use aws_smithy_types::retry::RetryConfig;
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
 
 use crate::{
-    aws::{create_client, AwsAuthentication, ClientBuilder, RegionOrEndpoint},
+    aws::{
+        create_client, create_smithy_client, resolve_region, AwsAuthentication, ClientBuilder,
+        RegionOrEndpoint,
+    },
     codecs::Encoder,
     config::{
         log_schema, AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig,
@@ -19,6 +23,7 @@ use crate::{
             encoding::{
                 EncodingConfig, EncodingConfigAdapter, StandardEncodings, StandardEncodingsMigrator,
             },
+            http::RequestConfig,
             BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
@@ -59,7 +64,7 @@ pub struct CloudwatchLogsSinkConfig {
     #[serde(default)]
     pub batch: BatchConfig<CloudwatchLogsDefaultBatchSettings>,
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub request: RequestConfig,
     pub tls: Option<TlsConfig>,
     // Deprecated name. Moved to auth.
     pub assume_role: Option<String>,
@@ -85,6 +90,21 @@ impl CloudwatchLogsSinkConfig {
         )
         .await
     }
+
+    pub async fn create_smithy_client(
+        &self,
+        proxy: &ProxyConfig,
+    ) -> crate::Result<aws_smithy_client::Client> {
+        let region = resolve_region(self.region.region()).await?;
+        create_smithy_client::<CloudwatchLogsClientBuilder>(
+            region,
+            proxy,
+            &self.tls,
+            true,
+            RetryConfig::disabled(),
+        )
+        .await
+    }
 }
 
 #[async_trait::async_trait]
@@ -92,13 +112,18 @@ impl CloudwatchLogsSinkConfig {
 impl SinkConfig for CloudwatchLogsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let batcher_settings = self.batch.into_batcher_settings()?;
-        let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
+        let request_settings = self
+            .request
+            .tower
+            .unwrap_with(&TowerRequestConfig::default());
         let client = self.create_client(cx.proxy()).await?;
+        let smithy_client = self.create_smithy_client(cx.proxy()).await?;
         let svc = ServiceBuilder::new()
             .settings(request_settings, CloudwatchRetryLogic::new())
             .service(CloudwatchLogsPartitionSvc::new(
                 self.clone(),
                 client.clone(),
+                std::sync::Arc::new(smithy_client),
             ));
         let transformer = self.encoding.transformer();
         let serializer = self.encoding.clone().encoding();

@@ -5,7 +5,7 @@ use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 
 use super::Block;
 use crate::{
-    expression::{levenstein, ExpressionError, FunctionArgument, Noop},
+    expression::{levenstein, ExpressionError, FunctionArgument},
     function::{
         closure::{self, VariableKind},
         ArgumentList, Example, FunctionClosure, FunctionCompileContext, Parameter,
@@ -14,13 +14,12 @@ use crate::{
     state::{ExternalEnv, LocalEnv},
     type_def::Details,
     value::Kind,
-    vm::{OpCode, VmFunctionClosure},
     Context, Expression, Function, Resolved, Span, TypeDef,
 };
 
 pub(crate) struct Builder<'a> {
     abort_on_error: bool,
-    maybe_fallible_arguments: bool,
+    arguments_with_unknown_type_validity: Vec<(Parameter, Node<FunctionArgument>)>,
     call_span: Span,
     ident_span: Span,
     function_id: usize,
@@ -88,7 +87,7 @@ impl<'a> Builder<'a> {
         let mut index = 0;
         let mut list = ArgumentList::default();
 
-        let mut maybe_fallible_arguments = false;
+        let mut arguments_with_unknown_type_validity = vec![];
         for node in &arguments {
             let (argument_span, argument) = node.clone().take();
 
@@ -138,7 +137,7 @@ impl<'a> Builder<'a> {
                     argument_span,
                 });
             } else if !param_kind.is_superset(expr_kind) {
-                maybe_fallible_arguments = true;
+                arguments_with_unknown_type_validity.push((*parameter, node.clone()));
             }
 
             // Check if the argument is infallible.
@@ -353,7 +352,7 @@ impl<'a> Builder<'a> {
 
         Ok(Self {
             abort_on_error,
-            maybe_fallible_arguments,
+            arguments_with_unknown_type_validity,
             call_span,
             ident_span,
             function_id,
@@ -370,6 +369,7 @@ impl<'a> Builder<'a> {
         external: &mut ExternalEnv,
         closure_block: Option<Node<Block>>,
         mut local_snapshot: LocalEnv,
+        fallible_expression_error: &mut Option<Box<dyn DiagnosticMessage>>,
     ) -> Result<FunctionCall, Error> {
         let mut closure_fallible = false;
         let mut closure = None;
@@ -434,13 +434,40 @@ impl<'a> Builder<'a> {
         // We consider this an error at compile-time, because it makes the
         // resulting program incorrectly convey this function call might fail.
         if self.abort_on_error
-            && !self.maybe_fallible_arguments
+            && self.arguments_with_unknown_type_validity.is_empty()
             && !expr.type_def((local, external)).is_fallible()
         {
             return Err(Error::AbortInfallible {
                 ident_span,
                 abort_span: Span::new(ident_span.end(), ident_span.end() + 1),
             });
+        }
+
+        // The function is expected to abort at boot-time if any error occurred,
+        // and one or more arguments are of an invalid type, so we'll return the
+        // appropriate error.
+        if let Some((parameter, argument)) =
+            self.arguments_with_unknown_type_validity.first().cloned()
+        {
+            if !self.abort_on_error {
+                let error = Error::InvalidArgumentKind {
+                    function_ident: self.function.identifier(),
+                    abort_on_error: self.abort_on_error,
+                    arguments_fmt: self
+                        .arguments
+                        .iter()
+                        .map(|arg| arg.inner().to_string())
+                        .collect::<Vec<_>>(),
+                    parameter,
+                    got: argument.expr().type_def((local, external)).into(),
+                    argument: argument.clone().into_inner(),
+                    argument_span: argument
+                        .keyword_span()
+                        .unwrap_or_else(|| argument.expr_span()),
+                };
+
+                *fallible_expression_error = Some(Box::new(error) as _);
+            }
         }
 
         // Update the state if necessary.
@@ -453,7 +480,7 @@ impl<'a> Builder<'a> {
         Ok(FunctionCall {
             abort_on_error: self.abort_on_error,
             expr,
-            maybe_fallible_arguments: self.maybe_fallible_arguments,
+            arguments_with_unknown_type_validity: self.arguments_with_unknown_type_validity,
             closure_fallible,
             closure,
             span: call_span,
@@ -464,11 +491,12 @@ impl<'a> Builder<'a> {
     }
 }
 
+#[allow(unused)] // will be used by LLVM runtime
 #[derive(Clone)]
 pub struct FunctionCall {
     abort_on_error: bool,
     expr: Box<dyn Expression>,
-    maybe_fallible_arguments: bool,
+    arguments_with_unknown_type_validity: Vec<(Parameter, Node<FunctionArgument>)>,
     closure_fallible: bool,
     closure: Option<FunctionClosure>,
 
@@ -486,6 +514,7 @@ pub struct FunctionCall {
     arguments: Arc<Vec<Node<FunctionArgument>>>,
 }
 
+#[allow(unused)] // will be used by LLVM runtime
 impl FunctionCall {
     /// Takes the arguments passed and resolves them into the order they are defined
     /// in the function
@@ -536,22 +565,6 @@ impl FunctionCall {
         }
 
         Ok(result)
-    }
-
-    pub fn noop() -> Self {
-        let expr = Box::new(Noop) as _;
-
-        Self {
-            abort_on_error: false,
-            expr,
-            maybe_fallible_arguments: false,
-            closure_fallible: false,
-            closure: None,
-            span: Span::default(),
-            ident: "noop",
-            arguments: Arc::new(Vec::new()),
-            function_id: 0,
-        }
     }
 
     pub fn arguments_fmt(&self) -> Vec<String> {
@@ -657,7 +670,7 @@ impl Expression for FunctionCall {
         // For the second event, only the `slice` function succeeds.
         // For the third event, both functions fail.
         //
-        if self.maybe_fallible_arguments {
+        if !self.arguments_with_unknown_type_validity.is_empty() {
             type_def = type_def.with_fallibility(true);
         }
 
@@ -682,85 +695,6 @@ impl Expression for FunctionCall {
         }
 
         type_def
-    }
-
-    fn compile_to_vm(
-        &self,
-        vm: &mut crate::vm::Vm,
-        (local, external): (&mut LocalEnv, &mut ExternalEnv),
-    ) -> Result<(), String> {
-        // Resolve the arguments so they are in the order defined in the function.
-        let args = match vm.function(self.function_id) {
-            Some(fun) => self.resolve_arguments(fun)?,
-            None => return Err(format!("Function {} not found.", self.function_id)),
-        };
-
-        // We take the external context, and pass it to the function compile context, this allows
-        // functions mutable access to external state, but keeps the internal compiler state behind
-        // an immutable reference, to ensure compiler state correctness.
-        let external_context = external.swap_external_context(AnyMap::new());
-
-        let mut compile_ctx =
-            FunctionCompileContext::new(self.span).with_external_context(external_context);
-
-        for (keyword, argument) in &args {
-            let fun = vm.function(self.function_id).unwrap();
-            let argument = argument.as_ref().map(|argument| argument.inner());
-
-            // Call `compile_argument` for functions that need to perform any compile time processing
-            // on the argument.
-            match fun
-                .compile_argument(&args, &mut compile_ctx, keyword, argument)
-                .map_err(|err| err.to_string())?
-            {
-                Some(stat) => {
-                    // The function has compiled this argument as a static.
-                    let stat = vm.add_static(stat);
-                    vm.write_opcode(OpCode::MoveStaticParameter);
-                    vm.write_primitive(stat);
-                }
-                None => match argument {
-                    Some(argument) => {
-                        // Compile the argument, `MoveParameter` will move the result of the expression onto the
-                        // parameter stack to be passed into the function.
-                        argument.compile_to_vm(vm, (local, external))?;
-                        vm.write_opcode(OpCode::MoveParameter);
-                    }
-                    None => {
-                        // The parameter hasn't been specified, so just move an empty parameter onto the
-                        // parameter stack.
-                        vm.write_opcode(OpCode::EmptyParameter);
-                    }
-                },
-            }
-        }
-
-        if let Some(FunctionClosure { variables, block }) = self.closure.as_ref().cloned() {
-            let mut closure_vm = crate::vm::Vm::new(vm.functions());
-            block.compile_to_vm(&mut closure_vm, (local, external))?;
-            closure_vm.write_opcode(OpCode::Return);
-
-            let closure = vm.write_closure(VmFunctionClosure {
-                vm: closure_vm,
-                variables,
-            });
-
-            vm.write_opcode(OpCode::MoveClosure);
-            vm.write_primitive(closure);
-        }
-
-        // Re-insert the external context into the compiler state.
-        let _ = external.swap_external_context(compile_ctx.into_external_context());
-
-        // Call the function with the given id.
-        vm.write_opcode(OpCode::Call);
-        vm.write_primitive(self.function_id);
-
-        // We need to write the spans for error reporting.
-        vm.write_primitive(self.span.start());
-        vm.write_primitive(self.span.end());
-
-        Ok(())
     }
 }
 
@@ -1246,14 +1180,6 @@ mod tests {
         ) -> crate::function::Compiled {
             Ok(Box::new(Fn))
         }
-
-        fn call_by_vm(
-            &self,
-            _ctx: &mut Context,
-            _args: &mut crate::vm::VmArgumentList,
-        ) -> Result<value::Value, ExpressionError> {
-            unimplemented!()
-        }
     }
 
     #[cfg(feature = "expr-literal")]
@@ -1287,7 +1213,13 @@ mod tests {
             None,
         )
         .unwrap()
-        .compile(&mut local, &mut external, None, LocalEnv::default())
+        .compile(
+            &mut local,
+            &mut external,
+            None,
+            LocalEnv::default(),
+            &mut None,
+        )
         .unwrap()
     }
 
