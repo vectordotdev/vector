@@ -4,9 +4,9 @@ use std::{fmt::Debug, future::Future, pin::Pin, task::Context, task::Poll};
 use futures::stream::{FuturesOrdered, FuturesUnordered};
 use futures::{FutureExt, Stream, StreamExt};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
+use vector_core::shutdown::ShutdownSignal;
 
 use crate::event::{BatchStatus, BatchStatusReceiver};
-use crate::shutdown::ShutdownSignal;
 
 /// The `OrderedFinalizer` framework produces a stream of acknowledged
 /// event batch identifiers from a source in a single background task

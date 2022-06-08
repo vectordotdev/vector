@@ -8972,6 +8972,7 @@ dependencies = [
  "serde",
  "serde_json",
  "snafu",
+ "stream-cancel",
  "tokio",
  "tokio-stream",
  "tokio-test",
