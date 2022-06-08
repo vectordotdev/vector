@@ -55,13 +55,16 @@ follow the following guidelines.
 ### Source and sink naming
 
 - MUST only contain ASCII alphanumeric, lowercase, and underscores.
-- MUST be a noun named after the protocol or service that the component integrates with.
-- MAY be suffixed with the event type, `logs`, `metrics`, or `traces` (e.g., `kubernetes_logs`, `apache_metrics`).
+- MUST be a noun named after the protocol or service that the component
+  integrates with.
+- MAY be suffixed with the event type, `logs`, `metrics`, or `traces`
+  (e.g., `kubernetes_logs`, `apache_metrics`).
 
 ### Transform naming
 
 - MUST only contain ASCII alphanumeric, lowercase, and underscores.
-- MUST be a verb describing the broad purpose of the transform (e.g., `route`, `sample`, `delegate`).
+- MUST be a verb describing the broad purpose of the transform (e.g., `route`,
+  `sample`, `delegate`).
 
 ## Configuration
 
@@ -87,11 +90,11 @@ Vector components MUST be instrumented for optimal observability and monitoring.
 
 ### Events
 
-This section lists all required events that a component MUST emit. Additional events
-are listed that a component is RECOMMENDED to emit, but remain OPTIONAL. It is
-expected that components will emit custom events beyond those listed here that
-reflect component specific behavior. There is leeway in the implementation of these
-events:
+This section lists all required events that a component MUST emit. Additional
+events are listed that a component is RECOMMENDED to emit, but remain OPTIONAL.
+It is expected that components will emit custom events beyond those listed here
+that reflect component specific behavior. There is leeway in the implementation
+of these events:
 
 - Events MAY be augmented with additional component-specific context. For
   example, the `socket` source adds a `mode` attribute as additional context.
@@ -135,8 +138,8 @@ creation of Vector events.
 
 #### ComponentBytesSent
 
-*Sinks* MUST emit a `ComponentBytesSent` that represents the number of raw
-bytes sent downstream.
+*Sinks* MUST emit a `ComponentBytesSent` that represents the number of
+*raw event bytes* sent downstream.
 
 - Emission
   - MUST emit immediately after *successful* transmission the bytes.
@@ -157,8 +160,8 @@ bytes sent downstream.
     HTTP, this MUST be the host and path only, excluding the query string.
   - `file` - If relevant, the absolute path of the file.
 - Metrics
-  - MUST increment the `component_sent_bytes_total` counter by the defined value with the
-    defined properties as metric tags.
+  - MUST increment the `component_sent_bytes_total` counter by the defined value
+    with the defined properties as metric tags.
 - Logs
   - MUST log a `Bytes sent.` message at the `trace` level with the
     defined properties as key-value pairs.
