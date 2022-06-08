@@ -29,6 +29,7 @@
 pub mod config;
 pub mod event;
 pub mod fanout;
+pub mod finalizer;
 pub mod metrics;
 pub mod partition;
 pub mod schema;

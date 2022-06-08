@@ -20,7 +20,7 @@ use rdkafka::{
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
-use vector_core::ByteSizeOf;
+use vector_core::{finalizer::OrderedFinalizer, ByteSizeOf};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -29,7 +29,6 @@ use crate::{
         SourceDescription,
     },
     event::{BatchNotifier, BatchStatus, Event, Value},
-    finalizer::OrderedFinalizer,
     internal_events::{
         KafkaBytesReceived, KafkaEventsReceived, KafkaNegativeAcknowledgmentError,
         KafkaOffsetUpdateError, KafkaReadError, StreamClosedError,

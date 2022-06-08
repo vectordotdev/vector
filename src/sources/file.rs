@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::{sync::oneshot, task::spawn_blocking};
 use tracing::{Instrument, Span};
+use vector_core::finalizer::OrderedFinalizer;
 
 use super::util::{EncodingConfig, MultilineConfig};
 use crate::{
@@ -21,7 +22,6 @@ use crate::{
     },
     encoding_transcode::{Decoder, Encoder},
     event::{BatchNotifier, BatchStatus, LogEvent},
-    finalizer::OrderedFinalizer,
     internal_events::{
         FileBytesReceived, FileEventsReceived, FileOpen, FileSourceInternalEventsEmitter,
     },

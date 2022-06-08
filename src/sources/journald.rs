@@ -31,7 +31,7 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::FramedRead;
-use vector_core::ByteSizeOf;
+use vector_core::{finalizer::OrderedFinalizer, ByteSizeOf};
 
 use crate::{
     config::{
@@ -39,7 +39,6 @@ use crate::{
         SourceDescription,
     },
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent, Value},
-    finalizer::OrderedFinalizer,
     internal_events::{
         BytesReceived, JournaldInvalidRecordError, JournaldNegativeAcknowledgmentError,
         OldEventsReceived,

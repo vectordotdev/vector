@@ -14,13 +14,12 @@ use tonic::{
     transport::{Certificate, Channel, ClientTlsConfig, Endpoint, Identity},
     Code, Request, Status,
 };
-use vector_core::ByteSizeOf;
+use vector_core::{finalizer::EmptyStream, finalizer::UnorderedFinalizer, ByteSizeOf};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, Event, MaybeAsLogMut, Value},
-    finalizer::{EmptyStream, UnorderedFinalizer},
     gcp::{GcpAuthConfig, GcpCredentials, Scope, PUBSUB_URL},
     internal_events::{
         BytesReceived, GcpPubsubConnectError, GcpPubsubReceiveError, GcpPubsubStreamingPullError,
