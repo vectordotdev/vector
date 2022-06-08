@@ -160,7 +160,7 @@ for the sink.
     `false` if not. See `bytes_size` for framing details.
   - `url` - REQUIRED, the URL of the downstream destination.
     - For HTTP, MUST not include the query string, only the host and path.
-      (i.e., `http://<host>:<port>/<path>`)
+      (i.e., `http(s)://<host>:<port>/<path>`)
     - For sockets, the full socket URL (i.e., `tcp://<address>:<port>`)
     - For files, MUST be the full file url (i.e., `file://<path>`)
 - Metrics
