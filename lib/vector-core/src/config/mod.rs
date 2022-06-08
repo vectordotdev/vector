@@ -218,7 +218,9 @@ impl LogNamespace {
     ) {
         match self {
             LogNamespace::Vector => {
-                log.insert(Self::VECTOR_METADATA_KEY.concat(key), value);
+                log.metadata_mut()
+                    .value_mut()
+                    .insert(Self::VECTOR_METADATA_KEY.concat(key), value);
             }
             LogNamespace::Legacy => {
                 log.try_insert(key, value);
