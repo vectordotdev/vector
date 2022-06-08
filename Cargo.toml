@@ -707,6 +707,7 @@ enterprise = [
   "sources-internal_logs",
   "sources-internal_metrics",
   "transforms-remap",
+  "transforms-filter",
 ]
 
 # Identifies that the build is a nightly build
