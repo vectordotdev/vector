@@ -1,4 +1,4 @@
-use std::{convert::TryFrom, iter, num::NonZeroU8, sync::Arc};
+use std::{collections::HashMap, convert::TryFrom, iter, num::NonZeroU8, sync::Arc};
 
 use serde_json::Value as JsonValue;
 use tokio::time::{sleep, Duration};
@@ -11,6 +11,7 @@ use crate::{
             common::{
                 acknowledgements::HecClientAcknowledgementsConfig,
                 integration_test_helpers::{get_token, splunk_api_address, splunk_hec_address},
+                EndpointTarget,
             },
             logs::{config::HecLogsSinkConfig, encoder::HecLogsEncoder},
         },
@@ -115,6 +116,8 @@ async fn config(
         tls: None,
         acknowledgements: Default::default(),
         timestamp_nanos_key: None,
+        endpoint_target: EndpointTarget::Event,
+        metadata: Default::default(),
     }
 }
 
@@ -137,6 +140,35 @@ async fn splunk_insert_message() {
     let entry = find_entry(message.as_str()).await;
 
     assert_eq!(message, entry["_raw"].as_str().unwrap());
+    assert!(entry.get("message").is_none());
+}
+
+#[tokio::test]
+async fn splunk_insert_raw_message() {
+    let cx = SinkContext::new_test();
+    let mut metadata = HashMap::new();
+    metadata.insert("host".to_string(), Template::try_from("zork").unwrap());
+
+    let config = HecLogsSinkConfig {
+        endpoint_target: EndpointTarget::Raw,
+        metadata,
+        ..config(HecLogsEncoder::Text, vec![]).await
+    };
+    let (sink, _) = config.build(cx).await.unwrap();
+
+    let message = random_string(100);
+    let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+    let event = LogEvent::from(message.clone())
+        .with_batch_notifier(&batch)
+        .into();
+    drop(batch);
+    components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    let entry = find_entry(message.as_str()).await;
+
+    assert_eq!(message, entry["_raw"].as_str().unwrap());
+    assert_eq!("zork", entry["host"].as_str().unwrap());
     assert!(entry.get("message").is_none());
 }
 
