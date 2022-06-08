@@ -101,7 +101,7 @@ impl<'a> Compiler<'a> {
         let mut exprs = vec![];
         for node in nodes {
             let expr = self.compile_expr(node, external)?;
-            let type_def = expr.type_def((&self.local, &external));
+            let type_def = expr.type_def((&self.local, external));
             exprs.push(expr);
 
             if type_def.is_never() {
@@ -243,7 +243,7 @@ impl<'a> Compiler<'a> {
                         }
 
                         if terminated_state.is_none() {
-                            let type_def = expr.type_def((&self.local, &external));
+                            let type_def = expr.type_def((&self.local, external));
                             node_exprs.push(expr);
                             // an expression that has the "never" type is a terminating expression
                             if type_def.is_never() {
