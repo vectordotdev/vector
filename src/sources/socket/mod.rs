@@ -1119,7 +1119,7 @@ mod test {
                 Ok(meta) => {
                     match meta.permissions().mode() {
                         // S_IFSOCK   0140000   socket
-                        0o140421 => ready(true),
+                        0o140555 => ready(true),
                         perm => {
                             println!("socket has different permissions: {:?}", perm);
                             ready(false)
