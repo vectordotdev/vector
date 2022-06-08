@@ -141,7 +141,14 @@ impl Expression for Query {
 
 impl fmt::Display for Query {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}{}", self.target, self.path)
+        match self.target {
+            Target::Internal(_)
+                if !self.path.is_root() && !self.path.iter().next().unwrap().is_index() =>
+            {
+                write!(f, "{}.{}", self.target, self.path)
+            }
+            _ => write!(f, "{}{}", self.target, self.path),
+        }
     }
 }
 

@@ -1,3 +1,4 @@
+use serde::Serializer;
 use std::fmt;
 
 use serde::{
@@ -5,11 +6,24 @@ use serde::{
     Deserialize, Deserializer, Serialize,
 };
 
-#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 pub enum Concurrency {
     None,
     Adaptive,
     Fixed(usize),
+}
+
+impl Serialize for Concurrency {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match &self {
+            Concurrency::None => serializer.serialize_str("none"),
+            Concurrency::Adaptive => serializer.serialize_str("adaptive"),
+            Concurrency::Fixed(i) => serializer.serialize_u64(*i as u64),
+        }
+    }
 }
 
 impl Default for Concurrency {
@@ -50,12 +64,14 @@ impl<'de> Deserialize<'de> for Concurrency {
             type Value = Concurrency;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str(r#"positive integer or "adaptive""#)
+                formatter.write_str(r#"positive integer, "adaptive", or "none" "#)
             }
 
             fn visit_str<E: de::Error>(self, value: &str) -> Result<Concurrency, E> {
                 if value == "adaptive" {
                     Ok(Concurrency::Adaptive)
+                } else if value == "none" {
+                    Ok(Concurrency::None)
                 } else {
                     Err(de::Error::unknown_variant(value, &["adaptive"]))
                 }
@@ -85,5 +101,22 @@ impl<'de> Deserialize<'de> for Concurrency {
         }
 
         deserializer.deserialize_any(UsizeOrAdaptive)
+    }
+}
+
+#[test]
+fn is_serialization_reversible() {
+    let variants = [
+        Concurrency::None,
+        Concurrency::Adaptive,
+        Concurrency::Fixed(8),
+    ];
+
+    for v in variants {
+        let value = serde_json::to_value(v).unwrap();
+        let deserialized = serde_json::from_value::<Concurrency>(value)
+            .expect("Failed to deserialize a previously serialized Concurrency value");
+
+        assert_eq!(v, deserialized)
     }
 }

@@ -33,7 +33,7 @@ pub(crate) struct Compiler<'a> {
     /// It is possible for this state to switch from `None`, to `Some(T)` and
     /// back to `None`, if the parent expression of a fallible expression
     /// nullifies the fallibility of that expression.
-    fallible_expression_error: Option<FallibleInfo>,
+    fallible_expression_error: Option<Box<dyn DiagnosticMessage>>,
 }
 
 impl<'a> Compiler<'a> {
@@ -107,10 +107,8 @@ impl<'a> Compiler<'a> {
 
                     let expr = self.compile_expr(expr, external)?;
 
-                    if let Some(info) = self.fallible_expression_error.take() {
-                        let error = crate::expression::Error::Fallible { span: info.span };
-
-                        self.diagnostics.push(Box::new(error) as _);
+                    if let Some(error) = self.fallible_expression_error.take() {
+                        self.diagnostics.push(error);
                     }
 
                     Some(expr)
@@ -159,7 +157,8 @@ impl<'a> Compiler<'a> {
         if expr.type_def((&self.local, external)).is_fallible()
             && self.fallible_expression_error.is_none()
         {
-            self.fallible_expression_error = Some(FallibleInfo { span });
+            let error = crate::expression::Error::Fallible { span };
+            self.fallible_expression_error = Some(Box::new(error) as _);
         }
 
         Some(expr)
@@ -402,7 +401,7 @@ impl<'a> Compiler<'a> {
         Some(Predicate::new(
             Node::new(span, exprs),
             (&self.local, external),
-            self.fallible_expression_error,
+            self.fallible_expression_error.as_deref(),
         ))
     }
 
@@ -542,7 +541,7 @@ impl<'a> Compiler<'a> {
             node,
             &mut self.local,
             external,
-            self.fallible_expression_error,
+            self.fallible_expression_error.as_deref(),
         )
         .map_err(|err| self.diagnostics.push(Box::new(err)))
         .ok()?;
@@ -711,7 +710,13 @@ impl<'a> Compiler<'a> {
             };
 
             builder
-                .compile(&mut self.local, external, block, local_snapshot)
+                .compile(
+                    &mut self.local,
+                    external,
+                    block,
+                    local_snapshot,
+                    &mut self.fallible_expression_error,
+                )
                 .map_err(|err| self.diagnostics.push(Box::new(err)))
                 .ok()
         })
