@@ -232,7 +232,6 @@ impl SourceConfig for SocketConfig {
 mod test {
     use std::{
         collections::HashMap,
-        future::ready,
         net::{SocketAddr, UdpSocket},
         sync::{
             atomic::{AtomicBool, Ordering},
@@ -254,7 +253,9 @@ mod test {
     #[cfg(unix)]
     use {
         super::{unix::UnixConfig, Mode},
+        crate::test_util::wait_for,
         futures::{SinkExt, Stream},
+        std::future::ready,
         std::os::unix::fs::PermissionsExt,
         std::path::PathBuf,
         tokio::{
@@ -276,7 +277,7 @@ mod test {
         test_util::{
             collect_n, collect_n_limited,
             components::{assert_source_compliance, SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS},
-            next_addr, random_string, send_lines, send_lines_tls, wait_for, wait_for_tcp,
+            next_addr, random_string, send_lines, send_lines_tls, wait_for_tcp,
         },
         tls::{self, TlsConfig, TlsEnableableConfig},
         SourceSender,
