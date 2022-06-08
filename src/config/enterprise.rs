@@ -474,13 +474,16 @@ fn setup_metrics_reporting(
     // Create internal sources for host and internal metrics. We're using distinct sources here and
     // not attempting to reuse existing ones, to configure according to enterprise requirements.
     let host_metrics = HostMetricsConfig {
-        namespace: host_metrics::Namespace::from(Some("pipelines".to_owned())),
+        namespace: host_metrics::Namespace::from(Some("vector.host".to_owned())),
         scrape_interval_secs: datadog.reporting_interval_secs,
         ..Default::default()
     };
 
     let internal_metrics = InternalMetricsConfig {
-        namespace: Some("pipelines".to_owned()),
+        // While the default namespace for internal metrics is already "vector",
+        // setting the namespace here is meant for clarity and resistance
+        // against any future or accidental changes.
+        namespace: Some("vector".to_owned()),
         scrape_interval_secs: datadog.reporting_interval_secs,
         ..Default::default()
     };
