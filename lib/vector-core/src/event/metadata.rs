@@ -25,12 +25,6 @@ pub struct EventMetadata {
     #[serde(default, skip)]
     secrets: Secrets,
 
-    /// Used to store the datadog API from sources to sinks
-    #[serde(default, skip)]
-    datadog_api_key: Option<Arc<str>>,
-    /// Used to store the Splunk HEC auth token from sources to sinks
-    #[serde(default, skip)]
-    splunk_hec_token: Option<Arc<str>>,
     #[serde(default, skip)]
     finalizers: EventFinalizers,
 
@@ -96,8 +90,6 @@ impl Default for EventMetadata {
         Self {
             value: Value::Object(BTreeMap::new()),
             secrets: Secrets::new(),
-            datadog_api_key: Default::default(),
-            splunk_hec_token: Default::default(),
             finalizers: Default::default(),
             schema_definition: default_schema_definition(),
         }
@@ -159,12 +151,7 @@ impl EventMetadata {
     /// If a Splunk HEC token is not set in `self`, the one from `other` will be used.
     pub fn merge(&mut self, other: Self) {
         self.finalizers.merge(other.finalizers);
-        if self.datadog_api_key.is_none() {
-            self.datadog_api_key = other.datadog_api_key;
-        }
-        if self.splunk_hec_token.is_none() {
-            self.splunk_hec_token = other.splunk_hec_token;
-        }
+        self.secrets.merge(&other.secrets);
     }
 
     /// Update the finalizer(s) status.

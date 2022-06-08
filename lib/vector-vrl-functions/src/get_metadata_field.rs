@@ -33,8 +33,8 @@ impl Function for GetMetadataField {
 
     fn examples(&self) -> &'static [Example] {
         &[Example {
-            title: "Get the datadog api key",
-            source: r#"get_metadata_field(.datadog_api_key)"#,
+            title: "Get metadata",
+            source: r#"get_metadata_field(.my_metadata_field)"#,
             result: Ok("null"),
         }]
     }

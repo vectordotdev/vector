@@ -18,7 +18,6 @@ fn unnest(path: &expression::Query, root_lookup: &LookupBuf, ctx: &mut Context) 
             let value = ctx.state().variable(v.ident()).unwrap_or(&Value::Null);
             let root = value.get_by_path(root_lookup).expect("always a value");
             unnest_root(root, lookup_buf)
-            // Box::new(v as &dyn Target) as Box<_>
         }
         expression::Target::Container(expr) => {
             let value = expr.resolve(ctx)?;
