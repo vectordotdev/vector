@@ -258,33 +258,37 @@ fn cpu_metrics(
     namespace: &Option<String>,
     tags: &BTreeMap<String, String>,
 ) -> Vec<Metric> {
-    let mut metrics = vec![];
+    let mut size = 8; // Eight expected metrics not including online_cpus
+    if let Some(online_cpus) = cpu.online_cpus {
+        size += online_cpus;
+    }
+    let mut metrics = Vec::with_capacity(size);
 
     if let Some(online_cpus) = cpu.online_cpus {
-        metrics.extend(vec![gauge(
+        metrics.push(gauge(
             "cpu",
             "online_cpus",
             namespace.clone(),
             timestamp,
             online_cpus as f64,
             tags.clone(),
-        )]);
+        ));
     }
 
     if let Some(system_cpu_usage) = cpu.system_cpu_usage {
-        metrics.extend(vec![counter(
+        metrics.push(counter(
             "cpu",
             "usage_system_jiffies_total",
             namespace.clone(),
             timestamp,
             system_cpu_usage,
             tags.clone(),
-        )]);
+        ));
     }
 
     if let Some(cpu_usage) = &cpu.cpu_usage {
         metrics.extend(
-            vec![
+            [
                 ("usage_usermode_jiffies_total", cpu_usage.usage_in_usermode),
                 (
                     "usage_kernelmode_jiffies_total",
@@ -293,23 +297,24 @@ fn cpu_metrics(
                 ("usage_total_jiffies_total", cpu_usage.total_usage),
             ]
             .iter()
-            .filter(|(_name, value)| value.is_some())
-            .map(|(name, value)| {
-                counter(
-                    "cpu",
-                    name,
-                    namespace.clone(),
-                    timestamp,
-                    value.unwrap(),
-                    tags.clone(),
-                )
+            .filter_map(|(name, value)| {
+                value.map(|value| {
+                    counter(
+                        "cpu",
+                        name,
+                        namespace.clone(),
+                        timestamp,
+                        value,
+                        tags.clone(),
+                    )
+                })
             }),
         );
     }
 
     if let Some(throttling_data) = &cpu.throttling_data {
         metrics.extend(
-            vec![
+            [
                 ("throttling_periods_total", throttling_data.periods),
                 ("throttled_periods_total", throttling_data.throttled_periods),
                 (
@@ -320,16 +325,17 @@ fn cpu_metrics(
                 ),
             ]
             .iter()
-            .filter(|(_name, value)| value.is_some())
-            .map(|(name, value)| {
-                counter(
-                    "cpu",
-                    name,
-                    namespace.clone(),
-                    timestamp,
-                    value.unwrap(),
-                    tags.clone(),
-                )
+            .filter_map(|(name, value)| {
+                value.map(|value| {
+                    counter(
+                        "cpu",
+                        name,
+                        namespace.clone(),
+                        timestamp,
+                        value,
+                        tags.clone(),
+                    )
+                })
             }),
         );
     }
@@ -367,28 +373,29 @@ fn memory_metrics(
     let mut metrics = vec![];
 
     metrics.extend(
-        vec![
+        [
             ("used_bytes", memory.usage),
             ("max_used_bytes", memory.max_usage),
             ("limit_bytes", memory.limit),
         ]
         .iter()
-        .filter(|(_name, value)| value.is_some())
-        .map(|(name, value)| {
-            gauge(
-                "memory",
-                name,
-                namespace.clone(),
-                timestamp,
-                value.unwrap(),
-                tags.clone(),
-            )
+        .filter_map(|(name, value)| {
+            value.map(|value| {
+                gauge(
+                    "memory",
+                    name,
+                    namespace.clone(),
+                    timestamp,
+                    value,
+                    tags.clone(),
+                )
+            })
         }),
     );
 
     if let Some(stats) = &memory.stats {
         metrics.extend(
-            vec![
+            [
                 ("active_anonymous_bytes", stats.active_anon),
                 ("active_file_bytes", stats.active_file),
                 ("cache_bytes", stats.cache),
@@ -421,21 +428,22 @@ fn memory_metrics(
                 ),
             ]
             .iter()
-            .filter(|(_name, value)| value.is_some())
-            .map(|(name, value)| {
-                gauge(
-                    "memory",
-                    name,
-                    namespace.clone(),
-                    timestamp,
-                    value.unwrap(),
-                    tags.clone(),
-                )
+            .filter_map(|(name, value)| {
+                value.map(|value| {
+                    gauge(
+                        "memory",
+                        name,
+                        namespace.clone(),
+                        timestamp,
+                        value,
+                        tags.clone(),
+                    )
+                })
             }),
         );
 
         metrics.extend(
-            vec![
+            [
                 ("page_faults_total", stats.pgfault),
                 ("major_faults_total", stats.pgmajfault),
                 ("page_charged_total", stats.pgpgin),
@@ -446,16 +454,17 @@ fn memory_metrics(
                 ("total_page_uncharged_total", stats.total_pgpgout),
             ]
             .iter()
-            .filter(|(_name, value)| value.is_some())
-            .map(|(name, value)| {
-                counter(
-                    "memory",
-                    name,
-                    namespace.clone(),
-                    timestamp,
-                    value.unwrap(),
-                    tags.clone(),
-                )
+            .filter_map(|(name, value)| {
+                value.map(|value| {
+                    counter(
+                        "memory",
+                        name,
+                        namespace.clone(),
+                        timestamp,
+                        value,
+                        tags.clone(),
+                    )
+                })
             }),
         );
     }
@@ -473,7 +482,7 @@ fn network_metrics(
     let mut tags = tags.clone();
     tags.insert("device".into(), interface.into());
 
-    vec![
+    [
         ("receive_bytes_total", network.rx_bytes),
         ("receive_packets_total", network.rx_packets),
         ("receive_packets_drop_total", network.rx_dropped),
