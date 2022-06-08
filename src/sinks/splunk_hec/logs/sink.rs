@@ -108,6 +108,7 @@ pub(super) struct Partitioned {
 }
 
 impl Partitioned {
+    #[allow(clippy::missing_const_for_fn)]
     pub(super) fn into_parts(self) -> (Option<Arc<str>>, HashMap<String, String>) {
         (self.token, self.metadata)
     }
@@ -149,7 +150,7 @@ impl Partitioner for EventPartitioner {
         self.metadata
             .iter()
             .map(|(key, value)| {
-                let res = value
+                value
                     .render_string(&item.event)
                     .map_err(|error| {
                         emit!(TemplateRenderingError {
@@ -159,9 +160,7 @@ impl Partitioner for EventPartitioner {
                         })
                     })
                     .ok()
-                    .map(|rendered| (key.clone(), rendered));
-
-                res
+                    .map(|rendered| (key.clone(), rendered))
             })
             .collect::<Option<_>>()
             .map(|metadata| Partitioned {
@@ -195,6 +194,7 @@ impl ByteSizeOf for HecLogsProcessedEventMetadata {
 
 pub type HecProcessedEvent = ProcessedEvent<LogEvent, HecLogsProcessedEventMetadata>;
 
+#[allow(clippy::too_many_arguments)]
 pub fn process_log(
     event: Event,
     sourcetype: Option<&Template>,
