@@ -13,7 +13,6 @@ env:
   CI: true
   DEBIAN_FRONTEND: noninteractive
   CONTAINER_TOOL: docker
-  RUSTFLAGS: "-D warnings"
 
 jobs:
   build-x86_64-unknown-linux-musl-packages:
