@@ -69,7 +69,8 @@ impl Expression for AppendFn {
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         self.value
             .type_def(state)
-            .merge_append(self.items.type_def(state))
+            .restrict_array()
+            .merge_append(self.items.type_def(state).restrict_array())
     }
 }
 

@@ -144,7 +144,7 @@ impl Expression for Op {
             Or if !lhs_def.is_boolean() => {
                 // We can remove Null from the lhs since we know that if the lhs is Null
                 // we will be taking the rhs and only the rhs type_def will then be relevant.
-                lhs_def.remove_null().expect("not empty");
+                lhs_def.remove_null();
 
                 lhs_def.merge_deep(rhs_def)
             }
@@ -152,7 +152,7 @@ impl Expression for Op {
             Or => lhs_def.merge_deep(rhs_def),
 
             // ... | ...
-            Merge => lhs_def.merge_deep(rhs_def),
+            Merge => lhs_def.merge_overwrite(rhs_def),
 
             // null && ...
             And if lhs_def.is_null() => rhs_def

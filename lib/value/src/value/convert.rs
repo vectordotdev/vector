@@ -124,6 +124,12 @@ impl Value {
         }
     }
 
+    /// Returns self as `Cow<str>`, only if self is `Value::Bytes`
+    pub fn as_str(&self) -> Option<Cow<'_, str>> {
+        self.as_bytes()
+            .map(|bytes| String::from_utf8_lossy(bytes.as_ref()))
+    }
+
     /// Converts the Value into a byte representation regardless of its original type.
     /// Object and Array are currently not supported, although technically there's no reason why it
     /// couldn't in future should the need arise.

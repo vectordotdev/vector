@@ -2,6 +2,7 @@ use bytes::{Bytes, BytesMut};
 use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Decoder;
+use vector_config::configurable_component;
 
 use super::{BoxedFramingError, CharacterDelimitedDecoder};
 
@@ -17,7 +18,8 @@ pub struct NewlineDelimitedDecoderConfig {
 }
 
 /// Options for building a `NewlineDelimitedDecoder`.
-#[derive(Debug, Clone, Derivative, Deserialize, Serialize, PartialEq)]
+#[configurable_component]
+#[derive(Clone, Debug, Derivative, PartialEq)]
 #[derivative(Default)]
 pub struct NewlineDelimitedDecoderOptions {
     /// The maximum length of the byte buffer.

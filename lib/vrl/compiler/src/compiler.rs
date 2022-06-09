@@ -2,6 +2,7 @@ use diagnostic::{DiagnosticList, DiagnosticMessage, Severity, Span};
 use lookup::LookupBuf;
 use parser::ast::{self, Node, QueryTarget};
 
+use crate::parser::ast::RootExpr;
 use crate::{
     expression::*,
     program::ProgramInfo,
@@ -26,6 +27,13 @@ pub(crate) struct Compiler<'a> {
     /// This list allows us to avoid printing "undefined variable" compilation
     /// errors when the reason for it being undefined is another compiler error.
     skip_missing_query_target: Vec<(QueryTarget, LookupBuf)>,
+
+    /// Track which expression in a chain of expressions is fallible.
+    ///
+    /// It is possible for this state to switch from `None`, to `Some(T)` and
+    /// back to `None`, if the parent expression of a fallible expression
+    /// nullifies the fallibility of that expression.
+    fallible_expression_error: Option<Box<dyn DiagnosticMessage>>,
 }
 
 impl<'a> Compiler<'a> {
@@ -39,6 +47,7 @@ impl<'a> Compiler<'a> {
             external_queries: vec![],
             external_assignments: vec![],
             skip_missing_query_target: vec![],
+            fallible_expression_error: None,
         }
     }
 
@@ -56,11 +65,7 @@ impl<'a> Compiler<'a> {
         ast: parser::Program,
         external: &mut ExternalEnv,
     ) -> Result<(Program, DiagnosticList), DiagnosticList> {
-        let mut expressions = self.compile_root_exprs(ast, external);
-
-        if expressions.is_empty() {
-            expressions.push(Expr::Noop(Noop));
-        }
+        let expressions = self.compile_root_exprs(ast, external);
 
         let (errors, warnings): (Vec<_>, Vec<_>) =
             self.diagnostics.into_iter().partition(|diagnostic| {
@@ -83,53 +88,33 @@ impl<'a> Compiler<'a> {
         Ok((Program { expressions, info }, warnings.into()))
     }
 
-    fn compile_root_exprs(
-        &mut self,
-        nodes: impl IntoIterator<Item = Node<ast::RootExpr>>,
-        external: &mut ExternalEnv,
-    ) -> Vec<Expr> {
-        use ast::RootExpr::*;
-
-        nodes
-            .into_iter()
-            .filter_map(|node| {
-                let span = node.span();
-
-                match node.into_inner() {
-                    Expr(expr) => {
-                        let expr = self.compile_expr(expr, external)?;
-                        if expr.type_def((&self.local, external)).is_fallible() {
-                            use crate::expression::Error;
-                            let err = Error::Fallible { span };
-                            self.diagnostics.push(Box::new(err));
-                        }
-
-                        Some(expr)
-                    }
-                    Error(err) => {
-                        self.handle_parser_error(err);
-                        None
-                    }
-                }
-            })
-            .collect()
-    }
-
     fn compile_exprs(
         &mut self,
         nodes: impl IntoIterator<Item = Node<ast::Expr>>,
         external: &mut ExternalEnv,
     ) -> Option<Vec<Expr>> {
-        nodes
-            .into_iter()
-            .map(|node| self.compile_expr(node, external))
-            .collect::<Option<_>>()
+        let mut exprs = vec![];
+        for node in nodes {
+            let expr = self.compile_expr(node, external)?;
+            let type_def = expr.type_def((&self.local, external));
+            exprs.push(expr);
+
+            if type_def.is_never() {
+                // This is a terminal expression. Further expressions must not be
+                // compiled since they will never execute, but could alter the types of
+                // variables in local or external scopes through assignments.
+                break;
+            }
+        }
+        Some(exprs)
     }
 
     fn compile_expr(&mut self, node: Node<ast::Expr>, external: &mut ExternalEnv) -> Option<Expr> {
         use ast::Expr::*;
 
-        match node.into_inner() {
+        let span = node.span();
+
+        let expr = match node.into_inner() {
             Literal(node) => self.compile_literal(node, external),
             Container(node) => self.compile_container(node, external).map(Into::into),
             IfStatement(node) => self.compile_if_statement(node, external).map(Into::into),
@@ -140,7 +125,20 @@ impl<'a> Compiler<'a> {
             Variable(node) => self.compile_variable(node, external).map(Into::into),
             Unary(node) => self.compile_unary(node, external).map(Into::into),
             Abort(node) => self.compile_abort(node, external).map(Into::into),
+        }?;
+
+        // If the previously compiled expression is fallible, _and_ we are
+        // currently not tracking any existing fallible expression in the chain
+        // of expressions, then this is the first expression within that chain
+        // that can cause the entire chain to be fallible.
+        if expr.type_def((&self.local, external)).is_fallible()
+            && self.fallible_expression_error.is_none()
+        {
+            let error = crate::expression::Error::Fallible { span };
+            self.fallible_expression_error = Some(Box::new(error) as _);
         }
+
+        Some(expr)
     }
 
     #[cfg(feature = "expr-literal")]
@@ -219,6 +217,52 @@ impl<'a> Compiler<'a> {
         Some(Group::new(expr))
     }
 
+    fn compile_root_exprs(
+        &mut self,
+        nodes: impl IntoIterator<Item = Node<ast::RootExpr>>,
+        external: &mut ExternalEnv,
+    ) -> Vec<Expr> {
+        let mut node_exprs = vec![];
+
+        // After a terminating expression, the state is stored, but the remaining expressions are checked.
+        let mut terminated_state = None;
+
+        for root_expr in nodes {
+            match root_expr.into_inner() {
+                RootExpr::Expr(node_expr) => {
+                    self.fallible_expression_error = None;
+
+                    if let Some(expr) = self.compile_expr(node_expr, external) {
+                        if let Some(error) = self.fallible_expression_error.take() {
+                            self.diagnostics.push(error);
+                        }
+
+                        if terminated_state.is_none() {
+                            let type_def = expr.type_def((&self.local, external));
+                            node_exprs.push(expr);
+                            // an expression that has the "never" type is a terminating expression
+                            if type_def.is_never() {
+                                terminated_state =
+                                    Some((self.local.clone(), external.target().clone()))
+                            }
+                        }
+                    }
+                }
+                RootExpr::Error(err) => self.handle_parser_error(err),
+            }
+        }
+
+        if let Some((local, details)) = terminated_state {
+            self.local = local;
+            external.update_target(details);
+        }
+
+        if node_exprs.is_empty() {
+            node_exprs.push(Expr::Noop(Noop));
+        }
+        node_exprs
+    }
+
     fn compile_block(
         &mut self,
         node: Node<ast::Block>,
@@ -236,7 +280,7 @@ impl<'a> Compiler<'a> {
         let exprs = match self.compile_exprs(node.into_inner().into_iter(), external) {
             Some(exprs) => exprs,
             None => {
-                self.local = local_snapshot.merge_mutations(self.local.clone());
+                self.local = local_snapshot.apply_child_scope(self.local.clone());
                 return None;
             }
         };
@@ -250,7 +294,7 @@ impl<'a> Compiler<'a> {
         // the block, and merge back into it any mutations that happened to
         // state the snapshot was already tracking. Then, revert the compiler
         // local state to the updated snapshot.
-        self.local = local_snapshot.merge_mutations(self.local.clone());
+        self.local = local_snapshot.apply_child_scope(self.local.clone());
 
         Some(block)
     }
@@ -302,19 +346,41 @@ impl<'a> Compiler<'a> {
             .map_err(|err| self.diagnostics.push(Box::new(err)))
             .ok()?;
 
+        let original_locals = self.local.clone();
+        let original_external = external.target().clone();
+
         let consequent = self.compile_block(consequent, external)?;
 
         match alternative {
-            Some(block) => Some(IfStatement {
-                predicate,
-                consequent,
-                alternative: Some(self.compile_block(block, external)?),
-            }),
-            None => Some(IfStatement {
-                predicate,
-                consequent,
-                alternative: None,
-            }),
+            Some(block) => {
+                let consequent_locals = self.local.clone();
+                let consequent_external = external.target().clone();
+
+                self.local = original_locals;
+
+                let else_block = self.compile_block(block, external)?;
+
+                // assignments must be the result of either the if or else block, but not the original value
+                self.local = self.local.clone().merge(consequent_locals);
+                external.update_target(consequent_external.merge(external.target().clone()));
+
+                Some(IfStatement {
+                    predicate,
+                    consequent,
+                    alternative: Some(else_block),
+                })
+            }
+            None => {
+                // assignments must be the result of either the if block or the original value
+                self.local = self.local.clone().merge(original_locals);
+                external.update_target(original_external.merge(external.target().clone()));
+
+                Some(IfStatement {
+                    predicate,
+                    consequent,
+                    alternative: None,
+                })
+            }
         }
     }
 
@@ -345,16 +411,25 @@ impl<'a> Compiler<'a> {
         Some(Predicate::new(
             Node::new(span, exprs),
             (&self.local, external),
+            self.fallible_expression_error.as_deref(),
         ))
     }
 
     #[cfg(feature = "expr-op")]
     fn compile_op(&mut self, node: Node<ast::Op>, external: &mut ExternalEnv) -> Option<Op> {
+        use parser::ast::Opcode;
+
         let op = node.into_inner();
         let ast::Op(lhs, opcode, rhs) = op;
 
         let lhs_span = lhs.span();
         let lhs = Node::new(lhs_span, self.compile_expr(*lhs, external)?);
+
+        // If we're using error-coalescing, we need to negate any tracked
+        // fallibility error state for the lhs expression.
+        if opcode.inner() == &Opcode::Err {
+            self.fallible_expression_error = None;
+        }
 
         let rhs_span = rhs.span();
         let rhs = Node::new(rhs_span, self.compile_expr(*rhs, external)?);
@@ -431,7 +506,7 @@ impl<'a> Compiler<'a> {
             Infallible { ok, err, op, expr } => {
                 let span = expr.span();
 
-                match op {
+                let node = match op {
                     AssignmentOp::Assign => {
                         let expr = self
                             .compile_expr(*expr, external)
@@ -461,13 +536,25 @@ impl<'a> Compiler<'a> {
 
                         Node::new(span, node)
                     }
-                }
+                };
+
+                // If the RHS expression is marked as fallible, the "infallible"
+                // assignment nullifies this fallibility, and thus no error
+                // should be emitted.
+                self.fallible_expression_error = None;
+
+                node
             }
         };
 
-        let assignment = Assignment::new(node, &mut self.local, external)
-            .map_err(|err| self.diagnostics.push(Box::new(err)))
-            .ok()?;
+        let assignment = Assignment::new(
+            node,
+            &mut self.local,
+            external,
+            self.fallible_expression_error.as_deref(),
+        )
+        .map_err(|err| self.diagnostics.push(Box::new(err)))
+        .ok()?;
 
         // Track any potential external target assignments within the program.
         //
@@ -633,7 +720,13 @@ impl<'a> Compiler<'a> {
             };
 
             builder
-                .compile(&mut self.local, external, block, local_snapshot)
+                .compile(
+                    &mut self.local,
+                    external,
+                    block,
+                    local_snapshot,
+                    &mut self.fallible_expression_error,
+                )
                 .map_err(|err| self.diagnostics.push(Box::new(err)))
                 .ok()
         })

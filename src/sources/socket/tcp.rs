@@ -1,8 +1,8 @@
 use bytes::Bytes;
 use chrono::Utc;
 use codecs::decoding::{DeserializerConfig, FramingConfig};
-use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
+use vector_config::configurable_component;
 
 use crate::{
     codecs::Decoder,
@@ -14,21 +14,56 @@ use crate::{
     tls::TlsEnableableConfig,
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// TCP configuration for the `socket` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct TcpConfig {
+    /// The address to listen for connections on.
     address: SocketListenAddr,
+
+    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
+
+    /// The maximum buffer size, in bytes, of incoming messages.
+    ///
+    /// Messages larger than this are truncated.
     max_length: Option<usize>,
+
+    /// The timeout, in seconds, before a connection is forcefully closed during shutdown.
     #[serde(default = "default_shutdown_timeout_secs")]
     shutdown_timeout_secs: u64,
+
+    /// Overrides the name of the log field used to add the peer host to each event.
+    ///
+    /// The value will be the peer host's address, including the port i.e. `1.2.3.4:9000`.
+    ///
+    /// By default, the [global `host_key` option](https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key) is used.
     host_key: Option<String>,
+
+    /// Overrides the name of the log field used to add the peer host's port to each event.
+    ///
+    /// The value will be the peer host's port i.e. `9000`.
+    ///
+    /// By default, `"port"` is used.
     port_key: Option<String>,
+
+    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
+
+    /// The size, in bytes, of the receive buffer used for each connection.
+    ///
+    /// This should not typically needed to be changed.
     receive_buffer_bytes: Option<usize>,
+
+    /// The maximum number of TCP connections that will be allowed at any given time.
+    pub connection_limit: Option<u32>,
+
+    #[configurable(derived)]
     framing: Option<FramingConfig>,
+
+    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
-    pub connection_limit: Option<u32>,
 }
 
 const fn default_shutdown_timeout_secs() -> u64 {

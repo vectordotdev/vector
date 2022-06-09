@@ -182,7 +182,7 @@ impl IntoIterator for Program {
 // root expression
 // -----------------------------------------------------------------------------
 
-#[allow(clippy::large_enum_variant)] // discovered during Rust upgrade to 1.57; just allowing for now since we did previously
+#[allow(clippy::large_enum_variant)]
 #[derive(PartialEq)]
 pub enum RootExpr {
     Expr(Node<Expr>),

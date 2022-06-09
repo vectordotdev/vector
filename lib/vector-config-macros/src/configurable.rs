@@ -58,7 +58,7 @@ pub fn derive_configurable_impl(input: TokenStream) -> TokenStream {
             #[allow(unused_qualifications)]
             impl #impl_generics ::vector_config::Configurable<#clt> for #name #ty_generics #where_clause {
                 fn referencable_name() -> Option<&'static str> {
-                    Some(#ref_name)
+                    Some(std::concat!(std::module_path!(), "::", #ref_name))
                 }
 
                 #metadata_fn
@@ -94,7 +94,7 @@ fn build_enum_generate_schema_fn(variants: &[Variant<'_>]) -> proc_macro2::Token
         .map(generate_enum_variant_schema);
 
     quote! {
-        fn generate_schema(schema_gen: &mut ::schemars::gen::SchemaGenerator, overrides: ::vector_config::Metadata<#clt, Self>) -> ::schemars::schema::SchemaObject {
+        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator, overrides: ::vector_config::Metadata<#clt, Self>) -> ::vector_config::schemars::schema::SchemaObject {
             let mut subschemas = ::std::vec::Vec::new();
 
             let schema_metadata = Self::metadata().merge(overrides);
@@ -150,31 +150,43 @@ fn generate_named_struct_field(
 
     let field_schema = generate_struct_field(field);
 
-    // If there is no default value specified for either the field itself, or the container the
-    // field is a part of, then we consider it required unless the field type itself is inherently
-    // optional, such as being `Option<T>`.
-    let maybe_field_required =
-        if container.default_value().is_none() && field.default_value().is_none() {
-            Some(quote! {
-                if !#field_as_configurable::is_optional() {
-                    if !required.insert(#field_key.to_string()) {
-                        panic!(#field_already_contained);
+    // If the field is flattened, we store it into a different list of flattened subschemas vs adding it directly as a
+    // field via `properties`/`required`.
+    //
+    // If any flattened subschemas are present when we generate the struct schema overall, we do the merging of those at
+    // the end.
+    let integrate_field = if field.flatten() {
+        quote! {
+            flattened_subschemas.push(subschema);
+        }
+    } else {
+        // If there is no default value specified for either the field itself, or the container the
+        // field is a part of, then we consider it required unless the field type itself is inherently
+        // optional, such as being `Option<T>`.
+        let maybe_field_required =
+            if container.default_value().is_none() && field.default_value().is_none() {
+                Some(quote! {
+                    if !#field_as_configurable::is_optional() {
+                        assert!(required.insert(#field_key.to_string()), #field_already_contained);
                     }
-                }
-            })
-        } else {
-            None
-        };
+                })
+            } else {
+                None
+            };
 
-    quote! {
-        {
-            #field_schema
-
+        quote! {
             if let Some(_) = properties.insert(#field_key.to_string(), subschema) {
                 panic!(#field_already_contained);
             }
 
             #maybe_field_required
+        }
+    };
+
+    quote! {
+        {
+            #field_schema
+            #integrate_field
         }
     }
 }
@@ -203,25 +215,26 @@ fn build_named_struct_generate_schema_fn(
         .map(|field| generate_named_struct_field(container, field));
 
     quote! {
-        fn generate_schema(schema_gen: &mut ::schemars::gen::SchemaGenerator, overrides: ::vector_config::Metadata<#clt, Self>) -> ::schemars::schema::SchemaObject {
-            let mut properties = ::indexmap::IndexMap::new();
+        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator, overrides: ::vector_config::Metadata<#clt, Self>) -> ::vector_config::schemars::schema::SchemaObject {
+            let mut properties = ::vector_config::indexmap::IndexMap::new();
             let mut required = ::std::collections::BTreeSet::new();
+            let mut flattened_subschemas = ::std::vec::Vec::new();
 
             let metadata = Self::metadata().merge(overrides);
             #(#mapped_fields)*
 
-            // TODO: We need to figure out if we actually use `#[serde(flatten)]` anywhere in order
-            // to capture not-specifically-named fields i.e. collecting all remaining/unknown fields
-            // in a hashmap.
-            //
-            // That usage would drive `additional_properties` but I can we can currently ignore it
-            // until we hit our first struct that needs it.
             let additional_properties = None;
             let mut schema = ::vector_config::schema::generate_struct_schema(
                 properties,
                 required,
                 additional_properties,
             );
+
+            // If we have any flattened subschemas, deal with them now.
+            if !flattened_subschemas.is_empty() {
+                ::vector_config::schema::convert_to_flattened_schema(&mut schema, flattened_subschemas);
+            }
+
             ::vector_config::schema::finalize_schema(schema_gen, &mut schema, metadata);
 
             schema
@@ -239,7 +252,7 @@ fn build_tuple_struct_generate_schema_fn(fields: &[Field<'_>]) -> proc_macro2::T
         .map(generate_tuple_struct_field);
 
     quote! {
-        fn generate_schema(schema_gen: &mut ::schemars::gen::SchemaGenerator, overrides: ::vector_config::Metadata<#clt, Self>) -> ::schemars::schema::SchemaObject {
+        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator, overrides: ::vector_config::Metadata<#clt, Self>) -> ::vector_config::schemars::schema::SchemaObject {
             let mut subschemas = ::std::collections::Vec::new();
 
             let metadata = Self::metadata().merge(overrides);
@@ -271,7 +284,7 @@ fn build_newtype_struct_generate_schema_fn(fields: &[Field<'_>]) -> proc_macro2:
     let field_schema = mapped_fields.remove(0);
 
     quote! {
-        fn generate_schema(schema_gen: &mut ::schemars::gen::SchemaGenerator, overrides: ::vector_config::Metadata<#clt, Self>) -> ::schemars::schema::SchemaObject {
+        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator, overrides: ::vector_config::Metadata<#clt, Self>) -> ::vector_config::schemars::schema::SchemaObject {
             let metadata = Self::metadata().merge(overrides);
 
             #field_schema
@@ -476,7 +489,7 @@ fn generate_enum_struct_named_variant_schema(
     let mapped_fields = variant.fields().iter().map(generate_named_enum_field);
 
     quote! {
-        let mut properties = ::indexmap::IndexMap::new();
+        let mut properties = ::vector_config::indexmap::IndexMap::new();
         let mut required = ::std::collections::BTreeSet::new();
 
         #(#mapped_fields)*
@@ -554,7 +567,7 @@ fn generate_enum_variant_schema(variant: &Variant<'_>) -> proc_macro2::TokenStre
                 quote! {
                     #variant_schema
 
-                    let mut wrapper_properties = ::indexmap::IndexMap::new();
+                    let mut wrapper_properties = ::vector_config::indexmap::IndexMap::new();
                     let mut wrapper_required = ::std::collections::BTreeSet::new();
 
                     wrapper_properties.insert(#variant_name.to_string(), subschema);
@@ -610,9 +623,34 @@ fn generate_enum_variant_schema(variant: &Variant<'_>) -> proc_macro2::TokenStre
                 generate_enum_variant_subschema(variant, variant_schema)
             }
             Style::Tuple => panic!("tuple variants should be rejected during AST parsing"),
-            Style::Newtype => panic!(
-                "newtype variants in internal tagging mode should be rejected during AST parsing"
-            ),
+            Style::Newtype => {
+                // We have to delegate viability to `serde`, essentially, because using internal tagging for a newtype
+                // variant is only possible when the inner field is a struct or map, and we can't access that type of
+                // information here, which is why `serde` does it at compile-time.
+
+                // As such, we generate the schema for the single field, like we would normally do for a newtype
+                // variant, and then we follow the struct flattening logic where we layer on our tag field schema on the
+                // schema of the wrapped field... and since it has to be a struct or map to be valid for `serde`, that
+                // means it will also be an object schema in both cases, which means our flatteneing logic will be
+                // correct if the caller is doing The Right Thing (tm).
+                let wrapped_variant_schema = generate_enum_newtype_struct_variant_schema(variant);
+
+                let variant_schema = quote! {
+                    let mut subschema = {
+                        let tag_schema = ::vector_config::schema::generate_internal_tagged_variant_schema(#tag.to_string(), #variant_name.to_string());
+                        let mut flattened_subschemas = ::std::vec::Vec::new();
+                        flattened_subschemas.push(tag_schema);
+
+                        #wrapped_variant_schema
+
+                        ::vector_config::schema::convert_to_flattened_schema(&mut subschema, flattened_subschemas);
+
+                        subschema
+                    };
+                };
+
+                generate_enum_variant_subschema(variant, variant_schema)
+            }
             Style::Unit => {
                 // Internally-tagged unit variants are basically just a play on externally-tagged
                 // struct variants.
@@ -620,7 +658,7 @@ fn generate_enum_variant_schema(variant: &Variant<'_>) -> proc_macro2::TokenStre
                 let variant_schema = quote! {
                     #variant_schema
 
-                    let mut wrapper_properties = ::indexmap::IndexMap::new();
+                    let mut wrapper_properties = ::vector_config::indexmap::IndexMap::new();
                     let mut wrapper_required = ::std::collections::BTreeSet::new();
 
                     wrapper_properties.insert(#tag.to_string(), subschema);
@@ -673,7 +711,7 @@ fn generate_enum_variant_schema(variant: &Variant<'_>) -> proc_macro2::TokenStre
 
             quote! {
                 {
-                    let mut wrapper_properties = ::indexmap::IndexMap::new();
+                    let mut wrapper_properties = ::vector_config::indexmap::IndexMap::new();
                     let mut wrapper_required = ::std::collections::BTreeSet::new();
 
                     #tag_schema

@@ -1,4 +1,4 @@
-use darling::{error::Accumulator, FromAttributes};
+use darling::{error::Accumulator, util::Flag, FromAttributes};
 use serde_derive_internals::ast as serde_ast;
 use syn::spanned::Spanned;
 
@@ -71,7 +71,7 @@ impl<'a> Variant<'a> {
     }
 
     pub fn deprecated(&self) -> bool {
-        self.attrs.deprecated
+        self.attrs.deprecated.is_present()
     }
 
     pub fn visible(&self) -> bool {
@@ -90,8 +90,7 @@ impl<'a> Spanned for Variant<'a> {
 struct Attributes {
     title: Option<String>,
     description: Option<String>,
-    #[darling(skip)]
-    deprecated: bool,
+    deprecated: Flag,
     #[darling(skip)]
     visible: bool,
 }
@@ -104,11 +103,6 @@ impl Attributes {
     ) -> darling::Result<Self> {
         // Derive any of the necessary fields from the `serde` side of things.
         self.visible = !variant.attrs.skip_deserializing() || !variant.attrs.skip_serializing();
-
-        // Parse any forwarded attributes that `darling` left us.
-        self.deprecated = forwarded_attrs
-            .iter()
-            .any(|a| a.path.is_ident("deprecated"));
 
         // We additionally attempt to extract a title/description from the forwarded doc attributes, if they exist.
         // Whether we extract both a title and description, or just description, is documented in more detail in

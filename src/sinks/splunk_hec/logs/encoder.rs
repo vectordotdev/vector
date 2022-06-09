@@ -1,26 +1,28 @@
-use std::io;
+use std::borrow::Cow;
 
-use serde::{Deserialize, Serialize};
-use vector_core::{config::log_schema, event::LogEvent};
+use bytes::BytesMut;
+use serde::Serialize;
+use tokio_util::codec::Encoder as _;
 
 use super::sink::HecProcessedEvent;
 use crate::{
+    event::{Event, LogEvent},
     internal_events::SplunkEventEncodeError,
-    sinks::util::encoding::{Encoder, EncodingConfiguration},
+    sinks::util::encoding::{Encoder, Transformer},
 };
 
 #[derive(Serialize, Debug)]
-pub enum HecEvent {
+pub enum HecEvent<'a> {
     #[serde(rename = "event")]
-    Json(LogEvent),
+    Json(serde_json::Value),
     #[serde(rename = "event")]
-    Text(String),
+    Text(Cow<'a, str>),
 }
 
 #[derive(Serialize, Debug)]
-pub struct HecData {
+pub struct HecData<'a> {
     #[serde(flatten)]
-    pub event: HecEvent,
+    pub event: HecEvent<'a>,
     pub fields: LogEvent,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub time: Option<f64>,
@@ -34,8 +36,8 @@ pub struct HecData {
     pub sourcetype: Option<String>,
 }
 
-impl HecData {
-    pub const fn new(event: HecEvent, fields: LogEvent, time: Option<f64>) -> Self {
+impl<'a> HecData<'a> {
+    pub const fn new(event: HecEvent<'a>, fields: LogEvent, time: Option<f64>) -> Self {
         Self {
             event,
             fields,
@@ -48,46 +50,10 @@ impl HecData {
     }
 }
 
-#[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum HecLogsEncoder {
-    Json,
-    Text,
-}
-
-impl Default for HecLogsEncoder {
-    fn default() -> Self {
-        HecLogsEncoder::Text
-    }
-}
-
-impl HecLogsEncoder {
-    pub fn encode_event(&self, processed_event: HecProcessedEvent) -> Option<Vec<u8>> {
-        let log = processed_event.event;
-        let metadata = processed_event.metadata;
-        let event = match self {
-            HecLogsEncoder::Json => HecEvent::Json(log),
-            HecLogsEncoder::Text => HecEvent::Text(
-                log.get(log_schema().message_key())
-                    .map(|v| v.to_string_lossy())
-                    .unwrap_or_else(|| "".to_string()),
-            ),
-        };
-
-        let mut hec_data = HecData::new(event, metadata.fields, metadata.timestamp);
-        hec_data.host = metadata.host.map(|host| host.to_string_lossy());
-        hec_data.index = metadata.index;
-        hec_data.source = metadata.source;
-        hec_data.sourcetype = metadata.sourcetype;
-
-        match serde_json::to_vec(&hec_data) {
-            Ok(value) => Some(value),
-            Err(error) => {
-                emit!(SplunkEventEncodeError { error });
-                None
-            }
-        }
-    }
+#[derive(Debug, Clone)]
+pub struct HecLogsEncoder {
+    pub transformer: Transformer,
+    pub encoder: crate::codecs::Encoder<()>,
 }
 
 impl Encoder<Vec<HecProcessedEvent>> for HecLogsEncoder {
@@ -96,30 +62,46 @@ impl Encoder<Vec<HecProcessedEvent>> for HecLogsEncoder {
         input: Vec<HecProcessedEvent>,
         writer: &mut dyn std::io::Write,
     ) -> std::io::Result<usize> {
+        let mut encoder = self.encoder.clone();
         let encoded_input: Vec<u8> = input
             .into_iter()
-            .filter_map(|e| self.encode_event(e))
+            .filter_map(|processed_event| {
+                let mut event = Event::from(processed_event.event);
+                let metadata = processed_event.metadata;
+                self.transformer.transform(&mut event);
+
+                let mut bytes = BytesMut::new();
+                let serializer = encoder.serializer();
+                let hec_event = if serializer.supports_json() {
+                    HecEvent::Json(
+                        serializer
+                            .to_json_value(event)
+                            .map_err(|error| emit!(SplunkEventEncodeError { error }))
+                            .ok()?,
+                    )
+                } else {
+                    encoder.encode(event, &mut bytes).ok()?;
+                    HecEvent::Text(String::from_utf8_lossy(&bytes))
+                };
+
+                let mut hec_data = HecData::new(hec_event, metadata.fields, metadata.timestamp);
+                hec_data.host = metadata.host.map(|host| host.to_string_lossy());
+                hec_data.index = metadata.index;
+                hec_data.source = metadata.source;
+                hec_data.sourcetype = metadata.sourcetype;
+
+                match serde_json::to_vec(&hec_data) {
+                    Ok(value) => Some(value),
+                    Err(error) => {
+                        emit!(SplunkEventEncodeError { error });
+                        None
+                    }
+                }
+            })
             .flatten()
             .collect();
         let encoded_size = encoded_input.len();
         writer.write_all(encoded_input.as_slice())?;
         Ok(encoded_size)
-    }
-}
-
-impl<E> Encoder<Vec<HecProcessedEvent>> for E
-where
-    E: EncodingConfiguration,
-    E::Codec: Encoder<Vec<HecProcessedEvent>>,
-{
-    fn encode_input(
-        &self,
-        mut input: Vec<HecProcessedEvent>,
-        writer: &mut dyn io::Write,
-    ) -> io::Result<usize> {
-        for event in input.iter_mut() {
-            self.apply_rules(event);
-        }
-        self.codec().encode_input(input, writer)
     }
 }

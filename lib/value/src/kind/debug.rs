@@ -14,7 +14,9 @@ impl Kind {
 }
 
 fn insert_kind(tree: &mut BTreeMap<String, Value>, kind: &Kind, show_unknown: bool) {
-    if kind.is_any() {
+    if kind.is_never() {
+        insert_if_true(tree, "never", true);
+    } else if kind.is_any() {
         insert_if_true(tree, "any", true);
     } else {
         insert_if_true(tree, "bytes", kind.contains_bytes());

@@ -121,9 +121,7 @@ fn validate_simple_span(span: dd_proto::Span, resource: String) {
 #[tokio::test]
 async fn smoke() {
     let mut t = simple_trace_event("a_resource".to_string());
-    t.metadata_mut()
-        .set_datadog_api_key(Some(Arc::from("a_key")));
-
+    t.metadata_mut().set_datadog_api_key(Arc::from("a_key"));
     let events = vec![Event::Trace(t)];
     let rx = start_test(BatchStatus::Delivered, StatusCode::OK, events).await;
 
@@ -233,11 +231,9 @@ async fn smoke() {
 #[tokio::test]
 async fn multiple_traces() {
     let mut t1 = simple_trace_event("trace_1".to_string());
-    t1.metadata_mut()
-        .set_datadog_api_key(Some(Arc::from("a_key")));
+    t1.metadata_mut().set_datadog_api_key(Arc::from("a_key"));
     let mut t2 = simple_trace_event("trace_2".to_string());
-    t2.metadata_mut()
-        .set_datadog_api_key(Some(Arc::from("a_key")));
+    t2.metadata_mut().set_datadog_api_key(Arc::from("a_key"));
 
     let events = vec![Event::Trace(t1), Event::Trace(t2)];
     let rx = start_test(BatchStatus::Delivered, StatusCode::OK, events).await;

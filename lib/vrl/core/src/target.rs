@@ -1,8 +1,8 @@
 use lookup::LookupBuf;
-use value::Value;
+use value::{Secrets, Value};
 
 /// Any target object you want to remap using VRL has to implement this trait.
-pub trait Target: std::fmt::Debug {
+pub trait Target: std::fmt::Debug + MetadataTarget + SecretTarget {
     /// Insert a given [`Value`] in the provided [`Target`].
     ///
     /// The `path` parameter determines _where_ in the given target the value
@@ -57,36 +57,203 @@ pub trait Target: std::fmt::Debug {
     /// If `compact` is true, after deletion, if an empty object or array is
     /// left behind, it should be removed as well, cascading up to the root.
     fn target_remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String>;
-
-    fn get_metadata(&self, _key: &str) -> Result<Option<Value>, String> {
-        Err("metadata not available".to_string())
-    }
-
-    fn set_metadata(&mut self, _key: &str, _value: String) -> Result<(), String> {
-        Err("metadata not available".to_string())
-    }
-
-    fn remove_metadata(&mut self, _key: &str) -> Result<(), String> {
-        Err("metadata not available".to_string())
-    }
 }
 
-impl Target for Value {
+pub trait MetadataTarget {
+    fn get_metadata(&self, _path: &LookupBuf) -> Result<Option<Value>, String>;
+
+    fn set_metadata(&mut self, _path: &LookupBuf, _value: Value) -> Result<(), String>;
+
+    fn remove_metadata(&mut self, _path: &LookupBuf) -> Result<(), String>;
+}
+
+pub trait SecretTarget {
+    fn get_secret(&self, key: &str) -> Option<&str>;
+
+    fn insert_secret(&mut self, key: &str, value: &str);
+
+    fn remove_secret(&mut self, key: &str);
+}
+
+#[derive(Debug)]
+pub struct TargetValueRef<'a> {
+    pub value: &'a mut Value,
+    pub metadata: &'a mut Value,
+    pub secrets: &'a mut Secrets,
+}
+
+impl Target for TargetValueRef<'_> {
     fn target_insert(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
-        self.insert_by_path(path, value);
+        self.value.insert_by_path(path, value);
         Ok(())
     }
 
     fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
-        Ok(self.get_by_path(path))
+        Ok(self.value.get_by_path(path))
     }
 
     fn target_get_mut(&mut self, path: &LookupBuf) -> Result<Option<&mut Value>, String> {
-        Ok(self.get_by_path_mut(path))
+        Ok(self.value.get_by_path_mut(path))
     }
 
     fn target_remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String> {
-        Ok(self.remove_by_path(path, compact))
+        Ok(self.value.remove_by_path(path, compact))
+    }
+}
+
+impl MetadataTarget for TargetValueRef<'_> {
+    fn get_metadata(&self, path: &LookupBuf) -> Result<Option<Value>, String> {
+        Ok(self.metadata.get_by_path(path).cloned())
+    }
+
+    fn set_metadata(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
+        self.metadata.insert_by_path(path, value);
+        Ok(())
+    }
+
+    fn remove_metadata(&mut self, path: &LookupBuf) -> Result<(), String> {
+        self.metadata.remove_by_path(path, true);
+        Ok(())
+    }
+}
+
+impl SecretTarget for TargetValueRef<'_> {
+    fn get_secret(&self, key: &str) -> Option<&str> {
+        self.secrets.get_secret(key)
+    }
+
+    fn insert_secret(&mut self, key: &str, value: &str) {
+        self.secrets.insert_secret(key, value);
+    }
+
+    fn remove_secret(&mut self, key: &str) {
+        self.secrets.remove_secret(key);
+    }
+}
+
+#[derive(Debug)]
+pub struct TargetValue {
+    pub value: Value,
+    pub metadata: Value,
+    pub secrets: Secrets,
+}
+
+impl Target for TargetValue {
+    fn target_insert(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
+        self.value.insert_by_path(path, value);
+        Ok(())
+    }
+
+    fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
+        Ok(self.value.get_by_path(path))
+    }
+
+    fn target_get_mut(&mut self, path: &LookupBuf) -> Result<Option<&mut Value>, String> {
+        Ok(self.value.get_by_path_mut(path))
+    }
+
+    fn target_remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String> {
+        Ok(self.value.remove_by_path(path, compact))
+    }
+}
+
+impl MetadataTarget for TargetValue {
+    fn get_metadata(&self, path: &LookupBuf) -> Result<Option<Value>, String> {
+        Ok(self.metadata.get_by_path(path).cloned())
+    }
+
+    fn set_metadata(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
+        self.metadata.insert_by_path(path, value);
+        Ok(())
+    }
+
+    fn remove_metadata(&mut self, path: &LookupBuf) -> Result<(), String> {
+        self.metadata.remove_by_path(path, true);
+        Ok(())
+    }
+}
+
+impl SecretTarget for TargetValue {
+    fn get_secret(&self, key: &str) -> Option<&str> {
+        self.secrets.get_secret(key)
+    }
+
+    fn insert_secret(&mut self, key: &str, value: &str) {
+        self.secrets.insert_secret(key, value);
+    }
+
+    fn remove_secret(&mut self, key: &str) {
+        self.secrets.remove_secret(key);
+    }
+}
+
+impl SecretTarget for Secrets {
+    fn get_secret(&self, key: &str) -> Option<&str> {
+        self.get(key).map(|value| value.as_ref())
+    }
+
+    fn insert_secret(&mut self, key: &str, value: &str) {
+        self.insert(key, value);
+    }
+
+    fn remove_secret(&mut self, key: &str) {
+        self.remove(&key.to_owned());
+    }
+}
+
+#[cfg(any(test, feature = "test"))]
+mod value_target_impl {
+    use super::*;
+
+    impl Target for Value {
+        fn target_insert(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
+            self.insert_by_path(path, value);
+            Ok(())
+        }
+
+        fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
+            Ok(self.get_by_path(path))
+        }
+
+        fn target_get_mut(&mut self, path: &LookupBuf) -> Result<Option<&mut Value>, String> {
+            Ok(self.get_by_path_mut(path))
+        }
+
+        fn target_remove(
+            &mut self,
+            path: &LookupBuf,
+            compact: bool,
+        ) -> Result<Option<Value>, String> {
+            Ok(self.remove_by_path(path, compact))
+        }
+    }
+
+    impl MetadataTarget for Value {
+        fn get_metadata(&self, _path: &LookupBuf) -> Result<Option<Value>, String> {
+            panic!("Value has no metadata. Use `TargetValue` instead.")
+        }
+
+        fn set_metadata(&mut self, _path: &LookupBuf, _value: Value) -> Result<(), String> {
+            panic!("Value has no metadata. Use `TargetValue` instead.")
+        }
+
+        fn remove_metadata(&mut self, _path: &LookupBuf) -> Result<(), String> {
+            panic!("Value has no metadata. Use `TargetValue` instead.")
+        }
+    }
+
+    impl SecretTarget for Value {
+        fn get_secret(&self, _key: &str) -> Option<&str> {
+            panic!("Value has no secrets. Use `TargetValue` instead.")
+        }
+
+        fn insert_secret(&mut self, _key: &str, _value: &str) {
+            panic!("Value has no secrets. Use `TargetValue` instead.")
+        }
+
+        fn remove_secret(&mut self, _key: &str) {
+            panic!("Value has no secrets. Use `TargetValue` instead.")
+        }
     }
 }
 
@@ -143,9 +310,14 @@ mod tests {
 
         for (value, segments, expect) in cases {
             let value: Value = value;
+            let target = TargetValue {
+                value,
+                metadata: value!({}),
+                secrets: Secrets::new(),
+            };
             let path = LookupBuf::from_segments(segments);
 
-            assert_eq!(value.target_get(&path).map(|v| v.cloned()), expect);
+            assert_eq!(target.target_get(&path).map(|v| v.cloned()), expect);
         }
     }
 
@@ -250,7 +422,12 @@ mod tests {
             */
         ];
 
-        for (mut target, segments, value, expect, result) in cases {
+        for (target, segments, value, expect, result) in cases {
+            let mut target = TargetValue {
+                value: target,
+                metadata: value!({}),
+                secrets: Secrets::new(),
+            };
             println!("Inserting at {:?}", segments);
             let path = LookupBuf::from_segments(segments);
 
@@ -258,7 +435,7 @@ mod tests {
                 Target::target_insert(&mut target, &path, value.clone()),
                 result
             );
-            assert_eq!(target, expect);
+            assert_eq!(target.value, expect);
             assert_eq!(
                 Target::target_get(&target, &path).map(|v| v.cloned()),
                 Ok(Some(value))
@@ -345,9 +522,14 @@ mod tests {
             ),
         ];
 
-        for (mut target, segments, compact, value, expect) in cases {
+        for (target, segments, compact, value, expect) in cases {
             let path = LookupBuf::from_segments(segments);
 
+            let mut target = TargetValue {
+                value: target,
+                metadata: value!({}),
+                secrets: Secrets::new(),
+            };
             assert_eq!(
                 Target::target_remove(&mut target, &path, compact),
                 Ok(value)

@@ -1,7 +1,7 @@
 use futures::StreamExt;
-use serde::{Deserialize, Serialize};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -12,13 +12,22 @@ use crate::{
     SourceSender,
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
+/// Configuration for the `internal_metrics` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct InternalMetricsConfig {
+    /// The interval between metric gathering, in seconds.
     #[derivative(Default(value = "2.0"))]
     pub scrape_interval_secs: f64,
+
+    #[configurable(derived)]
     pub tags: TagsConfig,
+
+    /// Overrides the default namespace for the metrics emitted by the source.
+    ///
+    /// By default, `vector` is used.
     pub namespace: Option<String>,
 }
 
@@ -29,12 +38,25 @@ impl InternalMetricsConfig {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
+/// Tag configuration for the `internal_metrics` source.
+#[configurable_component]
+#[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct TagsConfig {
-    host_key: Option<String>,
-    pid_key: Option<String>,
+    /// Sets the name of the tag to use to add the current hostname to each metric.
+    ///
+    /// The value will be the current hostname for wherever Vector is running.
+    ///
+    /// By default, this is not set and the tag will not be automatically added.
+    pub host_key: Option<String>,
+
+    /// Sets the name of the tag to use to add the current process ID to each metric.
+    ///
+    /// The value will be the current process ID for Vector itself.
+    ///
+    /// By default, this is not set and the tag will not be automatically added.
+    pub pid_key: Option<String>,
 }
 
 inventory::submit! {
