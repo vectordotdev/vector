@@ -279,22 +279,24 @@ impl WebSocketSink {
                     };
                     let mut bytes = BytesMut::new();
                     self.transformer.transform(&mut event);
-                    let res = match self.encoder.encode(event, &mut bytes).ok().map(|_| Message::text(String::from_utf8_lossy(&bytes))) {
-                        Some(msg) => {
-                            let msg_len = msg.len();
-                            ws_sink.send(msg).await.map(|_| {
+                    let res = match self.encoder.encode(event, &mut bytes) {
+                        Ok(()) => {
+                            let message = Message::text(String::from_utf8_lossy(&bytes));
+                            let message_len = message.len();
+                            ws_sink.send(message).await.map(|_| {
                                 emit!(EventsSent {
                                     count: 1,
-                                    byte_size: msg_len,
+                                    byte_size: message_len,
                                     output: None
                                 });
                                 emit!(BytesSent {
-                                    byte_size: msg_len,
+                                    byte_size: message_len,
                                     protocol: "websocket"
                                 });
                             })
                         },
-                        None => {
+                        Err(_) => {
+                            // Error is handled by `Encoder`.
                             Ok(())
                         }
                     };
