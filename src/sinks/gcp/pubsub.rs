@@ -64,7 +64,6 @@ pub struct PubsubConfig {
     pub batch: BatchConfig<PubsubDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    #[serde(flatten)]
     encoding: EncodingConfigAdapter<EncodingConfig<StandardEncodings>, StandardEncodingsMigrator>,
 
     #[serde(default)]
