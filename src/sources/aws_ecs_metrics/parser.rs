@@ -258,10 +258,8 @@ fn cpu_metrics(
     namespace: &Option<String>,
     tags: &BTreeMap<String, String>,
 ) -> Vec<Metric> {
-    let mut size = 8; // Eight expected metrics not including online_cpus
-    if let Some(online_cpus) = cpu.online_cpus {
-        size += online_cpus;
-    }
+    // Eight expected metrics not including online_cpus
+    let size = 8 + cpu.online_cpus.unwrap_or(0);
     let mut metrics = Vec::with_capacity(size);
 
     if let Some(online_cpus) = cpu.online_cpus {
