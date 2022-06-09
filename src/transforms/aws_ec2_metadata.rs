@@ -87,6 +87,7 @@ pub struct Ec2Metadata {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     proxy: ProxyConfig,
+    required: Option<bool>,
 }
 
 #[derive(Clone, Debug)]
@@ -173,7 +174,16 @@ impl TransformConfig for Ec2Metadata {
             fields,
         );
 
-        client.refresh_metadata().await?;
+        // if initial metadata is not required, just log and proceed
+        if let Err(error) = client.refresh_metadata().await {
+            if self.required.unwrap_or(true) {
+                println!("refresh_metadata failed but required is true");
+                return Err(error);
+            } else {
+                println!("refresh_metadata failed and required is false!");
+                emit!(AwsEc2MetadataRefreshError { error });
+            }
+        }
 
         tokio::spawn(
             async move {
@@ -698,6 +708,38 @@ mod integration_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn timeout() {
+        trace_init();
+
+        let addr = next_addr();
+
+        async fn sleepy() -> Result<impl warp::Reply, std::convert::Infallible> {
+            tokio::time::sleep(Duration::from_secs(3)).await;
+            Ok("I waited 3 seconds!")
+        }
+
+        let slow = warp::any().and_then(sleepy);
+        let server = warp::serve(slow).bind(addr);
+        let _server = tokio::spawn(server);
+
+        let config = Ec2Metadata {
+            endpoint: Some(format!("http://{}", addr)),
+            refresh_timeout_secs: Some(1),
+            ..Default::default()
+        };
+
+        match config.build(&TransformContext::default()).await {
+            Ok(_) => panic!("expected timeout failure"),
+            // cannot create tokio::time::error::Elapsed to compare with since constructor is
+            // private
+            Err(err) => assert_eq!(
+                err.to_string(),
+                "Unable to fetch metadata authentication token: deadline has elapsed."
+            ),
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn timeout_2() {
         trace_init();
 
         let addr = next_addr();
