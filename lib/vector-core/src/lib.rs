@@ -34,7 +34,6 @@ pub mod metrics;
 pub mod partition;
 pub mod schema;
 pub mod serde;
-pub mod shutdown;
 pub mod sink;
 pub mod source;
 pub mod stream;
@@ -42,7 +41,6 @@ pub mod stream;
 mod test_util;
 pub mod time;
 pub mod transform;
-pub mod trigger;
 
 use std::path::PathBuf;
 
