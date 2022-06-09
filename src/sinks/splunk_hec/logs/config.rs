@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use codecs::{encoding::SerializerConfig, JsonSerializerConfig, RawMessageSerializerConfig};
+use codecs::{encoding::SerializerConfig, JsonSerializerConfig, TextSerializerConfig};
 use futures_util::FutureExt;
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
@@ -44,7 +44,7 @@ impl EncodingConfigMigrator for HecEncodingMigrator {
 
     fn migrate(codec: &Self::Codec) -> SerializerConfig {
         match codec {
-            HecEncoding::Text => RawMessageSerializerConfig::new().into(),
+            HecEncoding::Text => TextSerializerConfig::new().into(),
             HecEncoding::Json => JsonSerializerConfig::new().into(),
         }
     }
@@ -120,7 +120,7 @@ impl SinkConfig for HecLogsSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(self.encoding.config().input_type())
     }
 
     fn sink_type(&self) -> &'static str {
