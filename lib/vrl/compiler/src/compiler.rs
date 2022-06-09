@@ -2,6 +2,7 @@ use diagnostic::{DiagnosticList, DiagnosticMessage, Severity, Span};
 use lookup::LookupBuf;
 use parser::ast::{self, Node, QueryTarget};
 
+use crate::parser::ast::RootExpr;
 use crate::{
     expression::*,
     program::ProgramInfo,
@@ -64,11 +65,7 @@ impl<'a> Compiler<'a> {
         ast: parser::Program,
         external: &mut ExternalEnv,
     ) -> Result<(Program, DiagnosticList), DiagnosticList> {
-        let mut expressions = self.compile_root_exprs(ast, external);
-
-        if expressions.is_empty() {
-            expressions.push(Expr::Noop(Noop));
-        }
+        let expressions = self.compile_root_exprs(ast, external);
 
         let (errors, warnings): (Vec<_>, Vec<_>) =
             self.diagnostics.into_iter().partition(|diagnostic| {
@@ -91,44 +88,25 @@ impl<'a> Compiler<'a> {
         Ok((Program { expressions, info }, warnings.into()))
     }
 
-    fn compile_root_exprs(
-        &mut self,
-        nodes: impl IntoIterator<Item = Node<ast::RootExpr>>,
-        external: &mut ExternalEnv,
-    ) -> Vec<Expr> {
-        use ast::RootExpr::*;
-
-        nodes
-            .into_iter()
-            .filter_map(|node| match node.into_inner() {
-                Expr(expr) => {
-                    self.fallible_expression_error = None;
-
-                    let expr = self.compile_expr(expr, external)?;
-
-                    if let Some(error) = self.fallible_expression_error.take() {
-                        self.diagnostics.push(error);
-                    }
-
-                    Some(expr)
-                }
-                Error(err) => {
-                    self.handle_parser_error(err);
-                    None
-                }
-            })
-            .collect()
-    }
-
     fn compile_exprs(
         &mut self,
         nodes: impl IntoIterator<Item = Node<ast::Expr>>,
         external: &mut ExternalEnv,
     ) -> Option<Vec<Expr>> {
-        nodes
-            .into_iter()
-            .map(|node| self.compile_expr(node, external))
-            .collect::<Option<_>>()
+        let mut exprs = vec![];
+        for node in nodes {
+            let expr = self.compile_expr(node, external)?;
+            let type_def = expr.type_def((&self.local, external));
+            exprs.push(expr);
+
+            if type_def.is_never() {
+                // This is a terminal expression. Further expressions must not be
+                // compiled since they will never execute, but could alter the types of
+                // variables in local or external scopes through assignments.
+                break;
+            }
+        }
+        Some(exprs)
     }
 
     fn compile_expr(&mut self, node: Node<ast::Expr>, external: &mut ExternalEnv) -> Option<Expr> {
@@ -237,6 +215,52 @@ impl<'a> Compiler<'a> {
         let expr = self.compile_expr(node.into_inner().into_inner(), external)?;
 
         Some(Group::new(expr))
+    }
+
+    fn compile_root_exprs(
+        &mut self,
+        nodes: impl IntoIterator<Item = Node<ast::RootExpr>>,
+        external: &mut ExternalEnv,
+    ) -> Vec<Expr> {
+        let mut node_exprs = vec![];
+
+        // After a terminating expression, the state is stored, but the remaining expressions are checked.
+        let mut terminated_state = None;
+
+        for root_expr in nodes {
+            match root_expr.into_inner() {
+                RootExpr::Expr(node_expr) => {
+                    self.fallible_expression_error = None;
+
+                    if let Some(expr) = self.compile_expr(node_expr, external) {
+                        if let Some(error) = self.fallible_expression_error.take() {
+                            self.diagnostics.push(error);
+                        }
+
+                        if terminated_state.is_none() {
+                            let type_def = expr.type_def((&self.local, external));
+                            node_exprs.push(expr);
+                            // an expression that has the "never" type is a terminating expression
+                            if type_def.is_never() {
+                                terminated_state =
+                                    Some((self.local.clone(), external.target().clone()))
+                            }
+                        }
+                    }
+                }
+                RootExpr::Error(err) => self.handle_parser_error(err),
+            }
+        }
+
+        if let Some((local, details)) = terminated_state {
+            self.local = local;
+            external.update_target(details);
+        }
+
+        if node_exprs.is_empty() {
+            node_exprs.push(Expr::Noop(Noop));
+        }
+        node_exprs
     }
 
     fn compile_block(
