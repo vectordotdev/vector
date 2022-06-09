@@ -48,9 +48,7 @@ impl Secrets {
     /// Merged both together. If there are collisions, the value from `self` is kept.
     pub fn merge(&mut self, other: Self) {
         for (key, value) in other.secrets {
-            if !self.secrets.contains_key(&key) {
-                self.secrets.insert(key, value);
-            }
+            self.secrets.entry(key).or_insert(value);
         }
     }
 }
