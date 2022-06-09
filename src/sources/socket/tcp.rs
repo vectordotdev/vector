@@ -37,7 +37,7 @@ pub struct TcpConfig {
     ///
     /// The value will be the peer host's address, including the port i.e. `1.2.3.4:9000`.
     ///
-    /// By default, the [global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key) is used.
+    /// By default, the [global `host_key` option](https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key) is used.
     host_key: Option<String>,
 
     /// Overrides the name of the log field used to add the peer host's port to each event.

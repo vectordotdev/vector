@@ -331,6 +331,14 @@ impl<'de, T: Configurable<'de>> fmt::Debug for Metadata<'de, T> {
     }
 }
 
+/// A type that can be represented in a Vector configuration.
+///
+/// In Vector, we want to be able to generate a schema for our configuration such that we can have a Rust-agnostic
+/// definition of exactly what is configurable, what values are allowed, what bounds exist, and so on and so forth.
+///
+/// `Configurable` provides the machinery to allow describing and encoding the shape of a type, recursively, so that by
+/// instrumenting all transitive types of the configuration, the schema can be discovered by generating the schema from
+/// some root type.
 pub trait Configurable<'de>: Serialize + Deserialize<'de> + Sized
 where
     Self: Clone,

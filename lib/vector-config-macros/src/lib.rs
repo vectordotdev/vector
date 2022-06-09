@@ -38,7 +38,10 @@ pub fn configurable_component(args: TokenStream, item: TokenStream) -> TokenStre
     configurable_component::configurable_component_impl(args, item)
 }
 
-/// A helpful lil derive.
+/// Generates an implementation of `Configurable` trait for the given container.
+///
+/// In general, `#[configurable_component]` should be preferred as it ensures the other necessary derives/trait
+/// implementations are provided, and offers other features related to describing specific configuration types, etc.
 #[proc_macro_derive(Configurable, attributes(configurable))]
 pub fn derive_configurable(input: TokenStream) -> TokenStream {
     configurable::derive_configurable_impl(input)

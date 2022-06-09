@@ -43,7 +43,7 @@ pub struct UnixConfig {
     ///
     /// The value will be the socket path itself.
     ///
-    /// By default, the [global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key) is used.pub host_key: Option<String>,
+    /// By default, the [global `host_key` option](https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key) is used.pub host_key: Option<String>,
     pub host_key: Option<String>,
 
     #[configurable(derived)]
