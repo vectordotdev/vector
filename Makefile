@@ -437,7 +437,8 @@ check-component-features: ## Check that all component features are setup properl
 
 .PHONY: check-clippy
 check-clippy: ## Check code with Clippy
-	${MAYBE_ENVIRONMENT_EXEC} cargo clippy --workspace --all-targets --features all-integration-tests -- -D warnings
+	cat .cargo/config.toml
+	${MAYBE_ENVIRONMENT_EXEC} cargo clippy --verbose --workspace --all-targets --features all-integration-tests -- -D warnings
 
 .PHONY: check-docs
 check-docs: ## Check that all /docs file are valid
