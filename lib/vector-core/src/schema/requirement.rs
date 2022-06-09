@@ -103,7 +103,7 @@ impl Requirement {
                     // If no kind is found, we set the kind to "any", since we
                     // lack any further information.
                     let definition_kind = definition
-                        .collection()
+                        .kind()
                         .find_known_at_path(&mut path.to_lookup())
                         .ok()
                         .flatten()

@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use lookup::LookupBuf;
+use lookup::{Look, LookupBuf};
+use value::kind::insert::InnerConflict;
 use value::{
     kind::{insert, merge, nest, Collection, Field, Unknown},
     Kind,
@@ -93,6 +94,16 @@ impl Definition {
         }
     }
 
+    /// Creates an empty definition that is of the kind specified.
+    /// There are no meanings or optional fields.
+    pub fn empty_kind(kind: Kind) -> Self {
+        Self {
+            kind,
+            meaning: BTreeMap::default(),
+            optional: BTreeSet::default(),
+        }
+    }
+
     /// An event with an object root, no known fields, and no unknown fields.
     pub fn empty_object() -> Self {
         // TODO: set the root to an object
@@ -114,9 +125,11 @@ impl Definition {
     // }
 
     /// Add type information for an event field.
+    /// A non-root required field means the root type must be an object, so the type will be automatically
+    /// restricted to an object.
     ///
     /// # Panics
-    ///
+    /// - If the path is not root, and the definition does not allow the type to be an object
     /// - Provided path has one or more coalesced segments (e.g. `.(foo | bar)`).
     #[must_use]
     pub fn required_field(
@@ -128,23 +141,40 @@ impl Definition {
         let mut path = path.into();
         let meaning = meaning.map(ToOwned::to_owned);
 
-        // TODO: can this use `Kind::insert_at_path`?
-        let new_kind = kind
-            .nest_at_path(
-                &path.to_lookup(),
-                nest::Strategy {
-                    coalesced_path: nest::CoalescedPath::Reject,
-                },
-            )
-            .expect("non-coalesced path used");
+        if !path.is_root() {
+            self.kind = self
+                .kind
+                .into_object()
+                .expect("required field implies the type can be an object")
+                .into();
+        }
 
-        self.kind.merge(
-            new_kind,
-            merge::Strategy {
-                depth: merge::Depth::Deep,
-                indices: merge::Indices::Keep,
+        self.kind.insert_at_path(
+            &path.to_lookup(),
+            kind,
+            insert::Strategy {
+                inner_conflict: insert::InnerConflict::Replace,
+                leaf_conflict: insert::LeafConflict::Replace,
+                coalesced_path: insert::CoalescedPath::InsertValid,
             },
         );
+        // // TODO: can this use `Kind::insert_at_path`?
+        // let new_kind = kind
+        //     .nest_at_path(
+        //         &path.to_lookup(),
+        //         nest::Strategy {
+        //             coalesced_path: nest::CoalescedPath::Reject,
+        //         },
+        //     )
+        //     .expect("non-coalesced path used");
+        //
+        // self.kind.merge(
+        //     new_kind,
+        //     merge::Strategy {
+        //         depth: merge::Depth::Deep,
+        //         indices: merge::Indices::Keep,
+        //     },
+        // );
 
         if let Some(meaning) = meaning {
             self.meaning.insert(meaning, MeaningPointer::Valid(path));
@@ -176,7 +206,7 @@ impl Definition {
     /// # Panics
     ///
     /// This method panics if the provided path points to an unknown location in the collection.
-    pub fn register_known_meaning(&mut self, path: impl Into<LookupBuf>, meaning: &str) {
+    pub fn with_known_meaning(mut self, path: impl Into<LookupBuf>, meaning: &str) -> Self {
         let path = path.into();
 
         // Ensure the path exists in the collection.
@@ -189,6 +219,7 @@ impl Definition {
 
         self.meaning
             .insert(meaning.to_owned(), MeaningPointer::Valid(path));
+        self
     }
 
     /// Set the kind for all unknown fields.
@@ -298,11 +329,8 @@ impl Definition {
             })
     }
 
-    // this assumes the root is an object, which is no longer true
-    #[deprecated]
-    pub fn collection(&self) -> &Collection<Field> {
-        panic!()
-        // &self.collection
+    pub fn kind(&self) -> &Kind {
+        &self.kind
     }
 }
 

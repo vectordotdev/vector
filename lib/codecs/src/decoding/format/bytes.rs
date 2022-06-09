@@ -40,7 +40,7 @@ impl BytesDeserializerConfig {
                 Some("message"),
             ),
             LogNamespace::Vector => {
-                schema::Definition::empty().required_field(".", Kind::bytes(), Some("message"))
+                schema::Definition::empty_kind(Kind::bytes()).with_known_meaning(".", "message")
             }
         }
     }
