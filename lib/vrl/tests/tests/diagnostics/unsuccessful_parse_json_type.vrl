@@ -7,7 +7,7 @@
 # 4 │ sha3(result.message)
 #   │      ^^^^^^^^^^^^^^
 #   │      │
-#   │      this expression resolves to one of integer, float, boolean, null, array, object or string
+#   │      this expression resolves to one of string, integer, float, boolean, null, array or object
 #   │      but the parameter "value" expects the exact type string
 #   │
 #   = try: ensuring an appropriate type at runtime

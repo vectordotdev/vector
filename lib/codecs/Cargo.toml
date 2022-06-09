@@ -20,6 +20,8 @@ tokio-util = { version = "0.7", default-features = false, features = ["codec"] }
 tracing = { version = "0.1", default-features = false }
 value = { path = "../value", default-features = false }
 vector_common = { path = "../vector-common", default-features = false }
+vector_config = { path = "../vector-config", default-features = false }
+vector_config_macros = { path = "../vector-config-macros", default-features = false }
 vector_core = { path = "../vector-core", default-features = false }
 
 [dev-dependencies]

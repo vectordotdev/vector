@@ -2,7 +2,7 @@ mod config;
 mod integration_tests;
 mod source;
 
-use config::AwsSqsConfig;
+pub use config::AwsSqsConfig;
 
 use crate::config::SourceDescription;
 

@@ -122,6 +122,8 @@ tracing-limit = { path = "lib/tracing-limit" }
 value = { path = "lib/value" }
 vector_buffers = { path = "lib/vector-buffers", default-features = false }
 vector_common = { path = "lib/vector-common" }
+vector_config = { path = "lib/vector-config" }
+vector_config_macros = { path = "lib/vector-config-macros" }
 vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl"] }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
 vector-vrl-functions = { path = "lib/vector-vrl-functions" }
@@ -307,7 +309,7 @@ warp = { version = "0.3.1", default-features = false }
 heim = { git = "https://github.com/vectordotdev/heim.git", branch="update-nix", default-features = false, features = ["cpu", "disk", "host", "memory", "net"], optional = true }
 
 # make sure to update the external docs when the Lua version changes
-mlua = { version = "0.7.4", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
+mlua = { version = "0.8.0", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 
 [target.'cfg(windows)'.dependencies]
 schannel = "0.1.20"

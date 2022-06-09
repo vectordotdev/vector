@@ -13,10 +13,10 @@ use hyper::{
 };
 use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tower::Service;
 use tracing::Instrument;
+use vector_config::configurable_component;
 
 use crate::{
     config::ProxyConfig,
@@ -209,11 +209,32 @@ impl<B> fmt::Debug for HttpClient<B> {
     }
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+/// Configuration of the authentication strategy for HTTP requests.
+///
+/// HTTP authentication should almost always be used with HTTPS only, as the authentication credentials are passed as an
+/// HTTP header without any additional encryption beyond what is provided by the transport itself.
+#[configurable_component]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
 pub enum Auth {
-    Basic { user: String, password: String },
-    Bearer { token: String },
+    /// Basic authentication.
+    ///
+    /// The username and password are concatenated and encoded via base64.
+    Basic {
+        /// The username to send.
+        user: String,
+
+        /// The password to send.
+        password: String,
+    },
+
+    /// Bearer authentication.
+    ///
+    /// A bearer token (OAuth2, JWT, etc) is passed as-is.
+    Bearer {
+        /// The bearer token to send.
+        token: String,
+    },
 }
 
 pub trait MaybeAuth: Sized {

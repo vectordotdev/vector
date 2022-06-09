@@ -3,6 +3,11 @@ use std::fmt::Debug;
 use chrono::{DateTime, Local, ParseError, TimeZone as _, Utc};
 use chrono_tz::Tz;
 use derivative::Derivative;
+use vector_config::{
+    schema::{finalize_schema, generate_string_schema},
+    schemars::{gen::SchemaGenerator, schema::SchemaObject},
+    Configurable, Metadata,
+};
 
 #[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 #[derivative(Default)]
@@ -80,5 +85,21 @@ pub mod ser_de {
                 None => Err(de::Error::custom("No such time zone")),
             }
         }
+    }
+}
+
+impl<'de> Configurable<'de> for TimeZone {
+    fn referencable_name() -> Option<&'static str> {
+        Some("vector_common::TimeZone")
+    }
+
+    fn description() -> Option<&'static str> {
+        Some("Strongly-typed list of timezones as defined in the `tz` database.")
+    }
+
+    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
+        let mut schema = generate_string_schema();
+        finalize_schema(gen, &mut schema, overrides);
+        schema
     }
 }

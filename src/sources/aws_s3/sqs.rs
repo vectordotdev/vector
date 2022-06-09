@@ -18,6 +18,7 @@ use snafu::{ResultExt, Snafu};
 use tokio::{pin, select};
 use tokio_util::codec::FramedRead;
 use tracing::Instrument;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::tls::TlsConfig;
@@ -39,31 +40,58 @@ use lookup::path;
 static SUPPORTED_S3S_EVENT_VERSION: Lazy<semver::VersionReq> =
     Lazy::new(|| semver::VersionReq::parse("~2").unwrap());
 
-#[derive(Derivative, Clone, Debug, Deserialize, Serialize)]
+/// SQS configuration options.
+//
+// TODO: It seems awfully likely that we could re-use the existing configuration type for the `aws_sqs` source in some
+// way, given the near 100% overlap in configurable values.
+#[configurable_component]
+#[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Config {
+    /// The URL of the SQS queue to poll for bucket notifications.
     pub(super) queue_url: String,
 
-    // restricted to u32 for safe conversion to i64 later
+    /// How long to wait while polling the queue for new messages, in seconds.
+    ///
+    /// Generally should not be changed unless instructed to do so, as if messages are available, they will always be
+    /// consumed, regardless of the value of `poll_secs`.
+    // NOTE: We restrict this to u32 for safe conversion to i64 later.
     #[serde(default = "default_poll_secs")]
     #[derivative(Default(value = "default_poll_secs()"))]
     pub(super) poll_secs: u32,
 
-    // restricted to u32 for safe conversion to i64 later
+    /// The visibility timeout to use for messages, in secords.
+    ///
+    /// This controls how long a message is left unavailable after Vector receives it. If Vector receives a message, and
+    /// takes longer than `visibility_timeout_secs` to process and delete the message from the queue, it will be made reavailable for another consumer.
+    ///
+    /// This can happen if, for example, if Vector crashes between consuming a message and deleting it.
+    // NOTE: We restrict this to u32 for safe conversion to i64 later.
     #[serde(default = "default_visibility_timeout_secs")]
     #[derivative(Default(value = "default_visibility_timeout_secs()"))]
     pub(super) visibility_timeout_secs: u32,
 
+    /// Whether to delete the message once Vector processes it.
+    ///
+    /// It can be useful to set this to `false` to debug or during initial Vector setup.
     #[serde(default = "default_true")]
     #[derivative(Default(value = "default_true()"))]
     pub(super) delete_message: bool,
 
-    // number of tasks spawned for running the SQS/S3 receive loop
+    /// Number of concurrent tasks to create for polling the queue for messages.
+    ///
+    /// Defaults to the number of available CPUs on the system.
+    ///
+    /// Should not typically need to be changed, but it can sometimes be beneficial to raise this value when there is a
+    /// high rate of messages being pushed into the queue and the objects being fetched are small. In these cases,
+    /// Vector may not fully utilize system resources without fetching more messages per second, as the SQS message
+    /// consumption rate affects the S3 object retrieval rate.
     #[serde(default = "default_client_concurrency")]
     #[derivative(Default(value = "default_client_concurrency()"))]
     pub(super) client_concurrency: u32,
 
+    #[configurable(derived)]
     #[serde(default)]
     #[derivative(Default)]
     pub(super) tls_options: Option<TlsConfig>,
@@ -693,7 +721,7 @@ pub struct S3Bucket {
     pub name: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct S3Object {
     // S3ObjectKeys are URL encoded
