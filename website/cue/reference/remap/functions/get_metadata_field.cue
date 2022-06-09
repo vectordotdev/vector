@@ -36,7 +36,7 @@ remap: functions: get_metadata_field: {
 		{
 			title: "Get the Datadog API key from the event metadata."
 			source: #"""
-				get_metadata_field!("datadog_api_key")
+				get_metadata_field("datadog_api_key")
 				"""#
 			return: "abc123"
 		},
