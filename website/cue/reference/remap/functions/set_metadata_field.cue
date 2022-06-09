@@ -40,7 +40,7 @@ remap: functions: set_metadata_field: {
 		{
 			title: "Set the Datadog API key in the event metadata to the given value."
 			source: #"""
-				set_metadata_field!("datadog_api_key", "abc122")
+				set_metadata_field("datadog_api_key", "abc122")
 				"""#
 			return: "null"
 		},
