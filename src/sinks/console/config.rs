@@ -38,6 +38,12 @@ pub struct ConsoleSinkConfig {
         EncodingConfig<StandardEncodings>,
         StandardEncodingsWithFramingMigrator,
     >,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 impl GenerateConfig for ConsoleSinkConfig {
@@ -45,6 +51,7 @@ impl GenerateConfig for ConsoleSinkConfig {
         toml::Value::try_from(Self {
             target: Target::Stdout,
             encoding: EncodingConfig::from(StandardEncodings::Json).into(),
+            acknowledgements: Default::default(),
         })
         .unwrap()
     }
@@ -97,7 +104,7 @@ impl SinkConfig for ConsoleSinkConfig {
     }
 
     fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        None
+        Some(&self.acknowledgements)
     }
 }
 

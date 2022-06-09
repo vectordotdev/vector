@@ -219,7 +219,7 @@ vrl-stdlib = { path = "lib/vrl/stdlib" }
 arc-swap = { version = "1.5", default-features = false, optional = true }
 async-compression = { version = "0.3.12", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 avro-rs = { version = "0.13.0", default-features = false, optional = true }
-axum = { version = "0.5.6", default-features = false }
+axum = { version = "0.5.7", default-features = false }
 base64 = { version = "0.13.0", default-features = false, optional = true }
 bloom = { version = "0.3.2", default-features = false, optional = true }
 bollard = { version = "0.12.0", default-features = false, features = ["ssl"] }
@@ -239,7 +239,7 @@ flate2 = { version = "1.0.24", default-features = false, features = ["default"] 
 futures-util = { version = "0.3.21", default-features = false }
 glob = { version = "0.3.0", default-features = false }
 governor = { version = "0.4.1", default-features = false, features = ["dashmap", "jitter", "std"], optional = true }
-grok = { version = "1.2.0", default-features = false, optional = true }
+grok = { version = "2.0.0", default-features = false, optional = true }
 h2 = { version = "0.3.13", default-features = false, optional = true }
 hash_hasher = { version = "2.0.0", default-features = false, optional  = true }
 headers = { version = "0.3.6", default-features = false }
@@ -254,7 +254,7 @@ infer = { version = "0.8.0", default-features = false, optional = true}
 indoc = { version = "1.0.6", default-features = false }
 inventory = { version = "0.1.10", default-features = false }
 k8s-openapi = { version = "0.14.0", default-features = false, features = ["api", "v1_16"], optional = true }
-kube = { version = "0.71.0", default-features = false, features = ["client", "rustls-tls", "runtime"], optional = true }
+kube = { version = "0.71.0", default-features = false, features = ["client", "native-tls", "runtime"], optional = true }
 listenfd = { version = "1.0.0", default-features = false, optional = true }
 logfmt = { version = "0.0.2", default-features = false, optional = true }
 lru = { version = "0.7.6", default-features = false, optional = true }
@@ -707,6 +707,7 @@ enterprise = [
   "sources-internal_logs",
   "sources-internal_metrics",
   "transforms-remap",
+  "transforms-filter",
 ]
 
 # Identifies that the build is a nightly build

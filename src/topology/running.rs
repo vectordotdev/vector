@@ -13,6 +13,7 @@ use tokio::{
 };
 use tracing::Instrument;
 use vector_buffers::topology::channel::BufferSender;
+use vector_core::trigger::DisabledTrigger;
 
 use super::{TapOutput, TapResource};
 use crate::{
@@ -28,7 +29,6 @@ use crate::{
         task::TaskOutput,
         BuiltBuffer, TaskHandle, WatchRx, WatchTx,
     },
-    trigger::DisabledTrigger,
 };
 
 #[allow(dead_code)]
