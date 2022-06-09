@@ -440,7 +440,7 @@ impl PrometheusExporter {
             #[allow(clippy::print_stderr)]
             Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
                 .serve(new_service)
-                .with_graceful_shutdown(tripwire.then(crate::stream::tripwire_handler))
+                .with_graceful_shutdown(tripwire.then(crate::shutdown::tripwire_handler))
                 .instrument(span)
                 .await
                 .map_err(|error| eprintln!("Server error: {}", error))?;

@@ -39,11 +39,6 @@ impl Function for Downcase {
             result: Ok("foo 2 bar"),
         }]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        downcase(value)
-    }
 }
 
 #[derive(Debug, Clone)]

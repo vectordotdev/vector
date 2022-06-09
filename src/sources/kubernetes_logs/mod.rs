@@ -473,8 +473,7 @@ impl Source {
         let partial_events_merger = Box::new(partial_events_merger::build(auto_partial_merge));
 
         let checkpoints = checkpointer.view();
-        let events = file_source_rx.map(futures::stream::iter);
-        let events = events.flatten();
+        let events = file_source_rx.flat_map(futures::stream::iter);
         let events = events.map(move |line| {
             let byte_size = line.text.len();
             emit!(BytesReceived {

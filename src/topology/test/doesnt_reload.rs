@@ -20,6 +20,7 @@ async fn topology_doesnt_reload_new_data_dir() {
         ConsoleSinkConfig {
             target: Target::Stdout,
             encoding: EncodingConfig::from(StandardEncodings::Text).into(),
+            acknowledgements: Default::default(),
         },
     );
     old_config.global.data_dir = Some(Path::new("/asdf").to_path_buf());

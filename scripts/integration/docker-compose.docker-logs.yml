@@ -23,9 +23,11 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${PWD}:/code
+      - target:/code/target
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
 
 volumes:
+  target: {}
   cargogit: {}
   cargoregistry: {}
