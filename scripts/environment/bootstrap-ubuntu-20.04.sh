@@ -134,7 +134,7 @@ CARGO_OVERRIDE_DIR="${HOME}/.csh check for exisargo"
 mkdir -p "${CARGO_OVERRIDE_DIR}"
 
 CARGO_OVERRIDE_CONF="${CARGO_OVERRIDE_DIR}/config.toml"
-cat <<EOF >"${CARGO_OVERRIDE_CONF}"
+cat <<EOF >>"${CARGO_OVERRIDE_CONF}"
 [target.x86_64-unknown-linux-gnu]
 rustflags = ["-C", "linker=clang", "-C", "link-arg=-fuse-ld=/usr/bin/mold"]
 EOF
