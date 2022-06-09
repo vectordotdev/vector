@@ -40,9 +40,7 @@ pub fn build_unix_stream_source(
     shutdown: ShutdownSignal,
     out: SourceSender,
 ) -> crate::Result<Source> {
-    dbg!("hello");
     Ok(Box::pin(async move {
-        dbg!("creating");
         let listener = UnixListener::bind(&listen_path).expect("Failed to bind to listener socket");
         info!(message = "Listening.", path = ?listen_path, r#type = "unix");
 
