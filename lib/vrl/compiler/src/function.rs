@@ -15,8 +15,7 @@ use crate::{
     parser::Node,
     state::{ExternalEnv, LocalEnv},
     value::{kind, Kind},
-    vm::VmArgumentList,
-    Context, ExpressionError, Span,
+    Span,
 };
 
 pub type Compiled = Result<Box<dyn Expression>, Box<dyn DiagnosticMessage>>;
@@ -40,9 +39,6 @@ pub trait Function: Send + Sync + fmt::Debug {
     /// One or more examples demonstrating usage of the function in VRL source
     /// code.
     fn examples(&self) -> &'static [Example];
-    // fn examples(&self) -> &'static [Example] {
-    //     &[/* ODO */]
-    // }
 
     /// Compile a [`Function`] into a type that can be resolved to an
     /// [`Expression`].
@@ -78,13 +74,6 @@ pub trait Function: Send + Sync + fmt::Debug {
     ) -> Result<Option<Box<dyn std::any::Any + Send + Sync>>, Box<dyn DiagnosticMessage>> {
         Ok(None)
     }
-
-    /// This function is called by the VM.
-    fn call_by_vm(
-        &self,
-        _ctx: &mut Context,
-        _args: &mut VmArgumentList,
-    ) -> Result<Value, ExpressionError>;
 
     /// An optional closure definition for the function.
     ///
@@ -171,7 +160,7 @@ pub struct Parameter {
 impl Parameter {
     #[allow(arithmetic_overflow)]
     pub fn kind(&self) -> Kind {
-        let mut kind = Kind::empty();
+        let mut kind = Kind::never();
 
         let n = self.kind;
 

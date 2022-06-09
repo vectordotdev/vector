@@ -253,7 +253,9 @@ mod test {
     #[cfg(unix)]
     use {
         super::{unix::UnixConfig, Mode},
+        crate::test_util::wait_for,
         futures::{SinkExt, Stream},
+        std::future::ready,
         std::os::unix::fs::PermissionsExt,
         std::path::PathBuf,
         tokio::{
@@ -1113,9 +1115,25 @@ mod test {
             .unwrap();
         tokio::spawn(server);
 
-        let meta = std::fs::metadata(in_path).unwrap();
-        // S_IFSOCK   0140000   socket
-        assert_eq!(0o140555, meta.permissions().mode());
+        wait_for(|| {
+            match std::fs::metadata(&in_path) {
+                Ok(meta) => {
+                    match meta.permissions().mode() {
+                        // S_IFSOCK   0140000   socket
+                        0o140555 => ready(true),
+                        perm => {
+                            println!("socket has different permissions: {:?}", perm);
+                            ready(false)
+                        }
+                    }
+                }
+                Err(_) => {
+                    println!("socket doesn't exist yet");
+                    ready(false)
+                }
+            }
+        })
+        .await;
     }
 
     ////////////// UNIX STREAM TESTS //////////////
@@ -1219,8 +1237,24 @@ mod test {
             .unwrap();
         tokio::spawn(server);
 
-        let meta = std::fs::metadata(in_path).unwrap();
-        // S_IFSOCK   0140000   socket
-        assert_eq!(0o140421, meta.permissions().mode());
+        wait_for(|| {
+            match std::fs::metadata(&in_path) {
+                Ok(meta) => {
+                    match meta.permissions().mode() {
+                        // S_IFSOCK   0140000   socket
+                        0o140421 => ready(true),
+                        perm => {
+                            println!("socket has different permissions: {:?}", perm);
+                            ready(false)
+                        }
+                    }
+                }
+                Err(_) => {
+                    println!("socket doesn't exist yet");
+                    ready(false)
+                }
+            }
+        })
+        .await;
     }
 }

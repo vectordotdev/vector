@@ -48,11 +48,6 @@ impl Function for ReverseDns {
 
         Ok(Box::new(ReverseDnsFn { value }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        reverse_dns(value)
-    }
 }
 
 #[derive(Debug, Clone)]

@@ -32,7 +32,9 @@ message EventWrapper {
 }
 
 message Log {
+  // Deprecated, use value instead
   map<string, Value> fields = 1;
+  Value value = 2;
 }
 
 message Trace {

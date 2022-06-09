@@ -273,7 +273,6 @@ fn fmt_enrichment_table(
 #[cfg(test)]
 mod tests {
     use value::Value;
-    use vector_common::btreemap;
 
     use super::*;
     use crate::test_util::DummyEnrichmentTable;
@@ -359,9 +358,7 @@ mod tests {
         registry.finish_load();
 
         assert_eq!(
-            Ok(btreemap! {
-                "field" => "result"
-            }),
+            Ok(BTreeMap::from([("field".into(), Value::from("result"))])),
             tables_search.find_table_row(
                 "dummy1",
                 Case::Sensitive,

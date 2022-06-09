@@ -51,11 +51,6 @@ impl Function for Array {
 
         Ok(Box::new(ArrayFn { value }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        array(value)
-    }
 }
 
 #[derive(Debug, Clone)]

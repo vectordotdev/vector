@@ -58,12 +58,6 @@ impl Function for ParseTimestamp {
             },
         ]
     }
-
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let format = args.required("format");
-        parse_timestamp(value, format, ctx)
-    }
 }
 
 #[derive(Debug, Clone)]

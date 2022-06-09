@@ -45,6 +45,7 @@ pub mod app;
 pub mod async_read;
 #[cfg(feature = "aws-config")]
 pub mod aws;
+#[allow(unreachable_pub)]
 pub mod codecs;
 pub(crate) mod common;
 pub mod encoding_transcode;
@@ -68,7 +69,6 @@ pub mod providers;
 pub mod serde;
 #[cfg(windows)]
 pub mod service;
-pub mod shutdown;
 pub mod signal;
 pub(crate) mod sink;
 #[allow(unreachable_pub)]
@@ -77,7 +77,6 @@ pub mod source_sender;
 #[allow(unreachable_pub)]
 pub mod sources;
 pub mod stats;
-pub(crate) mod stream;
 #[cfg(feature = "api-client")]
 #[allow(unreachable_pub)]
 mod tap;
@@ -94,7 +93,6 @@ pub mod topology;
 pub mod trace;
 #[allow(unreachable_pub)]
 pub mod transforms;
-pub mod trigger;
 pub mod types;
 pub mod udp;
 pub mod unit_test;
@@ -104,7 +102,7 @@ pub mod validate;
 pub mod vector_windows;
 
 pub use source_sender::SourceSender;
-pub use vector_core::{event, metrics, schema, Error, Result};
+pub use vector_core::{event, metrics, schema, shutdown, Error, Result};
 
 pub fn vector_version() -> impl std::fmt::Display {
     #[cfg(feature = "nightly")]

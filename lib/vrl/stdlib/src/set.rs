@@ -132,14 +132,6 @@ impl Function for Set {
 
         Ok(Box::new(SetFn { value, path, data }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let path = args.required("path");
-        let data = args.required("data");
-
-        set(path, value, data)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -161,7 +153,7 @@ impl Expression for SetFn {
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         let value_td = self.value.type_def(state);
 
-        let mut td = TypeDef::from(Kind::empty()).fallible();
+        let mut td = TypeDef::from(Kind::never()).fallible();
 
         if value_td.is_array() {
             td = td.add_array(Collection::any())

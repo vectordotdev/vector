@@ -15,7 +15,6 @@ pub mod function;
 pub mod state;
 pub mod type_def;
 pub mod value;
-pub mod vm;
 
 pub use core::{value, ExpressionError, Resolved, Target};
 use std::{fmt::Display, str::FromStr};
@@ -38,7 +37,6 @@ pub type Result<T = (Program, DiagnosticList)> = std::result::Result<T, Diagnost
 #[serde(rename_all = "lowercase")]
 pub enum VrlRuntime {
     Ast,
-    Vm,
 }
 
 impl Default for VrlRuntime {
@@ -53,8 +51,7 @@ impl FromStr for VrlRuntime {
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
             "ast" => Ok(Self::Ast),
-            "vm" => Ok(Self::Vm),
-            _ => Err("runtime must be ast or vm."),
+            _ => Err("runtime must be ast."),
         }
     }
 }
@@ -66,7 +63,6 @@ impl Display for VrlRuntime {
             "{}",
             match self {
                 VrlRuntime::Ast => "ast",
-                VrlRuntime::Vm => "vm",
             }
         )
     }

@@ -8,7 +8,8 @@ use crate::{
     sinks::{
         splunk_hec::{
             common::{
-                acknowledgements::HecClientAcknowledgementsConfig, SplunkHecDefaultBatchSettings,
+                acknowledgements::HecClientAcknowledgementsConfig, timestamp_key,
+                SplunkHecDefaultBatchSettings,
             },
             logs::config::HecLogsSinkConfig,
         },
@@ -51,6 +52,8 @@ pub struct HumioLogsConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+    #[serde(default = "timestamp_key")]
+    pub(super) timestamp_key: String,
 }
 
 inventory::submit! {
@@ -78,6 +81,7 @@ impl GenerateConfig for HumioLogsConfig {
             tls: None,
             timestamp_nanos_key: None,
             acknowledgements: Default::default(),
+            timestamp_key: timestamp_key(),
         })
         .unwrap()
     }
@@ -125,6 +129,7 @@ impl HumioLogsConfig {
                 indexer_acknowledgements_enabled: false,
                 ..Default::default()
             },
+            timestamp_key: timestamp_key(),
         }
     }
 }
@@ -145,6 +150,7 @@ mod integration_tests {
     use std::{collections::HashMap, convert::TryFrom};
 
     use chrono::{TimeZone, Utc};
+    use futures::{future::ready, stream};
     use indoc::indoc;
     use serde_json::{json, Value as JsonValue};
     use tokio::time::Duration;
@@ -152,9 +158,12 @@ mod integration_tests {
     use super::*;
     use crate::{
         config::{log_schema, SinkConfig, SinkContext},
-        event::Event,
+        event::LogEvent,
         sinks::util::Compression,
-        test_util::{components, components::HTTP_SINK_TAGS, random_string},
+        test_util::{
+            components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+            random_string,
+        },
     };
 
     fn humio_address() -> String {
@@ -175,14 +184,13 @@ mod integration_tests {
 
         let message = random_string(100);
         let host = "192.168.1.1".to_string();
-        let mut event = Event::from(message.clone());
-        let log = event.as_mut_log();
-        log.insert(log_schema().host_key(), host.clone());
+        let mut event = LogEvent::from(message.clone());
+        event.insert(log_schema().host_key(), host.clone());
 
         let ts = Utc.timestamp_nanos(Utc::now().timestamp_millis() * 1_000_000 + 132_456);
-        log.insert(log_schema().timestamp_key(), ts);
+        event.insert(log_schema().timestamp_key(), ts);
 
-        components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
+        run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
         let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 
@@ -220,8 +228,8 @@ mod integration_tests {
         let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
-        let event = Event::from(message.clone());
-        components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
+        let event = LogEvent::from(message.clone());
+        run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
         let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 
@@ -249,14 +257,12 @@ mod integration_tests {
             let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
 
             let message = random_string(100);
-            let mut event = Event::from(message.clone());
+            let mut event = LogEvent::from(message.clone());
             // Humio expects to find an @timestamp field for JSON lines
             // https://docs.humio.com/ingesting-data/parsers/built-in-parsers/#json
-            event
-                .as_mut_log()
-                .insert("@timestamp", Utc::now().to_rfc3339());
+            event.insert("@timestamp", Utc::now().to_rfc3339());
 
-            components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
+            run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
             let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 
@@ -277,9 +283,9 @@ mod integration_tests {
             let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
 
             let message = random_string(100);
-            let event = Event::from(message.clone());
+            let event = LogEvent::from(message.clone());
 
-            components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
+            run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
             let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 
@@ -307,6 +313,7 @@ mod integration_tests {
             tls: None,
             timestamp_nanos_key: timestamp_nanos_key(),
             acknowledgements: Default::default(),
+            timestamp_key: Default::default(),
         }
     }
 
@@ -393,8 +400,8 @@ mod integration_tests {
         let search_query = format!(r#"message="{}""#, message);
 
         // events are not available to search API immediately
-        // poll up 20 times for event to show up
-        for _ in 0..20usize {
+        // poll up 200 times for event to show up
+        for _ in 0..200usize {
             let res = client
                 .post(&search_url)
                 .json(&json!({

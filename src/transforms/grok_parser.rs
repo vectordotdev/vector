@@ -52,7 +52,7 @@ impl TransformConfig for GrokParserConfig {
             .clone()
             .unwrap_or_else(|| log_schema().message_key().into());
 
-        let mut grok = grok::Grok::with_patterns();
+        let mut grok = grok::Grok::with_default_patterns();
 
         let timezone = self.timezone.unwrap_or(context.globals.timezone);
         let types = parse_conversion_map(&self.types, timezone)?;
@@ -103,7 +103,7 @@ pub struct GrokParser {
 impl Clone for GrokParser {
     fn clone(&self) -> Self {
         Self {
-            pattern_built: grok::Grok::with_patterns().compile(&self.pattern, true)
+            pattern_built: grok::Grok::with_default_patterns().compile(&self.pattern, true)
                 .expect("Panicked while cloning an already valid Grok parser. For some reason, the pattern could not be built again."),
             pattern: self.pattern.clone(),
             field: self.field.clone(),
@@ -219,12 +219,14 @@ mod tests {
             "verb": "GET",
             "request": "/administrator/",
             "httpversion": "1.1",
-            "rawrequest": "",
             "response": "200",
             "bytes": "4263",
         });
 
-        assert_eq!(expected, serde_json::to_value(&event.all_fields()).unwrap());
+        assert_eq!(
+            expected,
+            serde_json::to_value(&event.all_fields().unwrap()).unwrap()
+        );
     }
 
     #[tokio::test]
@@ -238,7 +240,7 @@ mod tests {
         )
         .await;
 
-        assert_eq!(2, event.keys().count());
+        assert_eq!(2, event.keys().unwrap().count());
         assert_eq!(
             event::Value::from("Help I'm stuck in an HTTP server"),
             event[log_schema().message_key()]
@@ -266,13 +268,15 @@ mod tests {
             "verb": "GET",
             "request": "/administrator/",
             "httpversion": "1.1",
-            "rawrequest": "",
             "response": "200",
             "bytes": "4263",
             "message": r#"109.184.11.34 - - [12/Dec/2015:18:32:56 +0100] "GET /administrator/ HTTP/1.1" 200 4263"#,
         });
 
-        assert_eq!(expected, serde_json::to_value(&event.all_fields()).unwrap());
+        assert_eq!(
+            expected,
+            serde_json::to_value(&event.all_fields().unwrap()).unwrap()
+        );
     }
 
     #[tokio::test]
@@ -286,7 +290,7 @@ mod tests {
         )
         .await;
 
-        assert_eq!(2, event.keys().count());
+        assert_eq!(2, event.keys().unwrap().count());
         assert_eq!(
             event::Value::from("i am the only field"),
             event[log_schema().message_key()]
@@ -314,12 +318,14 @@ mod tests {
             "verb": "GET",
             "request": "/administrator/",
             "httpversion": "1.1",
-            "rawrequest": "",
             "response": 200,
             "bytes": 4263,
         });
 
-        assert_eq!(expected, serde_json::to_value(&event.all_fields()).unwrap());
+        assert_eq!(
+            expected,
+            serde_json::to_value(&event.all_fields().unwrap()).unwrap()
+        );
     }
 
     #[tokio::test]
@@ -338,6 +344,9 @@ mod tests {
             "message": "42",
         });
 
-        assert_eq!(expected, serde_json::to_value(&event.all_fields()).unwrap());
+        assert_eq!(
+            expected,
+            serde_json::to_value(&event.all_fields().unwrap()).unwrap()
+        );
     }
 }

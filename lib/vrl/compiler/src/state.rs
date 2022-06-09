@@ -3,6 +3,7 @@ use std::collections::{hash_map::Entry, HashMap};
 use anymap::AnyMap;
 use value::{Kind, Value};
 
+use crate::value::Collection;
 use crate::{parser::ast::Ident, type_def::Details};
 
 /// Local environment, limited to a given scope.
@@ -30,14 +31,26 @@ impl LocalEnv {
         self.bindings.remove(ident)
     }
 
-    /// Merge state present in both `self` and `other`.
-    pub(crate) fn merge_mutations(mut self, other: Self) -> Self {
-        for (ident, other_details) in other.bindings.into_iter() {
+    /// Any state the child scope modified that was part of the parent is copied to the parent scope
+    pub(crate) fn apply_child_scope(mut self, child: Self) -> Self {
+        for (ident, child_details) in child.bindings {
             if let Some(self_details) = self.bindings.get_mut(&ident) {
-                *self_details = other_details;
+                *self_details = child_details;
             }
         }
 
+        self
+    }
+
+    /// Merges two local envs together. This is useful in cases such as if statements
+    /// where different LocalEnv's can be created, and the result is decided at runtime.
+    /// The compile-time type must be the union of the options.
+    pub(crate) fn merge(mut self, other: Self) -> Self {
+        for (ident, other_details) in other.bindings {
+            if let Some(self_details) = self.bindings.get_mut(&ident) {
+                *self_details = self_details.clone().merge(other_details);
+            }
+        }
         self
     }
 }
@@ -46,7 +59,7 @@ impl LocalEnv {
 #[derive(Debug)]
 pub struct ExternalEnv {
     /// The external target of the program.
-    target: Option<Details>,
+    target: Details,
 
     /// Custom context injected by the external environment
     custom: AnyMap,
@@ -54,10 +67,7 @@ pub struct ExternalEnv {
 
 impl Default for ExternalEnv {
     fn default() -> Self {
-        Self {
-            custom: AnyMap::new(),
-            target: None,
-        }
+        Self::new_with_kind(Kind::object(Collection::any()))
     }
 }
 
@@ -66,30 +76,39 @@ impl ExternalEnv {
     /// [`Kind`].
     pub fn new_with_kind(kind: Kind) -> Self {
         Self {
-            target: Some(Details {
+            target: Details {
                 type_def: kind.into(),
                 value: None,
-            }),
-            ..Default::default()
+            },
+            custom: AnyMap::new(),
         }
     }
 
-    pub(crate) fn target(&self) -> Option<&Details> {
-        self.target.as_ref()
+    pub(crate) fn target(&self) -> &Details {
+        &self.target
     }
 
-    pub fn target_kind(&self) -> Option<&Kind> {
-        self.target().map(|details| details.type_def.kind())
+    pub(crate) fn target_mut(&mut self) -> &mut Details {
+        &mut self.target
+    }
+
+    pub fn target_kind(&self) -> &Kind {
+        self.target().type_def.kind()
     }
 
     #[cfg(any(feature = "expr-assignment", feature = "expr-query"))]
     pub(crate) fn update_target(&mut self, details: Details) {
-        self.target = Some(details);
+        self.target = details;
     }
 
     /// Sets the external context data for VRL functions to use.
     pub fn set_external_context<T: 'static>(&mut self, data: T) {
         self.custom.insert::<T>(data);
+    }
+
+    /// Get external context data from the external environment.
+    pub fn get_external_context<T: 'static>(&self) -> Option<&T> {
+        self.custom.get::<T>()
     }
 
     /// Swap the existing external contexts with new ones, returning the old ones.

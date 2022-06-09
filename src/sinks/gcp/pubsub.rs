@@ -283,7 +283,7 @@ mod integration_tests {
     use super::*;
     use crate::gcp;
     use crate::test_util::{
-        components::{self, HTTP_SINK_TAGS},
+        components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
         random_events_with_stream, random_string, trace_init,
     };
 
@@ -320,7 +320,7 @@ mod integration_tests {
 
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let (input, events) = random_events_with_stream(100, 100, Some(batch));
-        components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
+        run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let response = pull_messages(&subscription, 1000).await;
@@ -332,7 +332,7 @@ mod integration_tests {
         for i in 0..input.len() {
             let data = messages[i].message.decode_data();
             let data = serde_json::to_value(data).unwrap();
-            let expected = serde_json::to_value(input[i].as_log().all_fields()).unwrap();
+            let expected = serde_json::to_value(input[i].as_log().all_fields().unwrap()).unwrap();
             assert_eq!(data, expected);
         }
     }

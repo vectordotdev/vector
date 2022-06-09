@@ -23,6 +23,7 @@ use crate::{
     config::SinkContext,
     internal_events::DatadogMetricsEncodingError,
     sinks::util::{
+        buffer::metrics::sort::sort_for_compression,
         buffer::metrics::{AggregatedSummarySplitter, MetricSplitter},
         SinkBuilderExt,
     },
@@ -98,6 +99,11 @@ where
             // We batch metrics by their endpoint: series endpoint for counters, gauge, and sets vs sketch endpoint for
             // distributions, aggregated histograms, and sketches.
             .batched_partitioned(DatadogMetricsTypePartitioner, self.batch_settings)
+            .map(|(endpoint, mut metrics)| {
+                // Sorting significantly improves HTTP compression
+                sort_for_compression(&mut metrics);
+                (endpoint, metrics)
+            })
             // We build our requests "incrementally", which means that for a single batch of metrics, we might generate
             // N requests to send them all, as Datadog has API-level limits on payload size, so we keep adding metrics
             // to a request until we reach the limit, and then create a new request, and so on and so forth, until all

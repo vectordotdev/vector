@@ -9,6 +9,7 @@ use crate::{
     internal_events::KubernetesLogsDockerFormatParseError,
     transforms::{FunctionTransform, OutputBuffer},
 };
+use lookup::path;
 
 pub const TIME: &str = "time";
 pub const LOG: &str = "log";
@@ -51,7 +52,7 @@ fn parse_json(log: &mut LogEvent) -> Result<(), ParsingError> {
     match serde_json::from_slice(bytes.as_ref()) {
         Ok(JsonValue::Object(object)) => {
             for (key, value) in object {
-                log.insert_flat(key, value);
+                log.insert(path!(&key), value);
             }
             Ok(())
         }

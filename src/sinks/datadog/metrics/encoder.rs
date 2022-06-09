@@ -22,7 +22,7 @@ use super::config::{
 };
 use crate::{
     common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
-    sinks::util::{encode_namespace, Compressor},
+    sinks::util::{encode_namespace, Compression, Compressor},
 };
 
 const SERIES_PAYLOAD_HEADER: &[u8] = b"{\"series\":[";
@@ -560,7 +560,7 @@ where
 }
 
 fn get_compressor() -> Compressor {
-    Compressor::zlib_default()
+    Compression::zlib_default().into()
 }
 
 const fn max_uncompressed_header_len() -> usize {
@@ -678,13 +678,14 @@ mod tests {
 
     fn get_simple_counter() -> Metric {
         let value = MetricValue::Counter { value: 3.14 };
-        Metric::new("basic_counter", MetricKind::Incremental, value)
+        Metric::new("basic_counter", MetricKind::Incremental, value).with_timestamp(Some(ts()))
     }
 
     fn get_simple_sketch() -> Metric {
         let mut ddsketch = AgentDDSketch::with_agent_defaults();
         ddsketch.insert(3.14);
         Metric::new("basic_counter", MetricKind::Incremental, ddsketch.into())
+            .with_timestamp(Some(ts()))
     }
 
     fn get_compressed_empty_series_payload() -> Bytes {

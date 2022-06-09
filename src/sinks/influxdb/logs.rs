@@ -188,7 +188,7 @@ impl HttpEventEncoder<BytesMut> for InfluxDbLogsEncoder {
         // Tags + Fields
         let mut tags: BTreeMap<String, String> = BTreeMap::new();
         let mut fields: HashMap<String, Field> = HashMap::new();
-        log.all_fields().for_each(|(key, value)| {
+        log.convert_to_fields().for_each(|(key, value)| {
             if self.tags.contains(&key) {
                 tags.insert(key, value.to_string_lossy());
             } else {
@@ -752,7 +752,7 @@ mod integration_tests {
             test_util::{address_v2, onboarding_v2, BUCKET, ORG, TOKEN},
             InfluxDb2Settings,
         },
-        test_util::components::{self, HTTP_SINK_TAGS},
+        test_util::components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
     };
 
     #[tokio::test]
@@ -798,7 +798,7 @@ mod integration_tests {
 
         let events = vec![Event::Log(event1), Event::Log(event2)];
 
-        components::run_sink_events(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
+        run_and_assert_sink_compliance(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
 
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 

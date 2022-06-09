@@ -8,17 +8,15 @@ use std::{
     time::{Duration, Instant},
 };
 
+use futures::StreamExt;
 use roaring::RoaringTreemap;
 use serde::{Deserialize, Serialize};
 use tokio::time::interval;
-use vector_core::event::BatchStatusReceiver;
+use vector_core::{event::BatchStatusReceiver, finalizer::UnorderedFinalizer};
 use warp::Rejection;
 
 use super::ApiError;
-use crate::{
-    config::AcknowledgementsConfig, shutdown::ShutdownSignal,
-    sources::util::finalizer::UnorderedFinalizer,
-};
+use crate::{config::AcknowledgementsConfig, event::BatchStatus, shutdown::ShutdownSignal};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(default)]
@@ -170,21 +168,23 @@ impl Channel {
     fn new(max_pending_acks_per_channel: u64, shutdown: ShutdownSignal) -> Self {
         let ack_ids_status = Arc::new(Mutex::new(RoaringTreemap::new()));
         let finalizer_ack_ids_status = Arc::clone(&ack_ids_status);
-        let ack_event_finalizer = UnorderedFinalizer::new(shutdown, move |ack_id: u64| {
-            let finalizer_ack_ids_status = Arc::clone(&finalizer_ack_ids_status);
-            async move {
-                let mut ack_ids_status = finalizer_ack_ids_status.lock().unwrap();
-                ack_ids_status.insert(ack_id);
-                if ack_ids_status.len() > max_pending_acks_per_channel {
-                    match ack_ids_status.min() {
-                        Some(min) => ack_ids_status.remove(min),
-                        // max pending acks per channel is guaranteed to be >= 1,
-                        // thus there must be at least one ack id available to remove
-                        None => unreachable!(
-                            "Indexer acknowledgements channel must allow at least one pending ack"
-                        ),
-                    };
-                };
+        let (ack_event_finalizer, mut ack_stream) = UnorderedFinalizer::new(shutdown);
+        tokio::spawn(async move {
+            while let Some((status, ack_id)) = ack_stream.next().await {
+                if status == BatchStatus::Delivered {
+                    let mut ack_ids_status = finalizer_ack_ids_status.lock().unwrap();
+                    ack_ids_status.insert(ack_id);
+                    if ack_ids_status.len() > max_pending_acks_per_channel {
+                        match ack_ids_status.min() {
+                            Some(min) => ack_ids_status.remove(min),
+                            // max pending acks per channel is guaranteed to be >= 1,
+                            // thus there must be at least one ack id available to remove
+                            None => unreachable!(
+                                "Indexer acknowledgements channel must allow at least one pending ack"
+                            ),
+                        };
+                    }
+                }
             }
         });
 
