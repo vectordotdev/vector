@@ -309,7 +309,7 @@ impl SinkConfig for ElasticsearchConfig {
             http_auth: common.http_auth.clone(),
             query_params: common.query_params.clone(),
             region: common.region.clone(),
-            compression: self.compression.clone(),
+            compression: self.compression,
             credentials_provider: common.aws_auth.clone(),
         };
 
