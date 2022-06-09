@@ -196,6 +196,11 @@ impl TypeDef {
     }
 
     #[inline]
+    pub fn never() -> Self {
+        Kind::never().into()
+    }
+
+    #[inline]
     pub fn add_null(mut self) -> Self {
         self.kind.add_null();
         self

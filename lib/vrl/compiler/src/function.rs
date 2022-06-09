@@ -160,7 +160,7 @@ pub struct Parameter {
 impl Parameter {
     #[allow(arithmetic_overflow)]
     pub fn kind(&self) -> Kind {
-        let mut kind = Kind::empty();
+        let mut kind = Kind::never();
 
         let n = self.kind;
 
