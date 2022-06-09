@@ -653,6 +653,7 @@ mod tests {
 
     use encoding_rs::UTF_16LE;
     use pretty_assertions::assert_eq;
+    use serde::Deserialize;
     use tempfile::{tempdir, TempDir};
     use tokio::time::{sleep, timeout, Duration};
 
