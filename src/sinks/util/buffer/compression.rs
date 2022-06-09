@@ -14,10 +14,11 @@ pub enum Compression {
     #[derivative(Default)]
     None,
     Gzip(flate2::Compression),
+    Zlib(flate2::Compression),
 }
 
 impl Compression {
-    /// Gets whether or not this compression will actually compressing the input.
+    /// Gets whether or not this compression will actually compress the input.
     ///
     /// While it may be counterintuitive for "compression" to not compress, this is simply a
     /// consequence of designing a single type that may or may not compress so that we can avoid
@@ -36,10 +37,18 @@ impl Compression {
         Compression::Gzip(flate2::Compression::new(6))
     }
 
+    pub const fn zlib_default() -> Compression {
+        // flate2 doesn't have a const `default` fn, since it actually implements the `Default`
+        // trait, and it doesn't have a constant for what the "default" level should be, so we
+        // hard-code it here.
+        Compression::Zlib(flate2::Compression::new(6))
+    }
+
     pub const fn content_encoding(self) -> Option<&'static str> {
         match self {
             Self::None => None,
             Self::Gzip(_) => Some("gzip"),
+            Self::Zlib(_) => Some("deflate"),
         }
     }
 
@@ -47,6 +56,7 @@ impl Compression {
         match self {
             Self::None => "log",
             Self::Gzip(_) => "log.gz",
+            Self::Zlib(_) => "log.zz",
         }
     }
 }
@@ -55,6 +65,7 @@ impl fmt::Display for Compression {
         match *self {
             Compression::None => write!(f, "none"),
             Compression::Gzip(ref level) => write!(f, "gzip({})", level.level()),
+            Compression::Zlib(ref level) => write!(f, "zlib({})", level.level()),
         }
     }
 }
@@ -80,9 +91,10 @@ impl<'de> de::Deserialize<'de> for Compression {
                 match s {
                     "none" => Ok(Compression::None),
                     "gzip" => Ok(Compression::gzip_default()),
+                    "zlib" => Ok(Compression::zlib_default()),
                     _ => Err(de::Error::invalid_value(
                         de::Unexpected::Str(s),
-                        &r#""none" or "gzip""#,
+                        &r#""none" or "gzip" or "zlib""#,
                     )),
                 }
             }
@@ -94,13 +106,13 @@ impl<'de> de::Deserialize<'de> for Compression {
                 let mut algorithm = None;
                 let mut level = None;
 
-                while let Some(key) = map.next_key()? {
-                    match key {
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
                         "algorithm" => {
                             if algorithm.is_some() {
                                 return Err(de::Error::duplicate_field("algorithm"));
                             }
-                            algorithm = Some(map.next_value::<&str>()?);
+                            algorithm = Some(map.next_value::<String>()?);
                         }
                         "level" => {
                             if level.is_some() {
@@ -138,17 +150,24 @@ impl<'de> de::Deserialize<'de> for Compression {
                                 }
                             });
                         }
-                        _ => return Err(de::Error::unknown_field(key, &["algorithm", "level"])),
+                        _ => return Err(de::Error::unknown_field(&key, &["algorithm", "level"])),
                     };
                 }
 
-                match algorithm.ok_or_else(|| de::Error::missing_field("algorithm"))? {
+                match algorithm
+                    .ok_or_else(|| de::Error::missing_field("algorithm"))?
+                    .as_str()
+                {
                     "none" => match level {
                         Some(_) => Err(de::Error::unknown_field("level", &[])),
                         None => Ok(Compression::None),
                     },
                     "gzip" => Ok(Compression::Gzip(level.unwrap_or_default())),
-                    algorithm => Err(de::Error::unknown_variant(algorithm, &["none", "gzip"])),
+                    "zlib" => Ok(Compression::Zlib(level.unwrap_or_default())),
+                    algorithm => Err(de::Error::unknown_variant(
+                        algorithm,
+                        &["none", "gzip", "zlib"],
+                    )),
                 }
             }
         }
@@ -165,21 +184,39 @@ impl ser::Serialize for Compression {
         use ser::SerializeMap;
 
         let mut map = serializer.serialize_map(None)?;
+        let mut level = None;
         match self {
             Compression::None => map.serialize_entry("algorithm", "none")?,
-            Compression::Gzip(level) => {
+            Compression::Gzip(gzip_level) => {
                 map.serialize_entry("algorithm", "gzip")?;
-                match level.level() {
-                    GZIP_NONE => map.serialize_entry("level", "none")?,
-                    GZIP_FAST => map.serialize_entry("level", "fast")?,
-                    // Don't serialize if at default level, we already utilize that when
-                    // deserializing and it just clutters the resulting JSON.
-                    GZIP_DEFAULT => {}
-                    GZIP_BEST => map.serialize_entry("level", "best")?,
-                    level => map.serialize_entry("level", &level)?,
-                };
+                level = Some(*gzip_level);
             }
-        };
+            Compression::Zlib(zlib_level) => {
+                map.serialize_entry("algorithm", "zlib")?;
+                level = Some(*zlib_level);
+            }
+        }
+
+        if let Some(level) = level {
+            const NONE: flate2::Compression = flate2::Compression::none();
+            const FAST: flate2::Compression = flate2::Compression::fast();
+            const BEST: flate2::Compression = flate2::Compression::best();
+            let default = flate2::Compression::default();
+
+            match level {
+                NONE => map.serialize_entry("level", "none")?,
+                FAST => map.serialize_entry("level", "fast")?,
+                BEST => map.serialize_entry("level", "best")?,
+                // Don't serialize if at default level, we already utilize that when
+                // deserializing and it just clutters the resulting JSON.
+                level => {
+                    if level != default {
+                        map.serialize_entry("level", &level.level())?
+                    }
+                }
+            };
+        }
+
         map.end()
     }
 }
@@ -192,6 +229,14 @@ mod test {
     fn deserialization() {
         let fixtures_valid = [
             (r#""none""#, Compression::None),
+            (
+                r#""gzip""#,
+                Compression::Gzip(flate2::Compression::default()),
+            ),
+            (
+                r#""zlib""#,
+                Compression::Zlib(flate2::Compression::default()),
+            ),
             (r#"{"algorithm": "none"}"#, Compression::None),
             (
                 r#"{"algorithm": "gzip"}"#,
@@ -204,6 +249,18 @@ mod test {
             (
                 r#"{"algorithm": "gzip", "level": 8}"#,
                 Compression::Gzip(flate2::Compression::new(8)),
+            ),
+            (
+                r#"{"algorithm": "zlib"}"#,
+                Compression::Zlib(flate2::Compression::default()),
+            ),
+            (
+                r#"{"algorithm": "zlib", "level": "best"}"#,
+                Compression::Zlib(flate2::Compression::best()),
+            ),
+            (
+                r#"{"algorithm": "zlib", "level": 8}"#,
+                Compression::Zlib(flate2::Compression::new(8)),
             ),
         ];
         for (sources, result) in fixtures_valid.iter() {
@@ -218,11 +275,11 @@ mod test {
             ),
             (
                 r#""b42""#,
-                r#"invalid value: string "b42", expected "none" or "gzip" at line 1 column 5"#,
+                r#"invalid value: string "b42", expected "none" or "gzip" or "zlib" at line 1 column 5"#,
             ),
             (
                 r#"{"algorithm": "b42"}"#,
-                r#"unknown variant `b42`, expected `none` or `gzip` at line 1 column 20"#,
+                r#"unknown variant `b42`, expected one of `none`, `gzip`, `zlib` at line 1 column 20"#,
             ),
             (
                 r#"{"algorithm": "none", "level": "default"}"#,
@@ -249,6 +306,23 @@ mod test {
             let deserialized: Result<Compression, _> = serde_json::from_str(source);
             let error = deserialized.expect_err("invalid source");
             assert_eq!(error.to_string().as_str(), *result);
+        }
+    }
+
+    #[test]
+    fn from_and_to_value() {
+        let fixtures_valid = [
+            Compression::None,
+            Compression::Gzip(flate2::Compression::default()),
+            Compression::Gzip(flate2::Compression::new(7)),
+            Compression::Zlib(flate2::Compression::best()),
+            Compression::Zlib(flate2::Compression::new(7)),
+        ];
+
+        for v in fixtures_valid {
+            // Check serialize-deserialize round trip with defaults
+            let value = serde_json::to_value(v).unwrap();
+            serde_json::from_value::<Compression>(value).unwrap();
         }
     }
 }

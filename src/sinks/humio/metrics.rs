@@ -109,6 +109,8 @@ impl SinkConfig for HumioMetricsConfig {
             tls: self.tls.clone(),
             timestamp_nanos_key: None,
             acknowledgements: Default::default(),
+            // hard coded as humio expects this format so no sense in making it configurable
+            timestamp_key: "timestamp".to_string(),
         };
 
         let (sink, healthcheck) = sink.clone().build(cx).await?;
@@ -171,7 +173,10 @@ mod tests {
             Event, Metric,
         },
         sinks::util::test::{build_test_server, load_sink},
-        test_util::{self, components, components::HTTP_SINK_TAGS},
+        test_util::{
+            self,
+            components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+        },
     };
 
     #[test]
@@ -255,7 +260,7 @@ mod tests {
         ];
 
         let len = metrics.len();
-        components::run_sink_events(sink, stream::iter(metrics), &HTTP_SINK_TAGS).await;
+        run_and_assert_sink_compliance(sink, stream::iter(metrics), &HTTP_SINK_TAGS).await;
 
         let output = rx.take(len).collect::<Vec<_>>().await;
         assert_eq!(

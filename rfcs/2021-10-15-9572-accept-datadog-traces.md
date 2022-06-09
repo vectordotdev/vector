@@ -15,7 +15,7 @@ internal tracing has its own [RFC].
 
 ### Some details about traces handling by the Datadog Agent
 
-Offical "Datadog Agent" bundles (rpm/deb/msi/container image) actually ship multiple binaries, collectively named
+Official "Datadog Agent" bundles (rpm/deb/msi/container image) actually ship multiple binaries, collectively named
 "agents". Each of these "agents" is tasked to collect some data. For example "the core agent" (often shortened to "the
 agent", because it was the first of those agents to be released) is the one collecting metrics, logs and running checks.
 There are other agents like the process-agent, the security-agent or the trace-agent. But all of those are part of the

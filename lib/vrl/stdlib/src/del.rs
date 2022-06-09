@@ -117,15 +117,6 @@ impl Function for Del {
             _ => Ok(None),
         }
     }
-
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let query = args
-            .required_any("target")
-            .downcast_ref::<expression::Query>()
-            .unwrap();
-
-        del(query, ctx)
-    }
 }
 
 #[derive(Debug, Clone)]

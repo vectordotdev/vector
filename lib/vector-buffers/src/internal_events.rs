@@ -33,13 +33,13 @@ impl InternalEvent for BufferEventsSent {
     }
 }
 
-pub struct EventsDropped {
+pub struct BufferEventsDropped {
     pub idx: usize,
     pub count: u64,
     pub byte_size: u64,
 }
 
-impl InternalEvent for EventsDropped {
+impl InternalEvent for BufferEventsDropped {
     #[allow(clippy::cast_precision_loss)]
     fn emit(self) {
         counter!("buffer_discarded_events_total", self.count, "stage" => self.idx.to_string());

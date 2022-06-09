@@ -104,13 +104,6 @@ impl Function for ParseDuration {
             },
         ]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let unit = args.required("unit");
-
-        parse_duration(value, unit)
-    }
 }
 
 #[derive(Debug, Clone)]

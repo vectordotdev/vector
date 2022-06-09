@@ -139,7 +139,7 @@ The implementation would then consist in:
      Vector uses what's called a summary inside the Agent, implementing the complete DDSketch support in Vector is
      probably a good idea as sketches have convenient properties for wide consistent aggregation and limited error. To
      support smooth migration, full DDsktech (or compatible sketch) support is mandatory, as customers that emit
-     distribution metric from Datadog Agent would need it to migrate to Vector aggegation. This RFC assumes there will
+     distribution metric from Datadog Agent would need it to migrate to Vector aggregation. This RFC assumes there will
      be a complete sketch metric (likely to be DDSketch) that would be compatible and support the following scenario
      without loss of information: `(Agent Sketch) -> (Vector) -> (Datadog intake)`. This RFC focus on ingesting sketch
      and not the rest of the flow.
@@ -193,7 +193,7 @@ because of protocol conversion.
 
 For sketches, we could flatten sketches and compute usual derived metrics (min/max/average/count/some percentiles) and
 send those as gauge/count, but it would prevent (or at least impact) existing distribution/sketches users. Moreover if
-instead of sketches only derived metrics are used a lot of the tagging flexiblity will be lost. By submitting tagged
+instead of sketches only derived metrics are used a lot of the tagging flexibility will be lost. By submitting tagged
 sketches to the Datadog intake, any tag selector can be used to compute a distribution based on the sketches that bear
 matching tag. This cannot be done without sending sketches. But flattening sketches would have the benefit of simplify
 the implementation in Vector and remove the prerequisite of having sketches support inside Vector.
@@ -203,7 +203,7 @@ the implementation in Vector and remove the prerequisite of having sketches supp
 Instead of being done in the Agent, the request routing could be implemented either:
 
 1. In Vector, that would receive both metric and non-metric payload, simply proxying non-metric payload directly to
-   Datdog without further processing.
+   Datadog without further processing.
 2. Or in a third party middle layer (e.g. haproxy or similare). It could leverage the [documented
    haproxy](https://docs.datadoghq.com/agent/proxy/?tab=agentv6v7#haproxy) setup for Agent to divert selected routes to
    Vector, but it would have the advantage of resolving any migrations, not-yet-supported-metric-route in Vector and

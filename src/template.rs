@@ -240,8 +240,9 @@ impl Serialize for Template {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use chrono::TimeZone;
-    use vector_common::btreemap;
 
     use super::*;
     use crate::event::{Event, MetricKind, MetricValue};
@@ -439,9 +440,10 @@ mod tests {
     #[test]
     fn render_metric_with_tags() {
         let template = Template::try_from("name={{name}} component={{tags.component}}").unwrap();
-        let metric = sample_metric().with_tags(Some(
-            btreemap! { "test" => "true", "component" => "template" },
-        ));
+        let metric = sample_metric().with_tags(Some(BTreeMap::from([
+            (String::from("test"), String::from("true")),
+            (String::from("component"), String::from("template")),
+        ])));
         assert_eq!(
             Ok(Bytes::from("name=a-counter component=template")),
             template.render(&metric)

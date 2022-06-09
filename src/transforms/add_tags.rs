@@ -99,6 +99,8 @@ impl FunctionTransform for AddTags {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use vector_common::btreemap;
 
     use super::*;
@@ -143,7 +145,10 @@ mod tests {
             MetricKind::Absolute,
             MetricValue::Gauge { value: 10.0 },
         )
-        .with_tags(Some(btreemap! {"region" => "us-east-1"}));
+        .with_tags(Some(BTreeMap::from([(
+            String::from("region"),
+            String::from("us-east-1"),
+        )])));
         let expected = metric.clone();
 
         let map = vec![("region".to_string(), "overridden".to_string())]

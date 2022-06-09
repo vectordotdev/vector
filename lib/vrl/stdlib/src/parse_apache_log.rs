@@ -125,14 +125,6 @@ impl Function for ParseApacheLog {
             },
         ]
     }
-
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let format = args.required_any("format").downcast_ref::<Bytes>().unwrap();
-        let timestamp_format = args.optional("timestamp_format");
-
-        parse_apache_log(value, timestamp_format, format, ctx)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -340,7 +332,7 @@ mod tests {
             args: func_args![value: "- - - - - - -",
                              format: "common",
             ],
-            want: Ok(btreemap! {}),
+            want: Ok(BTreeMap::new()),
             tdef: TypeDef::object(kind_common()).fallible(),
             tz: vector_common::TimeZone::default(),
         }
@@ -349,7 +341,7 @@ mod tests {
             args: func_args![value: r#"- - - [-] "-" - -"#,
                              format: "common",
             ],
-            want: Ok(btreemap! {}),
+            want: Ok(BTreeMap::new()),
             tdef: TypeDef::object(kind_common()).fallible(),
             tz: vector_common::TimeZone::default(),
         }

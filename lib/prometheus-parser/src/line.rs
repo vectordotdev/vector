@@ -587,17 +587,17 @@ mod test {
         let input = wrap("{}");
         let (left, r) = Metric::parse_labels(&input).unwrap();
         assert_eq!(left, tail);
-        assert_eq!(r, btreemap! {});
+        assert_eq!(r, BTreeMap::new());
 
         let input = wrap(r#"{name="value"}"#);
         let (left, r) = Metric::parse_labels(&input).unwrap();
         assert_eq!(left, tail);
-        assert_eq!(r, btreemap! { "name" => "value" });
+        assert_eq!(r, BTreeMap::from([("name".into(), "value".into())]));
 
         let input = wrap(r#"{name="value",}"#);
         let (left, r) = Metric::parse_labels(&input).unwrap();
         assert_eq!(left, tail);
-        assert_eq!(r, btreemap! { "name" => "value" });
+        assert_eq!(r, BTreeMap::from([("name".into(), "value".into())]));
 
         let input = wrap(r#"{ name = "" ,b="a=b" , a="},", _c = "\""}"#);
         let (left, r) = Metric::parse_labels(&input).unwrap();
@@ -610,7 +610,7 @@ mod test {
         let input = wrap("100");
         let (left, r) = Metric::parse_labels(&input).unwrap();
         assert_eq!(left, "100".to_owned() + tail);
-        assert_eq!(r, btreemap! {});
+        assert_eq!(r, BTreeMap::new());
 
         // We don't allow these values
 

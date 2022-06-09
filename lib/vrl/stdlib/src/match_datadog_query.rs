@@ -111,16 +111,6 @@ impl Function for MatchDatadogQuery {
         }
     }
 
-    fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Resolved {
-        let value = arguments.required("value");
-        let filter = arguments
-            .required_any("query")
-            .downcast_ref::<DynMatcher>()
-            .unwrap();
-
-        Ok(filter.0.run(&value).into())
-    }
-
     fn parameters(&self) -> &'static [Parameter] {
         &[
             Parameter {

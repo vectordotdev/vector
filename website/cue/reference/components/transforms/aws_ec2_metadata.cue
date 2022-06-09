@@ -74,10 +74,19 @@ components: transforms: aws_ec2_metadata: {
 		proxy: configuration._proxy
 		refresh_interval_secs: {
 			common:      true
-			description: "The interval in seconds at which the EC2 Metadata api will be called."
+			description: "The interval in seconds on which the metadata from the IMDSv2 will be refreshed."
 			required:    false
 			type: uint: {
 				default: 10
+				unit:    null
+			}
+		}
+		refresh_timeout_secs: {
+			common:      true
+			description: "The timeout in seconds for requests to the IMDSv2."
+			required:    false
+			type: uint: {
+				default: 1
 				unit:    null
 			}
 		}

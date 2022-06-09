@@ -15,7 +15,10 @@ use crate::common::sqs::SqsClientBuilder;
 use crate::config::{ProxyConfig, SinkContext};
 use crate::sinks::util::encoding::EncodingConfig;
 use crate::sinks::VectorSink;
-use crate::test_util::{random_lines_with_stream, random_string};
+use crate::test_util::{
+    components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
+    random_lines_with_stream, random_string,
+};
 
 fn sqs_address() -> String {
     std::env::var("SQS_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into())
@@ -32,6 +35,7 @@ async fn create_test_client() -> SqsClient {
         Some(Endpoint::immutable(Uri::from_str(&endpoint).unwrap())),
         &proxy,
         &None,
+        true,
     )
     .await
     .unwrap()
@@ -66,7 +70,7 @@ async fn sqs_send_message_batch() {
     let sink = VectorSink::from_event_streamsink(sink);
 
     let (mut input_lines, events) = random_lines_with_stream(100, 10, None);
-    sink.run(events).await.unwrap();
+    run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
     sleep(Duration::from_secs(1)).await;
 

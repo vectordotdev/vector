@@ -81,13 +81,6 @@ impl Function for ParseCommonLog {
             }),
         }]
     }
-
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let timestamp_format = args.optional("timestamp_format");
-
-        parse_common_log(value, timestamp_format, ctx)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -157,13 +150,13 @@ mod tests {
 
         log_line_valid_empty {
             args: func_args![value: "- - - - - - -"],
-            want: Ok(btreemap! {}),
+            want: Ok(BTreeMap::new()),
             tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         log_line_valid_empty_variant {
             args: func_args![value: r#"- - - [-] "-" - -"#],
-            want: Ok(btreemap! {}),
+            want: Ok(BTreeMap::new()),
             tdef: TypeDef::object(inner_kind()).fallible(),
         }
 

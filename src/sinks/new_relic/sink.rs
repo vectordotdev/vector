@@ -17,8 +17,11 @@ use super::{
 use crate::{
     event::Event,
     sinks::util::{
-        builder::SinkBuilderExt, encoding::EncodingConfigFixed, Compression, RequestBuilder,
-        StreamSink,
+        builder::SinkBuilderExt,
+        encoding::EncodingConfigFixed,
+        metadata::{RequestMetadata, RequestMetadataBuilder},
+        request_builder::EncodeResult,
+        Compression, RequestBuilder, StreamSink,
     },
 };
 
@@ -72,7 +75,7 @@ struct NewRelicRequestBuilder {
 }
 
 impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
-    type Metadata = (Arc<NewRelicCredentials>, usize, EventFinalizers);
+    type Metadata = (EventFinalizers, RequestMetadataBuilder);
     type Events = Result<NewRelicApiModel, Self::Error>;
     type Encoder = EncodingConfigFixed<Encoding>;
     type Payload = Bytes;
@@ -88,7 +91,8 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
     }
 
     fn split_input(&self, mut input: Vec<Event>) -> (Self::Metadata, Self::Events) {
-        let events_len = input.len();
+        let metadata_builder = RequestMetadata::builder(&input);
+
         let finalizers = input.take_finalizers();
         let api_model = || -> Result<NewRelicApiModel, Self::Error> {
             match self.credentials.api {
@@ -101,17 +105,23 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
                 NewRelicApi::Logs => Ok(NewRelicApiModel::Logs(LogsApiModel::try_from(input)?)),
             }
         }();
-        let metadata = (Arc::clone(&self.credentials), events_len, finalizers);
-        (metadata, api_model)
+
+        ((finalizers, metadata_builder), api_model)
     }
 
-    fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
-        let (_credentials, events_len, finalizers) = metadata;
+    fn build_request(
+        &self,
+        metadata: Self::Metadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
+        let (finalizers, metadata_builder) = metadata;
+        let metadata = metadata_builder.build(&payload);
+
         NewRelicApiRequest {
-            batch_size: events_len,
+            metadata,
             finalizers,
             credentials: Arc::clone(&self.credentials),
-            payload,
+            payload: payload.into_payload(),
             compression: self.compression,
         }
     }

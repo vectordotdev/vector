@@ -13,6 +13,8 @@ use snafu::{ResultExt, Snafu};
 use tokio::{net::UdpSocket, sync::oneshot, time::sleep};
 use tokio_util::codec::Encoder;
 use vector_buffers::Acker;
+use vector_common::internal_event::BytesSent;
+use vector_core::ByteSizeOf;
 
 use super::SinkBuildError;
 use crate::{
@@ -212,6 +214,7 @@ impl tower::Service<BytesMut> for UdpService {
 
     fn call(&mut self, msg: BytesMut) -> Self::Future {
         let (sender, receiver) = oneshot::channel();
+        let byte_size = msg.len();
 
         let mut socket =
             match std::mem::replace(&mut self.state, UdpServiceState::Sending(receiver)) {
@@ -223,6 +226,19 @@ impl tower::Service<BytesMut> for UdpService {
             // TODO: Add reconnect support as TCP/Unix?
             let result = udp_send(&mut socket, &msg).await.context(SendSnafu);
             let _ = sender.send(socket);
+
+            if result.is_ok() {
+                // NOTE: This is obviously not happening before things like compression, etc, so it's currently a
+                // stopgap for the `socket` and `statsd` sinks, and potentially others, to ensure that we're at least
+                // emitting the `BytesSent` event, and related metrics... and practically, those sinks don't compress
+                // anyways, so the metrics are correct as-is... they just may not be correct in the future if
+                // compression support was added, etc.
+                emit!(BytesSent {
+                    byte_size,
+                    protocol: "udp",
+                });
+            }
+
             result
         })
     }
@@ -264,6 +280,8 @@ where
         while Pin::new(&mut input).peek().await.is_some() {
             let mut socket = self.connector.connect_backoff().await;
             while let Some(mut event) = input.next().await {
+                let byte_size = event.size_of();
+
                 self.acker.ack(1);
 
                 self.transformer.transform(&mut event);
@@ -274,11 +292,18 @@ where
                 }
 
                 match udp_send(&mut socket, &bytes).await {
-                    Ok(()) => emit!(SocketEventsSent {
-                        mode: SocketMode::Udp,
-                        count: 1,
-                        byte_size: bytes.len(),
-                    }),
+                    Ok(()) => {
+                        emit!(SocketEventsSent {
+                            mode: SocketMode::Udp,
+                            count: 1,
+                            byte_size,
+                        });
+
+                        emit!(BytesSent {
+                            byte_size: bytes.len(),
+                            protocol: "udp",
+                        });
+                    }
                     Err(error) => {
                         emit!(UdpSocketError { error });
                         break;

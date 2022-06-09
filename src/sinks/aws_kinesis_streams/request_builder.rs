@@ -10,7 +10,7 @@ use crate::{
     event::{Event, EventFinalizers, Finalizable},
     sinks::{
         aws_kinesis_streams::sink::KinesisProcessedEvent,
-        util::{encoding::Transformer, Compression, RequestBuilder},
+        util::{encoding::Transformer, request_builder::EncodeResult, Compression, RequestBuilder},
     },
 };
 
@@ -110,10 +110,15 @@ impl RequestBuilder<KinesisProcessedEvent> for KinesisRequestBuilder {
         (metadata, Event::from(event.event))
     }
 
-    fn build_request(&self, metadata: Self::Metadata, data: Bytes) -> Self::Request {
+    fn build_request(
+        &self,
+        metadata: Self::Metadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
+        let payload = payload.into_payload();
         KinesisRequest {
             put_records_request: PutRecordsRequestEntry::builder()
-                .data(Blob::new(data.as_ref()))
+                .data(Blob::new(&payload[..]))
                 .partition_key(metadata.partition_key)
                 .build(),
             finalizers: metadata.finalizers,

@@ -765,6 +765,11 @@ bench_function! {
         args: func_args![value: r#"{"key": "value""#],
         want: Ok(false),
     }
+
+    exact_variant {
+        args: func_args![value: r#"{"key": "value""#, variant: "object"],
+        want: Ok(true),
+    }
 }
 
 bench_function! {
@@ -1372,7 +1377,6 @@ bench_function! {
         args: func_args![
             value: "2020-10-02T23:22:12.223222Z info Hello world",
             pattern: "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}",
-            remove_empty: false,
         ],
         want: Ok(value!({
             "timestamp": "2020-10-02T23:22:12.223222Z",

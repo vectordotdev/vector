@@ -1,9 +1,9 @@
-use std::io::Read;
+use std::{collections::HashMap, io::Read};
 
 use indexmap::IndexMap;
 use toml::value::Table;
 
-use super::{deserialize_table, loader, prepare_input};
+use super::{deserialize_table, loader, prepare_input, secret};
 use super::{ComponentHint, Process};
 use crate::config::{
     ComponentKey, ConfigBuilder, EnrichmentTableOuter, SinkOuter, SourceOuter, TestDefinition,
@@ -12,20 +12,35 @@ use crate::config::{
 
 pub struct ConfigBuilderLoader {
     builder: ConfigBuilder,
+    secrets: Option<HashMap<String, String>>,
 }
 
 impl ConfigBuilderLoader {
     pub fn new() -> Self {
         Self {
             builder: ConfigBuilder::default(),
+            secrets: None,
+        }
+    }
+
+    pub fn with_secrets(secrets: HashMap<String, String>) -> Self {
+        Self {
+            builder: ConfigBuilder::default(),
+            secrets: Some(secrets),
         }
     }
 }
 
 impl Process for ConfigBuilderLoader {
     /// Prepares input for a `ConfigBuilder` by interpolating environment variables.
-    fn prepare<R: Read>(&self, input: R) -> Result<(String, Vec<String>), Vec<String>> {
-        prepare_input(input)
+    fn prepare<R: Read>(&mut self, input: R) -> Result<(String, Vec<String>), Vec<String>> {
+        let (prepared_input, warnings) = prepare_input(input)?;
+        let prepared_input = self
+            .secrets
+            .as_ref()
+            .map(|s| secret::interpolate(&prepared_input, s))
+            .unwrap_or(Ok(prepared_input))?;
+        Ok((prepared_input, warnings))
     }
 
     /// Merge a TOML `Table` with a `ConfigBuilder`. Component types extend specific keys.

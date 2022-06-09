@@ -152,14 +152,6 @@ impl Function for Decrypt {
             iv,
         }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let ciphertext = args.required("ciphertext");
-        let algorithm = args.required("algorithm");
-        let key = args.required("key");
-        let iv = args.required("iv");
-        decrypt(ciphertext, algorithm, key, iv)
-    }
 }
 
 #[derive(Debug, Clone)]

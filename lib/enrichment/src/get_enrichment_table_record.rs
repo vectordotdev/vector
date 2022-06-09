@@ -6,8 +6,7 @@ use vrl::{
         ArgumentList, Compiled, CompiledArgument, Example, FunctionCompileContext, Parameter,
     },
     prelude::{
-        expression, DiagnosticMessage, FunctionArgument, Resolved, Result, TypeDef, VmArgumentList,
-        VrlValueConvert,
+        expression, DiagnosticMessage, FunctionArgument, Resolved, Result, TypeDef, VrlValueConvert,
     },
     state,
     value::kind,
@@ -15,7 +14,7 @@ use vrl::{
 };
 
 use crate::{
-    vrl_util::{self, add_index, evaluate_condition, index_from_args, EnrichmentTableRecord},
+    vrl_util::{self, add_index, evaluate_condition, index_from_args},
     Case, Condition, IndexHandle, TableRegistry, TableSearch,
 };
 
@@ -178,32 +177,6 @@ impl Function for GetEnrichmentTableRecord {
             _ => Ok(None),
         }
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let condition = args.required("condition");
-        let condition = condition
-            .into_object()
-            .expect("condition should be an object");
-        let condition = condition
-            .iter()
-            .map(|(key, value)| evaluate_condition(key, value.clone()))
-            .collect::<Result<Vec<Condition>>>()?;
-
-        let record = args
-            .required_any("table")
-            .downcast_ref::<EnrichmentTableRecord>()
-            .unwrap();
-        let select = args.optional("select");
-
-        get_enrichment_table_record(
-            select,
-            &record.enrichment_tables,
-            &record.table,
-            record.case_sensitive,
-            &condition,
-            record.index,
-        )
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -255,7 +228,7 @@ impl Expression for GetEnrichmentTableRecordFn {
 
 #[cfg(test)]
 mod tests {
-    use vector_common::{btreemap, TimeZone};
+    use vector_common::TimeZone;
 
     use super::*;
     use crate::test_util::get_table_registry;
@@ -265,9 +238,10 @@ mod tests {
         let registry = get_table_registry();
         let func = GetEnrichmentTableRecordFn {
             table: "dummy1".to_string(),
-            condition: btreemap! {
-                "field" =>  expression::Literal::from("value"),
-            },
+            condition: BTreeMap::from([(
+                "field".into(),
+                expression::Literal::from("value").into(),
+            )]),
             index: Some(IndexHandle(999)),
             select: None,
             case_sensitive: Case::Sensitive,

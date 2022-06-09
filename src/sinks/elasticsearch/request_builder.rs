@@ -8,7 +8,10 @@ use crate::{
             encoder::{ElasticsearchEncoder, ProcessedEvent},
             service::ElasticsearchRequest,
         },
-        util::{encoding::EncodingConfigFixed, Compression, RequestBuilder},
+        util::{
+            encoding::EncodingConfigFixed, request_builder::EncodeResult, Compression,
+            RequestBuilder,
+        },
     },
 };
 
@@ -54,9 +57,13 @@ impl RequestBuilder<Vec<ProcessedEvent>> for ElasticsearchRequestBuilder {
         (metadata, events)
     }
 
-    fn build_request(&self, metadata: Self::Metadata, payload: Bytes) -> Self::Request {
+    fn build_request(
+        &self,
+        metadata: Self::Metadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
         ElasticsearchRequest {
-            payload,
+            payload: payload.into_payload(),
             finalizers: metadata.finalizers,
             batch_size: metadata.batch_size,
             events_byte_size: metadata.events_byte_size,

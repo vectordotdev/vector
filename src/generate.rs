@@ -393,7 +393,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     }
 }
 
-fn write_config(filepath: &Path, body: &str) -> Result<usize, crate::Error> {
+fn write_config(filepath: &Path, body: &str) -> Result<(), crate::Error> {
     if filepath.exists() {
         // If the file exists, we don't want to overwrite, that's just rude.
         Err(format!("{:?} already exists", &filepath).into())
@@ -402,7 +402,7 @@ fn write_config(filepath: &Path, body: &str) -> Result<usize, crate::Error> {
             create_dir_all(directory)?;
         }
         File::create(filepath)
-            .and_then(|mut file| file.write(body.as_bytes()))
+            .and_then(|mut file| file.write_all(body.as_bytes()))
             .map_err(Into::into)
     }
 }

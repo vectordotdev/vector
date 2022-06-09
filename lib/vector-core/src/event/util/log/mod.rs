@@ -1,12 +1,8 @@
 mod all_fields;
-mod contains;
-mod insert;
 mod keys;
 mod remove;
 
-pub use all_fields::all_fields;
-pub use contains::contains;
-pub use insert::insert;
+pub use all_fields::{all_fields, all_fields_non_object_root};
 pub use keys::keys;
 pub use remove::remove;
 

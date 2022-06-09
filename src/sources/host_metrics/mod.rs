@@ -12,8 +12,6 @@ use serde::{
 };
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
-#[cfg(unix)]
-use vector_common::btreemap;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -236,19 +234,19 @@ impl HostMetrics {
                         "load1",
                         timestamp,
                         loadavg.0.get::<ratio>() as f64,
-                        btreemap! {},
+                        BTreeMap::new(),
                     ),
                     self.gauge(
                         "load5",
                         timestamp,
                         loadavg.1.get::<ratio>() as f64,
-                        btreemap! {},
+                        BTreeMap::new(),
                     ),
                     self.gauge(
                         "load15",
                         timestamp,
                         loadavg.2.get::<ratio>() as f64,
-                        btreemap! {},
+                        BTreeMap::new(),
                     ),
                 ]
             }

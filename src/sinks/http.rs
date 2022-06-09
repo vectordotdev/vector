@@ -6,7 +6,7 @@ use codecs::encoding::{
     JsonSerializerConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig, Serializer,
     SerializerConfig, TextSerializerConfig,
 };
-use flate2::write::GzEncoder;
+use flate2::write::{GzEncoder, ZlibEncoder};
 use futures::{future, FutureExt, SinkExt};
 use http::{
     header::{self, HeaderName, HeaderValue},
@@ -335,6 +335,14 @@ impl util::http::HttpSink for HttpSink {
 
                 let buffer = BytesMut::new();
                 let mut w = GzEncoder::new(buffer.writer(), level);
+                w.write_all(&body).expect("Writing to Vec can't fail");
+                body = w.finish().expect("Writing to Vec can't fail").into_inner();
+            }
+            Compression::Zlib(level) => {
+                builder = builder.header("Content-Encoding", "deflate");
+
+                let buffer = BytesMut::new();
+                let mut w = ZlibEncoder::new(buffer.writer(), level);
                 w.write_all(&body).expect("Writing to Vec can't fail");
                 body = w.finish().expect("Writing to Vec can't fail").into_inner();
             }
@@ -756,7 +764,7 @@ mod tests {
 
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let (input_lines, events) = random_lines_with_stream(100, num_lines, Some(batch));
-        components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
+        components::run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
         drop(trigger);
 
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
