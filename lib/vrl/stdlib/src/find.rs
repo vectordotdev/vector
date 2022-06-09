@@ -173,7 +173,7 @@ mod tests {
 
         wrong_pattern {
             args: func_args![value: "foobar", pattern: Value::Integer(42)],
-            want: Err("expected regex or string, got integer"),
+            want: Err("expected string or regex, got integer"),
             tdef: TypeDef::integer().infallible(),
         }
     ];
