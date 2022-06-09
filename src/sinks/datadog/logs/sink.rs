@@ -7,6 +7,7 @@ use std::{
 
 use async_trait::async_trait;
 use bytes::Bytes;
+use codecs::{encoding::Framer, CharacterDelimitedEncoder, JsonSerializer};
 use futures::{stream::BoxStream, StreamExt};
 use lookup::path;
 use snafu::Snafu;
@@ -23,9 +24,10 @@ use vector_core::{
 
 use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};
 use crate::{
+    codecs::Encoder,
     config::SinkContext,
     sinks::util::{
-        encoding::{Encoder, EncodingConfigFixed, StandardEncodings},
+        encoding::{Encoder as _, Transformer},
         request_builder::EncodeResult,
         Compression, Compressor, RequestBuilder, SinkBuilderExt,
     },
@@ -44,7 +46,7 @@ impl Partitioner for EventPartitioner {
 
 #[derive(Debug)]
 pub struct LogSinkBuilder<S> {
-    encoding: EncodingConfigFixed<JsonEncoding>,
+    encoding: JsonEncoding,
     service: S,
     context: SinkContext,
     batch_settings: BatcherSettings,
@@ -54,13 +56,14 @@ pub struct LogSinkBuilder<S> {
 
 impl<S> LogSinkBuilder<S> {
     pub fn new(
+        transformer: Transformer,
         service: S,
         context: SinkContext,
         default_api_key: Arc<str>,
         batch_settings: BatcherSettings,
     ) -> Self {
         Self {
-            encoding: Default::default(),
+            encoding: JsonEncoding::new(transformer),
             service,
             context,
             default_api_key,
@@ -100,7 +103,7 @@ pub struct LogSink<S> {
     /// The API service
     service: S,
     /// The encoding of payloads
-    encoding: EncodingConfigFixed<JsonEncoding>,
+    encoding: JsonEncoding,
     /// Whether to enable schema support.
     schema_enabled: bool,
     /// The compression technique to use when building the request body
@@ -111,37 +114,34 @@ pub struct LogSink<S> {
 
 /// Customized encoding specific to the Datadog Logs sink, as the logs API only accepts JSON encoded
 /// log lines, and requires some specific normalization of certain event fields.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct JsonEncoding {
     log_schema: &'static LogSchema,
-    inner: StandardEncodings,
+    encoder: (Transformer, Encoder<Framer>),
 }
 
-impl Default for JsonEncoding {
-    fn default() -> Self {
+impl JsonEncoding {
+    pub fn new(transformer: Transformer) -> Self {
         Self {
             log_schema: log_schema(),
-            inner: StandardEncodings::Json,
+            encoder: (
+                transformer,
+                Encoder::<Framer>::new(
+                    CharacterDelimitedEncoder::new(b',').into(),
+                    JsonSerializer::new().into(),
+                ),
+            ),
         }
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct SemanticJsonEncoding {
     log_schema: &'static LogSchema,
-    inner: StandardEncodings,
+    encoder: (Transformer, Encoder<Framer>),
 }
 
-impl Default for SemanticJsonEncoding {
-    fn default() -> Self {
-        Self {
-            log_schema: log_schema(),
-            inner: StandardEncodings::Json,
-        }
-    }
-}
-
-impl Encoder<Vec<Event>> for JsonEncoding {
+impl crate::sinks::util::encoding::Encoder<Vec<Event>> for JsonEncoding {
     fn encode_input(&self, mut input: Vec<Event>, writer: &mut dyn io::Write) -> io::Result<usize> {
         for event in input.iter_mut() {
             let log = event.as_mut_log();
@@ -152,11 +152,11 @@ impl Encoder<Vec<Event>> for JsonEncoding {
             }
         }
 
-        self.inner.encode_input(input, writer)
+        self.encoder.encode_input(input, writer)
     }
 }
 
-impl Encoder<Vec<Event>> for SemanticJsonEncoding {
+impl crate::sinks::util::encoding::Encoder<Vec<Event>> for SemanticJsonEncoding {
     fn encode_input(&self, mut input: Vec<Event>, writer: &mut dyn io::Write) -> io::Result<usize> {
         for event in input.iter_mut() {
             let log = event.as_mut_log();
@@ -182,7 +182,7 @@ impl Encoder<Vec<Event>> for SemanticJsonEncoding {
             log.insert(path!("timestamp"), Value::Integer(ms));
         }
 
-        self.inner.encode_input(input, writer)
+        self.encoder.encode_input(input, writer)
     }
 }
 
@@ -202,14 +202,14 @@ impl From<io::Error> for RequestBuildError {
 
 struct LogRequestBuilder {
     default_api_key: Arc<str>,
-    encoding: EncodingConfigFixed<JsonEncoding>,
+    encoding: JsonEncoding,
     compression: Compression,
 }
 
 impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
     type Metadata = (Arc<str>, usize, EventFinalizers, usize);
     type Events = Vec<Event>;
-    type Encoder = EncodingConfigFixed<JsonEncoding>;
+    type Encoder = JsonEncoding;
     type Payload = Bytes;
     type Request = LogApiRequest;
     type Error = RequestBuildError;
@@ -286,14 +286,14 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
 
 struct SemanticLogRequestBuilder {
     default_api_key: Arc<str>,
-    encoding: EncodingConfigFixed<SemanticJsonEncoding>,
+    encoding: SemanticJsonEncoding,
     compression: Compression,
 }
 
 impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for SemanticLogRequestBuilder {
     type Metadata = (Arc<str>, usize, EventFinalizers, usize);
     type Events = Vec<Event>;
-    type Encoder = EncodingConfigFixed<SemanticJsonEncoding>;
+    type Encoder = SemanticJsonEncoding;
     type Payload = Bytes;
     type Request = LogApiRequest;
     type Error = RequestBuildError;
@@ -388,7 +388,10 @@ where
                     builder_limit,
                     SemanticLogRequestBuilder {
                         default_api_key,
-                        encoding: self.encoding.map::<SemanticJsonEncoding>(),
+                        encoding: SemanticJsonEncoding {
+                            log_schema: self.encoding.log_schema,
+                            encoder: self.encoding.encoder,
+                        },
                         compression: self.compression,
                     },
                 )
