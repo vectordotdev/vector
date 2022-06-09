@@ -4222,9 +4222,9 @@ dependencies = [
 
 [[package]]
 name = "luajit-src"
-version = "210.3.4+resty073ac54"
+version = "210.4.0+resty124ff8d"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "640b09e99575a442b4da0ef406a78188a1a4313bb9ead7b5b20ec12cc480130f"
+checksum = "f76fb2e2c0c7192e18719d321c9a148f7625c4dcbe3df5f4c19e685e4c286f6c"
 dependencies = [
  "cc",
 ]
@@ -4507,9 +4507,9 @@ dependencies = [
 
 [[package]]
 name = "mlua"
-version = "0.7.4"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29e2194305aa8301d5da9c1c98640047f4219f6b95c190f6860338ab9872b686"
+checksum = "d75eb178f8a9d6654ef31f094fb3da6d1e81e714f27007e92a3094ddd6587aa2"
 dependencies = [
  "bstr",
  "cc",

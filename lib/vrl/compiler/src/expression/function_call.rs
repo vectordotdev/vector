@@ -314,7 +314,7 @@ impl<'a> Builder<'a> {
                                 // If the target can resolve to a non-collection
                                 // type, this again returns "any".
                                 VariableKind::TargetInnerKey => {
-                                    let mut kind = Kind::empty();
+                                    let mut kind = Kind::never();
 
                                     if !type_def.is_collection() {
                                         kind = Kind::any()
