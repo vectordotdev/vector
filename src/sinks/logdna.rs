@@ -75,14 +75,6 @@ impl GenerateConfig for LogdnaConfig {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-pub enum Encoding {
-    #[derivative(Default)]
-    Default,
-}
-
 #[async_trait::async_trait]
 #[typetag::serde(name = "logdna")]
 impl SinkConfig for LogdnaConfig {
