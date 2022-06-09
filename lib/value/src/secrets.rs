@@ -69,7 +69,7 @@ mod test {
         b.insert("key-b", "value-b2");
         b.insert("key-c", "value-c2");
 
-        a.merge(&b);
+        a.merge(b);
 
         assert_eq!(a.get("key-a").unwrap().as_ref(), "value-a1");
         assert_eq!(a.get("key-b").unwrap().as_ref(), "value-b1");
