@@ -327,7 +327,7 @@ jobs:
         if: needs.changes.outputs.source == 'true'
         run: |
           ls .cargo
-          cat .cargo/config
+          cat .cargo/config.toml
           make check-clippy
       - name: Check version
         run: make check-version
