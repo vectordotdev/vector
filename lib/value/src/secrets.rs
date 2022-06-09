@@ -36,8 +36,8 @@ impl Secrets {
     }
 
     /// Inserts a new secret into the container.
-    pub fn insert(&mut self, key: &str, value: impl Into<Arc<str>>) {
-        self.secrets.insert(key.to_owned(), value.into());
+    pub fn insert(&mut self, key: impl Into<String>, value: impl Into<Arc<str>>) {
+        self.secrets.insert(key.into(), value.into());
     }
 
     /// Removes a secret
@@ -46,10 +46,10 @@ impl Secrets {
     }
 
     /// Merged both together. If there are collisions, the value from `self` is kept.
-    pub fn merge(&mut self, other: &Self) {
-        for (key, value) in &other.secrets {
-            if !self.secrets.contains_key(key) {
-                self.secrets.insert(key.clone(), value.clone());
+    pub fn merge(&mut self, other: Self) {
+        for (key, value) in other.secrets {
+            if !self.secrets.contains_key(&key) {
+                self.secrets.insert(key, value);
             }
         }
     }
