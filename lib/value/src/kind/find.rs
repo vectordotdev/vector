@@ -5,7 +5,7 @@ use std::{borrow::Cow, collections::VecDeque};
 use lookup::{Field, Lookup, Segment};
 
 use super::Kind;
-use crate::kind::{merge, EmptyKindError};
+use crate::kind::merge;
 
 /// The list of errors that can occur when `remove_at_path` fails.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -119,7 +119,7 @@ impl Kind {
                 },
 
                 Segment::Coalesce(fields) => {
-                    let mut merged_kind = Self::empty();
+                    let mut merged_kind = Self::never();
 
                     for field in fields {
                         let mut segments = iter.clone().cloned().collect::<VecDeque<_>>();
@@ -136,12 +136,8 @@ impl Kind {
                                 // If this `Kind` cannot be null, then the entire coalesced segment
                                 // will never be null, so we have to remove any reference to it.
                                 if non_null {
-                                    // Can error if we're left with an empty kind after removing
-                                    // `null`, but that's okay in this case, as we deal with the
-                                    // empty state at the end.
-                                    if let Err(EmptyKindError) = merged_kind.remove_null() {
-                                        merged_kind = Self::empty();
-                                    }
+                                    // if the type is empty after removing null, we deal with it at the end.
+                                    merged_kind.remove_null();
                                 }
 
                                 merged_kind.merge(
@@ -161,7 +157,7 @@ impl Kind {
                         };
                     }
 
-                    return Ok(if merged_kind.is_empty() {
+                    return Ok(if merged_kind.is_never() {
                         None
                     } else {
                         Some(Cow::Owned(merged_kind))

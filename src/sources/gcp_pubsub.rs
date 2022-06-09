@@ -6,7 +6,6 @@ use derivative::Derivative;
 use futures::{stream, Stream, StreamExt, TryFutureExt};
 use http::uri::{InvalidUri, Scheme, Uri};
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::sync::Mutex;
 use tonic::{
@@ -14,6 +13,7 @@ use tonic::{
     transport::{Certificate, Channel, ClientTlsConfig, Endpoint, Identity},
     Code, Request, Status,
 };
+use vector_config::configurable_component;
 use vector_core::{finalizer::EmptyStream, finalizer::UnorderedFinalizer, ByteSizeOf};
 
 use crate::{
@@ -92,34 +92,54 @@ pub(crate) enum PubsubError {
 
 static CLIENT_ID: Lazy<String> = Lazy::new(|| uuid::Uuid::new_v4().to_string());
 
-#[derive(Deserialize, Serialize, Derivative, Debug, Clone)]
+/// Configuration for the `gcp_pubsub` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub struct PubsubConfig {
+    /// The project name from which to pull logs.
     pub project: String,
+
+    /// The subscription within the project which is configured to receive logs.
     pub subscription: String,
+
+    /// The endpoint from which to pull data.
     pub endpoint: Option<String>,
 
-    #[serde(default)]
+    /// Disables the loading of authentication credentials.
+    ///
+    /// Only used for tests.
+    #[serde(skip, default)]
     pub skip_authentication: bool,
+
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
 
+    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
+    /// The acknowledgement deadline, in seconds, to use for this stream.
+    ///
+    /// Messages that are not acknowledged when this deadline expires may be retransmitted.
     #[serde(default = "default_ack_deadline")]
     pub ack_deadline_seconds: i32,
 
+    /// The amount of time, in seconds, to wait between retry attempts after an error.
     #[serde(default = "default_retry_delay")]
     pub retry_delay_seconds: f64,
 
+    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     pub framing: FramingConfig,
+
+    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,
 
+    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub acknowledgements: AcknowledgementsConfig,
 }

@@ -122,7 +122,7 @@ impl Expression for SliceFn {
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
-        let td = TypeDef::from(Kind::empty()).fallible();
+        let td = TypeDef::from(Kind::never()).fallible();
 
         match self.value.type_def(state) {
             v if v.is_bytes() => td.merge_deep(v),

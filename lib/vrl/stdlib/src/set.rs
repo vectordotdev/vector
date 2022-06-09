@@ -153,7 +153,7 @@ impl Expression for SetFn {
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         let value_td = self.value.type_def(state);
 
-        let mut td = TypeDef::from(Kind::empty()).fallible();
+        let mut td = TypeDef::from(Kind::never()).fallible();
 
         if value_td.is_array() {
             td = td.add_array(Collection::any())

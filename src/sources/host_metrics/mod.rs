@@ -12,6 +12,12 @@ use serde::{
 };
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+use vector_config::{
+    configurable_component,
+    schema::{finalize_schema, generate_string_schema},
+    schemars::{gen::SchemaGenerator, schema::SchemaObject},
+    Configurable, Metadata,
+};
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -30,64 +36,94 @@ mod filesystem;
 mod memory;
 mod network;
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Collector types.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum Collector {
+    /// CGroups.
     #[cfg(target_os = "linux")]
     CGroups,
+
+    /// CPU.
     Cpu,
+
+    /// Disk.
     Disk,
+
+    /// Filesystem.
     Filesystem,
+
+    /// Load average.
     Load,
+
+    /// Host.
     Host,
+
+    /// Memory.
     Memory,
+
+    /// Network.
     Network,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+/// Filtering configuration.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
 pub(self) struct FilterList {
+    /// Any patterns which should be included.
     includes: Option<Vec<PatternWrapper>>,
+
+    /// Any patterns which should be excluded.
     excludes: Option<Vec<PatternWrapper>>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Namespace(Option<String>);
-
-impl Default for Namespace {
-    fn default() -> Self {
-        Self(Some("host".into()))
-    }
-}
-
-impl From<Option<String>> for Namespace {
-    fn from(s: Option<String>) -> Self {
-        Namespace(s)
-    }
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+/// Configuration for the `host_metrics` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug, Derivative)]
+#[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub struct HostMetricsConfig {
+    /// The interval between metric gathering, in seconds.
     #[serde(default = "default_scrape_interval")]
     pub scrape_interval_secs: f64,
 
+    /// The list of host metric collector services to use.
+    ///
+    /// Defaults to all collectors.
     pub collectors: Option<Vec<Collector>>,
+
+    /// Overrides the default namespace for the metrics emitted by the source.
+    ///
+    /// By default, `host` is used.
     #[serde(default)]
-    pub namespace: Namespace,
+    #[derivative(Default(value = "default_namespace()"))]
+    pub namespace: Option<String>,
 
     #[cfg(target_os = "linux")]
+    #[configurable(derived)]
     #[serde(default)]
     pub(crate) cgroups: cgroups::CGroupsConfig,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub disk: disk::DiskConfig,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub filesystem: filesystem::FilesystemConfig,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub network: network::NetworkConfig,
 }
 
 const fn default_scrape_interval() -> f64 {
     15.0
+}
+
+fn default_namespace() -> Option<String> {
+    Some(String::from("host"))
 }
 
 inventory::submit! {
@@ -103,7 +139,7 @@ impl SourceConfig for HostMetricsConfig {
         init_roots();
 
         let mut config = self.clone();
-        config.namespace.0 = config.namespace.0.filter(|namespace| !namespace.is_empty());
+        config.namespace = config.namespace.filter(|namespace| !namespace.is_empty());
 
         Ok(Box::pin(config.run(cx.out, cx.shutdown)))
     }
@@ -304,7 +340,7 @@ impl HostMetrics {
         tags: BTreeMap<String, String>,
     ) -> Metric {
         Metric::new(name, MetricKind::Absolute, MetricValue::Counter { value })
-            .with_namespace(self.config.namespace.0.clone())
+            .with_namespace(self.config.namespace.clone())
             .with_tags(Some(tags))
             .with_timestamp(Some(timestamp))
     }
@@ -317,7 +353,7 @@ impl HostMetrics {
         tags: BTreeMap<String, String>,
     ) -> Metric {
         Metric::new(name, MetricKind::Absolute, MetricValue::Gauge { value })
-            .with_namespace(self.config.namespace.0.clone())
+            .with_namespace(self.config.namespace.clone())
             .with_tags(Some(tags))
             .with_timestamp(Some(timestamp))
     }
@@ -465,6 +501,24 @@ impl Serialize for PatternWrapper {
     }
 }
 
+// NOTE: We have to do a manual implementation of `Configurable` because `configurable_component` derives
+// `Serialize`/`Deserialize` automatically, which we can't do here since they're already implemented by hand here.
+impl<'de> Configurable<'de> for PatternWrapper {
+    fn referencable_name() -> Option<&'static str> {
+        Some("glob::PatternWrapper")
+    }
+
+    fn description() -> Option<&'static str> {
+        Some("A compiled Unix shell style pattern.")
+    }
+
+    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
+        let mut schema = generate_string_schema();
+        finalize_schema(gen, &mut schema, overrides);
+        schema
+    }
+}
+
 #[cfg(test)]
 pub(self) mod tests {
     use std::{collections::HashSet, future::Future};
@@ -585,7 +639,7 @@ pub(self) mod tests {
     #[tokio::test]
     async fn uses_custom_namespace() {
         let metrics = HostMetrics::new(HostMetricsConfig {
-            namespace: Namespace(Some("other".into())),
+            namespace: Some("other".into()),
             ..Default::default()
         })
         .capture_metrics()
