@@ -49,13 +49,12 @@ impl RequestBuilder<(Option<Partitioned>, Vec<HecProcessedEvent>)> for HecLogsRe
         let (partition, mut events) = input;
         let (partition, metadata) = match partition {
             None => (None, None),
-            // TODO This is messy
             Some(partition) => {
                 let (p, m) = partition.into_parts();
                 (p, Some(m))
             }
         };
-        //let partition = partition.and_then(|partition| partition.token);
+
         let finalizers = events.take_finalizers();
         let events_byte_size: usize = events.iter().map(|e| e.metadata.event_byte_size).sum();
 
@@ -85,21 +84,4 @@ impl RequestBuilder<(Option<Partitioned>, Vec<HecProcessedEvent>)> for HecLogsRe
             metadata: metadata.metadata,
         }
     }
-
-    /*
-    TODO: Why was this needed?
-
-    fn encode_events(
-        &self,
-        events: Self::Events,
-    ) -> Result<EncodeResult<Self::Payload>, Self::Error> {
-        use crate::sinks::util::encoding::Encoder;
-
-        let mut compressor = crate::sinks::util::Compressor::from(self.compression());
-        let _ = self.encoder().encode_input(events, &mut compressor)?;
-
-        let payload = compressor.into_inner().freeze();
-        Ok(payload)
-    }
-    */
 }

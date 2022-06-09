@@ -214,7 +214,7 @@ async fn splunk_insert_index() {
     let (sink, _) = config.build(cx).await.unwrap();
 
     let message = random_string(100);
-    let event = Event::from(message.clone());
+    let event = LogEvent::from(message.clone());
     run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
     let entry = find_entry(message.as_str()).await;
@@ -233,8 +233,8 @@ async fn splunk_index_is_interpolated() {
     let (sink, _) = config.build(cx).await.unwrap();
 
     let message = random_string(100);
-    let mut event = Event::from(message.clone());
-    event.as_mut_log().insert("index_name", "custom_index");
+    let mut event = LogEvent::from(message.clone());
+    event.insert("index_name", "custom_index");
     run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
     let entry = find_entry(message.as_str()).await;
@@ -265,8 +265,8 @@ async fn splunk_custom_fields() {
     let (sink, _) = config.build(cx).await.unwrap();
 
     let message = random_string(100);
-    let mut event = Event::from(message.clone());
-    event.as_mut_log().insert("asdf", "hello");
+    let mut event = LogEvent::from(message.clone());
+    event.insert("asdf", "hello");
     run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
     let entry = find_entry(message.as_str()).await;
@@ -285,9 +285,9 @@ async fn splunk_hostname() {
     let (sink, _) = config.build(cx).await.unwrap();
 
     let message = random_string(100);
-    let mut event = Event::from(message.clone());
-    event.as_mut_log().insert("asdf", "hello");
-    event.as_mut_log().insert("host", "example.com:1234");
+    let mut event = LogEvent::from(message.clone());
+    event.insert("asdf", "hello");
+    event.insert("host", "example.com:1234");
     run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
     let entry = find_entry(message.as_str()).await;
@@ -310,8 +310,8 @@ async fn splunk_sourcetype() {
     let (sink, _) = config.build(cx).await.unwrap();
 
     let message = random_string(100);
-    let mut event = Event::from(message.clone());
-    event.as_mut_log().insert("asdf", "hello");
+    let mut event = LogEvent::from(message.clone());
+    event.insert("asdf", "hello");
     run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
     let entry = find_entry(message.as_str()).await;
@@ -335,10 +335,10 @@ async fn splunk_configure_hostname() {
     let (sink, _) = config.build(cx).await.unwrap();
 
     let message = random_string(100);
-    let mut event = Event::from(message.clone());
-    event.as_mut_log().insert("asdf", "hello");
-    event.as_mut_log().insert("host", "example.com:1234");
-    event.as_mut_log().insert("roast", "beef.example.com:1234");
+    let mut event = LogEvent::from(message.clone());
+    event.insert("asdf", "hello");
+    event.insert("host", "example.com:1234");
+    event.insert("roast", "beef.example.com:1234");
     run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
     let entry = find_entry(message.as_str()).await;
