@@ -431,10 +431,6 @@ mod integration_tests {
 
         let table = gen_table();
         let host = clickhouse_address();
-        let encoding = EncodingConfigWithDefault {
-            timestamp_format: Some(TimestampFormat::Unix),
-            ..Default::default()
-        };
 
         let mut batch = BatchConfig::default();
         batch.max_events = Some(1);
@@ -443,7 +439,7 @@ mod integration_tests {
             endpoint: host.parse().unwrap(),
             table: table.clone(),
             compression: Compression::None,
-            encoding,
+            encoding: Transformer::new(None, None, Some(TimestampFormat::Unix)).unwrap(),
             batch,
             request: TowerRequestConfig {
                 retry_attempts: Some(1),
