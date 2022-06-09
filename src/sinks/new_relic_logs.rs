@@ -188,8 +188,10 @@ mod tests {
 
     #[test]
     fn new_relic_logs_check_config_defaults() {
-        let mut nr_config = NewRelicLogsConfig::default();
-        nr_config.license_key = Some("foo".to_owned());
+        let nr_config = NewRelicLogsConfig {
+            license_key: Some("foo".to_owned()),
+            ..Default::default()
+        };
         let http_config = nr_config.create_config().unwrap();
 
         assert_eq!(
@@ -217,12 +219,20 @@ mod tests {
 
     #[test]
     fn new_relic_logs_check_config_custom() {
-        let mut nr_config = NewRelicLogsConfig::default();
-        nr_config.insert_key = Some("foo".to_owned());
-        nr_config.region = Some(NewRelicLogsRegion::Eu);
-        nr_config.batch.max_bytes = Some(MAX_PAYLOAD_SIZE);
-        nr_config.request.concurrency = Concurrency::Fixed(12);
-        nr_config.request.rate_limit_num = Some(24);
+        let mut batch = BatchConfig::default();
+        batch.max_bytes = Some(MAX_PAYLOAD_SIZE);
+
+        let nr_config = NewRelicLogsConfig {
+            insert_key: Some("foo".to_owned()),
+            region: Some(NewRelicLogsRegion::Eu),
+            batch,
+            request: TowerRequestConfig {
+                concurrency: Concurrency::Fixed(12),
+                rate_limit_num: Some(24),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
 
         let http_config = nr_config.create_config().unwrap();
 
@@ -312,8 +322,10 @@ mod tests {
     async fn new_relic_logs_happy_path() {
         let in_addr = next_addr();
 
-        let mut nr_config = NewRelicLogsConfig::default();
-        nr_config.license_key = Some("foo".to_owned());
+        let nr_config = NewRelicLogsConfig {
+            license_key: Some("foo".to_owned()),
+            ..Default::default()
+        };
         let mut http_config = nr_config.create_config().unwrap();
         http_config.uri = format!("http://{}/fake_nr", in_addr)
             .parse::<http::Uri>()

@@ -119,7 +119,7 @@ where
                 encoding,
                 only_fields: transformer.only_fields().clone(),
                 except_fields: transformer.except_fields().clone(),
-                timestamp_format: transformer.timestamp_format().clone(),
+                timestamp_format: *transformer.timestamp_format(),
                 _marker: PhantomData,
             },
         )
@@ -301,7 +301,7 @@ where
                 encoding,
                 only_fields: transformer.only_fields().clone(),
                 except_fields: transformer.except_fields().clone(),
-                timestamp_format: transformer.timestamp_format().clone(),
+                timestamp_format: *transformer.timestamp_format(),
                 _marker: PhantomData,
             },
         }
