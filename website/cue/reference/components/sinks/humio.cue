@@ -127,7 +127,7 @@ components: sinks: _humio: {
 			type: array: {
 				default: null
 				items: type: string: {
-					examples: ["#env", "#datacenter"]
+					examples: ["#env", "\"#datacenter\""]
 				}
 			}
 		}
