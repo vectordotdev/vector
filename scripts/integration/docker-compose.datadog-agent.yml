@@ -1,7 +1,7 @@
 version: "3"
 
 services:
-  datadog-agent:
+  datadog-agent-for-logs:
     image: docker.io/datadog/agent:7
     networks:
       - backend
@@ -17,7 +17,24 @@ services:
       - DD_USE_DOGSTATSD=false
     volumes:
       - ${PWD}/tests/data/datadog-agent/conf.yaml:/etc/datadog-agent/conf.d/test.d/conf.yaml
-  datadog-trace-agent:
+  datadog-agent-for-metrics:
+    image: docker.io/datadog/agent:7
+    networks:
+      - backend
+    environment:
+      - DD_API_KEY=${TEST_DATADOG_API_KEY}
+      - DD_APM_ENABLED=false
+      - DD_LOGS_ENABLED=false
+      - DD_HEALTH_PORT=8184
+      - DD_CMD_PORT=5003
+      - DD_USE_DOGSTATSD=true
+      - DD_DOGSTATSD_PORT=8125
+      - DD_USE_V2_API_SERIES=true
+      - DD_VECTOR_METRICS_ENABLED=true
+      - DD_VECTOR_METRICS_URL=http://runner:8082
+    volumes:
+      - ${PWD}/tests/data/datadog-agent/conf.yaml:/etc/datadog-agent/conf.d/test.d/conf.yaml
+  datadog-agent-for-traces:
     # Using 7.31.0 image to have the ability mimic tracing lib using json
     image: docker.io/datadog/agent:7.31.0
     networks:
@@ -51,13 +68,15 @@ services:
       - "--lib"
       - "sources::datadog::agent::integration_tests::"
     environment:
-      - AGENT_ADDRESS=datadog-agent:8181
-      - AGENT_HEALTH_ADDRESS=http://datadog-agent:8182
-      - TRACE_AGENT_URL=http://datadog-trace-agent:8126/v0.4/traces
-      - TRACE_AGENT_HEALTH_ADDRESS=http://datadog-trace-agent:8183
+      - LOGS_AGENT_ADDRESS=datadog-agent-for-logs:8181
+      - LOGS_AGENT_HEALTH_ADDRESS=http://datadog-agent-for-logs:8182
+      - METRICS_AGENT_HEALTH_ADDRESS=http://datadog-agent-for-logs:8183
+      - TRACE_AGENT_URL=http://datadog-agent-for-traces:8126/v0.4/traces
+      - TRACE_AGENT_HEALTH_ADDRESS=http://datadog-agent-for-traces:8183
     depends_on:
-      - datadog-agent
-      - datadog-trace-agent
+      - datadog-agent-for-logs
+      - datadog-agent-for-metrics
+      - datadog-agent-for-traces
     volumes:
       - ${PWD}:/code
       - cargogit:/usr/local/cargo/git
