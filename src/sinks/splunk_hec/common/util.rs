@@ -97,9 +97,16 @@ pub fn build_uri(
 ) -> Result<Uri, http::uri::InvalidUri> {
     let mut uri = format!("{}{}", host.trim_end_matches('/'), path);
 
+    let mut first = true;
+
     if let Some(query) = query {
         uri.push('?');
         for (key, value) in query {
+            if !first {
+                uri.push('&');
+            } else {
+                first = false;
+            }
             uri.push_str(&key);
             uri.push('=');
             uri.push_str(&value);
@@ -138,6 +145,7 @@ pub fn render_template_string<'a>(
 mod tests {
     use bytes::Bytes;
     use http::{HeaderValue, Uri};
+    use std::collections::HashMap;
     use vector_core::config::proxy::ProxyConfig;
     use wiremock::{
         matchers::{header, method, path},
@@ -145,7 +153,9 @@ mod tests {
     };
 
     use crate::sinks::{
-        splunk_hec::common::{build_healthcheck, create_client, service::HttpRequestBuilder},
+        splunk_hec::common::{
+            build_healthcheck, build_uri, create_client, service::HttpRequestBuilder,
+        },
         util::Compression,
     };
 
@@ -308,6 +318,21 @@ mod tests {
             .build_request(events, "/services/collector/event", None, None)
             .unwrap_err();
         assert_eq!(err.to_string(), "URI parse error: invalid format")
+    }
+
+    #[test]
+    fn test_build_uri() {
+        let mut query = HashMap::new();
+        query.insert("host".to_string(), "zork".to_string());
+        query.insert("source".to_string(), "zam".to_string());
+        let uri = build_uri("http://sproink.com", "/thing/thang", Some(query)).unwrap();
+
+        assert_eq!(
+            "http://sproink.com/thing/thang?host=zork&source=zam"
+                .parse::<Uri>()
+                .unwrap(),
+            uri
+        );
     }
 }
 
