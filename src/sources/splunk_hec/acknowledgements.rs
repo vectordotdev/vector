@@ -12,21 +12,50 @@ use futures::StreamExt;
 use roaring::RoaringTreemap;
 use serde::{Deserialize, Serialize};
 use tokio::time::interval;
+use vector_config::configurable_component;
 use vector_core::{event::BatchStatusReceiver, finalizer::UnorderedFinalizer};
 use warp::Rejection;
 
 use super::ApiError;
 use crate::{config::AcknowledgementsConfig, event::BatchStatus, shutdown::ShutdownSignal};
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Acknowledgement configuration for the `splunk_hec` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(default)]
 pub struct HecAcknowledgementsConfig {
     #[serde(flatten)]
     pub inner: AcknowledgementsConfig,
+
+    /// The maximum number of ack statuses pending query across all channels.
+    ///
+    /// Equivalent to the `max_number_of_acked_requests_pending_query` Splunk HEC setting.
+    ///
+    /// Minimum of `1`.
     pub max_pending_acks: NonZeroU64,
+
+    /// The maximum number of Splunk HEC channels clients can use with this source.
+    ///
+    /// Minimum of `1`.
     pub max_number_of_ack_channels: NonZeroU64,
+
+    /// The maximum number of ack statuses pending query for a single channel.
+    ///
+    /// Equivalent to the `max_number_of_acked_requests_pending_query_per_ack_channel` Splunk HEC setting.
+    ///
+    /// Minimum of `1`.
     pub max_pending_acks_per_channel: NonZeroU64,
+
+    /// Whether or not to remove channels after idling for `max_idle_time` seconds.
+    ///
+    /// A channel is idling if it is not used for sending data or querying ack statuses.
     pub ack_idle_cleanup: bool,
+
+    /// The amount of time, in seconds, a channel is allowed to idle before removal.
+    ///
+    /// Channels can potentially idle for longer than this setting but clients should not rely on such behavior.
+    ///
+    /// Minimum of `1`.
     pub max_idle_time: NonZeroU64,
 }
 

@@ -4,8 +4,8 @@ use codecs::{
     LengthDelimitedDecoder,
 };
 use prost::Message;
-use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -21,15 +21,30 @@ use crate::{
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for version one of the `vector` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct VectorConfig {
+    /// The address to listen for connections on.
+    ///
+    /// It _must_ include a port.
     address: SocketListenAddr,
+
+    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
+
+    /// The timeout, in seconds, before a connection is forcefully closed during shutdown.
     #[serde(default = "default_shutdown_timeout_secs")]
     shutdown_timeout_secs: u64,
-    tls: Option<TlsEnableableConfig>,
+
+    /// The size, in bytes, of the receive buffer used for each connection.
+    ///
+    /// This should not typically needed to be changed.
     receive_buffer_bytes: Option<usize>,
+
+    #[configurable(derived)]
+    tls: Option<TlsEnableableConfig>,
 }
 
 const fn default_shutdown_timeout_secs() -> u64 {

@@ -1,5 +1,5 @@
 [package]
-name = "vector-config-macros"
+name = "vector_config_macros"
 version = "0.1.0"
 edition = "2021"
 
@@ -12,4 +12,4 @@ proc-macro2 = { version = "1.0", default-features = false }
 quote = { version = "1.0", default-features = false }
 serde_derive_internals = "0.26"
 syn = { version = "1.0", default-features = false }
-vector-config-common = { path = "../vector-config-common" }
+vector_config_common = { path = "../vector-config-common" }

@@ -10,10 +10,11 @@ use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::MultiGzDecoder;
 use futures::FutureExt;
 use http::StatusCode;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::{de::Read as JsonRead, Deserializer, Value as JsonValue};
 use snafu::Snafu;
 use tracing::Span;
+use vector_config::configurable_component;
 use vector_core::{event::BatchNotifier, ByteSizeOf};
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
@@ -47,23 +48,46 @@ pub const INDEX: &str = "splunk_index";
 pub const SOURCE: &str = "splunk_source";
 pub const SOURCETYPE: &str = "splunk_sourcetype";
 
-/// Accepts HTTP requests.
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `splunk_hec` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct SplunkConfig {
-    /// Local address on which to listen
+    /// The address to listen for connections on.
+    ///
+    /// The address _must_ include a port.
     #[serde(default = "default_socket_address")]
     pub address: SocketAddr,
-    /// Splunk HEC token. Deprecated - use `valid_tokens` instead
+
+    /// Optional authorization token.
+    ///
+    /// If supplied, incoming requests must supply this token in the `Authorization` header, just as a client would if
+    /// it was communicating with the Splunk HEC endpoint directly.
+    ///
+    /// If _not_ supplied, the `Authorization` header will be ignored and requests will not be authenticated.
+    #[configurable(deprecated)]
     token: Option<String>,
-    /// A list of tokens to accept. Omit this to accept any token
+
+    /// Optional list of valid authorization tokens.
+    ///
+    /// If supplied, incoming requests must supply one of these tokens in the `Authorization` header, just as a client
+    /// would if it was communicating with the Splunk HEC endpoint directly.
+    ///
+    /// If _not_ supplied, the `Authorization` header will be ignored and requests will not be authenticated.
     valid_tokens: Option<Vec<String>>,
+
+    /// Whether or not to forward the Splunk HEC authentication token with events.
+    ///
+    /// If set to `true`, when incoming requests contain a Splunk HEC token, the token used will kept in the
+    /// event metadata and be preferentially used if the event is sent to a Splunk HEC sink.
+    store_hec_token: bool,
+
+    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
-    /// Splunk HEC indexer acknowledgement settings
+
+    #[configurable(derived)]
     #[serde(deserialize_with = "bool_or_struct")]
     acknowledgements: HecAcknowledgementsConfig,
-    /// Splunk HEC token passthrough
-    store_hec_token: bool,
 }
 
 inventory::submit! {

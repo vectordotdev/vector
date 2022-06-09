@@ -10,11 +10,11 @@ use goauth::{
 };
 use hyper::header::AUTHORIZATION;
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
 use smpl_jwt::Jwt;
 use snafu::{ResultExt, Snafu};
 use tokio::time::Instant;
 use tokio_stream::wrappers::IntervalStream;
+use vector_config::configurable_component;
 
 use crate::{config::ProxyConfig, http::HttpClient, http::HttpError};
 
@@ -52,9 +52,34 @@ pub enum GcpError {
     BuildHttpClient { source: HttpError },
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+/// Configuration of the authentication strategy for interacting with GCP services.
+// TODO: We're duplicating the "either this or that" verbiage for each field because this struct gets flattened into the
+// component config types, which means all that's carried over are the fields, not the type itself.
+//
+// Seems like we really really have it as a nested field -- i.e. `auth.api_key` -- which is a closer fit to how we do
+// similar things in configuration (TLS, framing, decoding, etc.). Doing so would let us embed the type itself, and
+// hoist up the common documentation bits to the docs for the type rather than the fields.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
 pub struct GcpAuthConfig {
+    /// An API key. ([documentation](https://cloud.google.com/docs/authentication/api-keys))
+    ///
+    /// Either an API key, or a path to a service account credentials JSON file can be specified.
+    ///
+    /// If both are unset, Vector checks the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename. If no
+    /// filename is named, Vector will attempt to fetch an instance service account for the compute instance the program is
+    /// running on. If Vector is not running on a GCE instance, then you must define eith an API key or service account
+    /// credentials JSON file.
     pub api_key: Option<String>,
+
+    /// Path to a service account credentials JSON file. ([documentation](https://cloud.google.com/docs/authentication/production#manually))
+    ///
+    /// Either an API key, or a path to a service account credentials JSON file can be specified.
+    ///
+    /// If both are unset, Vector checks the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename. If no
+    /// filename is named, Vector will attempt to fetch an instance service account for the compute instance the program is
+    /// running on. If Vector is not running on a GCE instance, then you must define eith an API key or service account
+    /// credentials JSON file.
     pub credentials_path: Option<String>,
 }
 

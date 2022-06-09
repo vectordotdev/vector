@@ -1,5 +1,5 @@
 [package]
-name = "vector-config-common"
+name = "vector_config_common"
 version = "0.1.0"
 edition = "2021"
 

@@ -4,7 +4,7 @@ mod udp;
 mod unix;
 
 use codecs::NewlineDelimitedDecoderConfig;
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 #[cfg(unix)]
 use crate::serde::default_framing_message_based;
@@ -18,24 +18,33 @@ use crate::{
     tls::MaybeTlsSettings,
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
-// TODO: add back when https://github.com/serde-rs/serde/issues/1358 is addressed
-// #[serde(deny_unknown_fields)]
+/// Configuration for the `socket` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
 pub struct SocketConfig {
     #[serde(flatten)]
     pub mode: Mode,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Listening mode for the `socket` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum Mode {
-    Tcp(tcp::TcpConfig),
-    Udp(udp::UdpConfig),
+    /// Listen on TCP.
+    Tcp(#[configurable(derived)] tcp::TcpConfig),
+
+    /// Listen on UDP.
+    Udp(#[configurable(derived)] udp::UdpConfig),
+
+    /// Listen on UDS, in datagram mode. (Unix domain socket)
     #[cfg(unix)]
-    UnixDatagram(unix::UnixConfig),
+    UnixDatagram(#[configurable(derived)] unix::UnixConfig),
+
+    /// Listen on UDS, in stream mode. (Unix domain socket)
     #[cfg(unix)]
     #[serde(alias = "unix")]
-    UnixStream(unix::UnixConfig),
+    UnixStream(#[configurable(derived)] unix::UnixConfig),
 }
 
 impl SocketConfig {

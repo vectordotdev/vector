@@ -1,12 +1,12 @@
 use std::net::SocketAddr;
 
 use futures::TryFutureExt;
-use serde::{Deserialize, Serialize};
 use tokio::net::TcpStream;
 use tonic::{
     transport::{server::Connected, Certificate},
     Request, Response, Status,
 };
+use vector_config::configurable_component;
 use vector_core::{
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
     ByteSizeOf,
@@ -87,14 +87,26 @@ async fn handle_batch_status(receiver: Option<BatchStatusReceiver>) -> Result<()
         BatchStatus::Delivered => Ok(()),
     }
 }
-#[derive(Deserialize, Serialize, Debug, Clone)]
+
+/// Configuration for version two of the `vector` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct VectorConfig {
+    /// The address to listen for connections on.
+    ///
+    /// It _must_ include a port.
     pub address: SocketAddr,
+
+    /// The timeout, in seconds, before a connection is forcefully closed during shutdown.
     #[serde(default = "default_shutdown_timeout_secs")]
     pub shutdown_timeout_secs: u64,
+
+    #[configurable(derived)]
     #[serde(default)]
     tls: Option<TlsEnableableConfig>,
+
+    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
 }

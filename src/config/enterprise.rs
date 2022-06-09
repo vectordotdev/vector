@@ -30,8 +30,7 @@ use crate::{
         util::retries::ExponentialBackoff,
     },
     sources::{
-        host_metrics::{self, HostMetricsConfig},
-        internal_logs::InternalLogsConfig,
+        host_metrics::HostMetricsConfig, internal_logs::InternalLogsConfig,
         internal_metrics::InternalMetricsConfig,
     },
     transforms::{filter::FilterConfig, remap::RemapConfig},
@@ -480,7 +479,7 @@ fn setup_metrics_reporting(
     // Create internal sources for host and internal metrics. We're using distinct sources here and
     // not attempting to reuse existing ones, to configure according to enterprise requirements.
     let host_metrics = HostMetricsConfig {
-        namespace: host_metrics::Namespace::from(Some("vector.host".to_owned())),
+        namespace: Some("vector.host".to_owned()),
         scrape_interval_secs: datadog.reporting_interval_secs,
         ..Default::default()
     };

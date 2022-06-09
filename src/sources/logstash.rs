@@ -9,10 +9,10 @@ use bytes::{Buf, Bytes, BytesMut};
 use codecs::StreamDecodingError;
 use flate2::read::ZlibDecoder;
 use lookup::path;
-use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Decoder;
+use vector_config::configurable_component;
 
 use super::util::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
@@ -27,15 +27,30 @@ use crate::{
     types,
 };
 
-#[derive(Deserialize, Serialize, Debug)]
+/// Configuration for the `logstash` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
 pub struct LogstashConfig {
+    /// The address to listen for connections on.
     address: SocketListenAddr,
+
+    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
+
+    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
+
+    /// The size, in bytes, of the receive buffer used for each connection.
+    ///
+    /// This should not typically needed to be changed.
     receive_buffer_bytes: Option<usize>,
+
+    /// The maximum number of TCP connections that will be allowed at any given time.
+    connection_limit: Option<u32>,
+
+    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
-    connection_limit: Option<u32>,
 }
 
 inventory::submit! {

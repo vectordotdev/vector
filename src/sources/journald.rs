@@ -20,7 +20,6 @@ use nix::{
     unistd::Pid,
 };
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
 use serde_json::{Error as JsonError, Value as JsonValue};
 use snafu::{ResultExt, Snafu};
 use tokio::{
@@ -31,6 +30,7 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::FramedRead;
+use vector_config::configurable_component;
 use vector_core::{finalizer::OrderedFinalizer, ByteSizeOf};
 
 use crate::{
@@ -84,24 +84,71 @@ enum BuildError {
 
 type Matches = HashMap<String, HashSet<String>>;
 
-#[derive(Deserialize, Serialize, Debug, Default)]
+/// Configuration for the `journald` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct JournaldConfig {
+    /// Only include entries that appended to the journal after Vector starts reading it.
     pub since_now: Option<bool>,
+
+    /// Only include entries that occurred after the current boot of the system.
     pub current_boot_only: Option<bool>,
+
+    /// The list of unit names to monitor.
+    ///
+    /// If empty or not present, all units are accepted. Unit names lacking a "." will have ".service" appended to make them a valid service unit name.
+    // TODO: Why isn't this just an alias on `include_units`?
+    #[configurable(deprecated)]
     pub units: Vec<String>,
+
+    /// A list of unit names to monitor.
+    ///
+    /// If empty or not present, all units are accepted. Unit names lacking a "." will have ".service" appended to make them a valid service unit name.
     pub include_units: Vec<String>,
+
+    /// A list of unit names to exclude from monitoring.
+    ///
+    /// Unit names lacking a "." will have ".service" appended to make them a valid service unit name.
     pub exclude_units: Vec<String>,
+
+    /// A list of sets of field/value pairs to monitor.
+    ///
+    /// If empty or not present, all journal fields are accepted. If `include_units` is specified, it will be merged into this list.
     pub include_matches: Matches,
+
+    /// A list of sets of field/value pairs that, if any are present in a journal entry, will cause the entry to be excluded from this source.
+    ///
+    /// If `exclude_units` is specified, it will be merged into this list.
     pub exclude_matches: Matches,
+
+    /// The directory used to persist file checkpoint positions.
+    ///
+    /// By default, the global `data_dir` option is used. Please make sure the user Vector is running as has write permissions to this directory.
     pub data_dir: Option<PathBuf>,
+
+    /// The `systemd` journal is read in batches, and a checkpoint is set at the end of each batch. This option limits the size of the batch.
     pub batch_size: Option<usize>,
+
+    /// The full path of the `journalctl` executable.
+    ///
+    /// If not set, Vector will search the path for `journalctl`.
     pub journalctl_path: Option<PathBuf>,
+
+    /// The full path of the journal directory.
+    ///
+    /// If not set, `journalctl` will use the default system journal paths.
     pub journal_directory: Option<PathBuf>,
+
+    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
-    /// Deprecated
+
+    /// Enables remapping the `PRIORITY` field from an integer to string value.
+    ///
+    /// Has no effect unless the value of the field is already an integer.
     #[serde(default)]
+    #[configurable(deprecated)]
     remap_priority: bool,
 }
 

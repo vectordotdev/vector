@@ -17,9 +17,9 @@ use rdkafka::{
     consumer::{Consumer, StreamConsumer},
     message::{BorrowedMessage, Headers, Message},
 };
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
+use vector_config::configurable_component;
 use vector_core::{finalizer::OrderedFinalizer, ByteSizeOf};
 
 use crate::{
@@ -47,42 +47,109 @@ enum BuildError {
     KafkaSubscribeError { source: rdkafka::error::KafkaError },
 }
 
-#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
+/// Configuration for the `kafka` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub struct KafkaSourceConfig {
+    /// A comma-separated list of Kafka bootstrap servers.
+    ///
+    /// These are the servers in a Kafka cluster that a client should use to "bootstrap" its connection to the cluster,
+    /// allowing discovering all other hosts in the cluster.
+    ///
+    /// Must be in the form of `host:port`, and comma-separated.
     bootstrap_servers: String,
+
+    /// The Kafka topics names to read events from.
+    ///
+    /// Regular expression syntax is supported if the topic begins with `^`.
     topics: Vec<String>,
+
+    /// The consumer group name to be used to consume events from Kafka.
     group_id: String,
+
+    /// If offsets for consumer group do not exist, set them using this strategy.
+    ///
+    /// See the [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for the `auto.offset.reset` option for further clarification.
     #[serde(default = "default_auto_offset_reset")]
     auto_offset_reset: String,
+
+    /// The Kafka session timeout, in milliseconds.
     #[serde(default = "default_session_timeout_ms")]
     session_timeout_ms: u64,
+
+    /// Timeout for network requests, in milliseconds.
     #[serde(default = "default_socket_timeout_ms")]
     socket_timeout_ms: u64,
+
+    /// Maximum time the broker may wait to fill the response, in milliseconds.
     #[serde(default = "default_fetch_wait_max_ms")]
     fetch_wait_max_ms: u64,
+
+    /// The frequency that the consumer offsets are committed (written) to offset storage, in milliseconds.
     #[serde(default = "default_commit_interval_ms")]
     commit_interval_ms: u64,
+
+    /// Overrides the name of the log field used to add the message key to each event.
+    ///
+    /// The value will be the message key of the Kafka message itself.
+    ///
+    /// By default, `"message_key"` is used.
     #[serde(default = "default_key_field")]
     key_field: String,
+
+    /// Overrides the name of the log field used to add the topic to each event.
+    ///
+    /// The value will be the topic from which the Kafka message was consumed from.
+    ///
+    /// By default, `"topic"` is used.
     #[serde(default = "default_topic_key")]
     topic_key: String,
+
+    /// Overrides the name of the log field used to add the partition to each event.
+    ///
+    /// The value will be the partition from which the Kafka message was consumed from.
+    ///
+    /// By default, `"partition"` is used.
     #[serde(default = "default_partition_key")]
     partition_key: String,
+
+    /// Overrides the name of the log field used to add the offset to each event.
+    ///
+    /// The value will be the offset of the Kafka message itself.
+    ///
+    /// By default, `"offset"` is used.
     #[serde(default = "default_offset_key")]
     offset_key: String,
+
+    /// Overrides the name of the log field used to add the headers to each event.
+    ///
+    /// The value will be the headers of the Kafka message itself.
+    ///
+    /// By default, `"headers"` is used.
     #[serde(default = "default_headers_key")]
     headers_key: String,
+
+    /// Advanced options set directly on the underlying `librdkafka` client.
+    ///
+    /// See the [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for details.
     librdkafka_options: Option<HashMap<String, String>>,
+
     #[serde(flatten)]
     auth: KafkaAuthConfig,
+
+    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     framing: FramingConfig,
+
+    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     decoding: DeserializerConfig,
+
+    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
 }
