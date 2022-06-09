@@ -40,12 +40,15 @@ pub fn build_unix_stream_source(
     shutdown: ShutdownSignal,
     out: SourceSender,
 ) -> crate::Result<Source> {
-    let listener = UnixListener::bind(&listen_path).expect("Failed to bind to listener socket");
-    info!(message = "Listening.", path = ?listen_path, r#type = "unix");
-
-    change_socket_permissions(&listen_path, socket_file_mode)?;
-
+    dbg!("hello");
     Ok(Box::pin(async move {
+        dbg!("creating");
+        let listener = UnixListener::bind(&listen_path).expect("Failed to bind to listener socket");
+        info!(message = "Listening.", path = ?listen_path, r#type = "unix");
+
+        change_socket_permissions(&listen_path, socket_file_mode)
+            .expect("Failed to set socket permssions");
+
         let connection_open = OpenGauge::new();
         let stream = UnixListenerStream::new(listener).take_until(shutdown.clone());
         tokio::pin!(stream);

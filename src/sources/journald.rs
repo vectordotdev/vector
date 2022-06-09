@@ -31,7 +31,7 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::FramedRead;
-use vector_core::ByteSizeOf;
+use vector_core::{finalizer::OrderedFinalizer, ByteSizeOf};
 
 use crate::{
     config::{
@@ -45,7 +45,6 @@ use crate::{
     },
     serde::bool_or_struct,
     shutdown::ShutdownSignal,
-    sources::util::finalizer::OrderedFinalizer,
     SourceSender,
 };
 

@@ -3,6 +3,7 @@ use std::collections::{hash_map::Entry, HashMap};
 use anymap::AnyMap;
 use value::{Kind, Value};
 
+use crate::value::Collection;
 use crate::{parser::ast::Ident, type_def::Details};
 
 /// Local environment, limited to a given scope.
@@ -58,7 +59,7 @@ impl LocalEnv {
 #[derive(Debug)]
 pub struct ExternalEnv {
     /// The external target of the program.
-    target: Option<Details>,
+    target: Details,
 
     /// Custom context injected by the external environment
     custom: AnyMap,
@@ -66,10 +67,7 @@ pub struct ExternalEnv {
 
 impl Default for ExternalEnv {
     fn default() -> Self {
-        Self {
-            custom: AnyMap::new(),
-            target: None,
-        }
+        Self::new_with_kind(Kind::object(Collection::any()))
     }
 }
 
@@ -78,25 +76,29 @@ impl ExternalEnv {
     /// [`Kind`].
     pub fn new_with_kind(kind: Kind) -> Self {
         Self {
-            target: Some(Details {
+            target: Details {
                 type_def: kind.into(),
                 value: None,
-            }),
-            ..Default::default()
+            },
+            custom: AnyMap::new(),
         }
     }
 
-    pub(crate) fn target(&self) -> Option<&Details> {
-        self.target.as_ref()
+    pub(crate) fn target(&self) -> &Details {
+        &self.target
     }
 
-    pub fn target_kind(&self) -> Option<&Kind> {
-        self.target().map(|details| details.type_def.kind())
+    pub(crate) fn target_mut(&mut self) -> &mut Details {
+        &mut self.target
+    }
+
+    pub fn target_kind(&self) -> &Kind {
+        self.target().type_def.kind()
     }
 
     #[cfg(any(feature = "expr-assignment", feature = "expr-query"))]
     pub(crate) fn update_target(&mut self, details: Details) {
-        self.target = Some(details);
+        self.target = details;
     }
 
     /// Sets the external context data for VRL functions to use.
