@@ -1121,16 +1121,10 @@ mod test {
                     match meta.permissions().mode() {
                         // S_IFSOCK   0140000   socket
                         0o140555 => ready(true),
-                        perm => {
-                            println!("socket has different permissions: {:?}", perm);
-                            ready(false)
-                        }
+                        _ => ready(false),
                     }
                 }
-                Err(_) => {
-                    println!("socket doesn't exist yet");
-                    ready(false)
-                }
+                Err(_) => ready(false),
             }
         })
         .await;
@@ -1243,16 +1237,10 @@ mod test {
                     match meta.permissions().mode() {
                         // S_IFSOCK   0140000   socket
                         0o140421 => ready(true),
-                        perm => {
-                            println!("socket has different permissions: {:?}", perm);
-                            ready(false)
-                        }
+                        _ => ready(false),
                     }
                 }
-                Err(_) => {
-                    println!("socket doesn't exist yet");
-                    ready(false)
-                }
+                Err(_) => ready(false),
             }
         })
         .await;
