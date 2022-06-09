@@ -124,7 +124,7 @@ fn series_v1_service(
                 let events = source
                     .decode(&encoding_header, body, path.as_str())
                     .and_then(|body| {
-                        decode_datadog_series(
+                        decode_datadog_series_v1(
                             body,
                             source.api_key_extractor.extract(
                                 path.as_str(),
@@ -250,7 +250,7 @@ pub(crate) fn decode_ddseries_v2(
     schema_definition: &Arc<schema::Definition>,
 ) -> crate::Result<Vec<Event>> {
     let payload = MetricPayload::decode(frame)?;
-    Ok(payload
+    let decoded_metrics: Vec<Event> = payload
         .series
         .into_iter()
         .flat_map(|serie| {
@@ -265,12 +265,18 @@ pub(crate) fn decode_ddseries_v2(
 
             serie.resources.into_iter().for_each(|r| {
                 // As per https://github.com/DataDog/datadog-agent/blob/a62ac9fb13e1e5060b89e731b8355b2b20a07c5b/pkg/serializer/internal/metrics/iterable_series.go#L180-L189
-                // the hostname can be found in MetricSeries::resources
+                // the hostname can be found in MetricSeries::resources and that is the only value stored there.
                 if r.r#type.eq("host") {
-                    tags.insert(log_schema().host_key().to_string(), r.name.clone());
-                    return;
+                    tags.insert(log_schema().host_key().to_string(), r.name);
+                } else {
+                    // But to avoid losing information if this situation changes, any other resource type/name will be saved in the tags map
+                    tags.insert(format!("resource.{}", r.r#type), r.name);
                 }
             });
+            (!serie.source_type_name.is_empty())
+                .then(|| tags.insert("source_type_name".into(), serie.source_type_name));
+            // As per https://github.com/DataDog/datadog-agent/blob/a62ac9fb13e1e5060b89e731b8355b2b20a07c5b/pkg/serializer/internal/metrics/iterable_series.go#L224
+            // serie.unit is omitted
             match metric_payload::MetricType::from_i32(serie.r#type) {
                 Some(metric_payload::MetricType::Count) => serie
                     .points
@@ -279,7 +285,9 @@ pub(crate) fn decode_ddseries_v2(
                         Metric::new(
                             serie.metric.clone(),
                             MetricKind::Incremental,
-                            MetricValue::Counter { value: dd_point.value },
+                            MetricValue::Counter {
+                                value: dd_point.value,
+                            },
                         )
                         .with_timestamp(Some(Utc.timestamp(dd_point.timestamp, 0)))
                         .with_tags(Some(tags.clone()))
@@ -292,7 +300,9 @@ pub(crate) fn decode_ddseries_v2(
                         Metric::new(
                             serie.metric.clone(),
                             MetricKind::Absolute,
-                            MetricValue::Gauge { value: dd_point.value },
+                            MetricValue::Gauge {
+                                value: dd_point.value,
+                            },
                         )
                         .with_timestamp(Some(Utc.timestamp(dd_point.timestamp, 0)))
                         .with_tags(Some(tags.clone()))
@@ -326,17 +336,23 @@ pub(crate) fn decode_ddseries_v2(
                     .metadata_mut()
                     .set_datadog_api_key(Some(Arc::clone(k)));
             }
-
             metric
                 .metadata_mut()
                 .set_schema_definition(schema_definition);
 
             metric.into()
         })
-        .collect())
+        .collect();
+
+    emit!(EventsReceived {
+        byte_size: decoded_metrics.size_of(),
+        count: decoded_metrics.len(),
+    });
+
+    Ok(decoded_metrics)
 }
 
-fn decode_datadog_series(
+fn decode_datadog_series_v1(
     body: Bytes,
     api_key: Option<Arc<str>>,
     schema_definition: &Arc<schema::Definition>,

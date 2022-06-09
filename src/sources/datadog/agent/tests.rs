@@ -648,7 +648,7 @@ async fn ignores_api_key() {
 }
 
 #[tokio::test]
-async fn decode_series_endpoints() {
+async fn decode_series_endpoint_v1() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
         let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false).await;
 
@@ -1453,4 +1453,200 @@ fn test_config_outputs() {
             assert_eq!(got, want, "{}", title);
         }
     }
+}
+
+#[tokio::test]
+async fn decode_series_endpoint_v2() {
+    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+        let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false).await;
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "dd-api-key",
+            "12345678abcdefgh12345678abcdefgh".parse().unwrap(),
+        );
+
+        let series = vec![
+            ddmetric_proto::metric_payload::MetricSeries {
+                resources: vec![ddmetric_proto::metric_payload::Resource {
+                    r#type: "host".to_string(),
+                    name: "random_host".to_string(),
+                }],
+                metric: "dd_gauge".to_string(),
+                tags: vec!["foo:bar".to_string()],
+                points: vec![
+                    ddmetric_proto::metric_payload::MetricPoint {
+                        value: 3.14,
+                        timestamp: 1542182950,
+                    },
+                    ddmetric_proto::metric_payload::MetricPoint {
+                        value: 3.1415,
+                        timestamp: 1542182951,
+                    },
+                ],
+                r#type: ddmetric_proto::metric_payload::MetricType::Gauge as i32,
+                unit: "".to_string(),
+                source_type_name: "a_random_source_type_name".to_string(),
+                interval: 0,
+            },
+            ddmetric_proto::metric_payload::MetricSeries {
+                resources: vec![ddmetric_proto::metric_payload::Resource {
+                    r#type: "host".to_string(),
+                    name: "another_random_host".to_string(),
+                }],
+                metric: "dd_rate".to_string(),
+                tags: vec!["foo:bar:baz".to_string()],
+                points: vec![ddmetric_proto::metric_payload::MetricPoint {
+                    value: 3.14,
+                    timestamp: 1542182950,
+                }],
+                r#type: ddmetric_proto::metric_payload::MetricType::Rate as i32,
+                unit: "".to_string(),
+                source_type_name: "another_random_source_type_name".to_string(),
+                interval: 10,
+            },
+            ddmetric_proto::metric_payload::MetricSeries {
+                resources: vec![ddmetric_proto::metric_payload::Resource {
+                    r#type: "host".to_string(),
+                    name: "a_host".to_string(),
+                }],
+                metric: "dd_count".to_string(),
+                tags: vec!["foobar".to_string()],
+                points: vec![ddmetric_proto::metric_payload::MetricPoint {
+                    value: 16777216_f64,
+                    timestamp: 1542182955,
+                }],
+                r#type: ddmetric_proto::metric_payload::MetricType::Count as i32,
+                unit: "".to_string(),
+                source_type_name: "a_very_random_source_type_name".to_string(),
+                interval: 0,
+            },
+        ];
+
+        let series_payload = ddmetric_proto::MetricPayload { series };
+
+        let mut buf = Vec::new();
+        series_payload.encode(&mut buf).unwrap();
+
+        let events = spawn_collect_n(
+            async move {
+                assert_eq!(
+                    200,
+                    send_with_path(
+                        addr,
+                        unsafe { str::from_utf8_unchecked(&buf) },
+                        headers,
+                        "/api/v2/series"
+                    )
+                    .await
+                );
+            },
+            rx,
+            4,
+        )
+        .await;
+
+        {
+            let mut metric = events[0].as_metric();
+            assert_eq!(metric.name(), "dd_gauge");
+            assert_eq!(
+                metric.timestamp(),
+                Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 10))
+            );
+            assert_eq!(metric.kind(), MetricKind::Absolute);
+            assert_eq!(*metric.value(), MetricValue::Gauge { value: 3.14 });
+            assert_eq!(metric.tags().unwrap()["host"], "random_host".to_string());
+            assert_eq!(metric.tags().unwrap()["foo"], "bar".to_string());
+            assert_eq!(
+                metric.tags().unwrap()["source_type_name"],
+                "a_random_source_type_name".to_string()
+            );
+
+            assert_eq!(
+                &events[0].metadata().datadog_api_key().as_ref().unwrap()[..],
+                "12345678abcdefgh12345678abcdefgh"
+            );
+
+            metric = events[1].as_metric();
+            assert_eq!(metric.name(), "dd_gauge");
+            assert_eq!(
+                metric.timestamp(),
+                Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 11))
+            );
+            assert_eq!(metric.kind(), MetricKind::Absolute);
+            assert_eq!(*metric.value(), MetricValue::Gauge { value: 3.1415 });
+            assert_eq!(metric.tags().unwrap()["host"], "random_host".to_string());
+            assert_eq!(metric.tags().unwrap()["foo"], "bar".to_string());
+            assert_eq!(
+                metric.tags().unwrap()["source_type_name"],
+                "a_random_source_type_name".to_string()
+            );
+
+            assert_eq!(
+                &events[1].metadata().datadog_api_key().as_ref().unwrap()[..],
+                "12345678abcdefgh12345678abcdefgh"
+            );
+
+            metric = events[2].as_metric();
+            assert_eq!(metric.name(), "dd_rate");
+            assert_eq!(
+                metric.timestamp(),
+                Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 10))
+            );
+            assert_eq!(metric.kind(), MetricKind::Incremental);
+            assert_eq!(
+                *metric.value(),
+                MetricValue::Counter {
+                    value: 3.14 * (10_f64)
+                }
+            );
+            assert_eq!(
+                metric.tags().unwrap()["host"],
+                "another_random_host".to_string()
+            );
+            assert_eq!(metric.tags().unwrap()["foo"], "bar:baz".to_string());
+            assert_eq!(
+                metric.tags().unwrap()["source_type_name"],
+                "another_random_source_type_name".to_string()
+            );
+
+            assert_eq!(
+                &events[2].metadata().datadog_api_key().as_ref().unwrap()[..],
+                "12345678abcdefgh12345678abcdefgh"
+            );
+
+            metric = events[3].as_metric();
+            assert_eq!(metric.name(), "dd_count");
+            assert_eq!(
+                metric.timestamp(),
+                Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 15))
+            );
+            assert_eq!(metric.kind(), MetricKind::Incremental);
+            assert_eq!(
+                *metric.value(),
+                MetricValue::Counter {
+                    value: 16777216_f64
+                }
+            );
+            assert_eq!(metric.tags().unwrap()["host"], "a_host".to_string());
+            assert_eq!(metric.tags().unwrap()["foobar"], "".to_string());
+            assert_eq!(
+                metric.tags().unwrap()["source_type_name"],
+                "a_very_random_source_type_name".to_string()
+            );
+
+            assert_eq!(
+                &events[3].metadata().datadog_api_key().as_ref().unwrap()[..],
+                "12345678abcdefgh12345678abcdefgh"
+            );
+
+            for event in events {
+                assert_eq!(
+                    event.metadata().schema_definition(),
+                    &test_metrics_schema_definition()
+                );
+            }
+        }
+    })
+    .await;
 }
