@@ -8800,6 +8800,7 @@ dependencies = [
  "bytes 1.1.0",
  "chrono",
  "chrono-tz",
+ "crossbeam-utils",
  "derivative",
  "futures 0.3.21",
  "metrics",

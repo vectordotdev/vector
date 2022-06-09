@@ -4,6 +4,10 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{FutureExt, TryFutureExt};
 use tracing::Span;
+use vector_core::{
+    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
+    ByteSizeOf,
+};
 use warp::{
     filters::{
         path::{FullPath, Tail},
@@ -12,11 +16,6 @@ use warp::{
     http::{HeaderMap, StatusCode},
     reject::Rejection,
     Filter,
-};
-
-use vector_core::{
-    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
-    ByteSizeOf,
 };
 
 use crate::{
@@ -172,7 +171,7 @@ async fn handle_request(
 ) -> Result<impl warp::Reply, Rejection> {
     match events {
         Ok(mut events) => {
-            let receiver = BatchNotifier::maybe_apply_to_events(acknowledgements, &mut events);
+            let receiver = BatchNotifier::maybe_apply_to(acknowledgements, &mut events);
 
             out.send_batch(events)
                 .map_err(move |error: crate::source_sender::ClosedError| {
