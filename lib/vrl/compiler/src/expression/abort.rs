@@ -66,7 +66,7 @@ impl Expression for Abort {
     }
 
     fn type_def(&self, _: (&LocalEnv, &ExternalEnv)) -> TypeDef {
-        TypeDef::null().infallible()
+        TypeDef::never().infallible()
     }
 }
 
