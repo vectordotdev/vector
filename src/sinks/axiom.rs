@@ -117,11 +117,11 @@ mod test {
 #[cfg(feature = "axiom-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use chrono::{DateTime, Utc};
+    use chrono::{DateTime, Duration, Utc};
     use futures::stream;
     use http::StatusCode;
     use std::env;
-    use tokio::time::{sleep, Duration};
+    use tokio::time;
     use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
     use super::*;
@@ -136,23 +136,21 @@ mod integration_tests {
 
     #[tokio::test]
     async fn axiom_logs_put_data() {
-        let url = env::var("AXIOM_URL").unwrap();
-
-        let client = reqwest::Client::builder().build().unwrap();
-
         // Wait until deployment is ready
         wait_for_duration(
             || async {
-                client
-                    .get(url.clone())
-                    .send()
+                let url = env::var("AXIOM_URL").unwrap();
+                reqwest::get(url)
                     .await
                     .map(|res| res.status() == StatusCode::OK)
                     .unwrap_or(false)
             },
-            Duration::from_secs(30),
+            time::Duration::from_secs(30),
         )
         .await;
+
+        let client = reqwest::Client::new();
+        let url = env::var("AXIOM_URL").unwrap();
 
         // Axiom credentials
         let email = "info@axiom.co".to_string();
