@@ -325,7 +325,10 @@ jobs:
         run: make check-fmt
       - name: Check clippy
         if: needs.changes.outputs.source == 'true'
-        run: make check-clippy
+        run: |
+          ls .cargo
+          cat .cargo/config
+          make check-clippy
       - name: Check version
         run: make check-version
       - name: Check scripts
