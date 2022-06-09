@@ -6,6 +6,7 @@ use lookup::{Field, Lookup, Segment};
 
 use super::Kind;
 use crate::kind::merge;
+use crate::kind::merge::{Depth, Indices};
 
 /// The list of errors that can occur when `remove_at_path` fails.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -17,10 +18,7 @@ pub enum Error {
 impl Kind {
     /// Find the `Kind` within the known set of fields.
     ///
-    /// This currently has limited support for the first segment of the path. That is:
-    ///
-    /// - The path must not start with an index segment (`.[2]`)
-    /// - The path must not start with a coalesced segment (`.(foo | bar)`).
+    /// This is currently broken due to https://github.com/vectordotdev/vector/issues/13045
     ///
     /// In all of the above cases, this method returns `Ok(None)`.
     ///
@@ -33,7 +31,7 @@ impl Kind {
         path: &'a mut Lookup<'a>,
     ) -> Result<Option<Cow<'a, Kind>>, super::find::Error> {
         match path.pop_front() {
-            None => Ok(Some(self.into())),
+            None => Ok(Some(Cow::Borrowed(self))),
             Some(Segment::Field(field)) => {
                 if let Some(object) = &self.object {
                     object.find_known_at_path(path)
@@ -48,10 +46,33 @@ impl Kind {
                     // array.find_known_at_path(path)
 
                     path.push_front(Segment::Index(index));
-                    self.find_at_path(path);
+                    self.find_at_path(path)
                 } else {
                     Ok(None)
                 }
+            }
+            Some(Segment::Coalesce(fields)) => {
+                let mut merged: Option<Kind> = None;
+
+                for field in fields {
+                    let mut child_path = path.clone();
+                    child_path.push_front(Segment::Field(field));
+                    if let Some(child_kind) = self.find_known_at_path(&mut child_path)? {
+                        if let Some(merged) = &mut merged {
+                            merged.merge(
+                                child_kind.into_owned(),
+                                merge::Strategy {
+                                    depth: Depth::Deep,
+                                    indices: Indices::Keep,
+                                },
+                            );
+                        } else {
+                            merged = Some(child_kind.into_owned());
+                        }
+                    }
+                }
+
+                Ok(merged.map(Cow::Owned))
             }
         }
     }

@@ -104,14 +104,14 @@ impl Definition {
         Self::empty().unknown_fields(Kind::json())
     }
 
-    /// Check if the definition is "empty", meaning:
-    ///
-    /// 1. There are no known fields defined.
-    /// 2. The unknown fields are set to "any".
-    pub fn is_empty(&self) -> bool {
-        self.collection.known().is_empty()
-            && self.collection.unknown().map_or(false, Unknown::is_any)
-    }
+    // /// Check if the definition is "empty", meaning:
+    // ///
+    // /// 1. There are no known fields defined.
+    // /// 2. The unknown fields are set to "any".
+    // pub fn is_empty(&self) -> bool {
+    //     self.collection.known().is_empty()
+    //         && self.collection.unknown().map_or(false, Unknown::is_any)
+    // }
 
     /// Add type information for an event field.
     ///
@@ -128,19 +128,18 @@ impl Definition {
         let mut path = path.into();
         let meaning = meaning.map(ToOwned::to_owned);
 
-        let collection = kind
+        // TODO: can this use `Kind::insert_at_path`?
+        let new_kind = kind
             .nest_at_path(
                 &path.to_lookup(),
                 nest::Strategy {
                     coalesced_path: nest::CoalescedPath::Reject,
                 },
             )
-            .expect("non-coalesced path used")
-            .into_object()
-            .expect("always object");
+            .expect("non-coalesced path used");
 
-        self.collection.merge(
-            collection,
+        self.kind.merge(
+            new_kind,
             merge::Strategy {
                 depth: merge::Depth::Deep,
                 indices: merge::Indices::Keep,
@@ -182,7 +181,7 @@ impl Definition {
 
         // Ensure the path exists in the collection.
         assert!(self
-            .collection
+            .kind
             .find_known_at_path(&mut path.to_lookup())
             .ok()
             .flatten()
@@ -195,7 +194,13 @@ impl Definition {
     /// Set the kind for all unknown fields.
     #[must_use]
     pub fn unknown_fields(mut self, unknown: impl Into<Option<Kind>>) -> Self {
-        self.collection.set_unknown(unknown);
+        let unknown = unknown.into();
+        if let Some(object) = self.kind.as_object_mut() {
+            object.set_unknown(unknown.clone());
+        }
+        if let Some(array) = self.kind.as_array_mut() {
+            array.set_unknown(unknown);
+        }
         self
     }
 
@@ -220,7 +225,7 @@ impl Definition {
         for path in &self.optional {
             if other.is_optional_field(path)
                 || other
-                    .collection
+                    .kind
                     .find_known_at_path(&mut path.to_lookup())
                     .ok()
                     .flatten()

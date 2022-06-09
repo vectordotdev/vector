@@ -41,7 +41,7 @@ impl JsonDeserializerConfig {
                 )
                 .unknown_fields(Kind::json()),
             LogNamespace::Vector => {
-                // TODO: should root be set to (json - array)?
+                // TODO: should root be set to (json minus array)?
                 schema::Definition::empty().unknown_fields(Kind::json())
             }
         }
