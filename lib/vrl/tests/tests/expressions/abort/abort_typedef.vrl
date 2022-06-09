@@ -1,6 +1,7 @@
 # result: {
 #   "a": {"never": true},
 #   "b": {"bytes": true},
+#   "b2": {"bytes": true},
 #   "c": {"never": true},
 #   "d": {"object": {}},
 #   "e": {"null": true},
@@ -12,6 +13,7 @@ x = "string"
 
 .a = type_def({abort})
 .b = type_def({if false {abort} else {"string"}})
+.b2 = type_def({if true {abort} else {"string"}})
 .c = type_def({abort {if false {abort} else {"string"}}})
 .d = type_def({{} | {abort}})
 .e = type_def({ if false {abort} })

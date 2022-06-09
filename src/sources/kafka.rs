@@ -21,9 +21,8 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 use vector_core::config::LogNamespace;
-use vector_core::ByteSizeOf;
+use vector_core::{finalizer::OrderedFinalizer, ByteSizeOf};
 
-use super::util::finalizer::OrderedFinalizer;
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{

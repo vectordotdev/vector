@@ -81,10 +81,10 @@ impl std::fmt::Display for Kind {
         if self.contains_object() {
             kinds.push("object");
         }
-
         if kinds.is_empty() {
-            kinds.push("never");
+            return f.write_str("never");
         }
+
         let len = kinds.len();
         for (i, kind) in kinds.into_iter().enumerate() {
             if i != 0 {
