@@ -73,22 +73,6 @@ where
     }
 }
 
-#[cfg(any(feature = "sinks-new_relic_logs"))]
-impl<E> EncodingConfig<E> {
-    pub(crate) fn into_encoding<X>(self) -> EncodingConfig<X>
-    where
-        X: From<E>,
-    {
-        EncodingConfig {
-            codec: self.codec.into(),
-            schema: self.schema,
-            only_fields: self.only_fields,
-            except_fields: self.except_fields,
-            timestamp_format: self.timestamp_format,
-        }
-    }
-}
-
 impl<E> From<E> for EncodingConfig<E> {
     fn from(codec: E) -> Self {
         Self {
