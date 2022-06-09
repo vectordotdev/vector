@@ -108,7 +108,7 @@ impl Partitioner for EventPartitioner {
     type Key = Option<Arc<str>>;
 
     fn partition(&self, item: &Self::Item) -> Self::Key {
-        item.event.metadata().splunk_hec_token().clone()
+        item.event.metadata().splunk_hec_token()
     }
 }
 

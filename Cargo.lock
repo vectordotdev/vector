@@ -8946,6 +8946,7 @@ dependencies = [
  "value",
  "vector_common",
  "vrl-compiler",
+ "vrl-core",
  "vrl-diagnostic",
  "vrl-parser",
  "vrl-stdlib",
@@ -8965,8 +8966,10 @@ dependencies = [
  "serde_json",
  "thiserror",
  "value",
+ "vector-vrl-functions",
  "vector_common",
  "vrl",
+ "vrl-core",
  "vrl-stdlib",
  "webbrowser",
 ]
@@ -9077,6 +9080,7 @@ dependencies = [
  "value",
  "vector_common",
  "vrl",
+ "vrl-core",
  "woothee",
 ]
 
@@ -9097,6 +9101,7 @@ dependencies = [
  "tikv-jemallocator",
  "tracing-subscriber 0.3.11",
  "value",
+ "vector-vrl-functions",
  "vector_common",
  "vrl",
  "vrl-stdlib",

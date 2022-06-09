@@ -3,33 +3,22 @@ package metadata
 remap: functions: set_metadata_field: {
 	category: "Event"
 	description: """
-		Sets the given field in the event metadata to the provided value.
+		Sets the given field in the event metadata to the provided value. This can utilize VRL paths and store
+		arbitrarily typed metadata on an event.
 		"""
 
 	arguments: [
 		{
 			name:        "key"
-			description: "The name of the field to set in the metadata."
+			description: "The path of the value to set in the metadata. This must be a VRL path."
 			required:    true
-			enum: {
-				datadog_api_key: """
-					The Datadog API key.
-
-					This field will be used by the  `datadog_*` sinks as the API key to send the events with.
-					"""
-				splunk_hec_token: """
-					The Splunk HEC token.
-
-					This field will be used by the  `splunk_*` sinks as the token to send the events with.
-					"""
-			}
-			type: ["string"]
+			type: ["path"]
 		},
 		{
 			name:        "value"
 			description: "The value to set the field to."
 			required:    true
-			type: ["string"]
+			type: ["any"]
 		},
 	]
 	internal_failure_reasons: [
@@ -38,9 +27,10 @@ remap: functions: set_metadata_field: {
 
 	examples: [
 		{
-			title: "Set the Datadog API key in the event metadata to the given value."
+			title: "Sets arbitrary metadata on an event."
 			source: #"""
-				set_metadata_field("datadog_api_key", "abc122")
+				value = {"message": "Any VRL type can be used"}
+				set_metadata_field(nested.foo.bar, value)
 				"""#
 			return: "null"
 		},

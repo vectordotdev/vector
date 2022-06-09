@@ -374,9 +374,9 @@ impl SplunkSource {
                             _ => None,
                         };
                         let mut event = raw_event(body, gzip, channel_id, remote, xff, batch)?;
-                        event.metadata_mut().set_splunk_hec_token(
-                            token.filter(|_| store_hec_token).map(Into::into),
-                        );
+                        if let Some(token) = token.filter(|_| store_hec_token) {
+                            event.metadata_mut().set_splunk_hec_token(token.into());
+                        }
 
                         let res = out.send_event(event).await;
                         res.map(|_| maybe_ack_id)
@@ -656,8 +656,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
 
         // Add passthrough token if present
         if let Some(token) = &self.token {
-            log.metadata_mut()
-                .set_splunk_hec_token(Some(Arc::clone(token)));
+            log.metadata_mut().set_splunk_hec_token(Arc::clone(token));
         }
 
         if let Some(batch) = self.batch.clone() {

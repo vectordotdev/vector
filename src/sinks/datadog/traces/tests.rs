@@ -117,9 +117,7 @@ fn validate_simple_span(span: dd_proto::Span) {
 #[tokio::test]
 async fn smoke() {
     let mut t = simple_trace_event();
-    t.metadata_mut()
-        .set_datadog_api_key(Some(Arc::from("a_key")));
-
+    t.metadata_mut().set_datadog_api_key(Arc::from("a_key"));
     let events = vec![Event::Trace(t)];
     let rx = start_test(BatchStatus::Delivered, StatusCode::OK, events).await;
 
