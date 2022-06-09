@@ -10,7 +10,7 @@ use crate::{
     event::Event,
     http::{Auth, HttpClient, HttpError, MaybeAuth},
     sinks::util::{
-        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
+        encoding::Transformer,
         http::{BatchedHttpSink, HttpEventEncoder, HttpRetryLogic, HttpSink},
         retries::{RetryAction, RetryLogic},
         BatchConfig, Buffer, Compression, RealtimeSizeBasedDefaultBatchSettings,
@@ -32,10 +32,10 @@ pub struct ClickhouseConfig {
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
     #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
+    pub encoding: Transformer,
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
     pub auth: Option<Auth>,
@@ -55,14 +55,6 @@ inventory::submit! {
 }
 
 impl_generate_config_from_default!(ClickhouseConfig);
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-pub enum Encoding {
-    #[derivative(Default)]
-    Default,
-}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "clickhouse")]
@@ -111,12 +103,12 @@ impl SinkConfig for ClickhouseConfig {
 }
 
 pub struct ClickhouseEventEncoder {
-    encoding: EncodingConfigWithDefault<Encoding>,
+    transformer: Transformer,
 }
 
 impl HttpEventEncoder<BytesMut> for ClickhouseEventEncoder {
     fn encode_event(&mut self, mut event: Event) -> Option<BytesMut> {
-        self.encoding.apply_rules(&mut event);
+        self.transformer.transform(&mut event);
         let log = event.into_log();
 
         let mut body = crate::serde::json::to_bytes(&log).expect("Events should be valid json!");
@@ -134,7 +126,7 @@ impl HttpSink for ClickhouseConfig {
 
     fn build_encoder(&self) -> Self::Encoder {
         ClickhouseEventEncoder {
-            encoding: self.encoding.clone(),
+            transformer: self.encoding.clone(),
         }
     }
 
