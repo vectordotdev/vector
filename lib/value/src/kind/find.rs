@@ -15,6 +15,47 @@ pub enum Error {
 }
 
 impl Kind {
+    /// Find the `Kind` within the known set of fields.
+    ///
+    /// This currently has limited support for the first segment of the path. That is:
+    ///
+    /// - The path must not start with an index segment (`.[2]`)
+    /// - The path must not start with a coalesced segment (`.(foo | bar)`).
+    ///
+    /// In all of the above cases, this method returns `Ok(None)`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the path contains negative indexing segments (e.g. `.foo[-2]`). This
+    /// is currently not supported.
+    pub fn find_known_at_path<'a>(
+        &'a self,
+        path: &'a mut Lookup<'a>,
+    ) -> Result<Option<Cow<'a, Kind>>, super::find::Error> {
+        match path.pop_front() {
+            None => Ok(Some(self.into())),
+            Some(Segment::Field(field)) => {
+                if let Some(object) = &self.object {
+                    object.find_known_at_path(path)
+                } else {
+                    Ok(None)
+                }
+            }
+            Some(Segment::Index(index)) => {
+                if let Some(array) = &self.array {
+                    // This function is missing. (https://github.com/vectordotdev/vector/issues/13045)
+                    // using "find_at_path" instead since that is the current behavior anyway
+                    // array.find_known_at_path(path)
+
+                    path.push_front(Segment::Index(index));
+                    self.find_at_path(path);
+                } else {
+                    Ok(None)
+                }
+            }
+        }
+    }
+
     /// Find the [`Kind`] at the given path.
     ///
     /// If the path points to root, then `self` is returned, otherwise `None` is returned if `Kind`
