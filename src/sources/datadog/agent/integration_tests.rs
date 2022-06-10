@@ -37,7 +37,7 @@ fn metrics_v1_agent_health_address() -> String {
 
 fn metrics_v2_agent_health_address() -> String {
     std::env::var("METRICS_V2_AGENT_HEALTH_ADDRESS")
-        .unwrap_or_else(|_| "http://0.0.0.0:8184".to_owned())
+        .unwrap_or_else(|_| "http://0.0.0.0:8185".to_owned())
 }
 
 fn trace_agent_health_address() -> String {
