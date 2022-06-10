@@ -148,12 +148,12 @@ async fn splunk_insert_message() {
 async fn splunk_insert_raw_message() {
     let cx = SinkContext::new_test();
     let mut splunk_metadata = HashMap::new();
-    metadata.insert("host".to_string(), Template::try_from("zork").unwrap());
+    splunk_metadata.insert("host".to_string(), Template::try_from("zork").unwrap());
 
     let config = HecLogsSinkConfig {
         endpoint_target: EndpointTarget::Raw,
         splunk_metadata,
-        ..config(HecLogsEncoder::Text, vec![]).await
+        ..config(HecEncoding::Text, vec![]).await
     };
     let (sink, _) = config.build(cx).await.unwrap();
 
