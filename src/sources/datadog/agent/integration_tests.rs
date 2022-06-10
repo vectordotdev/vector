@@ -70,11 +70,12 @@ async fn wait_for_healthy_agent() {
     wait_for_healthy(agent_health_address()).await
 }
 
-async fn wait_for_healthy_metrics_agents() {
-    tokio::join!(
-        wait_for_healthy(metrics_v1_agent_health_address()),
-        wait_for_healthy(metrics_v2_agent_health_address())
-    );
+async fn wait_for_healthy_metrics_v1_agent() {
+    wait_for_healthy(metrics_v1_agent_health_address()).await
+}
+
+async fn wait_for_healthy_metrics_v2_agent() {
+    wait_for_healthy(metrics_v2_agent_health_address()).await
 }
 
 async fn wait_for_healthy_trace_agent() {
@@ -197,16 +198,17 @@ fn get_simple_trace() -> String {
 
 #[tokio::test]
 async fn wait_for_metrics_v1() {
+    wait_for_healthy_metrics_v1_agent().await;
     wait_for_metrics(8125, 8082).await
 }
 
 #[tokio::test]
 async fn wait_for_metrics_v2() {
+    wait_for_healthy_metrics_v2_agent().await;
     wait_for_metrics(8126, 8083).await
 }
 
 async fn wait_for_metrics(agent_port: u16, vector_port: u16) {
-    wait_for_healthy_metrics_agents().await;
     let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
     let schema_definitions = HashMap::from([
         (Some(LOGS.to_owned()), schema::Definition::empty()),
@@ -229,8 +231,8 @@ async fn wait_for_metrics(agent_port: u16, vector_port: u16) {
                 .unwrap();
             let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), agent_port);
             let statsd_metrics = (indoc! { r#"
-                    custom_gauge:60|g|#vector-intg-test,tag:value
-                    custom_count:42|c|#vector-intg-test,foo:bar
+                    custom_gauge_test:60|g|#vector-intg-test,tag:value
+                    custom_count_test:42|c|#vector-intg-test,foo:bar
                 "# })
             .to_string();
             assert_eq!(
@@ -243,30 +245,34 @@ async fn wait_for_metrics(agent_port: u16, vector_port: u16) {
             );
         },
         recv,
-        // We wait 60 seconds to let agent enough time to notice there is a valid endpoint for metrics and flush pending metrics
-        60,
+        // We wait 45 seconds to let agent enough time to notice there is a valid endpoint
+        // for metrics and flush pending metrics (the agent config has been tuned for
+        // fast retries).
+        45,
     )
     .await;
 
     // clean up everything that was not
-    let filtered_metrics = events
+    let mut filtered_metrics = events
         .into_iter()
         .filter_map(|m| m.try_into_metric())
-        .filter(|m| m.name() == "custom_gauge" || m.name() == "custom_count")
+        .filter(|m| m.name() == "custom_gauge_test" || m.name() == "custom_count_test")
         .collect::<Vec<Metric>>();
 
-    // Strictly two element should remain
+    filtered_metrics.sort_by(|m1, m2| m1.name().cmp(m2.name()));
+
+    // Strictly two elements should remain
     assert_eq!(filtered_metrics.len(), 2);
 
     let metric = filtered_metrics.get(0).unwrap();
-    assert_eq!(metric.name(), "custom_gauge");
-    assert_eq!(*metric.value(), MetricValue::Gauge { value: 60.0 });
-    assert_eq!(metric.tags().unwrap().get("vector-intg-test").unwrap(), "");
-    assert_eq!(metric.tags().unwrap().get("tag").unwrap(), "value");
-
-    let metric = filtered_metrics.get(1).unwrap();
-    assert_eq!(metric.name(), "custom_count");
-    assert_eq!(*metric.value(), MetricValue::Counter { value: 42.0 });
+    assert_eq!(metric.name(), "custom_count_test");
+    assert_eq!(metric.value(), &MetricValue::Counter { value: 42.0 });
     assert_eq!(metric.tags().unwrap().get("vector-intg-test").unwrap(), "");
     assert_eq!(metric.tags().unwrap().get("foo").unwrap(), "bar");
+
+    let metric = filtered_metrics.get(1).unwrap();
+    assert_eq!(metric.name(), "custom_gauge_test");
+    assert_eq!(metric.value(), &MetricValue::Gauge { value: 60.0 });
+    assert_eq!(metric.tags().unwrap().get("vector-intg-test").unwrap(), "");
+    assert_eq!(metric.tags().unwrap().get("tag").unwrap(), "value");
 }
