@@ -60,7 +60,7 @@ impl CompressionConfigAdapter {
 
 impl Default for CompressionConfigAdapter {
     fn default() -> Self {
-        CompressionConfigAdapter::Original(Compression::None)
+        CompressionConfigAdapter::Extended(ExtendedCompression::Snappy)
     }
 }
 
