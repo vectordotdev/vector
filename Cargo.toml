@@ -122,6 +122,8 @@ tracing-limit = { path = "lib/tracing-limit" }
 value = { path = "lib/value" }
 vector_buffers = { path = "lib/vector-buffers", default-features = false }
 vector_common = { path = "lib/vector-common" }
+vector_config = { path = "lib/vector-config" }
+vector_config_macros = { path = "lib/vector-config-macros" }
 vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl"] }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
 vector-vrl-functions = { path = "lib/vector-vrl-functions" }
@@ -219,7 +221,7 @@ vrl-stdlib = { path = "lib/vrl/stdlib" }
 arc-swap = { version = "1.5", default-features = false, optional = true }
 async-compression = { version = "0.3.12", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 avro-rs = { version = "0.13.0", default-features = false, optional = true }
-axum = { version = "0.5.6", default-features = false }
+axum = { version = "0.5.7", default-features = false }
 base64 = { version = "0.13.0", default-features = false, optional = true }
 bloom = { version = "0.3.2", default-features = false, optional = true }
 bollard = { version = "0.12.0", default-features = false, features = ["ssl"] }
@@ -254,7 +256,7 @@ infer = { version = "0.8.0", default-features = false, optional = true}
 indoc = { version = "1.0.6", default-features = false }
 inventory = { version = "0.1.10", default-features = false }
 k8s-openapi = { version = "0.14.0", default-features = false, features = ["api", "v1_16"], optional = true }
-kube = { version = "0.71.0", default-features = false, features = ["client", "rustls-tls", "runtime"], optional = true }
+kube = { version = "0.71.0", default-features = false, features = ["client", "native-tls", "runtime"], optional = true }
 listenfd = { version = "1.0.0", default-features = false, optional = true }
 logfmt = { version = "0.0.2", default-features = false, optional = true }
 lru = { version = "0.7.6", default-features = false, optional = true }
@@ -307,7 +309,7 @@ warp = { version = "0.3.1", default-features = false }
 heim = { git = "https://github.com/vectordotdev/heim.git", branch="update-nix", default-features = false, features = ["cpu", "disk", "host", "memory", "net"], optional = true }
 
 # make sure to update the external docs when the Lua version changes
-mlua = { version = "0.7.4", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
+mlua = { version = "0.8.0", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 
 [target.'cfg(windows)'.dependencies]
 schannel = "0.1.20"
@@ -671,7 +673,7 @@ sinks-datadog_archives = ["sinks-aws_s3", "sinks-azure_blob", "sinks-gcp"]
 sinks-datadog_events = []
 sinks-datadog_logs = []
 sinks-datadog_metrics = ["protobuf-build", "sinks-azure_blob"]
-sinks-datadog_traces = ["protobuf-build"]
+sinks-datadog_traces = ["protobuf-build", "rmpv", "rmp-serde", "serde_bytes"]
 sinks-elasticsearch = ["aws-core", "aws-sigv4", "transforms-metric_to_log"]
 sinks-file = ["async-compression"]
 sinks-gcp = ["base64", "gcp", "gouth"]
@@ -707,6 +709,7 @@ enterprise = [
   "sources-internal_logs",
   "sources-internal_metrics",
   "transforms-remap",
+  "transforms-filter",
 ]
 
 # Identifies that the build is a nightly build

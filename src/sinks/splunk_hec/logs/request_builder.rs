@@ -9,12 +9,12 @@ use super::{
 };
 use crate::sinks::{
     splunk_hec::common::request::HecRequest,
-    util::{encoding::EncodingConfig, request_builder::EncodeResult, Compression, RequestBuilder},
+    util::{request_builder::EncodeResult, Compression, RequestBuilder},
 };
 
 pub struct HecLogsRequestBuilder {
+    pub encoder: HecLogsEncoder,
     pub compression: Compression,
-    pub encoding: EncodingConfig<HecLogsEncoder>,
 }
 
 #[derive(Debug, Clone)]
@@ -29,7 +29,7 @@ pub struct RequestMetadata {
 impl RequestBuilder<(Option<Partitioned>, Vec<HecProcessedEvent>)> for HecLogsRequestBuilder {
     type Metadata = RequestMetadata;
     type Events = Vec<HecProcessedEvent>;
-    type Encoder = EncodingConfig<HecLogsEncoder>;
+    type Encoder = HecLogsEncoder;
     type Payload = Bytes;
     type Request = HecRequest;
     type Error = std::io::Error;
@@ -39,7 +39,7 @@ impl RequestBuilder<(Option<Partitioned>, Vec<HecProcessedEvent>)> for HecLogsRe
     }
 
     fn encoder(&self) -> &Self::Encoder {
-        &self.encoding
+        &self.encoder
     }
 
     fn split_input(

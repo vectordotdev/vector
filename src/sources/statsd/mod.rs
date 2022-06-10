@@ -6,10 +6,10 @@ use codecs::{
     NewlineDelimitedDecoder,
 };
 use futures::{StreamExt, TryFutureExt};
-use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use tokio::net::UdpSocket;
 use tokio_util::udp::UdpFramed;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use self::parser::ParseError;
@@ -38,18 +38,32 @@ use parser::parse;
 #[cfg(unix)]
 use unix::{statsd_unix, UnixConfig};
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `statsd` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
-enum StatsdConfig {
-    Tcp(TcpConfig),
-    Udp(UdpConfig),
+pub enum StatsdConfig {
+    /// Listen on TCP.
+    Tcp(#[configurable(derived)] TcpConfig),
+
+    /// Listen on UDP.
+    Udp(#[configurable(derived)] UdpConfig),
+
+    /// Listen on UDS. (Unix domain socket)
     #[cfg(unix)]
-    Unix(UnixConfig),
+    Unix(#[configurable(derived)] UnixConfig),
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// UDP configuration for the `statsd` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct UdpConfig {
+    /// The address to listen for messages on.
     address: SocketAddr,
+
+    /// The size, in bytes, of the receive buffer used for each connection.
+    ///
+    /// This should not typically needed to be changed.
     receive_buffer_bytes: Option<usize>,
 }
 
@@ -62,15 +76,30 @@ impl UdpConfig {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
-struct TcpConfig {
+/// TCP configuration for the `statsd` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct TcpConfig {
+    /// The address to listen for connections on.
     address: SocketListenAddr,
+
+    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
+
+    #[configurable(derived)]
     #[serde(default)]
     tls: Option<TlsEnableableConfig>,
+
+    /// The timeout before a connection is forcefully closed during shutdown.
     #[serde(default = "default_shutdown_timeout_secs")]
     shutdown_timeout_secs: u64,
+
+    /// The size, in bytes, of the receive buffer used for each connection.
+    ///
+    /// This should not typically needed to be changed.
     receive_buffer_bytes: Option<usize>,
+
+    /// The maximum number of TCP connections that will be allowed at any given time.
     connection_limit: Option<u32>,
 }
 

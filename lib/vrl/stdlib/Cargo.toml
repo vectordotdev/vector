@@ -63,7 +63,8 @@ anyhow = "1"
 chrono-tz = "0.6"
 criterion = "0.3"
 tracing-test = "0.1"
-value = { path = "../../value", features = ["test"]}
+value = { path = "../../value", features = ["test"] }
+vrl-core = { path = "../../vrl/core", features = ["test"] }
 vector_common = { path = "../../vector-common", default-features = false, features = ["btreemap"] }
 
 [features]

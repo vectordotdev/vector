@@ -49,21 +49,36 @@ impl Expression for Block {
         last.resolve(ctx)
     }
 
+    /// If an expression has a "never" type, it is considered a "terminating" expression.
+    /// Type information of future expressions in this block should not be considered after
+    /// a terminating expression.
+    ///
+    /// Since type definitions due to assignments are calculated outside of the "type_def" function,
+    /// assignments that can never execute might still have adjusted the type definition.
+    /// Therefore, expressions after a terminating expression must not be included in a block.
+    /// It is considered an internal compiler error if this situation occurs, which is checked here
+    /// and will result in a panic.
+    ///
+    /// VRL is allowed to have expressions after a terminating expression, but the compiler
+    /// MUST not include them in a block expression when compiled.
     fn type_def(&self, (_, external): (&LocalEnv, &ExternalEnv)) -> TypeDef {
-        let mut type_defs = self
-            .inner
-            .iter()
-            .map(|expr| expr.type_def((&self.local_env, external)))
-            .collect::<Vec<_>>();
+        let mut last = TypeDef::null();
+        let mut fallible = false;
+        let mut has_terminated = false;
+        for expr in &self.inner {
+            if has_terminated {
+                panic!("VRL block contains an expression after a terminating expression. This is an internal compiler error. Please submit a bug report.");
+            }
+            last = expr.type_def((&self.local_env, external));
+            if last.is_never() {
+                has_terminated = true;
+            }
+            if last.is_fallible() {
+                fallible = true;
+            }
+        }
 
-        // If any of the stored expressions is fallible, the entire block is
-        // fallible.
-        let fallible = type_defs.iter().any(TypeDef::is_fallible);
-
-        // The last expression determines the resulting value of the block.
-        let type_def = type_defs.pop().unwrap_or_else(TypeDef::null);
-
-        type_def.with_fallibility(fallible)
+        last.with_fallibility(fallible)
     }
 }
 

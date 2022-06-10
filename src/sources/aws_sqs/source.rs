@@ -7,13 +7,14 @@ use aws_sdk_sqs::{
 use chrono::{DateTime, TimeZone, Utc};
 use futures::{FutureExt, StreamExt};
 use tokio::{pin, select, time::Duration};
+use vector_core::finalizer::UnorderedFinalizer;
 
 use crate::{
     codecs::Decoder,
     event::{BatchNotifier, BatchStatus},
     internal_events::{EndpointBytesReceived, SqsMessageDeleteError, StreamClosedError},
     shutdown::ShutdownSignal,
-    sources::util::{self, finalizer::UnorderedFinalizer},
+    sources::util,
     SourceSender,
 };
 

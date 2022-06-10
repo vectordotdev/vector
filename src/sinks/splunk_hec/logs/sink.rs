@@ -171,7 +171,7 @@ impl Partitioner for EventPartitioner {
             })
             .collect::<Option<_>>()
             .map(|metadata| Partitioned {
-                token: item.event.metadata().splunk_hec_token().clone(),
+                token: item.event.metadata().splunk_hec_token(),
                 metadata,
             })
     }

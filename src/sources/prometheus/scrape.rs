@@ -9,6 +9,7 @@ use hyper::{Body, Request};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio_stream::wrappers::IntervalStream;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use super::parser;
@@ -41,19 +42,52 @@ enum ConfigError {
     BothEndpointsAndHosts,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
-struct PrometheusScrapeConfig {
-    // Deprecated name
+/// Configuration for the `prometheus_scrape` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
+pub struct PrometheusScrapeConfig {
+    /// Endpoints to scrape metrics from.
     #[serde(alias = "hosts")]
     endpoints: Vec<String>,
+
+    /// The interval between scrapes, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
+
+    /// Overrides the name of the tag used to add the instance to each metric.
+    ///
+    /// The tag value will be the host/port of the scraped instance.
+    ///
+    /// By default, `"instance"` is used.
     instance_tag: Option<String>,
+
+    /// Overrides the name of the tag used to add the endpoint to each metric.
+    ///
+    /// The tag value will be the endpoint of the scraped instance.
+    ///
+    /// By default, `"endpoint"` is used.
     endpoint_tag: Option<String>,
+
+    /// Controls how tag conflicts are handled if the scraped source has tags that Vector would add.
+    ///
+    /// If `true`, Vector will not add the new tag if the scraped metric has the tag already. If `false`, Vector will
+    /// rename the conflicting tag by prepending `exported_` to the name.
+    ///
+    /// This matches Prometheus’ `honor_labels` configuration.
     #[serde(default = "crate::serde::default_false")]
     honor_labels: bool,
+
+    /// Custom parameters for the scrape request query string.
+    ///
+    /// One or more values for the same parameter key can be provided. The parameters provided in this option are
+    /// appended to any parameters manually provided in the `endpoints` option. This option is especially useful when
+    /// scraping the `/federate` endpoint.
     query: Option<HashMap<String, Vec<String>>>,
+
+    #[configurable(derived)]
     tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
     auth: Option<Auth>,
 }
 

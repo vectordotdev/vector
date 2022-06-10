@@ -160,7 +160,7 @@ pub struct Parameter {
 impl Parameter {
     #[allow(arithmetic_overflow)]
     pub fn kind(&self) -> Kind {
-        let mut kind = Kind::empty();
+        let mut kind = Kind::never();
 
         let n = self.kind;
 
@@ -433,11 +433,11 @@ impl ArgumentList {
         self.closure = Some(closure);
     }
 
-    fn optional_expr(&mut self, keyword: &'static str) -> Option<Expr> {
-        self.arguments.remove(keyword)
+    pub(crate) fn optional_expr(&mut self, keyword: &'static str) -> Option<Expr> {
+        self.arguments.get(keyword).cloned()
     }
 
-    fn required_expr(&mut self, keyword: &'static str) -> Expr {
+    pub fn required_expr(&mut self, keyword: &'static str) -> Expr {
         required(self.optional_expr(keyword))
     }
 }

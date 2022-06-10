@@ -1,12 +1,21 @@
+use crate::{get_metadata_key, MetadataKey};
 use ::value::Value;
 use vrl::prelude::*;
 
 fn remove_metadata_field(
     ctx: &mut Context,
-    key: &str,
+    key: &MetadataKey,
 ) -> std::result::Result<Value, ExpressionError> {
-    ctx.target_mut().remove_metadata(key)?;
-    Ok(Value::Null)
+    Ok(match key {
+        MetadataKey::Legacy(key) => {
+            ctx.target_mut().remove_secret(key);
+            Value::Null
+        }
+        MetadataKey::Query(query) => {
+            ctx.target_mut().remove_metadata(query.path())?;
+            Value::Null
+        }
+    })
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -39,46 +48,19 @@ impl Function for RemoveMetadataField {
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
-        let key = arguments
-            .required_enum("key", &super::keys())?
-            .try_bytes_utf8_lossy()
-            .expect("key not bytes")
-            .to_string();
-
+        let key = get_metadata_key(&mut arguments)?;
         Ok(Box::new(RemoveMetadataFieldFn { key }))
-    }
-
-    fn compile_argument(
-        &self,
-        _args: &[(&'static str, Option<FunctionArgument>)],
-        _ctx: &mut FunctionCompileContext,
-        name: &str,
-        expr: Option<&expression::Expr>,
-    ) -> CompiledArgument {
-        match (name, expr) {
-            ("key", Some(expr)) => {
-                let key = expr
-                    .as_enum("key", super::keys())?
-                    .try_bytes_utf8_lossy()
-                    .expect("key not bytes")
-                    .to_string();
-                Ok(Some(Box::new(key) as _))
-            }
-            _ => Ok(None),
-        }
     }
 }
 
 #[derive(Debug, Clone)]
 struct RemoveMetadataFieldFn {
-    key: String,
+    key: MetadataKey,
 }
 
 impl Expression for RemoveMetadataFieldFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let key = &self.key;
-
-        remove_metadata_field(ctx, key)
+        remove_metadata_field(ctx, &self.key)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

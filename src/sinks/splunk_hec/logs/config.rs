@@ -1,5 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
+use codecs::{encoding::SerializerConfig, JsonSerializerConfig, TextSerializerConfig};
 use futures_util::FutureExt;
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
@@ -7,6 +8,7 @@ use vector_core::sink::VectorSink;
 
 use super::{encoder::HecLogsEncoder, request_builder::HecLogsRequestBuilder, sink::HecLogsSink};
 use crate::{
+    codecs::Encoder,
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
@@ -17,14 +19,36 @@ use crate::{
             timestamp_key, EndpointTarget, SplunkHecDefaultBatchSettings,
         },
         util::{
-            encoding::EncodingConfig, http::HttpRetryLogic, BatchConfig, Compression,
-            ServiceBuilderExt, TowerRequestConfig,
+            encoding::{EncodingConfig, EncodingConfigAdapter, EncodingConfigMigrator},
+            http::HttpRetryLogic,
+            BatchConfig, Compression, ServiceBuilderExt, TowerRequestConfig,
         },
         Healthcheck,
     },
     template::Template,
     tls::TlsConfig,
 };
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HecEncoding {
+    Json,
+    Text,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HecEncodingMigrator;
+
+impl EncodingConfigMigrator for HecEncodingMigrator {
+    type Codec = HecEncoding;
+
+    fn migrate(codec: &Self::Codec) -> SerializerConfig {
+        match codec {
+            HecEncoding::Text => TextSerializerConfig::new().into(),
+            HecEncoding::Json => JsonSerializerConfig::new().into(),
+        }
+    }
+}
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -40,7 +64,7 @@ pub struct HecLogsSinkConfig {
     pub index: Option<Template>,
     pub sourcetype: Option<Template>,
     pub source: Option<Template>,
-    pub encoding: EncodingConfig<HecLogsEncoder>,
+    pub encoding: EncodingConfigAdapter<EncodingConfig<HecEncoding>, HecEncodingMigrator>,
     #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
@@ -74,7 +98,7 @@ impl GenerateConfig for HecLogsSinkConfig {
             index: None,
             sourcetype: None,
             source: None,
-            encoding: HecLogsEncoder::Text.into(),
+            encoding: EncodingConfig::from(HecEncoding::Text).into(),
             compression: Compression::default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
@@ -106,7 +130,7 @@ impl SinkConfig for HecLogsSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(self.encoding.config().input_type())
     }
 
     fn sink_type(&self) -> &'static str {
@@ -130,8 +154,15 @@ impl HecLogsSinkConfig {
             None
         };
 
+        let transformer = self.encoding.transformer();
+        let serializer = self.encoding.clone().encoding();
+        let encoder = Encoder::<()>::new(serializer);
+        let encoder = HecLogsEncoder {
+            transformer,
+            encoder,
+        };
         let request_builder = HecLogsRequestBuilder {
-            encoding: self.encoding.clone(),
+            encoder,
             compression: self.compression,
         };
 
@@ -180,7 +211,6 @@ impl HecLogsSinkConfig {
 
 // Add a compatibility alias to avoid breaking existing configs
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 struct HecSinkCompatConfig {
     #[serde(flatten)]
     config: HecLogsSinkConfig,

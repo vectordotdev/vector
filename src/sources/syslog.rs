@@ -9,10 +9,10 @@ use codecs::{
     BytesDecoder, OctetCountingDecoder, SyslogDeserializer,
 };
 use futures::StreamExt;
-use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use tokio::net::UdpSocket;
 use tokio_util::udp::UdpFramed;
+use vector_config::configurable_component;
 
 use crate::codecs::Decoder;
 #[cfg(unix)]
@@ -31,35 +31,76 @@ use crate::{
     udp, SourceSender,
 };
 
-#[derive(Deserialize, Serialize, Debug)]
-// TODO: add back when serde-rs/serde#1358 is addressed
-// #[serde(deny_unknown_fields)]
+/// Configuration for the `syslog` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
 pub struct SyslogConfig {
     #[serde(flatten)]
     mode: Mode,
+
+    /// The maximum buffer size of incoming messages, in bytes.
+    ///
+    /// Messages larger than this are truncated.
     #[serde(default = "crate::serde::default_max_length")]
     max_length: usize,
-    /// The host key of the log. (This differs from `hostname`)
+
+    /// Overrides the name of the log field used to add the peer host to each event.
+    ///
+    /// If using TCP or UDP, the value will be the peer host's address, including the port i.e. `1.2.3.4:9000`. If using
+    /// UDS, the value will be the socket path itself.
+    ///
+    /// By default, the [global `host_key` option](https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key) is used.
     host_key: Option<String>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Listener mode for the `syslog` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum Mode {
+    /// Listen on TCP.
     Tcp {
+        /// The address to listen for connections on.
         address: SocketListenAddr,
+
+        #[configurable(derived)]
         keepalive: Option<TcpKeepaliveConfig>,
+
+        #[configurable(derived)]
         tls: Option<TlsEnableableConfig>,
+
+        /// The size, in bytes, of the receive buffer used for each connection.
+        ///
+        /// This should not typically needed to be changed.
         receive_buffer_bytes: Option<usize>,
+
+        /// The maximum number of TCP connections that will be allowed at any given time.
         connection_limit: Option<u32>,
     },
+
+    /// Listen on UDP.
     Udp {
+        /// The address to listen for messages on.
         address: SocketAddr,
+
+        /// The size, in bytes, of the receive buffer used for the listening socket.
+        ///
+        /// This should not typically needed to be changed.
         receive_buffer_bytes: Option<usize>,
     },
+
+    /// Listen on UDS. (Unix domain socket)
     #[cfg(unix)]
     Unix {
+        /// The Unix socket path.
+        ///
+        /// This should be an absolute path.
         path: PathBuf,
+
+        /// Unix file mode bits to be applied to the unix socket file as its designated file permissions.
+        ///
+        /// Note that the file mode value can be specified in any numeric format supported by your configuration
+        /// language, but it is most intuitive to use an octal number.
         socket_file_mode: Option<u32>,
     },
 }
@@ -323,6 +364,7 @@ mod test {
     use chrono::prelude::*;
     use codecs::decoding::format::Deserializer;
     use rand::{thread_rng, Rng};
+    use serde::Deserialize;
     use tokio::time::{sleep, Duration, Instant};
     use tokio_util::codec::BytesCodec;
     use value::Value;

@@ -10,7 +10,8 @@ pub mod prelude;
 mod runtime;
 
 pub use compiler::{
-    function, state, value, Context, Expression, Function, Program, ProgramInfo, Target, VrlRuntime,
+    function, state, value, Context, Expression, Function, MetadataTarget, Program, ProgramInfo,
+    SecretTarget, Target, TargetValue, TargetValueRef, VrlRuntime,
 };
 pub use diagnostic;
 pub use runtime::{Runtime, RuntimeResult, Terminate};

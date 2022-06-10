@@ -954,9 +954,9 @@ dependencies = [
 
 [[package]]
 name = "axum"
-version = "0.5.6"
+version = "0.5.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab2504b827a8bef941ba3dd64bdffe9cf56ca182908a147edd6189c95fbcae7d"
+checksum = "dc47084705629d09d15060d70a8dbfce479c842303d05929ce29c74c995916ae"
 dependencies = [
  "async-trait",
  "axum-core",
@@ -983,9 +983,9 @@ dependencies = [
 
 [[package]]
 name = "axum-core"
-version = "0.2.4"
+version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da31c0ed7b4690e2c78fe4b880d21cd7db04a346ebc658b4270251b695437f17"
+checksum = "c2efed1c501becea07ce48118786ebcf229531d0d3b28edf224a720020d9e106"
 dependencies = [
  "async-trait",
  "bytes 1.1.0",
@@ -1643,6 +1643,8 @@ dependencies = [
  "tracing 0.1.34",
  "value",
  "vector_common",
+ "vector_config",
+ "vector_config_macros",
  "vector_core",
 ]
 
@@ -3944,21 +3946,21 @@ dependencies = [
  "http",
  "http-body",
  "hyper",
- "hyper-rustls 0.23.0",
  "hyper-timeout",
+ "hyper-tls",
  "jsonpath_lib",
  "k8s-openapi",
  "kube-core",
+ "openssl",
  "pem 1.0.2",
  "pin-project",
- "rustls 0.20.4",
- "rustls-pemfile 0.3.0",
  "secrecy",
  "serde",
  "serde_json",
  "serde_yaml",
  "thiserror",
  "tokio",
+ "tokio-native-tls",
  "tokio-util 0.7.1",
  "tower",
  "tower-http 0.2.5",
@@ -4222,9 +4224,9 @@ dependencies = [
 
 [[package]]
 name = "luajit-src"
-version = "210.3.4+resty073ac54"
+version = "210.4.0+resty124ff8d"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "640b09e99575a442b4da0ef406a78188a1a4313bb9ead7b5b20ec12cc480130f"
+checksum = "f76fb2e2c0c7192e18719d321c9a148f7625c4dcbe3df5f4c19e685e4c286f6c"
 dependencies = [
  "cc",
 ]
@@ -4507,9 +4509,9 @@ dependencies = [
 
 [[package]]
 name = "mlua"
-version = "0.7.4"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29e2194305aa8301d5da9c1c98640047f4219f6b95c190f6860338ab9872b686"
+checksum = "d75eb178f8a9d6654ef31f094fb3da6d1e81e714f27007e92a3094ddd6587aa2"
 dependencies = [
  "bstr",
  "cc",
@@ -8707,6 +8709,8 @@ dependencies = [
  "vector-vrl-functions",
  "vector_buffers",
  "vector_common",
+ "vector_config",
+ "vector_config_macros",
  "vector_core",
  "vrl",
  "vrl-cli",
@@ -8734,29 +8738,6 @@ dependencies = [
  "tokio-tungstenite 0.17.1",
  "url",
  "uuid 1.1.1",
-]
-
-[[package]]
-name = "vector-config-common"
-version = "0.1.0"
-dependencies = [
- "darling 0.14.1",
- "proc-macro2",
- "quote",
- "schemars",
- "syn",
-]
-
-[[package]]
-name = "vector-config-macros"
-version = "0.1.0"
-dependencies = [
- "darling 0.14.1",
- "proc-macro2",
- "quote",
- "serde_derive_internals",
- "syn",
- "vector-config-common",
 ]
 
 [[package]]
@@ -8829,19 +8810,44 @@ dependencies = [
  "snafu",
  "tracing 0.1.34",
  "value",
+ "vector_config",
 ]
 
 [[package]]
 name = "vector_config"
 version = "0.1.0"
 dependencies = [
+ "encoding_rs",
  "indexmap",
  "num-traits",
  "schemars",
  "serde",
  "serde_json",
- "vector-config-common",
- "vector-config-macros",
+ "vector_config_common",
+ "vector_config_macros",
+]
+
+[[package]]
+name = "vector_config_common"
+version = "0.1.0"
+dependencies = [
+ "darling 0.14.1",
+ "proc-macro2",
+ "quote",
+ "schemars",
+ "syn",
+]
+
+[[package]]
+name = "vector_config_macros"
+version = "0.1.0"
+dependencies = [
+ "darling 0.14.1",
+ "proc-macro2",
+ "quote",
+ "serde_derive_internals",
+ "syn",
+ "vector_config_common",
 ]
 
 [[package]]
@@ -8893,6 +8899,7 @@ dependencies = [
  "serde",
  "serde_json",
  "snafu",
+ "stream-cancel",
  "tokio",
  "tokio-stream",
  "tokio-test",
@@ -8909,6 +8916,8 @@ dependencies = [
  "value",
  "vector_buffers",
  "vector_common",
+ "vector_config",
+ "vector_config_macros",
  "vrl",
 ]
 
@@ -8937,6 +8946,7 @@ dependencies = [
  "value",
  "vector_common",
  "vrl-compiler",
+ "vrl-core",
  "vrl-diagnostic",
  "vrl-parser",
  "vrl-stdlib",
@@ -8956,8 +8966,10 @@ dependencies = [
  "serde_json",
  "thiserror",
  "value",
+ "vector-vrl-functions",
  "vector_common",
  "vrl",
+ "vrl-core",
  "vrl-stdlib",
  "webbrowser",
 ]
@@ -9068,6 +9080,7 @@ dependencies = [
  "value",
  "vector_common",
  "vrl",
+ "vrl-core",
  "woothee",
 ]
 
@@ -9088,6 +9101,7 @@ dependencies = [
  "tikv-jemallocator",
  "tracing-subscriber 0.3.11",
  "value",
+ "vector-vrl-functions",
  "vector_common",
  "vrl",
  "vrl-stdlib",
