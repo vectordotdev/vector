@@ -151,7 +151,7 @@ impl SourceShutdownCoordinator {
             }),
         );
         assert!(
-            !existing.is_some(),
+            existing.is_none(),
             "ShutdownCoordinator already has a shutdown_begin_trigger for source \"{}\"",
             id
         );
@@ -166,7 +166,7 @@ impl SourceShutdownCoordinator {
             }),
         );
         assert!(
-            !existing.is_some(),
+            existing.is_none(),
             "ShutdownCoordinator already has a shutdown_force_trigger for source \"{}\"",
             id
         );
@@ -184,7 +184,7 @@ impl SourceShutdownCoordinator {
                 }),
         );
         assert!(
-            !existing.is_some(),
+            existing.is_none(),
             "ShutdownCoordinator already has a shutdown_complete_tripwire for source \"{}\"",
             id
         );

@@ -197,7 +197,7 @@ impl SecretTarget for Secrets {
     }
 
     fn remove_secret(&mut self, key: &str) {
-        self.remove(&key.to_owned());
+        self.remove(key);
     }
 }
 
