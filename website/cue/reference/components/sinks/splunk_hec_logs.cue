@@ -81,7 +81,10 @@ components: sinks: splunk_hec_logs: {
 		}
 		endpoint_target: {
 			common:      false
-			description: "The Splunk endpoint to send to."
+			description: """
+                                     The Splunk endpoint to send to. Either the [event endpoint](\(urls.splunk_hec_event_endpoint)) or the
+                                     [raw endpoint](\(urls.splunk_hec_raw_endpoint)).
+                                     """
 			required:    false
 			warnings: []
 			type: string: {
@@ -148,12 +151,12 @@ components: sinks: splunk_hec_logs: {
 			}
 		}
 		metadata: {
-			common: false
+			common:      false
 			description: """
-				 A set of fields that can be sent as metadata. The value is templatable, which enables
+				 A set of fields that can be sent as [metadata](\(urls.splunk_hec_metadata)). The value is templatable, which enables
 				 you to attach dynamic data to the event.
 				"""
-			required: false
+			required:    false
 			type: object: {
 				examples: [
 					{
