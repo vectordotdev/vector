@@ -53,53 +53,6 @@ impl<'a> HecData<'a> {
     }
 }
 
-/*
-impl HecLogsEncoder {
-    pub fn encode_event(&self, processed_event: HecProcessedEvent) -> Option<Vec<u8>> {
-        let log = processed_event.event;
-
-        match processed_event.metadata.endpoint_target {
-            EndpointTarget::Raw => match self {
-                HecLogsEncoder::Json => match serde_json::to_vec(&log) {
-                    Ok(value) => Some(value),
-                    Err(error) => {
-                        emit!(SplunkEventEncodeError { error });
-                        None
-                    }
-                },
-                HecLogsEncoder::Text => log
-                    .get(log_schema().message_key())
-                    .map(|v| v.coerce_to_bytes().as_ref().to_vec()),
-            },
-            EndpointTarget::Event => {
-                let metadata = processed_event.metadata;
-                let event = match self {
-                    HecLogsEncoder::Json => HecEvent::Json(log),
-                    HecLogsEncoder::Text => HecEvent::Text(
-                        log.get(log_schema().message_key())
-                            .map(|v| v.to_string_lossy())
-                            .unwrap_or_else(|| "".to_string()),
-                    ),
-                };
-
-                let mut hec_data = HecData::new(event, metadata.fields, metadata.timestamp);
-                hec_data.host = metadata.host.map(|host| host.to_string_lossy());
-                hec_data.index = metadata.index;
-                hec_data.source = metadata.source;
-                hec_data.sourcetype = metadata.sourcetype;
-
-                match serde_json::to_vec(&hec_data) {
-                    Ok(value) => Some(value),
-                    Err(error) => {
-                        emit!(SplunkEventEncodeError { error });
-                        None
-                    }
-                }
-            }
-        }
-    }
-    */
-
 #[derive(Debug, Clone)]
 pub struct HecLogsEncoder {
     pub transformer: Transformer,
