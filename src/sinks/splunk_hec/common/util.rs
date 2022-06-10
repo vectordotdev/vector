@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{borrow::Cow, collections::HashMap, sync::Arc};
 
 use bytes::Bytes;
 use futures_util::future::BoxFuture;
@@ -107,9 +107,15 @@ pub fn build_uri(
             } else {
                 first = false;
             }
-            uri.push_str(&key);
+            uri.push_str(&Cow::<str>::from(percent_encoding::utf8_percent_encode(
+                &key,
+                percent_encoding::NON_ALPHANUMERIC,
+            )));
             uri.push('=');
-            uri.push_str(&value);
+            uri.push_str(&Cow::<str>::from(percent_encoding::utf8_percent_encode(
+                &value,
+                percent_encoding::NON_ALPHANUMERIC,
+            )));
         }
     }
 
@@ -323,12 +329,12 @@ mod tests {
     #[test]
     fn test_build_uri() {
         let mut query = HashMap::new();
-        query.insert("host".to_string(), "zork".to_string());
+        query.insert("host".to_string(), "zork flork".to_string());
         query.insert("source".to_string(), "zam".to_string());
         let uri = build_uri("http://sproink.com", "/thing/thang", Some(query)).unwrap();
 
         assert_eq!(
-            "http://sproink.com/thing/thang?host=zork&source=zam"
+            "http://sproink.com/thing/thang?host=zork%20flork&source=zam"
                 .parse::<Uri>()
                 .unwrap(),
             uri
