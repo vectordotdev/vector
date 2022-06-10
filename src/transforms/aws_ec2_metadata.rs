@@ -174,13 +174,11 @@ impl TransformConfig for Ec2Metadata {
             fields,
         );
 
-        // if initial metadata is not required, just log and proceed
+        // If initial metadata is not required, log and proceed. Otherwise return error.
         if let Err(error) = client.refresh_metadata().await {
             if self.required.unwrap_or(true) {
-                println!("refresh_metadata failed but required is true");
                 return Err(error);
             } else {
-                println!("refresh_metadata failed and required is false!");
                 emit!(AwsEc2MetadataRefreshError { error });
             }
         }
@@ -738,8 +736,9 @@ mod integration_tests {
         }
     }
 
+    // validates the configuration setting 'required'=false allows vector to run
     #[tokio::test(flavor = "multi_thread")]
-    async fn timeout_2() {
+    async fn not_required() {
         trace_init();
 
         let addr = next_addr();
@@ -756,18 +755,14 @@ mod integration_tests {
         let config = Ec2Metadata {
             endpoint: Some(format!("http://{}", addr)),
             refresh_timeout_secs: Some(1),
+            required: Some(false),
             ..Default::default()
         };
 
-        match config.build(&TransformContext::default()).await {
-            Ok(_) => panic!("expected timeout failure"),
-            // cannot create tokio::time::error::Elapsed to compare with since constructor is
-            // private
-            Err(err) => assert_eq!(
-                err.to_string(),
-                "Unable to fetch metadata authentication token: deadline has elapsed."
-            ),
-        }
+        assert!(
+            config.build(&TransformContext::default()).await.is_ok(),
+            "expected no failure because 'required' config value set to false"
+        );
     }
 
     #[tokio::test]
