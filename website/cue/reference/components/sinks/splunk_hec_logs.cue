@@ -163,6 +163,17 @@ components: sinks: splunk_hec_logs: {
 						"host": "{{ hostname }}"
 					},
 				]
+		timestamp_key: {
+			common:      false
+			description: """
+				The name of the log field to be used as the timestamp sent to Splunk HEC. This overrides the
+				[global `timestamp_key` option](\(urls.vector_configuration)/global-options#log_schema.timestamp_key).
+				When set to "", vector omits setting a timestamp in the events sent to Splunk HEC.
+				"""
+			required:    false
+			type: string: {
+				default: null
+				examples: ["timestamp", ""]
 			}
 		}
 	}
