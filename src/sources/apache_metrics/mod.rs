@@ -8,9 +8,9 @@ use chrono::Utc;
 use futures::{stream, FutureExt, StreamExt, TryFutureExt};
 use http::uri::Scheme;
 use hyper::{Body, Request};
-use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use tokio_stream::wrappers::IntervalStream;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -31,11 +31,20 @@ mod parser;
 
 pub use parser::ParseError;
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
-struct ApacheMetricsConfig {
+/// Configuration for the `apache_metrics` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
+pub struct ApacheMetricsConfig {
+    /// The list of `mod_status` endpoints to scrape metrics from.
     endpoints: Vec<String>,
+
+    /// The interval between scrapes, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
+
+    /// The namespace of the metric.
+    ///
+    /// Disabled if empty.
     #[serde(default = "default_namespace")]
     namespace: String,
 }

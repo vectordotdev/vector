@@ -281,7 +281,7 @@ impl Infinite {
 
 impl From<Infinite> for Kind {
     fn from(infinite: Infinite) -> Self {
-        let mut kind = Self::empty();
+        let mut kind = Self::never();
 
         if infinite.bytes.is_some() {
             kind.add_bytes();

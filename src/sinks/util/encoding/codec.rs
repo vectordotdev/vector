@@ -271,6 +271,7 @@ where
 
     impl<'inner> io::Write for Tracked<'inner> {
         fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            #[allow(clippy::disallowed_method)] // We pass on the result of `write` to the caller.
             let n = self.inner.write(buf)?;
             self.count += n;
             Ok(n)

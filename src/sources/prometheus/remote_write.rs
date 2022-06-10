@@ -3,7 +3,7 @@ use std::{collections::HashMap, net::SocketAddr};
 use bytes::Bytes;
 use prometheus_parser::proto;
 use prost::Message;
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 use warp::http::{HeaderMap, StatusCode};
 
 use super::parser;
@@ -25,14 +25,22 @@ use crate::{
 
 const SOURCE_NAME: &str = "prometheus_remote_write";
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-struct PrometheusRemoteWriteConfig {
+/// Configuration for the `prometheus_remote_write` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
+pub struct PrometheusRemoteWriteConfig {
+    /// The address to accept connections on.
+    ///
+    /// The address _must_ include a port.
     address: SocketAddr,
 
+    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
+    #[configurable(derived)]
     auth: Option<HttpSourceAuthConfig>,
 
+    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
 }

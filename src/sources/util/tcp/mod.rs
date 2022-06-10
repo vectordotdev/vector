@@ -7,7 +7,7 @@ use bytes::Bytes;
 use codecs::StreamDecodingError;
 use futures::{future::BoxFuture, FutureExt, StreamExt};
 use listenfd::ListenFd;
-use serde::{de, Deserialize, Deserializer, Serialize};
+use serde::{de, Deserialize, Deserializer};
 use smallvec::SmallVec;
 use socket2::SockRef;
 use tokio::{
@@ -17,6 +17,7 @@ use tokio::{
 };
 use tokio_util::codec::{Decoder, FramedRead};
 use tracing::Instrument;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use super::AfterReadExt as _;
@@ -407,12 +408,17 @@ fn close_socket(socket: &MaybeTlsIncomingStream<TcpStream>) -> bool {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+/// A listening address that can be given directly or be managed via `systemd` socket activation.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, PartialEq)]
 #[serde(untagged)]
 pub enum SocketListenAddr {
-    SocketAddr(SocketAddr),
+    /// An IPv4/IPv6 address and port.
+    SocketAddr(#[configurable(derived)] SocketAddr),
+
+    /// A file descriptor identifier that is given from, and managed by, the socket activation feature of `systemd`.
     #[serde(deserialize_with = "parse_systemd_fd")]
-    SystemdFd(usize),
+    SystemdFd(#[configurable(transparent)] usize),
 }
 
 impl fmt::Display for SocketListenAddr {

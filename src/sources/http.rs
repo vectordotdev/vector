@@ -9,8 +9,8 @@ use codecs::{
 };
 use http::StatusCode;
 use lookup::path;
-use serde::{Deserialize, Serialize};
 use tokio_util::codec::Decoder as _;
+use vector_config::configurable_component;
 use warp::http::{HeaderMap, HeaderValue};
 
 use crate::{
@@ -27,40 +27,92 @@ use crate::{
     tls::TlsEnableableConfig,
 };
 
-#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
+/// HTTP method.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum HttpMethod {
+    /// HTTP HEAD method.
     Head,
+
+    /// HTTP GET method.
     Get,
+
+    /// HTTP POST method.
     #[derivative(Default)]
     Post,
+
+    /// HTTP Put method.
     Put,
+
+    /// HTTP PATCH method.
     Patch,
+
+    /// HTTP DELETE method.
     Delete,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub(super) struct SimpleHttpConfig {
+/// Configuration for the `http` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
+pub struct SimpleHttpConfig {
+    /// The address to listen for connections on.
     address: SocketAddr,
+
+    /// The expected encoding of received data.
+    ///
+    /// Note that for `json` and `ndjson` encodings, the fields of the JSON objects are output as separate fields.
     #[serde(default)]
     encoding: Option<Encoding>,
+
+    /// A list of HTTP headers to include in the log event.
+    ///
+    /// These will override any values included in the JSON payload with conflicting names.
     #[serde(default)]
     headers: Vec<String>,
+
+    /// A list of URL query parameters to include in the log event.
+    ///
+    /// These will override any values included in the body with conflicting names.
     #[serde(default)]
     query_parameters: Vec<String>,
-    tls: Option<TlsEnableableConfig>,
+
+    #[configurable(derived)]
     auth: Option<HttpSourceAuthConfig>,
+
+    /// Whether or not to treat the configured `path` as an absolute path.
+    ///
+    /// If set to `true`, only requests using the exact URL path specified in `path` will be accepted. Otherwise,
+    /// requests sent to a URL path that starts with the value of `path` will be accepted.
+    ///
+    /// With `strict_path` set to `false` and `path` set to `""`, the configured HTTP source will accept requests from
+    /// any URL path.
     #[serde(default = "crate::serde::default_true")]
     strict_path: bool,
+
+    /// The URL path on which log event POST requests shall be sent.
     #[serde(default = "default_path")]
     path: String,
+
+    /// The event key in which the requested URL path used to send the request will be stored.
     #[serde(default = "default_path_key")]
     path_key: String,
+
+    /// Specifies the action of the HTTP request.
     #[serde(default)]
     method: HttpMethod,
+
+    #[configurable(derived)]
+    tls: Option<TlsEnableableConfig>,
+
+    #[configurable(derived)]
     framing: Option<FramingConfig>,
+
+    #[configurable(derived)]
     decoding: Option<DeserializerConfig>,
+
+    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
 }

@@ -1,4 +1,8 @@
-use darling::{error::Accumulator, util::path_to_string, FromAttributes, FromMeta};
+use darling::{
+    error::Accumulator,
+    util::{path_to_string, Flag},
+    FromAttributes, FromMeta,
+};
 use serde_derive_internals::{ast as serde_ast, Ctxt, Derive};
 use syn::{DeriveInput, ExprPath, Generics, Ident, NestedMeta};
 
@@ -11,10 +15,10 @@ use super::{
 };
 
 const ERR_NO_ENUM_TUPLES: &str = "enum variants cannot be tuples (multiple unnamed fields)";
-const ERR_NO_ENUM_NEWTYPE_INTERNAL_TAG: &str = "newtype variants (i.e. `enum SomeEnum { SomeVariant(T) }`) cannot be used with tag-only mode as the type inside may or may not support embedding the tag field";
 const ERR_NO_ENUM_VARIANT_DESCRIPTION: &str = "enum variants must have a description i.e. `/// This is a description` or `#[configurable(description = \"This is a description...\")]`";
 const ERR_ENUM_UNTAGGED_DUPLICATES: &str = "enum variants must be unique in style/shape when in untagged mode i.e. there cannot be multiple unit variants, or tuple variants with the same fields, etc";
 const ERR_NO_UNIT_STRUCTS: &str = "unit structs are not supported by `Configurable`";
+const ERR_MISSING_DESC: &str = "all structs/enums must have a description i.e. `/// This is a description` or `#[configurable(description = \"This is a description...\")]`";
 
 pub struct Container<'a> {
     original: &'a DeriveInput,
@@ -70,16 +74,6 @@ impl<'a> Container<'a> {
                                 );
                             }
 
-                            // We don't support internal tag for newtype variants, because `serde` doesn't support it.
-                            if variant.style() == Style::Newtype
-                                && matches!(variant.tagging(), Tagging::Internal { .. })
-                            {
-                                accumulator.push(
-                                    darling::Error::custom(ERR_NO_ENUM_NEWTYPE_INTERNAL_TAG)
-                                        .with_span(variant),
-                                );
-                            }
-
                             // All variants must have a description.  No derived/transparent mode.
                             if variant.description().is_none() {
                                 accumulator.push(
@@ -127,6 +121,15 @@ impl<'a> Container<'a> {
                     },
                 };
 
+                // All containers must have a description: no ifs, ands, or buts.
+                //
+                // The compile-time errors are a bit too inscrutable otherwise, and inscrutable errors are not very
+                // helpful when using procedural macros.
+                if attrs.description.is_none() {
+                    accumulator
+                        .push(darling::Error::custom(ERR_MISSING_DESC).with_span(&serde.ident));
+                }
+
                 let original = input;
                 let name = serde.attrs.name().deserialize_name();
                 let default_value = get_serde_default_value(serde.attrs.default());
@@ -172,7 +175,7 @@ impl<'a> Container<'a> {
     }
 
     pub fn deprecated(&self) -> bool {
-        self.attrs.deprecated
+        self.attrs.deprecated.is_present()
     }
 
     pub fn metadata(&self) -> impl Iterator<Item = &(String, String)> {
@@ -189,19 +192,13 @@ impl<'a> Container<'a> {
 struct Attributes {
     title: Option<String>,
     description: Option<String>,
-    #[darling(skip)]
-    deprecated: bool,
+    deprecated: Flag,
     #[darling(multiple)]
     metadata: Vec<Metadata>,
 }
 
 impl Attributes {
     fn finalize(mut self, forwarded_attrs: &[syn::Attribute]) -> darling::Result<Self> {
-        // Parse any forwarded attributes that `darling` left us.
-        self.deprecated = forwarded_attrs
-            .iter()
-            .any(|a| a.path.is_ident("deprecated"));
-
         // We additionally attempt to extract a title/description from the forwarded doc attributes, if they exist.
         // Whether we extract both a title and description, or just description, is documented in more detail in
         // `try_extract_doc_title_description` itself.

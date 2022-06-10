@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 
 use tracing::warn;
 use value::Value;
-use vrl_compiler::Target;
 
 use crate::{
     grok_filter::apply_filter,
@@ -18,13 +17,9 @@ pub enum Error {
 }
 
 /// Parses a given source field value by applying the list of grok rules until the first match found.
-pub fn parse_grok(
-    source_field: &str,
-    grok_rules: &[GrokRule],
-    remove_empty: bool,
-) -> Result<Value, Error> {
+pub fn parse_grok(source_field: &str, grok_rules: &[GrokRule]) -> Result<Value, Error> {
     for rule in grok_rules {
-        match apply_grok_rule(source_field, rule, remove_empty) {
+        match apply_grok_rule(source_field, rule) {
             Err(Error::NoMatch) => continue,
             other => return other,
         }
@@ -37,7 +32,7 @@ pub fn parse_grok(
 /// Possible errors:
 /// - FailedToApplyFilter - matches the rule, but there was a runtime error while applying on of the filters
 /// - NoMatch - this rule does not match a given string
-fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Result<Value, Error> {
+fn apply_grok_rule(source: &str, grok_rule: &GrokRule) -> Result<Value, Error> {
     let mut parsed = Value::Object(BTreeMap::new());
 
     if let Some(ref matches) = grok_rule.pattern.match_against(source) {
@@ -71,29 +66,17 @@ fn apply_grok_rule(source: &str, grok_rule: &GrokRule, remove_empty: bool) -> Re
                         }
                         // anything else at the root leve must be ignored
                         _ if field.is_root() => {}
-                        // ignore empty strings if necessary
-                        Value::Bytes(b) if remove_empty && b.is_empty() => {}
                         // otherwise just apply VRL lookup insert logic
-                        _ => match parsed
-                            .target_get(field)
-                            .expect("field does not exist")
-                            .cloned()
-                        {
+                        _ => match parsed.get_by_path(field).cloned() {
                             Some(Value::Array(mut values)) => {
                                 values.push(value);
-                                parsed.target_insert(field, values.into()).unwrap_or_else(
-                                    |error| warn!(message = "Error updating field value", field = %field, %error)
-                                );
+                                parsed.insert_by_path(field, values.into());
                             }
                             Some(v) => {
-                                parsed.target_insert(field, Value::Array(vec![v, value])).unwrap_or_else(
-                                    |error| warn!(message = "Error updating field value", field = %field, %error)
-                                );
+                                parsed.insert_by_path(field, Value::Array(vec![v, value]));
                             }
                             None => {
-                                parsed.target_insert(field, value).unwrap_or_else(
-                                    |error| warn!(message = "Error updating field value", field = %field, %error)
-                                );
+                                parsed.insert_by_path(field, value);
                             }
                         },
                     };
@@ -134,12 +117,7 @@ mod tests {
             BTreeMap::new(),
         )
         .expect("couldn't parse rules");
-        let parsed = parse_grok(
-            "2020-10-02T23:22:12.223222Z info Hello world",
-            &rules,
-            false,
-        )
-        .unwrap();
+        let parsed = parse_grok("2020-10-02T23:22:12.223222Z info Hello world", &rules).unwrap();
 
         assert_eq!(
             parsed,
@@ -174,7 +152,7 @@ mod tests {
                 "_method" => r#"%{word:http.method}"#.to_string(),
                 "_date_access" => r#"%{notSpace:date_access}"#.to_string(),
                 "_x_forwarded_for" => r#"%{regex("[^\\\"]*"):http._x_forwarded_for:nullIf("-")}"#.to_string()}).expect("couldn't parse rules");
-        let parsed = parse_grok(r##"127.0.0.1 - frank [13/Jul/2016:10:55:36] "GET /apache_pb.gif HTTP/1.0" 200 2326 0.202 "http://www.perdu.com/" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36" "-""##, &rules, false).unwrap();
+        let parsed = parse_grok(r##"127.0.0.1 - frank [13/Jul/2016:10:55:36] "GET /apache_pb.gif HTTP/1.0" 200 2326 0.202 "http://www.perdu.com/" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36" "-""##, &rules).unwrap();
 
         assert_eq!(
             parsed,
@@ -241,7 +219,7 @@ mod tests {
         for (filter, k, v) in tests {
             let rules = parse_grok_rules(&[filter.to_string()], BTreeMap::new())
                 .expect("couldn't parse rules");
-            let parsed = parse_grok(k, &rules, false);
+            let parsed = parse_grok(k, &rules);
 
             if v.is_ok() {
                 assert_eq!(
@@ -260,7 +238,7 @@ mod tests {
         for (filter, k, v) in tests {
             let rules = parse_grok_rules(&[filter.to_string()], BTreeMap::new())
                 .expect("couldn't parse rules");
-            let parsed = parse_grok(k, &rules, false);
+            let parsed = parse_grok(k, &rules);
 
             assert_eq!(parsed, v);
         }
@@ -393,7 +371,7 @@ mod tests {
             BTreeMap::new(),
         )
         .expect("couldn't parse rules");
-        let error = parse_grok("an ungrokkable message", &rules, false).unwrap_err();
+        let error = parse_grok("an ungrokkable message", &rules).unwrap_err();
 
         assert_eq!(error, Error::NoMatch);
     }
@@ -408,7 +386,7 @@ mod tests {
             BTreeMap::new(),
         )
             .expect("couldn't parse rules");
-        let parsed = parse_grok("1 info message", &rules, false).unwrap();
+        let parsed = parse_grok("1 info message", &rules).unwrap();
 
         assert_eq!(
             parsed,
@@ -875,7 +853,7 @@ mod tests {
             },
         )
         .expect("couldn't parse rules");
-        let parsed = parse_grok("1 2", &rules, false).unwrap();
+        let parsed = parse_grok("1 2", &rules).unwrap();
 
         assert_eq!(
             parsed,
@@ -896,7 +874,7 @@ mod tests {
             },
         )
         .expect("couldn't parse rules");
-        let parsed = parse_grok("a 1", &rules, false).unwrap();
+        let parsed = parse_grok("a 1", &rules).unwrap();
 
         assert_eq!(
             parsed,

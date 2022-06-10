@@ -30,9 +30,11 @@ services:
       - humio
     volumes:
       - ${PWD}:/code
-      - cargogit:/usr/local/cargo/git
-      - cargoregistry:/usr/local/cargo/registry
+      - target:/code/target
+      - cargogit:/cargo/git
+      - cargoregistry:/cargo/registry
 
 volumes:
+  target: {}
   cargogit: {}
   cargoregistry: {}

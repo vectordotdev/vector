@@ -136,17 +136,6 @@ impl Function for Redact {
             _ => Ok(None),
         }
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let redactor = Redactor::Full;
-        let filters = args
-            .required_any("filters")
-            .downcast_ref::<Vec<Filter>>()
-            .unwrap();
-
-        Ok(redact(value, filters, &redactor))
-    }
 }
 
 //-----------------------------------------------------------------------------

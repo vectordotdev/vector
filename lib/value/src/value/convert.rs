@@ -34,6 +34,18 @@ impl Value {
         }
     }
 
+    /// Returns self as a `DateTime<Utc>`.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if self is anything other than `Value::Timestamp`.
+    pub fn as_timestamp_unwrap(&self) -> &DateTime<Utc> {
+        match self {
+            Value::Timestamp(ref timestamp) => timestamp,
+            _ => panic!("Tried to call `Value::as_timestamp_unwrap` on a non-timestamp value."),
+        }
+    }
+
     /// Returns self as a mutable `BTreeMap<String, Value>`.
     ///
     /// # Panics
@@ -110,6 +122,12 @@ impl Value {
             Value::Bytes(v) => Some(v),
             _ => None,
         }
+    }
+
+    /// Returns self as `Cow<str>`, only if self is `Value::Bytes`
+    pub fn as_str(&self) -> Option<Cow<'_, str>> {
+        self.as_bytes()
+            .map(|bytes| String::from_utf8_lossy(bytes.as_ref()))
     }
 
     /// Converts the Value into a byte representation regardless of its original type.

@@ -51,7 +51,7 @@ impl Encoder<Vec<LokiRecord>> for LokiBatchEncoder {
                 batch.encode()
             }
         };
-        writer.write(&body)
+        writer.write_all(&body).map(|()| body.len())
     }
 }
 

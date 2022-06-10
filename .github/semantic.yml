@@ -66,6 +66,7 @@ scopes:
   - setup # Anything related to setting up or installing Vector
   - shutdown # Anything related to the shutdown of Vector
   - sinks # Anything related to the Vector's sinks
+  - soak tests # Anything related to Vector's soak tests
   - sources # Anything related to the Vector's sources
   - startup # Anything related to the startup of Vector
   - templating # Anything related to templating Vector's configuration values

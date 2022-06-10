@@ -10,7 +10,7 @@ impl DisabledTrigger {
     }
 
     pub fn into_inner(mut self) -> Trigger {
-        self.trigger.take().unwrap()
+        self.trigger.take().unwrap_or_else(|| unreachable!())
     }
 }
 
