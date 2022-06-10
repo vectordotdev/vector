@@ -120,7 +120,7 @@ async fn config(
         timestamp_nanos_key: None,
         timestamp_key: Default::default(),
         endpoint_target: EndpointTarget::Event,
-        metadata: Default::default(),
+        splunk_metadata: Default::default(),
     }
 }
 
@@ -147,12 +147,12 @@ async fn splunk_insert_message() {
 #[tokio::test]
 async fn splunk_insert_raw_message() {
     let cx = SinkContext::new_test();
-    let mut metadata = HashMap::new();
+    let mut splunk_metadata = HashMap::new();
     metadata.insert("host".to_string(), Template::try_from("zork").unwrap());
 
     let config = HecLogsSinkConfig {
         endpoint_target: EndpointTarget::Raw,
-        metadata,
+        splunk_metadata,
         ..config(HecLogsEncoder::Text, vec![]).await
     };
     let (sink, _) = config.build(cx).await.unwrap();
