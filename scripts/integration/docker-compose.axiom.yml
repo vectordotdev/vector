@@ -9,7 +9,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
   axiom-db:
-    image: axiomhq/axiom-db:${AXIOM_VERSION:-1.20.1}
+    image: axiomhq/axiom-db:latest
     restart: unless-stopped
     environment:
       AXIOM_STORAGE: "file:///data"
@@ -17,7 +17,7 @@ services:
     depends_on:
       - postgres
   axiom-core:
-    image: axiomhq/axiom-core:${AXIOM_VERSION:-1.20.1}
+    image: axiomhq/axiom-core:latest
     restart: unless-stopped
     environment:
       AXIOM_POSTGRES_URL: "postgres://axiom:axiom@postgres?sslmode=disable&connect_timeout=5"
