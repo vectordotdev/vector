@@ -134,7 +134,7 @@ components: sinks: splunk_hec_logs: {
 			}
 		}
 		timestamp_key: {
-			common:      true
+			common:      false
 			description: """
 				The name of the log field to be used as the timestamp sent to Splunk HEC. This overrides the
 				[global `timestamp_key` option](\(urls.vector_configuration)/global-options#log_schema.timestamp_key).
