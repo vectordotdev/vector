@@ -27,7 +27,7 @@ async fn to_real_traces_endpoint() {
     let (batch, receiver) = BatchNotifier::new_with_receiver();
 
     let trace = vec![Event::Trace(
-        simple_trace_event().with_batch_notifier(&batch),
+        simple_trace_event("a_trace".to_string()).with_batch_notifier(&batch),
     )];
 
     let stream = map_event_batch_stream(stream::iter(trace), Some(batch));

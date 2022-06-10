@@ -34,7 +34,7 @@ impl Expression for IfStatement {
         let type_def = self.consequent.type_def(state);
 
         match &self.alternative {
-            None => type_def,
+            None => type_def.add_null(),
             Some(alternative) => type_def.merge_deep(alternative.type_def(state)),
         }
     }

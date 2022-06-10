@@ -144,7 +144,7 @@ fn handle_dd_trace_payload_v1(
             if let Some(k) = &api_key {
                 trace_event
                     .metadata_mut()
-                    .set_datadog_api_key(Some(Arc::clone(k)));
+                    .set_datadog_api_key(Arc::clone(k));
             }
             trace_event.insert(
                 source.log_schema_source_type_key,
@@ -245,7 +245,7 @@ fn handle_dd_trace_payload_v0(
             if let Some(k) = &api_key {
                 trace_event
                     .metadata_mut()
-                    .set_datadog_api_key(Some(Arc::clone(k)));
+                    .set_datadog_api_key(Arc::clone(k));
             }
             if let Some(lang) = lang {
                 trace_event.insert("language_name", lang.clone());

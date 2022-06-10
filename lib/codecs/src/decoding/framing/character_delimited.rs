@@ -3,6 +3,7 @@ use memchr::memchr;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Decoder;
 use tracing::{trace, warn};
+use vector_config::configurable_component;
 
 use super::BoxedFramingError;
 
@@ -28,7 +29,8 @@ impl CharacterDelimitedDecoderConfig {
 }
 
 /// Options for building a `CharacterDelimitedDecoder`.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[configurable_component]
+#[derive(Clone, Debug, PartialEq)]
 pub struct CharacterDelimitedDecoderOptions {
     /// The character that delimits byte sequences.
     #[serde(with = "vector_core::serde::ascii_char")]

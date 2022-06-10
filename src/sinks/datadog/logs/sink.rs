@@ -38,7 +38,7 @@ impl Partitioner for EventPartitioner {
     type Key = Option<Arc<str>>;
 
     fn partition(&self, item: &Self::Item) -> Self::Key {
-        item.metadata().datadog_api_key().clone()
+        item.metadata().datadog_api_key()
     }
 }
 

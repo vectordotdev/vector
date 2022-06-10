@@ -117,7 +117,7 @@ pub(crate) fn decode_log_body(
                             );
                             log.try_insert(path!(source.log_schema_timestamp_key), now);
                             if let Some(k) = &api_key {
-                                log.metadata_mut().set_datadog_api_key(Some(Arc::clone(k)));
+                                log.metadata_mut().set_datadog_api_key(Arc::clone(k));
                             }
 
                             log.metadata_mut()

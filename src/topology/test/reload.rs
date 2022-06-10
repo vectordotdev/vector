@@ -39,6 +39,7 @@ async fn topology_reuse_old_port() {
         ConsoleSinkConfig {
             target: Target::Stdout,
             encoding: EncodingConfig::from(StandardEncodings::Text).into(),
+            acknowledgements: Default::default(),
         },
     );
 
@@ -50,6 +51,7 @@ async fn topology_reuse_old_port() {
         ConsoleSinkConfig {
             target: Target::Stdout,
             encoding: EncodingConfig::from(StandardEncodings::Text).into(),
+            acknowledgements: Default::default(),
         },
     );
 
@@ -73,6 +75,7 @@ async fn topology_rebuild_old() {
         ConsoleSinkConfig {
             target: Target::Stdout,
             encoding: EncodingConfig::from(StandardEncodings::Text).into(),
+            acknowledgements: Default::default(),
         },
     );
 
@@ -84,6 +87,7 @@ async fn topology_rebuild_old() {
         ConsoleSinkConfig {
             target: Target::Stdout,
             encoding: EncodingConfig::from(StandardEncodings::Text).into(),
+            acknowledgements: Default::default(),
         },
     );
 
@@ -109,6 +113,7 @@ async fn topology_old() {
         ConsoleSinkConfig {
             target: Target::Stdout,
             encoding: EncodingConfig::from(StandardEncodings::Text).into(),
+            acknowledgements: Default::default(),
         },
     );
 

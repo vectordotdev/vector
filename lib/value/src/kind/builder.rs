@@ -2,34 +2,6 @@ use super::{Collection, Field, Index, Kind};
 
 // Initializer functions.
 impl Kind {
-    /// The "empty" type state.
-    ///
-    /// This represents a state in which "no type matches the given value". In regular use, this is
-    /// considered an invalid state caused by a programming error.
-    ///
-    /// It is useful for two purposes:
-    ///
-    /// 1. As extra validation to ensure such a state does not exist.
-    /// 2. As a starting point to build up a new `Kind` with a valid state.
-    ///
-    /// Note that all other public methods of `Kind` prevent this state from happening. For
-    /// example, the `remove_<state>` methods return an error if the to-be-removed state is the
-    /// last state type present in `Kind`.
-    #[must_use]
-    pub const fn empty() -> Self {
-        Self {
-            bytes: None,
-            integer: None,
-            float: None,
-            boolean: None,
-            timestamp: None,
-            regex: None,
-            null: None,
-            array: None,
-            object: None,
-        }
-    }
-
     /// The "any" type state.
     ///
     /// This state implies all states for the type are valid. There is no known information that
@@ -194,6 +166,22 @@ impl Kind {
             timestamp: None,
             regex: None,
             null: Some(()),
+            array: None,
+            object: None,
+        }
+    }
+
+    /// The "never" type state.
+    #[must_use]
+    pub const fn never() -> Self {
+        Self {
+            bytes: None,
+            integer: None,
+            float: None,
+            boolean: None,
+            timestamp: None,
+            regex: None,
+            null: None,
             array: None,
             object: None,
         }
@@ -368,176 +356,64 @@ impl Kind {
 impl Kind {
     /// Remove the `bytes` state from the type.
     ///
-    /// If the type already excluded this state, the function returns `Ok(false)`.
-    ///
-    /// # Errors
-    ///
-    /// If removing this state would leave an "empty" type, then the error variant is returned.
-    /// This was chosen, because when applying progressive type checking, there should _always_ be
-    /// at least one state for a given type, the "no state left for a type" variant is
-    /// a programming error.
-    pub fn remove_bytes(&mut self) -> Result<bool, EmptyKindError> {
-        if self.is_bytes() {
-            return Err(EmptyKindError);
-        }
-
-        Ok(self.bytes.take().is_none())
+    /// If the type previously included this state, true is returned.
+    pub fn remove_bytes(&mut self) -> bool {
+        self.bytes.take().is_some()
     }
 
     /// Remove the `integer` state from the type.
     ///
-    /// If the type already excluded this state, the function returns `Ok(false)`.
-    ///
-    /// # Errors
-    ///
-    /// If removing this state would leave an "empty" type, then the error variant is returned.
-    /// This was chosen, because when applying progressive type checking, there should _always_ be
-    /// at least one state for a given type, the "no state left for a type" variant is
-    /// a programming error.
-    pub fn remove_integer(&mut self) -> Result<bool, EmptyKindError> {
-        if self.is_integer() {
-            return Err(EmptyKindError);
-        }
-
-        Ok(self.integer.take().is_none())
+    /// If the type previously included this state, true is returned.
+    pub fn remove_integer(&mut self) -> bool {
+        self.integer.take().is_some()
     }
 
     /// Remove the `float` state from the type.
     ///
-    /// If the type already excluded this state, the function returns `Ok(false)`.
-    ///
-    /// # Errors
-    ///
-    /// If removing this state would leave an "empty" type, then the error variant is returned.
-    /// This was chosen, because when applying progressive type checking, there should _always_ be
-    /// at least one state for a given type, the "no state left for a type" variant is
-    /// a programming error.
-    pub fn remove_float(&mut self) -> Result<bool, EmptyKindError> {
-        if self.is_float() {
-            return Err(EmptyKindError);
-        }
-
-        Ok(self.float.take().is_none())
+    /// If the type previously included this state, true is returned.
+    pub fn remove_float(&mut self) -> bool {
+        self.float.take().is_some()
     }
 
     /// Remove the `boolean` state from the type.
     ///
-    /// If the type already excluded this state, the function returns `Ok(false)`.
-    ///
-    /// # Errors
-    ///
-    /// If removing this state would leave an "empty" type, then the error variant is returned.
-    /// This was chosen, because when applying progressive type checking, there should _always_ be
-    /// at least one state for a given type, the "no state left for a type" variant is
-    /// a programming error.
-    pub fn remove_boolean(&mut self) -> Result<bool, EmptyKindError> {
-        if self.is_boolean() {
-            return Err(EmptyKindError);
-        }
-
-        Ok(self.boolean.take().is_none())
+    /// If the type previously included this state, true is returned.
+    pub fn remove_boolean(&mut self) -> bool {
+        self.boolean.take().is_some()
     }
 
     /// Remove the `timestamp` state from the type.
     ///
-    /// If the type already excluded this state, the function returns `Ok(false)`.
-    ///
-    /// # Errors
-    ///
-    /// If removing this state would leave an "empty" type, then the error variant is returned.
-    /// This was chosen, because when applying progressive type checking, there should _always_ be
-    /// at least one state for a given type, the "no state left for a type" variant is
-    /// a programming error.
-    pub fn remove_timestamp(&mut self) -> Result<bool, EmptyKindError> {
-        if self.is_timestamp() {
-            return Err(EmptyKindError);
-        }
-
-        Ok(self.timestamp.take().is_none())
+    /// If the type previously included this state, true is returned.
+    pub fn remove_timestamp(&mut self) -> bool {
+        self.timestamp.take().is_some()
     }
 
     /// Remove the `regex` state from the type.
     ///
-    /// If the type already excluded this state, the function returns `Ok(false)`.
-    ///
-    /// # Errors
-    ///
-    /// If removing this state would leave an "empty" type, then the error variant is returned.
-    /// This was chosen, because when applying progressive type checking, there should _always_ be
-    /// at least one state for a given type, the "no state left for a type" variant is
-    /// a programming error.
-    pub fn remove_regex(&mut self) -> Result<bool, EmptyKindError> {
-        if self.is_regex() {
-            return Err(EmptyKindError);
-        }
-
-        Ok(self.regex.take().is_none())
+    /// If the type previously included this state, true is returned.
+    pub fn remove_regex(&mut self) -> bool {
+        self.regex.take().is_some()
     }
 
     /// Remove the `null` state from the type.
     ///
-    /// If the type already excluded this state, the function returns `Ok(false)`.
-    ///
-    /// # Errors
-    ///
-    /// If removing this state would leave an "empty" type, then the error variant is returned.
-    /// This was chosen, because when applying progressive type checking, there should _always_ be
-    /// at least one state for a given type, the "no state left for a type" variant is
-    /// a programming error.
-    pub fn remove_null(&mut self) -> Result<bool, EmptyKindError> {
-        if self.is_null() {
-            return Err(EmptyKindError);
-        }
-
-        Ok(self.null.take().is_none())
+    /// If the type previously included this state, true is returned.
+    pub fn remove_null(&mut self) -> bool {
+        self.null.take().is_some()
     }
 
     /// Remove the `array` state from the type.
     ///
-    /// If the type already excluded this state, the function returns `Ok(false)`.
-    ///
-    /// # Errors
-    ///
-    /// If removing this state would leave an "empty" type, then the error variant is returned.
-    /// This was chosen, because when applying progressive type checking, there should _always_ be
-    /// at least one state for a given type, the "no state left for a type" variant is
-    /// a programming error.
-    pub fn remove_array(&mut self) -> Result<bool, EmptyKindError> {
-        if self.is_array() {
-            return Err(EmptyKindError);
-        }
-
-        Ok(self.array.take().is_none())
+    /// If the type previously included this state, true is returned.
+    pub fn remove_array(&mut self) -> bool {
+        self.array.take().is_some()
     }
 
     /// Remove the `object` state from the type.
     ///
-    /// If the type already excluded this state, the function returns `Ok(false)`.
-    ///
-    /// # Errors
-    ///
-    /// If removing this state would leave an "empty" type, then the error variant is returned.
-    /// This was chosen, because when applying progressive type checking, there should _always_ be
-    /// at least one state for a given type, the "no state left for a type" variant is
-    /// a programming error.
-    pub fn remove_object(&mut self) -> Result<bool, EmptyKindError> {
-        if self.is_object() {
-            return Err(EmptyKindError);
-        }
-
-        Ok(self.object.take().is_none())
+    /// If the type previously included this state, true is returned.
+    pub fn remove_object(&mut self) -> bool {
+        self.object.take().is_some()
     }
 }
-
-/// The error triggered by any of [`Kind`]s `remove_*` methods, if the call to that method would
-/// leave the `Kind` in an empty state.
-#[derive(Debug)]
-pub struct EmptyKindError;
-
-impl std::fmt::Display for EmptyKindError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("invalid empty type state variant")
-    }
-}
-
-impl std::error::Error for EmptyKindError {}

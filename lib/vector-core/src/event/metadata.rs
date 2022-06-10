@@ -1,23 +1,30 @@
 #![deny(missing_docs)]
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
+use value::{Secrets, Value};
 use vector_common::EventDataEq;
 
 use super::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus};
 use crate::{schema, ByteSizeOf};
 
+const DATADOG_API_KEY: &str = "datadog_api_key";
+const SPLUNK_HEC_TOKEN: &str = "splunk_hec_token";
+
 /// The top-level metadata structure contained by both `struct Metric`
 /// and `struct LogEvent` types.
 #[derive(Clone, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
 pub struct EventMetadata {
-    /// Used to store the datadog API from sources to sinks
+    /// Arbitrary data stored with an event
+    #[serde(default = "default_metadata_value", skip)]
+    value: Value,
+
+    /// Storage for secrets
     #[serde(default, skip)]
-    datadog_api_key: Option<Arc<str>>,
-    /// Used to store the Splunk HEC auth token from sources to sinks
-    #[serde(default, skip)]
-    splunk_hec_token: Option<Arc<str>>,
+    secrets: Secrets,
+
     #[serde(default, skip)]
     finalizers: EventFinalizers,
 
@@ -29,33 +36,58 @@ pub struct EventMetadata {
     schema_definition: Arc<schema::Definition>,
 }
 
+fn default_metadata_value() -> Value {
+    Value::Object(BTreeMap::new())
+}
+
+/// Secret access functions
 impl EventMetadata {
+    /// Returns a reference to the metadata value
+    pub fn value(&self) -> &Value {
+        &self.value
+    }
+
+    /// Returns a mutable reference to the metadata value
+    pub fn value_mut(&mut self) -> &mut Value {
+        &mut self.value
+    }
+
+    /// Returns a reference to the secrets
+    pub fn secrets(&self) -> &Secrets {
+        &self.secrets
+    }
+
+    /// Returns a mutable reference to the secrets
+    pub fn secrets_mut(&mut self) -> &mut Secrets {
+        &mut self.secrets
+    }
+
     /// Return the datadog API key, if it exists
-    pub fn datadog_api_key(&self) -> &Option<Arc<str>> {
-        &self.datadog_api_key
+    pub fn datadog_api_key(&self) -> Option<Arc<str>> {
+        self.secrets.get(DATADOG_API_KEY).cloned()
     }
 
     /// Set the datadog API key to passed value
-    pub fn set_datadog_api_key(&mut self, key: Option<Arc<str>>) {
-        self.datadog_api_key = key;
+    pub fn set_datadog_api_key(&mut self, secret: Arc<str>) {
+        self.secrets.insert(DATADOG_API_KEY, secret);
     }
 
     /// Return the splunk hec token, if it exists
-    pub fn splunk_hec_token(&self) -> &Option<Arc<str>> {
-        &self.splunk_hec_token
+    pub fn splunk_hec_token(&self) -> Option<Arc<str>> {
+        self.secrets.get(SPLUNK_HEC_TOKEN).cloned()
     }
 
     /// Set the splunk hec token to passed value
-    pub fn set_splunk_hec_token(&mut self, token: Option<Arc<str>>) {
-        self.splunk_hec_token = token;
+    pub fn set_splunk_hec_token(&mut self, secret: Arc<str>) {
+        self.secrets.insert(SPLUNK_HEC_TOKEN, secret);
     }
 }
 
 impl Default for EventMetadata {
     fn default() -> Self {
         Self {
-            datadog_api_key: Default::default(),
-            splunk_hec_token: Default::default(),
+            value: Value::Object(BTreeMap::new()),
+            secrets: Secrets::new(),
             finalizers: Default::default(),
             schema_definition: default_schema_definition(),
         }
@@ -117,12 +149,7 @@ impl EventMetadata {
     /// If a Splunk HEC token is not set in `self`, the one from `other` will be used.
     pub fn merge(&mut self, other: Self) {
         self.finalizers.merge(other.finalizers);
-        if self.datadog_api_key.is_none() {
-            self.datadog_api_key = other.datadog_api_key;
-        }
-        if self.splunk_hec_token.is_none() {
-            self.splunk_hec_token = other.splunk_hec_token;
-        }
+        self.secrets.merge(other.secrets);
     }
 
     /// Update the finalizer(s) status.
@@ -193,5 +220,22 @@ impl<T> WithMetadata<T> {
             data: T1::from(self.data),
             metadata: self.metadata,
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    const SECRET: &str = "secret";
+    const SECRET2: &str = "secret2";
+
+    #[test]
+    fn get_set_secret() {
+        let mut metadata = EventMetadata::default();
+        metadata.set_datadog_api_key(Arc::from(SECRET));
+        metadata.set_splunk_hec_token(Arc::from(SECRET2));
+        assert_eq!(metadata.datadog_api_key().unwrap().as_ref(), SECRET);
+        assert_eq!(metadata.splunk_hec_token().unwrap().as_ref(), SECRET2);
     }
 }

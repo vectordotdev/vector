@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use bytes::Bytes;
 use chrono::Utc;
 use codecs::decoding::{DeserializerConfig, FramingConfig};
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use crate::{
     codecs::Decoder,
@@ -18,15 +18,39 @@ use crate::{
     SourceSender,
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Unix domain socket configuration for the `socket` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct UnixConfig {
+    /// The Unix socket path.
+    ///
+    /// This should be an absolute path.
     pub path: PathBuf,
+
+    /// Unix file mode bits to be applied to the unix socket file as its designated file permissions.
+    ///
+    /// Note that the file mode value can be specified in any numeric format supported by your configuration
+    /// language, but it is most intuitive to use an octal number.
     pub socket_file_mode: Option<u32>,
+
+    /// The maximum buffer size, in bytes, of incoming messages.
+    ///
+    /// Messages larger than this are truncated.
     pub max_length: Option<usize>,
+
+    /// Overrides the name of the log field used to add the peer host to each event.
+    ///
+    /// The value will be the socket path itself.
+    ///
+    /// By default, the [global `host_key` option](https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key) is used.pub host_key: Option<String>,
     pub host_key: Option<String>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub framing: Option<FramingConfig>,
+
+    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     pub decoding: DeserializerConfig,
 }

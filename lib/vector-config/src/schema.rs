@@ -1,7 +1,6 @@
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, mem};
 
 use indexmap::IndexMap;
-use num_traits::{Bounded, ToPrimitive};
 use schemars::{
     gen::{SchemaGenerator, SchemaSettings},
     schema::{
@@ -10,9 +9,8 @@ use schemars::{
     },
 };
 use serde_json::{Map, Value};
-use vector_config_common::num::{NUMERIC_ENFORCED_LOWER_BOUND, NUMERIC_ENFORCED_UPPER_BOUND};
 
-use crate::{Configurable, Metadata};
+use crate::{num::ConfigurableNumber, Configurable, Metadata};
 
 /// Finalizes the schema by ensuring all metadata is applied and registering it in the generator.
 ///
@@ -63,9 +61,6 @@ pub fn apply_metadata<'de, T>(schema: &mut SchemaObject, metadata: Metadata<'de,
 where
     T: Configurable<'de>,
 {
-    // TODO: apply validations here depending on the instance type(s) in the schema, and figure out how to split, or if
-    // we need to split, whether we apply validations to the referencable type and/or the actual mutable schema ref
-
     // Figure out if we're applying metadata to a schema reference or the actual schema itself.
     // Some things only makes sense to add to the reference (like a default value to use), while
     // some things only make sense to add to the schema itself (like custom metadata, validation,
@@ -115,6 +110,26 @@ where
     schema.metadata = Some(Box::new(schema_metadata));
 }
 
+pub fn convert_to_flattened_schema(primary: &mut SchemaObject, mut subschemas: Vec<SchemaObject>) {
+    // Now we need to extract our object validation portion into a new schema object, add it to the list of subschemas,
+    // and then update the primary schema to use `allOf`. It is not valid to "extend" a schema via `allOf`, hence why we
+    // have to extract the primary schema object validation first.
+
+    // First, we replace the primary schema with an empty schema, because we need to push it the actual primary schema
+    // into the list of `allOf` schemas. This is due to the fact that it's not valid to "extend" a schema using `allOf`,
+    // so everything has to be in there.
+    let primary_subschema = mem::take(primary);
+    subschemas.insert(0, primary_subschema);
+
+    let all_of_schemas = subschemas.into_iter().map(Schema::Object).collect();
+
+    // Now update the primary schema to use `allOf` to bring everything together.
+    primary.subschemas = Some(Box::new(SubschemaValidation {
+        all_of: Some(all_of_schemas),
+        ..Default::default()
+    }));
+}
+
 pub fn generate_null_schema() -> SchemaObject {
     SchemaObject {
         instance_type: Some(InstanceType::Null.into()),
@@ -138,36 +153,14 @@ pub fn generate_string_schema() -> SchemaObject {
 
 pub fn generate_number_schema<'de, N>() -> SchemaObject
 where
-    N: Configurable<'de> + Bounded + ToPrimitive,
+    N: Configurable<'de> + ConfigurableNumber,
 {
-    // Calculate the minimum/maximum for the given `N`, respecting the 2^53 limit we put on each of those values.
-    let (minimum, maximum) = {
-        let enforced_minimum = NUMERIC_ENFORCED_LOWER_BOUND;
-        let enforced_maximum = NUMERIC_ENFORCED_UPPER_BOUND;
-        let mechanical_minimum = N::min_value()
-            .to_f64()
-            .expect("`Configurable` does not support numbers larger than an f64 representation");
-        let mechanical_maximum = N::max_value()
-            .to_f64()
-            .expect("`Configurable` does not support numbers larger than an f64 representation");
+    let minimum = N::get_enforced_min_bound();
+    let maximum = N::get_enforced_max_bound();
 
-        let calculated_minimum = if mechanical_minimum < enforced_minimum {
-            enforced_minimum
-        } else {
-            mechanical_minimum
-        };
-
-        let calculated_maximum = if mechanical_maximum > enforced_maximum {
-            enforced_maximum
-        } else {
-            mechanical_maximum
-        };
-
-        (calculated_minimum, calculated_maximum)
-    };
-
-    // We always set the minimum/maximum bound to the mechanical limits
-    SchemaObject {
+    // We always set the minimum/maximum bound to the mechanical limits. Any additional constraining as part of field
+    // validators will overwrite these limits.
+    let mut schema = SchemaObject {
         instance_type: Some(InstanceType::Number.into()),
         number: Some(Box::new(NumberValidation {
             minimum: Some(minimum),
@@ -175,7 +168,22 @@ where
             ..Default::default()
         })),
         ..Default::default()
+    };
+
+    // If the actual numeric type we're generating the schema for is a nonzero variant, and its constraint can't be
+    // represently solely by the normal minimum/maximum bounds, we explicitly add an exclusion for the appropriate zero
+    // value of the given numeric type.
+    if N::requires_nonzero_exclusion() {
+        schema.subschemas = Some(Box::new(SubschemaValidation {
+            not: Some(Box::new(Schema::Object(SchemaObject {
+                const_value: Some(Value::Number(N::get_encoded_zero_value())),
+                ..Default::default()
+            }))),
+            ..Default::default()
+        }));
     }
+
+    schema
 }
 
 pub fn generate_array_schema<'de, T>(
@@ -192,6 +200,27 @@ where
         instance_type: Some(InstanceType::Array.into()),
         array: Some(Box::new(ArrayValidation {
             items: Some(SingleOrVec::Single(Box::new(element_schema.into()))),
+            ..Default::default()
+        })),
+        ..Default::default()
+    }
+}
+
+pub fn generate_set_schema<'de, T>(
+    gen: &mut SchemaGenerator,
+    metadata: Metadata<'de, T>,
+) -> SchemaObject
+where
+    T: Configurable<'de>,
+{
+    // We generate the schema for `T` itself, and then apply any of `T`'s metadata to the given schema.
+    let element_schema = T::generate_schema(gen, metadata);
+
+    SchemaObject {
+        instance_type: Some(InstanceType::Array.into()),
+        array: Some(Box::new(ArrayValidation {
+            items: Some(SingleOrVec::Single(Box::new(element_schema.into()))),
+            unique_items: Some(true),
             ..Default::default()
         })),
         ..Default::default()
@@ -319,6 +348,16 @@ pub fn generate_const_string_schema(value: String) -> SchemaObject {
         const_value: Some(Value::String(value)),
         ..Default::default()
     }
+}
+
+pub fn generate_internal_tagged_variant_schema(tag: String, value: String) -> SchemaObject {
+    let mut properties = IndexMap::new();
+    properties.insert(tag.clone(), generate_const_string_schema(value));
+
+    let mut required = BTreeSet::new();
+    required.insert(tag);
+
+    generate_struct_schema(properties, required, None)
 }
 
 pub fn generate_root_schema<'de, T>() -> RootSchema

@@ -332,9 +332,7 @@ pub(crate) fn decode_ddseries_v2(
         })
         .map(|mut metric| {
             if let Some(k) = &api_key {
-                metric
-                    .metadata_mut()
-                    .set_datadog_api_key(Some(Arc::clone(k)));
+                metric.metadata_mut().set_datadog_api_key(Arc::clone(k));
             }
             metric
                 .metadata_mut()
@@ -461,9 +459,7 @@ fn into_vector_metric(
     .into_iter()
     .map(|mut metric| {
         if let Some(k) = &api_key {
-            metric
-                .metadata_mut()
-                .set_datadog_api_key(Some(Arc::clone(k)));
+            metric.metadata_mut().set_datadog_api_key(Arc::clone(k));
         }
 
         metric
@@ -520,9 +516,7 @@ pub(crate) fn decode_ddsketch(
                         .with_tags(Some(tags.clone()))
                         .with_timestamp(Some(Utc.timestamp(sketch.ts, 0)));
                 if let Some(k) = &api_key {
-                    metric
-                        .metadata_mut()
-                        .set_datadog_api_key(Some(Arc::clone(k)));
+                    metric.metadata_mut().set_datadog_api_key(Arc::clone(k));
                 }
 
                 metric
