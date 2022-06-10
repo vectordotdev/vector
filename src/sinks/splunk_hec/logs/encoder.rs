@@ -123,10 +123,10 @@ impl Encoder<Vec<HecProcessedEvent>> for HecLogsEncoder {
                 let mut bytes = BytesMut::new();
                 let serializer = encoder.serializer();
 
-                match processed_event.metadata.endpoint_target {
+                match metadata.endpoint_target {
                     EndpointTarget::Raw => {
                         if serializer.supports_json() {
-                            match serde_json::to_vec(&log) {
+                            match serde_json::to_vec(&event) {
                                 Ok(value) => Some(value),
                                 Err(error) => {
                                     emit!(SplunkEventEncodeError { error });
@@ -134,8 +134,8 @@ impl Encoder<Vec<HecProcessedEvent>> for HecLogsEncoder {
                                 }
                             }
                         } else {
-                            log.get(log_schema().message_key())
-                                .map(|v| v.coerce_to_bytes().as_ref().to_vec())
+                            encoder.encode(event, &mut bytes).ok()?;
+                            Some(bytes.to_vec())
                         }
                     }
                     EndpointTarget::Event => {
