@@ -64,14 +64,6 @@ impl Function for Find {
             from,
         }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let pattern = args.required("pattern");
-        let from = args.optional("from");
-
-        find(value, pattern, from)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -181,7 +173,7 @@ mod tests {
 
         wrong_pattern {
             args: func_args![value: "foobar", pattern: Value::Integer(42)],
-            want: Err("expected regex or string, got integer"),
+            want: Err("expected string or regex, got integer"),
             tdef: TypeDef::integer().infallible(),
         }
     ];

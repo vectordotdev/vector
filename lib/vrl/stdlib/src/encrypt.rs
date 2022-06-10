@@ -212,14 +212,6 @@ impl Function for Encrypt {
             iv,
         }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let plaintext = args.required("plaintext");
-        let algorithm = args.required("algorithm");
-        let key = args.required("key");
-        let iv = args.required("iv");
-        encrypt(plaintext, algorithm, key, iv)
-    }
 }
 
 #[derive(Debug, Clone)]

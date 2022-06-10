@@ -10,11 +10,11 @@ use goauth::{
 };
 use hyper::header::AUTHORIZATION;
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
 use smpl_jwt::Jwt;
 use snafu::{ResultExt, Snafu};
 use tokio::time::Instant;
 use tokio_stream::wrappers::IntervalStream;
+use vector_config::configurable_component;
 
 use crate::{config::ProxyConfig, http::HttpClient, http::HttpError};
 
@@ -52,9 +52,34 @@ pub enum GcpError {
     BuildHttpClient { source: HttpError },
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+/// Configuration of the authentication strategy for interacting with GCP services.
+// TODO: We're duplicating the "either this or that" verbiage for each field because this struct gets flattened into the
+// component config types, which means all that's carried over are the fields, not the type itself.
+//
+// Seems like we really really have it as a nested field -- i.e. `auth.api_key` -- which is a closer fit to how we do
+// similar things in configuration (TLS, framing, decoding, etc.). Doing so would let us embed the type itself, and
+// hoist up the common documentation bits to the docs for the type rather than the fields.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
 pub struct GcpAuthConfig {
+    /// An API key. ([documentation](https://cloud.google.com/docs/authentication/api-keys))
+    ///
+    /// Either an API key, or a path to a service account credentials JSON file can be specified.
+    ///
+    /// If both are unset, Vector checks the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename. If no
+    /// filename is named, Vector will attempt to fetch an instance service account for the compute instance the program is
+    /// running on. If Vector is not running on a GCE instance, then you must define eith an API key or service account
+    /// credentials JSON file.
     pub api_key: Option<String>,
+
+    /// Path to a service account credentials JSON file. ([documentation](https://cloud.google.com/docs/authentication/production#manually))
+    ///
+    /// Either an API key, or a path to a service account credentials JSON file can be specified.
+    ///
+    /// If both are unset, Vector checks the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename. If no
+    /// filename is named, Vector will attempt to fetch an instance service account for the compute instance the program is
+    /// running on. If Vector is not running on a GCE instance, then you must define eith an API key or service account
+    /// credentials JSON file.
     pub credentials_path: Option<String>,
 }
 
@@ -83,10 +108,7 @@ struct Inner {
 impl GcpCredentials {
     async fn from_file(path: &str, scope: Scope) -> crate::Result<Self> {
         let creds = Credentials::from_file(path).context(InvalidCredentialsSnafu)?;
-        let jwt = make_jwt(&creds, &scope)?;
-        let token = goauth::get_token(&jwt, &creds)
-            .await
-            .context(GetTokenSnafu)?;
+        let token = fetch_token(&creds, &scope).await?;
         Ok(Self(Arc::new(Inner {
             creds: Some(creds),
             scope,
@@ -116,10 +138,7 @@ impl GcpCredentials {
 
     async fn regenerate_token(&self) -> crate::Result<()> {
         let token = match &self.0.creds {
-            Some(creds) => {
-                let jwt = make_jwt(creds, &self.0.scope).unwrap(); // Errors caught above
-                goauth::get_token(&jwt, creds).await?
-            }
+            Some(creds) => fetch_token(creds, &self.0.scope).await?,
             None => get_token_implicit().await?,
         };
         *self.0.token.write().unwrap() = token;
@@ -151,7 +170,25 @@ impl GcpCredentials {
     }
 }
 
+async fn fetch_token(creds: &Credentials, scope: &Scope) -> crate::Result<Token> {
+    let claims = JwtClaims::new(creds.iss(), scope, creds.token_uri(), None, None);
+    let rsa_key = creds.rsa_key().context(InvalidRsaKeySnafu)?;
+    let jwt = Jwt::new(claims, rsa_key, None);
+
+    debug!(
+        message = "Fetching GCP authentication token.",
+        project = ?creds.project(),
+        iss = ?creds.iss(),
+        token_uri = ?creds.token_uri(),
+    );
+    goauth::get_token(&jwt, creds)
+        .await
+        .context(GetTokenSnafu)
+        .map_err(Into::into)
+}
+
 async fn get_token_implicit() -> Result<Token, GcpError> {
+    debug!("Fetching implicit GCP authentication token.");
     let req = http::Request::get(SERVICE_ACCOUNT_TOKEN_URL)
         .header("Metadata-Flavor", "Google")
         .body(hyper::Body::empty())
@@ -177,12 +214,6 @@ async fn get_token_implicit() -> Result<Token, GcpError> {
             Err(_) => GcpError::TokenJsonFromStr { source: error },
         }),
     }
-}
-
-fn make_jwt(creds: &Credentials, scope: &Scope) -> crate::Result<Jwt<JwtClaims>> {
-    let claims = JwtClaims::new(creds.iss(), scope, creds.token_uri(), None, None);
-    let rsa_key = creds.rsa_key().context(InvalidRsaKeySnafu)?;
-    Ok(Jwt::new(claims, rsa_key, None))
 }
 
 #[cfg(test)]

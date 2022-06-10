@@ -79,13 +79,6 @@ impl Function for FormatInt {
             },
         ]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let base = args.optional("base");
-
-        format_int(value, base)
-    }
 }
 
 #[derive(Clone, Debug)]

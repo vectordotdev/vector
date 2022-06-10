@@ -24,7 +24,7 @@ mod integration_test {
 
     use crate::{
         event::Value,
-        kafka::{KafkaAuthConfig, KafkaCompression, KafkaSaslConfig, KafkaTlsConfig},
+        kafka::{KafkaAuthConfig, KafkaCompression, KafkaSaslConfig},
         sinks::{
             kafka::{
                 config::{KafkaRole, KafkaSinkConfig},
@@ -37,8 +37,11 @@ mod integration_test {
             },
             VectorSink,
         },
-        test_util::{components, random_lines_with_stream, random_string, wait_for},
-        tls::TlsConfig,
+        test_util::{
+            components::{run_and_assert_sink_compliance, SINK_TAGS},
+            random_lines_with_stream, random_string, wait_for,
+        },
+        tls::{TlsConfig, TlsEnableableConfig},
     };
 
     fn kafka_host() -> String {
@@ -203,7 +206,7 @@ mod integration_test {
         kafka_happy_path(
             kafka_address(9092),
             None,
-            Some(KafkaTlsConfig {
+            Some(TlsEnableableConfig {
                 enabled: Some(true),
                 options: TlsConfig::test_config(),
             }),
@@ -218,7 +221,7 @@ mod integration_test {
         kafka_happy_path(
             kafka_address(9092),
             None,
-            Some(KafkaTlsConfig {
+            Some(TlsEnableableConfig {
                 enabled: Some(true),
                 options: TlsConfig::test_config(),
             }),
@@ -247,7 +250,7 @@ mod integration_test {
     async fn kafka_happy_path(
         server: String,
         sasl: Option<KafkaSaslConfig>,
-        tls: Option<KafkaTlsConfig>,
+        tls: Option<TlsEnableableConfig>,
         compression: KafkaCompression,
     ) {
         let topic = format!("test-{}", random_string(10));
@@ -291,9 +294,7 @@ mod integration_test {
             });
             events
         });
-        components::init_test();
-        sink.run(input_events).await.unwrap();
-        components::SINK_TESTS.assert(&["protocol"]);
+        run_and_assert_sink_compliance(sink, input_events, &SINK_TAGS).await;
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         // read back everything from the beginning

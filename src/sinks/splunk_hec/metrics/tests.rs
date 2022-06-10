@@ -78,9 +78,7 @@ fn get_processed_event(
 
 fn get_event_with_token(token: &str) -> Event {
     let mut event = Event::from(get_counter());
-    event
-        .metadata_mut()
-        .set_splunk_hec_token(Some(Arc::from(token)));
+    event.metadata_mut().set_splunk_hec_token(Arc::from(token));
     event
 }
 

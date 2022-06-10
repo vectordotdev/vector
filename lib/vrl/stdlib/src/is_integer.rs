@@ -46,10 +46,6 @@ impl Function for IsInteger {
 
         Ok(Box::new(IsIntegerFn { value }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        Ok(value!(args.required("value").is_integer()))
-    }
 }
 
 #[derive(Clone, Debug)]

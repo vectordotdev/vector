@@ -34,6 +34,7 @@ impl From<Compression> for Writer {
 
 impl io::Write for Writer {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        #[allow(clippy::disallowed_method)] // Caller handles the result of `write`.
         match self {
             Writer::Plain(inner_buf) => inner_buf.write(buf),
             Writer::Gzip(writer) => writer.write(buf),
@@ -118,6 +119,7 @@ impl Compressor {
 
 impl io::Write for Compressor {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        #[allow(clippy::disallowed_method)] // Caller handles the result of `write`.
         self.inner.write(buf)
     }
 

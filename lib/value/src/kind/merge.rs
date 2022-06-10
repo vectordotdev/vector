@@ -164,6 +164,23 @@ mod tests {
             },
         ) in HashMap::from([
             (
+                "object field with unknown",
+                TestCase {
+                    this: Kind::object(Collection::any()),
+                    other: Kind::object(BTreeMap::from([("x".into(), Kind::integer())])),
+                    strategy: Strategy {
+                        depth: Depth::Deep,
+                        indices: Indices::Keep,
+                    },
+                    merged: {
+                        let mut collection =
+                            Collection::from(BTreeMap::from([("x".into(), Kind::any())]));
+                        collection.set_unknown(Kind::any());
+                        Kind::object(collection)
+                    },
+                },
+            ),
+            (
                 "primitives shallow",
                 TestCase {
                     this: Kind::bytes(),

@@ -1,4 +1,5 @@
 use darling::error::Accumulator;
+use quote::spanned::Spanned;
 use serde_derive_internals::{attr as serde_attr, Ctxt};
 use syn::{Attribute, ExprPath, Lit, Meta, MetaNameValue};
 
@@ -77,7 +78,7 @@ pub fn get_default_exprpath() -> ExprPath {
         .expect("expression path for default should never be invalid")
 }
 
-pub fn err_field_missing_description(field: &syn::Field) -> darling::Error {
+pub fn err_field_missing_description<T: Spanned>(field: &T) -> darling::Error {
     darling::Error::custom(ERR_FIELD_MISSING_DESCRIPTION).with_span(field)
 }
 

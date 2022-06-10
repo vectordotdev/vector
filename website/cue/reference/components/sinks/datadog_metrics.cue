@@ -59,16 +59,16 @@ components: sinks: datadog_metrics: {
 		region:   sinks._datadog.configuration.region
 		site:     sinks._datadog.configuration.site
 		default_namespace: {
-			common: true
+			common: false
 			description: """
 				Used as a namespace for metrics that don't have it.
-				A namespace will be prefixed to a metric's name.
+				A namespace will be prefixed to a metric's name separated by `.`.
 				"""
 			required: false
 			warnings: []
 			type: string: {
 				default: null
-				examples: ["service"]
+				examples: ["myservice"]
 			}
 		}
 	}

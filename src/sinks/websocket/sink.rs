@@ -370,7 +370,10 @@ mod tests {
         config::{SinkConfig, SinkContext},
         event::{Event, Value as EventValue},
         sinks::util::encoding::StandardEncodings,
-        test_util::{next_addr, random_lines_with_stream, trace_init, CountReceiver},
+        test_util::{
+            components::{run_and_assert_sink_compliance, SINK_TAGS},
+            next_addr, random_lines_with_stream, trace_init, CountReceiver,
+        },
         tls::{self, TlsConfig, TlsEnableableConfig},
     };
 
@@ -487,7 +490,7 @@ mod tests {
         let (sink, _healthcheck) = config.build(context).await.unwrap();
 
         let (lines, events) = random_lines_with_stream(10, 100, None);
-        sink.run(events).await.unwrap();
+        run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
 
         receiver.connected().await;
 

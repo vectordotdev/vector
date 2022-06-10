@@ -130,12 +130,12 @@ async fn api_key_in_metadata() {
     let events = events.map(|mut events| {
         events.for_each_log(|log| {
             log.metadata_mut()
-                .set_datadog_api_key(Some(Arc::from("from_metadata")));
+                .set_datadog_api_key(Arc::from("from_metadata"));
         });
         events
     });
 
-    components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
+    components::run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
     let output = rx.take(expected.len()).collect::<Vec<_>>().await;
 
     for (i, val) in output.iter().enumerate() {

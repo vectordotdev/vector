@@ -1,8 +1,8 @@
-use std::{collections::BTreeMap, convert::TryFrom, marker::PhantomData, sync::Arc};
+use std::{collections::BTreeMap, convert::TryFrom, marker::PhantomData};
 
 use lookup::{LookupBuf, SegmentBuf};
 use snafu::Snafu;
-use vrl_lib::{prelude::VrlValueConvert, ProgramInfo};
+use vrl_lib::{prelude::VrlValueConvert, MetadataTarget, ProgramInfo, SecretTarget};
 
 use super::{Event, EventMetadata, LogEvent, Metric, MetricKind, TraceEvent, Value};
 use crate::config::log_schema;
@@ -145,13 +145,28 @@ impl VrlTarget {
             VrlTarget::Metric { metric, .. } => TargetEvents::One(Event::Metric(metric)),
         }
     }
+
+    fn metadata(&self) -> &EventMetadata {
+        match self {
+            VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
+            VrlTarget::Metric { metric, .. } => metric.metadata(),
+        }
+    }
+
+    fn metadata_mut(&mut self) -> &mut EventMetadata {
+        match self {
+            VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
+            VrlTarget::Metric { metric, .. } => metric.metadata_mut(),
+        }
+    }
 }
 
 impl vrl_lib::Target for VrlTarget {
     fn target_insert(&mut self, path: &LookupBuf, value: ::value::Value) -> Result<(), String> {
         match self {
             VrlTarget::LogEvent(ref mut log, _) | VrlTarget::Trace(ref mut log, _) => {
-                log.target_insert(path, value)
+                log.insert_by_path(path, value);
+                Ok(())
             }
             VrlTarget::Metric {
                 ref mut metric,
@@ -224,14 +239,14 @@ impl vrl_lib::Target for VrlTarget {
     #[allow(clippy::redundant_closure_for_method_calls)] // false positive
     fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
         match self {
-            VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => log.target_get(path),
+            VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => Ok(log.get_by_path(path)),
             VrlTarget::Metric { value, .. } => target_get_metric(path, value),
         }
     }
 
     fn target_get_mut(&mut self, path: &LookupBuf) -> Result<Option<&mut Value>, String> {
         match self {
-            VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => log.target_get_mut(path),
+            VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => Ok(log.get_by_path_mut(path)),
             VrlTarget::Metric { value, .. } => target_get_mut_metric(path, value),
         }
     }
@@ -243,7 +258,7 @@ impl vrl_lib::Target for VrlTarget {
     ) -> Result<Option<::value::Value>, String> {
         match self {
             VrlTarget::LogEvent(ref mut log, _) | VrlTarget::Trace(ref mut log, _) => {
-                log.target_remove(path, compact)
+                Ok(log.remove_by_path(path, compact))
             }
             VrlTarget::Metric {
                 ref mut metric,
@@ -281,153 +296,36 @@ impl vrl_lib::Target for VrlTarget {
             }
         }
     }
+}
 
-    fn get_metadata(&self, key: &str) -> Result<Option<::value::Value>, String> {
-        let metadata = match self {
-            VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
-            VrlTarget::Metric { metric, .. } => metric.metadata(),
-        };
-
-        match key {
-            "datadog_api_key" => Ok(metadata
-                .datadog_api_key()
-                .as_ref()
-                .map(|api_key| ::value::Value::from(api_key.to_string()))),
-            "splunk_hec_token" => Ok(metadata
-                .splunk_hec_token()
-                .as_ref()
-                .map(|token| ::value::Value::from(token.to_string()))),
-            _ => Err(format!("key {} not available", key)),
-        }
+impl MetadataTarget for VrlTarget {
+    fn get_metadata(&self, path: &LookupBuf) -> Result<Option<::value::Value>, String> {
+        let value = self.metadata().value().get_by_path(path).cloned();
+        Ok(value)
     }
 
-    fn set_metadata(&mut self, key: &str, value: String) -> Result<(), String> {
-        let metadata = match self {
-            VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
-            VrlTarget::Metric { metric, .. } => metric.metadata_mut(),
-        };
-
-        match key {
-            "datadog_api_key" => {
-                metadata.set_datadog_api_key(Some(Arc::from(value.as_str())));
-                Ok(())
-            }
-            "splunk_hec_token" => {
-                metadata.set_splunk_hec_token(Some(Arc::from(value.as_str())));
-                Ok(())
-            }
-            _ => Err(format!("key {} not available", key)),
-        }
+    fn set_metadata(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
+        self.metadata_mut().value_mut().insert_by_path(path, value);
+        Ok(())
     }
 
-    fn remove_metadata(&mut self, key: &str) -> Result<(), String> {
-        let metadata = match self {
-            VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
-            VrlTarget::Metric { metric, .. } => metric.metadata_mut(),
-        };
-
-        match key {
-            "datadog_api_key" => {
-                metadata.set_datadog_api_key(None);
-                Ok(())
-            }
-            "splunk_hec_token" => {
-                metadata.set_splunk_hec_token(None);
-                Ok(())
-            }
-            _ => Err(format!("key {} not available", key)),
-        }
+    fn remove_metadata(&mut self, path: &LookupBuf) -> Result<(), String> {
+        self.metadata_mut().value_mut().remove_by_path(path, true);
+        Ok(())
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum VrlImmutableTarget<'a> {
-    LogEvent(&'a Value, &'a EventMetadata),
-    Metric { metric: &'a Metric, value: Value },
-    Trace(&'a Value, &'a EventMetadata),
-}
-
-impl<'a> VrlImmutableTarget<'a> {
-    pub fn new(event: &'a Event, info: &ProgramInfo) -> Self {
-        match event {
-            Event::Log(event) => {
-                let value = event.value();
-                let metadata = event.metadata();
-
-                VrlImmutableTarget::LogEvent(value, metadata)
-            }
-            Event::Metric(metric) => {
-                // We pre-generate [`Value`] types for the metric fields accessed in
-                // the event. This allows us to then return references to those
-                // values, even if the field is accessed more than once.
-                let value = precompute_metric_value(metric, info);
-
-                VrlImmutableTarget::Metric { metric, value }
-            }
-            Event::Trace(event) => {
-                let value = event.value();
-                let metadata = event.metadata();
-
-                VrlImmutableTarget::Trace(value, metadata)
-            }
-        }
-    }
-}
-
-impl<'a> vrl_lib::Target for VrlImmutableTarget<'a> {
-    fn target_insert(&mut self, _path: &LookupBuf, _value: ::value::Value) -> Result<(), String> {
-        Err("cannot modify immutable target".to_string())
+impl SecretTarget for VrlTarget {
+    fn get_secret(&self, key: &str) -> Option<&str> {
+        self.metadata().secrets().get_secret(key)
     }
 
-    #[allow(clippy::redundant_closure_for_method_calls)] // false positive
-    fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
-        match self {
-            VrlImmutableTarget::LogEvent(log, _) | VrlImmutableTarget::Trace(log, _) => {
-                log.target_get(path)
-            }
-            VrlImmutableTarget::Metric { value, .. } => target_get_metric(path, value),
-        }
+    fn insert_secret(&mut self, key: &str, value: &str) {
+        self.metadata_mut().secrets_mut().insert_secret(key, value);
     }
 
-    fn target_get_mut(&mut self, _path: &LookupBuf) -> Result<Option<&mut Value>, String> {
-        Err("cannot modify immutable target".to_string())
-    }
-
-    fn target_remove(
-        &mut self,
-        _path: &LookupBuf,
-        _compact: bool,
-    ) -> Result<Option<::value::Value>, String> {
-        Err("cannot modify immutable target".to_string())
-    }
-
-    fn get_metadata(&self, key: &str) -> Result<Option<::value::Value>, String> {
-        let metadata = match self {
-            VrlImmutableTarget::LogEvent(_, metadata) | VrlImmutableTarget::Trace(_, metadata) => {
-                metadata
-            }
-            VrlImmutableTarget::Metric { metric, .. } => metric.metadata(),
-        };
-
-        match key {
-            "datadog_api_key" => Ok(metadata
-                .datadog_api_key()
-                .as_ref()
-                .map(|api_key| ::value::Value::from(api_key.to_string()))),
-            "splunk_hec_token" => Ok(metadata
-                .splunk_hec_token()
-                .as_ref()
-                .map(|token| ::value::Value::from(token.to_string()))),
-            _ => Err(format!("key {} not available", key)),
-        }
-    }
-
-    fn set_metadata(&mut self, _key: &str, _value: String) -> Result<(), String> {
-        Err("cannot modify immutable target".to_string())
-    }
-
-    fn remove_metadata(&mut self, _key: &str) -> Result<(), String> {
-        Err("cannot modify immutable target".to_string())
+    fn remove_secret(&mut self, key: &str) {
+        self.metadata_mut().secrets_mut().remove_secret(key);
     }
 }
 

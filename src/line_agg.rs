@@ -14,53 +14,58 @@ use bytes::{Bytes, BytesMut};
 use futures::{Stream, StreamExt};
 use pin_project::pin_project;
 use regex::bytes::Regex;
-use serde::{Deserialize, Serialize};
 use tokio_util::time::delay_queue::{DelayQueue, Key};
+use vector_config::configurable_component;
 
-/// The mode of operation of the line aggregator.
-#[derive(Debug, Hash, Clone, Copy, PartialEq, Deserialize, Serialize)]
+/// Mode of operation of the line aggregator.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Hash, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum Mode {
     /// All consecutive lines matching this pattern are included in the group.
-    /// The first line (the line that matched the start pattern) does not need
-    /// to match the `ContinueThrough` pattern.
-    /// This is useful in cases such as a Java stack trace, where some indicator
-    /// in the line (such as leading whitespace) indicates that it is an
-    /// extension of the proceeding line.
+    ///
+    /// The first line (the line that matched the start pattern) does not need to match the `ContinueThrough` pattern.
+    ///
+    /// This is useful in cases such as a Java stack trace, where some indicator in the line (such as leading
+    /// whitespace) indicates that it is an extension of the proceeding line.
     ContinueThrough,
 
-    /// All consecutive lines matching this pattern, plus one additional line,
-    /// are included in the group.
-    /// This is useful in cases where a log message ends with a continuation
-    /// marker, such as a backslash, indicating that the following line is part
-    /// of the same message.
+    /// All consecutive lines matching this pattern, plus one additional line, are included in the group.
+    ///
+    /// This is useful in cases where a log message ends with a continuation marker, such as a backslash, indicating
+    /// that the following line is part of the same message.
     ContinuePast,
 
-    /// All consecutive lines not matching this pattern are included in the
-    /// group.
-    /// This is useful where a log line contains a marker indicating that it
-    /// begins a new message.
+    /// All consecutive lines not matching this pattern are included in the group.
+    ///
+    /// This is useful where a log line contains a marker indicating that it begins a new message.
     HaltBefore,
 
-    /// All consecutive lines, up to and including the first line matching this
-    /// pattern, are included in the group.
-    /// This is useful where a log line ends with a termination marker, such as
-    /// a semicolon.
+    /// All consecutive lines, up to and including the first line matching this pattern, are included in the group.
+    ///
+    /// This is useful where a log line ends with a termination marker, such as a semicolon.
     HaltWith,
 }
 
-/// Configuration parameters of the line aggregator.
-#[derive(Debug, Clone)]
+/// Configuration of multi-line aggregation.
+#[derive(Clone, Debug)]
 pub struct Config {
-    /// Start pattern to look for as a beginning of the message.
+    /// Regular expression pattern that is used to match the start of a new message.
     pub start_pattern: Regex,
-    /// Condition pattern to look for. Exact behavior is configured via `mode`.
+
+    /// Regular expression pattern that is used to determine whether or not more lines should be read.
+    ///
+    /// This setting must be configured in conjunction with `mode`.
     pub condition_pattern: Regex,
-    /// Mode of operation, specifies how the condition pattern is interpreted.
+
+    /// Aggregation mode.
+    ///
+    /// This setting must be configured in conjunction with `condition_pattern`.
     pub mode: Mode,
-    /// The maximum time to wait for the continuation. Once this timeout is
-    /// reached, the buffered message is guaranteed to be flushed, even if
-    /// incomplete.
+
+    /// The maximum amount of time to wait for the next additional line, in milliseconds.
+    ///
+    /// Once this timeout is reached, the buffered message is guaranteed to be flushed, even if incomplete.
     pub timeout: Duration,
 }
 

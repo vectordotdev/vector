@@ -36,8 +36,10 @@
 )]
 
 pub mod kind;
+pub mod secrets;
 pub mod value;
 
 pub use kind::Kind;
 
+pub use self::secrets::Secrets;
 pub use self::value::{Value, ValueRegex};

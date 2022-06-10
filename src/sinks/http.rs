@@ -764,7 +764,7 @@ mod tests {
 
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let (input_lines, events) = random_lines_with_stream(100, num_lines, Some(batch));
-        components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
+        components::run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
         drop(trigger);
 
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));

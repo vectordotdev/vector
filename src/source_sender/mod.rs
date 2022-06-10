@@ -16,6 +16,8 @@ mod errors;
 pub use errors::{ClosedError, StreamSendError};
 
 pub(crate) const CHUNK_SIZE: usize = 1000;
+#[cfg(test)]
+const TEST_BUFFER_SIZE: usize = 100;
 
 #[derive(Debug)]
 pub struct Builder {
@@ -88,18 +90,42 @@ impl SourceSender {
 
     #[cfg(test)]
     pub fn new_test() -> (Self, impl Stream<Item = Event> + Unpin) {
-        let (pipe, recv) = Self::new_with_buffer(4096);
+        let (pipe, recv) = Self::new_with_buffer(TEST_BUFFER_SIZE);
         let recv = recv.into_stream().flat_map(into_event_stream);
         (pipe, recv)
     }
 
     #[cfg(test)]
     pub fn new_test_finalize(status: EventStatus) -> (Self, impl Stream<Item = Event> + Unpin) {
-        let (pipe, recv) = Self::new_with_buffer(100);
+        let (pipe, recv) = Self::new_with_buffer(TEST_BUFFER_SIZE);
         // In a source test pipeline, there is no sink to acknowledge
         // events, so we have to add a map to the receiver to handle the
         // finalization.
         let recv = recv.into_stream().flat_map(move |mut events| {
+            events.for_each_event(|mut event| {
+                let metadata = event.metadata_mut();
+                metadata.update_status(status);
+                metadata.update_sources();
+            });
+            into_event_stream(events)
+        });
+        (pipe, recv)
+    }
+
+    #[cfg(test)]
+    pub fn new_test_error_after(n: usize) -> (Self, impl Stream<Item = Event> + Unpin) {
+        let (pipe, recv) = Self::new_with_buffer(TEST_BUFFER_SIZE);
+        // In a source test pipeline, there is no sink to acknowledge
+        // events, so we have to add a map to the receiver to handle the
+        // finalization.
+        let mut count: usize = 0;
+        let recv = recv.into_stream().flat_map(move |mut events| {
+            let status = if count == n {
+                EventStatus::Errored
+            } else {
+                EventStatus::Delivered
+            };
+            count += 1;
             events.for_each_event(|mut event| {
                 let metadata = event.metadata_mut();
                 metadata.update_status(status);
