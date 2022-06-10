@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::config::LogNamespace;
 use lookup::{Look, LookupBuf};
 use value::kind::insert::InnerConflict;
 use value::{
@@ -27,6 +28,11 @@ pub struct Definition {
     /// The key in this set points to a path inside the `collection`. It is an invalid state for
     /// there to be a key pointing to a non-existing path in the collection.
     optional: BTreeSet<LookupBuf>,
+
+    /// Type definitions of components can change depending on the log namespace chosen.
+    /// This records which ones are possible.
+    /// An empty set means the definition can't be for a log
+    log_namespaces: BTreeSet<LogNamespace>,
 }
 
 /// In regular use, a semantic meaning points to exactly _one_ location in the collection. However,
@@ -91,23 +97,24 @@ impl Definition {
             kind: Kind::object(Collection::empty()),
             meaning: BTreeMap::default(),
             optional: BTreeSet::default(),
+            // this is incorrect, but the func is being deleted anyway...
+            log_namespaces: BTreeSet::new(),
         }
     }
 
     /// Creates an empty definition that is of the kind specified.
     /// There are no meanings or optional fields.
-    pub fn empty_kind(kind: Kind) -> Self {
+    pub fn empty_kind(kind: Kind, log_namespace: Option<LogNamespace>) -> Self {
+        let mut log_namespaces = BTreeSet::new();
+        if let Some(namespace) = log_namespace {
+            log_namespaces.insert(namespace);
+        }
         Self {
             kind,
             meaning: BTreeMap::default(),
             optional: BTreeSet::default(),
+            log_namespaces,
         }
-    }
-
-    /// An event with an object root, no known fields, and no unknown fields.
-    pub fn empty_object() -> Self {
-        // TODO: set the root to an object
-        Self::empty()
     }
 
     /// Any valid JSON type
@@ -334,16 +341,16 @@ impl Definition {
     }
 }
 
-// TODO: this should be deleted. It assumes an object root
-impl From<Collection<Field>> for Definition {
-    fn from(collection: Collection<Field>) -> Self {
-        Self {
-            kind: Kind::object(collection),
-            meaning: BTreeMap::default(),
-            optional: BTreeSet::default(),
-        }
-    }
-}
+// // TODO: this should be deleted. It assumes an object root
+// impl From<Collection<Field>> for Definition {
+//     fn from(collection: Collection<Field>) -> Self {
+//         Self {
+//             kind: Kind::object(collection),
+//             meaning: BTreeMap::default(),
+//             optional: BTreeSet::default(),
+//         }
+//     }
+// }
 
 // TODO: can this be deleted?
 impl From<Definition> for Kind {

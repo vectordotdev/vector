@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use value::Kind;
 use vector_common::TimeZone;
+use vector_core::schema::Definition;
 use vector_vrl_functions::set_semantic_meaning::MeaningList;
 use vrl::{
     diagnostic::{Formatter, Note},
@@ -132,7 +133,7 @@ impl TransformConfig for RemapConfig {
     }
 
     fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
-        println!("Remap input definition: {:?}", merged_definition);
+        println!("Remap input definition: {:?}\n", merged_definition);
         // We need to compile the VRL program in order to know the schema definition output of this
         // transform. We ignore any compilation errors, as those are caught by the transform build
         // step.
@@ -153,7 +154,9 @@ impl TransformConfig for RemapConfig {
                     .target_kind()
                     .clone()
                     .into_object()
-                    .map(schema::Definition::from)
+                    .map(|x|{
+                        let def = Definition::empty_kind()
+                    })
                     .map(|mut def| {
                         for (id, path) in meaning {
                             def = def.with_known_meaning(path, &id);

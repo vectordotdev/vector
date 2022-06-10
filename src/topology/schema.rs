@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use value::Kind;
 
 pub(super) use crate::schema::Definition;
 
@@ -40,67 +41,39 @@ pub(super) fn merged_definition(
         return definition.clone();
     }
 
-    let mut definition = Definition::empty();
+    // let mut definition = Definition::empty_kind(Kind::any_object());
+    let mut definition = Definition::empty_kind(Kind::never(), None);
 
     for input in inputs {
         let key = &input.component;
 
-        // If the input is a source, it'll always have schema definition attached, even if it is an
-        // "empty" schema.
-        //
-        // We merge this schema into the top-level schema.
-        if let Some(outputs) = config.source_outputs(key) {
-            // After getting the source matching to the given input, we need to further narrow the
-            // actual output of the source feeding into this input, and then get the definition
-            // belonging to that output.
-            let maybe_source_definition = outputs.iter().find_map(|output| {
-                if output.port == input.port {
-                    // For sources, a `None` schema definition is equal to an "empty" definition.
-                    Some(
-                        output
-                            .log_schema_definition
-                            .clone()
-                            .unwrap_or_else(Definition::empty),
-                    )
-                } else {
-                    None
-                }
-            });
-
-            let source_definition = match maybe_source_definition {
-                Some(source_definition) => source_definition,
-                // If we find no match, it means the topology is misconfigured. This is a fatal
-                // error, but other parts of the topology builder deal with this state.
-                None => unreachable!("source output misconfigured"),
-            };
+        // Merge the schema if it's a source
+        if let Ok(maybe_output) = config.source_output_for_port(key, &input.port) {
+            let source_definition = maybe_output
+                .expect(&format!(
+                    "source output mis-configured - output for port {:?} missing",
+                    &input.port
+                ))
+                .log_schema_definition
+                .clone()
+                .unwrap_or_else(|| Definition::empty_kind(Kind::any_object()));
 
             definition = definition.merge(source_definition);
+        }
 
-        // If the input is a transform, it _might_ define its own output schema, or it might not
-        // change anything in the schema from its inputs, in which case we need to recursively get
-        // the schemas of the transform inputs.
-        } else if let Some(inputs) = config.transform_inputs(key) {
+        // Merge the schema if it's a transform
+        if let Some(inputs) = config.transform_inputs(key) {
             let merged_definition = merged_definition(inputs, config, cache);
 
-            // After getting the transform matching to the given input, we need to further narrow
-            // the actual output of the transform feeding into this input, and then get the
-            // definition belonging to that output.
             let maybe_transform_definition = config
-                .transform_outputs(key, &merged_definition)
-                .expect("already found inputs")
-                .iter()
-                .find_map(|output| {
-                    if output.port == input.port {
-                        // For transforms, a `None` schema definition is equal to "pass-through merged
-                        // input schemas".
-                        Some(output.log_schema_definition.clone())
-                    } else {
-                        None
-                    }
-                })
-                // If we find no match, it means the topology is misconfigured. This is a fatal
-                // error, but other parts of the topology builder deal with this state.
-                .expect("transform output misconfigured");
+                .transform_output_for_port(key, &input.port, &merged_definition)
+                .expect("transform must exist - already found inputs")
+                .expect(&format!(
+                    "transform output mis-configured - output for port {:?} missing",
+                    &input.port
+                ))
+                .log_schema_definition
+                .clone();
 
             let transform_definition = match maybe_transform_definition {
                 Some(transform_definition) => transform_definition,
@@ -269,6 +242,48 @@ pub(super) trait ComponentContainer {
         key: &ComponentKey,
         merged_definition: &Definition,
     ) -> Option<Vec<Output>>;
+
+    /// Gets the transform output for the given port.
+    ///
+    /// Returns Err(()) if there is no transform with the given key
+    /// Returns Some(None) if the source does not have an output for the port given
+    fn transform_output_for_port(
+        &self,
+        key: &ComponentKey,
+        port: &Option<String>,
+        merged_definition: &Definition,
+    ) -> Result<Option<Output>, ()> {
+        if let Some(outputs) = self.transform_outputs(key, merged_definition) {
+            Ok(get_output_for_port(outputs, port))
+        } else {
+            Err(())
+        }
+    }
+
+    /// Gets the source output for the given port.
+    ///
+    /// Returns Err(()) if there is no source with the given key
+    /// Returns Some(None) if the source does not have an output for the port given
+    fn source_output_for_port(
+        &self,
+        key: &ComponentKey,
+        port: &Option<String>,
+    ) -> Result<Option<Output>, ()> {
+        if let Some(outputs) = self.source_outputs(key) {
+            Ok(get_output_for_port(outputs, port))
+        } else {
+            Err(())
+        }
+    }
+}
+
+fn get_output_for_port(outputs: Vec<Output>, port: &Option<String>) -> Option<Output> {
+    for output in outputs {
+        if &output.port == port {
+            return Some(output);
+        }
+    }
+    None
 }
 
 impl ComponentContainer for Config {

@@ -178,7 +178,7 @@ impl From<bool> for AcknowledgementsConfig {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize, PartialOrd, Ord, Eq)]
 pub enum LogNamespace {
     /// Vector native namespacing
     ///

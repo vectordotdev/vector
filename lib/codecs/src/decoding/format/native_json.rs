@@ -1,6 +1,7 @@
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
+use value::kind::Collection;
 use value::Kind;
 use vector_core::{config::DataType, event::Event, schema};
 
@@ -25,8 +26,13 @@ impl NativeJsonDeserializerConfig {
     /// The schema produced by the deserializer.
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match log_namespace {
-            LogNamespace::Vector => schema::Definition::empty().unknown_fields(Kind::json()),
-            LogNamespace::Legacy => schema::Definition::empty_object().unknown_fields(Kind::json()),
+            LogNamespace::Vector => {
+                schema::Definition::empty_kind(Kind::json(), Some(log_namespace))
+            }
+            LogNamespace::Legacy => schema::Definition::empty_kind(
+                Kind::object(Collection::json()),
+                Some(log_namespace),
+            ),
         }
     }
 }

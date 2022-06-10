@@ -14,6 +14,7 @@ use tokio::{
     time::{timeout, Duration},
 };
 use tracing::Instrument;
+use value::Kind;
 use vector_core::{
     buffers::{
         topology::{
@@ -174,7 +175,11 @@ pub async fn build_pieces(
         let mut controls = HashMap::new();
         let mut schema_definitions = HashMap::with_capacity(source_outputs.len());
 
+        println!("Looping through source outputs...");
+
         for output in source_outputs {
+            println!("Looping on output = {:?}", output);
+
             let mut rx = builder.add_output(output.clone());
 
             let (mut fanout, control) = Fanout::new();
@@ -198,10 +203,12 @@ pub async fn build_pieces(
 
             let schema_definition = output
                 .log_schema_definition
-                .unwrap_or_else(schema::Definition::empty);
+                .unwrap_or_else(|| schema::Definition::empty_kind(Kind::any_object()));
 
             schema_definitions.insert(output.port, schema_definition);
         }
+
+        println!("Schema definitions: {:?}\n", schema_definitions);
 
         let pump = async move {
             let mut handles = Vec::new();
@@ -337,7 +344,7 @@ pub async fn build_pieces(
         if config.schema.enabled {
             // At this point, we've validated that all transforms are valid, including any
             // transform that mutates the schema provided by their sources. We can now validate the
-            // schema expectations of each invidual sink.
+            // schema expectations of each individual sink.
             if let Err(mut err) = schema::validate_sink_expectations(key, sink, config) {
                 errors.append(&mut err);
             };

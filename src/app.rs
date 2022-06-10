@@ -217,6 +217,7 @@ impl Application {
                 let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
                     .await
                     .ok_or(exitcode::CONFIG)?;
+                panic!();
 
                 #[cfg(feature = "api")]
                 let api = config.api;
