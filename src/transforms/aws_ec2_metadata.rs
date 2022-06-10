@@ -87,6 +87,7 @@ pub struct Ec2Metadata {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     proxy: ProxyConfig,
+    required: Option<bool>,
 }
 
 #[derive(Clone, Debug)]
@@ -159,6 +160,7 @@ impl TransformConfig for Ec2Metadata {
             .refresh_timeout_secs
             .map(Duration::from_secs)
             .unwrap_or_else(|| Duration::from_secs(1));
+        let required = self.required.unwrap_or(true);
 
         let proxy = ProxyConfig::merge_with_env(&context.globals.proxy, &self.proxy);
         let http_client = HttpClient::new(None, &proxy)?;
@@ -173,7 +175,14 @@ impl TransformConfig for Ec2Metadata {
             fields,
         );
 
-        client.refresh_metadata().await?;
+        // If initial metadata is not required, log and proceed. Otherwise return error.
+        if let Err(error) = client.refresh_metadata().await {
+            if required {
+                return Err(error);
+            } else {
+                emit!(AwsEc2MetadataRefreshError { error });
+            }
+        }
 
         tokio::spawn(
             async move {
@@ -726,6 +735,35 @@ mod integration_tests {
                 "Unable to fetch metadata authentication token: deadline has elapsed."
             ),
         }
+    }
+
+    // validates the configuration setting 'required'=false allows vector to run
+    #[tokio::test(flavor = "multi_thread")]
+    async fn not_required() {
+        trace_init();
+
+        let addr = next_addr();
+
+        async fn sleepy() -> Result<impl warp::Reply, std::convert::Infallible> {
+            tokio::time::sleep(Duration::from_secs(3)).await;
+            Ok("I waited 3 seconds!")
+        }
+
+        let slow = warp::any().and_then(sleepy);
+        let server = warp::serve(slow).bind(addr);
+        let _server = tokio::spawn(server);
+
+        let config = Ec2Metadata {
+            endpoint: Some(format!("http://{}", addr)),
+            refresh_timeout_secs: Some(1),
+            required: Some(false),
+            ..Default::default()
+        };
+
+        assert!(
+            config.build(&TransformContext::default()).await.is_ok(),
+            "expected no failure because 'required' config value set to false"
+        );
     }
 
     #[tokio::test]
