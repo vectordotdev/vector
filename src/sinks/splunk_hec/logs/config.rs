@@ -54,13 +54,13 @@ pub struct HecLogsSinkConfig {
     pub timestamp_nanos_key: Option<String>,
     #[serde(default = "crate::sinks::splunk_hec::common::timestamp_key")]
     pub timestamp_key: String,
-    #[serde(default = "default_data")]
+    #[serde(default = "default_endpoint_target")]
     pub endpoint_target: EndpointTarget,
     #[serde(default)]
     pub metadata: HashMap<String, Template>,
 }
 
-const fn default_data() -> EndpointTarget {
+const fn default_endpoint_target() -> EndpointTarget {
     EndpointTarget::Event
 }
 
