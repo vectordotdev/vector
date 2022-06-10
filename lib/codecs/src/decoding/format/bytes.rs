@@ -1,4 +1,5 @@
 use bytes::Bytes;
+use lookup::LookupBuf;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use value::Kind;
@@ -39,9 +40,8 @@ impl BytesDeserializerConfig {
                 Kind::bytes(),
                 Some("message"),
             ),
-            LogNamespace::Vector => {
-                schema::Definition::empty_kind(Kind::bytes()).with_known_meaning(".", "message")
-            }
+            LogNamespace::Vector => schema::Definition::empty_kind(Kind::bytes())
+                .with_known_meaning(LookupBuf::root(), "message"),
         }
     }
 }
