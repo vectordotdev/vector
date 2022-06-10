@@ -30,9 +30,14 @@ fn agent_health_address() -> String {
     std::env::var("AGENT_HEALTH_ADDRESS").unwrap_or_else(|_| "http://0.0.0.0:8182".to_owned())
 }
 
-fn metrics_agent_health_address() -> String {
-    std::env::var("METRICS_AGENT_HEALTH_ADDRESS")
-        .unwrap_or_else(|_| "http://0.0.0.0:8183".to_owned())
+fn metrics_v1_agent_health_address() -> String {
+    std::env::var("METRICS_V1_AGENT_HEALTH_ADDRESS")
+        .unwrap_or_else(|_| "http://0.0.0.0:8184".to_owned())
+}
+
+fn metrics_v2_agent_health_address() -> String {
+    std::env::var("METRICS_V2_AGENT_HEALTH_ADDRESS")
+        .unwrap_or_else(|_| "http://0.0.0.0:8184".to_owned())
 }
 
 fn trace_agent_health_address() -> String {
@@ -65,8 +70,11 @@ async fn wait_for_healthy_agent() {
     wait_for_healthy(agent_health_address()).await
 }
 
-async fn wait_for_healthy_metrics_agent() {
-    wait_for_healthy(metrics_agent_health_address()).await
+async fn wait_for_healthy_metrics_agents() {
+    tokio::join!(
+        wait_for_healthy(metrics_v1_agent_health_address()),
+        wait_for_healthy(metrics_v2_agent_health_address())
+    );
 }
 
 async fn wait_for_healthy_trace_agent() {
@@ -188,9 +196,17 @@ fn get_simple_trace() -> String {
 }
 
 #[tokio::test]
-async fn wait_for_metrics() {
-    wait_for_healthy_metrics_agent().await;
+async fn wait_for_metrics_v1() {
+    wait_for_metrics(8125, 8082).await
+}
 
+#[tokio::test]
+async fn wait_for_metrics_v2() {
+    wait_for_metrics(8126, 8083).await
+}
+
+async fn wait_for_metrics(agent_port: u16, vector_port: u16) {
+    wait_for_healthy_metrics_agents().await;
     let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
     let schema_definitions = HashMap::from([
         (Some(LOGS.to_owned()), schema::Definition::empty()),
@@ -198,7 +214,8 @@ async fn wait_for_metrics() {
     ]);
     let context = SourceContext::new_test(sender, Some(schema_definitions));
     tokio::spawn(async move {
-        let config: DatadogAgentConfig = DatadogAgentConfig::generate_config().try_into().unwrap();
+        let config_raw = format!("address = \"0.0.0.0:{}\"", vector_port);
+        let config = toml::from_str::<DatadogAgentConfig>(config_raw.as_str()).unwrap();
         config.build(context).await.unwrap().await.unwrap()
     });
 
@@ -210,11 +227,11 @@ async fn wait_for_metrics() {
                 .map_err(|error| panic!("{:}", error))
                 .ok()
                 .unwrap();
-            let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8125);
+            let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), agent_port);
             let statsd_metrics = (indoc! { r#"
-                custom_gauge:60|g|#vector-intg-test,tag:value
-                custom_count:42|c|#vector-intg-test,foo:bar
-            "# })
+                    custom_gauge:60|g|#vector-intg-test,tag:value
+                    custom_count:42|c|#vector-intg-test,foo:bar
+                "# })
             .to_string();
             assert_eq!(
                 socket
@@ -226,7 +243,8 @@ async fn wait_for_metrics() {
             );
         },
         recv,
-        5,
+        // We wait 60 seconds to let agent enough time to notice there is a valid endpoint for metrics and flush pending metrics
+        60,
     )
     .await;
 
@@ -242,9 +260,13 @@ async fn wait_for_metrics() {
 
     let metric = filtered_metrics.get(0).unwrap();
     assert_eq!(metric.name(), "custom_gauge");
-    assert_eq!(metric.value(), MetricValue::Gauge { value: 60.0 });
+    assert_eq!(*metric.value(), MetricValue::Gauge { value: 60.0 });
+    assert_eq!(metric.tags().unwrap().get("vector-intg-test").unwrap(), "");
+    assert_eq!(metric.tags().unwrap().get("tag").unwrap(), "value");
 
     let metric = filtered_metrics.get(1).unwrap();
     assert_eq!(metric.name(), "custom_count");
-    assert_eq!(metric.value(), MetricValue::Counter { value: 42.0 });
+    assert_eq!(*metric.value(), MetricValue::Counter { value: 42.0 });
+    assert_eq!(metric.tags().unwrap().get("vector-intg-test").unwrap(), "");
+    assert_eq!(metric.tags().unwrap().get("foo").unwrap(), "bar");
 }
