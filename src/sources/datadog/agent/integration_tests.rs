@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket},
+    net::UdpSocket,
     time::{Duration, SystemTime},
 };
 
@@ -38,6 +38,14 @@ fn metrics_v1_agent_health_address() -> String {
 fn metrics_v2_agent_health_address() -> String {
     std::env::var("METRICS_V2_AGENT_HEALTH_ADDRESS")
         .unwrap_or_else(|_| "http://0.0.0.0:8185".to_owned())
+}
+
+fn metrics_v1_dsd_address() -> String {
+    std::env::var("METRICS_V1_DSD_ADDRESS").unwrap_or_else(|_| "127.0.0.1:8125".to_owned())
+}
+
+fn metrics_v2_dsd_address() -> String {
+    std::env::var("METRICS_V2_DSD_ADDRESS").unwrap_or_else(|_| "127.0.0.1:8126".to_owned())
 }
 
 fn trace_agent_health_address() -> String {
@@ -199,16 +207,16 @@ fn get_simple_trace() -> String {
 #[tokio::test]
 async fn wait_for_metrics_v1() {
     wait_for_healthy_metrics_v1_agent().await;
-    wait_for_metrics(8125, 8082).await
+    wait_for_metrics(8082, metrics_v1_dsd_address()).await
 }
 
 #[tokio::test]
 async fn wait_for_metrics_v2() {
     wait_for_healthy_metrics_v2_agent().await;
-    wait_for_metrics(8126, 8083).await
+    wait_for_metrics(8083, metrics_v2_dsd_address()).await
 }
 
-async fn wait_for_metrics(agent_port: u16, vector_port: u16) {
+async fn wait_for_metrics(vector_port: u16, dsd_address: String) {
     let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
     let schema_definitions = HashMap::from([
         (Some(LOGS.to_owned()), schema::Definition::empty()),
@@ -229,7 +237,6 @@ async fn wait_for_metrics(agent_port: u16, vector_port: u16) {
                 .map_err(|error| panic!("{:}", error))
                 .ok()
                 .unwrap();
-            let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), agent_port);
             let statsd_metrics = (indoc! { r#"
                     custom_gauge_test:60|g|#vector-intg-test,tag:value
                     custom_count_test:42|c|#vector-intg-test,foo:bar
@@ -237,7 +244,7 @@ async fn wait_for_metrics(agent_port: u16, vector_port: u16) {
             .to_string();
             assert_eq!(
                 socket
-                    .send_to(statsd_metrics.as_bytes(), addr)
+                    .send_to(statsd_metrics.as_bytes(), dsd_address)
                     .map_err(|error| panic!("{:}", error))
                     .ok()
                     .unwrap(),

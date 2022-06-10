@@ -32,6 +32,7 @@ services:
       - DD_CMD_PORT=5003
       - DD_USE_DOGSTATSD=true
       - DD_DOGSTATSD_PORT=8125
+      - DD_DOGSTATSD_NON_LOCAL_TRAFFIC=true
       - DD_USE_V2_API_SERIES=false
       - DD_VECTOR_METRICS_ENABLED=true
       - DD_VECTOR_METRICS_URL=http://runner:8082
@@ -52,6 +53,7 @@ services:
       - DD_CMD_PORT=5004
       - DD_USE_DOGSTATSD=true
       - DD_DOGSTATSD_PORT=8126
+      - DD_DOGSTATSD_NON_LOCAL_TRAFFIC=true
       - DD_USE_V2_API_SERIES=true
       - DD_VECTOR_METRICS_ENABLED=true
       - DD_VECTOR_METRICS_URL=http://runner:8083
@@ -95,6 +97,8 @@ services:
       - LOGS_AGENT_HEALTH_ADDRESS=http://datadog-agent-for-logs:8182
       - METRICS_V1_AGENT_HEALTH_ADDRESS=http://datadog-agent-for-metrics-v1:8184
       - METRICS_V2_AGENT_HEALTH_ADDRESS=http://datadog-agent-for-metrics-v2:8185
+      - METRICS_V1_DSD_ADDRESS=datadog-agent-for-metrics-v1:8125
+      - METRICS_V2_DSD_ADDRESS=datadog-agent-for-metrics-v2:8126
       - TRACE_AGENT_URL=http://datadog-agent-for-traces:8126/v0.4/traces
       - TRACE_AGENT_HEALTH_ADDRESS=http://datadog-agent-for-traces:8183
     depends_on:
