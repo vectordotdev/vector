@@ -155,7 +155,7 @@ aws-config = { version = "0.12.0", default-features = false, features = ["rustls
 aws-types = { version = "0.12.0", default-features = false, features = ["hardcoded-credentials"], optional = true }
 aws-sdk-s3 = { version = "0.12.0", default-features = false, features = ["rustls"], optional = true }
 aws-sdk-sqs = { version = "0.12.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-cloudwatch = { version = "0.12.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-cloudwatch = { version = "0.13.0", default-features = false, features = ["rustls"], optional = true }
 aws-sdk-cloudwatchlogs = { version = "0.12.0", default-features = false, features = ["rustls"], optional = true }
 aws-sdk-elasticsearch = {version = "0.12.0", default-features = false, features = ["rustls"], optional = true }
 aws-sdk-firehose = { version = "0.12.0", default-features = false, features = ["rustls"], optional = true }
