@@ -33,7 +33,7 @@
       {{ end }}
 
       <div class="mt-8">
-        <div class="admonition no-prose rounded-xl border-3 px-3 py-3.5 lg:px-5 lg:py-4 border-yellow-400">
+        <div class="admonition dark:prose-dark prose rounded-xl border-3 px-3 py-3.5 lg:px-5 lg:py-4 border-yellow-400">
           <div class="flex items-center">
             <div class="flex-shrink-0">
               <svg class="h-6 w-6 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -44,7 +44,7 @@
               <span class="lg:text-lg text-base font-bold leading-tight tracking-tight">
                 Upgrading Vector
               </span>
-              <div class="tracking-tight leading-snug dark:prose-dark prose max-w-none">
+              <div class="tracking-tight leading-snug max-w-none">
                 When upgrading, we recommend stepping through minor versions as
                 these can each contain breaking changes while Vector is pre-1.0.
                 These breaking changes are noted in their respective upgrade
@@ -110,7 +110,7 @@
               {{ partial "heading.html" (dict "text" $heading "level" 3 "icon" false) }}
             </div>
 
-            <ul class="list-disc">
+            <ul class="prose dark:prose-dark list-disc">
               {{ range $changes }}
                 <li>
                   <span class="prose dark:prose-dark">

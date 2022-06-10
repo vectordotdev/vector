@@ -257,6 +257,7 @@ mod tests {
 
     #[test]
     #[ignore]
+    #[allow(clippy::print_stdout)]
     fn vector_config() {
         let root_schema = generate_root_schema::<MockRootConfig>();
         let json = serde_json::to_string_pretty(&root_schema)
