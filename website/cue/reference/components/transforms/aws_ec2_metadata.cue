@@ -94,9 +94,7 @@ components: transforms: aws_ec2_metadata: {
 			common:      false
 			description: "Whether or not vector should exit with error if initial metadata request fails."
 			required:    false
-			type: uint: {
-				default: true
-			}
+			type: bool: default: true
 		}
 	}
 
