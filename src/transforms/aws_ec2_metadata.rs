@@ -160,6 +160,7 @@ impl TransformConfig for Ec2Metadata {
             .refresh_timeout_secs
             .map(Duration::from_secs)
             .unwrap_or_else(|| Duration::from_secs(1));
+        let required = self.required.unwrap_or(true);
 
         let proxy = ProxyConfig::merge_with_env(&context.globals.proxy, &self.proxy);
         let http_client = HttpClient::new(None, &proxy)?;
@@ -176,7 +177,7 @@ impl TransformConfig for Ec2Metadata {
 
         // If initial metadata is not required, log and proceed. Otherwise return error.
         if let Err(error) = client.refresh_metadata().await {
-            if self.required.unwrap_or(true) {
+            if required {
                 return Err(error);
             } else {
                 emit!(AwsEc2MetadataRefreshError { error });
