@@ -59,7 +59,7 @@ impl<'a> Field<'a> {
     }
 
     pub fn deprecated(&self) -> bool {
-        self.attrs.deprecated
+        self.attrs.deprecated.is_present()
     }
 
     pub fn validation(&self) -> &[Validation] {
@@ -68,6 +68,10 @@ impl<'a> Field<'a> {
 
     pub fn visible(&self) -> bool {
         self.attrs.visible
+    }
+
+    pub fn flatten(&self) -> bool {
+        self.attrs.flatten
     }
 }
 
@@ -78,10 +82,11 @@ struct Attributes {
     description: Option<String>,
     derived: Flag,
     transparent: Flag,
-    #[darling(skip)]
-    deprecated: bool,
+    deprecated: Flag,
     #[darling(skip)]
     visible: bool,
+    #[darling(skip)]
+    flatten: bool,
     #[darling(multiple)]
     validation: Vec<Validation>,
 }
@@ -94,11 +99,7 @@ impl Attributes {
     ) -> darling::Result<Self> {
         // Derive any of the necessary fields from the `serde` side of things.
         self.visible = !field.attrs.skip_deserializing() || !field.attrs.skip_serializing();
-
-        // Parse any forwarded attributes that `darling` left us.
-        self.deprecated = forwarded_attrs
-            .iter()
-            .any(|a| a.path.is_ident("deprecated"));
+        self.flatten = field.attrs.flatten();
 
         // We additionally attempt to extract a title/description from the forwarded doc attributes, if they exist.
         // Whether we extract both a title and description, or just description, is documented in more detail in
@@ -107,21 +108,24 @@ impl Attributes {
         self.title = self.title.or(doc_title);
         self.description = self.description.or(doc_description);
 
-        // Make sure that if we weren't able to derive a description from the attributes on this
-        // field, that they used the `derived` flag, which implies forwarding the description from
-        // the underlying type of the field when the field type's schema is being finalized.
+        // Make sure that if we weren't able to derive a description from the attributes on this field, that they used
+        // the `derived` flag, which implies forwarding the description from the underlying type of the field when the
+        // field type's schema is being finalized.
         //
-        // The goal with doing so here is to be able to raise a compile-time error that points the
-        // user towards setting an explicit description unless they opt to derive it from the
-        // underlying type, which won't be _rare_, but is the only way for us to surface such a
-        // contextual error, as procedural macros can't dive into the given `T` to know if it has a
-        // description or not.
+        // The goal with doing so here is to be able to raise a compile-time error that points the user towards setting
+        // an explicit description unless they opt to derive it from the underlying type, which won't be _rare_, but is
+        // the only way for us to surface such a contextual error, as procedural macros can't dive into the given `T` to
+        // know if it has a description or not.
+        //
+        // If a field is flattened, that's also another form of derivation so we don't require a description in that
+        // scenario either.
         if self.description.is_none()
             && !self.derived.is_present()
             && !self.transparent.is_present()
             && self.visible
+            && !self.flatten
         {
-            return Err(err_field_missing_description(field.original));
+            return Err(err_field_missing_description(&field.original));
         }
 
         Ok(self)

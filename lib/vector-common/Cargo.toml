@@ -56,3 +56,4 @@ smallvec = { version = "1", default-features = false }
 snafu = { version = "0.7", optional = true }
 tracing = { version = "0.1.34", default-features = false }
 value = { path = "../value", features = ["json"] }
+vector_config = { path = "../vector-config" }

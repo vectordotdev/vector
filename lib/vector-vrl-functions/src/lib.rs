@@ -11,7 +11,10 @@ use vrl::prelude::expression::Query;
 use vrl::prelude::*;
 
 pub(crate) fn legacy_keys() -> Vec<Value> {
-    vec![value!("datadog_api_key"), value!("splunk_hec_token")]
+    LEGACY_METADATA_KEYS
+        .iter()
+        .map(|key| (*key).into())
+        .collect()
 }
 
 #[allow(clippy::large_enum_variant)]

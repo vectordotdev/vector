@@ -396,6 +396,7 @@ fn run_vrl(
 
     // Insert a dummy secret for examples to use
     target.insert_secret("my_secret", "secret value");
+    target.insert_secret("datadog_api_key", "secret value");
 
     match vrl_runtime {
         VrlRuntime::Ast => {

@@ -36,8 +36,8 @@ impl Secrets {
     }
 
     /// Inserts a new secret into the container.
-    pub fn insert(&mut self, key: &str, value: impl Into<Arc<str>>) {
-        self.secrets.insert(key.to_owned(), value.into());
+    pub fn insert(&mut self, key: impl Into<String>, value: impl Into<Arc<str>>) {
+        self.secrets.insert(key.into(), value.into());
     }
 
     /// Removes a secret
@@ -46,11 +46,9 @@ impl Secrets {
     }
 
     /// Merged both together. If there are collisions, the value from `self` is kept.
-    pub fn merge(&mut self, other: &Self) {
-        for (key, value) in &other.secrets {
-            if !self.secrets.contains_key(key) {
-                self.secrets.insert(key.clone(), value.clone());
-            }
+    pub fn merge(&mut self, other: Self) {
+        for (key, value) in other.secrets {
+            self.secrets.entry(key).or_insert(value);
         }
     }
 }
@@ -69,7 +67,7 @@ mod test {
         b.insert("key-b", "value-b2");
         b.insert("key-c", "value-c2");
 
-        a.merge(&b);
+        a.merge(b);
 
         assert_eq!(a.get("key-a").unwrap().as_ref(), "value-a1");
         assert_eq!(a.get("key-b").unwrap().as_ref(), "value-b1");

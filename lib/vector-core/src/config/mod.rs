@@ -1,7 +1,6 @@
 use std::{fmt, num::NonZeroUsize};
 
 use bitmask_enum::bitmask;
-use serde::{Deserialize, Serialize};
 
 mod global_options;
 mod id;
@@ -14,7 +13,9 @@ pub use id::ComponentKey;
 pub use log_schema::{init_log_schema, log_schema, LogSchema};
 use lookup::lookup_v2::{BorrowedSegment, Path};
 use lookup::path;
+use serde::{Deserialize, Serialize};
 use value::Value;
+use vector_config::configurable_component;
 
 use crate::schema;
 
@@ -145,8 +146,11 @@ impl Output {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+/// Configuration of acknowledgement behavior.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct AcknowledgementsConfig {
+    /// Enables end-to-end acknowledgements.
     enabled: Option<bool>,
 }
 

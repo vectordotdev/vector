@@ -40,6 +40,7 @@ fn default_metadata_value() -> Value {
     Value::Object(BTreeMap::new())
 }
 
+/// Secret access functions
 impl EventMetadata {
     /// Returns a reference to the metadata value
     pub fn value(&self) -> &Value {
@@ -55,10 +56,7 @@ impl EventMetadata {
     pub fn secrets(&self) -> &Secrets {
         &self.secrets
     }
-}
 
-/// Secret access functions
-impl EventMetadata {
     /// Returns a mutable reference to the secrets
     pub fn secrets_mut(&mut self) -> &mut Secrets {
         &mut self.secrets
@@ -151,7 +149,7 @@ impl EventMetadata {
     /// If a Splunk HEC token is not set in `self`, the one from `other` will be used.
     pub fn merge(&mut self, other: Self) {
         self.finalizers.merge(other.finalizers);
-        self.secrets.merge(&other.secrets);
+        self.secrets.merge(other.secrets);
     }
 
     /// Update the finalizer(s) status.

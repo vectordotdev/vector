@@ -21,9 +21,9 @@ pub use framing::{
     NewlineDelimitedDecoderConfig, NewlineDelimitedDecoderOptions, OctetCountingDecoder,
     OctetCountingDecoderConfig, OctetCountingDecoderOptions,
 };
-use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use std::fmt::Debug;
+use vector_config::configurable_component;
 use vector_core::{
     config::{DataType, LogNamespace},
     event::Event,
@@ -71,7 +71,8 @@ impl StreamDecodingError for Error {
 // Unfortunately, copying options of the nested enum variants is necessary
 // since `serde` doesn't allow `flatten`ing these:
 // https://github.com/serde-rs/serde/issues/1402.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(tag = "method", rename_all = "snake_case")]
 pub enum FramingConfig {
     /// Configures the `BytesDecoder`.
@@ -219,7 +220,8 @@ impl tokio_util::codec::Decoder for Framer {
 // Unfortunately, copying options of the nested enum variants is necessary
 // since `serde` doesn't allow `flatten`ing these:
 // https://github.com/serde-rs/serde/issues/1402.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(tag = "codec", rename_all = "snake_case")]
 pub enum DeserializerConfig {
     /// Configures the `BytesDeserializer`.

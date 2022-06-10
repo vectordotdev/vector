@@ -3,8 +3,8 @@ use std::time::Duration;
 use futures::{FutureExt, StreamExt};
 use http::Uri;
 use hyper::{Body, Request};
-use serde::{Deserialize, Serialize};
 use tokio_stream::wrappers::IntervalStream;
+use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
@@ -21,12 +21,21 @@ use crate::{
 
 pub mod types;
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default)]
-struct EventStoreDbConfig {
+/// Configuration for the `eventstoredb_metrics` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug, Default)]
+pub struct EventStoreDbConfig {
+    /// Endpoints to scrape stats from.
     #[serde(default = "default_endpoint")]
     endpoint: String,
+
+    /// The interval between scrapes, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
+
+    /// Overrides the default namespace for the metrics emitted by the source.
+    ///
+    /// By default, `eventstoredb` is used.
     default_namespace: Option<String>,
 }
 
