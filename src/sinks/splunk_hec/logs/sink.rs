@@ -18,7 +18,7 @@ use crate::{
     internal_events::SplunkEventTimestampMissing,
     internal_events::TemplateRenderingError,
     sinks::{
-        splunk_hec::common::{render_template_string, request::HecRequest, EndpointTarget},
+        splunk_hec::common::{render_template_string, request::HecRequest},
         util::{processed_event::ProcessedEvent, SinkBuilderExt},
     },
     template::Template,
@@ -38,7 +38,6 @@ pub struct HecLogsSink<S> {
     pub timestamp_nanos_key: Option<String>,
     pub timestamp_key: String,
     pub splunk_metadata: HashMap<String, Template>,
-    pub endpoint_target: EndpointTarget,
 }
 
 pub struct HecLogData<'a> {
@@ -49,7 +48,6 @@ pub struct HecLogData<'a> {
     pub host_key: &'a str,
     pub timestamp_nanos_key: Option<&'a String>,
     pub timestamp_key: &'a str,
-    pub endpoint_target: EndpointTarget,
 }
 
 impl<S> HecLogsSink<S>
@@ -70,7 +68,6 @@ where
             host_key: self.host.as_ref(),
             timestamp_nanos_key: self.timestamp_nanos_key.as_ref(),
             timestamp_key: self.timestamp_key.as_ref(),
-            endpoint_target: self.endpoint_target,
         };
 
         let sink = input
@@ -186,7 +183,6 @@ pub struct HecLogsProcessedEventMetadata {
     pub host: Option<Value>,
     pub timestamp: Option<f64>,
     pub fields: LogEvent,
-    pub endpoint_target: EndpointTarget,
 }
 
 impl ByteSizeOf for HecLogsProcessedEventMetadata {
@@ -258,7 +254,6 @@ pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
         host,
         timestamp,
         fields,
-        endpoint_target: data.endpoint_target,
     };
 
     ProcessedEvent {

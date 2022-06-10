@@ -78,14 +78,8 @@ pub struct HecLogsSinkConfig {
     pub timestamp_nanos_key: Option<String>,
     #[serde(default = "crate::sinks::splunk_hec::common::timestamp_key")]
     pub timestamp_key: String,
-    #[serde(default = "default_endpoint_target")]
-    pub endpoint_target: EndpointTarget,
     #[serde(default)]
     pub splunk_metadata: HashMap<String, Template>,
-}
-
-const fn default_endpoint_target() -> EndpointTarget {
-    EndpointTarget::Event
 }
 
 impl GenerateConfig for HecLogsSinkConfig {
@@ -106,7 +100,6 @@ impl GenerateConfig for HecLogsSinkConfig {
             acknowledgements: Default::default(),
             timestamp_nanos_key: None,
             timestamp_key: timestamp_key(),
-            endpoint_target: EndpointTarget::Event,
             splunk_metadata: Default::default(),
         })
         .unwrap()
@@ -177,7 +170,10 @@ impl HecLogsSinkConfig {
             .service(build_http_batch_service(
                 client,
                 Arc::clone(&http_request_builder),
-                self.endpoint_target,
+                match self.encoding.config() {
+                    SerializerConfig::Json | SerializerConfig::NativeJson => EndpointTarget::Event,
+                    _ => EndpointTarget::Raw,
+                },
             ));
 
         let service = HecService::new(
@@ -202,7 +198,6 @@ impl HecLogsSinkConfig {
             timestamp_nanos_key: self.timestamp_nanos_key.clone(),
             timestamp_key: self.timestamp_key.clone(),
             splunk_metadata: self.splunk_metadata.clone(),
-            endpoint_target: self.endpoint_target,
         };
 
         Ok(VectorSink::from_event_streamsink(sink))

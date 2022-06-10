@@ -8,10 +8,7 @@ use super::sink::HecProcessedEvent;
 use crate::{
     event::{Event, LogEvent},
     internal_events::SplunkEventEncodeError,
-    sinks::{
-        splunk_hec::common::EndpointTarget,
-        util::encoding::{Encoder, Transformer},
-    },
+    sinks::util::encoding::{Encoder, Transformer},
 };
 
 #[derive(Serialize, Debug)]
@@ -75,50 +72,30 @@ impl Encoder<Vec<HecProcessedEvent>> for HecLogsEncoder {
 
                 let mut bytes = BytesMut::new();
                 let serializer = encoder.serializer();
+                if serializer.supports_json() {
+                    let hec_event = HecEvent::Json(
+                        serializer
+                            .to_json_value(event)
+                            .map_err(|error| emit!(SplunkEventEncodeError { error }))
+                            .ok()?,
+                    );
 
-                match metadata.endpoint_target {
-                    EndpointTarget::Raw => {
-                        if serializer.supports_json() {
-                            match serde_json::to_vec(&event) {
-                                Ok(value) => Some(value),
-                                Err(error) => {
-                                    emit!(SplunkEventEncodeError { error });
-                                    None
-                                }
-                            }
-                        } else {
-                            encoder.encode(event, &mut bytes).ok()?;
-                            Some(bytes.to_vec())
+                    let mut hec_data = HecData::new(hec_event, metadata.fields, metadata.timestamp);
+                    hec_data.host = metadata.host.map(|host| host.to_string_lossy());
+                    hec_data.index = metadata.index;
+                    hec_data.source = metadata.source;
+                    hec_data.sourcetype = metadata.sourcetype;
+
+                    match serde_json::to_vec(&hec_data) {
+                        Ok(value) => Some(value),
+                        Err(error) => {
+                            emit!(SplunkEventEncodeError { error });
+                            None
                         }
                     }
-                    EndpointTarget::Event => {
-                        let hec_event = if serializer.supports_json() {
-                            HecEvent::Json(
-                                serializer
-                                    .to_json_value(event)
-                                    .map_err(|error| emit!(SplunkEventEncodeError { error }))
-                                    .ok()?,
-                            )
-                        } else {
-                            encoder.encode(event, &mut bytes).ok()?;
-                            HecEvent::Text(String::from_utf8_lossy(&bytes))
-                        };
-
-                        let mut hec_data =
-                            HecData::new(hec_event, metadata.fields, metadata.timestamp);
-                        hec_data.host = metadata.host.map(|host| host.to_string_lossy());
-                        hec_data.index = metadata.index;
-                        hec_data.source = metadata.source;
-                        hec_data.sourcetype = metadata.sourcetype;
-
-                        match serde_json::to_vec(&hec_data) {
-                            Ok(value) => Some(value),
-                            Err(error) => {
-                                emit!(SplunkEventEncodeError { error });
-                                None
-                            }
-                        }
-                    }
+                } else {
+                    encoder.encode(event, &mut bytes).ok()?;
+                    Some(bytes.to_vec())
                 }
             })
             .flatten()
