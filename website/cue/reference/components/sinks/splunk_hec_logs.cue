@@ -150,7 +150,7 @@ components: sinks: splunk_hec_logs: {
 				syntax: "template"
 			}
 		}
-		metadata: {
+		splunk_metadata: {
 			common:      false
 			description: """
 				 A set of fields that can be sent as [metadata](\(urls.splunk_hec_metadata)). The value is templatable, which enables

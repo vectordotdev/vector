@@ -135,7 +135,7 @@ impl HumioLogsConfig {
             },
             timestamp_key: timestamp_key(),
             endpoint_target: EndpointTarget::Event,
-            metadata: Default::default(),
+            splunk_metadata: Default::default(),
         }
     }
 }

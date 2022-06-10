@@ -37,7 +37,7 @@ pub struct HecLogsSink<S> {
     pub host: String,
     pub timestamp_nanos_key: Option<String>,
     pub timestamp_key: String,
-    pub metadata: HashMap<String, Template>,
+    pub splunk_metadata: HashMap<String, Template>,
     pub endpoint_target: EndpointTarget,
 }
 
@@ -76,7 +76,7 @@ where
         let sink = input
             .map(move |event| process_log(event, &data))
             .batched_partitioned(
-                EventPartitioner::new(self.metadata.clone()),
+                EventPartitioner::new(self.splunk_metadata.clone()),
                 self.batch_settings,
             )
             .request_builder(builder_limit, self.request_builder)
@@ -111,19 +111,19 @@ where
 #[derive(Clone, Debug, Eq)]
 pub(super) struct Partitioned {
     pub(super) token: Option<Arc<str>>,
-    pub(super) metadata: HashMap<String, String>,
+    pub(super) splunk_metadata: HashMap<String, String>,
 }
 
 impl Partitioned {
     #[allow(clippy::missing_const_for_fn)]
     pub(super) fn into_parts(self) -> (Option<Arc<str>>, HashMap<String, String>) {
-        (self.token, self.metadata)
+        (self.token, self.splunk_metadata)
     }
 }
 
 impl PartialEq for Partitioned {
     fn eq(&self, other: &Self) -> bool {
-        self.token == other.token && self.metadata == other.metadata
+        self.token == other.token && self.splunk_metadata == other.splunk_metadata
     }
 }
 
@@ -131,7 +131,7 @@ impl std::hash::Hash for Partitioned {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.token.hash(state);
 
-        for (key, value) in &self.metadata {
+        for (key, value) in &self.splunk_metadata {
             key.hash(state);
             value.hash(state);
         }
@@ -140,12 +140,12 @@ impl std::hash::Hash for Partitioned {
 
 #[derive(Default)]
 struct EventPartitioner {
-    metadata: HashMap<String, Template>,
+    splunk_metadata: HashMap<String, Template>,
 }
 
 impl EventPartitioner {
-    const fn new(metadata: HashMap<String, Template>) -> Self {
-        Self { metadata }
+    const fn new(splunk_metadata: HashMap<String, Template>) -> Self {
+        Self { splunk_metadata }
     }
 }
 
@@ -154,7 +154,7 @@ impl Partitioner for EventPartitioner {
     type Key = Option<Partitioned>;
 
     fn partition(&self, item: &Self::Item) -> Self::Key {
-        self.metadata
+        self.splunk_metadata
             .iter()
             .map(|(key, value)| {
                 value
@@ -170,9 +170,9 @@ impl Partitioner for EventPartitioner {
                     .map(|rendered| (key.clone(), rendered))
             })
             .collect::<Option<_>>()
-            .map(|metadata| Partitioned {
+            .map(|splunk_metadata| Partitioned {
                 token: item.event.metadata().splunk_hec_token(),
-                metadata,
+                splunk_metadata,
             })
     }
 }
