@@ -67,6 +67,7 @@ pub mod throttle;
 #[cfg(feature = "transforms-tokenizer")]
 pub mod tokenizer;
 
+use vector_config::configurable_component;
 pub use vector_core::transform::{
     FunctionTransform, OutputBuffer, SyncTransform, TaskTransform, Transform, TransformOutputs,
     TransformOutputsBuf,
@@ -79,6 +80,110 @@ enum BuildError {
 
     #[snafu(display("Invalid substring expression: {}", name))]
     InvalidSubstring { name: String },
+}
+
+/// Configurable transforms in Vector.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum Transforms {
+    // Deprecated transforms that _also_ have types with cyclical dependencies, and would require more changes to the
+    // schema generation logic to break cycles. We may want to actually support them, but they're commented out for now
+    // to avoid making the compiler angry.
+    // AddFields(#[configurable(derived)] add_fields::AddFieldsConfig),
+    // RenameFields(#[configurable(derived)] rename_fields::RenameFieldsConfig),
+    /// Aggregate.
+    Aggregate(#[configurable(derived)] aggregate::AggregateConfig),
+
+    /// ANSI stripper.
+    AnsiStripper(#[configurable(derived)] ansi_stripper::AnsiStripperConfig),
+
+    /// AWS Cloudwatch Logs subscription parser.
+    AwsCloudwatchLogsSubscriptionParser(
+        #[configurable(derived)]
+        aws_cloudwatch_logs_subscription_parser::AwsCloudwatchLogsSubscriptionParserConfig,
+    ),
+
+    /// AWS EC2 metadata.
+    AwsEc2Metadata(#[configurable(derived)] aws_ec2_metadata::Ec2Metadata),
+
+    /// Coercer.
+    Coercer(#[configurable(derived)] coercer::CoercerConfig),
+
+    /// Concat.
+    Concat(#[configurable(derived)] concat::ConcatConfig),
+
+    /// Dedupe.
+    Dedupe(#[configurable(derived)] dedupe::DedupeConfig),
+
+    /// Field filter.
+    FieldFilter(#[configurable(derived)] field_filter::FieldFilterConfig),
+
+    /// Filter.
+    Filter(#[configurable(derived)] filter::FilterConfig),
+
+    /// GeoIP.
+    Geoip(#[configurable(derived)] geoip::GeoipConfig),
+
+    /// Grok parser.
+    GrokParser(#[configurable(derived)] grok_parser::GrokParserConfig),
+
+    /// JSON parser.
+    JsonParser(#[configurable(derived)] json_parser::JsonParserConfig),
+
+    /// Key value parser.
+    KeyValueParser(#[configurable(derived)] key_value_parser::KeyValueConfig),
+
+    /// Log to metric.
+    LogToMetric(#[configurable(derived)] log_to_metric::LogToMetricConfig),
+
+    /// Logfmt parser.
+    LogfmtParser(#[configurable(derived)] logfmt_parser::LogfmtConfig),
+
+    /// Lua.
+    Lua(#[configurable(derived)] lua::LuaConfig),
+
+    /// Merge.
+    Merge(#[configurable(derived)] merge::MergeConfig),
+
+    /// Metric to log.
+    MetricToLog(#[configurable(derived)] metric_to_log::MetricToLogConfig),
+
+    /// Pipelines.
+    Pipelines(#[configurable(derived)] pipelines::PipelinesConfig),
+
+    /// Reduce.
+    Reduce(#[configurable(derived)] reduce::ReduceConfig),
+
+    /// Regex parser.
+    RegexParser(#[configurable(derived)] regex_parser::RegexParserConfig),
+
+    /// Remap.
+    Remap(#[configurable(derived)] remap::RemapConfig),
+
+    /// Remove fields.
+    RemoveFields(#[configurable(derived)] remove_fields::RemoveFieldsConfig),
+
+    /// Remove tags.
+    RemoveTags(#[configurable(derived)] remove_tags::RemoveTagsConfig),
+
+    /// Route.
+    Route(#[configurable(derived)] route::RouteConfig),
+
+    /// Sample.
+    Sample(#[configurable(derived)] sample::SampleConfig),
+
+    /// Split.
+    Split(#[configurable(derived)] split::SplitConfig),
+
+    /// Tag cardinality limit.
+    TagCardinalityLimit(#[configurable(derived)] tag_cardinality_limit::TagCardinalityLimitConfig),
+
+    /// Throttle.
+    Throttle(#[configurable(derived)] throttle::ThrottleConfig),
+
+    /// Tokenizer.
+    Tokenizer(#[configurable(derived)] tokenizer::TokenizerConfig),
 }
 
 #[cfg(test)]

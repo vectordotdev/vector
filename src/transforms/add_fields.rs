@@ -17,10 +17,14 @@ use crate::{
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `add_fields` transform.
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct AddFieldsConfig {
+    /// Fields to add.
     pub fields: Fields<TomlValue>,
+
+    /// Enables overwriting existing fields.
     #[serde(default = "crate::serde::default_true")]
     pub overwrite: bool,
 }
