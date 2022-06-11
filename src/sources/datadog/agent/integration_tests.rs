@@ -252,10 +252,10 @@ async fn wait_for_metrics(vector_port: u16, dsd_address: String) {
             );
         },
         recv,
-        // We wait 45 seconds to let agent enough time to notice there is a valid endpoint
+        // We wait 30 seconds to let agent enough time to notice there is a valid endpoint
         // for metrics and flush pending metrics (the agent config has been tuned for
         // fast retries).
-        45,
+        30,
     )
     .await;
 
