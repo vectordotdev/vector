@@ -236,7 +236,7 @@ impl Definition {
         }
     }
 
-    pub fn meanings(&self) -> impl Iterator<Item=(&String, &LookupBuf)> {
+    pub fn meanings(&self) -> impl Iterator<Item = (&String, &LookupBuf)> {
         self.meaning
             .iter()
             .filter_map(|(id, pointer)| match pointer {
@@ -305,11 +305,13 @@ mod tests {
                         collection: BTreeMap::from([(
                             "foo".into(),
                             Kind::object(BTreeMap::from([("bar".into(), Kind::regex().or_null())])),
-                        )]).into(),
+                        )])
+                        .into(),
                         meaning: [(
                             "foobar".to_owned(),
                             LookupBuf::from_str(".foo.bar").unwrap().into(),
-                        )].into(),
+                        )]
+                        .into(),
                     },
                 },
             ),
@@ -358,7 +360,8 @@ mod tests {
                     kind: Kind::boolean(),
                     meaning: Some("foo_meaning"),
                     want: Definition {
-                        collection: BTreeMap::from([("foo".into(), Kind::boolean().or_null())]).into(),
+                        collection: BTreeMap::from([("foo".into(), Kind::boolean().or_null())])
+                            .into(),
                         meaning: [("foo_meaning".to_owned(), "foo".into())].into(),
                     },
                 },
@@ -373,11 +376,13 @@ mod tests {
                         collection: BTreeMap::from([(
                             "foo".into(),
                             Kind::object(BTreeMap::from([("bar".into(), Kind::regex().or_null())])),
-                        )]).into(),
+                        )])
+                        .into(),
                         meaning: [(
                             "foobar".to_owned(),
                             LookupBuf::from_str(".foo.bar").unwrap().into(),
-                        )].into(),
+                        )]
+                        .into(),
                     },
                 },
             ),
@@ -388,7 +393,8 @@ mod tests {
                     kind: Kind::boolean(),
                     meaning: None,
                     want: Definition {
-                        collection: BTreeMap::from([("foo".into(), Kind::boolean().or_null())]).into(),
+                        collection: BTreeMap::from([("foo".into(), Kind::boolean().or_null())])
+                            .into(),
                         meaning: BTreeMap::default(),
                     },
                 },
