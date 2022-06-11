@@ -32,8 +32,9 @@ pub struct DatadogSearchRunner {
 }
 
 impl Conditional for DatadogSearchRunner {
-    fn check(&self, e: &Event) -> bool {
-        self.matcher.run(e)
+    fn check(&self, e: Event) -> (bool, Event) {
+        let result = self.matcher.run(&e);
+        (result, e)
     }
 }
 

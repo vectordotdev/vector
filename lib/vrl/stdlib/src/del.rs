@@ -83,11 +83,18 @@ impl Function for Del {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        state: (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let query = arguments.required_query("target")?;
+
+        if state.1.is_read_only_event_path(query.path()) {
+            return Err(vrl::function::Error::ReadOnlyMutation {
+                context: format!("{} is read-only, and cannot be deleted", query),
+            }
+            .into());
+        }
 
         Ok(Box::new(DelFn { query }))
     }

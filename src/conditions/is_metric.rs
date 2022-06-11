@@ -29,15 +29,16 @@ impl ConditionConfig for IsMetricConfig {
 pub struct IsMetric {}
 
 impl Conditional for IsMetric {
-    fn check(&self, e: &Event) -> bool {
-        matches!(e, Event::Metric(_))
+    fn check(&self, e: Event) -> (bool, Event) {
+        (matches!(e, Event::Metric(_)), e)
     }
 
-    fn check_with_context(&self, e: &Event) -> Result<(), String> {
-        if self.check(e) {
-            Ok(())
+    fn check_with_context(&self, e: Event) -> (Result<(), String>, Event) {
+        let (result, event) = self.check(e);
+        if result {
+            (Ok(()), event)
         } else {
-            Err("event is not a metric type".to_string())
+            (Err("event is not a metric type".to_string()), event)
         }
     }
 }

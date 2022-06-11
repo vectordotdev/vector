@@ -29,15 +29,16 @@ impl ConditionConfig for IsLogConfig {
 pub struct IsLog {}
 
 impl Conditional for IsLog {
-    fn check(&self, e: &Event) -> bool {
-        matches!(e, Event::Log(_))
+    fn check(&self, e: Event) -> (bool, Event) {
+        (matches!(e, Event::Log(_)), e)
     }
 
-    fn check_with_context(&self, e: &Event) -> Result<(), String> {
-        if self.check(e) {
-            Ok(())
+    fn check_with_context(&self, e: Event) -> (Result<(), String>, Event) {
+        let (result, event) = self.check(e);
+        if result {
+            (Ok(()), event)
         } else {
-            Err("event is not a log type".to_string())
+            (Err("event is not a log type".to_string()), event)
         }
     }
 }

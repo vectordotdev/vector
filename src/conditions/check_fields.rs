@@ -555,24 +555,28 @@ pub struct CheckFields {
 }
 
 impl Conditional for CheckFields {
-    fn check(&self, e: &Event) -> bool {
-        self.predicates.iter().all(|(_, p)| p.check(e))
+    fn check(&self, e: Event) -> (bool, Event) {
+        let result = self.predicates.iter().all(|(_, p)| p.check(&e));
+        (result, e)
     }
 
-    fn check_with_context(&self, e: &Event) -> Result<(), String> {
+    fn check_with_context(&self, e: Event) -> (Result<(), String>, Event) {
         let failed_preds = self
             .predicates
             .iter()
-            .filter(|(_, p)| !p.check(e))
+            .filter(|(_, p)| !p.check(&e))
             .map(|(n, _)| n.to_owned())
             .collect::<Vec<_>>();
         if failed_preds.is_empty() {
-            Ok(())
+            (Ok(()), e)
         } else {
-            Err(format!(
-                "predicates failed: [ {} ]",
-                failed_preds.join(", ")
-            ))
+            (
+                Err(format!(
+                    "predicates failed: [ {} ]",
+                    failed_preds.join(", ")
+                )),
+                e,
+            )
         }
     }
 }

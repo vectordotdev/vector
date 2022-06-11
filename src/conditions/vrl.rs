@@ -3,6 +3,7 @@ use value::Value;
 use vector_common::TimeZone;
 use vrl::{diagnostic::Formatter, Program, Runtime, VrlRuntime};
 
+use crate::event::TargetEvents;
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription, Conditional},
     emit,
@@ -82,30 +83,25 @@ pub struct Vrl {
 }
 
 impl Vrl {
-    fn run(&self, event: &Event) -> vrl::RuntimeResult {
-        // TODO(jean): This clone exists until vrl-lang has an "immutable"
-        // mode.
-        //
-        // For now, mutability in reduce "vrl ends-when conditions" is
-        // allowed, but it won't mutate the original event, since we cloned it
-        // here.
-        //
-        // Having first-class immutability support in the language allows for
-        // more performance (one less clone), and boot-time errors when a
-        // program wants to mutate its events.
-        //
-        // see: https://github.com/vectordotdev/vector/issues/4744
-        let mut target = VrlTarget::new(event.clone(), self.program.info());
+    fn run(&self, event: Event) -> (Event, vrl::RuntimeResult) {
+        let mut target = VrlTarget::new(event, self.program.info());
         // TODO: use timezone from remap config
         let timezone = TimeZone::default();
 
-        Runtime::default().resolve(&mut target, &self.program, &timezone)
+        let result = Runtime::default().resolve(&mut target, &self.program, &timezone);
+        let original_event = match target.into_events() {
+            TargetEvents::One(event) => event,
+            _ => panic!("Event was modified in a condition. This is an internal compiler error."),
+        };
+        (original_event, result)
     }
 }
 
 impl Conditional for Vrl {
-    fn check(&self, event: &Event) -> bool {
-        self.run(event)
+    fn check(&self, event: Event) -> (bool, Event) {
+        let (event, result) = self.run(event);
+
+        let result = result
             .map(|value| match value {
                 Value::Boolean(boolean) => boolean,
                 _ => false,
@@ -115,11 +111,14 @@ impl Conditional for Vrl {
                     error: err.to_string().as_ref()
                 });
                 false
-            })
+            });
+        (result, event)
     }
 
-    fn check_with_context(&self, event: &Event) -> Result<(), String> {
-        let value = self.run(event).map_err(|err| match err {
+    fn check_with_context(&self, event: Event) -> (Result<(), String>, Event) {
+        let (event, result) = self.run(event);
+
+        let value_result = result.map_err(|err| match err {
             vrl::Terminate::Abort(err) => {
                 let err = Formatter::new(
                     &self.source,
@@ -142,13 +141,21 @@ impl Conditional for Vrl {
                 .to_string();
                 format!("source execution failed: {}", err)
             }
-        })?;
+        });
 
-        match value {
+        let value = match value_result {
+            Ok(value) => value,
+            Err(err) => {
+                return (Err(err), event);
+            }
+        };
+
+        let result = match value {
             Value::Boolean(v) if v => Ok(()),
             Value::Boolean(v) if !v => Err("source execution resolved to false".into()),
             _ => Err("source execution resolved to a non-boolean value".into()),
-        }
+        };
+        (result, event)
     }
 }
 
