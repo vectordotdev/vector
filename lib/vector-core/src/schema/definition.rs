@@ -152,11 +152,10 @@ impl Definition {
     pub fn optional_field(
         self,
         path: impl Into<LookupBuf>,
-        mut kind: Kind,
+        kind: Kind,
         meaning: Option<&str>,
     ) -> Self {
-        kind.add_null();
-        self.with_field(path, kind, meaning)
+        self.with_field(path, kind.or_null(), meaning)
     }
 
     /// Register a semantic meaning for the definition.
@@ -237,7 +236,7 @@ impl Definition {
         }
     }
 
-    pub fn meanings(&self) -> impl Iterator<Item = (&String, &LookupBuf)> {
+    pub fn meanings(&self) -> impl Iterator<Item=(&String, &LookupBuf)> {
         self.meaning
             .iter()
             .filter_map(|(id, pointer)| match pointer {
@@ -290,17 +289,9 @@ mod tests {
                     path: "foo".into(),
                     kind: Kind::boolean(),
                     meaning: Some("foo_meaning"),
-                    want: {
-                        let collection =
-                            Collection::from(BTreeMap::from([("foo".into(), Kind::boolean())]));
-                        let meaning = BTreeMap::from([("foo_meaning".to_owned(), "foo".into())]);
-                        let optional = BTreeSet::default();
-
-                        Definition {
-                            collection,
-                            meaning,
-                            optional,
-                        }
+                    want: Definition {
+                        collection: BTreeMap::from([("foo".into(), Kind::boolean())]).into(),
+                        meaning: [("foo_meaning".to_owned(), "foo".into())].into(),
                     },
                 },
             ),
@@ -310,22 +301,15 @@ mod tests {
                     path: LookupBuf::from_str(".foo.bar").unwrap(),
                     kind: Kind::regex().or_null(),
                     meaning: Some("foobar"),
-                    want: {
-                        let collection = Collection::from(BTreeMap::from([(
+                    want: Definition {
+                        collection: BTreeMap::from([(
                             "foo".into(),
                             Kind::object(BTreeMap::from([("bar".into(), Kind::regex().or_null())])),
-                        )]));
-                        let meaning = BTreeMap::from([(
+                        )]).into(),
+                        meaning: [(
                             "foobar".to_owned(),
                             LookupBuf::from_str(".foo.bar").unwrap().into(),
-                        )]);
-                        let optional = BTreeSet::default();
-
-                        Definition {
-                            collection,
-                            meaning,
-                            optional,
-                        }
+                        )].into(),
                     },
                 },
             ),
@@ -335,17 +319,9 @@ mod tests {
                     path: "foo".into(),
                     kind: Kind::boolean(),
                     meaning: None,
-                    want: {
-                        let collection =
-                            Collection::from(BTreeMap::from([("foo".into(), Kind::boolean())]));
-                        let meaning = BTreeMap::default();
-                        let optional = BTreeSet::default();
-
-                        Definition {
-                            collection,
-                            meaning,
-                            optional,
-                        }
+                    want: Definition {
+                        collection: BTreeMap::from([("foo".into(), Kind::boolean())]).into(),
+                        meaning: BTreeMap::default(),
                     },
                 },
             ),
@@ -381,17 +357,9 @@ mod tests {
                     path: "foo".into(),
                     kind: Kind::boolean(),
                     meaning: Some("foo_meaning"),
-                    want: {
-                        let collection =
-                            Collection::from(BTreeMap::from([("foo".into(), Kind::boolean())]));
-                        let meaning = BTreeMap::from([("foo_meaning".to_owned(), "foo".into())]);
-                        let optional = BTreeSet::from(["foo".into()]);
-
-                        Definition {
-                            collection,
-                            meaning,
-                            optional,
-                        }
+                    want: Definition {
+                        collection: BTreeMap::from([("foo".into(), Kind::boolean().or_null())]).into(),
+                        meaning: [("foo_meaning".to_owned(), "foo".into())].into(),
                     },
                 },
             ),
@@ -401,22 +369,15 @@ mod tests {
                     path: LookupBuf::from_str(".foo.bar").unwrap(),
                     kind: Kind::regex().or_null(),
                     meaning: Some("foobar"),
-                    want: {
-                        let collection = Collection::from(BTreeMap::from([(
+                    want: Definition {
+                        collection: BTreeMap::from([(
                             "foo".into(),
                             Kind::object(BTreeMap::from([("bar".into(), Kind::regex().or_null())])),
-                        )]));
-                        let meaning = BTreeMap::from([(
+                        )]).into(),
+                        meaning: [(
                             "foobar".to_owned(),
                             LookupBuf::from_str(".foo.bar").unwrap().into(),
-                        )]);
-                        let optional = BTreeSet::from([LookupBuf::from_str(".foo.bar").unwrap()]);
-
-                        Definition {
-                            collection,
-                            meaning,
-                            optional,
-                        }
+                        )].into(),
                     },
                 },
             ),
@@ -426,17 +387,9 @@ mod tests {
                     path: "foo".into(),
                     kind: Kind::boolean(),
                     meaning: None,
-                    want: {
-                        let collection =
-                            Collection::from(BTreeMap::from([("foo".into(), Kind::boolean())]));
-                        let meaning = BTreeMap::default();
-                        let optional = BTreeSet::from(["foo".into()]);
-
-                        Definition {
-                            collection,
-                            meaning,
-                            optional,
-                        }
+                    want: Definition {
+                        collection: BTreeMap::from([("foo".into(), Kind::boolean().or_null())]).into(),
+                        meaning: BTreeMap::default(),
                     },
                 },
             ),
@@ -453,7 +406,6 @@ mod tests {
         let want = Definition {
             collection: Collection::from_unknown(Kind::bytes().or_integer()),
             meaning: BTreeMap::default(),
-            optional: BTreeSet::default(),
         };
 
         let mut got = Definition::empty();
@@ -479,25 +431,22 @@ mod tests {
                     this: Definition {
                         collection: Collection::from(BTreeMap::from([(
                             "foo".into(),
-                            Kind::boolean(),
+                            Kind::boolean().or_null(),
                         )])),
-                        optional: BTreeSet::from(["foo".into()]),
                         meaning: BTreeMap::from([("foo_meaning".to_owned(), "foo".into())]),
                     },
                     other: Definition {
                         collection: Collection::from(BTreeMap::from([(
                             "foo".into(),
-                            Kind::boolean(),
+                            Kind::boolean().or_null(),
                         )])),
-                        optional: BTreeSet::from(["foo".into()]),
                         meaning: BTreeMap::from([("foo_meaning".to_owned(), "foo".into())]),
                     },
                     want: Definition {
                         collection: Collection::from(BTreeMap::from([(
                             "foo".into(),
-                            Kind::boolean(),
+                            Kind::boolean().or_null(),
                         )])),
-                        optional: BTreeSet::from(["foo".into()]),
                         meaning: BTreeMap::from([("foo_meaning".to_owned(), "foo".into())]),
                     },
                 },
@@ -508,9 +457,8 @@ mod tests {
                     this: Definition {
                         collection: Collection::from(BTreeMap::from([(
                             "foo".into(),
-                            Kind::boolean(),
+                            Kind::boolean().or_null(),
                         )])),
-                        optional: BTreeSet::from(["foo".into()]),
                         meaning: BTreeMap::default(),
                     },
                     other: Definition {
@@ -518,15 +466,13 @@ mod tests {
                             "foo".into(),
                             Kind::boolean(),
                         )])),
-                        optional: BTreeSet::default(),
                         meaning: BTreeMap::default(),
                     },
                     want: Definition {
                         collection: Collection::from(BTreeMap::from([(
                             "foo".into(),
-                            Kind::boolean(),
+                            Kind::boolean().or_null(),
                         )])),
-                        optional: BTreeSet::default(),
                         meaning: BTreeMap::default(),
                     },
                 },
@@ -539,23 +485,20 @@ mod tests {
                             "foo".into(),
                             Kind::boolean(),
                         )])),
-                        optional: BTreeSet::default(),
                         meaning: BTreeMap::default(),
                     },
                     other: Definition {
                         collection: Collection::from(BTreeMap::from([(
                             "foo".into(),
-                            Kind::boolean(),
+                            Kind::boolean().or_null(),
                         )])),
-                        optional: BTreeSet::from(["foo".into()]),
                         meaning: BTreeMap::default(),
                     },
                     want: Definition {
                         collection: Collection::from(BTreeMap::from([(
                             "foo".into(),
-                            Kind::boolean(),
+                            Kind::boolean().or_null(),
                         )])),
-                        optional: BTreeSet::default(),
                         meaning: BTreeMap::default(),
                     },
                 },
@@ -568,7 +511,6 @@ mod tests {
                             "foo".into(),
                             Kind::boolean(),
                         )])),
-                        optional: BTreeSet::default(),
                         meaning: BTreeMap::default(),
                     },
                     other: Definition {
@@ -576,7 +518,6 @@ mod tests {
                             "foo".into(),
                             Kind::boolean(),
                         )])),
-                        optional: BTreeSet::default(),
                         meaning: BTreeMap::default(),
                     },
                     want: Definition {
@@ -584,7 +525,6 @@ mod tests {
                             "foo".into(),
                             Kind::boolean(),
                         )])),
-                        optional: BTreeSet::default(),
                         meaning: BTreeMap::default(),
                     },
                 },
@@ -597,7 +537,6 @@ mod tests {
                             "foo".into(),
                             Kind::boolean(),
                         )])),
-                        optional: BTreeSet::default(),
                         meaning: BTreeMap::from([(
                             "foo".into(),
                             MeaningPointer::Valid("foo".into()),
@@ -608,7 +547,6 @@ mod tests {
                             "foo".into(),
                             Kind::boolean(),
                         )])),
-                        optional: BTreeSet::default(),
                         meaning: BTreeMap::from([(
                             "foo".into(),
                             MeaningPointer::Valid("bar".into()),
@@ -619,7 +557,6 @@ mod tests {
                             "foo".into(),
                             Kind::boolean(),
                         )])),
-                        optional: BTreeSet::default(),
                         meaning: BTreeMap::from([(
                             "foo".into(),
                             MeaningPointer::Invalid(BTreeSet::from(["foo".into(), "bar".into()])),
@@ -635,7 +572,6 @@ mod tests {
                             "foo".into(),
                             Kind::boolean(),
                         )])),
-                        optional: BTreeSet::default(),
                         meaning: BTreeMap::from([(
                             "foo".into(),
                             MeaningPointer::Valid("foo".into()),
@@ -646,7 +582,6 @@ mod tests {
                             "foo".into(),
                             Kind::boolean(),
                         )])),
-                        optional: BTreeSet::default(),
                         meaning: BTreeMap::from([(
                             "foo".into(),
                             MeaningPointer::Valid("foo".into()),
@@ -657,7 +592,6 @@ mod tests {
                             "foo".into(),
                             Kind::boolean(),
                         )])),
-                        optional: BTreeSet::default(),
                         meaning: BTreeMap::from([(
                             "foo".into(),
                             MeaningPointer::Valid("foo".into()),
