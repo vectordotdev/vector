@@ -3,6 +3,88 @@ use std::{collections::BTreeMap, iter::Peekable};
 use lookup::lookup_v2::BorrowedSegment;
 
 use super::Value;
+use std::collections::btree_map::Entry;
+
+/// Returns a reference to a field value specified by a path iter.
+#[allow(clippy::needless_pass_by_value)]
+pub fn insert<'a>(
+    value: &mut Value,
+    mut path_iter: Peekable<impl Iterator<Item = BorrowedSegment<'a>>>,
+    insert_value: Value,
+) -> Option<Value> {
+    match path_iter.next() {
+        Some(BorrowedSegment::Field(field)) => {
+            if let Value::Object(map) = value {
+                let entry = map.entry(field.to_string());
+                map_insert2(map, field.to_string(), path_iter, insert_value)
+            } else {
+                unimplemented!()
+                // let mut map = BTreeMap::new();
+                // let prev_value = map_insert(&mut map, path_iter, insert_value);
+                // *value = Value::Object(map);
+                // prev_value
+            }
+        }
+        Some(BorrowedSegment::Index(index)) => {
+            unimplemented!()
+        }
+        Some(BorrowedSegment::Invalid) => None,
+        None => Some(std::mem::replace(value, insert_value)),
+    }
+
+    // match path_iter.peek() {
+    //     None => Some(std::mem::replace(value, insert_value)),
+    //     Some(BorrowedSegment::Field(field)) => {
+    //         if let Value::Object(map) = value {
+    //             map_insert(map, path_iter, insert_value)
+    //         } else {
+    //             let mut map = BTreeMap::new();
+    //             let prev_value = map_insert(&mut map, path_iter, insert_value);
+    //             *value = Value::Object(map);
+    //             prev_value
+    //         }
+    //     }
+    //     Some(BorrowedSegment::Index(index)) => {
+    //         if let Value::Array(array) = value {
+    //             array_insert(array, path_iter, insert_value)
+    //         } else {
+    //             let mut array = vec![];
+    //             let prev_value = array_insert(&mut array, path_iter, insert_value);
+    //             *value = Value::Array(array);
+    //             prev_value
+    //         }
+    //     }
+    //     Some(BorrowedSegment::Invalid) => None,
+    // }
+}
+
+pub fn map_insert2<'a>(
+    entry: &mut BTreeMap<String, Value>,
+    field: String,
+    mut path_iter: Peekable<impl Iterator<Item = BorrowedSegment<'a>>>,
+    insert_value: Value,
+) -> Option<Value> {
+    match path_iter.next() {
+        Some(BorrowedSegment::Field(child_field)) => {
+            // entry.
+            if let Value::Object(map) = value {
+                let entry = map.entry(field.to_string());
+                map_insert2(entry, path_iter, insert_value)
+            } else {
+                unimplemented!()
+                // let mut map = BTreeMap::new();
+                // let prev_value = map_insert(&mut map, path_iter, insert_value);
+                // *value = Value::Object(map);
+                // prev_value
+            }
+        }
+        Some(BorrowedSegment::Index(index)) => {
+            unimplemented!()
+        }
+        Some(BorrowedSegment::Invalid) => None,
+        None => Some(std::mem::replace(value, insert_value)),
+    }
+}
 
 pub fn map_insert<'a>(
     fields: &mut BTreeMap<String, Value>,
@@ -62,15 +144,20 @@ pub fn array_insert<'a>(
     }
 }
 
-fn set_array_index(values: &mut Vec<Value>, index: usize, insert_value: Value) -> Option<Value> {
-    if values.len() <= (index as usize) {
-        while values.len() <= (index as usize) {
-            values.push(Value::Null);
+fn set_array_index(values: &mut Vec<Value>, index: isize, insert_value: Value) -> Option<Value> {
+    if index >= 0 {
+        if values.len() <= (index as usize) {
+            while values.len() <= (index as usize) {
+                values.push(Value::Null);
+            }
+            values[index as usize] = insert_value;
+            None
+        } else {
+            Some(std::mem::replace(&mut values[index as usize], insert_value))
         }
-        values[index as usize] = insert_value;
-        None
     } else {
-        Some(std::mem::replace(&mut values[index as usize], insert_value))
+        //TODO: finish
+        None
     }
 }
 

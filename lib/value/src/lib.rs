@@ -19,7 +19,7 @@
     rustdoc::missing_crate_level_docs,
     rustdoc::private_doc_tests,
     rustdoc::private_intra_doc_links,
-    unused
+    // unused
 )]
 #![allow(
     clippy::cast_lossless,

@@ -229,32 +229,9 @@ impl Value {
         insert_value: impl Into<Self>,
     ) -> Option<Self> {
         let insert_value = insert_value.into();
-        let mut path_iter = path.segment_iter().peekable();
+        let path_iter = path.segment_iter().peekable();
 
-        match path_iter.peek() {
-            None => Some(std::mem::replace(self, insert_value)),
-            Some(BorrowedSegment::Field(field)) => {
-                if let Self::Object(map) = self {
-                    insert::map_insert(map, path_iter, insert_value)
-                } else {
-                    let mut map = BTreeMap::new();
-                    let prev_value = insert::map_insert(&mut map, path_iter, insert_value);
-                    *self = Self::Object(map);
-                    prev_value
-                }
-            }
-            Some(BorrowedSegment::Index(index)) => {
-                if let Value::Array(array) = self {
-                    insert::array_insert(array, path_iter, insert_value)
-                } else {
-                    let mut array = vec![];
-                    let prev_value = insert::array_insert(&mut array, path_iter, insert_value);
-                    *self = Self::Array(array);
-                    prev_value
-                }
-            }
-            Some(BorrowedSegment::Invalid) => None,
-        }
+        insert::insert(self, path_iter, insert_value)
     }
 
     /// Removes field value specified by the given path and return its value.

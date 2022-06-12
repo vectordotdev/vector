@@ -84,7 +84,14 @@ impl<'a, 'b, const A: usize> Path<'a> for &'b [BorrowedSegment<'a>; A] {
 impl quickcheck::Arbitrary for BorrowedSegment<'static> {
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
         match usize::arbitrary(g) % 2 {
-            0 => BorrowedSegment::Index(isize::arbitrary(g) % 20),
+            0 => {
+                // TODO
+                // if bool::arbitrary(g) {
+                BorrowedSegment::Index((usize::arbitrary(g) % 20) as isize)
+                // } else {
+                //     BorrowedSegment::Index(-((usize::arbitrary(g) % 20) as isize))
+                // }
+            }
             _ => BorrowedSegment::Field(String::arbitrary(g).into()),
         }
     }
