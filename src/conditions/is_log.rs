@@ -62,11 +62,15 @@ mod test {
     fn is_log_basic() {
         let cond = IsLogConfig {}.build(&Default::default()).unwrap();
 
-        assert!(cond.check(&Event::from("just a log")));
-        assert!(!cond.check(&Event::from(Metric::new(
-            "test metric",
-            MetricKind::Incremental,
-            MetricValue::Counter { value: 1.0 },
-        ))),);
+        assert!(cond.check(Event::from("just a log")).0);
+        assert!(
+            !cond
+                .check(Event::from(Metric::new(
+                    "test metric",
+                    MetricKind::Incremental,
+                    MetricValue::Counter { value: 1.0 },
+                )))
+                .0,
+        );
     }
 }

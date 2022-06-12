@@ -1066,14 +1066,14 @@ mod test {
                 .unwrap_or_else(|_| panic!("build failed: {}", source));
 
             assert!(
-                cond.check_with_context(&pass).is_ok(),
+                cond.check_with_context(pass.clone()).0.is_ok(),
                 "should pass: {}\nevent: {:?}",
                 source,
                 pass.as_log()
             );
 
             assert!(
-                cond.check_with_context(&fail).is_err(),
+                cond.check_with_context(fail.clone()).0.is_err(),
                 "should fail: {}\nevent: {:?}",
                 source,
                 fail.as_log()

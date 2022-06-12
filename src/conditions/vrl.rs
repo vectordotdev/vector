@@ -247,7 +247,7 @@ mod test {
 
             if let Ok(cond) = config.build(&Default::default()) {
                 assert_eq!(
-                    cond.check_with_context(&event),
+                    cond.check_with_context(event.clone()).0,
                     check.map_err(|e| e.to_string())
                 );
             }
