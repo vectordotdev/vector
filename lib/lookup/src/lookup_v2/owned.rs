@@ -21,11 +21,11 @@ impl OwnedPath {
         new_path
     }
 
-    pub fn push_index(&mut self, index: usize) {
+    pub fn push_index(&mut self, index: isize) {
         self.segments.push(OwnedSegment::index(index));
     }
 
-    pub fn with_index_appended(&self, index: usize) -> Self {
+    pub fn with_index_appended(&self, index: isize) -> Self {
         let mut new_path = self.clone();
         new_path.push_index(index);
         new_path
@@ -117,7 +117,7 @@ impl<'a, const N: usize> From<[BorrowedSegment<'a>; N]> for OwnedPath {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum OwnedSegment {
     Field(String),
-    Index(usize),
+    Index(isize),
     Invalid,
 }
 
@@ -125,7 +125,7 @@ impl OwnedSegment {
     pub fn field(value: &str) -> OwnedSegment {
         OwnedSegment::Field(value.into())
     }
-    pub fn index(value: usize) -> OwnedSegment {
+    pub fn index(value: isize) -> OwnedSegment {
         OwnedSegment::Index(value)
     }
     pub fn is_field(&self) -> bool {
@@ -161,8 +161,8 @@ impl<'a> From<&'a String> for OwnedSegment {
     }
 }
 
-impl From<usize> for OwnedSegment {
-    fn from(index: usize) -> Self {
+impl From<isize> for OwnedSegment {
+    fn from(index: isize) -> Self {
         OwnedSegment::index(index)
     }
 }
@@ -229,10 +229,10 @@ mod test {
             ("[42]", "[42]"),
             ("foo.[42]", "foo.<invalid>"),
             ("[42].foo", "[42].foo"),
-            ("[-1]", "<invalid>"),
-            ("[-42]", "<invalid>"),
-            ("[-42].foo", "<invalid>"),
-            ("[-42]foo", "<invalid>"),
+            ("[-1]", "[-1]"),
+            ("[-42]", "[-42]"),
+            ("[-42].foo", "[-42].foo"),
+            ("[-42]foo", "[-42].foo"),
             (r#""[42]. {}-_""#, r#""[42]. {}-_""#),
             (r#""a\"a""#, r#""a\"a""#),
             (r#"foo."a\"a"."b\\b".bar"#, r#"foo."a\"a"."b\\b".bar"#),

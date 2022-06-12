@@ -6,7 +6,7 @@ use std::slice::Iter;
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum BorrowedSegment<'a> {
     Field(Cow<'a, str>),
-    Index(usize),
+    Index(isize),
     Invalid,
 }
 
@@ -14,7 +14,7 @@ impl BorrowedSegment<'_> {
     pub fn field(value: &str) -> BorrowedSegment {
         BorrowedSegment::Field(Cow::Borrowed(value))
     }
-    pub fn index(value: usize) -> BorrowedSegment<'static> {
+    pub fn index(value: isize) -> BorrowedSegment<'static> {
         BorrowedSegment::Index(value)
     }
     pub fn is_field(&self) -> bool {
@@ -40,8 +40,8 @@ impl<'a> From<&'a String> for BorrowedSegment<'a> {
     }
 }
 
-impl From<usize> for BorrowedSegment<'_> {
-    fn from(index: usize) -> Self {
+impl From<isize> for BorrowedSegment<'_> {
+    fn from(index: isize) -> Self {
         BorrowedSegment::index(index)
     }
 }
@@ -84,7 +84,7 @@ impl<'a, 'b, const A: usize> Path<'a> for &'b [BorrowedSegment<'a>; A] {
 impl quickcheck::Arbitrary for BorrowedSegment<'static> {
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
         match usize::arbitrary(g) % 2 {
-            0 => BorrowedSegment::Index(usize::arbitrary(g) % 20),
+            0 => BorrowedSegment::Index(isize::arbitrary(g) % 20),
             _ => BorrowedSegment::Field(String::arbitrary(g).into()),
         }
     }

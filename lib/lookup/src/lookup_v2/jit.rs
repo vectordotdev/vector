@@ -50,7 +50,8 @@ enum JitState {
     Continue,
     Dot,
     IndexStart,
-    Index { value: usize },
+    NegativeIndex { value: isize },
+    Index { value: isize },
     Field { start: usize },
     Quote { start: usize },
     EscapedQuote,
@@ -68,6 +69,7 @@ impl<'a> Iterator for JitLookup<'a> {
                         JitState::Start
                         | JitState::IndexStart
                         | JitState::Index { .. }
+                        | JitState::NegativeIndex { .. }
                         | JitState::Quote { .. }
                         | JitState::EscapedQuote { .. } => Some(BorrowedSegment::Invalid),
 
@@ -159,18 +161,35 @@ impl<'a> Iterator for JitLookup<'a> {
                             '0'..='9' => (
                                 None,
                                 JitState::Index {
-                                    value: c as usize - '0' as usize,
+                                    value: c as isize - '0' as isize,
                                 },
                             ),
+                            '-' => (None, JitState::NegativeIndex { value: 0 }),
                             _ => (Some(Some(BorrowedSegment::Invalid)), JitState::End),
                         },
                         JitState::Index { value } => match c {
                             '0'..='9' => {
-                                let new_digit = c as usize - '0' as usize;
+                                let new_digit = c as isize - '0' as isize;
                                 (
                                     None,
                                     JitState::Index {
                                         value: value * 10 + new_digit,
+                                    },
+                                )
+                            }
+                            ']' => (
+                                Some(Some(BorrowedSegment::Index(value))),
+                                JitState::Continue,
+                            ),
+                            _ => (Some(Some(BorrowedSegment::Invalid)), JitState::End),
+                        },
+                        JitState::NegativeIndex { value } => match c {
+                            '0'..='9' => {
+                                let new_digit = c as isize - '0' as isize;
+                                (
+                                    None,
+                                    JitState::NegativeIndex {
+                                        value: value * 10 - new_digit,
                                     },
                                 )
                             }
@@ -227,11 +246,11 @@ mod test {
             (".[42]", owned_path!(OwnedSegment::Invalid)),
             ("[42].foo", owned_path!(42, "foo")),
             ("[42]foo", owned_path!(42, "foo")),
-            ("[-1]", owned_path!(OwnedSegment::Invalid)),
-            ("[-42]", owned_path!(OwnedSegment::Invalid)),
+            ("[-1]", owned_path!(-1)),
+            ("[-42]", owned_path!(-42)),
             (".[-42]", owned_path!(OwnedSegment::Invalid)),
-            ("[-42].foo", owned_path!(OwnedSegment::Invalid)),
-            ("[-42]foo", owned_path!(OwnedSegment::Invalid)),
+            ("[-42].foo", owned_path!(-42, "foo")),
+            ("[-42]foo", owned_path!(-42, "foo")),
             (".\"[42]. {}-_\"", owned_path!("[42]. {}-_")),
             ("\"a\\\"a\"", owned_path!("a\"a")),
             (".\"a\\\"a\"", owned_path!("a\"a")),
@@ -243,12 +262,12 @@ mod test {
         ];
 
         for (path, expected) in test_cases {
-            let actual = JitPath::new(path);
-            if !actual.eq(&expected) {
+            if !Path::eq(&path, &expected) {
                 panic!(
-                    "Not equal.\nExpected: {:?}\nActual: {:?}",
+                    "Not equal. Input={:?}\nExpected: {:?}\nActual: {:?}",
+                    path,
                     (&expected).segment_iter().collect::<Vec<_>>(),
-                    actual.segment_iter().collect::<Vec<_>>()
+                    path.segment_iter().collect::<Vec<_>>()
                 );
             }
         }
