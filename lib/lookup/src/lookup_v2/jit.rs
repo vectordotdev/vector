@@ -1,3 +1,7 @@
+//!
+//! This contains all the functionality for the JIT (Just In Time) features of the lookup path.
+//! This allows parsing on the fly as it's needed.
+
 use std::borrow::Cow;
 use std::str::CharIndices;
 
@@ -190,113 +194,63 @@ impl<'a> Iterator for JitLookup<'a> {
 
 #[cfg(test)]
 mod test {
-    use std::borrow::Cow;
-
-    use crate::lookup_v2::{BorrowedSegment, JitPath, Path};
+    use crate::lookup_v2::{JitPath, OwnedPath, OwnedSegment, Path};
+    use crate::owned_path;
 
     #[test]
     fn parsing() {
-        let test_cases: Vec<(_, Vec<BorrowedSegment>)> = vec![
-            ("", vec![BorrowedSegment::Invalid]),
-            (".", vec![]),
-            ("]", vec![BorrowedSegment::Invalid]),
-            ("]foo", vec![BorrowedSegment::Invalid]),
-            ("..", vec![BorrowedSegment::Invalid]),
-            ("...", vec![BorrowedSegment::Invalid]),
-            ("f", vec![BorrowedSegment::Field(Cow::from("f"))]),
-            (".f", vec![BorrowedSegment::Field(Cow::from("f"))]),
-            (".[", vec![BorrowedSegment::Invalid]),
-            ("f.", vec![BorrowedSegment::Field(Cow::from("f"))]),
-            ("foo", vec![BorrowedSegment::Field(Cow::from("foo"))]),
+        let test_cases: Vec<(_, OwnedPath)> = vec![
+            ("", owned_path!(OwnedSegment::Invalid)),
+            (".", owned_path!()),
+            ("]", owned_path!(OwnedSegment::Invalid)),
+            ("]foo", owned_path!(OwnedSegment::Invalid)),
+            ("..", owned_path!(OwnedSegment::Invalid)),
+            ("...", owned_path!(OwnedSegment::Invalid)),
+            ("f", owned_path!("f")),
+            (".f", owned_path!("f")),
+            (".[", owned_path!(OwnedSegment::Invalid)),
+            ("f.", owned_path!("f")),
+            ("foo", owned_path!("foo")),
             (
                 "ec2.metadata.\"availability-zone\"",
-                vec![
-                    BorrowedSegment::Field(Cow::from("ec2")),
-                    BorrowedSegment::Field(Cow::from("metadata")),
-                    BorrowedSegment::Field(Cow::from("availability-zone")),
-                ],
+                owned_path!("ec2", "metadata", "availability-zone"),
             ),
-            (".foo", vec![BorrowedSegment::Field(Cow::from("foo"))]),
-            (
-                ".@timestamp",
-                vec![BorrowedSegment::Field(Cow::from("@timestamp"))],
-            ),
-            (
-                "foo[",
-                vec![
-                    BorrowedSegment::Field(Cow::from("foo")),
-                    BorrowedSegment::Invalid,
-                ],
-            ),
-            ("foo$", vec![BorrowedSegment::Invalid]),
-            (
-                "\"$peci@l chars\"",
-                vec![BorrowedSegment::Field(Cow::from("$peci@l chars"))],
-            ),
-            (
-                ".foo.foo bar",
-                vec![
-                    BorrowedSegment::Field(Cow::from("foo")),
-                    BorrowedSegment::Invalid,
-                ],
-            ),
-            (
-                ".foo.\"foo bar\".bar",
-                vec![
-                    BorrowedSegment::Field(Cow::from("foo")),
-                    BorrowedSegment::Field(Cow::from("foo bar")),
-                    BorrowedSegment::Field(Cow::from("bar")),
-                ],
-            ),
-            ("[1]", vec![BorrowedSegment::Index(1)]),
-            ("[42]", vec![BorrowedSegment::Index(42)]),
-            (".[42]", vec![BorrowedSegment::Invalid]),
-            (
-                "[42].foo",
-                vec![
-                    BorrowedSegment::Index(42),
-                    BorrowedSegment::Field(Cow::from("foo")),
-                ],
-            ),
-            (
-                "[42]foo",
-                vec![
-                    BorrowedSegment::Index(42),
-                    BorrowedSegment::Field(Cow::from("foo")),
-                ],
-            ),
-            ("[-1]", vec![BorrowedSegment::Invalid]),
-            ("[-42]", vec![BorrowedSegment::Invalid]),
-            (".[-42]", vec![BorrowedSegment::Invalid]),
-            ("[-42].foo", vec![BorrowedSegment::Invalid]),
-            ("[-42]foo", vec![BorrowedSegment::Invalid]),
-            (
-                ".\"[42]. {}-_\"",
-                vec![BorrowedSegment::Field(Cow::from("[42]. {}-_"))],
-            ),
-            (
-                "\"a\\\"a\"",
-                vec![BorrowedSegment::Field(Cow::from("a\"a"))],
-            ),
-            (
-                ".\"a\\\"a\"",
-                vec![BorrowedSegment::Field(Cow::from("a\"a"))],
-            ),
+            (".foo", owned_path!("foo")),
+            (".@timestamp", owned_path!("@timestamp")),
+            ("foo[", owned_path!("foo", OwnedSegment::Invalid)),
+            ("foo$", owned_path!(OwnedSegment::Invalid)),
+            ("\"$peci@l chars\"", owned_path!("$peci@l chars")),
+            (".foo.foo bar", owned_path!("foo", OwnedSegment::Invalid)),
+            (".foo.\"foo bar\".bar", owned_path!("foo", "foo bar", "bar")),
+            ("[1]", owned_path!(1)),
+            ("[42]", owned_path!(42)),
+            (".[42]", owned_path!(OwnedSegment::Invalid)),
+            ("[42].foo", owned_path!(42, "foo")),
+            ("[42]foo", owned_path!(42, "foo")),
+            ("[-1]", owned_path!(OwnedSegment::Invalid)),
+            ("[-42]", owned_path!(OwnedSegment::Invalid)),
+            (".[-42]", owned_path!(OwnedSegment::Invalid)),
+            ("[-42].foo", owned_path!(OwnedSegment::Invalid)),
+            ("[-42]foo", owned_path!(OwnedSegment::Invalid)),
+            (".\"[42]. {}-_\"", owned_path!("[42]. {}-_")),
+            ("\"a\\\"a\"", owned_path!("a\"a")),
+            (".\"a\\\"a\"", owned_path!("a\"a")),
             (
                 ".foo.\"a\\\"a\".\"b\\\\b\".bar",
-                vec![
-                    BorrowedSegment::Field(Cow::from("foo")),
-                    BorrowedSegment::Field(Cow::from("a\"a")),
-                    BorrowedSegment::Field(Cow::from("b\\b")),
-                    BorrowedSegment::Field(Cow::from("bar")),
-                ],
+                owned_path!("foo", "a\"a", "b\\b", "bar"),
             ),
-            (r#"."🤖""#, vec![BorrowedSegment::Field(Cow::from("🤖"))]),
+            (r#"."🤖""#, owned_path!("🤖")),
         ];
 
         for (path, expected) in test_cases {
-            let segments: Vec<_> = JitPath::new(path).segment_iter().collect();
-            assert_eq!(segments, expected)
+            let actual = JitPath::new(path);
+            if !actual.eq(&expected) {
+                panic!(
+                    "Not equal.\nExpected: {:?}\nActual: {:?}",
+                    (&expected).segment_iter().collect::<Vec<_>>(),
+                    actual.segment_iter().collect::<Vec<_>>()
+                );
+            }
         }
     }
 }
