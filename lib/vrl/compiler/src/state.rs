@@ -181,6 +181,14 @@ impl ExternalEnv {
         self.custom.insert::<T>(data);
     }
 
+    /// Marks everything as read only. Any mutations on read-only values will result in a
+    /// compile time error.
+    pub fn read_only(mut self) -> Self {
+        self.add_read_only_event_path(LookupBuf::root(), true);
+        self.add_read_only_metadata_path(LookupBuf::root(), true);
+        self
+    }
+
     /// Get external context data from the external environment.
     pub fn get_external_context<T: 'static>(&self) -> Option<&T> {
         self.custom.get::<T>()

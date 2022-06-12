@@ -38,19 +38,13 @@ impl ConditionConfig for VrlConfig {
         //     },
         // };
 
-        // Filter out functions that directly mutate the event.
-        //
-        // TODO(jean): expose this as a method on the `Function` trait, so we
-        // don't need to do this manually.
         let functions = vrl_stdlib::all()
             .into_iter()
-            .filter(|f| f.identifier() != "del")
-            .filter(|f| f.identifier() != "only_fields")
             .chain(enrichment::vrl_functions().into_iter())
             .chain(vector_vrl_functions::vrl_functions())
             .collect::<Vec<_>>();
 
-        let mut state = vrl::state::ExternalEnv::default();
+        let mut state = vrl::state::ExternalEnv::default().read_only();
         state.set_external_context(enrichment_tables.clone());
 
         let (program, warnings) = vrl::compile_with_state(&self.source, &functions, &mut state)
