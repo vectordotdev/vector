@@ -125,10 +125,8 @@ impl ExternalEnv {
                 if path.starts_with(&read_only_path.path) {
                     return true;
                 }
-            } else {
-                if path == &read_only_path.path {
-                    return true;
-                }
+            } else if path == &read_only_path.path {
+                return true;
             }
         }
         false

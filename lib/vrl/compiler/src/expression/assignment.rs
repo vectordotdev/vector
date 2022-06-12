@@ -164,7 +164,7 @@ fn verify_mutable(
 ) -> Result<(), Error> {
     match target {
         Target::External(lookup_buf) => {
-            if external.is_read_only_event_path(&lookup_buf) {
+            if external.is_read_only_event_path(lookup_buf) {
                 Err(Error {
                     variant: ErrorVariant::ReadOnly,
                     expr_span,

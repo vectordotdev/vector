@@ -625,7 +625,7 @@ impl diagnostic::DiagnosticMessage for Error {
 
             ExpectedFunctionClosure => vec![],
             ReadOnlyMutation { context } => vec![
-                Label::primary(format!(r#"mutation of read-only value"#), Span::default()),
+                Label::primary(r#"mutation of read-only value"#, Span::default()),
                 Label::context(context, Span::default()),
             ],
         }
