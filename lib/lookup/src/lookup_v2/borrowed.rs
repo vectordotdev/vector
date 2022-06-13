@@ -83,15 +83,14 @@ impl<'a, 'b, const A: usize> Path<'a> for &'b [BorrowedSegment<'a>; A] {
 #[cfg(any(test, feature = "arbitrary"))]
 impl quickcheck::Arbitrary for BorrowedSegment<'static> {
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
-        match usize::arbitrary(g) % 2 {
-            0 => {
-                if bool::arbitrary(g) {
-                    BorrowedSegment::Index((usize::arbitrary(g) % 20) as isize)
-                } else {
-                    BorrowedSegment::Index(-((usize::arbitrary(g) % 20) as isize))
-                }
+        if bool::arbitrary(g) {
+            if bool::arbitrary(g) {
+                BorrowedSegment::Index((usize::arbitrary(g) % 20) as isize)
+            } else {
+                BorrowedSegment::Index(-((usize::arbitrary(g) % 20) as isize))
             }
-            _ => BorrowedSegment::Field(String::arbitrary(g).into()),
+        } else {
+            BorrowedSegment::Field(String::arbitrary(g).into())
         }
     }
 
