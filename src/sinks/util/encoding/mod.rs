@@ -95,17 +95,6 @@ pub trait Encoder<T> {
     ///
     /// If an I/O error is encountered while encoding the input, an error variant will be returned.
     fn encode_input(&self, input: T, writer: &mut dyn io::Write) -> io::Result<usize>;
-
-    /// Encodes the input into a String.
-    ///
-    /// # Errors
-    ///
-    /// If an I/O error is encountered while encoding the input, an error variant will be returned.
-    fn encode_input_to_string(&self, input: T) -> io::Result<String> {
-        let mut buffer = vec![];
-        self.encode_input(input, &mut buffer)?;
-        Ok(String::from_utf8_lossy(&buffer).to_string())
-    }
 }
 
 impl Encoder<Vec<Event>> for (Transformer, crate::codecs::Encoder<Framer>) {

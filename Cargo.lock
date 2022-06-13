@@ -1019,7 +1019,7 @@ dependencies = [
  "serde_json",
  "thiserror",
  "url",
- "uuid 1.1.1",
+ "uuid 1.1.2",
 ]
 
 [[package]]
@@ -1041,7 +1041,7 @@ dependencies = [
  "serde_json",
  "thiserror",
  "url",
- "uuid 1.1.1",
+ "uuid 1.1.2",
 ]
 
 [[package]]
@@ -1067,7 +1067,7 @@ dependencies = [
  "sha2 0.10.2",
  "thiserror",
  "url",
- "uuid 1.1.1",
+ "uuid 1.1.2",
 ]
 
 [[package]]
@@ -1091,7 +1091,7 @@ dependencies = [
  "serde_json",
  "thiserror",
  "url",
- "uuid 1.1.1",
+ "uuid 1.1.2",
 ]
 
 [[package]]
@@ -2145,7 +2145,7 @@ dependencies = [
  "peeking_take_while",
  "regex",
  "serde_json",
- "strum_macros 0.24.0",
+ "strum_macros 0.24.1",
  "thiserror",
  "tracing 0.1.34",
  "tracing-test 0.2.1",
@@ -3619,9 +3619,9 @@ checksum = "64e9829a50b42bb782c1df523f78d332fe371b10c661e78b7a3c34b0198e9fac"
 
 [[package]]
 name = "infer"
-version = "0.8.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16f98856089d7ef1e861afada561bc23897918cfdfda49fe4f90ae9152ac86c3"
+checksum = "e035cede526e0b21d5adffc9fa0eb4ef5d6026fe9c5b0bfe8084b9472b587a55"
 
 [[package]]
 name = "inherent"
@@ -4146,7 +4146,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "14e4fcc00ff6731d94b70e16e71f43bda62883461f31230742e3bc6dddf12988"
 dependencies = [
  "libc",
- "uuid 1.1.1",
+ "uuid 1.1.2",
  "winapi 0.3.9",
 ]
 
@@ -6428,7 +6428,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bfa0f585226d2e68097d4f95d113b15b83a82e819ab25717ec0590d9584ef366"
 dependencies = [
- "semver 1.0.9",
+ "semver 1.0.10",
 ]
 
 [[package]]
@@ -6739,9 +6739,9 @@ dependencies = [
 
 [[package]]
 name = "semver"
-version = "1.0.9"
+version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8cb243bdfdb5936c8dc3c45762a19d12ab4550cdc753bc247637d4ec35a040fd"
+checksum = "a41d061efea015927ac527063765e73601444cdc344ba855bc7bd44578b25e1c"
 dependencies = [
  "serde",
 ]
@@ -7315,9 +7315,9 @@ checksum = "57bd81eb48f4c437cadc685403cad539345bf703d78e63707418431cecd4522b"
 
 [[package]]
 name = "strum"
-version = "0.24.0"
+version = "0.24.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e96acfc1b70604b8b2f1ffa4c57e59176c7dbb05d556c71ecd2f5498a1dee7f8"
+checksum = "063e6045c0e62079840579a7e47a355ae92f60eb74daaf156fb1e84ba164e63f"
 
 [[package]]
 name = "strum_macros"
@@ -7333,9 +7333,9 @@ dependencies = [
 
 [[package]]
 name = "strum_macros"
-version = "0.24.0"
+version = "0.24.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6878079b17446e4d3eba6192bb0a2950d5b14f0ed8424b852310e5a94345d0ef"
+checksum = "9550962e7cf70d9980392878dfaf1dcc3ece024f4cf3bf3c46b978d0bad61d6c"
 dependencies = [
  "heck 0.4.0",
  "proc-macro2",
@@ -8483,9 +8483,9 @@ dependencies = [
 
 [[package]]
 name = "uuid"
-version = "1.1.1"
+version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c6d5d669b51467dcf7b2f1a796ce0f955f05f01cafda6c19d6e95f730df29238"
+checksum = "dd6469f4314d5f1ffec476e05f17cc9a78bc7a27a6a857842170bdf8d6f98d2f"
 dependencies = [
  "getrandom 0.2.6",
  "serde",
@@ -8609,7 +8609,7 @@ dependencies = [
  "hyper-proxy",
  "indexmap",
  "indoc",
- "infer 0.8.0",
+ "infer 0.8.1",
  "inventory 0.1.11",
  "itertools",
  "k8s-openapi",
@@ -8661,7 +8661,7 @@ dependencies = [
  "schannel",
  "seahash",
  "security-framework",
- "semver 1.0.9",
+ "semver 1.0.10",
  "serde",
  "serde-toml-merge",
  "serde_bytes",
@@ -8676,8 +8676,8 @@ dependencies = [
  "socket2",
  "stream-cancel",
  "strip-ansi-escapes",
- "strum 0.24.0",
- "strum_macros 0.24.0",
+ "strum 0.24.1",
+ "strum_macros 0.24.1",
  "syslog",
  "tempfile",
  "tikv-jemallocator",
@@ -8703,7 +8703,7 @@ dependencies = [
  "tui",
  "typetag",
  "url",
- "uuid 1.1.1",
+ "uuid 1.1.2",
  "value",
  "vector-api-client",
  "vector-vrl-functions",
@@ -8737,7 +8737,7 @@ dependencies = [
  "tokio-stream",
  "tokio-tungstenite 0.17.1",
  "url",
- "uuid 1.1.1",
+ "uuid 1.1.2",
 ]
 
 [[package]]
@@ -9076,7 +9076,7 @@ dependencies = [
  "uaparser",
  "url",
  "utf8-width",
- "uuid 1.1.1",
+ "uuid 1.1.2",
  "value",
  "vector_common",
  "vrl",

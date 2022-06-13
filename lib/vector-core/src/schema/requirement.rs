@@ -308,11 +308,7 @@ mod tests {
                 "invalid required meaning kind",
                 TestCase {
                     requirement: Requirement::empty().required_meaning("foo", Kind::boolean()),
-                    definition: Definition::empty().required_field(
-                        "foo",
-                        Kind::integer(),
-                        Some("foo"),
-                    ),
+                    definition: Definition::empty().with_field("foo", Kind::integer(), Some("foo")),
                     errors: vec![ValidationError::MeaningKind {
                         identifier: "foo",
                         want: Kind::boolean(),
@@ -324,11 +320,7 @@ mod tests {
                 "invalid optional meaning kind",
                 TestCase {
                     requirement: Requirement::empty().optional_meaning("foo", Kind::boolean()),
-                    definition: Definition::empty().required_field(
-                        "foo",
-                        Kind::integer(),
-                        Some("foo"),
-                    ),
+                    definition: Definition::empty().with_field("foo", Kind::integer(), Some("foo")),
                     errors: vec![ValidationError::MeaningKind {
                         identifier: "foo",
                         want: Kind::boolean(),
@@ -341,12 +333,8 @@ mod tests {
                 TestCase {
                     requirement: Requirement::empty().optional_meaning("foo", Kind::boolean()),
                     definition: Definition::empty()
-                        .required_field("foo", Kind::integer(), Some("foo"))
-                        .merge(Definition::empty().required_field(
-                            "bar",
-                            Kind::boolean(),
-                            Some("foo"),
-                        )),
+                        .with_field("foo", Kind::integer(), Some("foo"))
+                        .merge(Definition::empty().with_field("bar", Kind::boolean(), Some("foo"))),
                     errors: vec![ValidationError::MeaningDuplicate {
                         identifier: "foo",
                         paths: BTreeSet::from(["foo".into(), "bar".into()]),

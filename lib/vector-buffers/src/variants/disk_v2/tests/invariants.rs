@@ -8,7 +8,7 @@ use crate::{
     assert_reader_writer_v2_file_positions, await_timeout, set_data_file_length,
     test::common::{install_tracing_helpers, with_temp_dir, MultiEventRecord, SizedRecord},
     variants::disk_v2::{
-        common::MAX_FILE_ID,
+        common::{DEFAULT_FLUSH_INTERVAL, MAX_FILE_ID},
         tests::{create_buffer_v2_with_write_buffer_size, create_default_buffer_v2},
     },
     EventCount,
@@ -647,7 +647,16 @@ async fn writer_waits_for_reader_after_validate_last_write_fails_and_data_file_s
                 assert_buffer_size!(ledger, records_written, total_bytes_written);
             }
 
+            // Advance the time to ensure that we can trigger a full flush so that all writer bytes
+            // are demonstrably on disk after doing so.
+            tokio::time::pause();
+            tokio::time::advance(DEFAULT_FLUSH_INTERVAL).await;
+
+            writer.flush().await.expect("flush should not fail");
             writer.close();
+
+            tokio::time::resume();
+
             let current_data_file_path = ledger.get_current_writer_data_file_path();
             let next_data_file_path = ledger.get_next_writer_data_file_path();
             let next_data_file_id = ledger.get_next_writer_file_id();
