@@ -7,7 +7,7 @@ use http::{
     Request, StatusCode, Uri,
 };
 use hyper::Body;
-use snafu::{ResultExt, Snafu};
+use snafu::ResultExt;
 use tower::Service;
 use vector_common::internal_event::BytesSent;
 use vector_core::{
@@ -18,7 +18,8 @@ use vector_core::{
 };
 
 use crate::{
-    http::{BuildRequestSnafu, CallRequestSnafu, HttpClient, HttpError},
+    http::{BuildRequestSnafu, CallRequestSnafu, HttpClient},
+    sinks::datadog::ApiError,
     sinks::util::retries::{RetryAction, RetryLogic},
 };
 
@@ -27,22 +28,26 @@ use crate::{
 pub struct DatadogMetricsRetryLogic;
 
 impl RetryLogic for DatadogMetricsRetryLogic {
-    type Error = HttpError;
+    type Error = ApiError;
     type Response = DatadogMetricsResponse;
 
-    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
-        true
+    fn is_retriable_error(&self, error: &Self::Error) -> bool {
+        match *error {
+            ApiError::BadRequest | ApiError::PayloadTooLarge => false,
+            // This retry logic will be expanded further, but specifically retrying unauthorized
+            // requests and lower level HttpErrorsfor now.
+            // I verified using `curl` that `403` is the respose code for this.
+            //
+            // https://github.com/vectordotdev/vector/issues/10870
+            // https://github.com/vectordotdev/vector/issues/12220
+            ApiError::HttpError { .. } | ApiError::ServerError | ApiError::Forbidden => true,
+        }
     }
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
         let status = response.status_code;
 
         match status {
-            // This retry logic will be expanded further, but specifically retrying unauthorized
-            // requests for now. I verified using `curl` that `403` is the respose code for this.
-            //
-            // https://github.com/vectordotdev/vector/issues/10870
-            // https://github.com/vectordotdev/vector/issues/12220
             StatusCode::FORBIDDEN => RetryAction::Retry("forbidden".into()),
             StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
             StatusCode::NOT_IMPLEMENTED => {
@@ -55,20 +60,6 @@ impl RetryLogic for DatadogMetricsRetryLogic {
             _ => RetryAction::DontRetry(format!("response status: {}", status).into()),
         }
     }
-}
-
-#[derive(Debug, Snafu)]
-pub enum MetricApiError {
-    #[snafu(display("Server responded with an error."))]
-    ServerError,
-    #[snafu(display("Failed to make HTTP(S) request: {}", error))]
-    HttpError { error: crate::http::HttpError },
-    #[snafu(display("Client sent a payload that is too large."))]
-    PayloadTooLarge,
-    #[snafu(display("Client request was not valid for unknown reasons."))]
-    BadRequest,
-    #[snafu(display("Client request was forbidden."))]
-    Forbidden,
 }
 
 /// Generalized request for sending metrics to the Datadog metrics endpoints.
@@ -184,13 +175,13 @@ impl DatadogMetricsService {
 
 impl Service<DatadogMetricsRequest> for DatadogMetricsService {
     type Response = DatadogMetricsResponse;
-    type Error = MetricApiError;
+    type Error = ApiError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
         match self.client.poll_ready(cx) {
             Poll::Ready(Ok(())) => Poll::Ready(Ok(())),
-            Poll::Ready(Err(error)) => Poll::Ready(Err(MetricApiError::HttpError { error })),
+            Poll::Ready(Err(error)) => Poll::Ready(Err(ApiError::HttpError { error })),
             Poll::Pending => Poll::Pending,
         }
     }
@@ -208,26 +199,43 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
             let request = request
                 .into_http_request(api_key)
                 .context(BuildRequestSnafu)
-                .map_err(|error| MetricApiError::HttpError { error })?;
+                .map_err(|error| ApiError::HttpError { error })?;
 
             match client.send(request).await {
-                Ok(response) => {
-                    let (parts, body) = response.into_parts();
-                    let mut body = hyper::body::aggregate(body)
-                        .await
-                        .context(CallRequestSnafu)
-                        .map_err(|error| MetricApiError::HttpError { error })?;
-                    let body = body.copy_to_bytes(body.remaining());
-                    Ok(DatadogMetricsResponse {
-                        status_code: parts.status,
-                        body,
-                        batch_size,
-                        byte_size,
-                        raw_byte_size,
-                        protocol,
-                    })
-                }
-                Err(error) => Err(MetricApiError::HttpError { error }),
+                Ok(response) => match response.status() {
+                    // From https://docs.datadoghq.com/api/latest/logs/:
+                    //
+                    // The status codes answered by the HTTP API are:
+                    // 200: OK (v1)
+                    // 202: Accepted (v2)
+                    // 400: Bad request (likely an issue in the payload
+                    //      formatting)
+                    // 403: Permission issue (likely using an invalid API Key)
+                    // 413: Payload too large (batch is above 5MB uncompressed)
+                    // 5xx: Internal error, request should be retried after some
+                    //      time
+                    StatusCode::BAD_REQUEST => Err(ApiError::BadRequest),
+                    StatusCode::FORBIDDEN => Err(ApiError::Forbidden),
+                    StatusCode::OK | StatusCode::ACCEPTED => {
+                        let (parts, body) = response.into_parts();
+                        let mut body = hyper::body::aggregate(body)
+                            .await
+                            .context(CallRequestSnafu)
+                            .map_err(|error| ApiError::HttpError { error })?;
+                        let body = body.copy_to_bytes(body.remaining());
+                        Ok(DatadogMetricsResponse {
+                            status_code: parts.status,
+                            body,
+                            batch_size,
+                            byte_size,
+                            raw_byte_size,
+                            protocol,
+                        })
+                    }
+                    StatusCode::PAYLOAD_TOO_LARGE => Err(ApiError::PayloadTooLarge),
+                    _ => Err(ApiError::ServerError),
+                },
+                Err(error) => Err(ApiError::HttpError { error }),
             }
         })
     }

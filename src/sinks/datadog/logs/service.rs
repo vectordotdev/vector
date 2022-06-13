@@ -10,7 +10,6 @@ use http::{
     Request, StatusCode, Uri,
 };
 use hyper::Body;
-use snafu::Snafu;
 use tower::Service;
 use tracing::Instrument;
 use vector_common::internal_event::BytesSent;
@@ -23,6 +22,7 @@ use vector_core::{
 
 use crate::{
     http::HttpClient,
+    sinks::datadog::ApiError,
     sinks::util::{retries::RetryLogic, Compression},
 };
 
@@ -30,21 +30,19 @@ use crate::{
 pub struct LogApiRetry;
 
 impl RetryLogic for LogApiRetry {
-    type Error = LogApiError;
+    type Error = ApiError;
     type Response = LogApiResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match *error {
-            LogApiError::BadRequest | LogApiError::PayloadTooLarge => false,
+            ApiError::BadRequest | ApiError::PayloadTooLarge => false,
             // This retry logic will be expanded further, but specifically retrying unauthorized
             // requests and lower level HttpErrorsfor now.
             // I verified using `curl` that `403` is the respose code for this.
             //
             // https://github.com/vectordotdev/vector/issues/10870
             // https://github.com/vectordotdev/vector/issues/12220
-            LogApiError::HttpError { .. } | LogApiError::ServerError | LogApiError::Forbidden => {
-                true
-            }
+            ApiError::HttpError { .. } | ApiError::ServerError | ApiError::Forbidden => true,
         }
     }
 }
@@ -70,20 +68,6 @@ impl Finalizable for LogApiRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
         std::mem::take(&mut self.finalizers)
     }
-}
-
-#[derive(Debug, Snafu)]
-pub enum LogApiError {
-    #[snafu(display("Server responded with an error."))]
-    ServerError,
-    #[snafu(display("Failed to make HTTP(S) request: {}", error))]
-    HttpError { error: crate::http::HttpError },
-    #[snafu(display("Client sent a payload that is too large."))]
-    PayloadTooLarge,
-    #[snafu(display("Client request was not valid for unknown reasons."))]
-    BadRequest,
-    #[snafu(display("Client request was forbidden."))]
-    Forbidden,
 }
 
 #[derive(Debug)]
@@ -140,7 +124,7 @@ impl LogApiService {
 
 impl Service<LogApiRequest> for LogApiService {
     type Response = LogApiResponse;
-    type Error = LogApiError;
+    type Error = ApiError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
@@ -194,8 +178,8 @@ impl Service<LogApiRequest> for LogApiService {
                     // 5xx: Internal error, request should be retried after some
                     //      time
                     match status {
-                        StatusCode::BAD_REQUEST => Err(LogApiError::BadRequest),
-                        StatusCode::FORBIDDEN => Err(LogApiError::Forbidden),
+                        StatusCode::BAD_REQUEST => Err(ApiError::BadRequest),
+                        StatusCode::FORBIDDEN => Err(ApiError::Forbidden),
                         StatusCode::OK | StatusCode::ACCEPTED => Ok(LogApiResponse {
                             event_status: EventStatus::Delivered,
                             count,
@@ -203,11 +187,11 @@ impl Service<LogApiRequest> for LogApiService {
                             raw_byte_size,
                             protocol,
                         }),
-                        StatusCode::PAYLOAD_TOO_LARGE => Err(LogApiError::PayloadTooLarge),
-                        _ => Err(LogApiError::ServerError),
+                        StatusCode::PAYLOAD_TOO_LARGE => Err(ApiError::PayloadTooLarge),
+                        _ => Err(ApiError::ServerError),
                     }
                 }
-                Err(error) => Err(LogApiError::HttpError { error }),
+                Err(error) => Err(ApiError::HttpError { error }),
             }
         })
     }

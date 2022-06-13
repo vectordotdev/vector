@@ -18,6 +18,7 @@ use crate::{
     http::HttpError,
     sinks::{
         datadog::logs::DatadogLogsConfig,
+        datadog::ApiError,
         util::retries::RetryLogic,
         util::test::{build_test_server_status, load_sink},
     },
@@ -25,7 +26,7 @@ use crate::{
     tls::TlsError,
 };
 
-use super::service::{LogApiError, LogApiRetry};
+use super::service::LogApiRetry;
 
 // The sink must support v1 and v2 API endpoints which have different codes for
 // signaling status. This enum allows us to signal which API endpoint and what
@@ -437,15 +438,15 @@ async fn no_enterprise_headers_inner(api_status: ApiStatus) {
 }
 
 #[tokio::test]
-/// Assert retry behavior for LogApiErrors
+/// Assert the RetryLogic implementation of LogApiRetry
 async fn log_api_error_is_retriable() {
     let retry = LogApiRetry;
 
-    assert!(!retry.is_retriable_error(&LogApiError::BadRequest));
-    assert!(!retry.is_retriable_error(&LogApiError::PayloadTooLarge));
-    assert!(retry.is_retriable_error(&LogApiError::ServerError));
-    assert!(retry.is_retriable_error(&LogApiError::Forbidden));
-    assert!(retry.is_retriable_error(&LogApiError::HttpError {
+    assert!(!retry.is_retriable_error(&ApiError::BadRequest));
+    assert!(!retry.is_retriable_error(&ApiError::PayloadTooLarge));
+    assert!(retry.is_retriable_error(&ApiError::ServerError));
+    assert!(retry.is_retriable_error(&ApiError::Forbidden));
+    assert!(retry.is_retriable_error(&ApiError::HttpError {
         error: HttpError::BuildTlsConnector {
             source: TlsError::MissingKey
         }

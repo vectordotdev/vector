@@ -1,8 +1,9 @@
 use http::{Request, StatusCode, Uri};
+use snafu::Snafu;
 
 use crate::{
     common::datadog::{get_api_base_endpoint, Region},
-    http::HttpClient,
+    http::{HttpClient, HttpError},
     sinks::HealthcheckError,
 };
 
@@ -45,4 +46,18 @@ async fn healthcheck(
         StatusCode::OK => Ok(()),
         other => Err(HealthcheckError::UnexpectedStatus { status: other }.into()),
     }
+}
+
+#[derive(Debug, Snafu)]
+pub enum ApiError {
+    #[snafu(display("Server responded with an error."))]
+    ServerError,
+    #[snafu(display("Failed to make HTTP(S) request: {}", error))]
+    HttpError { error: HttpError },
+    #[snafu(display("Client sent a payload that is too large."))]
+    PayloadTooLarge,
+    #[snafu(display("Client request was not valid for unknown reasons."))]
+    BadRequest,
+    #[snafu(display("Client request was forbidden."))]
+    Forbidden,
 }
