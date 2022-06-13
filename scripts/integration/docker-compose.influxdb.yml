@@ -36,8 +36,6 @@ services:
       - "influxdb-integration-tests"
       - "--lib"
       - "${FILTER:-::influxdb::}"
-      - "--"
-      - "--nocapture"
     depends_on:
       - influxdb-v1
       - influxdb-v1-tls

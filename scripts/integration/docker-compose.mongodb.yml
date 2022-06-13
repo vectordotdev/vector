@@ -53,8 +53,6 @@ services:
       - "mongodb_metrics-integration-tests"
       - "--lib"
       - "::mongodb_metrics::"
-      - "--"
-      - "--nocapture"
     depends_on:
       - mongodb-primary
       - mongodb-secondary

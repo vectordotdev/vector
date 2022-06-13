@@ -48,8 +48,6 @@ services:
       - "kafka-integration-tests"
       - "--lib"
       - "${FILTER:-::kafka::}"
-      - "--"
-      - "--nocapture"
     depends_on:
       - kafka
     environment:

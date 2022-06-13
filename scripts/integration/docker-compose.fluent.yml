@@ -19,8 +19,6 @@ services:
       - "fluent-integration-tests"
       - "--lib"
       - "::fluent::"
-      - "--"
-      - "--nocapture"
     volumes:
       - ${PWD}:/code
       - /var/run/docker.sock:/var/run/docker.sock

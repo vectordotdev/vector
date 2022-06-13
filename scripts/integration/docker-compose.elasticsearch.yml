@@ -48,8 +48,6 @@ services:
       - "es-integration-tests"
       - "--lib"
       - "::elasticsearch::integration_tests::"
-      - "--"
-      - "--nocapture"
     depends_on:
       - localstack
       - elasticsearch

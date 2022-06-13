@@ -27,8 +27,6 @@ services:
       - "dnstap-integration-tests"
       - "--lib"
       - "::dnstap::"
-      - "--"
-      - "--nocapture"
     depends_on:
       - dnstap
     environment:

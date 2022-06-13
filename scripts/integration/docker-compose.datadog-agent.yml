@@ -47,7 +47,6 @@ services:
       - "--no-default-features"
       - "--features"
       - "datadog-agent-integration-tests"
-      - "--no-capture"
       - "--lib"
       - "sources::datadog::agent::integration_tests::"
     environment:
