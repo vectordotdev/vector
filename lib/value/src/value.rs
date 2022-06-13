@@ -1,13 +1,12 @@
 //! Contains the main "Value" type for Vector and VRL, as well as helper methods.
 
 mod convert;
+mod crud;
 mod display;
 mod error;
-mod insert;
 mod iter;
 mod path;
 mod regex;
-mod remove;
 mod target;
 
 #[cfg(any(test, feature = "api"))]
@@ -27,15 +26,12 @@ use std::{
     hash::{Hash, Hasher},
 };
 
+pub use crate::value::regex::ValueRegex;
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, SecondsFormat, Utc};
-
 pub use iter::IterItem;
-use lookup::lookup_v2::{BorrowedSegment, Path};
-
+use lookup::lookup_v2::Path;
 use ordered_float::NotNan;
-
-pub use crate::value::regex::ValueRegex;
 
 /// A boxed `std::error::Error`.
 pub type StdError = Box<dyn std::error::Error + Send + Sync + 'static>;
@@ -229,98 +225,31 @@ impl Value {
         insert_value: impl Into<Self>,
     ) -> Option<Self> {
         let insert_value = insert_value.into();
-        let mut path_iter = path.segment_iter().peekable();
+        let path_iter = path.segment_iter().peekable();
 
-        match path_iter.peek() {
-            None => Some(std::mem::replace(self, insert_value)),
-            Some(BorrowedSegment::Field(field)) => {
-                if let Self::Object(map) = self {
-                    insert::map_insert(map, path_iter, insert_value)
-                } else {
-                    let mut map = BTreeMap::new();
-                    let prev_value = insert::map_insert(&mut map, path_iter, insert_value);
-                    *self = Self::Object(map);
-                    prev_value
-                }
-            }
-            Some(BorrowedSegment::Index(index)) => {
-                if let Value::Array(array) = self {
-                    insert::array_insert(array, path_iter, insert_value)
-                } else {
-                    let mut array = vec![];
-                    let prev_value = insert::array_insert(&mut array, path_iter, insert_value);
-                    *self = Self::Array(array);
-                    prev_value
-                }
-            }
-            Some(BorrowedSegment::Invalid) => None,
-        }
+        crud::insert(self, (), path_iter, insert_value)
     }
 
     /// Removes field value specified by the given path and return its value.
     ///
     /// A special case worth mentioning: if there is a nested array and an item is removed
     /// from the middle of this array, then it is just replaced by `Value::Null`.
+    #[allow(clippy::needless_pass_by_value)]
     pub fn remove<'a>(&mut self, path: impl Path<'a>, prune: bool) -> Option<Self> {
-        remove::remove(self, path, prune)
+        crud::remove(self, &(), path.segment_iter(), prune)
+            .map(|(prev_value, _is_empty)| prev_value)
     }
 
     /// Returns a reference to a field value specified by a path iter.
     #[allow(clippy::needless_pass_by_value)]
     pub fn get<'a>(&self, path: impl Path<'a>) -> Option<&Self> {
-        let mut value = self;
-        let mut path_iter = path.segment_iter();
-        loop {
-            match (path_iter.next(), value) {
-                (None, _) => return Some(value),
-                (Some(BorrowedSegment::Field(key)), Value::Object(map)) => {
-                    match map.get(key.as_ref()) {
-                        None => return None,
-                        Some(nested_value) => {
-                            value = nested_value;
-                        }
-                    }
-                }
-                (Some(BorrowedSegment::Index(index)), Value::Array(array)) => {
-                    match array.get(index as usize) {
-                        None => return None,
-                        Some(nested_value) => {
-                            value = nested_value;
-                        }
-                    }
-                }
-                _ => return None,
-            }
-        }
+        crud::get(self, path.segment_iter())
     }
 
     /// Get a mutable borrow of the value by path
     #[allow(clippy::needless_pass_by_value)]
     pub fn get_mut<'a>(&mut self, path: impl Path<'a>) -> Option<&mut Self> {
-        let mut value = self;
-        let mut path_iter = path.segment_iter();
-        loop {
-            match (path_iter.next(), value) {
-                (None, value) => return Some(value),
-                (Some(BorrowedSegment::Field(key)), Value::Object(map)) => {
-                    match map.get_mut(key.as_ref()) {
-                        None => return None,
-                        Some(nested_value) => {
-                            value = nested_value;
-                        }
-                    }
-                }
-                (Some(BorrowedSegment::Index(index)), Value::Array(array)) => {
-                    match array.get_mut(index as usize) {
-                        None => return None,
-                        Some(nested_value) => {
-                            value = nested_value;
-                        }
-                    }
-                }
-                _ => return None,
-            }
-        }
+        crud::get_mut(self, path.segment_iter())
     }
 
     /// Determine if the lookup is contained within the value.
@@ -337,6 +266,7 @@ pub fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
 
 #[cfg(test)]
 mod test {
+    use lookup::lookup_v2::BorrowedSegment;
     use lookup::path;
     use quickcheck::{QuickCheck, TestResult};
 
@@ -391,164 +321,6 @@ mod test {
                 hash(&Value::Array(vec![Value::Integer(0), Value::Boolean(true)])),
                 hash(&Value::Array(vec![Value::Integer(1), Value::Boolean(true)]))
             );
-        }
-    }
-
-    mod insert_get_remove {
-        use super::*;
-
-        #[test]
-        fn single_field() {
-            let mut value = Value::from(BTreeMap::default());
-            let key = "root";
-            let mut marker = Value::from(true);
-            assert_eq!(value.insert(key, marker.clone()), None);
-            assert_eq!(value.as_object().unwrap()[key], marker);
-            assert_eq!(value.get(key), Some(&marker));
-            assert_eq!(value.get_mut(key), Some(&mut marker));
-            assert_eq!(value.remove(key, false), Some(marker));
-        }
-
-        #[test]
-        fn nested_field() {
-            let mut value = Value::from(BTreeMap::default());
-            let key = "root.doot";
-            let mut marker = Value::from(true);
-            assert_eq!(value.insert(key, marker.clone()), None);
-            assert_eq!(
-                value.as_object().unwrap()["root"].as_object().unwrap()["doot"],
-                marker
-            );
-            assert_eq!(value.get(key), Some(&marker));
-            assert_eq!(value.get_mut(key), Some(&mut marker));
-            assert_eq!(value.remove(key, false), Some(marker));
-        }
-
-        #[test]
-        fn double_nested_field() {
-            let mut value = Value::from(BTreeMap::default());
-            let key = "root.doot.toot";
-            let mut marker = Value::from(true);
-            assert_eq!(value.insert(key, marker.clone()), None);
-            assert_eq!(
-                value.as_object().unwrap()["root"].as_object().unwrap()["doot"]
-                    .as_object()
-                    .unwrap()["toot"],
-                marker
-            );
-            assert_eq!(value.get(key), Some(&marker));
-            assert_eq!(value.get_mut(key), Some(&mut marker));
-            assert_eq!(value.remove(key, false), Some(marker));
-        }
-
-        #[test]
-        fn single_index() {
-            let mut value = Value::from(Vec::<Value>::default());
-            let key = "[0]";
-            let mut marker = Value::from(true);
-            assert_eq!(value.insert(key, marker.clone()), None);
-            assert_eq!(value.as_array_unwrap()[0], marker);
-            assert_eq!(value.get(key), Some(&marker));
-            assert_eq!(value.get_mut(key), Some(&mut marker));
-            assert_eq!(value.remove(key, false), Some(marker));
-        }
-
-        #[test]
-        fn nested_index() {
-            let mut value = Value::from(Vec::<Value>::default());
-            let key = "[0][0]";
-            let mut marker = Value::from(true);
-            assert_eq!(value.insert(key, marker.clone()), None);
-            assert_eq!(value.as_array_unwrap()[0].as_array_unwrap()[0], marker);
-            assert_eq!(value.get(key), Some(&marker));
-            assert_eq!(value.get_mut(key), Some(&mut marker));
-            assert_eq!(value.remove(key, false), Some(marker));
-        }
-
-        #[test]
-        fn field_index() {
-            let mut value = Value::from(BTreeMap::default());
-            let key = "root[0]";
-            let mut marker = Value::from(true);
-            assert_eq!(value.insert(key, marker.clone()), None);
-            assert_eq!(
-                value.as_object().unwrap()["root"].as_array_unwrap()[0],
-                marker
-            );
-            assert_eq!(value.get(key), Some(&marker));
-            assert_eq!(value.get_mut(key), Some(&mut marker));
-            assert_eq!(value.remove(key, false), Some(marker));
-        }
-
-        #[test]
-        fn index_field() {
-            let mut value = Value::from(Vec::<Value>::default());
-            let key = "[0].boot";
-            let mut marker = Value::from(true);
-            assert_eq!(value.insert(key, marker.clone()), None);
-            assert_eq!(
-                value.as_array_unwrap()[0].as_object().unwrap()["boot"],
-                marker
-            );
-            assert_eq!(value.get(key), Some(&marker));
-            assert_eq!(value.get_mut(key), Some(&mut marker));
-            assert_eq!(value.remove(key, false), Some(marker));
-        }
-
-        #[test]
-        fn nested_index_field() {
-            let mut value = Value::from(Vec::<Value>::default());
-            let key = "[0][0].boot";
-            let mut marker = Value::from(true);
-            assert_eq!(value.insert(key, marker.clone()), None);
-            assert_eq!(
-                value.as_array_unwrap()[0].as_array_unwrap()[0]
-                    .as_object()
-                    .unwrap()["boot"],
-                marker
-            );
-            assert_eq!(value.get(key), Some(&marker));
-            assert_eq!(value.get_mut(key), Some(&mut marker));
-            assert_eq!(value.remove(key, false), Some(marker));
-        }
-        #[test]
-        fn field_with_nested_index_field() {
-            let mut value = Value::from(BTreeMap::default());
-            let key = "root[0][0].boot";
-            let mut marker = Value::from(true);
-            assert_eq!(value.insert(key, marker.clone()), None);
-            assert_eq!(
-                value.as_object().unwrap()["root"].as_array_unwrap()[0].as_array_unwrap()[0]
-                    .as_object()
-                    .unwrap()["boot"],
-                marker
-            );
-            assert_eq!(value.get(key), Some(&marker));
-            assert_eq!(value.get_mut(key), Some(&mut marker));
-            assert_eq!(value.remove(key, false), Some(marker));
-        }
-
-        #[test]
-        fn populated_field() {
-            let mut value = Value::from(BTreeMap::default());
-            let marker = Value::from(true);
-            assert_eq!(value.insert("a[2]", marker.clone()), None);
-
-            let key = "a[0]";
-            assert_eq!(value.insert(key, marker.clone()), Some(Value::Null));
-
-            assert_eq!(value.as_object().unwrap()["a"].as_array_unwrap().len(), 3);
-            assert_eq!(value.as_object().unwrap()["a"].as_array_unwrap()[0], marker);
-            assert_eq!(
-                value.as_object().unwrap()["a"].as_array_unwrap()[1],
-                Value::Null
-            );
-            assert_eq!(value.as_object().unwrap()["a"].as_array_unwrap()[2], marker);
-
-            // Replace the value at 0.
-            let marker = Value::from(false);
-            assert_eq!(value.insert(key, marker.clone()), Some(Value::from(true)));
-            assert_eq!(value.as_object().unwrap()["a"].as_array_unwrap()[0], marker);
         }
     }
 
