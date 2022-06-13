@@ -14,7 +14,6 @@ services:
       - "nextest"
       - "run"
       - "--no-fail-fast"
-      - "--no-capture"
       - "--no-default-features"
       - "--features"
       - "fluent-integration-tests"

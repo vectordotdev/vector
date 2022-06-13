@@ -48,7 +48,6 @@ services:
       - "nextest"
       - "run"
       - "--no-fail-fast"
-      - "--no-capture"
       - "--no-default-features"
       - "--features"
       - "mongodb_metrics-integration-tests"
