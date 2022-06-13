@@ -187,12 +187,10 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
     type Error = MetricApiError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
-    fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
-        match self.client.poll_ready(_cx) {
+    fn poll_ready(&mut self, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
+        match self.client.poll_ready(cx) {
             Poll::Ready(Ok(())) => Poll::Ready(Ok(())),
-            Poll::Ready(Err(error)) => {
-                return Poll::Ready(Err(MetricApiError::HttpError { error }));
-            }
+            Poll::Ready(Err(error)) => Poll::Ready(Err(MetricApiError::HttpError { error })),
             Poll::Pending => Poll::Pending,
         }
     }

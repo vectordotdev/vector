@@ -441,19 +441,13 @@ async fn no_enterprise_headers_inner(api_status: ApiStatus) {
 async fn log_api_error_is_retriable() {
     let retry = LogApiRetry;
 
-    assert_eq!(false, retry.is_retriable_error(&LogApiError::BadRequest));
-    assert_eq!(
-        false,
-        retry.is_retriable_error(&LogApiError::PayloadTooLarge)
-    );
-    assert_eq!(true, retry.is_retriable_error(&LogApiError::ServerError));
-    assert_eq!(true, retry.is_retriable_error(&LogApiError::Forbidden));
-    assert_eq!(
-        true,
-        retry.is_retriable_error(&LogApiError::HttpError {
-            error: HttpError::BuildTlsConnector {
-                source: TlsError::MissingKey
-            }
-        })
-    );
+    assert!(!retry.is_retriable_error(&LogApiError::BadRequest));
+    assert!(!retry.is_retriable_error(&LogApiError::PayloadTooLarge));
+    assert!(retry.is_retriable_error(&LogApiError::ServerError));
+    assert!(retry.is_retriable_error(&LogApiError::Forbidden));
+    assert!(retry.is_retriable_error(&LogApiError::HttpError {
+        error: HttpError::BuildTlsConnector {
+            source: TlsError::MissingKey
+        }
+    }));
 }
