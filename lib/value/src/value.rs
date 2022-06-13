@@ -1,9 +1,9 @@
 //! Contains the main "Value" type for Vector and VRL, as well as helper methods.
 
+mod crud;
 mod convert;
 mod display;
 mod error;
-mod insert;
 mod iter;
 mod path;
 mod regex;
@@ -231,7 +231,7 @@ impl Value {
         let insert_value = insert_value.into();
         let path_iter = path.segment_iter().peekable();
 
-        insert::insert(self, path_iter, insert_value)
+        crud::insert(self, (), path_iter, insert_value)
     }
 
     /// Removes field value specified by the given path and return its value.
