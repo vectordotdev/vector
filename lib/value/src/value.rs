@@ -78,11 +78,11 @@ impl Eq for Value {}
 impl PartialEq<Self> for Value {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Value::Array(a), Value::Array(b)) => a.eq(b),
-            (Value::Boolean(a), Value::Boolean(b)) => a.eq(b),
-            (Value::Bytes(a), Value::Bytes(b)) => a.eq(b),
-            (Value::Regex(a), Value::Regex(b)) => a.eq(b),
-            (Value::Float(a), Value::Float(b)) => {
+            (Self::Array(a), Self::Array(b)) => a.eq(b),
+            (Self::Boolean(a), Self::Boolean(b)) => a.eq(b),
+            (Self::Bytes(a), Self::Bytes(b)) => a.eq(b),
+            (Self::Regex(a), Self::Regex(b)) => a.eq(b),
+            (Self::Float(a), Self::Float(b)) => {
                 // This compares floats with the following rules:
                 // * NaNs compare as equal
                 // * Positive and negative infinity are not equal
@@ -98,10 +98,10 @@ impl PartialEq<Self> for Value {
                     false
                 }
             }
-            (Value::Integer(a), Value::Integer(b)) => a.eq(b),
-            (Value::Object(a), Value::Object(b)) => a.eq(b),
+            (Self::Integer(a), Self::Integer(b)) => a.eq(b),
+            (Self::Object(a), Self::Object(b)) => a.eq(b),
             (Self::Null, Self::Null) => true,
-            (Value::Timestamp(a), Value::Timestamp(b)) => a.eq(b),
+            (Self::Timestamp(a), Self::Timestamp(b)) => a.eq(b),
             _ => false,
         }
     }
