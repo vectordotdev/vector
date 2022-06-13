@@ -172,7 +172,6 @@ jobs:
     name: master-failure
     if: failure() && github.ref == 'refs/heads/master'
     needs:
-      - cancel-previous
       - build-x86_64-unknown-linux-gnu
       - compute-k8s-test-plan
       - test-e2e-kubernetes

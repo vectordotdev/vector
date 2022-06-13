@@ -112,7 +112,6 @@ jobs:
     name: master-failure
     if: failure() && github.ref == 'refs/heads/master'
     needs:
-      - cancel-previous
       - test-integration-check
     runs-on: ubuntu-20.04
     steps:
