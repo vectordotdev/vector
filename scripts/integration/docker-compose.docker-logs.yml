@@ -13,13 +13,12 @@ services:
       - "nextest"
       - "run"
       - "--no-fail-fast"
+      - "--no-capture"
       - "--no-default-features"
       - "--features"
       - "docker-logs-integration-tests"
       - "--lib"
       - "::docker_::"
-      - "--"
-      - "--nocapture"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${PWD}:/code

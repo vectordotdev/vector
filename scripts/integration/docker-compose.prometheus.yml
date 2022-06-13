@@ -37,13 +37,12 @@ services:
       - "nextest"
       - "run"
       - "--no-fail-fast"
+      - "--no-capture"
       - "--no-default-features"
       - "--features"
       - "prometheus-integration-tests"
       - "--lib"
       - "${FILTER:-::prometheus::}"
-      - "--"
-      - "--nocapture"
     depends_on:
       - influxdb
       - influxdb-tls

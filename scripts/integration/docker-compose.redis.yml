@@ -17,13 +17,12 @@ services:
       - "nextest"
       - "run"
       - "--no-fail-fast"
+      - "--no-capture"
       - "--no-default-features"
       - "--features"
       - "redis-integration-tests"
       - "--lib"
       - "::redis::"
-      - "--"
-      - "--nocapture"
     depends_on:
       - redis
     environment:

@@ -18,13 +18,12 @@ services:
       - "nextest"
       - "run"
       - "--no-fail-fast"
+      - "--no-capture"
       - "--no-default-features"
       - "--features"
       - "pulsar-integration-tests"
       - "--lib"
       - "::pulsar::"
-      - "--"
-      - "--nocapture"
     depends_on:
       - pulsar
     environment:

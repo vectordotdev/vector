@@ -43,13 +43,12 @@ services:
       - "nextest"
       - "run"
       - "--no-fail-fast"
+      - "--no-capture"
       - "--no-default-features"
       - "--features"
       - "kafka-integration-tests"
       - "--lib"
       - "${FILTER:-::kafka::}"
-      - "--"
-      - "--nocapture"
     depends_on:
       - kafka
     environment:

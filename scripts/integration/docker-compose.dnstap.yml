@@ -22,13 +22,12 @@ services:
       - "nextest"
       - "run"
       - "--no-fail-fast"
+      - "--no-capture"
       - "--no-default-features"
       - "--features"
       - "dnstap-integration-tests"
       - "--lib"
       - "::dnstap::"
-      - "--"
-      - "--nocapture"
     depends_on:
       - dnstap
     environment:

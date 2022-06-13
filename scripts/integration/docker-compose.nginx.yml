@@ -32,13 +32,12 @@ services:
       - "nextest"
       - "run"
       - "--no-fail-fast"
+      - "--no-capture"
       - "--no-default-features"
       - "--features"
       - "nginx-integration-tests"
       - "--lib"
       - "::nginx_metrics::"
-      - "--"
-      - "--nocapture"
     depends_on:
       - nginx
       - squid

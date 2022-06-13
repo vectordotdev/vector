@@ -34,13 +34,12 @@ services:
       - "nextest"
       - "run"
       - "--no-fail-fast"
+      - "--no-capture"
       - "--no-default-features"
       - "--features"
       - "aws-integration-tests"
       - "--lib"
       - "${FILTER:-::aws_}"
-      - "--"
-      - "--nocapture"
     depends_on:
       - mock-ec2-metadata
       - mock-localstack

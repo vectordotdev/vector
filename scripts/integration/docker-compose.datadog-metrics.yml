@@ -13,13 +13,12 @@ services:
       - "nextest"
       - "run"
       - "--no-fail-fast"
+      - "--no-capture"
       - "--no-default-features"
       - "--features"
       - "datadog-metrics-integration-tests"
       - "--lib"
       - "::datadog::metrics::"
-      - "--"
-      - "--nocapture"
     environment:
       - TEST_DATADOG_API_KEY
     volumes:
