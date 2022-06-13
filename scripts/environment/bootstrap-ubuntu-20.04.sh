@@ -138,7 +138,7 @@ EOF
 # Notably, we don't install/configure it when we're going to do anything with `cross`, as `cross` takes the Cargo
 # configuration from the host system and ships it over...  which isn't good when we're overriding the `rustc-wrapper`
 # and all of that.
-if [ -n "${DISABLE_MOLD-}" ] ; then
+if [ -z "${DISABLE_MOLD:-""}" ] ; then
     # We explicitly put `mold-wrapper.so` right beside `mold` itself because it's hard-coded to look in the same directory
     # first when trying to load the shared object, so we can dodge having to care about the "right" lib folder to put it in.
     TEMP=$(mktemp -d)
