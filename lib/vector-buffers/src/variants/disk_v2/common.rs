@@ -18,7 +18,11 @@ pub const DEFAULT_MAX_DATA_FILE_SIZE: usize = 128 * 1024 * 1024;
 // _exceed_ the size of a data file, even if they're the first write to a data file.
 pub const DEFAULT_MAX_RECORD_SIZE: usize = DEFAULT_MAX_DATA_FILE_SIZE;
 
-// We want to ensure a reasonably time fsync/flush to disk, which 500ms should provide for normal workloads.
+// We want to ensure a reasonable time before we `fsync`/flush to disk, and 500ms should provide that for non-critical
+// workloads.
+//
+// Practically, it's far more definitive than `disk_v1` which does not definitvely `fsync` at all, at least with how we
+// have it configured.
 pub const DEFAULT_FLUSH_INTERVAL: Duration = Duration::from_millis(500);
 
 // Using 256KB as it aligns nicely with the I/O size exposed by major cloud providers.  This may not
