@@ -198,6 +198,7 @@ impl HecLogsSinkConfig {
             timestamp_nanos_key: self.timestamp_nanos_key.clone(),
             timestamp_key: self.timestamp_key.clone(),
             splunk_metadata: self.splunk_metadata.clone(),
+            encoding: self.encoding.config().clone(),
         };
 
         Ok(VectorSink::from_event_streamsink(sink))

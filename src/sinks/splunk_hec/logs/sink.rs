@@ -1,6 +1,7 @@
 use std::{collections::HashMap, fmt, num::NonZeroUsize, sync::Arc};
 
 use async_trait::async_trait;
+use codecs::encoding::SerializerConfig;
 use futures_util::{stream::BoxStream, StreamExt};
 use tower::Service;
 use vector_core::{
@@ -38,6 +39,7 @@ pub struct HecLogsSink<S> {
     pub timestamp_nanos_key: Option<String>,
     pub timestamp_key: String,
     pub splunk_metadata: HashMap<String, Template>,
+    pub encoding: SerializerConfig,
 }
 
 pub struct HecLogData<'a> {
@@ -73,7 +75,20 @@ where
         let sink = input
             .map(move |event| process_log(event, &data))
             .batched_partitioned(
-                EventPartitioner::new(self.splunk_metadata.clone()),
+                // With the text encoding we need to batch on index, sourcetype and source
+                // as those fields are sent as metadata in the url query parameters.
+                // The event encoding sends them as part of the event.
+                match self.encoding {
+                    SerializerConfig::Json | SerializerConfig::NativeJson => {
+                        EventPartitioner::new(None, None, None, self.splunk_metadata.clone())
+                    }
+                    _ => EventPartitioner::new(
+                        self.index.as_ref(),
+                        self.sourcetype.as_ref(),
+                        self.source.as_ref(),
+                        self.splunk_metadata.clone(),
+                    ),
+                },
                 self.batch_settings,
             )
             .request_builder(builder_limit, self.request_builder)
@@ -141,7 +156,24 @@ struct EventPartitioner {
 }
 
 impl EventPartitioner {
-    const fn new(splunk_metadata: HashMap<String, Template>) -> Self {
+    fn new(
+        index: Option<&Template>,
+        sourcetype: Option<&Template>,
+        source: Option<&Template>,
+        mut splunk_metadata: HashMap<String, Template>,
+    ) -> Self {
+        if let Some(index) = index {
+            splunk_metadata.insert("index".to_string(), index.clone());
+        }
+
+        if let Some(sourcetype) = sourcetype {
+            splunk_metadata.insert("sourcetype".to_string(), sourcetype.clone());
+        }
+
+        if let Some(source) = source {
+            splunk_metadata.insert("source".to_string(), source.clone());
+        }
+
         Self { splunk_metadata }
     }
 }
@@ -197,7 +229,6 @@ impl ByteSizeOf for HecLogsProcessedEventMetadata {
 
 pub type HecProcessedEvent = ProcessedEvent<LogEvent, HecLogsProcessedEventMetadata>;
 
-#[allow(clippy::too_many_arguments)]
 pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
     let event_byte_size = event.size_of();
     let mut log = event.into_log();
