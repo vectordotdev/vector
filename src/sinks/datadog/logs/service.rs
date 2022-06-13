@@ -35,15 +35,16 @@ impl RetryLogic for LogApiRetry {
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match *error {
-            LogApiError::HttpError { .. }
-            | LogApiError::BadRequest
-            | LogApiError::PayloadTooLarge => false,
+            LogApiError::BadRequest | LogApiError::PayloadTooLarge => false,
             // This retry logic will be expanded further, but specifically retrying unauthorized
-            // requests for now. I verified using `curl` that `403` is the respose code for this.
+            // requests and lower level HttpErrorsfor now.
+            // I verified using `curl` that `403` is the respose code for this.
             //
             // https://github.com/vectordotdev/vector/issues/10870
             // https://github.com/vectordotdev/vector/issues/12220
-            LogApiError::ServerError | LogApiError::Forbidden => true,
+            LogApiError::HttpError { .. } | LogApiError::ServerError | LogApiError::Forbidden => {
+                true
+            }
         }
     }
 }

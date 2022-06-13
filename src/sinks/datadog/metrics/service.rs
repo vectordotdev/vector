@@ -7,7 +7,7 @@ use http::{
     Request, StatusCode, Uri,
 };
 use hyper::Body;
-use snafu::ResultExt;
+use snafu::{ResultExt, Snafu};
 use tower::Service;
 use vector_common::internal_event::BytesSent;
 use vector_core::{
@@ -55,6 +55,20 @@ impl RetryLogic for DatadogMetricsRetryLogic {
             _ => RetryAction::DontRetry(format!("response status: {}", status).into()),
         }
     }
+}
+
+#[derive(Debug, Snafu)]
+pub enum MetricApiError {
+    #[snafu(display("Server responded with an error."))]
+    ServerError,
+    #[snafu(display("Failed to make HTTP(S) request: {}", error))]
+    HttpError { error: crate::http::HttpError },
+    #[snafu(display("Client sent a payload that is too large."))]
+    PayloadTooLarge,
+    #[snafu(display("Client request was not valid for unknown reasons."))]
+    BadRequest,
+    #[snafu(display("Client request was forbidden."))]
+    Forbidden,
 }
 
 /// Generalized request for sending metrics to the Datadog metrics endpoints.
@@ -170,11 +184,17 @@ impl DatadogMetricsService {
 
 impl Service<DatadogMetricsRequest> for DatadogMetricsService {
     type Response = DatadogMetricsResponse;
-    type Error = HttpError;
+    type Error = MetricApiError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
-    fn poll_ready(&mut self, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
-        self.client.poll_ready(cx)
+    fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
+        match self.client.poll_ready(_cx) {
+            Poll::Ready(Ok(())) => Poll::Ready(Ok(())),
+            Poll::Ready(Err(error)) => {
+                return Poll::Ready(Err(MetricApiError::HttpError { error }));
+            }
+            Poll::Pending => Poll::Pending,
+        }
     }
 
     fn call(&mut self, request: DatadogMetricsRequest) -> Self::Future {
@@ -189,21 +209,28 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
 
             let request = request
                 .into_http_request(api_key)
-                .context(BuildRequestSnafu)?;
-            let response = client.send(request).await?;
-            let (parts, body) = response.into_parts();
-            let mut body = hyper::body::aggregate(body)
-                .await
-                .context(CallRequestSnafu)?;
-            let body = body.copy_to_bytes(body.remaining());
-            Ok(DatadogMetricsResponse {
-                status_code: parts.status,
-                body,
-                batch_size,
-                byte_size,
-                raw_byte_size,
-                protocol,
-            })
+                .context(BuildRequestSnafu)
+                .map_err(|error| MetricApiError::HttpError { error })?;
+
+            match client.send(request).await {
+                Ok(response) => {
+                    let (parts, body) = response.into_parts();
+                    let mut body = hyper::body::aggregate(body)
+                        .await
+                        .context(CallRequestSnafu)
+                        .map_err(|error| MetricApiError::HttpError { error })?;
+                    let body = body.copy_to_bytes(body.remaining());
+                    Ok(DatadogMetricsResponse {
+                        status_code: parts.status,
+                        body,
+                        batch_size,
+                        byte_size,
+                        raw_byte_size,
+                        protocol,
+                    })
+                }
+                Err(error) => Err(MetricApiError::HttpError { error }),
+            }
         })
     }
 }

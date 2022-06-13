@@ -15,12 +15,17 @@ use vector_core::event::{BatchNotifier, BatchStatus, Event};
 
 use crate::{
     config::SinkConfig,
+    http::HttpError,
     sinks::{
         datadog::logs::DatadogLogsConfig,
+        util::retries::RetryLogic,
         util::test::{build_test_server_status, load_sink},
     },
     test_util::{next_addr, random_lines_with_stream},
+    tls::TlsError,
 };
+
+use super::service::{LogApiError, LogApiRetry};
 
 // The sink must support v1 and v2 API endpoints which have different codes for
 // signaling status. This enum allows us to signal which API endpoint and what
@@ -67,7 +72,7 @@ fn event_with_api_key(msg: &str, key: &str) -> Event {
 /// runs random lines through it, returning a vector of the random lines and a
 /// Receiver populated with the result of the sink's operation.
 ///
-/// Testers may set `http_status` and `batch_status`. The first controls what
+/// Testers may set `api_status` and `batch_status`. The first controls what
 /// status code faked HTTP responses will have, the second acts as a check on
 /// the `Receiver`'s status before being returned to the caller.
 async fn start_test(
@@ -429,4 +434,26 @@ async fn no_enterprise_headers_inner(api_status: ApiStatus) {
 
     assert_eq!(parts.headers.get("DD-EVP-ORIGIN").unwrap(), "vector");
     assert!(parts.headers.get("DD-EVP-ORIGIN-VERSION").is_some());
+}
+
+#[tokio::test]
+/// Assert retry behavior for LogApiErrors
+async fn log_api_error_is_retriable() {
+    let retry = LogApiRetry;
+
+    assert_eq!(false, retry.is_retriable_error(&LogApiError::BadRequest));
+    assert_eq!(
+        false,
+        retry.is_retriable_error(&LogApiError::PayloadTooLarge)
+    );
+    assert_eq!(true, retry.is_retriable_error(&LogApiError::ServerError));
+    assert_eq!(true, retry.is_retriable_error(&LogApiError::Forbidden));
+    assert_eq!(
+        true,
+        retry.is_retriable_error(&LogApiError::HttpError {
+            error: HttpError::BuildTlsConnector {
+                source: TlsError::MissingKey
+            }
+        })
+    );
 }
