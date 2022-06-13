@@ -134,6 +134,9 @@ rustflags = [ "-D", "warnings" ]
 EOF
 
 # Install mold, because the system linker wastes a bunch of time.
+#
+# We explicitly put `mold-wrapper.so` right beside `mold` itself because it's hard-coded to look in the same directory
+# first when trying to load the shared object, so we can dodge having to care about the "right" lib folder to put it in.
 TEMP=$(mktemp -d)
 MOLD_VERSION=1.2.1
 MOLD_TARGET=mold-${MOLD_VERSION}-x86_64-linux
@@ -143,6 +146,7 @@ tar \
     -xvf "${TEMP}/${MOLD_TARGET}.tar.gz" \
     -C "${TEMP}"
 cp "${TEMP}/${MOLD_TARGET}/bin/mold" /usr/bin/mold
+cp "${TEMP}/${MOLD_TARGET}/lib/mold/mold-wrapper.so" /usr/bin/mold-wrapper.so
 
 # Set Cargo to use mold as its linker.
 CARGO_BIN_DIR="${CARGO_OVERRIDE_DIR}/bin"
