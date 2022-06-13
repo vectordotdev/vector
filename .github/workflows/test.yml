@@ -209,7 +209,7 @@ jobs:
 
   cross-linux-check:
     if: ${{ needs.changes.outputs.dependencies == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     name: Cross - Linux
     needs: cross-linux
     steps:
@@ -222,7 +222,7 @@ jobs:
     # Full CI suites for this platform were only recently introduced.
     # Some failures are permitted until we can properly correct them.
     continue-on-error: true
-    runs-on: macos-latest
+    runs-on: macos-11
     needs: changes
     env:
       CARGO_INCREMENTAL: 0
