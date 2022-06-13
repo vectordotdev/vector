@@ -148,15 +148,15 @@ cp "${TEMP}/${MOLD_TARGET}/bin/mold" /usr/bin/mold
 CARGO_BIN_DIR="${CARGO_OVERRIDE_DIR}/bin"
 mkdir -p "$CARGO_BIN_DIR"
 
-RUST_WRAPPER="${CARGO_BIN_DIR}/wrap-rustc"
-cat <<EOF >"$RUST_WRAPPER"
+RUSTC_WRAPPER="${CARGO_BIN_DIR}/wrap-rustc"
+cat <<EOF >"$RUSTC_WRAPPER"
 #!/bin/sh
 set -x
 exec mold -run "\$@"
 EOF
-chmod +x "$RUST_WRAPPER"
+chmod +x "$RUSTC_WRAPPER"
 
 cat <<EOF >>"$CARGO_OVERRIDE_CONF"
 [build]
-rustc-wrapper = "$RUST_WRAPPER"
+rustc-wrapper = "$RUSTC_WRAPPER"
 EOF
