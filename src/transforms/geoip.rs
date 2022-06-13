@@ -261,13 +261,12 @@ impl FunctionTransform for Geoip {
 mod tests {
     use std::collections::HashMap;
 
+    use value::Value;
+
     use super::*;
     use crate::{
         event::Event,
-        transforms::{
-            json_parser::{JsonParser, JsonParserConfig},
-            test::transform_one,
-        },
+        transforms::test::transform_one,
     };
 
     #[test]
@@ -444,12 +443,17 @@ mod tests {
     }
 
     fn parse_one(text: &str, database: &str) -> Event {
-        let mut parser = JsonParser::from(JsonParserConfig::default());
-        let event = Event::from(text);
-        let metadata = event.metadata().clone();
-        let event = transform_one(&mut parser, event).unwrap();
-        assert_eq!(event.metadata(), &metadata);
-
+        let parsed_text = serde_json::from_str::<Value>(text)
+            .ok()
+            .and_then(|value| if let Value::Object(object) = value {
+                Some(object)
+            } else {
+                None
+            })
+            .expect("Input JSON string must represent a JSON object.");
+    
+        let event = Event::from(parsed_text);
+ 
         let mut augment = Geoip::new(
             database.to_string(),
             "remote_addr".to_string(),
@@ -458,7 +462,6 @@ mod tests {
         )
         .unwrap();
         let result = transform_one(&mut augment, event).unwrap();
-        assert_eq!(result.metadata(), &metadata);
         result
     }
 }
