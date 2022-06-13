@@ -1,5 +1,3 @@
-#![allow(clippy::must_use_candidate)]
-
 use std::{
     cmp::{Ord, Ordering, PartialOrd},
     fmt,
@@ -16,6 +14,7 @@ pub struct ComponentKey {
 }
 
 impl ComponentKey {
+    #[must_use]
     pub fn id(&self) -> &str {
         &self.id
     }
@@ -32,6 +31,7 @@ impl ComponentKey {
         format!("{}.{}", self.id, name)
     }
 
+    #[must_use]
     pub fn into_id(self) -> String {
         self.id
     }
