@@ -189,15 +189,17 @@ impl SourceConfig for DatadogAgentConfig {
             LogNamespace::Legacy => {
                 match self.decoding {
                     // See: `LogMsg` struct.
-                    DeserializerConfig::Bytes => schema::Definition::empty_kind(Kind::any_object())
-                        .required_field("message", Kind::bytes(), Some("message"))
-                        .required_field("status", Kind::bytes(), Some("severity"))
-                        .required_field("timestamp", Kind::timestamp(), Some("timestamp"))
-                        .required_field("hostname", Kind::bytes(), Some("host"))
-                        .required_field("service", Kind::bytes(), Some("service"))
-                        .required_field("ddsource", Kind::bytes(), Some("source"))
-                        .required_field("ddtags", Kind::bytes(), Some("tags"))
-                        .merge(self.decoding.schema_definition(log_namespace)),
+                    DeserializerConfig::Bytes => {
+                        schema::Definition::empty_kind(Kind::any_object(), [log_namespace])
+                            .required_field("message", Kind::bytes(), Some("message"))
+                            .required_field("status", Kind::bytes(), Some("severity"))
+                            .required_field("timestamp", Kind::timestamp(), Some("timestamp"))
+                            .required_field("hostname", Kind::bytes(), Some("host"))
+                            .required_field("service", Kind::bytes(), Some("service"))
+                            .required_field("ddsource", Kind::bytes(), Some("source"))
+                            .required_field("ddtags", Kind::bytes(), Some("tags"))
+                            .merge(self.decoding.schema_definition(log_namespace))
+                    }
 
                     // JSON deserializer can overwrite existing fields at runtime, so we have to treat
                     // those events as if there is no known type details we can provide, other than the

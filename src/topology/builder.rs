@@ -15,6 +15,7 @@ use tokio::{
 };
 use tracing::Instrument;
 use value::Kind;
+use vector_core::config::LogNamespace;
 use vector_core::{
     buffers::{
         topology::{
@@ -203,7 +204,7 @@ pub async fn build_pieces(
 
             let schema_definition = output
                 .log_schema_definition
-                .unwrap_or_else(|| schema::Definition::empty_kind(Kind::any_object()));
+                .unwrap_or_else(schema::Definition::source_default());
 
             schema_definitions.insert(output.port, schema_definition);
         }

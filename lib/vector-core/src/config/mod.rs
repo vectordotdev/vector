@@ -111,7 +111,7 @@ pub struct Output {
     /// The `None` variant of a schema definition has two distinct meanings for a source component
     /// versus a transform component:
     ///
-    /// For *sources*, a `None` schema is identical to a `Some(Definition::undefined())` schema.
+    /// For *sources*, a `None` schema is identical to a `Some(Definition::source_default())`.
     ///
     /// For a *transform*, a `None` schema means the transform inherits the merged [`Definition`]
     /// of its inputs, without modifying the schema further.

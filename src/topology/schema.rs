@@ -41,8 +41,7 @@ pub(super) fn merged_definition(
         return definition.clone();
     }
 
-    // let mut definition = Definition::empty_kind(Kind::any_object());
-    let mut definition = Definition::empty_kind(Kind::never(), None);
+    let mut definition = Definition::empty_kind(Kind::never(), []);
 
     for input in inputs {
         let key = &input.component;
@@ -56,7 +55,7 @@ pub(super) fn merged_definition(
                 ))
                 .log_schema_definition
                 .clone()
-                .unwrap_or_else(|| Definition::empty_kind(Kind::any_object()));
+                .unwrap_or_else(Definition::source_default);
 
             definition = definition.merge(source_definition);
         }

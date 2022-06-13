@@ -114,6 +114,13 @@ impl Definition {
         }
     }
 
+    /// All sources should set a schema definition, but they are not all implemented yet
+    /// This is the default used for a source that does not yet implement it.
+    /// This assumes the source does not yet implement the "Vector" log namespace.
+    pub fn source_default() -> Self {
+        Self::empty_kind(Kind::any_object(), [LogNamespace::Legacy])
+    }
+
     /// Any valid JSON type
     pub fn json() -> Self {
         Self::empty().unknown_fields(Kind::json())
@@ -127,6 +134,10 @@ impl Definition {
     //     self.collection.known().is_empty()
     //         && self.collection.unknown().map_or(false, Unknown::is_any)
     // }
+
+    pub fn log_namespaces(&self) -> &BTreeSet<LogNamespace> {
+        &self.log_namespaces
+    }
 
     /// Add type information for an event field.
     /// A non-root required field means the root type must be an object, so the type will be automatically

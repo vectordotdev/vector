@@ -150,13 +150,18 @@ impl TransformConfig for RemapConfig {
                     .expect("context exists")
                     .0;
 
-                let mut new_type_def = Definition::empty_kind(state.target_kind().clone());
+                let mut new_type_def = Definition::empty_kind(
+                    state.target_kind().clone(),
+                    merged_definition.log_namespaces().clone(),
+                );
                 for (id, path) in meaning {
                     new_type_def = new_type_def.with_known_meaning(path, &id);
                 }
                 new_type_def
             })
-            .unwrap_or_else(|| Definition::empty_kind(Kind::never()));
+            .unwrap_or_else(|| {
+                Definition::empty_kind(Kind::never(), merged_definition.log_namespaces().clone())
+            });
 
         // When a message is dropped and re-routed, we keep the original event, but also annotate
         // it with additional metadata.
