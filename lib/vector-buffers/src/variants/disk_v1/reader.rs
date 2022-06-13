@@ -18,6 +18,7 @@ use leveldb::database::{
     Database,
 };
 use tokio::{sync::Notify, task::JoinHandle, time::Instant};
+use vector_common::finalizer::OrderedFinalizer;
 
 use super::Key;
 use crate::{
@@ -88,6 +89,7 @@ pub struct Reader<T> {
     // Buffer usage data.
     pub(crate) usage_handle: BufferUsageHandle,
     pub(crate) phantom: PhantomData<T>,
+    pub(crate) finalizer: OrderedFinalizer<u64>,
 }
 
 impl<T> Reader<T>
