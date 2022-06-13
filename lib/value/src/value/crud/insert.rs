@@ -1,6 +1,7 @@
 use crate::value::crud::ValueCollection;
 use crate::Value;
 use lookup::lookup_v2::BorrowedSegment;
+use std::borrow::Borrow;
 use std::collections::BTreeMap;
 
 pub fn insert<'a, T: ValueCollection>(
@@ -11,7 +12,7 @@ pub fn insert<'a, T: ValueCollection>(
 ) -> Option<Value> {
     match path_iter.next() {
         Some(BorrowedSegment::Field(field)) => {
-            if let Some(Value::Object(map)) = value.get_mut_value(&key) {
+            if let Some(Value::Object(map)) = value.get_mut_value(key.borrow()) {
                 insert(map, field.to_string(), path_iter, insert_value)
             } else {
                 let mut map = BTreeMap::new();
@@ -21,7 +22,7 @@ pub fn insert<'a, T: ValueCollection>(
             }
         }
         Some(BorrowedSegment::Index(index)) => {
-            if let Some(Value::Array(array)) = value.get_mut_value(&key) {
+            if let Some(Value::Array(array)) = value.get_mut_value(key.borrow()) {
                 insert(array, index, path_iter, insert_value)
             } else {
                 let capacity = if index >= 0 {

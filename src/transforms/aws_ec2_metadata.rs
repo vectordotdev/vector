@@ -453,7 +453,11 @@ impl MetadataClient {
                     for (i, role_name) in role_names.lines().enumerate() {
                         new_state.push((
                             MetadataKey {
-                                log_path: self.keys.role_name_key.log_path.with_index_appended(i),
+                                log_path: self
+                                    .keys
+                                    .role_name_key
+                                    .log_path
+                                    .with_index_appended(i as isize),
                                 metric_tag: format!(
                                     "{}[{}]",
                                     self.keys.role_name_key.metric_tag, i

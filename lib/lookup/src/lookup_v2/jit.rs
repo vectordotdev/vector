@@ -213,7 +213,7 @@ impl<'a> Iterator for JitLookup<'a> {
 
 #[cfg(test)]
 mod test {
-    use crate::lookup_v2::{JitPath, OwnedPath, OwnedSegment, Path};
+    use crate::lookup_v2::{OwnedPath, OwnedSegment, Path};
     use crate::owned_path;
 
     #[test]
