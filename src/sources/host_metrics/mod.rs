@@ -96,8 +96,8 @@ pub struct HostMetricsConfig {
     /// Overrides the default namespace for the metrics emitted by the source.
     ///
     /// By default, `host` is used.
-    #[serde(default)]
     #[derivative(Default(value = "default_namespace()"))]
+    #[serde(default = "default_namespace")]
     pub namespace: Option<String>,
 
     #[cfg(target_os = "linux")]
