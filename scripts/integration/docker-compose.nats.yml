@@ -54,8 +54,6 @@ services:
       - "cargo"
       - "nextest"
       - "run"
-      - "--retries"
-      - "0"
       - "--no-fail-fast"
       - "--no-default-features"
       - "--features"

@@ -3,17 +3,19 @@ version: "3"
 services:
   beats-heartbeat:
     image: docker.elastic.co/beats/heartbeat:7.12.1
+    networks:
+      - backend
     # adding `-strict.perms=false to the default cmd as otherwise heartbeat was
     # complaining about the file permissions when running in CI
     # https://www.elastic.co/guide/en/beats/libbeat/5.3/config-file-permissions.html
     command: -environment=container -strict.perms=false
-    network_mode: host
     volumes:
       - ${PWD}/tests/data/logstash/heartbeat.yml:/usr/share/heartbeat/heartbeat.yml:ro
 
   logstash:
     image: docker.elastic.co/logstash/logstash:7.13.1
-    network_mode: host
+    networks:
+      - backend
     volumes:
       - /dev/null:/usr/share/logstash/pipeline/logstash.yml
       - ${PWD}/tests/data/host.docker.internal.crt:/tmp/logstash.crt
@@ -26,6 +28,9 @@ services:
       args:
         - RUST_VERSION=${RUST_VERSION}
     working_dir: /code
+    hostname: runner
+    networks:
+      - backend
     command:
       - "cargo"
       - "nextest"
@@ -42,12 +47,14 @@ services:
     depends_on:
       - beats-heartbeat
       - logstash
-    network_mode: host
     volumes:
       - ${PWD}:/code
       - target:/code/target
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
+
+networks:
+  backend: {}
 
 volumes:
   target: {}
