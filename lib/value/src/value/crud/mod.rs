@@ -40,11 +40,12 @@ impl ValueCollection for Vec<Value> {
     type Key = isize;
 
     fn get_mut_value(&mut self, key: &isize) -> Option<&mut Value> {
-        if *key >= 0 {
-            self.get_mut(*key as usize)
+        let index = if *key >= 0 {
+            *key as usize
         } else {
-            unimplemented!()
-        }
+            (self.len() as isize + key) as usize
+        };
+        self.get_mut(index)
     }
 
     fn insert_value(&mut self, key: isize, value: Value) -> Option<Value> {

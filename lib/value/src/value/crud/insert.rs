@@ -1,12 +1,12 @@
-use std::{collections::BTreeMap};
-use lookup::lookup_v2::BorrowedSegment;
-use crate::Value;
 use crate::value::crud::ValueCollection;
+use crate::Value;
+use lookup::lookup_v2::BorrowedSegment;
+use std::collections::BTreeMap;
 
 pub fn insert<'a, T: ValueCollection>(
     value: &mut T,
     key: T::Key,
-    mut path_iter: impl Iterator<Item=BorrowedSegment<'a>>,
+    mut path_iter: impl Iterator<Item = BorrowedSegment<'a>>,
     insert_value: Value,
 ) -> Option<Value> {
     match path_iter.next() {
@@ -36,14 +36,14 @@ pub fn insert<'a, T: ValueCollection>(
             }
         }
         Some(BorrowedSegment::Invalid) => None,
-        None => value.insert_value(key, insert_value)
+        None => value.insert_value(key, insert_value),
     }
 }
 
 #[cfg(test)]
 mod test {
-    use serde_json::json;
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn test_insert_nested() {
@@ -81,6 +81,7 @@ mod test {
         assert_eq!(value.insert("[-2]", 10), None);
         assert_eq!(value.insert("[-1]", 5), Some(Value::Null));
         assert_eq!(value.insert("[-2]", 2), Some(Value::Integer(10)));
-        assert_eq!(value, Value::from(json!([2, 5])));
+        assert_eq!(value.insert("[-1][1]", 3), None);
+        assert_eq!(value, Value::from(json!([2, [null, 3]])));
     }
 }
