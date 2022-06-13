@@ -35,7 +35,7 @@ The answer to the second question—how to fix it—is more complex because it d
 In one case, we found that rate limits were limiting performance by over 80%.
 {{< /quote >}}
 
-The crux of the matter is that Vector's high throughput presents a major challenge for HTTP-based sinks like [Elasticsearch] because those services can't always handle event payloads as quickly as Vector can send them. And when data services are heavily interdependent—which is almost always!—letting Vector overhwelm one of them can lead to system-wide performance degradation or even cascading failures.
+The crux of the matter is that Vector's high throughput presents a major challenge for HTTP-based sinks like [Elasticsearch] because those services can't always handle event payloads as quickly as Vector can send them. And when data services are heavily interdependent—which is almost always!—letting Vector overwhelm one of them can lead to system-wide performance degradation or even cascading failures.
 
 In versions of Vector prior to 0.11, you could address this problem by setting [**rate limits**][rate limit] on outbound HTTP traffic to downstream services. Rate limiting certainly *does* help prevent certain worst-case scenarios but customer feedback and our own internal QA has revealed that this approach also has deep limitations.
 
@@ -149,7 +149,7 @@ For now, we're quite confident that ARC in Vector 0.11, even in its initial stat
 [open issue]: https://github.com/vectordotdev/vector/issues/3887
 [performance under load]: https://medium.com/@NetflixTechBlog/performance-under-load-3e6fa9a60581
 [prior_art]: https://github.com/vectordotdev/vector/blob/master/rfcs/2020-04-06-1858-automatically-adjust-request-limits.md#prior-art
-[rate limit]: /docs/reference/configuration/sinks/http/#rate-limits-adapative-concurrency
+[rate limit]: /docs/reference/configuration/sinks/http/#rate-limits-adaptive-concurrency
 [rate_limit_duration_secs]: /docs/reference/configuration/sinks/http/#request.rate_limit_duration_secs
 [rate_limit_num]: /docs/reference/configuration/sinks/http/#request.rate_limit_num
 [request_concurrency]: /docs/reference/configuration/sinks/http/#request.concurrency

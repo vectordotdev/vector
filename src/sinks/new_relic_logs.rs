@@ -1,9 +1,9 @@
+use codecs::{CharacterDelimitedEncoderConfig, JsonSerializerConfig};
 use http::Uri;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 
-use super::util::SinkBatchSettings;
 use crate::{
     config::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
@@ -11,9 +11,9 @@ use crate::{
     sinks::{
         http::{HttpMethod, HttpSinkConfig},
         util::{
-            encoding::{EncodingConfig, EncodingConfigWithDefault},
+            encoding::{EncodingConfigWithFramingAdapter, Transformer},
             http::RequestConfig,
-            BatchConfig, Compression, TowerRequestConfig,
+            BatchConfig, Compression, SinkBatchSettings, TowerRequestConfig,
         },
     },
 };
@@ -54,10 +54,10 @@ pub struct NewRelicLogsConfig {
     pub insert_key: Option<String>,
     pub region: Option<NewRelicLogsRegion>,
     #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
+    pub encoding: Transformer,
     #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
@@ -79,23 +79,7 @@ inventory::submit! {
 
 impl GenerateConfig for NewRelicLogsConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self::with_encoding(Encoding::Json)).unwrap()
-    }
-}
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-pub enum Encoding {
-    #[derivative(Default)]
-    Json,
-}
-
-impl From<Encoding> for crate::sinks::http::Encoding {
-    fn from(v: Encoding) -> crate::sinks::http::Encoding {
-        match v {
-            Encoding::Json => crate::sinks::http::Encoding::Json,
-        }
+        toml::Value::try_from(Self::default()).expect("config must serialize to valid TOML")
     }
 }
 
@@ -124,19 +108,6 @@ impl SinkConfig for NewRelicLogsConfig {
 }
 
 impl NewRelicLogsConfig {
-    fn with_encoding(encoding: Encoding) -> Self {
-        Self {
-            license_key: None,
-            insert_key: None,
-            region: None,
-            encoding: encoding.into(),
-            compression: Compression::default(),
-            batch: BatchConfig::default(),
-            request: TowerRequestConfig::default(),
-            acknowledgements: Default::default(),
-        }
-    }
-
     fn create_config(&self) -> crate::Result<HttpSinkConfig> {
         let mut headers: IndexMap<String, String> = IndexMap::new();
         if let Some(license_key) = &self.license_key {
@@ -164,9 +135,11 @@ impl NewRelicLogsConfig {
             auth: None,
             headers: None,
             compression: self.compression,
-            encoding: EncodingConfig::<Encoding>::from(self.encoding.clone())
-                .into_encoding()
-                .into(),
+            encoding: EncodingConfigWithFramingAdapter::with_transformer(
+                Some(CharacterDelimitedEncoderConfig::new(b',').into()),
+                JsonSerializerConfig::new().into(),
+                self.encoding.clone(),
+            ),
             batch: batch_settings.into(),
             request,
             tls: None,
@@ -206,9 +179,7 @@ mod tests {
         assert_eq!(
             format!(
                 "{}",
-                NewRelicLogsConfig::with_encoding(Encoding::Json)
-                    .create_config()
-                    .unwrap_err()
+                NewRelicLogsConfig::default().create_config().unwrap_err()
             ),
             "Missing authentication key, must provide either 'license_key' or 'insert_key'"
                 .to_owned(),
@@ -217,8 +188,10 @@ mod tests {
 
     #[test]
     fn new_relic_logs_check_config_defaults() {
-        let mut nr_config = NewRelicLogsConfig::with_encoding(Encoding::Json);
-        nr_config.license_key = Some("foo".to_owned());
+        let nr_config = NewRelicLogsConfig {
+            license_key: Some("foo".to_owned()),
+            ..Default::default()
+        };
         let http_config = nr_config.create_config().unwrap();
 
         assert_eq!(
@@ -246,12 +219,20 @@ mod tests {
 
     #[test]
     fn new_relic_logs_check_config_custom() {
-        let mut nr_config = NewRelicLogsConfig::with_encoding(Encoding::Json);
-        nr_config.insert_key = Some("foo".to_owned());
-        nr_config.region = Some(NewRelicLogsRegion::Eu);
-        nr_config.batch.max_bytes = Some(MAX_PAYLOAD_SIZE);
-        nr_config.request.concurrency = Concurrency::Fixed(12);
-        nr_config.request.rate_limit_num = Some(24);
+        let mut batch = BatchConfig::default();
+        batch.max_bytes = Some(MAX_PAYLOAD_SIZE);
+
+        let nr_config = NewRelicLogsConfig {
+            insert_key: Some("foo".to_owned()),
+            region: Some(NewRelicLogsRegion::Eu),
+            batch,
+            request: TowerRequestConfig {
+                concurrency: Concurrency::Fixed(12),
+                rate_limit_num: Some(24),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
 
         let http_config = nr_config.create_config().unwrap();
 
@@ -283,7 +264,6 @@ mod tests {
         let config = r#"
         insert_key = "foo"
         region = "eu"
-        encoding = "json"
 
         [batch]
         max_bytes = 838860
@@ -325,7 +305,6 @@ mod tests {
         let config = r#"
         insert_key = "foo"
         region = "eu"
-        encoding = "json"
 
         [batch]
         max_bytes = 8388600
@@ -343,8 +322,10 @@ mod tests {
     async fn new_relic_logs_happy_path() {
         let in_addr = next_addr();
 
-        let mut nr_config = NewRelicLogsConfig::with_encoding(Encoding::Json);
-        nr_config.license_key = Some("foo".to_owned());
+        let nr_config = NewRelicLogsConfig {
+            license_key: Some("foo".to_owned()),
+            ..Default::default()
+        };
         let mut http_config = nr_config.create_config().unwrap();
         http_config.uri = format!("http://{}/fake_nr", in_addr)
             .parse::<http::Uri>()
