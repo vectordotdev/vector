@@ -29,7 +29,6 @@
 pub mod config;
 pub mod event;
 pub mod fanout;
-pub mod finalizer;
 pub mod metrics;
 pub mod partition;
 pub mod schema;
@@ -49,8 +48,6 @@ pub use vector_buffers as buffers;
 pub use vector_common::event_test_util;
 pub use vector_common::{byte_size_of::ByteSizeOf, internal_event};
 
-#[macro_use]
-extern crate derivative;
 #[macro_use]
 extern crate tracing;
 

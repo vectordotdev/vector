@@ -41,6 +41,7 @@ pub use event_data_eq::EventDataEq;
 pub mod event_test_util;
 
 pub mod finalization;
+pub mod finalizer;
 
 pub mod internal_event;
 
