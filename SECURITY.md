@@ -198,7 +198,7 @@ When possible, we'll create automated checks to enforce security policies.
   [on every incoming PR][urls.cargo_deny_schedule] to the Vector project.
 - Vector implements [Dependabot][urls.dependabot] which performs automated
   upgrades on dependencies and [alerts][urls.dependabot_alerts] about any
-  dependency-related security vulernerabilities.
+  dependency-related security vulnerabilities.
 - We verify the security of our Docker images using [Synk's][urls.snyk] vulnerability
   scanning.
 

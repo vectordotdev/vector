@@ -112,6 +112,19 @@ where
         )
     }
 
+    /// Create a new encoding configuration with a `Transformer`.
+    pub fn with_transformer(encoding: SerializerConfig, transformer: Transformer) -> Self {
+        Self(
+            EncodingWithTransformationConfig::<LegacyEncodingConfig, Migrator> {
+                encoding,
+                only_fields: transformer.only_fields().clone(),
+                except_fields: transformer.except_fields().clone(),
+                timestamp_format: *transformer.timestamp_format(),
+                _marker: PhantomData,
+            },
+        )
+    }
+
     /// Create a legacy sink-specific encoding configuration.
     pub fn legacy(encoding: LegacyEncodingConfig) -> Self {
         Self::from(encoding)
@@ -271,6 +284,24 @@ where
                 only_fields: None,
                 except_fields: None,
                 timestamp_format: None,
+                _marker: PhantomData,
+            },
+        }
+    }
+
+    /// Create a new encoding configuration with a `Transformer`.
+    pub fn with_transformer(
+        framing: Option<FramingConfig>,
+        encoding: SerializerConfig,
+        transformer: Transformer,
+    ) -> Self {
+        Self {
+            framing,
+            encoding: EncodingWithTransformationConfig {
+                encoding,
+                only_fields: transformer.only_fields().clone(),
+                except_fields: transformer.except_fields().clone(),
+                timestamp_format: *transformer.timestamp_format(),
                 _marker: PhantomData,
             },
         }
