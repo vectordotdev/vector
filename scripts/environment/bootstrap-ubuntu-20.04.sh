@@ -125,6 +125,14 @@ mv --force --verbose "$TEMP"/bin/protoc /usr/bin/protoc
 # Apt cleanup
 apt clean
 
+# Set up the default "deny all warnings" build flags
+CARGO_OVERRIDE_DIR="${HOME}/.cargo"
+CARGO_OVERRIDE_CONF="${CARGO_OVERRIDE_DIR}/config.toml"
+cat <<EOF >>"$CARGO_OVERRIDE_CONF"
+[target.'cfg(linux)']
+rustflags = [ "-D", "warnings" ]
+EOF
+
 # Install mold, because the system linker wastes a bunch of time.
 TEMP=$(mktemp -d)
 MOLD_VERSION=1.2.1
@@ -137,16 +145,17 @@ tar \
 cp "${TEMP}/${MOLD_TARGET}/bin/mold" /usr/bin/mold
 
 # Set Cargo to use mold as its linker.
-CARGO_OVERRIDE_DIR="${HOME}/.cargo"
-mkdir -p "${CARGO_OVERRIDE_DIR}"
+CARGO_BIN_DIR="${CARGO_OVERRIDE_DIR}/bin"
+mkdir -p "$CARGO_BIN_DIR"
 
-CARGO_OVERRIDE_CONF="${CARGO_OVERRIDE_DIR}/config.toml"
-cat <<EOF >>"${CARGO_OVERRIDE_CONF}"
-[target.x86_64-unknown-linux-gnu]
-rustflags = ["-D", "warnings", "-C", "linker=clang", "-C", "link-arg=-fuse-ld=/usr/bin/mold"]
+RUST_WRAPPER="${CARGO_BIN_DIR}/wrap-rustc"
+cat <<EOF >"$RUST_WRAPPER"
+#!/bin/sh
+exec mold -run "\$@"
 EOF
+chmod +x "$RUST_WRAPPER"
 
-# Install clang if we don't already have it, as we need it for overriding the linker.
-if ! [ -x "$(command -v clang)" ]; then
-    apt install --yes clang
-fi
+cat <<EOF >>"$CARGO_OVERRIDE_CONF"
+[build]
+rustc-wrapper = "$RUST_WRAPPER"
+EOF
