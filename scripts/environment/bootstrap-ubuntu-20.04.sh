@@ -3,6 +3,7 @@ set -e -o verbose
 
 if [ -n "$RUSTFLAGS" ]
 then
+  # shellcheck disable=SC2016
   echo '$RUSTFLAGS MUST NOT be set in CI configs as it overrides settings in `.cargo/config.toml`.'
   exit 1
 fi
