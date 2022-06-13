@@ -151,6 +151,7 @@ mkdir -p "$CARGO_BIN_DIR"
 RUST_WRAPPER="${CARGO_BIN_DIR}/wrap-rustc"
 cat <<EOF >"$RUST_WRAPPER"
 #!/bin/sh
+set -x
 exec mold -run "\$@"
 EOF
 chmod +x "$RUST_WRAPPER"
