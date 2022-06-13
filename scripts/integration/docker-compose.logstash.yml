@@ -36,8 +36,6 @@ services:
       - "logstash-integration-tests"
       - "--lib"
       - "::logstash::integration_tests::"
-      - "--"
-      - "--nocapture"
     environment:
       - HEARTBEAT_ADDRESS=0.0.0.0:8080
       - LOGSTASH_ADDRESS=0.0.0.0:8081

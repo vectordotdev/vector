@@ -23,8 +23,6 @@ services:
       - "azure-integration-tests"
       - "--lib"
       - "::azure_"
-      - "--"
-      - "--nocapture"
     environment:
       - AZURE_ADDRESS=local-azure-blob
       - HEARTBEAT_ADDRESS=0.0.0.0:8080
