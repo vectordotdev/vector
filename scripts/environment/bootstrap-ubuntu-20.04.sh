@@ -135,32 +135,39 @@ EOF
 
 # Install mold, because the system linker wastes a bunch of time.
 #
-# We explicitly put `mold-wrapper.so` right beside `mold` itself because it's hard-coded to look in the same directory
-# first when trying to load the shared object, so we can dodge having to care about the "right" lib folder to put it in.
-TEMP=$(mktemp -d)
-MOLD_VERSION=1.2.1
-MOLD_TARGET=mold-${MOLD_VERSION}-x86_64-linux
-curl -fsSL "https://github.com/rui314/mold/releases/download/v${MOLD_VERSION}/${MOLD_TARGET}.tar.gz" \
-     --output "$TEMP/${MOLD_TARGET}.tar.gz"
-tar \
-    -xvf "${TEMP}/${MOLD_TARGET}.tar.gz" \
-    -C "${TEMP}"
-cp "${TEMP}/${MOLD_TARGET}/bin/mold" /usr/bin/mold
-cp "${TEMP}/${MOLD_TARGET}/lib/mold/mold-wrapper.so" /usr/bin/mold-wrapper.so
+# Notably, we don't install/configure it when we're going to do anything with `cross`, as `cross` takes the Cargo
+# configuration from the host system and ships it over...  which isn't good when we're overriding the `rustc-wrapper`
+# and all of that.
+if [ -n "${DISABLE_MOLD-}" ] ; then
+    # We explicitly put `mold-wrapper.so` right beside `mold` itself because it's hard-coded to look in the same directory
+    # first when trying to load the shared object, so we can dodge having to care about the "right" lib folder to put it in.
+    TEMP=$(mktemp -d)
+    MOLD_VERSION=1.2.1
+    MOLD_TARGET=mold-${MOLD_VERSION}-x86_64-linux
+    curl -fsSL "https://github.com/rui314/mold/releases/download/v${MOLD_VERSION}/${MOLD_TARGET}.tar.gz" \
+        --output "$TEMP/${MOLD_TARGET}.tar.gz"
+    tar \
+        -xvf "${TEMP}/${MOLD_TARGET}.tar.gz" \
+        -C "${TEMP}"
+    cp "${TEMP}/${MOLD_TARGET}/bin/mold" /usr/bin/mold
+    cp "${TEMP}/${MOLD_TARGET}/lib/mold/mold-wrapper.so" /usr/bin/mold-wrapper.so
 
-# Set Cargo to use mold as its linker.
-CARGO_BIN_DIR="${CARGO_OVERRIDE_DIR}/bin"
-mkdir -p "$CARGO_BIN_DIR"
+    # Create our rustc wrapper script that we'll use to actually invoke `rustc` such that `mold` will wrap it and intercept
+    # anything linking calls to use `mold` instead of `ld`, etc.
+    CARGO_BIN_DIR="${CARGO_OVERRIDE_DIR}/bin"
+    mkdir -p "$CARGO_BIN_DIR"
 
-RUSTC_WRAPPER="${CARGO_BIN_DIR}/wrap-rustc"
-cat <<EOF >"$RUSTC_WRAPPER"
+    RUSTC_WRAPPER="${CARGO_BIN_DIR}/wrap-rustc"
+    cat <<EOF >"$RUSTC_WRAPPER"
 #!/bin/sh
 set -x
 exec mold -run "\$@"
 EOF
-chmod +x "$RUSTC_WRAPPER"
+    chmod +x "$RUSTC_WRAPPER"
 
-cat <<EOF >>"$CARGO_OVERRIDE_CONF"
+    # Now configure Cargo to use our rustc wrapper script.
+    cat <<EOF >>"$CARGO_OVERRIDE_CONF"
 [build]
 rustc-wrapper = "$RUSTC_WRAPPER"
 EOF
+fi

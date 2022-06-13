@@ -59,6 +59,7 @@ jobs:
       CARGO_PROFILE_RELEASE_OPT_LEVEL: 0
       CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 256
       CARGO_INCREMENTAL: 0
+      DISABLE_MOLD: true
     steps:
       - uses: actions/checkout@v3
       - run: make ci-sweep
