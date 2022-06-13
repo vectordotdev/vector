@@ -143,29 +143,20 @@ impl TransformConfig for RemapConfig {
                 merged_definition.clone(),
             )
             .ok()
-            .and_then(|(_, _, _, state)| {
+            .map(|(_, _, _, state)| {
                 let meaning = state
                     .get_external_context::<MeaningList>()
                     .cloned()
                     .expect("context exists")
                     .0;
 
-                state
-                    .target_kind()
-                    .clone()
-                    .into_object()
-                    .map(|x|{
-                        let def = Definition::empty_kind()
-                    })
-                    .map(|mut def| {
-                        for (id, path) in meaning {
-                            def = def.with_known_meaning(path, &id);
-                        }
-
-                        def
-                    })
+                let mut new_type_def = Definition::empty_kind(state.target_kind().clone());
+                for (id, path) in meaning {
+                    new_type_def = new_type_def.with_known_meaning(path, &id);
+                }
+                new_type_def
             })
-            .unwrap_or_else(schema::Definition::empty);
+            .unwrap_or_else(|| Definition::empty_kind(Kind::never()));
 
         // When a message is dropped and re-routed, we keep the original event, but also annotate
         // it with additional metadata.

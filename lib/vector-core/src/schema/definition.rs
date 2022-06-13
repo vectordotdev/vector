@@ -104,16 +104,13 @@ impl Definition {
 
     /// Creates an empty definition that is of the kind specified.
     /// There are no meanings or optional fields.
-    pub fn empty_kind(kind: Kind, log_namespace: Option<LogNamespace>) -> Self {
-        let mut log_namespaces = BTreeSet::new();
-        if let Some(namespace) = log_namespace {
-            log_namespaces.insert(namespace);
-        }
+    /// The log_namespaces are used to list the possible namespaces the schema is for.
+    pub fn empty_kind(kind: Kind, log_namespaces: impl Into<BTreeSet<LogNamespace>>) -> Self {
         Self {
             kind,
             meaning: BTreeMap::default(),
             optional: BTreeSet::default(),
-            log_namespaces,
+            log_namespaces: log_namespaces.into(),
         }
     }
 
