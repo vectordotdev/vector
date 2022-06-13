@@ -283,9 +283,9 @@ where
             });
         }
 
-        // In practice, we calculate our current buffer size based on the number of unacknowledged records. However, we
-        // only delete data files once they've been entirely acknowledged. This means that we may report a current
-        // buffer size that is smaller than the sum of the size of the data files currently on disk.
+        // We calculate our current buffer size based on the number of unacknowledged records. However, we only delete
+        // data files once they've been entirely acknowledged. This means that we may report a current buffer size that
+        // is smaller than the sum of the size of the data files currently on disk.
         //
         // We do this because if we used the true on-disk total buffer size, we might stall further writes until an
         // entire data file was deleted, even if we had fully acknowledged all but the last record in a data file, etc.
