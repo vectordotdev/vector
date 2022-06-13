@@ -62,8 +62,6 @@ services:
       - "nats-integration-tests"
       - "--lib"
       - "::nats::"
-      - "--"
-      - "--nocapture"
     depends_on:
       - nats
       - nats-userpass

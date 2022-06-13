@@ -19,8 +19,6 @@ services:
       - "fluent-integration-tests"
       - "--lib"
       - "::fluent::"
-      - "--"
-      - "--nocapture"
     volumes:
       - ${PWD}:/code
       - target:/code/target
