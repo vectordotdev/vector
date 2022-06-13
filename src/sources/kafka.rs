@@ -19,8 +19,8 @@ use rdkafka::{
 };
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
+use vector_common::{byte_size_of::ByteSizeOf, finalizer::OrderedFinalizer};
 use vector_config::configurable_component;
-use vector_core::{finalizer::OrderedFinalizer, ByteSizeOf};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},

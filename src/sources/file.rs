@@ -13,8 +13,8 @@ use regex::bytes::Regex;
 use snafu::{ResultExt, Snafu};
 use tokio::{sync::oneshot, task::spawn_blocking};
 use tracing::{Instrument, Span};
+use vector_common::finalizer::OrderedFinalizer;
 use vector_config::configurable_component;
-use vector_core::finalizer::OrderedFinalizer;
 
 use super::util::{EncodingConfig, MultilineConfig};
 use crate::{
