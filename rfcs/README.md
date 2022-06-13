@@ -61,7 +61,7 @@ Examples of changes that do not require a RFC:
 
 Use the "Scope" section to address out of scope concerns, like future improvements. This signals to the Vector team
 that you are aware of these concerns but have explicitly chosen to defer them. This not only helps to keep the RFC
-discussion focused, but also the implementation, resultin in a quicker overall delivery time.
+discussion focused, but also the implementation, resulting in a quicker overall delivery time.
 
 ### Be opinionated and propose a single solution
 
