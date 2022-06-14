@@ -2,6 +2,7 @@ use bytes::Bytes;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
+use value::Kind;
 use vector_core::config::LogNamespace;
 use vector_core::{
     config::DataType,
@@ -27,8 +28,11 @@ impl NativeDeserializerConfig {
     }
 
     /// The schema produced by the deserializer.
-    pub fn schema_definition(&self, _log_namespace: LogNamespace) -> schema::Definition {
-        schema::Definition::empty()
+    pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
+        match log_namespace {
+            LogNamespace::Legacy => schema::Definition::legacy_default(),
+            LogNamespace::Vector => schema::Definition::empty_kind(Kind::any(), [log_namespace]),
+        }
     }
 }
 

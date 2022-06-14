@@ -210,12 +210,33 @@ impl Default for LogNamespace {
 }
 
 impl LogNamespace {
-    // pub const VECTOR_DATA_KEY: &'static [BorrowedSegment<'static>; 1] =
-    //     &[BorrowedSegment::field("data")];
-    pub const VECTOR_METADATA_KEY: &'static [BorrowedSegment<'static>; 1] =
-        &[BorrowedSegment::field("metadata")];
+    /// Vector: This is added to "event metadata", nested under the source name
+    ///
+    /// Legacy: This is stored on the event root, only if a field with that name doesn't already exist
+    pub fn insert_source_metadata<'a>(
+        &self,
+        source_name: &'a str,
+        log: &mut LogEvent,
+        key: impl Path<'a>,
+        value: impl Into<Value>,
+    ) {
+        match self {
+            LogNamespace::Vector => {
+                log.metadata_mut()
+                    .value_mut()
+                    .insert(path!(source_name).concat(key), value);
+            }
+            LogNamespace::Legacy => {
+                log.try_insert(key, value);
+            }
+        }
+    }
 
-    pub fn insert_metadata<'a>(
+    /// Vector: This is added to the "event metadata", nested under the name "vector". This data
+    /// will be marked as read-only in VRL
+    ///
+    /// Legacy: This is stored on the event root, only if a field with that name doesn't already exist
+    pub fn insert_vector_metadata<'a>(
         &self,
         log: &mut LogEvent,
         key: impl Path<'a>,
@@ -225,23 +246,9 @@ impl LogNamespace {
             LogNamespace::Vector => {
                 log.metadata_mut()
                     .value_mut()
-                    .insert(Self::VECTOR_METADATA_KEY.concat(key), value);
+                    .insert(path!("vector").concat(key), value);
             }
-            LogNamespace::Legacy => {
-                log.try_insert(key, value);
-            }
-        }
-    }
-
-    pub fn insert_vector_metadata<'a>(
-        &self,
-        log: &mut LogEvent,
-        key: impl Path<'a>,
-        value: impl Into<Value>,
-    ) {
-        match self {
-            LogNamespace::Vector => self.insert_metadata(log, path!("vector").concat(key), value),
-            LogNamespace::Legacy => self.insert_metadata(log, key, value),
+            LogNamespace::Legacy => log.try_insert(key, value),
         }
     }
 

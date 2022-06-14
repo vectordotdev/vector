@@ -27,7 +27,6 @@ env:
   VERBOSE: true
   CI: true
   PROFILE: debug
-  RUSTFLAGS: "-D warnings"
 
 jobs:
   changes:

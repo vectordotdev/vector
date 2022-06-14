@@ -35,7 +35,7 @@ impl BytesDeserializerConfig {
     /// The schema produced by the deserializer.
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match log_namespace {
-            LogNamespace::Legacy => schema::Definition::empty().required_field(
+            LogNamespace::Legacy => schema::Definition::legacy_default().with_field(
                 log_schema().message_key(),
                 Kind::bytes(),
                 Some("message"),

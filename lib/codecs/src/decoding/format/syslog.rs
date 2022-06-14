@@ -35,10 +35,10 @@ impl SyslogDeserializerConfig {
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match log_namespace {
             LogNamespace::Legacy => {
-                schema::Definition::empty()
+                schema::Definition::empty_kind(Kind::any_object(), [log_namespace])
                     // The `message` field is always defined. If parsing fails, the entire body becomes the
                     // message.
-                    .required_field(log_schema().message_key(), Kind::bytes(), Some("message"))
+                    .with_field(log_schema().message_key(), Kind::bytes(), Some("message"))
                     // All other fields are optional.
                     .optional_field(
                         log_schema().timestamp_key(),
@@ -52,25 +52,23 @@ impl SyslogDeserializerConfig {
                     .optional_field("appname", Kind::bytes(), None)
                     .optional_field("msgid", Kind::bytes(), None)
                     .optional_field("procid", Kind::integer().or_bytes(), None)
-                    // "structured data" in a syslog message can be stored in any field, but will always be
-                    // a string.
-                    .unknown_fields(Kind::bytes())
+                    // "structured data" is placed at the root. It will always be a map strings
+                    .unknown_fields(Kind::object(Collection::from_unknown(Kind::bytes())))
             }
-            LogNamespace::Vector => schema::Definition::empty()
-                .required_field("message", Kind::bytes(), Some("message"))
-                .optional_field("timestamp", Kind::timestamp(), Some("timestamp"))
-                .optional_field("hostname", Kind::bytes(), None)
-                .optional_field("severity", Kind::bytes(), Some("severity"))
-                .optional_field("facility", Kind::bytes(), None)
-                .optional_field("version", Kind::integer(), None)
-                .optional_field("appname", Kind::bytes(), None)
-                .optional_field("msgid", Kind::bytes(), None)
-                .optional_field("procid", Kind::integer().or_bytes(), None)
-                .optional_field(
-                    "structured_data",
-                    Kind::object(Collection::from_unknown(Kind::bytes())),
-                    None,
-                ),
+            LogNamespace::Vector => {
+                schema::Definition::empty_kind(Kind::any_object(), [log_namespace])
+                    .with_field("message", Kind::bytes(), Some("message"))
+                    .optional_field("timestamp", Kind::timestamp(), Some("timestamp"))
+                    .optional_field("hostname", Kind::bytes(), None)
+                    .optional_field("severity", Kind::bytes(), Some("severity"))
+                    .optional_field("facility", Kind::bytes(), None)
+                    .optional_field("version", Kind::integer(), None)
+                    .optional_field("appname", Kind::bytes(), None)
+                    .optional_field("msgid", Kind::bytes(), None)
+                    .optional_field("procid", Kind::integer().or_bytes(), None)
+                    // "structured data" is placed at the root. It will always be a map strings
+                    .unknown_fields(Kind::object(Collection::from_unknown(Kind::bytes())))
+            }
         }
     }
 }

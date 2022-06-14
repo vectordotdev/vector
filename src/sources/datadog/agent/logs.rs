@@ -107,12 +107,43 @@ pub(crate) fn decode_log_body(
                     for mut event in events {
                         if let Event::Log(ref mut log) = event {
                             let namespace = &source.log_namespace;
-                            namespace.insert_metadata(log, path!("status"), status.clone());
-                            namespace.insert_metadata(log, path!("timestamp"), timestamp);
-                            namespace.insert_metadata(log, path!("hostname"), hostname.clone());
-                            namespace.insert_metadata(log, path!("service"), service.clone());
-                            namespace.insert_metadata(log, path!("ddsource"), ddsource.clone());
-                            namespace.insert_metadata(log, path!("ddtags"), ddtags.clone());
+                            let source_name = "datadog_agent";
+                            namespace.insert_source_metadata(
+                                source_name,
+                                log,
+                                path!("status"),
+                                status.clone(),
+                            );
+                            namespace.insert_source_metadata(
+                                source_name,
+                                log,
+                                path!("timestamp"),
+                                timestamp,
+                            );
+                            namespace.insert_source_metadata(
+                                source_name,
+                                log,
+                                path!("hostname"),
+                                hostname.clone(),
+                            );
+                            namespace.insert_source_metadata(
+                                source_name,
+                                log,
+                                path!("service"),
+                                service.clone(),
+                            );
+                            namespace.insert_source_metadata(
+                                source_name,
+                                log,
+                                path!("ddsource"),
+                                ddsource.clone(),
+                            );
+                            namespace.insert_source_metadata(
+                                source_name,
+                                log,
+                                path!("ddtags"),
+                                ddtags.clone(),
+                            );
 
                             // TODO: don't use log schema keys for Vector namespace
                             namespace.insert_vector_metadata(

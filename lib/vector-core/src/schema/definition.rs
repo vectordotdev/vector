@@ -2,9 +2,10 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::config::LogNamespace;
 use lookup::{Look, LookupBuf};
+use value::kind::insert;
 use value::kind::insert::InnerConflict;
 use value::{
-    kind::{insert, merge, nest, Collection, Field, Unknown},
+    kind::{merge, nest, Collection, Field, Unknown},
     Kind,
 };
 
@@ -22,12 +23,6 @@ pub struct Definition {
     /// The value within this map points to a path inside the `collection`. It is an invalid state
     /// for there to be a meaning pointing to a non-existing path in the collection.
     meaning: BTreeMap<String, MeaningPointer>,
-
-    /// A list of paths that are allowed to be missing.
-    ///
-    /// The key in this set points to a path inside the `collection`. It is an invalid state for
-    /// there to be a key pointing to a non-existing path in the collection.
-    optional: BTreeSet<LookupBuf>,
 
     /// Type definitions of components can change depending on the log namespace chosen.
     /// This records which ones are possible.
@@ -96,7 +91,6 @@ impl Definition {
         Self {
             kind: Kind::object(Collection::empty()),
             meaning: BTreeMap::default(),
-            optional: BTreeSet::default(),
             // this is incorrect, but the func is being deleted anyway...
             log_namespaces: BTreeSet::new(),
         }
@@ -109,9 +103,14 @@ impl Definition {
         Self {
             kind,
             meaning: BTreeMap::default(),
-            optional: BTreeSet::default(),
             log_namespaces: log_namespaces.into(),
         }
+    }
+
+    /// An object with any fields, and the `Legacy` namespace.
+    /// This is what most sources use for the legacy namespace.
+    pub fn legacy_default() -> Self {
+        Self::empty_kind(Kind::any_object(), [LogNamespace::Legacy])
     }
 
     /// All sources should set a schema definition, but they are not all implemented yet
@@ -120,20 +119,6 @@ impl Definition {
     pub fn source_default() -> Self {
         Self::empty_kind(Kind::any_object(), [LogNamespace::Legacy])
     }
-
-    /// Any valid JSON type
-    pub fn json() -> Self {
-        Self::empty().unknown_fields(Kind::json())
-    }
-
-    // /// Check if the definition is "empty", meaning:
-    // ///
-    // /// 1. There are no known fields defined.
-    // /// 2. The unknown fields are set to "any".
-    // pub fn is_empty(&self) -> bool {
-    //     self.collection.known().is_empty()
-    //         && self.collection.unknown().map_or(false, Unknown::is_any)
-    // }
 
     pub fn log_namespaces(&self) -> &BTreeSet<LogNamespace> {
         &self.log_namespaces
@@ -147,7 +132,7 @@ impl Definition {
     /// - If the path is not root, and the definition does not allow the type to be an object
     /// - Provided path has one or more coalesced segments (e.g. `.(foo | bar)`).
     #[must_use]
-    pub fn required_field(
+    pub fn with_field(
         mut self,
         path: impl Into<LookupBuf>,
         kind: Kind,
@@ -173,23 +158,6 @@ impl Definition {
                 coalesced_path: insert::CoalescedPath::InsertValid,
             },
         );
-        // // TODO: can this use `Kind::insert_at_path`?
-        // let new_kind = kind
-        //     .nest_at_path(
-        //         &path.to_lookup(),
-        //         nest::Strategy {
-        //             coalesced_path: nest::CoalescedPath::Reject,
-        //         },
-        //     )
-        //     .expect("non-coalesced path used");
-        //
-        // self.kind.merge(
-        //     new_kind,
-        //     merge::Strategy {
-        //         depth: merge::Depth::Deep,
-        //         indices: merge::Indices::Keep,
-        //     },
-        // );
 
         if let Some(meaning) = meaning {
             self.meaning.insert(meaning, MeaningPointer::Valid(path));
@@ -205,15 +173,12 @@ impl Definition {
     /// See `Definition::require_field`.
     #[must_use]
     pub fn optional_field(
-        mut self,
+        self,
         path: impl Into<LookupBuf>,
         kind: Kind,
         meaning: Option<&str>,
     ) -> Self {
-        let path = path.into();
-        self.optional.insert(path.clone());
-
-        self.required_field(path, kind, meaning)
+        self.with_field(path, kind.or_null(), meaning)
     }
 
     /// Register a semantic meaning for the definition.
@@ -266,35 +231,6 @@ impl Definition {
     /// required to have a `bar` field.
     #[must_use]
     pub fn merge(mut self, other: Self) -> Self {
-        let mut optional = BTreeSet::default();
-
-        for path in &self.optional {
-            if other.is_optional_field(path)
-                || other
-                    .kind
-                    .find_known_at_path(&mut path.to_lookup())
-                    .ok()
-                    .flatten()
-                    .is_none()
-            {
-                optional.insert(path.clone());
-            }
-        }
-        for path in other.optional {
-            if self.is_optional_field(&path)
-                || self
-                    .kind
-                    .find_known_at_path(&mut path.to_lookup())
-                    .ok()
-                    .flatten()
-                    .is_none()
-            {
-                optional.insert(path);
-            }
-        }
-
-        self.optional = optional;
-
         for (other_id, other_meaning) in other.meaning {
             let meaning = match self.meaning.remove(&other_id) {
                 Some(this_meaning) => this_meaning.merge(other_meaning),
@@ -330,11 +266,6 @@ impl Definition {
         }
     }
 
-    /// Returns `true` if the provided field is marked as optional.
-    fn is_optional_field(&self, path: &LookupBuf) -> bool {
-        self.optional.contains(path)
-    }
-
     pub fn meanings(&self) -> impl Iterator<Item = (&String, &LookupBuf)> {
         self.meaning
             .iter()
@@ -346,42 +277,6 @@ impl Definition {
 
     pub fn kind(&self) -> &Kind {
         &self.kind
-    }
-}
-
-// // TODO: this should be deleted. It assumes an object root
-// impl From<Collection<Field>> for Definition {
-//     fn from(collection: Collection<Field>) -> Self {
-//         Self {
-//             kind: Kind::object(collection),
-//             meaning: BTreeMap::default(),
-//             optional: BTreeSet::default(),
-//         }
-//     }
-// }
-
-// TODO: can this be deleted?
-impl From<Definition> for Kind {
-    fn from(definition: Definition) -> Self {
-        let mut kind: Self = definition.kind;
-
-        for optional in &definition.optional {
-            kind.insert_at_path(
-                &optional.to_lookup(),
-                Kind::null(),
-                insert::Strategy {
-                    inner_conflict: insert::InnerConflict::Reject,
-                    leaf_conflict: insert::LeafConflict::Merge(merge::Strategy {
-                        depth: merge::Depth::Deep,
-                        indices: merge::Indices::Keep,
-                    }),
-                    coalesced_path: insert::CoalescedPath::Reject,
-                },
-            )
-            .expect("api contract guarantees infallible operation");
-        }
-
-        kind
     }
 }
 
@@ -415,385 +310,332 @@ mod tests {
                     path: "foo".into(),
                     kind: Kind::boolean(),
                     meaning: Some("foo_meaning"),
-                    want: {
-                        let collection =
-                            Collection::from(BTreeMap::from([("foo".into(), Kind::boolean())]));
-                        let meaning = BTreeMap::from([("foo_meaning".to_owned(), "foo".into())]);
-                        let optional = BTreeSet::default();
-
-                        Definition {
-                            collection,
-                            meaning,
-                            optional,
-                        }
-                    },
+                    want: Definition::empty_kind(
+                        Kind::object(BTreeMap::from([("foo".into(), Kind::boolean())])),
+                        [],
+                    )
+                    .with_known_meaning("foo", "foo_meaning"),
+                    // want: Definition {
+                    //     kind: Kind::object(BTreeMap::from([("foo".into(), Kind::boolean())])),
+                    // collection: BTreeMap::from([("foo".into(), Kind::boolean())]).into(),
+                    // meaning: [("foo_meaning".to_owned(), "foo".into())].into(),
+                    // },
                 },
             ),
-            (
-                "nested fields",
-                TestCase {
-                    path: LookupBuf::from_str(".foo.bar").unwrap(),
-                    kind: Kind::regex().or_null(),
-                    meaning: Some("foobar"),
-                    want: {
-                        let collection = Collection::from(BTreeMap::from([(
-                            "foo".into(),
-                            Kind::object(BTreeMap::from([("bar".into(), Kind::regex().or_null())])),
-                        )]));
-                        let meaning = BTreeMap::from([(
-                            "foobar".to_owned(),
-                            LookupBuf::from_str(".foo.bar").unwrap().into(),
-                        )]);
-                        let optional = BTreeSet::default();
-
-                        Definition {
-                            collection,
-                            meaning,
-                            optional,
-                        }
-                    },
-                },
-            ),
-            (
-                "no meaning",
-                TestCase {
-                    path: "foo".into(),
-                    kind: Kind::boolean(),
-                    meaning: None,
-                    want: {
-                        let collection =
-                            Collection::from(BTreeMap::from([("foo".into(), Kind::boolean())]));
-                        let meaning = BTreeMap::default();
-                        let optional = BTreeSet::default();
-
-                        Definition {
-                            collection,
-                            meaning,
-                            optional,
-                        }
-                    },
-                },
-            ),
+            // (
+            //     "nested fields",
+            //     TestCase {
+            //         path: LookupBuf::from_str(".foo.bar").unwrap(),
+            //         kind: Kind::regex().or_null(),
+            //         meaning: Some("foobar"),
+            //         want: Definition {
+            //             collection: BTreeMap::from([(
+            //                 "foo".into(),
+            //                 Kind::object(BTreeMap::from([("bar".into(), Kind::regex().or_null())])),
+            //             )])
+            //             .into(),
+            //             meaning: [(
+            //                 "foobar".to_owned(),
+            //                 LookupBuf::from_str(".foo.bar").unwrap().into(),
+            //             )]
+            //             .into(),
+            //         },
+            //     },
+            // ),
+            // (
+            //     "no meaning",
+            //     TestCase {
+            //         path: "foo".into(),
+            //         kind: Kind::boolean(),
+            //         meaning: None,
+            //         want: Definition {
+            //             collection: BTreeMap::from([("foo".into(), Kind::boolean())]).into(),
+            //             meaning: BTreeMap::default(),
+            //         },
+            //     },
+            // ),
         ]) {
-            let mut got = Definition::empty();
-            got = got.required_field(path, kind, meaning);
+            let mut got = Definition::empty_kind(Kind::any_object(), []);
+            got = got.with_field(path, kind, meaning);
 
             assert_eq!(got, want, "{}", title);
         }
     }
 
-    #[test]
-    fn test_optional_field() {
-        struct TestCase {
-            path: LookupBuf,
-            kind: Kind,
-            meaning: Option<&'static str>,
-            want: Definition,
-        }
-
-        for (
-            title,
-            TestCase {
-                path,
-                kind,
-                meaning,
-                want,
-            },
-        ) in HashMap::from([
-            (
-                "simple",
-                TestCase {
-                    path: "foo".into(),
-                    kind: Kind::boolean(),
-                    meaning: Some("foo_meaning"),
-                    want: {
-                        let collection =
-                            Collection::from(BTreeMap::from([("foo".into(), Kind::boolean())]));
-                        let meaning = BTreeMap::from([("foo_meaning".to_owned(), "foo".into())]);
-                        let optional = BTreeSet::from(["foo".into()]);
-
-                        Definition {
-                            collection,
-                            meaning,
-                            optional,
-                        }
-                    },
-                },
-            ),
-            (
-                "nested fields",
-                TestCase {
-                    path: LookupBuf::from_str(".foo.bar").unwrap(),
-                    kind: Kind::regex().or_null(),
-                    meaning: Some("foobar"),
-                    want: {
-                        let collection = Collection::from(BTreeMap::from([(
-                            "foo".into(),
-                            Kind::object(BTreeMap::from([("bar".into(), Kind::regex().or_null())])),
-                        )]));
-                        let meaning = BTreeMap::from([(
-                            "foobar".to_owned(),
-                            LookupBuf::from_str(".foo.bar").unwrap().into(),
-                        )]);
-                        let optional = BTreeSet::from([LookupBuf::from_str(".foo.bar").unwrap()]);
-
-                        Definition {
-                            collection,
-                            meaning,
-                            optional,
-                        }
-                    },
-                },
-            ),
-            (
-                "no meaning",
-                TestCase {
-                    path: "foo".into(),
-                    kind: Kind::boolean(),
-                    meaning: None,
-                    want: {
-                        let collection =
-                            Collection::from(BTreeMap::from([("foo".into(), Kind::boolean())]));
-                        let meaning = BTreeMap::default();
-                        let optional = BTreeSet::from(["foo".into()]);
-
-                        Definition {
-                            collection,
-                            meaning,
-                            optional,
-                        }
-                    },
-                },
-            ),
-        ]) {
-            let mut got = Definition::empty();
-            got = got.optional_field(path, kind, meaning);
-
-            assert_eq!(got, want, "{}", title);
-        }
-    }
-
-    #[test]
-    fn test_unknown_fields() {
-        let want = Definition {
-            collection: Collection::from_unknown(Kind::bytes().or_integer()),
-            meaning: BTreeMap::default(),
-            optional: BTreeSet::default(),
-        };
-
-        let mut got = Definition::empty();
-        got = got.unknown_fields(Kind::boolean());
-        got = got.unknown_fields(Kind::bytes().or_integer());
-
-        assert_eq!(got, want);
-    }
-
-    #[test]
-    #[allow(clippy::too_many_lines)]
-    fn test_merge() {
-        struct TestCase {
-            this: Definition,
-            other: Definition,
-            want: Definition,
-        }
-
-        for (title, TestCase { this, other, want }) in HashMap::from([
-            (
-                "equal definitions",
-                TestCase {
-                    this: Definition {
-                        collection: Collection::from(BTreeMap::from([(
-                            "foo".into(),
-                            Kind::boolean(),
-                        )])),
-                        optional: BTreeSet::from(["foo".into()]),
-                        meaning: BTreeMap::from([("foo_meaning".to_owned(), "foo".into())]),
-                    },
-                    other: Definition {
-                        collection: Collection::from(BTreeMap::from([(
-                            "foo".into(),
-                            Kind::boolean(),
-                        )])),
-                        optional: BTreeSet::from(["foo".into()]),
-                        meaning: BTreeMap::from([("foo_meaning".to_owned(), "foo".into())]),
-                    },
-                    want: Definition {
-                        collection: Collection::from(BTreeMap::from([(
-                            "foo".into(),
-                            Kind::boolean(),
-                        )])),
-                        optional: BTreeSet::from(["foo".into()]),
-                        meaning: BTreeMap::from([("foo_meaning".to_owned(), "foo".into())]),
-                    },
-                },
-            ),
-            (
-                "this optional, other required",
-                TestCase {
-                    this: Definition {
-                        collection: Collection::from(BTreeMap::from([(
-                            "foo".into(),
-                            Kind::boolean(),
-                        )])),
-                        optional: BTreeSet::from(["foo".into()]),
-                        meaning: BTreeMap::default(),
-                    },
-                    other: Definition {
-                        collection: Collection::from(BTreeMap::from([(
-                            "foo".into(),
-                            Kind::boolean(),
-                        )])),
-                        optional: BTreeSet::default(),
-                        meaning: BTreeMap::default(),
-                    },
-                    want: Definition {
-                        collection: Collection::from(BTreeMap::from([(
-                            "foo".into(),
-                            Kind::boolean(),
-                        )])),
-                        optional: BTreeSet::default(),
-                        meaning: BTreeMap::default(),
-                    },
-                },
-            ),
-            (
-                "this required, other optional",
-                TestCase {
-                    this: Definition {
-                        collection: Collection::from(BTreeMap::from([(
-                            "foo".into(),
-                            Kind::boolean(),
-                        )])),
-                        optional: BTreeSet::default(),
-                        meaning: BTreeMap::default(),
-                    },
-                    other: Definition {
-                        collection: Collection::from(BTreeMap::from([(
-                            "foo".into(),
-                            Kind::boolean(),
-                        )])),
-                        optional: BTreeSet::from(["foo".into()]),
-                        meaning: BTreeMap::default(),
-                    },
-                    want: Definition {
-                        collection: Collection::from(BTreeMap::from([(
-                            "foo".into(),
-                            Kind::boolean(),
-                        )])),
-                        optional: BTreeSet::default(),
-                        meaning: BTreeMap::default(),
-                    },
-                },
-            ),
-            (
-                "this required, other required",
-                TestCase {
-                    this: Definition {
-                        collection: Collection::from(BTreeMap::from([(
-                            "foo".into(),
-                            Kind::boolean(),
-                        )])),
-                        optional: BTreeSet::default(),
-                        meaning: BTreeMap::default(),
-                    },
-                    other: Definition {
-                        collection: Collection::from(BTreeMap::from([(
-                            "foo".into(),
-                            Kind::boolean(),
-                        )])),
-                        optional: BTreeSet::default(),
-                        meaning: BTreeMap::default(),
-                    },
-                    want: Definition {
-                        collection: Collection::from(BTreeMap::from([(
-                            "foo".into(),
-                            Kind::boolean(),
-                        )])),
-                        optional: BTreeSet::default(),
-                        meaning: BTreeMap::default(),
-                    },
-                },
-            ),
-            (
-                "same meaning, pointing to different paths",
-                TestCase {
-                    this: Definition {
-                        collection: Collection::from(BTreeMap::from([(
-                            "foo".into(),
-                            Kind::boolean(),
-                        )])),
-                        optional: BTreeSet::default(),
-                        meaning: BTreeMap::from([(
-                            "foo".into(),
-                            MeaningPointer::Valid("foo".into()),
-                        )]),
-                    },
-                    other: Definition {
-                        collection: Collection::from(BTreeMap::from([(
-                            "foo".into(),
-                            Kind::boolean(),
-                        )])),
-                        optional: BTreeSet::default(),
-                        meaning: BTreeMap::from([(
-                            "foo".into(),
-                            MeaningPointer::Valid("bar".into()),
-                        )]),
-                    },
-                    want: Definition {
-                        collection: Collection::from(BTreeMap::from([(
-                            "foo".into(),
-                            Kind::boolean(),
-                        )])),
-                        optional: BTreeSet::default(),
-                        meaning: BTreeMap::from([(
-                            "foo".into(),
-                            MeaningPointer::Invalid(BTreeSet::from(["foo".into(), "bar".into()])),
-                        )]),
-                    },
-                },
-            ),
-            (
-                "same meaning, pointing to same path",
-                TestCase {
-                    this: Definition {
-                        collection: Collection::from(BTreeMap::from([(
-                            "foo".into(),
-                            Kind::boolean(),
-                        )])),
-                        optional: BTreeSet::default(),
-                        meaning: BTreeMap::from([(
-                            "foo".into(),
-                            MeaningPointer::Valid("foo".into()),
-                        )]),
-                    },
-                    other: Definition {
-                        collection: Collection::from(BTreeMap::from([(
-                            "foo".into(),
-                            Kind::boolean(),
-                        )])),
-                        optional: BTreeSet::default(),
-                        meaning: BTreeMap::from([(
-                            "foo".into(),
-                            MeaningPointer::Valid("foo".into()),
-                        )]),
-                    },
-                    want: Definition {
-                        collection: Collection::from(BTreeMap::from([(
-                            "foo".into(),
-                            Kind::boolean(),
-                        )])),
-                        optional: BTreeSet::default(),
-                        meaning: BTreeMap::from([(
-                            "foo".into(),
-                            MeaningPointer::Valid("foo".into()),
-                        )]),
-                    },
-                },
-            ),
-        ]) {
-            let got = this.merge(other);
-
-            assert_eq!(got, want, "{}", title);
-        }
-    }
+    // #[test]
+    // fn test_optional_field() {
+    //     struct TestCase {
+    //         path: LookupBuf,
+    //         kind: Kind,
+    //         meaning: Option<&'static str>,
+    //         want: Definition,
+    //     }
+    //
+    //     for (
+    //         title,
+    //         TestCase {
+    //             path,
+    //             kind,
+    //             meaning,
+    //             want,
+    //         },
+    //     ) in HashMap::from([
+    //         (
+    //             "simple",
+    //             TestCase {
+    //                 path: "foo".into(),
+    //                 kind: Kind::boolean(),
+    //                 meaning: Some("foo_meaning"),
+    //                 want: Definition {
+    //                     collection: BTreeMap::from([("foo".into(), Kind::boolean().or_null())])
+    //                         .into(),
+    //                     meaning: [("foo_meaning".to_owned(), "foo".into())].into(),
+    //                 },
+    //             },
+    //         ),
+    //         (
+    //             "nested fields",
+    //             TestCase {
+    //                 path: LookupBuf::from_str(".foo.bar").unwrap(),
+    //                 kind: Kind::regex().or_null(),
+    //                 meaning: Some("foobar"),
+    //                 want: Definition {
+    //                     collection: BTreeMap::from([(
+    //                         "foo".into(),
+    //                         Kind::object(BTreeMap::from([("bar".into(), Kind::regex().or_null())])),
+    //                     )])
+    //                     .into(),
+    //                     meaning: [(
+    //                         "foobar".to_owned(),
+    //                         LookupBuf::from_str(".foo.bar").unwrap().into(),
+    //                     )]
+    //                     .into(),
+    //                 },
+    //             },
+    //         ),
+    //         (
+    //             "no meaning",
+    //             TestCase {
+    //                 path: "foo".into(),
+    //                 kind: Kind::boolean(),
+    //                 meaning: None,
+    //                 want: Definition {
+    //                     collection: BTreeMap::from([("foo".into(), Kind::boolean().or_null())])
+    //                         .into(),
+    //                     meaning: BTreeMap::default(),
+    //                 },
+    //             },
+    //         ),
+    //     ]) {
+    //         let mut got = Definition::empty();
+    //         got = got.optional_field(path, kind, meaning);
+    //
+    //         assert_eq!(got, want, "{}", title);
+    //     }
+    // }
+    //
+    // #[test]
+    // fn test_unknown_fields() {
+    //     let want = Definition {
+    //         collection: Collection::from_unknown(Kind::bytes().or_integer()),
+    //         meaning: BTreeMap::default(),
+    //     };
+    //
+    //     let mut got = Definition::empty();
+    //     got = got.unknown_fields(Kind::boolean());
+    //     got = got.unknown_fields(Kind::bytes().or_integer());
+    //
+    //     assert_eq!(got, want);
+    // }
+    //
+    // #[test]
+    // #[allow(clippy::too_many_lines)]
+    // fn test_merge() {
+    //     struct TestCase {
+    //         this: Definition,
+    //         other: Definition,
+    //         want: Definition,
+    //     }
+    //
+    //     for (title, TestCase { this, other, want }) in HashMap::from([
+    //         (
+    //             "equal definitions",
+    //             TestCase {
+    //                 this: Definition {
+    //                     collection: Collection::from(BTreeMap::from([(
+    //                         "foo".into(),
+    //                         Kind::boolean().or_null(),
+    //                     )])),
+    //                     meaning: BTreeMap::from([("foo_meaning".to_owned(), "foo".into())]),
+    //                 },
+    //                 other: Definition {
+    //                     collection: Collection::from(BTreeMap::from([(
+    //                         "foo".into(),
+    //                         Kind::boolean().or_null(),
+    //                     )])),
+    //                     meaning: BTreeMap::from([("foo_meaning".to_owned(), "foo".into())]),
+    //                 },
+    //                 want: Definition {
+    //                     collection: Collection::from(BTreeMap::from([(
+    //                         "foo".into(),
+    //                         Kind::boolean().or_null(),
+    //                     )])),
+    //                     meaning: BTreeMap::from([("foo_meaning".to_owned(), "foo".into())]),
+    //                 },
+    //             },
+    //         ),
+    //         (
+    //             "this optional, other required",
+    //             TestCase {
+    //                 this: Definition {
+    //                     collection: Collection::from(BTreeMap::from([(
+    //                         "foo".into(),
+    //                         Kind::boolean().or_null(),
+    //                     )])),
+    //                     meaning: BTreeMap::default(),
+    //                 },
+    //                 other: Definition {
+    //                     collection: Collection::from(BTreeMap::from([(
+    //                         "foo".into(),
+    //                         Kind::boolean(),
+    //                     )])),
+    //                     meaning: BTreeMap::default(),
+    //                 },
+    //                 want: Definition {
+    //                     collection: Collection::from(BTreeMap::from([(
+    //                         "foo".into(),
+    //                         Kind::boolean().or_null(),
+    //                     )])),
+    //                     meaning: BTreeMap::default(),
+    //                 },
+    //             },
+    //         ),
+    //         (
+    //             "this required, other optional",
+    //             TestCase {
+    //                 this: Definition {
+    //                     collection: Collection::from(BTreeMap::from([(
+    //                         "foo".into(),
+    //                         Kind::boolean(),
+    //                     )])),
+    //                     meaning: BTreeMap::default(),
+    //                 },
+    //                 other: Definition {
+    //                     collection: Collection::from(BTreeMap::from([(
+    //                         "foo".into(),
+    //                         Kind::boolean().or_null(),
+    //                     )])),
+    //                     meaning: BTreeMap::default(),
+    //                 },
+    //                 want: Definition {
+    //                     collection: Collection::from(BTreeMap::from([(
+    //                         "foo".into(),
+    //                         Kind::boolean().or_null(),
+    //                     )])),
+    //                     meaning: BTreeMap::default(),
+    //                 },
+    //             },
+    //         ),
+    //         (
+    //             "this required, other required",
+    //             TestCase {
+    //                 this: Definition {
+    //                     collection: Collection::from(BTreeMap::from([(
+    //                         "foo".into(),
+    //                         Kind::boolean(),
+    //                     )])),
+    //                     meaning: BTreeMap::default(),
+    //                 },
+    //                 other: Definition {
+    //                     collection: Collection::from(BTreeMap::from([(
+    //                         "foo".into(),
+    //                         Kind::boolean(),
+    //                     )])),
+    //                     meaning: BTreeMap::default(),
+    //                 },
+    //                 want: Definition {
+    //                     collection: Collection::from(BTreeMap::from([(
+    //                         "foo".into(),
+    //                         Kind::boolean(),
+    //                     )])),
+    //                     meaning: BTreeMap::default(),
+    //                 },
+    //             },
+    //         ),
+    //         (
+    //             "same meaning, pointing to different paths",
+    //             TestCase {
+    //                 this: Definition {
+    //                     collection: Collection::from(BTreeMap::from([(
+    //                         "foo".into(),
+    //                         Kind::boolean(),
+    //                     )])),
+    //                     meaning: BTreeMap::from([(
+    //                         "foo".into(),
+    //                         MeaningPointer::Valid("foo".into()),
+    //                     )]),
+    //                 },
+    //                 other: Definition {
+    //                     collection: Collection::from(BTreeMap::from([(
+    //                         "foo".into(),
+    //                         Kind::boolean(),
+    //                     )])),
+    //                     meaning: BTreeMap::from([(
+    //                         "foo".into(),
+    //                         MeaningPointer::Valid("bar".into()),
+    //                     )]),
+    //                 },
+    //                 want: Definition {
+    //                     collection: Collection::from(BTreeMap::from([(
+    //                         "foo".into(),
+    //                         Kind::boolean(),
+    //                     )])),
+    //                     meaning: BTreeMap::from([(
+    //                         "foo".into(),
+    //                         MeaningPointer::Invalid(BTreeSet::from(["foo".into(), "bar".into()])),
+    //                     )]),
+    //                 },
+    //             },
+    //         ),
+    //         (
+    //             "same meaning, pointing to same path",
+    //             TestCase {
+    //                 this: Definition {
+    //                     collection: Collection::from(BTreeMap::from([(
+    //                         "foo".into(),
+    //                         Kind::boolean(),
+    //                     )])),
+    //                     meaning: BTreeMap::from([(
+    //                         "foo".into(),
+    //                         MeaningPointer::Valid("foo".into()),
+    //                     )]),
+    //                 },
+    //                 other: Definition {
+    //                     collection: Collection::from(BTreeMap::from([(
+    //                         "foo".into(),
+    //                         Kind::boolean(),
+    //                     )])),
+    //                     meaning: BTreeMap::from([(
+    //                         "foo".into(),
+    //                         MeaningPointer::Valid("foo".into()),
+    //                     )]),
+    //                 },
+    //                 want: Definition {
+    //                     collection: Collection::from(BTreeMap::from([(
+    //                         "foo".into(),
+    //                         Kind::boolean(),
+    //                     )])),
+    //                     meaning: BTreeMap::from([(
+    //                         "foo".into(),
+    //                         MeaningPointer::Valid("foo".into()),
+    //                     )]),
+    //                 },
+    //             },
+    //         ),
+    //     ]) {
+    //         let got = this.merge(other);
+    //
+    //         assert_eq!(got, want, "{}", title);
+    //     }
+    // }
 }

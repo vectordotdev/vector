@@ -70,7 +70,7 @@ impl Decoder {
         // Parse structured events from the byte frame.
         self.deserializer
             .parse(frame, self.log_namespace)
-            .map(|mut events| Some((events, byte_size)))
+            .map(|events| Some((events, byte_size)))
             .map_err(|error| {
                 emit!(DecoderDeserializeFailed { error: &error });
                 Error::ParsingError(error)

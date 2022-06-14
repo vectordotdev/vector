@@ -176,11 +176,7 @@ pub async fn build_pieces(
         let mut controls = HashMap::new();
         let mut schema_definitions = HashMap::with_capacity(source_outputs.len());
 
-        println!("Looping through source outputs...");
-
         for output in source_outputs {
-            println!("Looping on output = {:?}", output);
-
             let mut rx = builder.add_output(output.clone());
 
             let (mut fanout, control) = Fanout::new();
@@ -204,12 +200,10 @@ pub async fn build_pieces(
 
             let schema_definition = output
                 .log_schema_definition
-                .unwrap_or_else(schema::Definition::source_default());
+                .unwrap_or_else(schema::Definition::source_default);
 
             schema_definitions.insert(output.port, schema_definition);
         }
-
-        println!("Schema definitions: {:?}\n", schema_definitions);
 
         let pump = async move {
             let mut handles = Vec::new();

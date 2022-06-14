@@ -577,7 +577,7 @@ components: sinks: [Name=string]: {
 		if features.send != _|_ {
 			if features.send.request.enabled {
 				rate_limits: {
-					title: "Rate limits & adapative concurrency"
+					title: "Rate limits & adaptive concurrency"
 					body:  null
 					sub_sections: [
 						{

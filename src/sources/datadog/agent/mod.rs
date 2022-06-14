@@ -191,13 +191,13 @@ impl SourceConfig for DatadogAgentConfig {
                     // See: `LogMsg` struct.
                     DeserializerConfig::Bytes => {
                         schema::Definition::empty_kind(Kind::any_object(), [log_namespace])
-                            .required_field("message", Kind::bytes(), Some("message"))
-                            .required_field("status", Kind::bytes(), Some("severity"))
-                            .required_field("timestamp", Kind::timestamp(), Some("timestamp"))
-                            .required_field("hostname", Kind::bytes(), Some("host"))
-                            .required_field("service", Kind::bytes(), Some("service"))
-                            .required_field("ddsource", Kind::bytes(), Some("source"))
-                            .required_field("ddtags", Kind::bytes(), Some("tags"))
+                            .with_field("message", Kind::bytes(), Some("message"))
+                            .with_field("status", Kind::bytes(), Some("severity"))
+                            .with_field("timestamp", Kind::timestamp(), Some("timestamp"))
+                            .with_field("hostname", Kind::bytes(), Some("host"))
+                            .with_field("service", Kind::bytes(), Some("service"))
+                            .with_field("ddsource", Kind::bytes(), Some("source"))
+                            .with_field("ddtags", Kind::bytes(), Some("tags"))
                             .merge(self.decoding.schema_definition(log_namespace))
                     }
 
