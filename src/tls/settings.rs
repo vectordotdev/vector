@@ -515,7 +515,7 @@ fn open_read(filename: &Path, note: &'static str) -> Result<(Vec<u8>, PathBuf)> 
 mod test {
     use super::*;
 
-    const TEST_PKCS12_PATH: &str = "tests/data/ca/intermediate_server/private/localhost.p12";
+    const TEST_PKCS12_PATH: &str = "tests/data/ca/intermediate_client/private/localhost.p12";
     const TEST_PEM_CRT_BYTES: &[u8] =
         include_bytes!("../../tests/data/ca/intermediate_server/certs/localhost.cert.pem");
     const TEST_PEM_KEY_BYTES: &[u8] =
@@ -592,15 +592,13 @@ mod test {
     #[test]
     fn from_options_intermediate_ca() {
         let options = TlsConfig {
-            ca_file: Some(
-                "tests/data/ca/intermediate_server/certs/intermediate_server.cert.pem".into(),
-            ),
+            ca_file: Some("tests/data/ca/intermediate_server/certs/ca-chain.cert.pem".into()),
             ..Default::default()
         };
         let settings = TlsSettings::from_options(&Some(options))
             .expect("Failed to load authority certificate");
         assert!(settings.identity.is_none());
-        assert_eq!(settings.authorities.len(), 3);
+        assert_eq!(settings.authorities.len(), 2);
     }
 
     #[test]
