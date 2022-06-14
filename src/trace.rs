@@ -63,8 +63,8 @@ pub fn init(color: bool, json: bool, levels: &str) {
     let metrics_layer = metrics_layer_enabled()
         .then(|| MetricsLayer::new().with_filter(tracing_subscriber::filter::LevelFilter::INFO));
 
-    let broadcast_layer = RateLimitedLayer::new(BroadcastLayer::new())
-        .with_filter(fmt_filter.clone());
+    let broadcast_layer =
+        RateLimitedLayer::new(BroadcastLayer::new()).with_filter(fmt_filter.clone());
 
     let subscriber = tracing_subscriber::registry()
         .with(metrics_layer)
