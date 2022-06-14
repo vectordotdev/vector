@@ -9098,6 +9098,7 @@ dependencies = [
  "clap 3.1.18",
  "enrichment",
  "glob",
+ "lookup",
  "prettydiff",
  "regex",
  "serde",

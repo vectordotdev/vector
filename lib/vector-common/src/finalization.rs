@@ -7,7 +7,6 @@ use std::{cmp, future::Future, mem, pin::Pin, sync::Arc, task::Poll};
 
 use crossbeam_utils::atomic::AtomicCell;
 use futures::future::FutureExt;
-use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 
 #[cfg(feature = "byte_size_of")]
@@ -259,7 +258,7 @@ impl Drop for BatchNotifier {
 }
 
 /// The status of an individual batch.
-#[derive(Copy, Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u8)]
 pub enum BatchStatus {
     /// All events in the batch were accepted.
@@ -299,7 +298,7 @@ impl BatchStatus {
 }
 
 /// The status of an individual event.
-#[derive(Copy, Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u8)]
 pub enum EventStatus {
     /// All copies of this event were dropped without being finalized.

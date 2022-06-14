@@ -128,9 +128,14 @@ where
                         match maybe_event {
                             None => true,
                             Some(event) => {
-                                match self.exclude.as_ref() {
-                                  Some(condition) if condition.check(&event) => output.push(event),
-                                  _ => {
+                                let (throttle, event) = match self.exclude.as_ref() {
+                                        Some(condition) => {
+                                            let (result, event) = condition.check(event);
+                                            (!result, event)
+                                        },
+                                        _ => (true, event)
+                                    };
+                                    if throttle {
                                         let key = self.key_field.as_ref().and_then(|t| {
                                             t.render_string(&event)
                                                 .map_err(|error| {
@@ -155,8 +160,9 @@ where
                                                 }
                                             }
                                         }
+                                    } else {
+                                        output.push(event)
                                     }
-                                }
                                 false
                             }
                         }
