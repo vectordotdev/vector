@@ -19,7 +19,7 @@ pub use r#ref::{EventMutRef, EventRef};
 use serde::{Deserialize, Serialize};
 pub use trace::TraceEvent;
 use vector_buffers::EventCount;
-use vector_common::EventDataEq;
+use vector_common::{finalization, EventDataEq};
 #[cfg(feature = "vrl")]
 pub use vrl_target::{TargetEvents, VrlTarget};
 
@@ -28,7 +28,6 @@ use crate::ByteSizeOf;
 pub mod array;
 pub mod discriminant;
 pub mod error;
-mod finalization;
 mod log_event;
 #[cfg(feature = "lua")]
 pub mod lua;
@@ -250,15 +249,6 @@ impl Event {
         }
     }
 
-    pub fn add_batch_notifier(&mut self, batch: Arc<BatchNotifier>) {
-        let finalizer = EventFinalizer::new(batch);
-        match self {
-            Self::Log(log) => log.add_finalizer(finalizer),
-            Self::Metric(metric) => metric.add_finalizer(finalizer),
-            Self::Trace(trace) => trace.add_finalizer(finalizer),
-        }
-    }
-
     #[must_use]
     pub fn with_batch_notifier(self, batch: &Arc<BatchNotifier>) -> Self {
         match self {
@@ -285,6 +275,17 @@ impl EventDataEq for Event {
             (Self::Metric(a), Self::Metric(b)) => a.event_data_eq(b),
             (Self::Trace(a), Self::Trace(b)) => a.event_data_eq(b),
             _ => false,
+        }
+    }
+}
+
+impl finalization::AddBatchNotifier for Event {
+    fn add_batch_notifier(&mut self, batch: Arc<BatchNotifier>) {
+        let finalizer = EventFinalizer::new(batch);
+        match self {
+            Self::Log(log) => log.add_finalizer(finalizer),
+            Self::Metric(metric) => metric.add_finalizer(finalizer),
+            Self::Trace(trace) => trace.add_finalizer(finalizer),
         }
     }
 }

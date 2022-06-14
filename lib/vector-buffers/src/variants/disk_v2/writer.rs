@@ -66,8 +66,6 @@ where
     /// record being big enough that it would exceed the max data file size.
     ///
     /// The record that was given to write is returned.
-    ///
-    /// See lemma 5.
     #[snafu(display("data file full or record would exceed max data file size"))]
     DataFileFull { record: T, serialized_size: usize },
 
@@ -76,8 +74,6 @@ where
     /// This is nonsensicial because we don't intend to ever support encoding zero-sized types
     /// through the buffer, and the logic we use to count the number of actual events in the buffer
     /// transitively depends on not being able to represent more than one event per encoded byte.
-    ///
-    /// See lemma 4 for more information.
     #[snafu(display(
         "record reported event count ({}) higher than encoded length ({})",
         encoded_len,

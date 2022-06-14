@@ -117,7 +117,7 @@ where
     S: Service<B::Output>,
     B: Batch,
 {
-    pub fn get_ref(&self) -> &S {
+    pub const fn get_ref(&self) -> &S {
         &self.inner.service.service.inner
     }
 }

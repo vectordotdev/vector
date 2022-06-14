@@ -10,9 +10,21 @@ use snafu::Snafu;
 use super::io::{Filesystem, ProductionFilesystem};
 
 // We don't want data files to be bigger than 128MB, but we might end up overshooting slightly.
-pub const DEFAULT_MAX_DATA_FILE_SIZE: u64 = 128 * 1024 * 1024;
-// There's no particular reason that _has_ to be 8MB, it's just a simple default we've chosen here.
-pub const DEFAULT_MAX_RECORD_SIZE: usize = 8 * 1024 * 1024;
+pub const DEFAULT_MAX_DATA_FILE_SIZE: usize = 128 * 1024 * 1024;
+
+// We allow records to be as large as a data file.
+//
+// Practically, this means we'll allow records that are just about as big as as a single data file, but they won't
+// _exceed_ the size of a data file, even if they're the first write to a data file.
+pub const DEFAULT_MAX_RECORD_SIZE: usize = DEFAULT_MAX_DATA_FILE_SIZE;
+
+// We want to ensure a reasonable time before we `fsync`/flush to disk, and 500ms should provide that for non-critical
+// workloads.
+//
+// Practically, it's far more definitive than `disk_v1` which does not definitvely `fsync` at all, at least with how we
+// have it configured.
+pub const DEFAULT_FLUSH_INTERVAL: Duration = Duration::from_millis(500);
+
 // Using 256KB as it aligns nicely with the I/O size exposed by major cloud providers.  This may not
 // be the underlying block size used by the OS, but it still aligns well with what will happen on
 // the "backend" for cloud providers, which is simply a useful default for when we want to look at
@@ -36,7 +48,7 @@ pub enum BuildError {
     #[snafu(display("parameter '{}' was invalid: {}", param_name, reason))]
     InvalidParameter {
         param_name: &'static str,
-        reason: &'static str,
+        reason: String,
     },
 }
 
@@ -143,7 +155,7 @@ where
     /// amount, as we must account for one full data file's worth of extra data.
     ///
     /// Defaults to `usize::MAX`, or effectively no limit.  Due to the internal design of the
-    /// buffer, the effective maximum limit is around `max_data_file_size + max_record_size` * 2^16.
+    /// buffer, the effective maximum limit is around `max_data_file_size` * 2^16.
     #[allow(dead_code)]
     pub fn max_buffer_size(mut self, amount: u64) -> Self {
         self.max_buffer_size = Some(amount);
@@ -169,7 +181,7 @@ where
     /// Any record which, when encoded, is larger than this amount (with a small caveat, see note)
     /// will not be written to the buffer.
     ///
-    /// Defaults to 8MB.
+    /// Defaults to 128MB.
     #[allow(dead_code)]
     pub fn max_record_size(mut self, amount: usize) -> Self {
         self.max_record_size = Some(amount);
@@ -230,53 +242,62 @@ where
     /// Consumes this builder and constructs a `DiskBufferConfig`.
     pub fn build(self) -> Result<DiskBufferConfig<FS>, BuildError> {
         let max_buffer_size = self.max_buffer_size.unwrap_or(u64::MAX);
-        let max_data_file_size = self
-            .max_data_file_size
-            .unwrap_or(DEFAULT_MAX_DATA_FILE_SIZE);
+        let max_data_file_size = self.max_data_file_size.unwrap_or_else(|| {
+            u64::try_from(DEFAULT_MAX_DATA_FILE_SIZE)
+                .expect("Vector does not support 128-bit platforms.")
+        });
         let max_record_size = self.max_record_size.unwrap_or(DEFAULT_MAX_RECORD_SIZE);
         let write_buffer_size = self.write_buffer_size.unwrap_or(DEFAULT_WRITE_BUFFER_SIZE);
-        let flush_interval = self
-            .flush_interval
-            .unwrap_or_else(|| Duration::from_millis(500));
+        let flush_interval = self.flush_interval.unwrap_or(DEFAULT_FLUSH_INTERVAL);
         let filesystem = self.filesystem;
 
         // Validate the input parameters.
-        if max_buffer_size == 0 {
-            return Err(BuildError::InvalidParameter {
-                param_name: "max_buffer_size",
-                reason: "cannot be zero",
-            });
-        }
-
         if max_data_file_size == 0 {
             return Err(BuildError::InvalidParameter {
                 param_name: "max_data_file_size",
-                reason: "cannot be zero",
+                reason: "cannot be zero".to_string(),
+            });
+        }
+
+        if max_buffer_size < max_data_file_size {
+            return Err(BuildError::InvalidParameter {
+                param_name: "max_buffer_size",
+                reason: format!(
+                    "must be greater than or equal to {} bytes",
+                    max_data_file_size
+                ),
             });
         }
 
         if max_record_size == 0 {
             return Err(BuildError::InvalidParameter {
                 param_name: "max_record_size",
-                reason: "cannot be zero",
+                reason: "cannot be zero".to_string(),
             });
         }
 
         if write_buffer_size == 0 {
             return Err(BuildError::InvalidParameter {
                 param_name: "write_buffer_size",
-                reason: "cannot be zero",
+                reason: "cannot be zero".to_string(),
             });
         }
 
-        // The actual on-disk maximum buffer size will be the user-supplied `max_buffer_size`
-        // rounded up to the next multiple of `DATA_FILE_TARGET_MAX_SIZE`.  Internally, we'll limit
-        // ourselves to `max_buffer_size` rounded _down_ to the next multiple of
-        // `DATA_FILE_TARGET_MAX_SIZE`, so that when we have a full data file hanging around
-        // mid-read, our actual on-disk usage will match what we've told the user to expect.
+        // We calculate our current buffer size based on the number of unacknowledged records. However, we only delete
+        // data files once they've been entirely acknowledged. This means that we may report a current buffer size that
+        // is smaller than the sum of the size of the data files currently on disk.
         //
-        // We also ensure that `max_buffer_size` is at least as big as `DATA_FILE_TARGET_MAX_SIZE`
-        // which means the overall minimum on-disk buffer size is 256MB (2x 128MB).
+        // We do this because if we used the true on-disk total buffer size, we might stall further writes until an
+        // entire data file was deleted, even if we had fully acknowledged all but the last record in a data file, etc.
+        // We essentially trade off using up to an additional `DEFAULT_MAX_DATA_FILE_SIZE` bytes to allow writers to
+        // make progress as records are read and acknowledged, when the buffer is riding close to the overall buffer
+        // size limit.
+        //
+        // In practical terms, this means the expected true on-disk total buffer size can grow to `max_buffer_size`,
+        // rounded up to the closest multiple of `DEFAULT_MAX_DATA_FILE_SIZE`. On the flipside, though, we limit our
+        // functional max buffer size -- the value we use internally for limiting writes until more records are
+        // acknowledged, etc -- to `max_buffer_size` rounded _down_ to the closest multiple of
+        // `DEFAULT_MAX_DATA_FILE_SIZE`.
         let max_buffer_size = max_buffer_size - (max_buffer_size % max_data_file_size);
         let max_buffer_size = cmp::max(max_buffer_size, max_data_file_size);
 
@@ -289,5 +310,36 @@ where
             flush_interval,
             filesystem,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use proptest::{prop_assert, prop_assert_eq, proptest};
+
+    use crate::variants::disk_v2::{common::DEFAULT_MAX_DATA_FILE_SIZE, DiskBufferConfigBuilder};
+
+    const MAX_BUFFER_SIZE_TEST_UPPER_BOUND_INPUT: usize = DEFAULT_MAX_DATA_FILE_SIZE * 10;
+
+    proptest! {
+        #[test]
+        fn ensure_max_disk_buffer_size_lower_bound(max_buffer_size in DEFAULT_MAX_DATA_FILE_SIZE..MAX_BUFFER_SIZE_TEST_UPPER_BOUND_INPUT) {
+            // This is a little ugly but the `u64`/`usize` conversions make it annoying to do in a full const way.
+            let default_max_data_file_size = u64::try_from(DEFAULT_MAX_DATA_FILE_SIZE)
+                .expect("`DEFAULT_MAX_DATA_FILE_SIZE` should not ever be greater than `u64::MAX`.");
+            let max_buffer_size = u64::try_from(max_buffer_size)
+                .expect("`max_buffer_size` should not ever be greater than `u64::MAX`.");
+
+            let config = DiskBufferConfigBuilder::from_path("/tmp/dummy/path")
+                .max_buffer_size(max_buffer_size)
+                .build()
+                .expect("errors during the config build are all invalid here");
+
+            // Small sanity check to make sure our logic for enforcing the maximum buffer size doesn't truncate to zero.
+            prop_assert!(config.max_buffer_size != 0);
+
+            prop_assert_eq!(config.max_data_file_size, default_max_data_file_size, "the default max data file size should always match the default in this test");
+            prop_assert!(config.max_buffer_size >= default_max_data_file_size, "max_buffer_size should be at least as big as max data file size ({}), got {}", default_max_data_file_size, config.max_buffer_size);
+        }
     }
 }

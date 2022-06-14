@@ -17,6 +17,7 @@ use tokio::{
 };
 use tokio_util::codec::{Decoder, FramedRead};
 use tracing::Instrument;
+use vector_common::finalization::AddBatchNotifier;
 use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 

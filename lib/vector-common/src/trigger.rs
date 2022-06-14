@@ -1,14 +1,17 @@
 use stream_cancel::Trigger;
 
+#[allow(clippy::module_name_repetitions)]
 pub struct DisabledTrigger {
     trigger: Option<Trigger>,
 }
 
 impl DisabledTrigger {
+    #[must_use]
     pub fn new(t: Trigger) -> Self {
         Self { trigger: Some(t) }
     }
 
+    #[must_use]
     pub fn into_inner(mut self) -> Trigger {
         self.trigger.take().unwrap_or_else(|| unreachable!())
     }

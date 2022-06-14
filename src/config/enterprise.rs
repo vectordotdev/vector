@@ -30,7 +30,8 @@ use crate::{
         util::retries::ExponentialBackoff,
     },
     sources::{
-        host_metrics::HostMetricsConfig, internal_logs::InternalLogsConfig,
+        host_metrics::{Collector, HostMetricsConfig},
+        internal_logs::InternalLogsConfig,
         internal_metrics::InternalMetricsConfig,
     },
     transforms::{filter::FilterConfig, remap::RemapConfig},
@@ -478,9 +479,21 @@ fn setup_metrics_reporting(
 
     // Create internal sources for host and internal metrics. We're using distinct sources here and
     // not attempting to reuse existing ones, to configure according to enterprise requirements.
+
+    // By default, host_metrics generates many metrics and some with high
+    // cardinality which can negatively impact customers' costs and downstream
+    // systems' performance. To avoid this, we explicitly set `collectors`.
     let host_metrics = HostMetricsConfig {
         namespace: Some("vector.host".to_owned()),
         scrape_interval_secs: datadog.reporting_interval_secs,
+        collectors: Some(vec![
+            Collector::Cpu,
+            Collector::Disk,
+            Collector::Load,
+            Collector::Host,
+            Collector::Memory,
+            Collector::Network,
+        ]),
         ..Default::default()
     };
 
@@ -594,8 +607,7 @@ pub(crate) fn report_configuration(
         // We need to create a JSON representation of config, based on the original files
         // that Vector was spawned with.
         let (table, _) = process_paths(&config_paths)
-            .map(|paths| load_source_from_paths(&paths).ok())
-            .flatten()
+            .and_then(|paths| load_source_from_paths(&paths).ok())
             .expect("Couldn't load source from config paths. Please report.");
 
         // Set the relevant fields needed to report a config to Datadog. This is a struct rather than

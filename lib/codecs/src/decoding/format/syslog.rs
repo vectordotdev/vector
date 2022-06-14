@@ -32,7 +32,7 @@ impl SyslogDeserializerConfig {
         schema::Definition::empty()
             // The `message` field is always defined. If parsing fails, the entire body becomes the
             // message.
-            .required_field(log_schema().message_key(), Kind::bytes(), Some("message"))
+            .with_field(log_schema().message_key(), Kind::bytes(), Some("message"))
             // All other fields are optional.
             .optional_field(
                 log_schema().timestamp_key(),

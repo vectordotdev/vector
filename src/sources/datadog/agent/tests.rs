@@ -42,7 +42,7 @@ use crate::{
 };
 
 fn test_logs_schema_definition() -> schema::Definition {
-    schema::Definition::empty().required_field(
+    schema::Definition::empty().with_field(
         "a log field",
         Kind::integer().or_bytes(),
         Some("log field"),
@@ -50,11 +50,7 @@ fn test_logs_schema_definition() -> schema::Definition {
 }
 
 fn test_metrics_schema_definition() -> schema::Definition {
-    schema::Definition::empty().required_field(
-        "a schema tag",
-        Kind::boolean().or_null(),
-        Some("tag"),
-    )
+    schema::Definition::empty().with_field("a schema tag", Kind::boolean().or_null(), Some("tag"))
 }
 
 impl Arbitrary for LogMsg {
@@ -1276,13 +1272,13 @@ fn test_config_outputs() {
                     None,
                     Some(
                         schema::Definition::empty()
-                            .required_field("message", Kind::bytes(), Some("message"))
-                            .required_field("status", Kind::bytes(), Some("severity"))
-                            .required_field("timestamp", Kind::timestamp(), Some("timestamp"))
-                            .required_field("hostname", Kind::bytes(), Some("host"))
-                            .required_field("service", Kind::bytes(), Some("service"))
-                            .required_field("ddsource", Kind::bytes(), Some("source"))
-                            .required_field("ddtags", Kind::bytes(), Some("tags")),
+                            .with_field("message", Kind::bytes(), Some("message"))
+                            .with_field("status", Kind::bytes(), Some("severity"))
+                            .with_field("timestamp", Kind::timestamp(), Some("timestamp"))
+                            .with_field("hostname", Kind::bytes(), Some("host"))
+                            .with_field("service", Kind::bytes(), Some("service"))
+                            .with_field("ddsource", Kind::bytes(), Some("source"))
+                            .with_field("ddtags", Kind::bytes(), Some("tags")),
                     ),
                 )]),
             },
@@ -1296,13 +1292,13 @@ fn test_config_outputs() {
                     None,
                     Some(
                         schema::Definition::empty()
-                            .required_field("message", Kind::bytes(), Some("message"))
-                            .required_field("status", Kind::bytes(), Some("severity"))
-                            .required_field("timestamp", Kind::timestamp(), Some("timestamp"))
-                            .required_field("hostname", Kind::bytes(), Some("host"))
-                            .required_field("service", Kind::bytes(), Some("service"))
-                            .required_field("ddsource", Kind::bytes(), Some("source"))
-                            .required_field("ddtags", Kind::bytes(), Some("tags")),
+                            .with_field("message", Kind::bytes(), Some("message"))
+                            .with_field("status", Kind::bytes(), Some("severity"))
+                            .with_field("timestamp", Kind::timestamp(), Some("timestamp"))
+                            .with_field("hostname", Kind::bytes(), Some("host"))
+                            .with_field("service", Kind::bytes(), Some("service"))
+                            .with_field("ddsource", Kind::bytes(), Some("source"))
+                            .with_field("ddtags", Kind::bytes(), Some("tags")),
                     ),
                 )]),
             },
@@ -1317,13 +1313,13 @@ fn test_config_outputs() {
                         Some(LOGS),
                         Some(
                             schema::Definition::empty()
-                                .required_field("message", Kind::bytes(), Some("message"))
-                                .required_field("status", Kind::bytes(), Some("severity"))
-                                .required_field("timestamp", Kind::timestamp(), Some("timestamp"))
-                                .required_field("hostname", Kind::bytes(), Some("host"))
-                                .required_field("service", Kind::bytes(), Some("service"))
-                                .required_field("ddsource", Kind::bytes(), Some("source"))
-                                .required_field("ddtags", Kind::bytes(), Some("tags")),
+                                .with_field("message", Kind::bytes(), Some("message"))
+                                .with_field("status", Kind::bytes(), Some("severity"))
+                                .with_field("timestamp", Kind::timestamp(), Some("timestamp"))
+                                .with_field("hostname", Kind::bytes(), Some("host"))
+                                .with_field("service", Kind::bytes(), Some("service"))
+                                .with_field("ddsource", Kind::bytes(), Some("source"))
+                                .with_field("ddtags", Kind::bytes(), Some("tags")),
                         ),
                     ),
                     (Some(METRICS), None),
@@ -1340,11 +1336,7 @@ fn test_config_outputs() {
                     None,
                     Some(
                         schema::Definition::empty()
-                            .required_field(
-                                "timestamp",
-                                Kind::json().or_timestamp(),
-                                Some("timestamp"),
-                            )
+                            .with_field("timestamp", Kind::json().or_timestamp(), Some("timestamp"))
                             .unknown_fields(Kind::json()),
                     ),
                 )]),
@@ -1360,7 +1352,7 @@ fn test_config_outputs() {
                         Some(LOGS),
                         Some(
                             schema::Definition::empty()
-                                .required_field(
+                                .with_field(
                                     "timestamp",
                                     Kind::json().or_timestamp(),
                                     Some("timestamp"),
@@ -1383,7 +1375,7 @@ fn test_config_outputs() {
                     None,
                     Some(
                         schema::Definition::empty()
-                            .required_field("message", Kind::bytes(), Some("message"))
+                            .with_field("message", Kind::bytes(), Some("message"))
                             .optional_field("timestamp", Kind::timestamp(), Some("timestamp"))
                             .optional_field("hostname", Kind::bytes(), None)
                             .optional_field("severity", Kind::bytes(), Some("severity"))
@@ -1408,7 +1400,7 @@ fn test_config_outputs() {
                         Some(LOGS),
                         Some(
                             schema::Definition::empty()
-                                .required_field("message", Kind::bytes(), Some("message"))
+                                .with_field("message", Kind::bytes(), Some("message"))
                                 .optional_field("timestamp", Kind::timestamp(), Some("timestamp"))
                                 .optional_field("hostname", Kind::bytes(), None)
                                 .optional_field("severity", Kind::bytes(), Some("severity"))

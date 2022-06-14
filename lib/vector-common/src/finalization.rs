@@ -1,4 +1,7 @@
 #![deny(missing_docs)]
+//! This module contains the event metadata required to track an event
+//! as it flows through transforms, being duplicated and merged, and
+//! then report its status when the last copy is delivered or dropped.
 
 use std::{cmp, future::Future, mem, pin::Pin, sync::Arc, task::Poll};
 
@@ -7,8 +10,8 @@ use futures::future::FutureExt;
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 
-use super::Event;
-use crate::ByteSizeOf;
+#[cfg(feature = "byte_size_of")]
+use crate::byte_size_of::ByteSizeOf;
 
 /// A collection of event finalizers.
 #[derive(Clone, Debug, Default)]
@@ -35,6 +38,7 @@ impl PartialOrd for EventFinalizers {
     }
 }
 
+#[cfg(feature = "byte_size_of")]
 impl ByteSizeOf for EventFinalizers {
     fn allocated_bytes(&self) -> usize {
         // Don't count the allocated data here, it's not really event
@@ -46,16 +50,19 @@ impl ByteSizeOf for EventFinalizers {
 
 impl EventFinalizers {
     /// Creates a new `EventFinalizers` based on the given event finalizer.
+    #[must_use]
     pub fn new(finalizer: EventFinalizer) -> Self {
         Self(vec![Arc::new(finalizer)])
     }
 
     /// Returns `true` if the collection contains no event finalizers.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
     /// Returns the number of event finalizers in the collection.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.0.len()
     }
@@ -100,6 +107,7 @@ pub struct EventFinalizer {
     batch: Arc<BatchNotifier>,
 }
 
+#[cfg(feature = "byte_size_of")]
 impl ByteSizeOf for EventFinalizer {
     fn allocated_bytes(&self) -> usize {
         // Don't count the batch notifier, as it's shared across
@@ -110,13 +118,13 @@ impl ByteSizeOf for EventFinalizer {
 
 impl EventFinalizer {
     /// Creates a new `EventFinalizer` attached to the given `batch`.
+    #[must_use]
     pub fn new(batch: Arc<BatchNotifier>) -> Self {
         let status = AtomicCell::new(EventStatus::Dropped);
         Self { status, batch }
     }
 
     /// Updates the status of the event finalizer to `status`.
-    #[allow(clippy::missing_panics_doc)] // Panic is unreachable
     pub fn update_status(&self, status: EventStatus) {
         self.status
             .fetch_update(|old_status| Some(old_status.update(status)))
@@ -126,7 +134,6 @@ impl EventFinalizer {
     /// Updates the underlying batch status with the status of the event finalizer.
     ///
     /// In doing so, the event finalizer is marked as "recorded", which prevents any further updates to it.
-    #[allow(clippy::missing_panics_doc)] // Panic is unreachable
     pub fn update_batch(&self) {
         let status = self
             .status
@@ -184,6 +191,7 @@ pub struct BatchNotifier {
 
 impl BatchNotifier {
     /// Creates a new `BatchNotifier` along with the receiver used to await its finalization status.
+    #[must_use]
     pub fn new_with_receiver() -> (Arc<Self>, BatchStatusReceiver) {
         let (sender, receiver) = oneshot::channel();
         let notifier = Self {
@@ -194,6 +202,7 @@ impl BatchNotifier {
     }
 
     /// Optionally creates a new `BatchNotifier` along with the receiver used to await its finalization status.
+    #[must_use]
     pub fn maybe_new_with_receiver(
         enabled: bool,
     ) -> (Option<Arc<Self>>, Option<BatchStatusReceiver>) {
@@ -208,21 +217,20 @@ impl BatchNotifier {
     /// Optionally creates a new `BatchNotifier` and attaches it to a group of events.
     ///
     /// If `enabled`, the receiver used to await the finalization status of the batch is returned. Otherwise, `None` is returned.
-    pub fn maybe_apply_to_events(
+    pub fn maybe_apply_to<T: AddBatchNotifier>(
         enabled: bool,
-        events: &mut [Event],
+        items: &mut [T],
     ) -> Option<BatchStatusReceiver> {
         enabled.then(|| {
             let (batch, receiver) = Self::new_with_receiver();
-            for event in events {
-                event.add_batch_notifier(Arc::clone(&batch));
+            for item in items {
+                item.add_batch_notifier(Arc::clone(&batch));
             }
             receiver
         })
     }
 
     /// Updates the status of the notifier.
-    #[allow(clippy::missing_panics_doc)] // Panic is unreachable
     fn update_status(&self, status: EventStatus) {
         // The status starts as Delivered and can only change if the new
         // status is different than that.
@@ -251,19 +259,23 @@ impl Drop for BatchNotifier {
 }
 
 /// The status of an individual batch.
-#[derive(Copy, Clone, Debug, Derivative, Deserialize, Eq, PartialEq, Serialize)]
-#[derivative(Default)]
+#[derive(Copy, Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[repr(u8)]
 pub enum BatchStatus {
     /// All events in the batch were accepted.
     ///
     /// This is the default.
-    #[derivative(Default)]
     Delivered,
     /// At least one event in the batch had a transient error in delivery.
     Errored,
     /// At least one event in the batch had a permanent failure or rejection.
     Rejected,
+}
+
+impl Default for BatchStatus {
+    fn default() -> Self {
+        Self::Delivered
+    }
 }
 
 impl BatchStatus {
@@ -275,7 +287,7 @@ impl BatchStatus {
     fn update(self, status: EventStatus) -> Self {
         match (self, status) {
             // `Dropped` and `Delivered` do not change the status.
-            (_, EventStatus::Dropped) | (_, EventStatus::Delivered) => self,
+            (_, EventStatus::Dropped | EventStatus::Delivered) => self,
             // `Rejected` overrides `Errored` and `Delivered`
             (Self::Rejected, _) | (_, EventStatus::Rejected) => Self::Rejected,
             // `Errored` overrides `Delivered`
@@ -287,14 +299,12 @@ impl BatchStatus {
 }
 
 /// The status of an individual event.
-#[derive(Copy, Clone, Debug, Derivative, Deserialize, Eq, PartialEq, Serialize)]
-#[derivative(Default)]
+#[derive(Copy, Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[repr(u8)]
 pub enum EventStatus {
     /// All copies of this event were dropped without being finalized.
     ///
     /// This is the default.
-    #[derivative(Default)]
     Dropped,
     /// All copies of this event were delivered successfully.
     Delivered,
@@ -304,6 +314,12 @@ pub enum EventStatus {
     Rejected,
     /// This status has been recorded and should not be updated.
     Recorded,
+}
+
+impl Default for EventStatus {
+    fn default() -> Self {
+        Self::Dropped
+    }
 }
 
 impl EventStatus {
@@ -336,6 +352,12 @@ impl EventStatus {
             (Self::Delivered, Self::Delivered) => Self::Delivered,
         }
     }
+}
+
+/// An object to which we can add a batch notifier.
+pub trait AddBatchNotifier {
+    /// Adds a single shared batch notifier to this type.
+    fn add_batch_notifier(&mut self, notifier: Arc<BatchNotifier>);
 }
 
 /// An object that can be finalized.
