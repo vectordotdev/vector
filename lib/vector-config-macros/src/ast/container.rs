@@ -182,8 +182,7 @@ impl<'a> Container<'a> {
         self.attrs
             .metadata
             .iter()
-            .map(|metadata| &metadata.pairs)
-            .flatten()
+            .flat_map(|metadata| &metadata.pairs)
     }
 }
 

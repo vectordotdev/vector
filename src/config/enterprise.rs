@@ -607,8 +607,7 @@ pub(crate) fn report_configuration(
         // We need to create a JSON representation of config, based on the original files
         // that Vector was spawned with.
         let (table, _) = process_paths(&config_paths)
-            .map(|paths| load_source_from_paths(&paths).ok())
-            .flatten()
+            .and_then(|paths| load_source_from_paths(&paths).ok())
             .expect("Couldn't load source from config paths. Please report.");
 
         // Set the relevant fields needed to report a config to Datadog. This is a struct rather than

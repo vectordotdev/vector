@@ -49,7 +49,7 @@ pub struct RetryPolicyFuture<L: RetryLogic> {
 }
 
 impl<L: RetryLogic> FixedRetryPolicy<L> {
-    pub fn new(
+    pub const fn new(
         remaining_attempts: usize,
         initial_backoff: Duration,
         max_duration: Duration,
@@ -76,7 +76,7 @@ impl<L: RetryLogic> FixedRetryPolicy<L> {
         }
     }
 
-    fn backoff(&self) -> Duration {
+    const fn backoff(&self) -> Duration {
         self.current_duration
     }
 
