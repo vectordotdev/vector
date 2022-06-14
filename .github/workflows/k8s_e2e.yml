@@ -40,6 +40,7 @@ env:
   RUST_TEST_THREADS: 1
   TEST_LOG: vector=debug
   VERBOSE: true
+  DISABLE_MOLD: true
   CI: true
   PROFILE: debug
 
