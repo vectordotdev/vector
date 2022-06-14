@@ -433,11 +433,11 @@ impl ArgumentList {
         self.closure = Some(closure);
     }
 
-    fn optional_expr(&mut self, keyword: &'static str) -> Option<Expr> {
-        self.arguments.remove(keyword)
+    pub(crate) fn optional_expr(&mut self, keyword: &'static str) -> Option<Expr> {
+        self.arguments.get(keyword).cloned()
     }
 
-    fn required_expr(&mut self, keyword: &'static str) -> Expr {
+    pub fn required_expr(&mut self, keyword: &'static str) -> Expr {
         required(self.optional_expr(keyword))
     }
 }
@@ -543,6 +543,9 @@ pub enum Error {
 
     #[error(r#"missing function closure"#)]
     ExpectedFunctionClosure,
+
+    #[error(r#"mutation of read-only value"#)]
+    ReadOnlyMutation { context: String },
 }
 
 impl diagnostic::DiagnosticMessage for Error {
@@ -555,6 +558,7 @@ impl diagnostic::DiagnosticMessage for Error {
             ExpectedStaticExpression { .. } => 402,
             InvalidArgument { .. } => 403,
             ExpectedFunctionClosure => 420,
+            ReadOnlyMutation { .. } => 315,
         }
     }
 
@@ -620,6 +624,10 @@ impl diagnostic::DiagnosticMessage for Error {
             ],
 
             ExpectedFunctionClosure => vec![],
+            ReadOnlyMutation { context } => vec![
+                Label::primary(r#"mutation of read-only value"#, Span::default()),
+                Label::context(context, Span::default()),
+            ],
         }
     }
 

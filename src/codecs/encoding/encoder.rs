@@ -218,7 +218,7 @@ mod tests {
     where
         T: tokio_util::codec::Encoder<(), Error = BoxedFramingError>,
     {
-        pub(super) fn new(encoder: T, n: usize) -> Self {
+        pub(super) const fn new(encoder: T, n: usize) -> Self {
             Self(encoder, 0, n)
         }
     }

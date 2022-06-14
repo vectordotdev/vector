@@ -3,32 +3,38 @@ use lookup_lib::LookupBuf;
 use vrl::{prelude::*, value::kind::merge};
 
 fn unnest(path: &expression::Query, root_lookup: &LookupBuf, ctx: &mut Context) -> Resolved {
-    let path_path = path.path();
+    let lookup_buf = path.path();
 
-    let value: Value;
-    let target: Box<&dyn Target> = match path.target() {
-        expression::Target::External => Box::new(ctx.target()) as Box<_>,
+    match path.target() {
+        expression::Target::External => {
+            let root = ctx
+                .target()
+                .target_get(root_lookup)
+                .expect("must never fail")
+                .expect("always a value");
+            unnest_root(root, lookup_buf)
+        }
         expression::Target::Internal(v) => {
-            let v = ctx.state().variable(v.ident()).unwrap_or(&Value::Null);
-            Box::new(v as &dyn Target) as Box<_>
+            let value = ctx.state().variable(v.ident()).unwrap_or(&Value::Null);
+            let root = value.get_by_path(root_lookup).expect("always a value");
+            unnest_root(root, lookup_buf)
         }
         expression::Target::Container(expr) => {
-            value = expr.resolve(ctx)?;
-            Box::new(&value as &dyn Target) as Box<&dyn Target>
+            let value = expr.resolve(ctx)?;
+            let root = value.get_by_path(root_lookup).expect("always a value");
+            unnest_root(root, lookup_buf)
         }
         expression::Target::FunctionCall(expr) => {
-            value = expr.resolve(ctx)?;
-            Box::new(&value as &dyn Target) as Box<&dyn Target>
+            let value = expr.resolve(ctx)?;
+            let root = value.get_by_path(root_lookup).expect("always a value");
+            unnest_root(root, lookup_buf)
         }
-    };
+    }
+}
 
-    let root = target
-        .target_get(root_lookup)
-        .expect("must never fail")
-        .expect("always a value");
-
+fn unnest_root(root: &Value, path: &LookupBuf) -> Resolved {
     let values = root
-        .get_by_path(path_path)
+        .get_by_path(path)
         .cloned()
         .ok_or(value::Error::Expected {
             got: Kind::null(),
@@ -40,7 +46,7 @@ fn unnest(path: &expression::Query, root_lookup: &LookupBuf, ctx: &mut Context) 
         .into_iter()
         .map(|value| {
             let mut event = root.clone();
-            event.insert_by_path(path_path, value);
+            event.insert_by_path(path, value);
             event
         })
         .collect::<Vec<_>>();

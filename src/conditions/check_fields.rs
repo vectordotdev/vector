@@ -555,24 +555,28 @@ pub struct CheckFields {
 }
 
 impl Conditional for CheckFields {
-    fn check(&self, e: &Event) -> bool {
-        self.predicates.iter().all(|(_, p)| p.check(e))
+    fn check(&self, e: Event) -> (bool, Event) {
+        let result = self.predicates.iter().all(|(_, p)| p.check(&e));
+        (result, e)
     }
 
-    fn check_with_context(&self, e: &Event) -> Result<(), String> {
+    fn check_with_context(&self, e: Event) -> (Result<(), String>, Event) {
         let failed_preds = self
             .predicates
             .iter()
-            .filter(|(_, p)| !p.check(e))
+            .filter(|(_, p)| !p.check(&e))
             .map(|(n, _)| n.to_owned())
             .collect::<Vec<_>>();
         if failed_preds.is_empty() {
-            Ok(())
+            (Ok(()), e)
         } else {
-            Err(format!(
-                "predicates failed: [ {} ]",
-                failed_preds.join(", ")
-            ))
+            (
+                Err(format!(
+                    "predicates failed: [ {} ]",
+                    failed_preds.join(", ")
+                )),
+                e,
+            )
         }
     }
 }
@@ -654,9 +658,9 @@ mod test {
             .unwrap();
 
         let mut event = Event::from("neither");
-        assert!(!cond.check(&event));
+        assert!(!cond.check(event.clone()).0);
         assert_eq!(
-            cond.check_with_context(&event),
+            cond.check_with_context(event.clone()).0,
             Err(
                 "predicates failed: [ message.equals: \"foo\", other_thing.eq: \"bar\", third_thing.eq: [\"hello\", \"world\"] ]"
                     .to_owned()
@@ -664,25 +668,25 @@ mod test {
         );
 
         event.as_mut_log().insert("message", "foo");
-        assert!(!cond.check(&event));
+        assert!(!cond.check(event.clone()).0);
         assert_eq!(
-            cond.check_with_context(&event),
+            cond.check_with_context(event.clone()).0,
             Err("predicates failed: [ other_thing.eq: \"bar\", third_thing.eq: [\"hello\", \"world\"] ]".to_owned())
         );
 
         event.as_mut_log().insert("other_thing", "bar");
         event.as_mut_log().insert("third_thing", "hello");
-        assert!(cond.check(&event));
-        assert_eq!(cond.check_with_context(&event), Ok(()));
+        assert!(cond.check(event.clone()).0);
+        assert_eq!(cond.check_with_context(event.clone()).0, Ok(()));
 
         event.as_mut_log().insert("third_thing", "world");
-        assert!(cond.check(&event));
-        assert_eq!(cond.check_with_context(&event), Ok(()));
+        assert!(cond.check(event.clone()).0);
+        assert_eq!(cond.check_with_context(event.clone()).0, Ok(()));
 
         event.as_mut_log().insert("message", "not foo");
-        assert!(!cond.check(&event));
+        assert!(!cond.check(event.clone()).0);
         assert_eq!(
-            cond.check_with_context(&event),
+            cond.check_with_context(event.clone()).0,
             Err("predicates failed: [ message.equals: \"foo\" ]".to_owned())
         );
     }
@@ -708,9 +712,9 @@ mod test {
             .unwrap();
 
         let mut event = Event::from("neither");
-        assert!(!cond.check(&event));
+        assert!(!cond.check(event.clone()).0);
         assert_eq!(
-            cond.check_with_context(&event),
+            cond.check_with_context(event.clone()).0,
             Err(
                 "predicates failed: [ message.contains: \"foo\", other_thing.contains: \"bar\", third_thing.contains: [\"hello\", \"world\"] ]"
                     .to_owned()
@@ -719,33 +723,33 @@ mod test {
 
         event.as_mut_log().insert("message", "hello foo world");
         event.as_mut_log().insert("third_thing", "hello world");
-        assert!(!cond.check(&event));
+        assert!(!cond.check(event.clone()).0);
         assert_eq!(
-            cond.check_with_context(&event),
+            cond.check_with_context(event.clone()).0,
             Err("predicates failed: [ other_thing.contains: \"bar\" ]".to_owned())
         );
 
         event.as_mut_log().insert("other_thing", "hello bar world");
-        assert!(cond.check(&event));
-        assert_eq!(cond.check_with_context(&event), Ok(()));
+        assert!(cond.check(event.clone()).0);
+        assert_eq!(cond.check_with_context(event.clone()).0, Ok(()));
 
         event
             .as_mut_log()
             .insert("third_thing", "not hell0 or w0rld");
-        assert!(!cond.check(&event));
+        assert!(!cond.check(event.clone()).0);
         assert_eq!(
-            cond.check_with_context(&event),
+            cond.check_with_context(event.clone()).0,
             Err("predicates failed: [ third_thing.contains: [\"hello\", \"world\"] ]".to_owned()),
         );
 
         event.as_mut_log().insert("third_thing", "world");
-        assert!(cond.check(&event));
-        assert_eq!(cond.check_with_context(&event), Ok(()));
+        assert!(cond.check(event.clone()).0);
+        assert_eq!(cond.check_with_context(event.clone()).0, Ok(()));
 
         event.as_mut_log().insert("message", "not fo0");
-        assert!(!cond.check(&event));
+        assert!(!cond.check(event.clone()).0);
         assert_eq!(
-            cond.check_with_context(&event),
+            cond.check_with_context(event.clone()).0,
             Err("predicates failed: [ message.contains: \"foo\" ]".to_owned())
         );
     }
@@ -767,9 +771,9 @@ mod test {
             .unwrap();
 
         let mut event = Event::from("neither");
-        assert!(!cond.check(&event));
+        assert!(!cond.check(event.clone()).0);
         assert_eq!(
-            cond.check_with_context(&event),
+            cond.check_with_context(event.clone()).0,
             Err(
                 "predicates failed: [ message.prefix: \"foo\", other_thing.prefix: \"bar\" ]"
                     .to_owned()
@@ -777,20 +781,20 @@ mod test {
         );
 
         event.as_mut_log().insert("message", "foo hello world");
-        assert!(!cond.check(&event));
+        assert!(!cond.check(event.clone()).0);
         assert_eq!(
-            cond.check_with_context(&event),
+            cond.check_with_context(event.clone()).0,
             Err("predicates failed: [ other_thing.prefix: \"bar\" ]".to_owned())
         );
 
         event.as_mut_log().insert("other_thing", "bar hello world");
-        assert!(cond.check(&event));
-        assert_eq!(cond.check_with_context(&event), Ok(()));
+        assert!(cond.check(event.clone()).0);
+        assert_eq!(cond.check_with_context(event.clone()).0, Ok(()));
 
         event.as_mut_log().insert("message", "not prefixed");
-        assert!(!cond.check(&event));
+        assert!(!cond.check(event.clone()).0);
         assert_eq!(
-            cond.check_with_context(&event),
+            cond.check_with_context(event.clone()).0,
             Err("predicates failed: [ message.prefix: \"foo\" ]".to_owned())
         );
     }
@@ -816,9 +820,9 @@ mod test {
             .unwrap();
 
         let mut event = Event::from("neither");
-        assert!(!cond.check(&event));
+        assert!(!cond.check(event.clone()).0);
         assert_eq!(
-            cond.check_with_context(&event),
+            cond.check_with_context(event.clone()).0,
             Err(
                 "predicates failed: [ message.starts_with: \"foo\", other_thing.starts_with: \"bar\", third_thing.starts_with: [\"hello\", \"world\"] ]"
                     .to_owned()
@@ -827,35 +831,35 @@ mod test {
 
         event.as_mut_log().insert("third_thing", "hello world");
         event.as_mut_log().insert("message", "foo hello world");
-        assert!(!cond.check(&event));
+        assert!(!cond.check(event.clone()).0);
         assert_eq!(
-            cond.check_with_context(&event),
+            cond.check_with_context(event.clone()).0,
             Err("predicates failed: [ other_thing.starts_with: \"bar\" ]".to_owned())
         );
 
         event.as_mut_log().insert("other_thing", "bar hello world");
-        assert!(cond.check(&event));
-        assert_eq!(cond.check_with_context(&event), Ok(()));
+        assert!(cond.check(event.clone()).0);
+        assert_eq!(cond.check_with_context(event.clone()).0, Ok(()));
 
         event
             .as_mut_log()
             .insert("third_thing", "wrong hello world");
-        assert!(!cond.check(&event));
+        assert!(!cond.check(event.clone()).0);
         assert_eq!(
-            cond.check_with_context(&event),
+            cond.check_with_context(event.clone()).0,
             Err(
                 "predicates failed: [ third_thing.starts_with: [\"hello\", \"world\"] ]".to_owned()
             ),
         );
 
         event.as_mut_log().insert("third_thing", "world");
-        assert!(cond.check(&event));
-        assert_eq!(cond.check_with_context(&event), Ok(()));
+        assert!(cond.check(event.clone()).0);
+        assert_eq!(cond.check_with_context(event.clone()).0, Ok(()));
 
         event.as_mut_log().insert("message", "not prefixed");
-        assert!(!cond.check(&event));
+        assert!(!cond.check(event.clone()).0);
         assert_eq!(
-            cond.check_with_context(&event),
+            cond.check_with_context(event.clone()).0,
             Err("predicates failed: [ message.starts_with: \"foo\" ]".to_owned())
         );
     }
@@ -881,9 +885,9 @@ mod test {
             .unwrap();
 
         let mut event = Event::from("neither");
-        assert!(!cond.check(&event));
+        assert!(!cond.check(event.clone()).0);
         assert_eq!(
-            cond.check_with_context(&event),
+            cond.check_with_context(event.clone()).0,
             Err(
                 "predicates failed: [ message.ends_with: \"foo\", other_thing.ends_with: \"bar\", third_thing.ends_with: [\"hello\", \"world\"] ]"
                     .to_owned()
@@ -892,31 +896,31 @@ mod test {
 
         event.as_mut_log().insert("message", "hello world foo");
         event.as_mut_log().insert("third_thing", "hello world");
-        assert!(!cond.check(&event));
+        assert!(!cond.check(event.clone()).0);
         assert_eq!(
-            cond.check_with_context(&event),
+            cond.check_with_context(event.clone()).0,
             Err("predicates failed: [ other_thing.ends_with: \"bar\" ]".to_owned())
         );
 
         event.as_mut_log().insert("other_thing", "hello world bar");
-        assert!(cond.check(&event));
-        assert_eq!(cond.check_with_context(&event), Ok(()));
+        assert!(cond.check(event.clone()).0);
+        assert_eq!(cond.check_with_context(event.clone()).0, Ok(()));
 
         event.as_mut_log().insert("third_thing", "hello world bad");
-        assert!(!cond.check(&event));
+        assert!(!cond.check(event.clone()).0);
         assert_eq!(
-            cond.check_with_context(&event),
+            cond.check_with_context(event.clone()).0,
             Err("predicates failed: [ third_thing.ends_with: [\"hello\", \"world\"] ]".to_owned()),
         );
 
         event.as_mut_log().insert("third_thing", "world hello");
-        assert!(cond.check(&event));
-        assert_eq!(cond.check_with_context(&event), Ok(()));
+        assert!(cond.check(event.clone()).0);
+        assert_eq!(cond.check_with_context(event.clone()).0, Ok(()));
 
         event.as_mut_log().insert("message", "not suffixed");
-        assert!(!cond.check(&event));
+        assert!(!cond.check(event.clone()).0);
         assert_eq!(
-            cond.check_with_context(&event),
+            cond.check_with_context(event.clone()).0,
             Err("predicates failed: [ message.ends_with: \"foo\" ]".to_owned())
         );
     }
@@ -942,9 +946,9 @@ mod test {
             .unwrap();
 
         let mut event = Event::from("not foo");
-        assert!(!cond.check(&event));
+        assert!(!cond.check(event.clone()).0);
         assert_eq!(
-            cond.check_with_context(&event),
+            cond.check_with_context(event.clone()).0,
             Err("predicates failed: [ other_thing.neq: \"bar\", third_thing.neq: [\"hello\", \"world\"] ]".to_owned())
         );
 
@@ -952,35 +956,35 @@ mod test {
         event
             .as_mut_log()
             .insert("third_thing", "not hello or world");
-        assert!(cond.check(&event));
-        assert_eq!(cond.check_with_context(&event), Ok(()));
+        assert!(cond.check(event.clone()).0);
+        assert_eq!(cond.check_with_context(event.clone()).0, Ok(()));
 
         event.as_mut_log().insert("third_thing", "world");
-        assert!(!cond.check(&event));
+        assert!(!cond.check(event.clone()).0);
         assert_eq!(
-            cond.check_with_context(&event),
+            cond.check_with_context(event.clone()).0,
             Err("predicates failed: [ third_thing.neq: [\"hello\", \"world\"] ]".to_owned()),
         );
 
         event.as_mut_log().insert("third_thing", "hello");
-        assert!(!cond.check(&event));
+        assert!(!cond.check(event.clone()).0);
         assert_eq!(
-            cond.check_with_context(&event),
+            cond.check_with_context(event.clone()).0,
             Err("predicates failed: [ third_thing.neq: [\"hello\", \"world\"] ]".to_owned()),
         );
 
         event.as_mut_log().insert("third_thing", "safe");
         event.as_mut_log().insert("other_thing", "bar");
-        assert!(!cond.check(&event));
+        assert!(!cond.check(event.clone()).0);
         assert_eq!(
-            cond.check_with_context(&event),
+            cond.check_with_context(event.clone()).0,
             Err("predicates failed: [ other_thing.neq: \"bar\" ]".to_owned())
         );
 
         event.as_mut_log().insert("message", "foo");
-        assert!(!cond.check(&event));
+        assert!(!cond.check(event.clone()).0);
         assert_eq!(
-            cond.check_with_context(&event),
+            cond.check_with_context(event.clone()).0,
             Err(
                 "predicates failed: [ message.not_equals: \"foo\", other_thing.neq: \"bar\" ]"
                     .to_owned()
@@ -1005,27 +1009,27 @@ mod test {
             .unwrap();
 
         let mut event = Event::from("starts with a bang");
-        assert!(!cond.check(&event));
+        assert!(!cond.check(event.clone()).0);
         assert_eq!(
-            cond.check_with_context(&event),
+            cond.check_with_context(event.clone()).0,
             Err(r#"predicates failed: [ other_thing.regex: "end$" ]"#.to_owned())
         );
 
         event.as_mut_log().insert("other_thing", "at the end");
-        assert!(cond.check(&event));
-        assert_eq!(cond.check_with_context(&event), Ok(()));
+        assert!(cond.check(event.clone()).0);
+        assert_eq!(cond.check_with_context(event.clone()).0, Ok(()));
 
         event.as_mut_log().insert("other_thing", "end up here");
-        assert!(!cond.check(&event));
+        assert!(!cond.check(event.clone()).0);
         assert_eq!(
-            cond.check_with_context(&event),
+            cond.check_with_context(event.clone()).0,
             Err(r#"predicates failed: [ other_thing.regex: "end$" ]"#.to_owned())
         );
 
         event.as_mut_log().insert("message", "foo");
-        assert!(!cond.check(&event));
+        assert!(!cond.check(event.clone()).0);
         assert_eq!(
-            cond.check_with_context(&event),
+            cond.check_with_context(event.clone()).0,
             Err(
                 r#"predicates failed: [ message.regex: "^start", other_thing.regex: "end$" ]"#
                     .to_owned()
@@ -1050,16 +1054,16 @@ mod test {
             .unwrap();
 
         let mut event = Event::from("ignored message");
-        assert!(!cond.check(&event));
+        assert!(!cond.check(event.clone()).0);
         assert_eq!(
-            cond.check_with_context(&event),
+            cond.check_with_context(event.clone()).0,
             Err("predicates failed: [ foo.ip_cidr_contains: \"10.0.0.0/8\", bar.ip_cidr_contains: [\"2000::/3\", \"192.168.0.0/16\"] ]".to_owned()),
         );
 
         event.as_mut_log().insert("foo", "10.1.2.3");
-        assert!(!cond.check(&event));
+        assert!(!cond.check(event.clone()).0);
         assert_eq!(
-            cond.check_with_context(&event),
+            cond.check_with_context(event.clone()).0,
             Err(
                 "predicates failed: [ bar.ip_cidr_contains: [\"2000::/3\", \"192.168.0.0/16\"] ]"
                     .to_owned()
@@ -1067,24 +1071,24 @@ mod test {
         );
 
         event.as_mut_log().insert("bar", "2000::");
-        assert!(cond.check(&event));
-        assert_eq!(cond.check_with_context(&event), Ok(()));
+        assert!(cond.check(event.clone()).0);
+        assert_eq!(cond.check_with_context(event.clone()).0, Ok(()));
 
         event.as_mut_log().insert("bar", "192.168.255.255");
-        assert!(cond.check(&event));
-        assert_eq!(cond.check_with_context(&event), Ok(()));
+        assert!(cond.check(event.clone()).0);
+        assert_eq!(cond.check_with_context(event.clone()).0, Ok(()));
 
         event.as_mut_log().insert("foo", "192.200.200.200");
-        assert!(!cond.check(&event));
+        assert!(!cond.check(event.clone()).0);
         assert_eq!(
-            cond.check_with_context(&event),
+            cond.check_with_context(event.clone()).0,
             Err("predicates failed: [ foo.ip_cidr_contains: \"10.0.0.0/8\" ]".to_owned()),
         );
 
         event.as_mut_log().insert("foo", "not an ip");
-        assert!(!cond.check(&event));
+        assert!(!cond.check(event.clone()).0);
         assert_eq!(
-            cond.check_with_context(&event),
+            cond.check_with_context(event.clone()).0,
             Err("predicates failed: [ foo.ip_cidr_contains: \"10.0.0.0/8\" ]".to_owned()),
         );
     }
@@ -1100,20 +1104,20 @@ mod test {
             .unwrap();
 
         let mut event = Event::from("ignored field");
-        assert!(!cond.check(&event));
+        assert!(!cond.check(event.clone()).0);
         assert_eq!(
-            cond.check_with_context(&event),
+            cond.check_with_context(event.clone()).0,
             Err("predicates failed: [ foo.exists: true ]".to_owned())
         );
 
         event.as_mut_log().insert("foo", "not ignored");
-        assert!(cond.check(&event));
-        assert_eq!(cond.check_with_context(&event), Ok(()));
+        assert!(cond.check(event.clone()).0);
+        assert_eq!(cond.check_with_context(event.clone()).0, Ok(()));
 
         event.as_mut_log().insert("bar", "also not ignored");
-        assert!(!cond.check(&event));
+        assert!(!cond.check(event.clone()).0);
         assert_eq!(
-            cond.check_with_context(&event),
+            cond.check_with_context(event.clone()).0,
             Err("predicates failed: [ bar.exists: false ]".to_owned())
         );
     }
@@ -1129,22 +1133,22 @@ mod test {
             .unwrap();
 
         let mut event = Event::from("");
-        assert!(!cond.check(&event));
+        assert!(!cond.check(event.clone()).0);
         assert_eq!(
-            cond.check_with_context(&event),
+            cond.check_with_context(event.clone()).0,
             Err("predicates failed: [ foo.length_eq: 10, bar.length_eq: 4 ]".to_owned())
         );
 
         event.as_mut_log().insert("foo", "helloworld");
-        assert!(!cond.check(&event));
+        assert!(!cond.check(event.clone()).0);
         assert_eq!(
-            cond.check_with_context(&event),
+            cond.check_with_context(event.clone()).0,
             Err("predicates failed: [ bar.length_eq: 4 ]".to_owned())
         );
 
         event.as_mut_log().insert("bar", vec![0, 1, 2, 3]);
-        assert!(cond.check(&event));
-        assert_eq!(cond.check_with_context(&event), Ok(()));
+        assert!(cond.check(event.clone()).0);
+        assert_eq!(cond.check_with_context(event.clone()).0, Ok(()));
     }
 
     #[test]
@@ -1159,13 +1163,13 @@ mod test {
             .unwrap();
 
         let mut event = Event::from("ignored field");
-        assert!(cond.check(&event));
-        assert_eq!(cond.check_with_context(&event), Ok(()));
+        assert!(cond.check(event.clone()).0);
+        assert_eq!(cond.check_with_context(event.clone()).0, Ok(()));
 
         event.as_mut_log().insert("foo", "not ignored");
-        assert!(!cond.check(&event));
+        assert!(!cond.check(event.clone()).0);
         assert_eq!(
-            cond.check_with_context(&event),
+            cond.check_with_context(event.clone()).0,
             Err("predicates failed: [ foo.not_exists: true ]".into())
         );
     }

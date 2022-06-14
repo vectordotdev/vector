@@ -40,6 +40,15 @@ impl JsonSerializer {
     pub const fn new() -> Self {
         Self
     }
+
+    /// Encode event and represent it as JSON value.
+    pub fn to_json_value(&self, event: Event) -> Result<serde_json::Value, serde_json::Error> {
+        match event {
+            Event::Log(log) => serde_json::to_value(&log),
+            Event::Metric(metric) => serde_json::to_value(&metric),
+            Event::Trace(trace) => serde_json::to_value(&trace),
+        }
+    }
 }
 
 impl Encoder<Event> for JsonSerializer {
@@ -75,5 +84,20 @@ mod tests {
         serializer.encode(event, &mut bytes).unwrap();
 
         assert_eq!(bytes.freeze(), r#"{"foo":"bar"}"#);
+    }
+
+    #[test]
+    fn serialize_equals_to_json_value() {
+        let event = Event::from(btreemap! {
+            "foo" => Value::from("bar")
+        });
+        let mut serializer = JsonSerializer::new();
+        let mut bytes = BytesMut::new();
+
+        serializer.encode(event.clone(), &mut bytes).unwrap();
+
+        let json = serializer.to_json_value(event).unwrap();
+
+        assert_eq!(bytes.freeze(), serde_json::to_string(&json).unwrap());
     }
 }

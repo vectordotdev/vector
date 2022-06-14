@@ -12,7 +12,7 @@
 #![allow(clippy::unit_arg)]
 #![deny(clippy::clone_on_ref_ptr)]
 #![deny(clippy::trivially_copy_pass_by_ref)]
-#![deny(clippy::disallowed_method)] // [nursery] mark some functions as verboten
+#![deny(clippy::disallowed_methods)] // [nursery] mark some functions as verboten
 #![deny(clippy::missing_const_for_fn)] // [nursery] valuable to the optimizer,
                                        // but may produce false positives
 
@@ -102,7 +102,8 @@ pub mod validate;
 pub mod vector_windows;
 
 pub use source_sender::SourceSender;
-pub use vector_core::{event, metrics, schema, shutdown, Error, Result};
+pub use vector_common::shutdown;
+pub use vector_core::{event, metrics, schema, Error, Result};
 
 pub fn vector_version() -> impl std::fmt::Display {
     #[cfg(feature = "nightly")]

@@ -5,6 +5,7 @@ use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::{LinesCodec, LinesCodecError};
 use tracing::trace;
+use vector_config::configurable_component;
 
 use super::BoxedFramingError;
 
@@ -31,9 +32,11 @@ impl OctetCountingDecoderConfig {
 }
 
 /// Options for building a `OctetCountingDecoder`.
-#[derive(Debug, Clone, Derivative, Deserialize, Serialize, PartialEq)]
+#[configurable_component]
+#[derive(Clone, Debug, Derivative, PartialEq)]
 #[derivative(Default)]
 pub struct OctetCountingDecoderOptions {
+    /// The maximum length of the byte buffer.
     #[serde(skip_serializing_if = "vector_core::serde::skip_serializing_if_default")]
     max_length: Option<usize>,
 }

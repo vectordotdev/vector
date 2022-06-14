@@ -16,6 +16,7 @@ use lookup::lookup_v2::{parse_path, OwnedSegment};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use super::util::MultilineConfig;
@@ -46,21 +47,81 @@ static STDERR: Lazy<Bytes> = Lazy::new(|| "stderr".into());
 static STDOUT: Lazy<Bytes> = Lazy::new(|| "stdout".into());
 static CONSOLE: Lazy<Bytes> = Lazy::new(|| "console".into());
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `docker_logs` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
-pub(super) struct DockerLogsConfig {
+pub struct DockerLogsConfig {
+    /// Overrides the name of the log field used to add the current hostname to each event.
+    ///
+    /// The value will be the current hostname for wherever Vector is running.
+    ///
+    /// By default, the [global `host_key` option](https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key) is used.
     #[serde(default = "host_key")]
     host_key: String,
+
+    /// Docker host to connect to.
+    ///
+    /// Use an HTTPS URL to enable TLS encryption.
+    ///
+    /// If absent, Vector will try to use `DOCKER_HOST` environment variable. If `DOCKER_HOST` is also absent, Vector will use default Docker local socket (`/var/run/docker.sock` on Unix platforms, `//./pipe/docker_engine` on Windows).
     docker_host: Option<String>,
-    tls: Option<DockerTlsConfig>,
+
+    /// A list of container IDs or names of containers to exclude from log collection.
+    ///
+    /// Matching is prefix first, so specifying a value of `foo` would match any container named `foo` as well as any
+    /// container whose name started with `foo`. This applies equally whether matching container IDs or names.
+    ///
+    /// By default, the source will collect logs for all containers. If `exclude_containers` is configured, any
+    /// container that matches a configured exclusion will be excluded even if it is also included via
+    /// `include_containers`, so care should be taken when utilizing prefix matches as they cannot be overridden by a
+    /// corresponding entry in `include_containers` e.g. excluding `foo` by attempting to include `foo-specific-id`.
+    ///
+    /// This can be used in conjunction with `include_containers`.
     exclude_containers: Option<Vec<String>>, // Starts with actually, not exclude
+
+    /// A list of container IDs or names of containers to include in log collection.
+    ///
+    /// Matching is prefix first, so specifying a value of `foo` would match any container named `foo` as well as any
+    /// container whose name started with `foo`. This applies equally whether matching container IDs or names.
+    ///
+    /// By default, the source will collect logs for all containers. If `include_containers` is configured, only
+    /// containers that match a configured inclusion and are also not excluded will be matched.
+    ///
+    /// This can be used in conjunction with `include_containers`.
     include_containers: Option<Vec<String>>, // Starts with actually, not include
+
+    /// A list of container object labels to match against when filtering running containers.
+    ///
+    /// Labels should follow the syntax described in the [Docker object labels](https://docs.docker.com/config/labels-custom-metadata/) documentation.
     include_labels: Option<Vec<String>>,
+
+    /// A list of image names to match against.
+    ///
+    /// If not provided, all images will be included.
     include_images: Option<Vec<String>>,
+
+    /// Overrides the name of the log field used to mark an event as partial.
+    ///
+    /// If `auto_partial_merge` is disabled, partial events will be emitted with a log field, controlled by this
+    /// configuration value, is set, indicating that the event is not complete.
+    ///
+    /// By default, `"_partial"` is used.
     partial_event_marker_field: Option<String>,
+
+    /// Enables automatic merging of partial events.
     auto_partial_merge: bool,
-    multiline: Option<MultilineConfig>,
+
+    /// The amount of time, in seconds, to wait before retrying after an error.
     retry_backoff_secs: u64,
+
+    /// Multiline aggregation configuration.
+    ///
+    /// If not specified, multiline aggregation is disabled.
+    multiline: Option<MultilineConfig>,
+
+    #[configurable(derived)]
+    tls: Option<DockerTlsConfig>,
 }
 
 impl Default for DockerLogsConfig {

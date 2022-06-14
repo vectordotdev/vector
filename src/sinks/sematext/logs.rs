@@ -5,16 +5,17 @@ use serde::{Deserialize, Serialize};
 
 use super::Region;
 use crate::sinks::elasticsearch::BulkConfig;
+use crate::sinks::util::encoding::Transformer;
 use crate::{
     config::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
     },
     event::EventArray,
     sinks::{
-        elasticsearch::{ElasticsearchConfig, ElasticsearchEncoder},
+        elasticsearch::ElasticsearchConfig,
         util::{
-            encoding::EncodingConfigFixed, http::RequestConfig, BatchConfig, Compression,
-            RealtimeSizeBasedDefaultBatchSettings, StreamSink, TowerRequestConfig,
+            http::RequestConfig, BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings,
+            StreamSink, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -32,7 +33,7 @@ pub struct SematextLogsConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
     )]
-    pub encoding: EncodingConfigFixed<ElasticsearchEncoder>,
+    pub encoding: Transformer,
 
     #[serde(default)]
     request: TowerRequestConfig,
