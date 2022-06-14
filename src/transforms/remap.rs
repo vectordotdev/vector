@@ -135,7 +135,6 @@ impl TransformConfig for RemapConfig {
     }
 
     fn outputs(&self, input_definition: &schema::Definition) -> Vec<Output> {
-        println!("Remap input definition: {:?}\n", input_definition);
         // We need to compile the VRL program in order to know the schema definition output of this
         // transform. We ignore any compilation errors, as those are caught by the transform build
         // step.
@@ -164,8 +163,6 @@ impl TransformConfig for RemapConfig {
                 Definition::empty_kind(Kind::never(), input_definition.log_namespaces().clone())
             });
 
-        println!("b: {:?}", default_definition);
-
         // When a message is dropped and re-routed, we keep the original event, but also annotate
         // it with additional metadata.
         let mut dropped_definition =
@@ -189,11 +186,9 @@ impl TransformConfig for RemapConfig {
             ));
         }
 
-        println!("c");
         let default_output =
             Output::default(DataType::all()).with_schema_definition(default_definition);
 
-        println!("d");
         let output = if self.reroute_dropped {
             vec![
                 default_output,
@@ -204,7 +199,6 @@ impl TransformConfig for RemapConfig {
         } else {
             vec![default_output]
         };
-        println!("remap type def done");
         output
     }
 

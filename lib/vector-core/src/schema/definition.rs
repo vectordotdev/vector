@@ -157,7 +157,6 @@ impl Definition {
                     panic!("Setting a field on a value that cannot be an object");
                 }
             } else {
-                println!("Def kind: {:?}", self.kind.debug_info());
                 self.kind = self
                     .kind
                     .into_object()

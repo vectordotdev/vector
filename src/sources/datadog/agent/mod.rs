@@ -220,9 +220,6 @@ impl SourceConfig for DatadogAgentConfig {
             LogNamespace::Vector => self.decoding.schema_definition(log_namespace),
         };
 
-        println!("DD output Definition: {:?}\n", definition);
-        // panic!();
-
         if self.multiple_outputs {
             vec![
                 Output::default(DataType::Metric).with_port(METRICS),
