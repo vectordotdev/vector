@@ -133,7 +133,7 @@ impl ExternalEnv {
     }
 
     /// Adds a path that is considered read only. Assignments to any paths that match
-    /// will fail at compile time
+    /// will fail at compile time.
     ///
     /// # Panics
     ///

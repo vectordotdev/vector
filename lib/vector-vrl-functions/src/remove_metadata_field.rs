@@ -44,14 +44,14 @@ impl Function for RemoveMetadataField {
 
     fn compile(
         &self,
-        state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        (_, external): (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let key = get_metadata_key(&mut arguments)?;
 
         if let MetadataKey::Query(query) = &key {
-            if state.1.is_read_only_metadata_path(query.path()) {
+            if external.is_read_only_metadata_path(query.path()) {
                 return Err(vrl::function::Error::ReadOnlyMutation {
                     context: format!("{} is read-only, and cannot be removed", query),
                 }
