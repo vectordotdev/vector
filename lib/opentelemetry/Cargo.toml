@@ -1,0 +1,20 @@
+[package]
+name = "otel_proto"
+version = "0.1.0"
+authors = ["caibirdme <ronaldoliu@tencent.com>"]
+edition = "2021"
+publish = false
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[build-dependencies]
+prost-build = { version = "0.10.4"}
+tonic-build = { version = "0.7", default-features = false, features = ["transport", "prost", "compression"]}
+
+[dependencies]
+tonic = {version="0.7.2", features = ["transport", "codegen", "prost", "tls", "tls-roots", "compression"]}
+prost = { version="0.10.4", features = ["std"] }
+bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
+vector_core = { path = "../vector-core"}
+value = {path = "../value"}
+hex = { version = "0.4.3", features = ["std"]}
+ordered-float = { version = "3.0.0", default-features = false }

@@ -106,6 +106,7 @@ members = [
   "lib/datadog/grok",
   "lib/datadog/search-syntax",
   "lib/datadog/filter",
+  "lib/opentelemetry",
 ]
 
 [dependencies]
@@ -116,6 +117,7 @@ enrichment = { path = "lib/enrichment" }
 fakedata = { path = "lib/fakedata", optional = true }
 file-source = { path = "lib/file-source", optional = true }
 lookup = { path = "lib/lookup" }
+otel_proto = { path = "lib/opentelemetry", optional = true}
 portpicker = { path = "lib/portpicker" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
@@ -455,6 +457,7 @@ sources-logs = [
   "sources-kubernetes_logs",
   "sources-logstash",
   "sources-nats",
+  "sources-opentelemetry",
   "sources-redis",
   "sources-socket",
   "sources-splunk_hec",
@@ -502,6 +505,7 @@ sources-logstash = ["listenfd", "tokio-util/net", "sources-utils-tcp-keepalive",
 sources-mongodb_metrics = ["mongodb"]
 sources-nats = ["nats", "nkeys"]
 sources-nginx_metrics = ["nom"]
+sources-opentelemetry = ["sources-vector", "otel_proto"]
 sources-postgresql_metrics = ["postgres-openssl", "tokio-postgres"]
 sources-prometheus = ["prometheus-parser", "sinks-prometheus", "sources-http", "sources-utils-http"]
 sources-redis= ["redis"]
