@@ -20,10 +20,7 @@ use crate::{
     internal_events::{NatsEventSendError, TemplateRenderingError},
     nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
     sinks::util::{
-        encoding::{
-            EncodingConfig, EncodingConfigAdapter, EncodingConfigMigrator, StandardEncodings,
-            Transformer,
-        },
+        encoding::{EncodingConfig, EncodingConfigAdapter, EncodingConfigMigrator, Transformer},
         StreamSink,
     },
     template::{Template, TemplateParseError},
@@ -208,6 +205,7 @@ impl StreamSink<Event> for NatsSink {
                 Err(error) => {
                     emit!(NatsEventSendError { error });
                     finalizers.update_status(EventStatus::Errored);
+                    continue;
                 }
                 Ok(_) => {
                     finalizers.update_status(EventStatus::Delivered);
@@ -312,6 +310,7 @@ mod integration_tests {
             std::env::var("NATS_ADDRESS").unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSinkConfig {
+            acknowledgements: Default::default(),
             encoding: EncodingConfig::from(Encoding::Text).into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
@@ -337,6 +336,7 @@ mod integration_tests {
             .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSinkConfig {
+            acknowledgements: Default::default(),
             encoding: EncodingConfig::from(Encoding::Text).into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
@@ -364,6 +364,7 @@ mod integration_tests {
             .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSinkConfig {
+            acknowledgements: Default::default(),
             encoding: EncodingConfig::from(Encoding::Text).into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
@@ -394,6 +395,7 @@ mod integration_tests {
             .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSinkConfig {
+            acknowledgements: Default::default(),
             encoding: EncodingConfig::from(Encoding::Text).into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
@@ -423,6 +425,7 @@ mod integration_tests {
             .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSinkConfig {
+            acknowledgements: Default::default(),
             encoding: EncodingConfig::from(Encoding::Text).into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
@@ -452,6 +455,7 @@ mod integration_tests {
             .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSinkConfig {
+            acknowledgements: Default::default(),
             encoding: EncodingConfig::from(Encoding::Text).into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
@@ -482,6 +486,7 @@ mod integration_tests {
             .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSinkConfig {
+            acknowledgements: Default::default(),
             encoding: EncodingConfig::from(Encoding::Text).into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
@@ -512,6 +517,7 @@ mod integration_tests {
             .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSinkConfig {
+            acknowledgements: Default::default(),
             encoding: EncodingConfig::from(Encoding::Text).into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
@@ -543,6 +549,7 @@ mod integration_tests {
             .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSinkConfig {
+            acknowledgements: Default::default(),
             encoding: EncodingConfig::from(Encoding::Text).into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
@@ -568,6 +575,7 @@ mod integration_tests {
             .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSinkConfig {
+            acknowledgements: Default::default(),
             encoding: EncodingConfig::from(Encoding::Text).into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
@@ -601,6 +609,7 @@ mod integration_tests {
             .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSinkConfig {
+            acknowledgements: Default::default(),
             encoding: EncodingConfig::from(Encoding::Text).into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
@@ -632,6 +641,7 @@ mod integration_tests {
             .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSinkConfig {
+            acknowledgements: Default::default(),
             encoding: EncodingConfig::from(Encoding::Text).into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
@@ -667,6 +677,7 @@ mod integration_tests {
             .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSinkConfig {
+            acknowledgements: Default::default(),
             encoding: EncodingConfig::from(Encoding::Text).into(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
