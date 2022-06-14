@@ -145,7 +145,7 @@ impl HecLogsSinkConfig {
         };
 
         let transformer = self.encoding.transformer();
-        let serializer = self.encoding.clone().encoding();
+        let serializer = self.encoding.clone().encoding()?;
         let encoder = Encoder::<()>::new(serializer);
         let encoder = HecLogsEncoder {
             transformer,

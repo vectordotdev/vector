@@ -30,7 +30,7 @@ pub(crate) struct SqsRequestBuilder {
 impl SqsRequestBuilder {
     pub fn new(config: SqsSinkConfig) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
-        let serializer = config.encoding.encoding();
+        let serializer = config.encoding.encoding()?;
         let encoder = Encoder::<()>::new(serializer);
 
         Ok(Self {

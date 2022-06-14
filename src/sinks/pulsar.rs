@@ -5,6 +5,7 @@ use std::{
     task::{Context, Poll},
 };
 
+use bytes::BytesMut;
 use futures::{future::BoxFuture, ready, stream::FuturesUnordered, FutureExt, Sink, Stream};
 use pulsar::{
     message::proto, producer::SendFuture, proto::CommandSendReceipt, Authentication,
@@ -16,16 +17,13 @@ use vector_buffers::Acker;
 use vector_common::internal_event::{BytesSent, EventsSent};
 
 use crate::{
+    codecs::{Encoder, EncodingConfig},
     config::{
-        log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
-        SinkDescription,
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
     },
     event::Event,
     internal_events::PulsarEncodeEventError,
-    sinks::util::{
-        encoding::{EncodingConfig, EncodingConfiguration},
-        metadata::RequestMetadata,
-    },
+    sinks::util::{encoding::Transformer, metadata::RequestMetadata},
 };
 
 #[derive(Debug, Snafu)]
@@ -40,7 +38,7 @@ pub struct PulsarSinkConfig {
     #[serde(alias = "address")]
     endpoint: String,
     topic: String,
-    encoding: EncodingConfig<Encoding>,
+    encoding: EncodingConfig,
     auth: Option<AuthConfig>,
 }
 
@@ -77,8 +75,8 @@ enum PulsarSinkState {
 }
 
 struct PulsarSink {
-    encoding: EncodingConfig<Encoding>,
-    avro_schema: Option<avro_rs::Schema>,
+    transformer: Transformer,
+    encoder: Encoder<()>,
     state: PulsarSinkState,
     in_flight: FuturesUnordered<
         BoxFuture<
@@ -187,26 +185,13 @@ async fn healthcheck(producer: PulsarProducer) -> crate::Result<()> {
 impl PulsarSink {
     fn new(
         producer: PulsarProducer,
-        encoding: EncodingConfig<Encoding>,
+        transformer: Transformer,
+        encoder: Encoder<()>,
         acker: Acker,
     ) -> crate::Result<Self> {
-        let schema = match &encoding.codec() {
-            Encoding::Avro => {
-                if let Some(schema) = &encoding.schema() {
-                    avro_rs::Schema::parse_str(schema).ok()
-                } else {
-                    return Err(
-                        "Avro requires a schema, specify a schema file with `encoding.schema`."
-                            .into(),
-                    );
-                }
-            }
-            _ => None,
-        };
-
         Ok(Self {
-            encoding,
-            avro_schema: schema,
+            transformer,
+            encoder,
             state: PulsarSinkState::Ready(Box::new(producer)),
             in_flight: FuturesUnordered::new(),
             acker,
@@ -245,19 +230,24 @@ impl Sink<Event> for PulsarSink {
         Poll::Ready(Ok(()))
     }
 
-    fn start_send(mut self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
+    fn start_send(mut self: Pin<&mut Self>, mut event: Event) -> Result<(), Self::Error> {
         assert!(
             matches!(self.state, PulsarSinkState::Ready(_)),
             "Expected `poll_ready` to be called first."
         );
 
-        let metadata_builder = RequestMetadata::builder(&item);
-        let message = encode_event(item, &self.encoding, &self.avro_schema)
-            .map_err(|error| emit!(PulsarEncodeEventError { error }))?;
+        self.transformer.transform(&mut event);
 
-        let message_len =
-            NonZeroUsize::new(message.len()).expect("payload should never be zero length");
-        let metadata = metadata_builder.with_request_size(message_len);
+        let metadata_builder = RequestMetadata::builder(&event);
+        let mut bytes = BytesMut::new();
+        self.encoder.encode(event, &mut bytes).map_err(|_| {
+            // Error is handled by `Encoder`.
+            ()
+        })?;
+
+        let bytes_len =
+            NonZeroUsize::new(bytes.len()).expect("payload should never be zero length");
+        let metadata = metadata_builder.with_request_size(bytes_len);
 
         let mut producer = match std::mem::replace(&mut self.state, PulsarSinkState::None) {
             PulsarSinkState::Ready(producer) => producer,
@@ -325,34 +315,6 @@ impl Sink<Event> for PulsarSink {
     }
 }
 
-fn encode_event(
-    mut item: Event,
-    encoding: &EncodingConfig<Encoding>,
-    avro_schema: &Option<avro_rs::Schema>,
-) -> crate::Result<Vec<u8>> {
-    encoding.apply_rules(&mut item);
-    let log = item.into_log();
-
-    Ok(match encoding.codec() {
-        Encoding::Json => serde_json::to_vec(&log)?,
-        Encoding::Text => log
-            .get(log_schema().message_key())
-            .map(|v| v.coerce_to_bytes().to_vec())
-            .unwrap_or_default(),
-        Encoding::Avro => {
-            let value = avro_rs::to_value(log)?;
-            let resolved_value =
-                avro_rs::types::Value::resolve(value, avro_schema.as_ref().unwrap())?;
-            avro_rs::to_avro_datum(
-                avro_schema
-                    .as_ref()
-                    .expect("Avro encoding selected but no schema found. Please report this."),
-                resolved_value,
-            )?
-        }
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
@@ -362,76 +324,6 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<PulsarSinkConfig>();
-    }
-
-    #[test]
-    fn pulsar_event_json() {
-        let msg = "hello_world".to_owned();
-        let mut evt = Event::from(msg.clone());
-        evt.as_mut_log().insert("key", "value");
-        let result = encode_event(evt, &EncodingConfig::from(Encoding::Json), &None).unwrap();
-        let map: HashMap<String, String> = serde_json::from_slice(&result[..]).unwrap();
-        assert_eq!(msg, map[&log_schema().message_key().to_string()]);
-    }
-
-    #[test]
-    fn pulsar_event_text() {
-        let msg = "hello_world".to_owned();
-        let evt = Event::from(msg.clone());
-        let event = encode_event(evt, &EncodingConfig::from(Encoding::Text), &None).unwrap();
-
-        assert_eq!(&event[..], msg.as_bytes());
-    }
-
-    #[test]
-    fn pulsar_event_avro() {
-        let raw_schema = r#"
-        {
-          "type": "record",
-          "name": "Log",
-          "fields": [
-            {"name": "message","type": ["null","string"]}
-          ]
-        }
-        "#;
-
-        let msg = "hello_world".to_owned();
-        let mut evt = Event::from(msg);
-        evt.as_mut_log().insert("key", "value");
-        let mut encoding = EncodingConfig::from(Encoding::Avro);
-        encoding.schema = Some(raw_schema.to_string());
-        let schema = avro_rs::Schema::parse_str(raw_schema).unwrap();
-        let result = encode_event(evt.clone(), &encoding, &Some(schema.clone())).unwrap();
-
-        let value = avro_rs::to_value(evt.into_log()).unwrap();
-        let resolved_value = avro_rs::types::Value::resolve(value, &schema).unwrap();
-        let must_be = avro_rs::to_avro_datum(&schema, resolved_value).unwrap();
-
-        assert_eq!(result, must_be);
-    }
-
-    #[test]
-    fn pulsar_encode_event() {
-        let msg = "hello_world";
-
-        let mut evt = Event::from(msg);
-        evt.as_mut_log().insert("key", "value");
-
-        let event = encode_event(
-            evt,
-            &EncodingConfig {
-                codec: Encoding::Json,
-                schema: None,
-                only_fields: None,
-                except_fields: Some(vec!["key".into()]),
-                timestamp_format: None,
-            },
-            &None,
-        )
-        .unwrap();
-
-        let map: HashMap<String, String> = serde_json::from_slice(&event[..]).unwrap();
-        assert!(!map.contains_key("key"));
     }
 }
 
