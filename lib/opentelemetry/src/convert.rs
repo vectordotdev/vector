@@ -50,8 +50,7 @@ impl IntoIterator for ResourceLogs {
 
         scope_logs
             .into_iter()
-            .map(|scope_log| scope_log.log_records)
-            .flatten()
+            .flat_map(|scope_log| scope_log.log_records)
             .map(|log_record| {
                 ResourceLog {
                     resource: resource.clone(),
