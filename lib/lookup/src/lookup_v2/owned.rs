@@ -1,5 +1,6 @@
 use crate::lookup_v2::{parse_path, BorrowedSegment, Path};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::borrow::Cow;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct OwnedPath {
@@ -54,45 +55,76 @@ impl Serialize for OwnedPath {
         if self.segments.is_empty() {
             serializer.serialize_str("<invalid>")
         } else {
+            let mut coalesce_i = 0;
+
             let path = self
                 .segments
                 .iter()
                 .enumerate()
                 .map(|(i, segment)| match segment {
                     OwnedSegment::Field(field) => {
-                        let needs_quotes = field
-                            .chars()
-                            .any(|c| !matches!(c, 'A'..='Z' | 'a'..='z' | '_' | '0'..='9' | '@'));
-                        // Allocate enough to fit the field, a `.` and two `"` characters. This
-                        // should suffice for the majority of cases when no escape sequence is used.
-                        let mut string = String::with_capacity(field.as_bytes().len() + 3);
-                        if i != 0 {
-                            string.push('.');
-                        }
-                        if needs_quotes {
-                            string.push('"');
-                            for c in field.chars() {
-                                if matches!(c, '"' | '\\') {
-                                    string.push('\\');
-                                }
-                                string.push(c);
-                            }
-                            string.push('"');
-                            string
-                        } else {
-                            string.push_str(field);
-                            string
-                        }
+                        serialize_field(field.as_ref(), (i != 0).then(|| '.'))
+                    }
+
+                    OwnedSegment::CoalesceField(field) => {
+                        let output =
+                            serialize_field(field.as_ref(), (coalesce_i != 0).then(|| '|'));
+                        coalesce_i += 1;
+                        output
                     }
                     OwnedSegment::Index(index) => format!("[{}]", index),
                     OwnedSegment::Invalid => {
                         (if i == 0 { "<invalid>" } else { ".<invalid>" }).to_owned()
+                    }
+                    OwnedSegment::CoalesceStart => {
+                        coalesce_i = 0;
+                        if i == 0 {
+                            "(".to_owned()
+                        } else {
+                            ".(".to_owned()
+                        }
+                    }
+                    OwnedSegment::CoalesceEnd(field) => {
+                        if let Some(field) = field {
+                            format!(
+                                "{})",
+                                serialize_field(field.as_ref(), (coalesce_i != 0).then(|| '|'))
+                            )
+                        } else {
+                            ")".to_owned()
+                        }
                     }
                 })
                 .collect::<Vec<_>>()
                 .join("");
             serializer.serialize_str(&path)
         }
+    }
+}
+
+fn serialize_field(field: &str, separator: Option<char>) -> String {
+    let needs_quotes = field
+        .chars()
+        .any(|c| !matches!(c, 'A'..='Z' | 'a'..='z' | '_' | '0'..='9' | '@'));
+    // Allocate enough to fit the field, a `.` and two `"` characters. This
+    // should suffice for the majority of cases when no escape sequence is used.
+    let mut string = String::with_capacity(field.as_bytes().len() + 3);
+    if let Some(separator) = separator {
+        string.push(separator);
+    }
+    if needs_quotes {
+        string.push('"');
+        for c in field.chars() {
+            if matches!(c, '"' | '\\') {
+                string.push('\\');
+            }
+            string.push(c);
+        }
+        string.push('"');
+        string
+    } else {
+        string.push_str(field);
+        string
     }
 }
 
@@ -116,18 +148,34 @@ impl<'a, const N: usize> From<[BorrowedSegment<'a>; N]> for OwnedPath {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum OwnedSegment {
-    Field(String),
+    Field(Cow<'static, str>),
     Index(isize),
+    CoalesceStart,
+    CoalesceField(Cow<'static, str>),
+    CoalesceEnd(Option<Cow<'static, str>>),
     Invalid,
 }
 
 impl OwnedSegment {
     pub fn field(value: &str) -> OwnedSegment {
-        OwnedSegment::Field(value.into())
+        OwnedSegment::Field(value.to_string().into())
     }
     pub fn index(value: isize) -> OwnedSegment {
         OwnedSegment::Index(value)
     }
+
+    pub fn coalesce_field(field: impl Into<Cow<'static, str>>) -> OwnedSegment {
+        OwnedSegment::CoalesceField(field.into())
+    }
+
+    pub fn coalesce_end(field: impl Into<Cow<'static, str>>) -> OwnedSegment {
+        OwnedSegment::CoalesceEnd(Some(field.into()))
+    }
+
+    pub fn coalesce_empty_end() -> OwnedSegment {
+        OwnedSegment::CoalesceEnd(None)
+    }
+
     pub fn is_field(&self) -> bool {
         matches!(self, OwnedSegment::Field(_))
     }
@@ -142,9 +190,16 @@ impl OwnedSegment {
 impl<'a> From<BorrowedSegment<'a>> for OwnedSegment {
     fn from(x: BorrowedSegment<'a>) -> Self {
         match x {
-            BorrowedSegment::Field(value) => OwnedSegment::Field((*value).to_owned()),
+            BorrowedSegment::Field(value) => OwnedSegment::Field(value.to_string().into()),
             BorrowedSegment::Index(value) => OwnedSegment::Index(value),
             BorrowedSegment::Invalid => OwnedSegment::Invalid,
+            BorrowedSegment::CoalesceStart => OwnedSegment::CoalesceStart,
+            BorrowedSegment::CoalesceField(field) => {
+                OwnedSegment::CoalesceField(field.to_string().into())
+            }
+            BorrowedSegment::CoalesceEnd(field) => {
+                OwnedSegment::CoalesceEnd(field.map(|field| field.to_string().into()))
+            }
         }
     }
 }
@@ -238,6 +293,11 @@ mod test {
             (r#"foo."a\"a"."b\\b".bar"#, r#"foo."a\"a"."b\\b".bar"#),
             ("<invalid>", "<invalid>"),
             (r#""🤖""#, r#""🤖""#),
+            (".(a|b)", "(a|b)"),
+            (".(a|b|c)", "(a|b|c)"),
+            ("foo.(a|b|c)", "foo.(a|b|c)"),
+            ("[0].(a|b|c)", "[0].(a|b|c)"),
+            (".(a|b|c).foo", "(a|b|c).foo"),
         ];
 
         for (path, expected) in test_cases {
