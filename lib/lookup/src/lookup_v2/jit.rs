@@ -63,7 +63,9 @@ enum JitState {
     EscapedQuote,
     CoalesceStart,
     CoalesceField { start: usize },
-    CoalesceFieldEnd,
+    // using u32 to not increase the size of `JitState`
+    CoalesceFieldEnd { start: usize, end: usize },
+    CoalesceEscapedFieldEnd,
     CoalesceQuote { start: usize },
     CoalesceEscapedQuote,
     End,
@@ -85,9 +87,10 @@ impl<'a> Iterator for JitLookup<'a> {
                         | JitState::EscapedQuote { .. }
                         | JitState::CoalesceStart
                         | JitState::CoalesceField { .. }
-                        | JitState::CoalesceFieldEnd
+                        | JitState::CoalesceFieldEnd { .. }
                         | JitState::CoalesceQuote { .. }
                         | JitState::CoalesceEscapedQuote { .. }
+                        | JitState::CoalesceEscapedFieldEnd
                         | JitState::Dot => Some(BorrowedSegment::Invalid),
 
                         JitState::Continue | JitState::EventRoot | JitState::End => None,
@@ -107,10 +110,7 @@ impl<'a> Iterator for JitLookup<'a> {
                                 (None, JitState::Field { start: index })
                             }
                             '[' => (None, JitState::IndexStart),
-                            '(' => (
-                                Some(Some(BorrowedSegment::CoalesceStart)),
-                                JitState::CoalesceStart,
-                            ),
+                            '(' => (None, JitState::CoalesceStart),
                             '\"' => (None, JitState::Quote { start: index + 1 }),
                             _ => (Some(Some(BorrowedSegment::Invalid)), JitState::End),
                         },
@@ -120,10 +120,7 @@ impl<'a> Iterator for JitLookup<'a> {
                                 (None, JitState::Field { start: index })
                             }
                             '[' => (None, JitState::IndexStart),
-                            '(' => (
-                                Some(Some(BorrowedSegment::CoalesceStart)),
-                                JitState::CoalesceStart,
-                            ),
+                            '(' => (None, JitState::CoalesceStart),
                             '\"' => (None, JitState::Quote { start: index + 1 }),
                             _ => (Some(Some(BorrowedSegment::Invalid)), JitState::End),
                         },
@@ -132,10 +129,7 @@ impl<'a> Iterator for JitLookup<'a> {
                                 (None, JitState::Field { start: index })
                             }
                             '[' => (None, JitState::IndexStart),
-                            '(' => (
-                                Some(Some(BorrowedSegment::CoalesceStart)),
-                                JitState::CoalesceStart,
-                            ),
+                            '(' => (None, JitState::CoalesceStart),
                             '\"' => (None, JitState::Quote { start: index + 1 }),
                             _ => (Some(Some(BorrowedSegment::Invalid)), JitState::End),
                         },
@@ -143,10 +137,7 @@ impl<'a> Iterator for JitLookup<'a> {
                             'A'..='Z' | 'a'..='z' | '_' | '0'..='9' | '@' => {
                                 (None, JitState::Field { start: index })
                             }
-                            '(' => (
-                                Some(Some(BorrowedSegment::CoalesceStart)),
-                                JitState::CoalesceStart,
-                            ),
+                            '(' => (None, JitState::CoalesceStart),
                             '\"' => (None, JitState::Quote { start: index + 1 }),
                             _ => (Some(Some(BorrowedSegment::Invalid)), JitState::End),
                         },
@@ -261,12 +252,7 @@ impl<'a> Iterator for JitLookup<'a> {
                             'A'..='Z' | 'a'..='z' | '_' | '0'..='9' | '@' => {
                                 (None, JitState::CoalesceField { start })
                             }
-                            ' ' => (
-                                Some(Some(BorrowedSegment::CoalesceField(Cow::Borrowed(
-                                    &self.path[start..index],
-                                )))),
-                                JitState::CoalesceFieldEnd,
-                            ),
+                            ' ' => (None, JitState::CoalesceFieldEnd { start, end: index }),
                             '|' => (
                                 Some(Some(BorrowedSegment::CoalesceField(Cow::Borrowed(
                                     &self.path[start..index],
@@ -274,29 +260,47 @@ impl<'a> Iterator for JitLookup<'a> {
                                 JitState::CoalesceStart,
                             ),
                             ')' => (
-                                Some(Some(BorrowedSegment::CoalesceEnd(Some(Cow::Borrowed(
+                                Some(Some(BorrowedSegment::CoalesceEnd(Cow::Borrowed(
                                     &self.path[start..index],
-                                ))))),
+                                )))),
                                 JitState::Continue,
                             ),
                             _ => (Some(Some(BorrowedSegment::Invalid)), JitState::End),
                         },
-                        JitState::CoalesceFieldEnd => match c {
-                            ' ' => (None, JitState::CoalesceFieldEnd),
-                            '|' => (None, JitState::CoalesceStart),
+                        JitState::CoalesceFieldEnd { start, end } => match c {
+                            ' ' => (None, JitState::CoalesceFieldEnd { start, end }),
+                            '|' => (
+                                Some(Some(BorrowedSegment::CoalesceField(Cow::Borrowed(
+                                    &self.path[(start as usize)..(end as usize)],
+                                )))),
+                                JitState::CoalesceStart,
+                            ),
                             ')' => (
-                                Some(Some(BorrowedSegment::CoalesceEnd(None))),
+                                Some(Some(BorrowedSegment::CoalesceEnd(Cow::Borrowed(
+                                    &self.path[(start as usize)..(end as usize)],
+                                )))),
+                                JitState::Continue,
+                            ),
+                            _ => (Some(Some(BorrowedSegment::Invalid)), JitState::End),
+                        },
+                        JitState::CoalesceEscapedFieldEnd => match c {
+                            ' ' => (None, JitState::CoalesceEscapedFieldEnd),
+                            '|' => (
+                                (Some(Some(BorrowedSegment::CoalesceField(
+                                    std::mem::take(&mut self.escape_buffer).into(),
+                                )))),
+                                JitState::CoalesceStart,
+                            ),
+                            ')' => (
+                                (Some(Some(BorrowedSegment::CoalesceEnd(
+                                    std::mem::take(&mut self.escape_buffer).into(),
+                                )))),
                                 JitState::Continue,
                             ),
                             _ => (Some(Some(BorrowedSegment::Invalid)), JitState::End),
                         },
                         JitState::CoalesceQuote { start } => match c {
-                            '\"' => (
-                                Some(Some(BorrowedSegment::CoalesceField(Cow::Borrowed(
-                                    &self.path[start..index],
-                                )))),
-                                JitState::CoalesceFieldEnd,
-                            ),
+                            '\"' => (None, JitState::CoalesceFieldEnd { start, end: index }),
                             '\\' => {
                                 // Character escaping requires copying chars to a new String.
                                 // State is reverted back to the start of the quote to start over
@@ -308,12 +312,7 @@ impl<'a> Iterator for JitLookup<'a> {
                             _ => (None, JitState::CoalesceQuote { start }),
                         },
                         JitState::CoalesceEscapedQuote => match c {
-                            '\"' => (
-                                (Some(Some(BorrowedSegment::CoalesceField(
-                                    std::mem::take(&mut self.escape_buffer).into(),
-                                )))),
-                                JitState::CoalesceFieldEnd,
-                            ),
+                            '\"' => (None, JitState::CoalesceEscapedFieldEnd),
                             '\\' => match self.chars.next() {
                                 Some((_, c)) => match c {
                                     '\\' | '\"' => {
@@ -396,7 +395,6 @@ mod test {
             (
                 ".(a|b)",
                 owned_path!(
-                    OwnedSegment::CoalesceStart,
                     OwnedSegment::coalesce_field("a"),
                     OwnedSegment::coalesce_end("b")
                 ),
@@ -404,7 +402,6 @@ mod test {
             (
                 "(a|b)",
                 owned_path!(
-                    OwnedSegment::CoalesceStart,
                     OwnedSegment::coalesce_field("a"),
                     OwnedSegment::coalesce_end("b")
                 ),
@@ -412,20 +409,14 @@ mod test {
             (
                 "( a | b )",
                 owned_path!(
-                    OwnedSegment::CoalesceStart,
                     OwnedSegment::coalesce_field("a"),
-                    OwnedSegment::coalesce_field("b"),
-                    OwnedSegment::coalesce_empty_end()
+                    OwnedSegment::coalesce_end("b")
                 ),
             ),
-            (
-                "(a)",
-                owned_path!(OwnedSegment::CoalesceStart, OwnedSegment::coalesce_end("a")),
-            ),
+            ("(a)", owned_path!(OwnedSegment::coalesce_end("a"))),
             (
                 ".(a|b)[1]",
                 owned_path!(
-                    OwnedSegment::CoalesceStart,
                     OwnedSegment::coalesce_field("a"),
                     OwnedSegment::coalesce_end("b"),
                     1
@@ -434,7 +425,6 @@ mod test {
             (
                 ".(a|b).foo",
                 owned_path!(
-                    OwnedSegment::CoalesceStart,
                     OwnedSegment::coalesce_field("a"),
                     OwnedSegment::coalesce_end("b"),
                     "foo"
@@ -443,7 +433,6 @@ mod test {
             (
                 ".(a|b|c)",
                 owned_path!(
-                    OwnedSegment::CoalesceStart,
                     OwnedSegment::coalesce_field("a"),
                     OwnedSegment::coalesce_field("b"),
                     OwnedSegment::coalesce_end("c")
@@ -453,7 +442,6 @@ mod test {
                 "[1](a|b)",
                 owned_path!(
                     1,
-                    OwnedSegment::CoalesceStart,
                     OwnedSegment::coalesce_field("a"),
                     OwnedSegment::coalesce_end("b")
                 ),
@@ -462,7 +450,6 @@ mod test {
                 "[1].(a|b)",
                 owned_path!(
                     1,
-                    OwnedSegment::CoalesceStart,
                     OwnedSegment::coalesce_field("a"),
                     OwnedSegment::coalesce_end("b")
                 ),
@@ -471,7 +458,6 @@ mod test {
                 "foo.(a|b)",
                 owned_path!(
                     "foo",
-                    OwnedSegment::CoalesceStart,
                     OwnedSegment::coalesce_field("a"),
                     OwnedSegment::coalesce_end("b")
                 ),
@@ -479,7 +465,6 @@ mod test {
             (
                 "(\"a\"|b)",
                 owned_path!(
-                    OwnedSegment::CoalesceStart,
                     OwnedSegment::coalesce_field("a"),
                     OwnedSegment::coalesce_end("b")
                 ),
@@ -487,19 +472,22 @@ mod test {
             (
                 "(a|\"b.c\")",
                 owned_path!(
-                    OwnedSegment::CoalesceStart,
                     OwnedSegment::coalesce_field("a"),
-                    OwnedSegment::coalesce_field("b.c"),
-                    OwnedSegment::coalesce_empty_end()
+                    OwnedSegment::coalesce_end("b.c")
                 ),
             ),
             (
                 "(a|\"b\\\"c\")",
                 owned_path!(
-                    OwnedSegment::CoalesceStart,
                     OwnedSegment::coalesce_field("a"),
+                    OwnedSegment::coalesce_end("b\"c")
+                ),
+            ),
+            (
+                "(\"b\\\"c\"|a)",
+                owned_path!(
                     OwnedSegment::coalesce_field("b\"c"),
-                    OwnedSegment::coalesce_empty_end()
+                    OwnedSegment::coalesce_end("a")
                 ),
             ),
         ];

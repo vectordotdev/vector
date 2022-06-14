@@ -1,6 +1,5 @@
 use crate::lookup_v2::{parse_path, BorrowedSegment, Path};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::borrow::Cow;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct OwnedPath {
@@ -63,12 +62,22 @@ impl Serialize for OwnedPath {
                 .enumerate()
                 .map(|(i, segment)| match segment {
                     OwnedSegment::Field(field) => {
-                        serialize_field(field.as_ref(), (i != 0).then(|| '.'))
+                        serialize_field(field.as_ref(), (i != 0).then(|| "."))
                     }
 
                     OwnedSegment::CoalesceField(field) => {
-                        let output =
-                            serialize_field(field.as_ref(), (coalesce_i != 0).then(|| '|'));
+                        let output = serialize_field(
+                            field.as_ref(),
+                            Some(if coalesce_i == 0 {
+                                if i == 0 {
+                                    "("
+                                } else {
+                                    ".("
+                                }
+                            } else {
+                                "|"
+                            }),
+                        );
                         coalesce_i += 1;
                         output
                     }
@@ -76,23 +85,11 @@ impl Serialize for OwnedPath {
                     OwnedSegment::Invalid => {
                         (if i == 0 { "<invalid>" } else { ".<invalid>" }).to_owned()
                     }
-                    OwnedSegment::CoalesceStart => {
-                        coalesce_i = 0;
-                        if i == 0 {
-                            "(".to_owned()
-                        } else {
-                            ".(".to_owned()
-                        }
-                    }
                     OwnedSegment::CoalesceEnd(field) => {
-                        if let Some(field) = field {
-                            format!(
-                                "{})",
-                                serialize_field(field.as_ref(), (coalesce_i != 0).then(|| '|'))
-                            )
-                        } else {
-                            ")".to_owned()
-                        }
+                        format!(
+                            "{})",
+                            serialize_field(field.as_ref(), (coalesce_i != 0).then(|| "|"))
+                        )
                     }
                 })
                 .collect::<Vec<_>>()
@@ -102,7 +99,7 @@ impl Serialize for OwnedPath {
     }
 }
 
-fn serialize_field(field: &str, separator: Option<char>) -> String {
+fn serialize_field(field: &str, separator: Option<&str>) -> String {
     let needs_quotes = field
         .chars()
         .any(|c| !matches!(c, 'A'..='Z' | 'a'..='z' | '_' | '0'..='9' | '@'));
@@ -110,7 +107,7 @@ fn serialize_field(field: &str, separator: Option<char>) -> String {
     // should suffice for the majority of cases when no escape sequence is used.
     let mut string = String::with_capacity(field.as_bytes().len() + 3);
     if let Some(separator) = separator {
-        string.push(separator);
+        string.push_str(separator);
     }
     if needs_quotes {
         string.push('"');
@@ -148,11 +145,10 @@ impl<'a, const N: usize> From<[BorrowedSegment<'a>; N]> for OwnedPath {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum OwnedSegment {
-    Field(Cow<'static, str>),
+    Field(String),
     Index(isize),
-    CoalesceStart,
-    CoalesceField(Cow<'static, str>),
-    CoalesceEnd(Option<Cow<'static, str>>),
+    CoalesceField(String),
+    CoalesceEnd(String),
     Invalid,
 }
 
@@ -164,16 +160,12 @@ impl OwnedSegment {
         OwnedSegment::Index(value)
     }
 
-    pub fn coalesce_field(field: impl Into<Cow<'static, str>>) -> OwnedSegment {
+    pub fn coalesce_field(field: impl Into<String>) -> OwnedSegment {
         OwnedSegment::CoalesceField(field.into())
     }
 
-    pub fn coalesce_end(field: impl Into<Cow<'static, str>>) -> OwnedSegment {
-        OwnedSegment::CoalesceEnd(Some(field.into()))
-    }
-
-    pub fn coalesce_empty_end() -> OwnedSegment {
-        OwnedSegment::CoalesceEnd(None)
+    pub fn coalesce_end(field: impl Into<String>) -> OwnedSegment {
+        OwnedSegment::CoalesceEnd(field.into())
     }
 
     pub fn is_field(&self) -> bool {
@@ -190,16 +182,11 @@ impl OwnedSegment {
 impl<'a> From<BorrowedSegment<'a>> for OwnedSegment {
     fn from(x: BorrowedSegment<'a>) -> Self {
         match x {
-            BorrowedSegment::Field(value) => OwnedSegment::Field(value.to_string().into()),
+            BorrowedSegment::Field(value) => OwnedSegment::Field(value.to_string()),
             BorrowedSegment::Index(value) => OwnedSegment::Index(value),
             BorrowedSegment::Invalid => OwnedSegment::Invalid,
-            BorrowedSegment::CoalesceStart => OwnedSegment::CoalesceStart,
-            BorrowedSegment::CoalesceField(field) => {
-                OwnedSegment::CoalesceField(field.to_string().into())
-            }
-            BorrowedSegment::CoalesceEnd(field) => {
-                OwnedSegment::CoalesceEnd(field.map(|field| field.to_string().into()))
-            }
+            BorrowedSegment::CoalesceField(field) => OwnedSegment::CoalesceField(field.to_string()),
+            BorrowedSegment::CoalesceEnd(field) => OwnedSegment::CoalesceEnd(field.to_string()),
         }
     }
 }

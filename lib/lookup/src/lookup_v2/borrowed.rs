@@ -7,10 +7,9 @@ use std::slice::Iter;
 pub enum BorrowedSegment<'a> {
     Field(Cow<'a, str>),
     Index(isize),
-    CoalesceStart,
     CoalesceField(Cow<'a, str>),
     // This has an optional field since the parser would have to emit 2 segments in 1 state otherwise
-    CoalesceEnd(Option<Cow<'a, str>>),
+    CoalesceEnd(Cow<'a, str>),
     Invalid,
 }
 
@@ -53,14 +52,13 @@ impl From<isize> for BorrowedSegment<'_> {
 impl<'a, 'b: 'a> From<&'b OwnedSegment> for BorrowedSegment<'a> {
     fn from(segment: &'b OwnedSegment) -> Self {
         match segment {
-            OwnedSegment::Field(value) => BorrowedSegment::Field(value.clone()),
+            OwnedSegment::Field(field) => BorrowedSegment::Field(field.as_str().into()),
             OwnedSegment::Index(value) => BorrowedSegment::Index(*value),
             OwnedSegment::Invalid => BorrowedSegment::Invalid,
-            OwnedSegment::CoalesceStart => BorrowedSegment::CoalesceStart,
-            OwnedSegment::CoalesceField(field) => BorrowedSegment::CoalesceField(field.clone()),
-            OwnedSegment::CoalesceEnd(field) => {
-                BorrowedSegment::CoalesceEnd(field.clone().map(|x| x.clone()))
+            OwnedSegment::CoalesceField(field) => {
+                BorrowedSegment::CoalesceField(field.as_str().into())
             }
+            OwnedSegment::CoalesceEnd(field) => BorrowedSegment::CoalesceEnd(field.as_str().into()),
         }
     }
 }
