@@ -90,25 +90,28 @@ type ConditionDescription = ComponentDescription<Box<dyn ConditionConfig>>;
 
 inventory::collect!(ConditionDescription);
 
-/// A condition can either be a raw string such as
-/// `condition = '.message == "hooray"'`.
-/// In this case it is turned into a VRL condition.
-/// Otherwise it is a condition such as:
-///
+/// An event matching condition.
+/// 
+/// Many methods exist for matching for matching events, such as using a VRL expression, a Datadog Search query string,
+/// or hard-coded matchers like "must be a metric" or "fields A, B, and C must match these constraints".
+/// 
+/// As VRL is the most common way to apply conditions to events, this type provides a shortcut to define VRL expressions
+/// directly in configuration by passing the VRL expression as a string:
+/// 
+/// ```toml
+/// condition = '.message == "hooray"'
+/// ```
+/// 
+/// When other condition types are required, they can specified with an enum-style notation:
+/// 
+/// ```toml
 /// condition.type = 'check_fields'
 /// condition."message.equals" = 'hooray'
+/// ```
+/// 
+/// ## Warning
 ///
-///
-/// It is important to note that because the way this is
-/// structured, it is wrong to flatten a field that contains
-/// an AnyCondition:
-///
-/// #[serde(flatten)]
-/// condition: AnyCondition,
-///
-/// This will result in an error when serializing to json
-/// which we need to do when determining which transforms have changed
-/// when a config is reloaded.
+/// It is not valid to use `#[serde(flatten)]` with this type. If you do so, things will almost certainly break.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(untagged)]
 pub enum AnyCondition {

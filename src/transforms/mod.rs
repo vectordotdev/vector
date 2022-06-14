@@ -2,14 +2,10 @@ use snafu::Snafu;
 
 #[cfg(feature = "transforms-aggregate")]
 pub mod aggregate;
-#[cfg(feature = "transforms-aws_cloudwatch_logs_subscription_parser")]
-pub mod aws_cloudwatch_logs_subscription_parser;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
 pub mod aws_ec2_metadata;
 #[cfg(feature = "transforms-dedupe")]
 pub mod dedupe;
-#[cfg(feature = "transforms-field_filter")]
-pub mod field_filter;
 #[cfg(feature = "transforms-filter")]
 pub mod filter;
 #[cfg(feature = "transforms-geoip")]
@@ -62,20 +58,11 @@ pub enum Transforms {
     /// Aggregate.
     Aggregate(#[configurable(derived)] aggregate::AggregateConfig),
 
-    /// AWS Cloudwatch Logs subscription parser.
-    AwsCloudwatchLogsSubscriptionParser(
-        #[configurable(derived)]
-        aws_cloudwatch_logs_subscription_parser::AwsCloudwatchLogsSubscriptionParserConfig,
-    ),
-
     /// AWS EC2 metadata.
     AwsEc2Metadata(#[configurable(derived)] aws_ec2_metadata::Ec2Metadata),
 
     /// Dedupe.
     Dedupe(#[configurable(derived)] dedupe::DedupeConfig),
-
-    /// Field filter.
-    FieldFilter(#[configurable(derived)] field_filter::FieldFilterConfig),
 
     /// Filter.
     Filter(#[configurable(derived)] filter::FilterConfig),

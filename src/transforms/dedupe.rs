@@ -3,7 +3,7 @@ use std::{future::ready, pin::Pin};
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use lru::LruCache;
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use crate::{
     config::{
@@ -16,26 +16,43 @@ use crate::{
     transforms::{TaskTransform, Transform},
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for controlling what fields to match against.
+///
+/// When no field matching configuration is specified, events are matched using the `timestamp`, `host`, and `message`
+/// fields from an event. The specific field names used will be those set in the global [`log
+/// schema`](https://vector.dev/docs/reference/configuration/global-options/#log_schema) configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub enum FieldMatchConfig {
+    /// Matches events using only the specified fields.
     #[serde(rename = "match")]
-    MatchFields(Vec<String>),
+    MatchFields(#[configurable(transparent)] Vec<String>),
+
+    /// Matches events using all fields except for the ignored ones.
     #[serde(rename = "ignore")]
-    IgnoreFields(Vec<String>),
+    IgnoreFields(#[configurable(transparent)] Vec<String>),
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Caching configuration for deduplication.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct CacheConfig {
+    /// Number of events to cache and use for comparing incoming events to previously seen events.
     pub num_events: usize,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `dedupe` transform.
+#[configurable_component(transform)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct DedupeConfig {
+    #[configurable(derived)]
     #[serde(default)]
     pub fields: Option<FieldMatchConfig>,
+
+    #[configurable(derived)]
     #[serde(default = "default_cache_config")]
     pub cache: CacheConfig,
 }

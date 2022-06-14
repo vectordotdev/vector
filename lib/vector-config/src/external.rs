@@ -1,8 +1,7 @@
-use indexmap::IndexMap;
 use schemars::{gen::SchemaGenerator, schema::SchemaObject};
 
 use crate::{
-    schema::{finalize_schema, generate_map_schema, generate_string_schema},
+    schema::{finalize_schema, generate_map_schema, generate_string_schema, generate_array_schema},
     Configurable, Metadata,
 };
 
@@ -28,7 +27,7 @@ impl<'de> Configurable<'de> for &'static encoding_rs::Encoding {
     }
 }
 
-impl<'de, V> Configurable<'de> for IndexMap<String, V>
+impl<'de, V> Configurable<'de> for indexmap::IndexMap<String, V>
 where
     V: Configurable<'de>,
 {
@@ -62,6 +61,20 @@ impl<'de> Configurable<'de> for toml::Value {
         // `toml::Value` can be anything that it is possible to represent in TOML, and equivalently, is anything it's
         // possible to represent in JSON, so.... a default schema indicates that.
         let mut schema = SchemaObject::default();
+        finalize_schema(gen, &mut schema, overrides);
+        schema
+    }
+}
+
+impl<'de> Configurable<'de> for no_proxy::NoProxy {
+    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
+        // `NoProxy` (de)serializes itself as a vector of strings, without any constrain on the string value itself, so
+        // we just... do that. We do set the element metadata to be transparent, the same as we do for `Vec<T>`, because
+        // all of the pertinent information will be on `NoProxy` itself.
+        let mut element_metadata = String::metadata();
+        element_metadata.set_transparent();
+
+        let mut schema = generate_array_schema(gen, element_metadata);
         finalize_schema(gen, &mut schema, overrides);
         schema
     }

@@ -7,7 +7,7 @@ use http::{uri::PathAndQuery, Request, StatusCode, Uri};
 use hyper::{body::to_bytes as body_to_bytes, Body};
 use lookup::lookup_v2::{parse_path, OwnedPath};
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use snafu::ResultExt as _;
 use tokio::time::{sleep, Duration, Instant};
 use tracing::Instrument;

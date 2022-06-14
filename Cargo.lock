@@ -8819,6 +8819,7 @@ version = "0.1.0"
 dependencies = [
  "encoding_rs",
  "indexmap",
+ "no-proxy",
  "num-traits",
  "schemars",
  "serde",

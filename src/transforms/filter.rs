@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use crate::{
     conditions::{AnyCondition, Condition},
@@ -14,9 +14,12 @@ use crate::{
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+/// Configuration for the `filter` transform.
+#[configurable_component(transform)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct FilterConfig {
+    #[configurable(derived)]
     condition: AnyCondition,
 }
 
