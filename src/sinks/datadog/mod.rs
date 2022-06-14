@@ -49,7 +49,7 @@ async fn healthcheck(
 }
 
 #[derive(Debug, Snafu)]
-pub enum ApiError {
+pub enum DatadogApiError {
     #[snafu(display("Server responded with an error."))]
     ServerError,
     #[snafu(display("Failed to make HTTP(S) request: {}", error))]
@@ -60,4 +60,34 @@ pub enum ApiError {
     BadRequest,
     #[snafu(display("Client request was forbidden."))]
     Forbidden,
+}
+
+pub const fn is_retriable_error(error: &DatadogApiError) -> bool {
+    match *error {
+        DatadogApiError::HttpError {
+            error: HttpError::BuildRequest { .. },
+        }
+        | DatadogApiError::HttpError {
+            error: HttpError::MakeProxyConnector { .. },
+        }
+        | DatadogApiError::BadRequest
+        | DatadogApiError::PayloadTooLarge => false,
+        // This retry logic will be expanded further, but specifically retrying unauthorized
+        // requests and lower level HttpErrorsfor now.
+        // I verified using `curl` that `403` is the respose code for this.
+        //
+        // https://github.com/vectordotdev/vector/issues/10870
+        // https://github.com/vectordotdev/vector/issues/12220
+        DatadogApiError::HttpError {
+            error: HttpError::CallRequest { .. },
+        }
+        | DatadogApiError::HttpError {
+            error: HttpError::BuildTlsConnector { .. },
+        }
+        | DatadogApiError::HttpError {
+            error: HttpError::MakeHttpsConnector { .. },
+        }
+        | DatadogApiError::ServerError
+        | DatadogApiError::Forbidden => true,
+    }
 }

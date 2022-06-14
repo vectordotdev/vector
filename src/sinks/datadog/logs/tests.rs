@@ -18,7 +18,7 @@ use crate::{
     http::HttpError,
     sinks::{
         datadog::logs::DatadogLogsConfig,
-        datadog::ApiError,
+        datadog::DatadogApiError,
         util::retries::RetryLogic,
         util::test::{build_test_server_status, load_sink},
     },
@@ -439,16 +439,32 @@ async fn no_enterprise_headers_inner(api_status: ApiStatus) {
 
 #[tokio::test]
 /// Assert the RetryLogic implementation of LogApiRetry
-async fn log_api_error_is_retriable() {
+async fn error_is_retriable() {
     let retry = LogApiRetry;
 
-    assert!(!retry.is_retriable_error(&ApiError::BadRequest));
-    assert!(!retry.is_retriable_error(&ApiError::PayloadTooLarge));
-    assert!(retry.is_retriable_error(&ApiError::ServerError));
-    assert!(retry.is_retriable_error(&ApiError::Forbidden));
-    assert!(retry.is_retriable_error(&ApiError::HttpError {
+    // not retry-able
+    assert!(!retry.is_retriable_error(&DatadogApiError::BadRequest));
+    assert!(!retry.is_retriable_error(&DatadogApiError::PayloadTooLarge));
+    assert!(!retry.is_retriable_error(&DatadogApiError::HttpError {
+        error: HttpError::BuildRequest {
+            source: http::status::StatusCode::from_u16(6666).unwrap_err().into()
+        }
+    }));
+    assert!(!retry.is_retriable_error(&DatadogApiError::HttpError {
+        error: HttpError::MakeProxyConnector {
+            source: http::Uri::try_from("").unwrap_err()
+        }
+    }));
+
+    // retry-able
+    assert!(retry.is_retriable_error(&DatadogApiError::ServerError));
+    assert!(retry.is_retriable_error(&DatadogApiError::Forbidden));
+    assert!(retry.is_retriable_error(&DatadogApiError::HttpError {
         error: HttpError::BuildTlsConnector {
             source: TlsError::MissingKey
         }
     }));
+    // note: HttpError::CallRequest and HttpError::MakeHttpsConnector are all retry-able,
+    //       but are not straightforward to instantiate due to the design of
+    //       the crates they originate from.
 }

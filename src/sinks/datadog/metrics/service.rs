@@ -19,7 +19,7 @@ use vector_core::{
 
 use crate::{
     http::{BuildRequestSnafu, CallRequestSnafu, HttpClient},
-    sinks::datadog::ApiError,
+    sinks::datadog::{is_retriable_error, DatadogApiError},
     sinks::util::retries::{RetryAction, RetryLogic},
 };
 
@@ -28,20 +28,11 @@ use crate::{
 pub struct DatadogMetricsRetryLogic;
 
 impl RetryLogic for DatadogMetricsRetryLogic {
-    type Error = ApiError;
+    type Error = DatadogApiError;
     type Response = DatadogMetricsResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        match *error {
-            ApiError::BadRequest | ApiError::PayloadTooLarge => false,
-            // This retry logic will be expanded further, but specifically retrying unauthorized
-            // requests and lower level HttpErrorsfor now.
-            // I verified using `curl` that `403` is the respose code for this.
-            //
-            // https://github.com/vectordotdev/vector/issues/10870
-            // https://github.com/vectordotdev/vector/issues/12220
-            ApiError::HttpError { .. } | ApiError::ServerError | ApiError::Forbidden => true,
-        }
+        is_retriable_error(error)
     }
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
@@ -175,13 +166,13 @@ impl DatadogMetricsService {
 
 impl Service<DatadogMetricsRequest> for DatadogMetricsService {
     type Response = DatadogMetricsResponse;
-    type Error = ApiError;
+    type Error = DatadogApiError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
         match self.client.poll_ready(cx) {
             Poll::Ready(Ok(())) => Poll::Ready(Ok(())),
-            Poll::Ready(Err(error)) => Poll::Ready(Err(ApiError::HttpError { error })),
+            Poll::Ready(Err(error)) => Poll::Ready(Err(DatadogApiError::HttpError { error })),
             Poll::Pending => Poll::Pending,
         }
     }
@@ -199,7 +190,7 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
             let request = request
                 .into_http_request(api_key)
                 .context(BuildRequestSnafu)
-                .map_err(|error| ApiError::HttpError { error })?;
+                .map_err(|error| DatadogApiError::HttpError { error })?;
 
             match client.send(request).await {
                 Ok(response) => match response.status() {
@@ -214,14 +205,14 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
                     // 413: Payload too large (batch is above 5MB uncompressed)
                     // 5xx: Internal error, request should be retried after some
                     //      time
-                    StatusCode::BAD_REQUEST => Err(ApiError::BadRequest),
-                    StatusCode::FORBIDDEN => Err(ApiError::Forbidden),
+                    StatusCode::BAD_REQUEST => Err(DatadogApiError::BadRequest),
+                    StatusCode::FORBIDDEN => Err(DatadogApiError::Forbidden),
                     StatusCode::OK | StatusCode::ACCEPTED => {
                         let (parts, body) = response.into_parts();
                         let mut body = hyper::body::aggregate(body)
                             .await
                             .context(CallRequestSnafu)
-                            .map_err(|error| ApiError::HttpError { error })?;
+                            .map_err(|error| DatadogApiError::HttpError { error })?;
                         let body = body.copy_to_bytes(body.remaining());
                         Ok(DatadogMetricsResponse {
                             status_code: parts.status,
@@ -232,10 +223,10 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
                             protocol,
                         })
                     }
-                    StatusCode::PAYLOAD_TOO_LARGE => Err(ApiError::PayloadTooLarge),
-                    _ => Err(ApiError::ServerError),
+                    StatusCode::PAYLOAD_TOO_LARGE => Err(DatadogApiError::PayloadTooLarge),
+                    _ => Err(DatadogApiError::ServerError),
                 },
-                Err(error) => Err(ApiError::HttpError { error }),
+                Err(error) => Err(DatadogApiError::HttpError { error }),
             }
         })
     }
