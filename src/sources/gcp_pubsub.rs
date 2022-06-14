@@ -13,8 +13,10 @@ use tonic::{
     transport::{Certificate, Channel, ClientTlsConfig, Endpoint, Identity},
     Code, Request, Status,
 };
+use vector_common::{
+    byte_size_of::ByteSizeOf, finalizer::EmptyStream, finalizer::UnorderedFinalizer,
+};
 use vector_config::configurable_component;
-use vector_core::{finalizer::EmptyStream, finalizer::UnorderedFinalizer, ByteSizeOf};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},

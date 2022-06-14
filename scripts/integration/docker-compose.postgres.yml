@@ -28,8 +28,6 @@ services:
       - "postgresql_metrics-integration-tests"
       - "--lib"
       - "${FILTER:-::postgres}"
-      - "--"
-      - "--nocapture"
     depends_on:
       - postgres
     environment:

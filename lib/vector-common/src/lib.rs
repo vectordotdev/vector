@@ -20,6 +20,8 @@ pub mod btreemap;
 #[cfg(feature = "byte_size_of")]
 pub mod byte_size_of;
 
+pub mod config;
+
 #[cfg(feature = "conversion")]
 pub mod conversion;
 #[cfg(feature = "conversion")]
@@ -38,7 +40,17 @@ pub use event_data_eq::EventDataEq;
 #[cfg(any(test, feature = "test"))]
 pub mod event_test_util;
 
+pub mod finalization;
+pub mod finalizer;
+
 pub mod internal_event;
+
+pub mod shutdown;
 
 #[cfg(feature = "tokenize")]
 pub mod tokenize;
+
+pub mod trigger;
+
+#[macro_use]
+extern crate tracing;

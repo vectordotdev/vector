@@ -1,3 +1,5 @@
+#![allow(clippy::module_name_repetitions)]
+
 use std::{
     collections::HashMap,
     future::Future,
@@ -76,6 +78,7 @@ impl Future for ShutdownSignal {
 }
 
 impl ShutdownSignal {
+    #[must_use]
     pub fn new(tripwire: Tripwire, trigger: Trigger) -> Self {
         Self {
             begin_shutdown: Some(tripwire),
@@ -83,6 +86,7 @@ impl ShutdownSignal {
         }
     }
 
+    #[must_use]
     pub fn noop() -> Self {
         let (trigger, tripwire) = Tripwire::new();
         Self {
@@ -91,6 +95,7 @@ impl ShutdownSignal {
         }
     }
 
+    #[must_use]
     pub fn new_wired() -> (Trigger, ShutdownSignal, Tripwire) {
         let (trigger_shutdown, tripwire) = Tripwire::new();
         let (trigger, shutdown_done) = Tripwire::new();
@@ -284,6 +289,7 @@ impl SourceShutdownCoordinator {
     }
 
     /// Returned future will finish once all sources have finished.
+    #[must_use]
     pub fn shutdown_tripwire(&self) -> future::BoxFuture<'static, ()> {
         let futures = self
             .shutdown_complete_tripwires
