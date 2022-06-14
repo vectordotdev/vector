@@ -1,8 +1,11 @@
-use crate::Value;
+use std::collections::BTreeMap;
+
 use bytes::Bytes;
 use chrono::{DateTime, NaiveDateTime, Utc};
+use ordered_float::NotNan;
 use quickcheck::{Arbitrary, Gen};
-use std::collections::BTreeMap;
+
+use crate::Value;
 
 const MAX_ARRAY_SIZE: usize = 4;
 const MAX_MAP_SIZE: usize = 4;
@@ -31,17 +34,15 @@ impl Arbitrary for Value {
             }
             1 => Self::Integer(i64::arbitrary(g)),
             2 => {
-                let mut f = f64::arbitrary(g) % MAX_F64_SIZE;
-                if f.is_nan() {
-                    f = 0.0;
-                }
-                Self::from(f)
+                let f = f64::arbitrary(g) % MAX_F64_SIZE;
+                let not_nan = NotNan::new(f).unwrap_or_else(|_| NotNan::new(0.0).unwrap());
+                Self::from(not_nan)
             }
             3 => Self::Boolean(bool::arbitrary(g)),
             4 => Self::Timestamp(datetime(g)),
             5 => {
                 let mut gen = Gen::new(MAX_MAP_SIZE);
-                Self::Map(BTreeMap::arbitrary(&mut gen))
+                Self::Object(BTreeMap::arbitrary(&mut gen))
             }
             6 => {
                 let mut gen = Gen::new(MAX_ARRAY_SIZE);

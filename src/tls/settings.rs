@@ -12,8 +12,8 @@ use openssl::{
     stack::Stack,
     x509::{store::X509StoreBuilder, X509},
 };
-use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
+use vector_config::configurable_component;
 
 use super::{
     AddCertToStoreSnafu, AddExtraChainCertSnafu, CaStackPushSnafu, DerExportSnafu,
@@ -31,14 +31,20 @@ pub const TEST_PEM_CRT_PATH: &str = "tests/data/localhost.crt";
 #[cfg(test)]
 pub const TEST_PEM_KEY_PATH: &str = "tests/data/localhost.key";
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct TlsConfig {
+/// Configures the TLS options for incoming/outgoing connections.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
+pub struct TlsEnableableConfig {
+    /// Whether or not to require TLS for incoming/outgoing connections.
+    ///
+    /// When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
+    /// more information.
     pub enabled: Option<bool>,
     #[serde(flatten)]
-    pub options: TlsOptions,
+    pub options: TlsConfig,
 }
 
-impl TlsConfig {
+impl TlsEnableableConfig {
     pub fn enabled() -> Self {
         Self {
             enabled: Some(true),
@@ -50,28 +56,68 @@ impl TlsConfig {
     pub fn test_config() -> Self {
         Self {
             enabled: Some(true),
-            options: TlsOptions::test_options(),
+            options: TlsConfig::test_config(),
         }
     }
 }
 
-/// Standard TLS options
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct TlsOptions {
+/// Standard TLS options.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
+#[serde(deny_unknown_fields)]
+pub struct TlsConfig {
+    /// Enables certificate verification.
+    ///
+    /// If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
+    /// issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
+    /// certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
+    /// so on until reaching a root certificate.
+    ///
+    /// Relevant for both incoming and outgoing connections.
+    ///
+    /// Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
     pub verify_certificate: Option<bool>,
+
+    /// Enables hostname verification.
+    ///
+    /// If enabled, the hostname used to connect to the remote host must be present in the TLS certificate presented by
+    /// the remote host, either as the Common Name or as an entry in the Subject Alternative Name extension.
+    ///
+    /// Only relevant for outgoing connections.
+    ///
+    /// Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
     pub verify_hostname: Option<bool>,
+
+    /// Absolute path to an additional CA certificate file.
+    ///
+    /// The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
     #[serde(alias = "ca_path")]
     pub ca_file: Option<PathBuf>,
+
+    /// Absolute path to a certificate file used to identify this server.
+    ///
+    /// The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
+    /// an inline string in PEM format.
+    ///
+    /// If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
     #[serde(alias = "crt_path")]
     pub crt_file: Option<PathBuf>,
+
+    /// Absolute path to a private key file used to identify this server.
+    ///
+    /// The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
     #[serde(alias = "key_path")]
     pub key_file: Option<PathBuf>,
+
+    /// Passphrase used to unlock the encrypted key file.
+    ///
+    /// This has no effect unless `key_file` is set.
     pub key_pass: Option<String>,
 }
 
-impl TlsOptions {
+impl TlsConfig {
     #[cfg(test)]
-    pub fn test_options() -> Self {
+    pub fn test_config() -> Self {
         Self {
             ca_file: Some(TEST_PEM_CA_PATH.into()),
             crt_file: Some(TEST_PEM_CRT_PATH.into()),
@@ -97,15 +143,12 @@ impl TlsSettings {
     /// Generate a filled out settings struct from the given optional
     /// option set, interpreted as client options. If `options` is
     /// `None`, the result is set to defaults (ie empty).
-    pub fn from_options(options: &Option<TlsOptions>) -> Result<Self> {
+    pub fn from_options(options: &Option<TlsConfig>) -> Result<Self> {
         Self::from_options_base(options, false)
     }
 
-    pub(super) fn from_options_base(
-        options: &Option<TlsOptions>,
-        for_server: bool,
-    ) -> Result<Self> {
-        let default = TlsOptions::default();
+    pub(super) fn from_options_base(options: &Option<TlsConfig>, for_server: bool) -> Result<Self> {
+        let default = TlsConfig::default();
         let options = options.as_ref().unwrap_or(&default);
 
         if !for_server {
@@ -137,6 +180,36 @@ impl TlsSettings {
                 .expect("Could not build PKCS#12 archive from parsed data")
                 .parse(&identity.1)
                 .expect("Could not parse stored PKCS#12 archive")
+        })
+    }
+
+    #[cfg(feature = "sources-gcp_pubsub")]
+    pub fn identity_pem(&self) -> Option<(Vec<u8>, Vec<u8>)> {
+        self.identity().map(|identity| {
+            let mut cert = identity.cert.to_pem().expect("Invalid stored identity");
+            if let Some(chain) = identity.chain {
+                for authority in chain {
+                    cert.extend(
+                        authority
+                            .to_pem()
+                            .expect("Invalid stored identity chain certificate"),
+                    );
+                }
+            }
+            let key = identity
+                .pkey
+                .private_key_to_pem_pkcs8()
+                .expect("Invalid stored private key");
+            (cert, key)
+        })
+    }
+
+    #[cfg(feature = "sources-gcp_pubsub")]
+    pub fn authorities_pem(&self) -> impl Iterator<Item = Vec<u8>> + '_ {
+        self.authorities.iter().map(|authority| {
+            authority
+                .to_pem()
+                .expect("Invalid stored authority certificate")
         })
     }
 
@@ -189,7 +262,7 @@ impl TlsSettings {
     }
 }
 
-impl TlsOptions {
+impl TlsConfig {
     fn load_authorities(&self) -> Result<Vec<X509>> {
         match &self.ca_file {
             None => Ok(vec![]),
@@ -370,13 +443,17 @@ impl MaybeTlsSettings {
         Ok(Self::Tls(tls))
     }
 
+    pub fn tls_client(config: &Option<TlsConfig>) -> Result<Self> {
+        Ok(Self::Tls(TlsSettings::from_options_base(config, false)?))
+    }
+
     /// Generate an optional settings struct from the given optional
     /// configuration reference. If `config` is `None`, TLS is
     /// disabled. The `for_server` parameter indicates the options
     /// should be interpreted as being for a TLS server, which requires
     /// an identity certificate and changes the certificate verification
     /// default to false.
-    pub fn from_config(config: &Option<TlsConfig>, for_server: bool) -> Result<Self> {
+    pub fn from_config(config: &Option<TlsEnableableConfig>, for_server: bool) -> Result<Self> {
         match config {
             None => Ok(Self::Raw(())), // No config, no TLS settings
             Some(config) => {
@@ -473,7 +550,7 @@ mod test {
 
     #[test]
     fn from_options_pkcs12() {
-        let options = TlsOptions {
+        let options = TlsConfig {
             crt_file: Some(TEST_PKCS12_PATH.into()),
             key_pass: Some("NOPASS".into()),
             ..Default::default()
@@ -486,7 +563,7 @@ mod test {
 
     #[test]
     fn from_options_pem() {
-        let options = TlsOptions {
+        let options = TlsConfig {
             crt_file: Some(TEST_PEM_CRT_PATH.into()),
             key_file: Some(TEST_PEM_KEY_PATH.into()),
             ..Default::default()
@@ -501,7 +578,7 @@ mod test {
     fn from_options_inline_pem() {
         let crt = String::from_utf8(TEST_PEM_CRT_BYTES.to_vec()).unwrap();
         let key = String::from_utf8(TEST_PEM_KEY_BYTES.to_vec()).unwrap();
-        let options = TlsOptions {
+        let options = TlsConfig {
             crt_file: Some(crt.into()),
             key_file: Some(key.into()),
             ..Default::default()
@@ -514,7 +591,7 @@ mod test {
 
     #[test]
     fn from_options_ca() {
-        let options = TlsOptions {
+        let options = TlsConfig {
             ca_file: Some(TEST_PEM_CA_PATH.into()),
             ..Default::default()
         };
@@ -528,7 +605,7 @@ mod test {
     fn from_options_inline_ca() {
         let ca =
             String::from_utf8(include_bytes!("../../tests/data/Vector_CA.crt").to_vec()).unwrap();
-        let options = TlsOptions {
+        let options = TlsConfig {
             ca_file: Some(ca.into()),
             ..Default::default()
         };
@@ -540,7 +617,7 @@ mod test {
 
     #[test]
     fn from_options_intermediate_ca() {
-        let options = TlsOptions {
+        let options = TlsConfig {
             ca_file: Some("tests/data/Chain_with_intermediate.crt".into()),
             ..Default::default()
         };
@@ -552,7 +629,7 @@ mod test {
 
     #[test]
     fn from_options_multi_ca() {
-        let options = TlsOptions {
+        let options = TlsConfig {
             ca_file: Some("tests/data/Multi_CA.crt".into()),
             ..Default::default()
         };
@@ -571,7 +648,7 @@ mod test {
 
     #[test]
     fn from_options_bad_certificate() {
-        let options = TlsOptions {
+        let options = TlsConfig {
             key_file: Some(TEST_PEM_KEY_PATH.into()),
             ..Default::default()
         };
@@ -579,7 +656,7 @@ mod test {
             .expect_err("from_options failed to check certificate");
         assert!(matches!(error, TlsError::MissingCrtKeyFile));
 
-        let options = TlsOptions {
+        let options = TlsConfig {
             crt_file: Some(TEST_PEM_CRT_PATH.into()),
             ..Default::default()
         };
@@ -629,10 +706,10 @@ mod test {
             .expect("Failed to generate settings from config")
     }
 
-    fn make_config(enabled: Option<bool>, set_crt: bool, set_key: bool) -> TlsConfig {
-        TlsConfig {
+    fn make_config(enabled: Option<bool>, set_crt: bool, set_key: bool) -> TlsEnableableConfig {
+        TlsEnableableConfig {
             enabled,
-            options: TlsOptions {
+            options: TlsConfig {
                 crt_file: set_crt.then(|| TEST_PEM_CRT_PATH.into()),
                 key_file: set_key.then(|| TEST_PEM_KEY_PATH.into()),
                 ..Default::default()

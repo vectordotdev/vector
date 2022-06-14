@@ -1,6 +1,7 @@
+use ::value::Value;
 use vrl::prelude::*;
 
-fn downcase(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn downcase(value: Value) -> Resolved {
     Ok(value.try_bytes_utf8_lossy()?.to_lowercase().into())
 }
 
@@ -22,8 +23,8 @@ impl Function for Downcase {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -38,11 +39,6 @@ impl Function for Downcase {
             result: Ok("foo 2 bar"),
         }]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        downcase(value)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -56,7 +52,7 @@ impl Expression for DowncaseFn {
         downcase(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().infallible()
     }
 }

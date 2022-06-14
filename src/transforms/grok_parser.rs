@@ -2,6 +2,7 @@ use std::{collections::HashMap, str};
 
 use bytes::Bytes;
 use grok::Pattern;
+use lookup::lookup_v2::{parse_path, OwnedPath};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use vector_common::TimeZone;
@@ -11,8 +12,9 @@ use crate::{
         log_schema, DataType, Input, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
-    event::{Event, PathComponent, PathIter, Value},
+    event::{Event, Value},
     internal_events::{ParserConversionError, ParserMatchError, ParserMissingFieldError},
+    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_conversion_map, Conversion},
 };
@@ -50,7 +52,7 @@ impl TransformConfig for GrokParserConfig {
             .clone()
             .unwrap_or_else(|| log_schema().message_key().into());
 
-        let mut grok = grok::Grok::with_patterns();
+        let mut grok = grok::Grok::with_default_patterns();
 
         let timezone = self.timezone.unwrap_or(context.globals.timezone);
         let types = parse_conversion_map(&self.types, timezone)?;
@@ -73,7 +75,7 @@ impl TransformConfig for GrokParserConfig {
         Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -95,13 +97,13 @@ pub struct GrokParser {
     field: String,
     drop_field: bool,
     types: HashMap<String, Conversion>,
-    paths: HashMap<String, Vec<PathComponent<'static>>>,
+    paths: HashMap<String, OwnedPath>,
 }
 
 impl Clone for GrokParser {
     fn clone(&self) -> Self {
         Self {
-            pattern_built: grok::Grok::with_patterns().compile(&self.pattern, true)
+            pattern_built: grok::Grok::with_default_patterns().compile(&self.pattern, true)
                 .expect("Panicked while cloning an already valid Grok parser. For some reason, the pattern could not be built again."),
             pattern: self.pattern.clone(),
             field: self.field.clone(),
@@ -115,7 +117,7 @@ impl Clone for GrokParser {
 impl FunctionTransform for GrokParser {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         let mut event = event.into_log();
-        let value = event.get(&self.field).map(|s| s.to_string_lossy());
+        let value = event.get(self.field.as_str()).map(|s| s.to_string_lossy());
 
         if let Some(value) = value {
             if let Some(matches) = self.pattern_built.match_against(&value) {
@@ -125,29 +127,27 @@ impl FunctionTransform for GrokParser {
                     match conv.convert::<Value>(Bytes::copy_from_slice(value.as_bytes())) {
                         Ok(value) => {
                             if let Some(path) = self.paths.get(name) {
-                                event.insert_path(path.to_vec(), value);
+                                event.insert(path, value);
                             } else {
-                                let path = PathIter::new(name)
-                                    .map(|component| component.into_static())
-                                    .collect::<Vec<_>>();
+                                let path = parse_path(name);
                                 self.paths.insert(name.to_string(), path.clone());
-                                event.insert_path(path, value);
+                                event.insert(&path, value);
                             }
                         }
-                        Err(error) => emit!(&ParserConversionError { name, error }),
+                        Err(error) => emit!(ParserConversionError { name, error }),
                     }
                 }
 
                 if drop_field {
-                    event.remove(&self.field);
+                    event.remove(self.field.as_str());
                 }
             } else {
-                emit!(&ParserMatchError {
+                emit!(ParserMatchError {
                     value: value.as_ref()
                 });
             }
         } else {
-            emit!(&ParserMissingFieldError {
+            emit!(ParserMissingFieldError {
                 field: self.field.as_ref()
             });
         }
@@ -196,7 +196,7 @@ mod tests {
 
         let mut buf = OutputBuffer::with_capacity(1);
         parser.transform(&mut buf, event);
-        let result = buf.pop().unwrap().into_log();
+        let result = buf.first().unwrap().into_log();
         assert_eq!(result.metadata(), &metadata);
         result
     }
@@ -219,12 +219,14 @@ mod tests {
             "verb": "GET",
             "request": "/administrator/",
             "httpversion": "1.1",
-            "rawrequest": "",
             "response": "200",
             "bytes": "4263",
         });
 
-        assert_eq!(expected, serde_json::to_value(&event.all_fields()).unwrap());
+        assert_eq!(
+            expected,
+            serde_json::to_value(&event.all_fields().unwrap()).unwrap()
+        );
     }
 
     #[tokio::test]
@@ -238,7 +240,7 @@ mod tests {
         )
         .await;
 
-        assert_eq!(2, event.keys().count());
+        assert_eq!(2, event.keys().unwrap().count());
         assert_eq!(
             event::Value::from("Help I'm stuck in an HTTP server"),
             event[log_schema().message_key()]
@@ -266,13 +268,15 @@ mod tests {
             "verb": "GET",
             "request": "/administrator/",
             "httpversion": "1.1",
-            "rawrequest": "",
             "response": "200",
             "bytes": "4263",
             "message": r#"109.184.11.34 - - [12/Dec/2015:18:32:56 +0100] "GET /administrator/ HTTP/1.1" 200 4263"#,
         });
 
-        assert_eq!(expected, serde_json::to_value(&event.all_fields()).unwrap());
+        assert_eq!(
+            expected,
+            serde_json::to_value(&event.all_fields().unwrap()).unwrap()
+        );
     }
 
     #[tokio::test]
@@ -286,7 +290,7 @@ mod tests {
         )
         .await;
 
-        assert_eq!(2, event.keys().count());
+        assert_eq!(2, event.keys().unwrap().count());
         assert_eq!(
             event::Value::from("i am the only field"),
             event[log_schema().message_key()]
@@ -314,12 +318,14 @@ mod tests {
             "verb": "GET",
             "request": "/administrator/",
             "httpversion": "1.1",
-            "rawrequest": "",
             "response": 200,
             "bytes": 4263,
         });
 
-        assert_eq!(expected, serde_json::to_value(&event.all_fields()).unwrap());
+        assert_eq!(
+            expected,
+            serde_json::to_value(&event.all_fields().unwrap()).unwrap()
+        );
     }
 
     #[tokio::test]
@@ -338,6 +344,9 @@ mod tests {
             "message": "42",
         });
 
-        assert_eq!(expected, serde_json::to_value(&event.all_fields()).unwrap());
+        assert_eq!(
+            expected,
+            serde_json::to_value(&event.all_fields().unwrap()).unwrap()
+        );
     }
 }

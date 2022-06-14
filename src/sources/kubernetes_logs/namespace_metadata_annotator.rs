@@ -2,18 +2,19 @@
 
 #![deny(missing_docs)]
 
-use evmap::ReadHandle;
 use k8s_openapi::{api::core::v1::Namespace, apimachinery::pkg::apis::meta::v1::ObjectMeta};
-use serde::{Deserialize, Serialize};
+use kube::runtime::reflector::{store::Store, ObjectRef};
+use lookup::lookup_v2::{parse_path, OwnedSegment};
+use vector_config::configurable_component;
 
-use crate::{
-    event::{Event, LogEvent, PathComponent, PathIter},
-    kubernetes as k8s,
-};
+use crate::event::{Event, LogEvent};
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for how the events are annotated with Namespace metadata.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct FieldsSpec {
+    /// Event field for Namespace labels.
     pub namespace_labels: String,
 }
 
@@ -27,16 +28,13 @@ impl Default for FieldsSpec {
 
 /// Annotate the event with namespace metadata.
 pub struct NamespaceMetadataAnnotator {
-    namespace_state_reader: ReadHandle<String, k8s::state::evmap::Value<Namespace>>,
+    namespace_state_reader: Store<Namespace>,
     fields_spec: FieldsSpec,
 }
 
 impl NamespaceMetadataAnnotator {
     /// Create a new [`NamespaceMetadataAnnotator`].
-    pub fn new(
-        namespace_state_reader: ReadHandle<String, k8s::state::evmap::Value<Namespace>>,
-        fields_spec: FieldsSpec,
-    ) -> Self {
+    pub const fn new(namespace_state_reader: Store<Namespace>, fields_spec: FieldsSpec) -> Self {
         Self {
             namespace_state_reader,
             fields_spec,
@@ -49,9 +47,9 @@ impl NamespaceMetadataAnnotator {
     /// The event has to have a [`POD_NAMESPACE`] field set.
     pub fn annotate(&self, event: &mut Event, pod_namespace: &str) -> Option<()> {
         let log = event.as_mut_log();
-        let guard = self.namespace_state_reader.get(pod_namespace)?;
-        let entry = guard.get_one()?;
-        let namespace: &Namespace = entry.as_ref();
+        let obj = ObjectRef::<Namespace>::new(pod_namespace);
+        let resource = self.namespace_state_reader.get(&obj)?;
+        let namespace: &Namespace = resource.as_ref();
 
         annotate_from_metadata(log, &self.fields_spec, &namespace.metadata);
         Some(())
@@ -60,12 +58,12 @@ impl NamespaceMetadataAnnotator {
 
 fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata: &ObjectMeta) {
     // Calculate and cache the prefix path.
-    let prefix_path = PathIter::new(fields_spec.namespace_labels.as_ref()).collect::<Vec<_>>();
+    let prefix_path = parse_path(&fields_spec.namespace_labels);
     if let Some(labels) = &metadata.labels {
         for (key, val) in labels.iter() {
-            let mut path = prefix_path.clone();
-            path.push(PathComponent::Key(key.clone().into()));
-            log.insert_path(path, val.to_owned());
+            let mut path = prefix_path.clone().segments;
+            path.push(OwnedSegment::Field(key.clone()));
+            log.insert(&path, val.to_owned());
         }
     }
 }
@@ -101,8 +99,8 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("kubernetes.namespace_labels.sandbox0-label0", "val0");
-                    log.insert("kubernetes.namespace_labels.sandbox0-label1", "val1");
+                    log.insert("kubernetes.namespace_labels.\"sandbox0-label0\"", "val0");
+                    log.insert("kubernetes.namespace_labels.\"sandbox0-label1\"", "val1");
                     log
                 },
             ),
@@ -125,8 +123,8 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("ns_labels.sandbox0-label0", "val0");
-                    log.insert("ns_labels.sandbox0-label1", "val1");
+                    log.insert("ns_labels.\"sandbox0-label0\"", "val0");
+                    log.insert("ns_labels.\"sandbox0-label1\"", "val1");
                     log
                 },
             ),
@@ -151,11 +149,11 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert(r#"kubernetes.namespace_labels.nested0\.label0"#, "val0");
-                    log.insert(r#"kubernetes.namespace_labels.nested0\.label1"#, "val1");
-                    log.insert(r#"kubernetes.namespace_labels.nested1\.label0"#, "val2");
+                    log.insert(r#"kubernetes.namespace_labels."nested0.label0""#, "val0");
+                    log.insert(r#"kubernetes.namespace_labels."nested0.label1""#, "val1");
+                    log.insert(r#"kubernetes.namespace_labels."nested1.label0""#, "val2");
                     log.insert(
-                        r#"kubernetes.namespace_labels.nested2\.label0\.deep0"#,
+                        r#"kubernetes.namespace_labels."nested2.label0.deep0""#,
                         "val3",
                     );
                     log

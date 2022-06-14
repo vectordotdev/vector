@@ -1,36 +1,50 @@
 use bytes::Bytes;
-use getset::Setters;
+use codecs::{
+    decoding::{self, Deserializer, Framer},
+    LengthDelimitedDecoder,
+};
 use prost::Message;
-use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
+use vector_config::configurable_component;
+use vector_core::ByteSizeOf;
 
 use crate::{
-    codecs::{
-        self,
-        decoding::{self, Deserializer, Framer},
-        LengthDelimitedDecoder,
-    },
+    codecs::Decoder,
     config::{DataType, GenerateConfig, Output, Resource, SourceContext},
     event::{proto, Event},
-    internal_events::{VectorEventReceived, VectorProtoDecodeError},
+    internal_events::{BytesReceived, OldEventsReceived, VectorProtoDecodeError},
     sources::{
         util::{SocketListenAddr, TcpNullAcker, TcpSource},
         Source,
     },
     tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone, Setters)]
+/// Configuration for version one of the `vector` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct VectorConfig {
+pub(crate) struct VectorConfig {
+    /// The address to listen for connections on.
+    ///
+    /// It _must_ include a port.
     address: SocketListenAddr,
+
+    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
+
+    /// The timeout, in seconds, before a connection is forcefully closed during shutdown.
     #[serde(default = "default_shutdown_timeout_secs")]
     shutdown_timeout_secs: u64,
-    #[set = "pub"]
-    tls: Option<TlsConfig>,
+
+    /// The size, in bytes, of the receive buffer used for each connection.
+    ///
+    /// This should not typically needed to be changed.
     receive_buffer_bytes: Option<usize>,
+
+    #[configurable(derived)]
+    tls: Option<TlsEnableableConfig>,
 }
 
 const fn default_shutdown_timeout_secs() -> u64 {
@@ -38,6 +52,13 @@ const fn default_shutdown_timeout_secs() -> u64 {
 }
 
 impl VectorConfig {
+    #[cfg(test)]
+    #[allow(unused)] // this test function is not always used in test, breaking
+                     // our check-component-features run
+    pub fn set_tls(&mut self, config: Option<TlsEnableableConfig>) {
+        self.tls = config;
+    }
+
     pub const fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,
@@ -75,7 +96,7 @@ impl VectorConfig {
     }
 
     pub(super) fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Any)]
+        vec![Output::default(DataType::all())]
     }
 
     pub(super) const fn source_type(&self) -> &'static str {
@@ -93,13 +114,21 @@ struct VectorDeserializer;
 impl decoding::format::Deserializer for VectorDeserializer {
     fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
         let byte_size = bytes.len();
+        emit!(BytesReceived {
+            byte_size,
+            protocol: "tcp",
+        });
+
         match proto::EventWrapper::decode(bytes).map(Event::from) {
             Ok(event) => {
-                emit!(&VectorEventReceived { byte_size });
+                emit!(OldEventsReceived {
+                    count: 1,
+                    byte_size: event.size_of()
+                });
                 Ok(smallvec![event])
             }
             Err(error) => {
-                emit!(&VectorProtoDecodeError { error: &error });
+                emit!(VectorProtoDecodeError { error: &error });
                 Err(Box::new(error))
             }
         }
@@ -110,13 +139,13 @@ impl decoding::format::Deserializer for VectorDeserializer {
 struct VectorSource;
 
 impl TcpSource for VectorSource {
-    type Error = codecs::decoding::Error;
+    type Error = decoding::Error;
     type Item = SmallVec<[Event; 1]>;
-    type Decoder = codecs::Decoder;
+    type Decoder = Decoder;
     type Acker = TcpNullAcker;
 
     fn decoder(&self) -> Self::Decoder {
-        codecs::Decoder::new(
+        Decoder::new(
             Framer::LengthDelimited(LengthDelimitedDecoder::new()),
             Deserializer::Boxed(Box::new(VectorDeserializer)),
         )
@@ -130,7 +159,7 @@ impl TcpSource for VectorSource {
 #[cfg(feature = "sinks-vector")]
 #[cfg(test)]
 mod test {
-    use std::net::SocketAddr;
+    use std::{collections::HashMap, net::SocketAddr};
 
     use tokio::{
         io::AsyncWriteExt,
@@ -156,8 +185,12 @@ mod test {
         },
         shutdown::ShutdownSignal,
         sinks::vector::v1::VectorConfig as SinkConfig,
-        test_util::{collect_ready, next_addr, trace_init, wait_for_tcp},
-        tls::{TlsConfig, TlsOptions},
+        test_util::{
+            collect_ready,
+            components::{assert_source_compliance, SOCKET_PUSH_SOURCE_TAGS},
+            next_addr, trace_init, wait_for_tcp,
+        },
+        tls::{TlsConfig, TlsEnableableConfig},
         SourceSender,
     };
 
@@ -169,7 +202,10 @@ mod test {
     async fn stream_test(addr: SocketAddr, source: VectorConfig, sink: SinkConfig) {
         let (tx, rx) = SourceSender::new_test();
 
-        let server = source.build(SourceContext::new_test(tx)).await.unwrap();
+        let server = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
         tokio::spawn(server);
         wait_for_tcp(addr).await;
 
@@ -202,37 +238,43 @@ mod test {
 
     #[tokio::test]
     async fn it_works_with_vector_sink() {
-        let addr = next_addr();
-        stream_test(
-            addr,
-            VectorConfig::from_address(addr.into()),
-            SinkConfig::from_address(format!("localhost:{}", addr.port())),
-        )
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let addr = next_addr();
+            stream_test(
+                addr,
+                VectorConfig::from_address(addr.into()),
+                SinkConfig::from_address(format!("localhost:{}", addr.port())),
+            )
+            .await;
+        })
         .await;
     }
 
     #[tokio::test]
     async fn it_works_with_vector_sink_tls() {
-        let addr = next_addr();
-        stream_test(
-            addr,
-            {
-                let mut config = VectorConfig::from_address(addr.into());
-                config.set_tls(Some(TlsConfig::test_config()));
-                config
-            },
-            {
-                let mut config = SinkConfig::from_address(format!("localhost:{}", addr.port()));
-                config.set_tls(Some(TlsConfig {
-                    enabled: Some(true),
-                    options: TlsOptions {
-                        verify_certificate: Some(false),
-                        ..Default::default()
-                    },
-                }));
-                config
-            },
-        )
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let addr = next_addr();
+            stream_test(
+                addr,
+                {
+                    let mut config = VectorConfig::from_address(addr.into());
+                    config.set_tls(Some(TlsEnableableConfig::test_config()));
+                    config
+                },
+                {
+                    let mut config = SinkConfig::from_address(format!("localhost:{}", addr.port()));
+                    config.set_tls(Some(TlsEnableableConfig {
+                        enabled: Some(true),
+                        options: TlsConfig {
+                            verify_certificate: Some(false),
+                            ..Default::default()
+                        },
+                    }));
+                    config
+                },
+            )
+            .await;
+        })
         .await;
     }
 
@@ -253,6 +295,8 @@ mod test {
                 shutdown,
                 out: tx,
                 proxy: Default::default(),
+                acknowledgements: false,
+                schema_definitions: HashMap::default(),
             })
             .await
             .unwrap();
@@ -261,7 +305,7 @@ mod test {
         wait_for_tcp(addr).await;
 
         let mut stream = TcpStream::connect(&addr).await.unwrap();
-        stream.write(b"hello world \n").await.unwrap();
+        stream.write_all(b"hello world \n").await.unwrap();
 
         tokio::time::sleep(Duration::from_secs(2)).await;
         stream.shutdown().await.unwrap();
@@ -290,6 +334,8 @@ mod test {
                 shutdown,
                 out: tx,
                 proxy: Default::default(),
+                acknowledgements: false,
+                schema_definitions: HashMap::default(),
             })
             .await
             .unwrap();

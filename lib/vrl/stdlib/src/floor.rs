@@ -1,6 +1,27 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 use crate::util::round_to_precision;
+
+fn floor(precision: Option<Value>, value: Value) -> Resolved {
+    let precision = match precision {
+        Some(value) => value.try_integer()?,
+        None => 0,
+    };
+    match value {
+        Value::Float(f) => Ok(Value::from_f64_or_zero(round_to_precision(
+            *f,
+            precision,
+            f64::floor,
+        ))),
+        value @ Value::Integer(_) => Ok(value),
+        value => Err(value::Error::Expected {
+            got: value.kind(),
+            expected: Kind::float() | Kind::integer(),
+        }
+        .into()),
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Floor;
@@ -27,8 +48,8 @@ impl Function for Floor {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -54,23 +75,17 @@ struct FloorFn {
 
 impl Expression for FloorFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let precision = match &self.precision {
-            Some(expr) => expr.resolve(ctx)?.try_integer()?,
-            None => 0,
-        };
+        let precision = self
+            .precision
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
+        let value = self.value.resolve(ctx)?;
 
-        match self.value.resolve(ctx)? {
-            Value::Float(f) => Ok(round_to_precision(*f, precision, f64::floor).into()),
-            value @ Value::Integer(_) => Ok(value),
-            value => Err(value::Error::Expected {
-                got: value.kind(),
-                expected: Kind::float() | Kind::integer(),
-            }
-            .into()),
-        }
+        floor(precision, value)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         match Kind::from(self.value.type_def(state)) {
             v if v.is_float() || v.is_integer() => v.into(),
             _ => Kind::integer().or_float().into(),

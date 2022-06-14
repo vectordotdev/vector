@@ -13,14 +13,14 @@ components: sinks: azure_blob: {
 	}
 
 	features: {
-		buffer: enabled:      true
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {
 				enabled:      true
 				common:       true
 				max_bytes:    10_000_000
-				timeout_secs: 300
+				timeout_secs: 300.0
 			}
 			compression: {
 				enabled: true
@@ -68,10 +68,21 @@ components: sinks: azure_blob: {
 
 	configuration: {
 		connection_string: {
-			description: "The Azure Blob Storage Account connection string. Only authentication with access key supported."
-			required:    true
+			description: "The Azure Blob Storage Account connection string. Only authentication with access key supported. This or storage_account has to be provided."
+			required:    false
+			common:      true
 			type: string: {
+				default: ""
 				examples: ["DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net"]
+			}
+		}
+		storage_account: {
+			description: "The Azure Blob Storage Account name. Credentials are read in this order: [EnvironmentCredential](https://docs.rs/azure_identity/latest/azure_identity/struct.DefaultAzureCredential.html), ManagedIdentityCredential, AzureCliCredential. This or connection_string has to be provided."
+			required:    false
+			common:      true
+			type: string: {
+				default: ""
+				examples: ["mylogstorage"]
 			}
 		}
 		container_name: {
@@ -114,6 +125,7 @@ components: sinks: azure_blob: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	how_it_works: {

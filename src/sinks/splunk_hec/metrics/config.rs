@@ -7,7 +7,7 @@ use vector_core::sink::VectorSink;
 
 use super::{request_builder::HecMetricsRequestBuilder, sink::HecMetricsSink};
 use crate::{
-    config::{GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
         splunk_hec::common::{
@@ -22,7 +22,7 @@ use crate::{
         Healthcheck,
     },
     template::Template,
-    tls::TlsOptions,
+    tls::TlsConfig,
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -44,7 +44,7 @@ pub struct HecMetricsSinkConfig {
     pub batch: BatchConfig<SplunkHecDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
     #[serde(default)]
     pub acknowledgements: HecClientAcknowledgementsConfig,
 }
@@ -90,6 +90,10 @@ impl SinkConfig for HecMetricsSinkConfig {
 
     fn sink_type(&self) -> &'static str {
         "splunk_hec_metrics"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements.inner)
     }
 }
 

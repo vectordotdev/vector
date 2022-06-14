@@ -38,17 +38,13 @@ impl Function for IsString {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
         Ok(Box::new(IsStringFn { value }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        Ok(value!(args.required("value").is_bytes()))
     }
 }
 
@@ -62,7 +58,7 @@ impl Expression for IsStringFn {
         self.value.resolve(ctx).map(|v| value!(v.is_bytes()))
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().infallible()
     }
 }

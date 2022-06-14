@@ -1,13 +1,15 @@
 use std::{collections::HashMap, str};
 
 use bytes::Bytes;
+use lookup::lookup_v2::{parse_path, OwnedPath};
 use serde::{Deserialize, Serialize};
 use vector_common::{tokenize::parse, TimeZone};
 
 use crate::{
     config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
-    event::{Event, PathComponent, PathIter, Value},
+    event::{Event, Value},
     internal_events::{ParserConversionError, ParserMissingFieldError},
+    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_check_conversion_map, Conversion},
 };
@@ -55,7 +57,7 @@ impl TransformConfig for TokenizerConfig {
         Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -70,7 +72,7 @@ impl TransformConfig for TokenizerConfig {
 
 #[derive(Clone, Debug)]
 pub struct Tokenizer {
-    field_names: Vec<(String, Vec<PathComponent<'static>>, Conversion)>,
+    field_names: Vec<(String, OwnedPath, Conversion)>,
     field: String,
     drop_field: bool,
 }
@@ -86,9 +88,7 @@ impl Tokenizer {
             .into_iter()
             .map(|name| {
                 let conversion = types.get(&name).unwrap_or(&Conversion::Bytes).clone();
-                let path: Vec<PathComponent<'static>> = PathIter::new(name.as_str())
-                    .map(|component| component.into_static())
-                    .collect();
+                let path = parse_path(&name);
                 (name, path, conversion)
             })
             .collect();
@@ -103,7 +103,10 @@ impl Tokenizer {
 
 impl FunctionTransform for Tokenizer {
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
-        let value = event.as_log().get(&self.field).map(|s| s.to_string_lossy());
+        let value = event
+            .as_log()
+            .get(self.field.as_str())
+            .map(|s| s.to_string_lossy());
 
         if let Some(value) = &value {
             for ((name, path, conversion), value) in
@@ -111,18 +114,18 @@ impl FunctionTransform for Tokenizer {
             {
                 match conversion.convert::<Value>(Bytes::copy_from_slice(value.as_bytes())) {
                     Ok(value) => {
-                        event.as_mut_log().insert_path(path.clone(), value);
+                        event.as_mut_log().insert(path, value);
                     }
                     Err(error) => {
-                        emit!(&ParserConversionError { name, error });
+                        emit!(ParserConversionError { name, error });
                     }
                 }
             }
             if self.drop_field {
-                event.as_mut_log().remove(&self.field);
+                event.as_mut_log().remove(self.field.as_str());
             }
         } else {
-            emit!(&ParserMissingFieldError { field: &self.field });
+            emit!(ParserMissingFieldError { field: &self.field });
         };
 
         output.push(event)
@@ -131,13 +134,14 @@ impl FunctionTransform for Tokenizer {
 
 #[cfg(test)]
 mod tests {
+    use ordered_float::NotNan;
+
     use super::TokenizerConfig;
     use crate::{
         config::{TransformConfig, TransformContext},
         event::{Event, LogEvent, Value},
         transforms::OutputBuffer,
     };
-    use ordered_float::NotNan;
 
     #[test]
     fn generate_config() {
@@ -169,7 +173,7 @@ mod tests {
         let metadata = event.metadata().clone();
         let mut buf = OutputBuffer::with_capacity(1);
         parser.transform(&mut buf, event);
-        let result = buf.pop().unwrap().into_log();
+        let result = buf.into_events().next().unwrap().into_log();
         assert_eq!(result.metadata(), &metadata);
         result
     }

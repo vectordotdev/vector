@@ -1,6 +1,7 @@
+use ::value::Value;
 use vrl::prelude::*;
 
-fn push(list: Value, item: Value) -> std::result::Result<Value, ExpressionError> {
+fn push(list: Value, item: Value) -> Resolved {
     let mut list = list.try_array()?;
     list.push(item);
     Ok(list.into())
@@ -46,21 +47,14 @@ impl Function for Push {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
         let item = arguments.required("item");
 
         Ok(Box::new(PushFn { value, item }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let list = args.required("value");
-        let item = args.required("item");
-
-        push(list, item)
     }
 }
 
@@ -78,20 +72,24 @@ impl Expression for PushFn {
         push(list, item)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         let item = TypeDef::array(BTreeMap::from([(
             0.into(),
             self.item.type_def(state).into(),
         )]));
-
-        self.value.type_def(state).merge_append(item).infallible()
+        self.value
+            .type_def(state)
+            .restrict_array()
+            .merge_append(item)
+            .infallible()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use vector_common::btreemap;
+
+    use super::*;
 
     test_function![
         push => Push;

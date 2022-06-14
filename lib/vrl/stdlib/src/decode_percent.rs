@@ -1,5 +1,14 @@
+use ::value::Value;
 use percent_encoding::percent_decode;
 use vrl::prelude::*;
+
+fn decode_percent(value: Value) -> Resolved {
+    let value = value.try_bytes()?;
+    Ok(percent_decode(&value)
+        .decode_utf8_lossy()
+        .to_string()
+        .into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct DecodePercent;
@@ -19,8 +28,8 @@ impl Function for DecodePercent {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -44,15 +53,12 @@ struct DecodePercentFn {
 
 impl Expression for DecodePercentFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?.try_bytes()?;
+        let value = self.value.resolve(ctx)?;
 
-        Ok(percent_decode(&value)
-            .decode_utf8_lossy()
-            .to_string()
-            .into())
+        decode_percent(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().infallible()
     }
 }

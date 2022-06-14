@@ -1,4 +1,5 @@
 use chrono::Utc;
+use lookup::path;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use vector_common::TimeZone;
@@ -10,6 +11,7 @@ use crate::{
     },
     event::{self, Event, LogEvent, Metric},
     internal_events::MetricToLogSerializeError,
+    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
     types::Conversion,
 };
@@ -49,7 +51,7 @@ impl TransformConfig for MetricToLogConfig {
         Input::metric()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -83,7 +85,7 @@ impl MetricToLog {
 
     pub fn transform_one(&self, metric: Metric) -> Option<LogEvent> {
         serde_json::to_value(&metric)
-            .map_err(|error| emit!(&MetricToLogSerializeError { error }))
+            .map_err(|error| emit!(MetricToLogSerializeError { error }))
             .ok()
             .and_then(|value| match value {
                 Value::Object(object) => {
@@ -91,21 +93,21 @@ impl MetricToLog {
                     let mut log = LogEvent::new_with_metadata(metric.metadata().clone());
 
                     for (key, value) in object {
-                        log.insert_flat(key, value);
+                        log.insert(path!(&key), value);
                     }
 
                     let timestamp = log
-                        .remove(&self.timestamp_key)
+                        .remove(self.timestamp_key.as_str())
                         .and_then(|value| {
                             Conversion::Timestamp(self.timezone)
-                                .convert(value.as_bytes())
+                                .convert(value.coerce_to_bytes())
                                 .ok()
                         })
                         .unwrap_or_else(|| event::Value::Timestamp(Utc::now()));
-                    log.insert(&log_schema().timestamp_key(), timestamp);
+                    log.insert(log_schema().timestamp_key(), timestamp);
 
-                    if let Some(host) = log.remove_prune(&self.host_tag, true) {
-                        log.insert(&log_schema().host_key(), host);
+                    if let Some(host) = log.remove_prune(self.host_tag.as_str(), true) {
+                        log.insert(log_schema().host_key(), host);
                     }
 
                     Some(log)
@@ -177,7 +179,7 @@ mod tests {
         let metadata = counter.metadata().clone();
 
         let log = do_transform(counter).unwrap();
-        let collected: Vec<_> = log.all_fields().collect();
+        let collected: Vec<_> = log.all_fields().unwrap().collect();
 
         assert_eq!(
             collected,
@@ -204,7 +206,7 @@ mod tests {
         let metadata = gauge.metadata().clone();
 
         let log = do_transform(gauge).unwrap();
-        let collected: Vec<_> = log.all_fields().collect();
+        let collected: Vec<_> = log.all_fields().unwrap().collect();
 
         assert_eq!(
             collected,
@@ -231,7 +233,7 @@ mod tests {
         let metadata = set.metadata().clone();
 
         let log = do_transform(set).unwrap();
-        let collected: Vec<_> = log.all_fields().collect();
+        let collected: Vec<_> = log.all_fields().unwrap().collect();
 
         assert_eq!(
             collected,
@@ -260,7 +262,7 @@ mod tests {
         let metadata = distro.metadata().clone();
 
         let log = do_transform(distro).unwrap();
-        let collected: Vec<_> = log.all_fields().collect();
+        let collected: Vec<_> = log.all_fields().unwrap().collect();
 
         assert_eq!(
             collected,
@@ -308,7 +310,7 @@ mod tests {
         let metadata = histo.metadata().clone();
 
         let log = do_transform(histo).unwrap();
-        let collected: Vec<_> = log.all_fields().collect();
+        let collected: Vec<_> = log.all_fields().unwrap().collect();
 
         assert_eq!(
             collected,
@@ -354,7 +356,7 @@ mod tests {
         let metadata = summary.metadata().clone();
 
         let log = do_transform(summary).unwrap();
-        let collected: Vec<_> = log.all_fields().collect();
+        let collected: Vec<_> = log.all_fields().unwrap().collect();
 
         assert_eq!(
             collected,

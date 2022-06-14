@@ -7,40 +7,58 @@ use std::{
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use codecs::{
+    decoding::{DeserializerConfig, FramingConfig},
+    StreamDecodingError,
+};
 use smallvec::SmallVec;
-use tokio_util::codec::Decoder;
+use tokio_util::codec::Decoder as _;
+use vector_config::configurable_component;
 use warp::http::{HeaderMap, StatusCode};
 
 use crate::{
-    codecs::{
-        self,
-        decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
-    },
+    codecs::{Decoder, DecodingConfig},
     config::{
-        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
-        SourceConfig, SourceContext, SourceDescription,
+        log_schema, AcknowledgementsConfig, GenerateConfig, Output, Resource, SourceConfig,
+        SourceContext, SourceDescription,
     },
     event::Event,
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
-    sources::util::{
-        add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig, StreamDecodingError,
-    },
-    tls::TlsConfig,
+    sources::http::HttpMethod,
+    sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
+    tls::TlsEnableableConfig,
 };
+use lookup::path;
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for `heroku_logs` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
 pub struct LogplexConfig {
+    /// The address to listen for connections on.
     address: SocketAddr,
+
+    /// A list of URL query parameters to include in the log event.
+    ///
+    /// These will override any values included in the body with conflicting names.
     #[serde(default)]
     query_parameters: Vec<String>,
-    tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
+    tls: Option<TlsEnableableConfig>,
+
+    #[configurable(derived)]
     auth: Option<HttpSourceAuthConfig>,
+
+    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     framing: FramingConfig,
+
+    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
+
+    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
 }
@@ -71,7 +89,7 @@ impl GenerateConfig for LogplexConfig {
 #[derive(Clone, Default)]
 struct LogplexSource {
     query_parameters: Vec<String>,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
 }
 
 impl HttpSource for LogplexSource {
@@ -100,6 +118,7 @@ impl SourceConfig for LogplexConfig {
         source.run(
             self.address,
             "events",
+            HttpMethod::Post,
             true,
             &self.tls,
             &self.auth,
@@ -109,7 +128,7 @@ impl SourceConfig for LogplexConfig {
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+        vec![Output::default(self.decoding.output_type())]
     }
 
     fn source_type(&self) -> &'static str {
@@ -119,11 +138,18 @@ impl SourceConfig for LogplexConfig {
     fn resources(&self) -> Vec<Resource> {
         vec![Resource::tcp(self.address)]
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 // Add a compatibility alias to avoid breaking existing configs
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct LogplexCompatConfig(LogplexConfig);
+
+/// Configuration for the `logplex` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
+pub struct LogplexCompatConfig(#[configurable(transparent)] LogplexConfig);
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "logplex")]
@@ -143,10 +169,14 @@ impl SourceConfig for LogplexCompatConfig {
     fn resources(&self) -> Vec<Resource> {
         self.0.resources()
     }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
 }
 
 fn decode_message(
-    decoder: codecs::Decoder,
+    decoder: Decoder,
     body: Bytes,
     header_map: HeaderMap,
 ) -> Result<Vec<Event>, ErrorMessage> {
@@ -158,7 +188,7 @@ fn decode_message(
     let frame_id = get_header(&header_map, "Logplex-Frame-Id")?;
     let drain_token = get_header(&header_map, "Logplex-Drain-Token")?;
 
-    emit!(&HerokuLogplexRequestReceived {
+    emit!(HerokuLogplexRequestReceived {
         msg_count,
         frame_id,
         drain_token
@@ -200,11 +230,11 @@ fn header_error_message(name: &str, msg: &str) -> ErrorMessage {
     )
 }
 
-fn body_to_events(decoder: codecs::Decoder, body: Bytes) -> Vec<Event> {
+fn body_to_events(decoder: Decoder, body: Bytes) -> Vec<Event> {
     let rdr = BufReader::new(body.reader());
     rdr.lines()
         .filter_map(|res| {
-            res.map_err(|error| emit!(&HerokuLogplexRequestReadError { error }))
+            res.map_err(|error| emit!(HerokuLogplexRequestReadError { error }))
                 .ok()
         })
         .filter(|s| !s.is_empty())
@@ -212,7 +242,7 @@ fn body_to_events(decoder: codecs::Decoder, body: Bytes) -> Vec<Event> {
         .collect()
 }
 
-fn line_to_events(mut decoder: codecs::Decoder, line: String) -> SmallVec<[Event; 1]> {
+fn line_to_events(mut decoder: Decoder, line: String) -> SmallVec<[Event; 1]> {
     let parts = line.splitn(8, ' ').collect::<Vec<&str>>();
 
     let mut events = SmallVec::<[Event; 1]>::new();
@@ -238,8 +268,8 @@ fn line_to_events(mut decoder: codecs::Decoder, line: String) -> SmallVec<[Event
 
                             log.try_insert(log_schema().host_key(), hostname.to_owned());
 
-                            log.try_insert_flat("app_name", app_name.to_owned());
-                            log.try_insert_flat("proc_id", proc_id.to_owned());
+                            log.try_insert(path!("app_name"), app_name.to_owned());
+                            log.try_insert(path!("proc_id"), proc_id.to_owned());
                         }
 
                         events.push(event);
@@ -288,7 +318,10 @@ mod tests {
     use crate::{
         config::{log_schema, SourceConfig, SourceContext},
         serde::{default_decoding, default_framing_message_based},
-        test_util::{components, next_addr, random_string, spawn_collect_n, wait_for_tcp},
+        test_util::{
+            components::{assert_source_compliance, HTTP_PUSH_SOURCE_TAGS},
+            next_addr, random_string, spawn_collect_n, wait_for_tcp,
+        },
         SourceSender,
     };
 
@@ -303,10 +336,9 @@ mod tests {
         status: EventStatus,
         acknowledgements: bool,
     ) -> (impl Stream<Item = Event>, SocketAddr) {
-        components::init_test();
         let (sender, recv) = SourceSender::new_test_finalize(status);
         let address = next_addr();
-        let context = SourceContext::new_test(sender);
+        let context = SourceContext::new_test(sender, None);
         tokio::spawn(async move {
             LogplexConfig {
                 address,
@@ -360,69 +392,72 @@ mod tests {
 
     #[tokio::test]
     async fn logplex_handles_router_log() {
-        let auth = make_auth();
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let auth = make_auth();
 
-        let (rx, addr) = source(
-            Some(auth.clone()),
-            vec!["appname".to_string(), "absent".to_string()],
-            EventStatus::Delivered,
-            true,
-        )
-        .await;
+            let (rx, addr) = source(
+                Some(auth.clone()),
+                vec!["appname".to_string(), "absent".to_string()],
+                EventStatus::Delivered,
+                true,
+            )
+            .await;
 
-        let mut events = spawn_collect_n(
-            async move {
-                assert_eq!(
-                    200,
-                    send(addr, SAMPLE_BODY, Some(auth), "appname=lumberjack-store").await
-                )
-            },
-            rx,
-            SAMPLE_BODY.lines().count(),
-        )
-        .await;
-        components::SOURCE_TESTS.assert(&["http_path"]);
+            let mut events = spawn_collect_n(
+                async move {
+                    assert_eq!(
+                        200,
+                        send(addr, SAMPLE_BODY, Some(auth), "appname=lumberjack-store").await
+                    )
+                },
+                rx,
+                SAMPLE_BODY.lines().count(),
+            )
+            .await;
 
-        let event = events.remove(0);
-        let log = event.as_log();
+            let event = events.remove(0);
+            let log = event.as_log();
 
-        assert_eq!(
-            log[log_schema().message_key()],
-            r#"at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_id=05726858-c44e-4f94-9a20-37df73be9006 fwd="73.75.38.87" dyno=web.1 connect=1ms service=22ms status=304 bytes=656 protocol=http"#.into()
-        );
-        assert_eq!(
-            log[log_schema().timestamp_key()],
-            "2020-01-08T22:33:57.353034+00:00"
-                .parse::<DateTime<Utc>>()
-                .unwrap()
-                .into()
-        );
-        assert_eq!(log[&log_schema().host_key()], "host".into());
-        assert_eq!(log[log_schema().source_type_key()], "heroku_logs".into());
-        assert_eq!(log["appname"], "lumberjack-store".into());
-        assert_eq!(log["absent"], Value::Null);
+            assert_eq!(
+                log[log_schema().message_key()],
+                r#"at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_id=05726858-c44e-4f94-9a20-37df73be9006 fwd="73.75.38.87" dyno=web.1 connect=1ms service=22ms status=304 bytes=656 protocol=http"#.into()
+            );
+            assert_eq!(
+                log[log_schema().timestamp_key()],
+                "2020-01-08T22:33:57.353034+00:00"
+                    .parse::<DateTime<Utc>>()
+                    .unwrap()
+                    .into()
+            );
+            assert_eq!(log[&log_schema().host_key()], "host".into());
+            assert_eq!(log[log_schema().source_type_key()], "heroku_logs".into());
+            assert_eq!(log["appname"], "lumberjack-store".into());
+            assert_eq!(log["absent"], Value::Null);
+        }).await;
     }
 
     #[tokio::test]
     async fn logplex_handles_failures() {
-        let auth = make_auth();
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let auth = make_auth();
 
-        let (rx, addr) = source(Some(auth.clone()), vec![], EventStatus::Rejected, true).await;
+            let (rx, addr) = source(Some(auth.clone()), vec![], EventStatus::Rejected, true).await;
 
-        let events = spawn_collect_n(
-            async move {
-                assert_eq!(
-                    400,
-                    send(addr, SAMPLE_BODY, Some(auth), "appname=lumberjack-store").await
-                )
-            },
-            rx,
-            SAMPLE_BODY.lines().count(),
-        )
+            let events = spawn_collect_n(
+                async move {
+                    assert_eq!(
+                        400,
+                        send(addr, SAMPLE_BODY, Some(auth), "appname=lumberjack-store").await
+                    )
+                },
+                rx,
+                SAMPLE_BODY.lines().count(),
+            )
+            .await;
+
+            assert_eq!(events.len(), SAMPLE_BODY.lines().count());
+        })
         .await;
-        components::SOURCE_TESTS.assert(&["http_path"]);
-
-        assert_eq!(events.len(), SAMPLE_BODY.lines().count());
     }
 
     #[tokio::test]

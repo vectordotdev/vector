@@ -11,6 +11,7 @@ use crate::{
     config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::{TemplateRenderingError, ThrottleEventDiscarded},
+    schema,
     template::Template,
     transforms::{TaskTransform, Transform},
 };
@@ -41,7 +42,7 @@ impl TransformConfig for ThrottleConfig {
         Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -55,7 +56,7 @@ pub struct Throttle<C: clock::Clock<Instant = I>, I: clock::Reference> {
     quota: Quota,
     flush_keys_interval: Duration,
     key_field: Option<Template>,
-    exclude: Option<Box<dyn Condition>>,
+    exclude: Option<Condition>,
     clock: C,
 }
 
@@ -127,13 +128,18 @@ where
                         match maybe_event {
                             None => true,
                             Some(event) => {
-                                match self.exclude.as_ref() {
-                                  Some(condition) if condition.check(&event) => output.push(event),
-                                  _ => {
+                                let (throttle, event) = match self.exclude.as_ref() {
+                                        Some(condition) => {
+                                            let (result, event) = condition.check(event);
+                                            (!result, event)
+                                        },
+                                        _ => (true, event)
+                                    };
+                                    if throttle {
                                         let key = self.key_field.as_ref().and_then(|t| {
                                             t.render_string(&event)
                                                 .map_err(|error| {
-                                                    emit!(&TemplateRenderingError {
+                                                    emit!(TemplateRenderingError {
                                                         error,
                                                         field: Some("key_field"),
                                                         drop_event: false,
@@ -148,14 +154,15 @@ where
                                             }
                                             _ => {
                                                 if let Some(key) = key {
-                                                  emit!(&ThrottleEventDiscarded{key})
+                                                  emit!(ThrottleEventDiscarded{key})
                                                 } else {
-                                                  emit!(&ThrottleEventDiscarded{key: "None".to_string()})
+                                                  emit!(ThrottleEventDiscarded{key: "None".to_string()})
                                                 }
                                             }
                                         }
+                                    } else {
+                                        output.push(event)
                                     }
-                                }
                                 false
                             }
                         }

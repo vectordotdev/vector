@@ -5,14 +5,17 @@ use serde::{Deserialize, Serialize};
 
 use super::Region;
 use crate::sinks::elasticsearch::BulkConfig;
+use crate::sinks::util::encoding::Transformer;
 use crate::{
-    config::{GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+    },
     event::EventArray,
     sinks::{
-        elasticsearch::{ElasticSearchConfig, ElasticSearchEncoder},
+        elasticsearch::ElasticsearchConfig,
         util::{
-            encoding::EncodingConfigFixed, http::RequestConfig, BatchConfig, Compression,
-            RealtimeSizeBasedDefaultBatchSettings, StreamSink, TowerRequestConfig,
+            http::RequestConfig, BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings,
+            StreamSink, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -30,13 +33,20 @@ pub struct SematextLogsConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
     )]
-    pub encoding: EncodingConfigFixed<ElasticSearchEncoder>,
+    pub encoding: Transformer,
 
     #[serde(default)]
     request: TowerRequestConfig,
 
     #[serde(default)]
     batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
+
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 inventory::submit! {
@@ -67,7 +77,7 @@ impl SinkConfig for SematextLogsConfig {
             }
         };
 
-        let (sink, healthcheck) = ElasticSearchConfig {
+        let (sink, healthcheck) = ElasticsearchConfig {
             endpoint,
             compression: Compression::None,
             doc_type: Some(
@@ -102,6 +112,10 @@ impl SinkConfig for SematextLogsConfig {
 
     fn sink_type(&self) -> &'static str {
         "sematext_logs"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 
@@ -180,7 +194,7 @@ mod tests {
         tokio::spawn(server);
 
         let (expected, events) = random_lines_with_stream(100, 10, None);
-        components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
+        components::run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
 
         let output = rx.next().await.unwrap();
 

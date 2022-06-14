@@ -13,7 +13,7 @@ components: sinks: nats: {
 	}
 
 	features: {
-		buffer: enabled:      false
+		acknowledgements: false
 		healthcheck: enabled: true
 		send: {
 			compression: enabled: false
@@ -25,7 +25,12 @@ components: sinks: nats: {
 				}
 			}
 			request: enabled: false
-			tls: enabled:     false
+			tls: {
+				enabled:                true
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        false
+			}
 			to: {
 				service: services.nats
 
@@ -51,6 +56,7 @@ components: sinks: nats: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	how_it_works: components._nats.how_it_works

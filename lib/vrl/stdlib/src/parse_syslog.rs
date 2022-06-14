@@ -1,9 +1,20 @@
 use std::collections::BTreeMap;
 
+use ::value::Value;
 use chrono::{DateTime, Datelike, Utc};
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
 use vector_common::TimeZone;
 use vrl::prelude::*;
+
+pub(crate) fn parse_syslog(value: Value, ctx: &Context) -> Resolved {
+    let message = value.try_bytes_utf8_lossy()?;
+    let timezone = match ctx.timezone() {
+        TimeZone::Local => None,
+        TimeZone::Named(tz) => Some(*tz),
+    };
+    let parsed = syslog_loose::parse_message_with_year_exact_tz(&message, resolve_year, timezone)?;
+    Ok(message_to_value(parsed))
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseSyslog;
@@ -44,27 +55,13 @@ impl Function for ParseSyslog {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
         Ok(Box::new(ParseSyslogFn { value }))
-    }
-
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let message = value.try_bytes_utf8_lossy()?;
-
-        let timezone = match ctx.timezone() {
-            TimeZone::Local => None,
-            TimeZone::Named(tz) => Some(*tz),
-        };
-        let parsed =
-            syslog_loose::parse_message_with_year_exact_tz(&message, resolve_year, timezone)?;
-
-        Ok(message_to_value(parsed))
     }
 }
 
@@ -76,19 +73,11 @@ pub(crate) struct ParseSyslogFn {
 impl Expression for ParseSyslogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let message = value.try_bytes_utf8_lossy()?;
 
-        let timezone = match ctx.timezone() {
-            TimeZone::Local => None,
-            TimeZone::Named(tz) => Some(*tz),
-        };
-        let parsed =
-            syslog_loose::parse_message_with_year_exact_tz(&message, resolve_year, timezone)?;
-
-        Ok(message_to_value(parsed))
+        parse_syslog(value, ctx)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::object(inner_kind()).fallible()
     }
 }

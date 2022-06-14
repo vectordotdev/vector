@@ -18,6 +18,7 @@ components: sources: internal_metrics: {
 	}
 
 	features: {
+		acknowledgements: false
 		collect: {
 			checkpoint: enabled: false
 			from: service:       services.vector
@@ -48,8 +49,8 @@ components: sources: internal_metrics: {
 			description: "The interval between metric gathering, in seconds."
 			common:      true
 			required:    false
-			type: uint: {
-				default: 2
+			type: float: {
+				default: 2.0
 				unit:    "seconds"
 			}
 		}
@@ -62,30 +63,25 @@ components: sources: internal_metrics: {
 				examples: []
 				options: {
 					host_key: {
-						category:    "Context"
-						common:      false
+						category: "Context"
+						common:   false
 						description: """
-				The key name added to each event representing the current host. This can also be globally set via the
-				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
-
-				Set to "" to suppress this key.
-				"""
-						required:    false
+							If set, will add a tag using the provided key name with a value of the current the current host.
+							"""
+						required: false
 						type: string: {
-							default: "host"
+							default: null
 						}
 					}
 					pid_key: {
 						category: "Context"
 						common:   false
 						description: """
-					The key name added to each event representing the current process ID.
-
-					Set to "" to suppress this key.
-					"""
+							If set, will add a tag using the provided key name with a value of the current the current process ID.
+							"""
 						required: false
 						type: string: {
-							default: "pid"
+							default: null
 						}
 					}
 				}
@@ -98,12 +94,12 @@ components: sources: internal_metrics: {
 		_internal_metrics_tags: {
 			pid: {
 				description: "The process ID of the Vector instance."
-				required:    true
+				required:    false
 				examples: ["4232"]
 			}
 			host: {
 				description: "The hostname of the system Vector is running on."
-				required:    true
+				required:    false
 				examples: [_values.local_host]
 			}
 		}
@@ -527,6 +523,42 @@ components: sources: internal_metrics: {
 				origins like file and uri, or cumulatively from other origins.
 				"""
 			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags & {
+				file: {
+					description: "The file from which the data originated."
+					required:    false
+				}
+				uri: {
+					description: "The sanitized URI from which the data originated."
+					required:    false
+				}
+				container_name: {
+					description: "The name of the container from which the data originated."
+					required:    false
+				}
+				pod_name: {
+					description: "The name of the pod from which the data originated."
+					required:    false
+				}
+				peer_addr: {
+					description: "The IP from which the data originated."
+					required:    false
+				}
+				peer_path: {
+					description: "The pathname from which the data originated."
+					required:    false
+				}
+				mode: _mode
+			}
+		}
+		component_received_events_count: {
+			description: """
+				A histogram of Vector the number of events passed in each internal batch in Vector's internal topology.
+				Note that this is separate than sink-level batching. It is mostly useful for low level debugging
+				performance issues in Vector due to small internal batches.
+				"""
+			type:              "histogram"
 			default_namespace: "vector"
 			tags:              _component_tags & {
 				file: {
@@ -1230,6 +1262,21 @@ components: sources: internal_metrics: {
 				"out_of_order": "The event was out of order."
 				"oversized":    "The event was too large."
 			}
+		}
+	}
+
+	how_it_works: {
+		unique_series: {
+			title: "Sending metrics from multiple Vector instances"
+			body: """
+				When sending `internal_metrics` from multiple Vector instances
+				to the same destination, you will typically want to tag the
+				metrics with a tag that is unique to the Vector instance sending
+				the metrics to avoid the metric series conflicting. The
+				`tags.host_key` option can be used for this, but you can also
+				use a subsequent `remap` transform to add a different unique
+				tag from the environment.
+				"""
 		}
 	}
 

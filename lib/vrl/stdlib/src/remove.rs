@@ -1,5 +1,44 @@
+use ::value::Value;
 use lookup_lib::{LookupBuf, SegmentBuf};
 use vrl::prelude::*;
+
+fn remove(path: Value, compact: Value, mut value: Value) -> Resolved {
+    let path = match path {
+        Value::Array(path) => {
+            let mut lookup = LookupBuf::root();
+
+            for segment in path {
+                let segment = match segment {
+                    Value::Bytes(field) => {
+                        SegmentBuf::Field(String::from_utf8_lossy(&field).into_owned().into())
+                    }
+                    Value::Integer(index) => SegmentBuf::Index(index as isize),
+                    value => {
+                        return Err(format!(
+                            r#"path segment must be either string or integer, not {}"#,
+                            value.kind()
+                        )
+                        .into())
+                    }
+                };
+
+                lookup.push_back(segment)
+            }
+
+            lookup
+        }
+        value => {
+            return Err(value::Error::Expected {
+                got: value.kind(),
+                expected: Kind::array(Collection::any()),
+            }
+            .into())
+        }
+    };
+    let compact = compact.try_boolean()?;
+    value.remove_by_path(&path, compact);
+    Ok(value)
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Remove;
@@ -104,8 +143,8 @@ impl Function for Remove {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -121,7 +160,7 @@ impl Function for Remove {
 }
 
 #[derive(Debug, Clone)]
-pub struct RemoveFn {
+pub(crate) struct RemoveFn {
     value: Box<dyn Expression>,
     path: Box<dyn Expression>,
     compact: Box<dyn Expression>,
@@ -129,51 +168,17 @@ pub struct RemoveFn {
 
 impl Expression for RemoveFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let path = match self.path.resolve(ctx)? {
-            Value::Array(path) => {
-                let mut lookup = LookupBuf::root();
+        let path = self.path.resolve(ctx)?;
+        let compact = self.compact.resolve(ctx)?;
+        let value = self.value.resolve(ctx)?;
 
-                for segment in path {
-                    let segment = match segment {
-                        Value::Bytes(field) => {
-                            SegmentBuf::Field(String::from_utf8_lossy(&field).into_owned().into())
-                        }
-                        Value::Integer(index) => SegmentBuf::Index(index as isize),
-                        value => {
-                            return Err(format!(
-                                r#"path segment must be either string or integer, not {}"#,
-                                value.kind()
-                            )
-                            .into())
-                        }
-                    };
-
-                    lookup.push_back(segment)
-                }
-
-                lookup
-            }
-            value => {
-                return Err(value::Error::Expected {
-                    got: value.kind(),
-                    expected: Kind::array(Collection::any()),
-                }
-                .into())
-            }
-        };
-
-        let compact = self.compact.resolve(ctx)?.try_boolean()?;
-
-        let mut value = self.value.resolve(ctx)?;
-        value.remove(&path, compact)?;
-
-        Ok(value)
+        remove(path, compact, value)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         let value_td = self.value.type_def(state);
 
-        let mut td = TypeDef::from(Kind::empty()).fallible();
+        let mut td = TypeDef::from(Kind::never()).fallible();
 
         if value_td.is_array() {
             td = td.add_array(Collection::any())

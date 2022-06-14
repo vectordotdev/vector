@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::{
     collections::{hash_map, HashMap},
     pin::Pin,
@@ -14,11 +15,13 @@ use crate::{
     config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
     event::{discriminant::Discriminant, Event, EventMetadata, LogEvent},
     internal_events::ReduceStaleEventFlushed,
+    schema,
     transforms::{TaskTransform, Transform},
 };
 
 mod merge_strategy;
 
+use crate::event::Value;
 use merge_strategy::*;
 
 //------------------------------------------------------------------------------
@@ -61,7 +64,7 @@ impl TransformConfig for ReduceConfig {
         Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -79,10 +82,10 @@ struct ReduceState {
 
 impl ReduceState {
     fn new(e: LogEvent, strategies: &IndexMap<String, MergeStrategy>) -> Self {
-        let (fields, metadata) = e.into_parts();
-        Self {
-            stale_since: Instant::now(),
-            fields: fields
+        let (value, metadata) = e.into_parts();
+
+        let fields = if let Value::Object(fields) = value {
+            fields
                 .into_iter()
                 .filter_map(|(k, v)| {
                     if let Some(strat) = strategies.get(&k) {
@@ -97,14 +100,27 @@ impl ReduceState {
                         Some((k, v.into()))
                     }
                 })
-                .collect(),
+                .collect()
+        } else {
+            HashMap::new()
+        };
+
+        Self {
+            stale_since: Instant::now(),
+            fields,
             metadata,
         }
     }
 
     fn add_event(&mut self, e: LogEvent, strategies: &IndexMap<String, MergeStrategy>) {
-        let (fields, metadata) = e.into_parts();
+        let (value, metadata) = e.into_parts();
         self.metadata.merge(metadata);
+
+        let fields = if let Value::Object(fields) = value {
+            fields
+        } else {
+            BTreeMap::new()
+        };
 
         for (k, v) in fields.into_iter() {
             let strategy = strategies.get(&k);
@@ -152,8 +168,8 @@ pub struct Reduce {
     group_by: Vec<String>,
     merge_strategies: IndexMap<String, MergeStrategy>,
     reduce_merge_states: HashMap<Discriminant, ReduceState>,
-    ends_when: Option<Box<dyn Condition>>,
-    starts_when: Option<Box<dyn Condition>>,
+    ends_when: Option<Condition>,
+    starts_when: Option<Condition>,
 }
 
 impl Reduce {
@@ -197,7 +213,7 @@ impl Reduce {
         }
         for k in &flush_discriminants {
             if let Some(t) = self.reduce_merge_states.remove(k) {
-                emit!(&ReduceStaleEventFlushed);
+                emit!(ReduceStaleEventFlushed);
                 output.push(Event::from(t.flush()));
             }
         }
@@ -221,16 +237,15 @@ impl Reduce {
     }
 
     fn transform_one(&mut self, output: &mut Vec<Event>, event: Event) {
-        let starts_here = self
-            .starts_when
-            .as_ref()
-            .map(|c| c.check(&event))
-            .unwrap_or(false);
-        let ends_here = self
-            .ends_when
-            .as_ref()
-            .map(|c| c.check(&event))
-            .unwrap_or(false);
+        let (starts_here, event) = match &self.starts_when {
+            Some(condition) => condition.check(event),
+            None => (false, event),
+        };
+
+        let (ends_here, event) = match &self.ends_when {
+            Some(condition) => condition.check(event),
+            None => (false, event),
+        };
 
         let event = event.into_log();
         let discriminant = Discriminant::from_log_event(&event, &self.group_by);

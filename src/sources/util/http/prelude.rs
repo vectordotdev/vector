@@ -3,6 +3,7 @@ use std::{collections::HashMap, convert::TryFrom, fmt, net::SocketAddr};
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{FutureExt, TryFutureExt};
+use tracing::Span;
 use vector_core::{
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
     ByteSizeOf,
@@ -17,16 +18,18 @@ use warp::{
     Filter,
 };
 
+use crate::{
+    config::{AcknowledgementsConfig, SourceContext},
+    internal_events::{HttpBadRequest, HttpBytesReceived, HttpEventsReceived},
+    sources::http::HttpMethod,
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
+    SourceSender,
+};
+
 use super::{
     auth::{HttpSourceAuth, HttpSourceAuthConfig},
     encoding::decode,
     error::ErrorMessage,
-};
-use crate::{
-    config::{AcknowledgementsConfig, SourceContext},
-    internal_events::{HttpBadRequest, HttpBytesReceived, HttpEventsReceived},
-    tls::{MaybeTlsSettings, TlsConfig},
-    SourceSender,
 };
 
 #[async_trait]
@@ -39,12 +42,14 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         path: &str,
     ) -> Result<Vec<Event>, ErrorMessage>;
 
+    #[allow(clippy::too_many_arguments)]
     fn run(
         self,
         address: SocketAddr,
         path: &str,
+        method: HttpMethod,
         strict_path: bool,
-        tls: &Option<TlsConfig>,
+        tls: &Option<TlsEnableableConfig>,
         auth: &Option<HttpSourceAuthConfig>,
         cx: SourceContext,
         acknowledgements: AcknowledgementsConfig,
@@ -53,10 +58,20 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         let protocol = tls.http_protocol_name();
         let auth = HttpSourceAuth::try_from(auth.as_ref())?;
         let path = path.to_owned();
-        let acknowledgements = cx.globals.acknowledgements.merge(&acknowledgements);
+        let acknowledgements = cx.do_acknowledgements(&acknowledgements);
         Ok(Box::pin(async move {
-            let span = crate::trace::current_span();
-            let mut filter: BoxedFilter<()> = warp::post().boxed();
+            let span = Span::current();
+            let mut filter: BoxedFilter<()> = match method {
+                HttpMethod::Head => warp::head().boxed(),
+                HttpMethod::Get => warp::get().boxed(),
+                HttpMethod::Put => warp::put().boxed(),
+                HttpMethod::Post => warp::post().boxed(),
+                HttpMethod::Patch => warp::patch().boxed(),
+                HttpMethod::Delete => warp::delete().boxed(),
+            };
+
+            // https://github.com/rust-lang/rust-clippy/issues/8148
+            #[allow(clippy::unnecessary_to_owned)]
             for s in path.split('/').filter(|&x| !x.is_empty()) {
                 filter = filter.and(warp::path(s.to_string())).boxed()
             }
@@ -89,7 +104,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                           query_parameters: HashMap<String, String>| {
                         debug!(message = "Handling HTTP request.", headers = ?headers);
                         let http_path = path.as_str();
-                        emit!(&HttpBytesReceived {
+                        emit!(HttpBytesReceived {
                             byte_size: body.len(),
                             http_path,
                             protocol,
@@ -102,7 +117,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                 self.build_events(body, headers, query_parameters, path.as_str())
                             })
                             .map(|events| {
-                                emit!(&HttpEventsReceived {
+                                emit!(HttpEventsReceived {
                                     count: events.len(),
                                     byte_size: events.size_of(),
                                     http_path,
@@ -111,7 +126,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                 events
                             });
 
-                        handle_request(events, acknowledgements.enabled(), cx.out.clone())
+                        handle_request(events, acknowledgements, cx.out.clone())
                     },
                 )
                 .with(warp::trace(move |_info| span.clone()));
@@ -158,9 +173,9 @@ async fn handle_request(
 ) -> Result<impl warp::Reply, Rejection> {
     match events {
         Ok(mut events) => {
-            let receiver = BatchNotifier::maybe_apply_to_events(acknowledgements, &mut events);
+            let receiver = BatchNotifier::maybe_apply_to(acknowledgements, &mut events);
 
-            out.send_all(&mut futures::stream::iter(events))
+            out.send_batch(events)
                 .map_err(move |error: crate::source_sender::ClosedError| {
                     // can only fail if receiving end disconnected, so we are shutting down,
                     // probably not gracefully.
@@ -172,10 +187,7 @@ async fn handle_request(
                 .await
         }
         Err(error) => {
-            emit!(&HttpBadRequest {
-                error_code: error.code(),
-                error_message: error.message(),
-            });
+            emit!(HttpBadRequest::new(error.code(), error.message()));
             Err(warp::reject::custom(error))
         }
     }

@@ -10,15 +10,16 @@ use crate::{
     },
     event::Event,
     internal_events::{AddTagsTagNotOverwritten, AddTagsTagOverwritten},
+    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct AddTagsConfig {
-    pub tags: IndexMap<String, String>,
+    tags: IndexMap<String, String>,
     #[serde(default = "crate::serde::default_true")]
-    pub overwrite: bool,
+    pub(super) overwrite: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -55,7 +56,7 @@ impl TransformConfig for AddTagsConfig {
         Input::metric()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Metric)]
     }
 
@@ -82,11 +83,11 @@ impl FunctionTransform for AddTags {
                         entry.insert(value.clone());
                     }
                     (Entry::Occupied(mut entry), true) => {
-                        emit!(&AddTagsTagOverwritten { tag: name.as_ref() });
+                        emit!(AddTagsTagOverwritten { tag: name.as_ref() });
                         entry.insert(value.clone());
                     }
                     (Entry::Occupied(_entry), false) => {
-                        emit!(&AddTagsTagNotOverwritten { tag: name.as_ref() })
+                        emit!(AddTagsTagNotOverwritten { tag: name.as_ref() })
                     }
                 }
             }
@@ -98,6 +99,8 @@ impl FunctionTransform for AddTags {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use vector_common::btreemap;
 
     use super::*;
@@ -142,7 +145,10 @@ mod tests {
             MetricKind::Absolute,
             MetricValue::Gauge { value: 10.0 },
         )
-        .with_tags(Some(btreemap! {"region" => "us-east-1"}));
+        .with_tags(Some(BTreeMap::from([(
+            String::from("region"),
+            String::from("us-east-1"),
+        )])));
         let expected = metric.clone();
 
         let map = vec![("region".to_string(), "overridden".to_string())]

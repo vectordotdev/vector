@@ -1,30 +1,44 @@
-use serde::{Deserialize, Serialize};
+use std::{fmt, num::NonZeroUsize};
+
+use bitmask_enum::bitmask;
 
 mod global_options;
-mod id;
 mod log_schema;
 pub mod proxy;
 
 pub use global_options::GlobalOptions;
-pub use id::ComponentKey;
 pub use log_schema::{init_log_schema, log_schema, LogSchema};
+pub use vector_common::config::ComponentKey;
+use vector_config::configurable_component;
 
 use crate::schema;
 
-pub const MEMORY_BUFFER_DEFAULT_MAX_EVENTS: usize =
+pub const MEMORY_BUFFER_DEFAULT_MAX_EVENTS: NonZeroUsize =
     vector_buffers::config::memory_buffer_default_max_events();
 
-#[derive(Debug, Clone, PartialEq, Copy)]
+// This enum should be kept alphabetically sorted as the bitmask value is used when
+// sorting sources by data type in the GraphQL API.
+#[bitmask(u8)]
 pub enum DataType {
-    Any,
     Log,
     Metric,
+    Trace,
+}
+
+impl fmt::Display for DataType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut t = Vec::new();
+        self.contains(DataType::Log).then(|| t.push("Log"));
+        self.contains(DataType::Metric).then(|| t.push("Metric"));
+        self.contains(DataType::Trace).then(|| t.push("Trace"));
+        f.write_str(&t.join(","))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Input {
     ty: DataType,
-    schema_requirement: schema::Requirement,
+    log_schema_requirement: schema::Requirement,
 }
 
 impl Input {
@@ -33,28 +47,49 @@ impl Input {
     }
 
     pub fn schema_requirement(&self) -> &schema::Requirement {
-        &self.schema_requirement
+        &self.log_schema_requirement
+    }
+
+    pub fn new(ty: DataType) -> Self {
+        Self {
+            ty,
+            log_schema_requirement: schema::Requirement::empty(),
+        }
     }
 
     pub fn log() -> Self {
         Self {
             ty: DataType::Log,
-            schema_requirement: schema::Requirement,
+            log_schema_requirement: schema::Requirement::empty(),
         }
     }
 
     pub fn metric() -> Self {
         Self {
             ty: DataType::Metric,
-            schema_requirement: schema::Requirement,
+            log_schema_requirement: schema::Requirement::empty(),
         }
     }
 
-    pub fn any() -> Self {
+    pub fn trace() -> Self {
         Self {
-            ty: DataType::Any,
-            schema_requirement: schema::Requirement,
+            ty: DataType::Trace,
+            log_schema_requirement: schema::Requirement::empty(),
         }
+    }
+
+    pub fn all() -> Self {
+        Self {
+            ty: DataType::all(),
+            log_schema_requirement: schema::Requirement::empty(),
+        }
+    }
+
+    /// Set the schema requirement for this output.
+    #[must_use]
+    pub fn with_schema_requirement(mut self, schema_requirement: schema::Requirement) -> Self {
+        self.log_schema_requirement = schema_requirement;
+        self
     }
 }
 
@@ -62,7 +97,19 @@ impl Input {
 pub struct Output {
     pub port: Option<String>,
     pub ty: DataType,
-    pub schema_definition: schema::Definition,
+
+    // NOTE: schema definitions are only implemented/supported for log-type events. There is no
+    // inherent blocker to support other types as well, but it'll require additional work to add
+    // the relevant schemas, and store them separately in this type.
+    ///
+    /// The `None` variant of a schema definition has two distinct meanings for a source component
+    /// versus a transform component:
+    ///
+    /// For *sources*, a `None` schema is identical to a `Some(Definition::undefined())` schema.
+    ///
+    /// For a *transform*, a `None` schema means the transform inherits the merged [`Definition`]
+    /// of its inputs, without modifying the schema further.
+    pub log_schema_definition: Option<schema::Definition>,
 }
 
 impl Output {
@@ -74,31 +121,38 @@ impl Output {
         Self {
             port: None,
             ty,
-            schema_definition: schema::Definition,
+            log_schema_definition: None,
         }
+    }
+
+    /// Set the schema definition for this `Output`.
+    #[must_use]
+    pub fn with_schema_definition(mut self, schema_definition: schema::Definition) -> Self {
+        self.log_schema_definition = Some(schema_definition);
+        self
+    }
+
+    /// Set the port name for this `Output`.
+    #[must_use]
+    pub fn with_port(mut self, name: impl Into<String>) -> Self {
+        self.port = Some(name.into());
+        self
     }
 }
 
-impl<T: Into<String>> From<(T, DataType)> for Output {
-    fn from((name, ty): (T, DataType)) -> Self {
-        Self {
-            port: Some(name.into()),
-            ty,
-            schema_definition: schema::Definition,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+/// Configuration of acknowledgement behavior.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct AcknowledgementsConfig {
+    /// Enables end-to-end acknowledgements.
     enabled: Option<bool>,
 }
 
 impl AcknowledgementsConfig {
-    pub fn merge(&self, other: &Self) -> Self {
-        Self {
-            enabled: other.enabled.or(self.enabled),
-        }
+    #[must_use]
+    pub fn merge_default(&self, other: &Self) -> Self {
+        let enabled = self.enabled.or(other.enabled);
+        Self { enabled }
     }
 
     pub fn enabled(&self) -> bool {

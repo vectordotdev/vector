@@ -1,23 +1,24 @@
-use std::num::NonZeroUsize;
+use std::{fmt, num::NonZeroUsize};
 
 use async_trait::async_trait;
 use futures::{future, stream::BoxStream, StreamExt};
-use tower::util::BoxService;
-use vector_core::{buffers::Acker, stream::BatcherSettings, ByteSizeOf};
+use tower::Service;
+use vector_core::{
+    buffers::Acker,
+    stream::{BatcherSettings, DriverResponse},
+    ByteSizeOf,
+};
 
 use crate::{
     event::{Event, LogEvent, Value},
     sinks::{
         elasticsearch::{
-            encoder::ProcessedEvent,
-            request_builder::ElasticsearchRequestBuilder,
-            service::{ElasticSearchRequest, ElasticSearchResponse},
-            BulkAction, ElasticSearchCommonMode,
+            encoder::ProcessedEvent, request_builder::ElasticsearchRequestBuilder,
+            service::ElasticsearchRequest, BulkAction, ElasticsearchCommonMode,
         },
-        util::{Compression, SinkBuilderExt, StreamSink},
+        util::{encoding::Transformer, SinkBuilderExt, StreamSink},
     },
     transforms::metric_to_log::MetricToLog,
-    Error,
 };
 
 #[derive(Clone, Eq, Hash, PartialEq)]
@@ -37,18 +38,24 @@ impl ByteSizeOf for BatchedEvents {
     }
 }
 
-pub struct ElasticSearchSink {
+pub struct ElasticsearchSink<S> {
     pub batch_settings: BatcherSettings,
     pub request_builder: ElasticsearchRequestBuilder,
-    pub compression: Compression,
-    pub service: BoxService<ElasticSearchRequest, ElasticSearchResponse, Error>,
+    pub transformer: Transformer,
+    pub service: S,
     pub acker: Acker,
     pub metric_to_log: MetricToLog,
-    pub mode: ElasticSearchCommonMode,
+    pub mode: ElasticsearchCommonMode,
     pub id_key_field: Option<String>,
 }
 
-impl ElasticSearchSink {
+impl<S> ElasticsearchSink<S>
+where
+    S: Service<ElasticsearchRequest> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
+    S::Error: fmt::Debug + Into<crate::Error> + Send,
+{
     pub async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let request_builder_concurrency_limit = NonZeroUsize::new(50);
 
@@ -56,10 +63,15 @@ impl ElasticSearchSink {
         let id_key_field = self.id_key_field;
 
         let sink = input
+            .map(|mut event| {
+                self.transformer.transform(&mut event);
+                event
+            })
             .scan(self.metric_to_log, |metric_to_log, event| {
                 future::ready(Some(match event {
                     Event::Metric(metric) => metric_to_log.transform_one(metric),
                     Event::Log(log) => Some(log),
+                    _ => None,
                 }))
             })
             .filter_map(|x| async move { x })
@@ -83,7 +95,7 @@ impl ElasticSearchSink {
 
 pub fn process_log(
     mut log: LogEvent,
-    mode: &ElasticSearchCommonMode,
+    mode: &ElasticsearchCommonMode,
     id_key_field: &Option<String>,
 ) -> Option<ProcessedEvent> {
     let index = mode.index(&log)?;
@@ -93,7 +105,9 @@ pub fn process_log(
         cfg.sync_fields(&mut log);
         cfg.remap_timestamp(&mut log);
     };
-    let id = if let Some(Value::Bytes(key)) = id_key_field.as_ref().and_then(|key| log.remove(key))
+    let id = if let Some(Value::Bytes(key)) = id_key_field
+        .as_ref()
+        .and_then(|key| log.remove(key.as_str()))
     {
         Some(String::from_utf8_lossy(&key).into_owned())
     } else {
@@ -108,7 +122,13 @@ pub fn process_log(
 }
 
 #[async_trait]
-impl StreamSink<Event> for ElasticSearchSink {
+impl<S> StreamSink<Event> for ElasticsearchSink<S>
+where
+    S: Service<ElasticsearchRequest> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
+    S::Error: fmt::Debug + Into<crate::Error> + Send,
+{
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
     }

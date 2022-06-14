@@ -1,5 +1,12 @@
+#![deny(clippy::all)]
+#![deny(unused_allocation)]
+#![deny(unused_extern_crates)]
+#![deny(unused_assignments)]
+#![deny(unused_comparisons)]
+
 mod ast;
-mod filters;
+#[doc(hidden)]
+pub mod filters; // TODO Must be exposed for criterion. Perhaps we should pass a feature? Yuck.
 mod grok;
 mod grok_filter;
 mod lexer;

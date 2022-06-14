@@ -1,8 +1,26 @@
 use std::str::FromStr;
 
+use ::value::Value;
 use vrl::prelude::*;
 
 use crate::util::Base64Charset;
+
+fn encode_base64(value: Value, padding: Option<Value>, charset: Option<Value>) -> Resolved {
+    let value = value.try_bytes()?;
+    let padding = padding
+        .map(|v| v.try_boolean())
+        .transpose()?
+        .unwrap_or(true);
+    let charset = charset
+        .map(|v| v.try_bytes())
+        .transpose()?
+        .map(|c| Base64Charset::from_str(&String::from_utf8_lossy(&c)))
+        .transpose()?
+        .unwrap_or_default();
+    let config = base64::Config::new(charset.into(), padding);
+
+    Ok(base64::encode_config(value, config).into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct EncodeBase64;
@@ -34,8 +52,8 @@ impl Function for EncodeBase64 {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -67,36 +85,14 @@ struct EncodeBase64Fn {
 
 impl Expression for EncodeBase64Fn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?.try_bytes()?;
+        let value = self.value.resolve(ctx)?;
+        let padding = self.padding.as_ref().map(|p| p.resolve(ctx)).transpose()?;
+        let charset = self.charset.as_ref().map(|c| c.resolve(ctx)).transpose()?;
 
-        let padding = self
-            .padding
-            .as_ref()
-            .map(|p| {
-                p.resolve(ctx)
-                    .and_then(|v| Value::try_boolean(v).map_err(Into::into))
-            })
-            .transpose()?
-            .unwrap_or(true);
-
-        let charset = self
-            .charset
-            .as_ref()
-            .map(|c| {
-                c.resolve(ctx)
-                    .and_then(|v| Value::try_bytes(v).map_err(Into::into))
-            })
-            .transpose()?
-            .map(|c| Base64Charset::from_str(&String::from_utf8_lossy(&c)))
-            .transpose()?
-            .unwrap_or_default();
-
-        let config = base64::Config::new(charset.into(), padding);
-
-        Ok(base64::encode_config(value, config).into())
+        encode_base64(value, padding, charset)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().infallible()
     }
 }

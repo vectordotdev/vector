@@ -1,14 +1,17 @@
+use ::value::Value;
 use vector_common::conversion::Conversion;
 use vrl::prelude::*;
 
-fn to_float(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn to_float(value: Value) -> Resolved {
     use Value::*;
     match value {
         Float(_) => Ok(value),
-        Integer(v) => Ok((v as f64).into()),
+        Integer(v) => Ok(Value::from_f64_or_zero(v as f64)),
         Boolean(v) => Ok(NotNan::new(if v { 1.0 } else { 0.0 }).unwrap().into()),
-        Null => Ok(0.0.into()),
-        Timestamp(v) => Ok((v.timestamp_nanos() as f64 / 1_000_000_000_f64).into()),
+        Null => Ok(NotNan::new(0.0).unwrap().into()),
+        Timestamp(v) => Ok(Value::from_f64_or_zero(
+            v.timestamp_nanos() as f64 / 1_000_000_000_f64,
+        )),
         Bytes(v) => Conversion::Float
             .convert(v)
             .map_err(|e| e.to_string().into()),
@@ -102,19 +105,13 @@ impl Function for ToFloat {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
         Ok(Box::new(ToFloatFn { value }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-
-        to_float(value)
     }
 }
 
@@ -130,7 +127,7 @@ impl Expression for ToFloatFn {
         to_float(value)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         let td = self.value.type_def(state);
 
         TypeDef::float().with_fallibility(

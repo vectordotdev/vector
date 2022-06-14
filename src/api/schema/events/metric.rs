@@ -1,25 +1,25 @@
-use async_graphql::{Enum, Object};
 use std::collections::BTreeMap;
 
+use async_graphql::{Enum, Object};
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 use vector_common::encode_logfmt;
 
 use super::EventEncodingType;
 use crate::{
-    config::OutputId,
     event::{self},
+    topology::TapOutput,
 };
 
 #[derive(Debug, Clone)]
 pub struct Metric {
-    output_id: OutputId,
+    output: TapOutput,
     event: event::Metric,
 }
 
 impl Metric {
-    pub const fn new(output_id: OutputId, event: event::Metric) -> Self {
-        Self { output_id, event }
+    pub const fn new(output: TapOutput, event: event::Metric) -> Self {
+        Self { output, event }
     }
 }
 
@@ -63,12 +63,22 @@ impl MetricTag {
 impl Metric {
     /// Id of the component associated with the metric event
     async fn component_id(&self) -> &str {
-        self.output_id.component.id()
+        self.output.output_id.component.id()
+    }
+
+    /// Type of component associated with the metric event
+    async fn component_type(&self) -> &str {
+        self.output.component_type.as_ref()
+    }
+
+    /// Kind of component associated with the metric event
+    async fn component_kind(&self) -> &str {
+        self.output.component_kind
     }
 
     /// Metric timestamp
     async fn timestamp(&self) -> Option<&DateTime<Utc>> {
-        self.event.data().timestamp().as_ref()
+        self.event.data().timestamp()
     }
 
     /// Metric name
@@ -119,7 +129,7 @@ impl Metric {
                 let json = serde_json::to_value(&self.event)
                     .expect("logfmt serialization of metric event failed: conversion to serde Value failed. Please report.");
                 match json {
-                    Value::Object(map) => encode_logfmt::to_string(
+                    Value::Object(map) => encode_logfmt::encode_map(
                         &map.into_iter().collect::<BTreeMap<String, Value>>(),
                     )
                     .expect("logfmt serialization of metric event failed. Please report."),

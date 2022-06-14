@@ -1,4 +1,12 @@
+use ::value::Value;
 use vrl::prelude::*;
+
+fn timestamp(value: Value) -> Resolved {
+    match value {
+        v @ Value::Timestamp(_) => Ok(v),
+        v => Err(format!(r#"expected timestamp, got {}"#, v.kind()).into()),
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Timestamp;
@@ -35,8 +43,8 @@ impl Function for Timestamp {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -52,13 +60,11 @@ struct TimestampFn {
 
 impl Expression for TimestampFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        match self.value.resolve(ctx)? {
-            v @ Value::Timestamp(_) => Ok(v),
-            v => Err(format!(r#"expected timestamp, got {}"#, v.kind()).into()),
-        }
+        let value = self.value.resolve(ctx)?;
+        timestamp(value)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         let non_timestamp = !self.value.type_def(state).is_timestamp();
 
         TypeDef::timestamp().with_fallibility(non_timestamp)

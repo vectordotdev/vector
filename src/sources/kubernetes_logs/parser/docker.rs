@@ -9,6 +9,7 @@ use crate::{
     internal_events::KubernetesLogsDockerFormatParseError,
     transforms::{FunctionTransform, OutputBuffer},
 };
+use lookup::path;
 
 pub const TIME: &str = "time";
 pub const LOG: &str = "log";
@@ -26,11 +27,11 @@ impl FunctionTransform for Docker {
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let log = event.as_mut_log();
         if let Err(err) = parse_json(log) {
-            emit!(&KubernetesLogsDockerFormatParseError { error: &err });
+            emit!(KubernetesLogsDockerFormatParseError { error: &err });
             return;
         }
         if let Err(err) = normalize_event(log) {
-            emit!(&KubernetesLogsDockerFormatParseError { error: &err });
+            emit!(KubernetesLogsDockerFormatParseError { error: &err });
             return;
         }
         output.push(event);
@@ -51,7 +52,7 @@ fn parse_json(log: &mut LogEvent) -> Result<(), ParsingError> {
     match serde_json::from_slice(bytes.as_ref()) {
         Ok(JsonValue::Object(object)) => {
             for (key, value) in object {
-                log.insert_flat(key, value);
+                log.insert(path!(&key), value);
             }
             Ok(())
         }

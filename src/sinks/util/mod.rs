@@ -5,6 +5,7 @@ pub mod builder;
 pub mod compressor;
 pub mod encoding;
 pub mod http;
+pub mod metadata;
 pub mod normalizer;
 pub mod partitioner;
 pub mod processed_event;
@@ -128,7 +129,7 @@ pub fn encode_log(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Opti
         Encoding::Text => {
             let bytes = log
                 .get(crate::config::log_schema().message_key())
-                .map(|v| v.as_bytes().to_vec())
+                .map(|v| v.coerce_to_bytes().to_vec())
                 .unwrap_or_default();
             Ok(bytes)
         }

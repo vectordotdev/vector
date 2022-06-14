@@ -2,41 +2,56 @@ use std::task::Poll;
 
 use bytes::Bytes;
 use chrono::Utc;
+use codecs::{
+    decoding::{DeserializerConfig, FramingConfig},
+    StreamDecodingError,
+};
 use fakedata::logs::*;
-use futures::{stream, StreamExt};
+use futures::StreamExt;
 use rand::seq::SliceRandom;
-use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tokio::time::{self, Duration};
 use tokio_util::codec::FramedRead;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    codecs::{
-        self,
-        decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
-    },
-    config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
+    codecs::{Decoder, DecodingConfig},
+    config::{log_schema, Output, SourceConfig, SourceContext, SourceDescription},
     internal_events::{BytesReceived, DemoLogsEventProcessed, EventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
-    sources::util::StreamDecodingError,
     SourceSender,
 };
 
-#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
+/// Configuration for the `demo_logs` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(default)]
 pub struct DemoLogsConfig {
+    /// The amount of time, in seconds, to pause between each batch of output lines.
+    ///
+    /// The default is one batch per second. In order to remove the delay and output batches as quickly as possible, set
+    /// `interval` to `0.0`.
     #[serde(alias = "batch_interval")]
     #[derivative(Default(value = "default_interval()"))]
     pub interval: f64,
+
+    /// The total number of lines to output.
+    ///
+    /// By default, the source continuously prints logs (infinitely).
     #[derivative(Default(value = "default_count()"))]
     pub count: usize,
+
     #[serde(flatten)]
     pub format: OutputFormat,
+
+    #[configurable(derived)]
     #[derivative(Default(value = "default_framing_message_based()"))]
     pub framing: FramingConfig,
+
+    #[configurable(derived)]
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,
 }
@@ -55,28 +70,43 @@ pub enum DemoLogsConfigError {
     ShuffleDemoLogsItemsEmpty,
 }
 
-#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
+/// Output format configuration.
+#[configurable_component]
+#[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(tag = "format", rename_all = "snake_case")]
 pub enum OutputFormat {
+    /// Lines are chosen at random from the list specified using `lines`.
     Shuffle {
+        /// If `true`, each output line starts with an increasing sequence number, beginning with 0.
         #[serde(default)]
         sequence: bool,
+        /// The list of lines to output.
         lines: Vec<String>,
     },
+
+    /// Randomly generated logs in [Apache common](\(urls.apache_common)) format.
     ApacheCommon,
+
+    /// Randomly generated logs in [Apache error](\(urls.apache_error)) format.
     ApacheError,
+
+    /// Randomly generated logs in Syslog format ([RFC 5424](\(urls.syslog_5424))).
     #[serde(alias = "rfc5424")]
     Syslog,
+
+    /// Randomly generated logs in Syslog format ([RFC 3164](\(urls.syslog_3164))).
     #[serde(alias = "rfc3164")]
     BsdSyslog,
+
+    /// Randomly generated HTTP server logs in [JSON](\(urls.json)) format.
     #[derivative(Default)]
     Json,
 }
 
 impl OutputFormat {
     fn generate_line(&self, n: usize) -> String {
-        emit!(&DemoLogsEventProcessed);
+        emit!(DemoLogsEventProcessed);
 
         match self {
             Self::Shuffle {
@@ -137,15 +167,11 @@ async fn demo_logs_source(
     interval: f64,
     count: usize,
     format: OutputFormat,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
     mut shutdown: ShutdownSignal,
     mut out: SourceSender,
 ) -> Result<(), ()> {
-    let maybe_interval: Option<f64> = if interval != 0.0 {
-        Some(interval)
-    } else {
-        None
-    };
+    let maybe_interval: Option<f64> = (interval != 0.0).then(|| interval);
 
     let mut interval = maybe_interval.map(|i| time::interval(Duration::from_secs_f64(i)));
 
@@ -157,7 +183,7 @@ async fn demo_logs_source(
         if let Some(interval) = &mut interval {
             interval.tick().await;
         }
-        emit!(&BytesReceived {
+        emit!(BytesReceived {
             byte_size: 0,
             protocol: "none",
         });
@@ -169,13 +195,13 @@ async fn demo_logs_source(
             match next {
                 Ok((events, _byte_size)) => {
                     let count = events.len();
-                    emit!(&EventsReceived {
+                    emit!(EventsReceived {
                         count,
                         byte_size: events.size_of()
                     });
                     let now = Utc::now();
 
-                    let mut events = stream::iter(events).map(|mut event| {
+                    let events = events.into_iter().map(|mut event| {
                         let log = event.as_mut_log();
 
                         log.try_insert(log_schema().source_type_key(), Bytes::from("demo_logs"));
@@ -183,8 +209,8 @@ async fn demo_logs_source(
 
                         event
                     });
-                    out.send_all(&mut events).await.map_err(|error| {
-                        emit!(&StreamClosedError { error, count });
+                    out.send_batch(events).await.map_err(|error| {
+                        emit!(StreamClosedError { error, count });
                     })?;
                 }
                 Err(error) => {
@@ -228,17 +254,25 @@ impl SourceConfig for DemoLogsConfig {
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+        vec![Output::default(self.decoding.output_type())]
     }
 
     fn source_type(&self) -> &'static str {
         "demo_logs"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
+/// Configuration for the `generator` source.
 // Add a compatibility alias to avoid breaking existing configs
-#[derive(Deserialize, Serialize, Debug, Clone)]
-struct DemoLogsCompatConfig(DemoLogsConfig);
+//
+// TODO: Is this old enough now that we could actually remove it?
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
+pub struct DemoLogsCompatConfig(#[configurable(transparent)] DemoLogsConfig);
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "generator")]
@@ -254,26 +288,27 @@ impl SourceConfig for DemoLogsCompatConfig {
     fn source_type(&self) -> &'static str {
         self.0.source_type()
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use std::time::{Duration, Instant};
 
-    use futures::{poll, StreamExt};
+    use futures::{poll, Stream, StreamExt};
 
     use super::*;
-    use crate::{
-        config::log_schema, event::Event, shutdown::ShutdownSignal, source_sender::ReceiverStream,
-        SourceSender,
-    };
+    use crate::{config::log_schema, event::Event, shutdown::ShutdownSignal, SourceSender};
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<DemoLogsConfig>();
     }
 
-    async fn runit(config: &str) -> ReceiverStream<Event> {
+    async fn runit(config: &str) -> impl Stream<Item = Event> {
         let (tx, rx) = SourceSender::new_test();
         let config: DemoLogsConfig = toml::from_str(config).unwrap();
         let decoder =

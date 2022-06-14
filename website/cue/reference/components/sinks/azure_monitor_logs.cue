@@ -13,14 +13,14 @@ components: sinks: azure_monitor_logs: {
 	}
 
 	features: {
-		buffer: enabled:      true
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {
 				enabled:      true
 				common:       false
 				max_bytes:    10_000_000
-				timeout_secs: 1
+				timeout_secs: 1.0
 			}
 			compression: enabled: false
 			encoding: {
@@ -31,10 +31,9 @@ components: sinks: azure_monitor_logs: {
 			request: enabled: false
 			tls: {
 				enabled:                true
-				can_enable:             true
 				can_verify_certificate: true
 				can_verify_hostname:    true
-				enabled_default:        true
+				enabled_default:        false
 			}
 			to: {
 				service: services.azure_monitor_logs
@@ -105,6 +104,7 @@ components: sinks: azure_monitor_logs: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	telemetry: metrics: {

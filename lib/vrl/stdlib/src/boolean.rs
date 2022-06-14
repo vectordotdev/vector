@@ -1,6 +1,7 @@
+use ::value::Value;
 use vrl::prelude::*;
 
-fn boolean(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn boolean(value: Value) -> Resolved {
     match value {
         v @ Value::Boolean(_) => Ok(v),
         v => Err(format!("expected boolean, got {}", v.kind()).into()),
@@ -42,22 +43,13 @@ impl Function for Boolean {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
         Ok(Box::new(BooleanFn { value }))
-    }
-
-    fn call_by_vm(
-        &self,
-        _ctx: &mut Context,
-        args: &mut VmArgumentList,
-    ) -> std::result::Result<Value, ExpressionError> {
-        let value = args.required("value");
-        boolean(value)
     }
 }
 
@@ -71,7 +63,7 @@ impl Expression for BooleanFn {
         boolean(self.value.resolve(ctx)?)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         let non_boolean = !self.value.type_def(state).is_boolean();
 
         TypeDef::boolean().with_fallibility(non_boolean)

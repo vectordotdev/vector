@@ -154,8 +154,9 @@ fn render_fields<'a>(src: &str, event: EventRef<'a>) -> Result<String, TemplateR
                 .map(|s| s.as_str().trim())
                 .expect("src should match regex");
             match event {
-                EventRef::Log(log) => log.get(&key).map(|val| val.to_string_lossy()),
+                EventRef::Log(log) => log.get(key).map(|val| val.to_string_lossy()),
                 EventRef::Metric(metric) => render_metric_field(key, metric),
+                EventRef::Trace(trace) => trace.get(&key).map(|val| val.to_string_lossy()),
             }
             .unwrap_or_else(|| {
                 missing_keys.push(key.to_owned());
@@ -188,6 +189,10 @@ fn render_timestamp(src: &str, event: EventRef<'_>) -> String {
             .and_then(Value::as_timestamp)
             .copied(),
         EventRef::Metric(metric) => metric.timestamp(),
+        EventRef::Trace(trace) => trace
+            .get(log_schema().timestamp_key())
+            .and_then(Value::as_timestamp)
+            .copied(),
     };
     if let Some(ts) = timestamp {
         ts.format(src).to_string()
@@ -235,8 +240,9 @@ impl Serialize for Template {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use chrono::TimeZone;
-    use vector_common::btreemap;
 
     use super::*;
     use crate::event::{Event, MetricKind, MetricValue};
@@ -410,10 +416,10 @@ mod tests {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
         let mut event = Event::from("hello world");
-        event.as_mut_log().insert("%F", "foo");
+        event.as_mut_log().insert("\"%F\"", "foo");
         event.as_mut_log().insert(log_schema().timestamp_key(), ts);
 
-        let template = Template::try_from("nested {{ %F }} %T").unwrap();
+        let template = Template::try_from("nested {{ \"%F\" }} %T").unwrap();
 
         assert_eq!(
             Ok(Bytes::from("nested foo 04:05:06")),
@@ -434,9 +440,10 @@ mod tests {
     #[test]
     fn render_metric_with_tags() {
         let template = Template::try_from("name={{name}} component={{tags.component}}").unwrap();
-        let metric = sample_metric().with_tags(Some(
-            btreemap! { "test" => "true", "component" => "template" },
-        ));
+        let metric = sample_metric().with_tags(Some(BTreeMap::from([
+            (String::from("test"), String::from("true")),
+            (String::from("component"), String::from("template")),
+        ])));
         assert_eq!(
             Ok(Bytes::from("name=a-counter component=template")),
             template.render(&metric)

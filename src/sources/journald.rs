@@ -2,7 +2,7 @@ use std::{
     collections::{HashMap, HashSet},
     io::SeekFrom,
     iter::FromIterator,
-    path::{Path, PathBuf},
+    path::PathBuf,
     process::Stdio,
     str::FromStr,
     sync::Arc,
@@ -11,38 +11,45 @@ use std::{
 
 use bytes::Bytes;
 use chrono::TimeZone;
-use futures::{future, stream, stream::BoxStream, StreamExt};
+use codecs::{decoding::BoxedFramingError, CharacterDelimitedDecoder};
+use futures::{
+    future, future::BoxFuture, poll, stream::BoxStream, task::Poll, FutureExt, StreamExt,
+};
 use nix::{
     sys::signal::{kill, Signal},
     unistd::Pid,
 };
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
 use serde_json::{Error as JsonError, Value as JsonValue};
 use snafu::{ResultExt, Snafu};
 use tokio::{
     fs::{File, OpenOptions},
     io::{self, AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
-    process::Command,
+    process::{Child, Command},
+    sync::{oneshot, Mutex, MutexGuard},
     time::sleep,
 };
 use tokio_util::codec::FramedRead;
-use vector_core::ByteSizeOf;
+use vector_common::{byte_size_of::ByteSizeOf, finalizer::OrderedFinalizer};
+use vector_config::configurable_component;
 
 use crate::{
-    codecs::{decoding::BoxedFramingError, CharacterDelimitedDecoder},
     config::{
         log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext,
         SourceDescription,
     },
-    event::{BatchNotifier, Event, LogEvent, Value},
-    internal_events::{BytesReceived, JournaldEventsReceived, JournaldInvalidRecordError},
+    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent, Value},
+    internal_events::{
+        BytesReceived, JournaldInvalidRecordError, JournaldNegativeAcknowledgmentError,
+        OldEventsReceived,
+    },
     serde::bool_or_struct,
     shutdown::ShutdownSignal,
     SourceSender,
 };
 
 const DEFAULT_BATCH_SIZE: usize = 16;
+const BATCH_TIMEOUT: Duration = Duration::from_millis(10);
 
 const CHECKPOINT_FILENAME: &str = "checkpoint.txt";
 const CURSOR: &str = "__CURSOR";
@@ -75,23 +82,73 @@ enum BuildError {
     DuplicatedMatches { field: String, value: String },
 }
 
-#[derive(Deserialize, Serialize, Debug, Default)]
+type Matches = HashMap<String, HashSet<String>>;
+
+/// Configuration for the `journald` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct JournaldConfig {
+    /// Only include entries that appended to the journal after Vector starts reading it.
+    pub since_now: Option<bool>,
+
+    /// Only include entries that occurred after the current boot of the system.
     pub current_boot_only: Option<bool>,
+
+    /// The list of unit names to monitor.
+    ///
+    /// If empty or not present, all units are accepted. Unit names lacking a "." will have ".service" appended to make them a valid service unit name.
+    // TODO: Why isn't this just an alias on `include_units`?
+    #[configurable(deprecated)]
     pub units: Vec<String>,
+
+    /// A list of unit names to monitor.
+    ///
+    /// If empty or not present, all units are accepted. Unit names lacking a "." will have ".service" appended to make them a valid service unit name.
     pub include_units: Vec<String>,
+
+    /// A list of unit names to exclude from monitoring.
+    ///
+    /// Unit names lacking a "." will have ".service" appended to make them a valid service unit name.
     pub exclude_units: Vec<String>,
-    pub include_matches: HashMap<String, HashSet<String>>,
-    pub exclude_matches: HashMap<String, HashSet<String>>,
+
+    /// A list of sets of field/value pairs to monitor.
+    ///
+    /// If empty or not present, all journal fields are accepted. If `include_units` is specified, it will be merged into this list.
+    pub include_matches: Matches,
+
+    /// A list of sets of field/value pairs that, if any are present in a journal entry, will cause the entry to be excluded from this source.
+    ///
+    /// If `exclude_units` is specified, it will be merged into this list.
+    pub exclude_matches: Matches,
+
+    /// The directory used to persist file checkpoint positions.
+    ///
+    /// By default, the global `data_dir` option is used. Please make sure the user Vector is running as has write permissions to this directory.
     pub data_dir: Option<PathBuf>,
+
+    /// The `systemd` journal is read in batches, and a checkpoint is set at the end of each batch. This option limits the size of the batch.
     pub batch_size: Option<usize>,
+
+    /// The full path of the `journalctl` executable.
+    ///
+    /// If not set, Vector will search the path for `journalctl`.
     pub journalctl_path: Option<PathBuf>,
+
+    /// The full path of the journal directory.
+    ///
+    /// If not set, `journalctl` will use the default system journal paths.
     pub journal_directory: Option<PathBuf>,
+
+    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
-    /// Deprecated
+
+    /// Enables remapping the `PRIORITY` field from an integer to string value.
+    ///
+    /// Has no effect unless the value of the field is already an integer.
     #[serde(default)]
+    #[configurable(deprecated)]
     remap_priority: bool,
 }
 
@@ -130,7 +187,6 @@ inventory::submit! {
 impl_generate_config_from_default!(JournaldConfig);
 
 type Record = HashMap<String, String>;
-type Matches = HashMap<String, HashSet<String>>;
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "journald")]
@@ -169,20 +225,15 @@ impl SourceConfig for JournaldConfig {
             .clone()
             .unwrap_or_else(|| JOURNALCTL.clone());
 
-        let batch_size = self.batch_size.unwrap_or(DEFAULT_BATCH_SIZE);
-        let current_boot_only = self.current_boot_only.unwrap_or(true);
-        let journal_dir = self.journal_directory.clone();
-        let acknowledgements = cx.globals.acknowledgements.merge(&self.acknowledgements);
+        let starter = StartJournalctl::new(
+            journalctl_path,
+            self.journal_directory.clone(),
+            self.current_boot_only.unwrap_or(true),
+            self.since_now.unwrap_or(false),
+        );
 
-        let start: StartJournalctlFn = Box::new(move |cursor| {
-            let mut command = create_command(
-                &journalctl_path,
-                journal_dir.as_ref(),
-                current_boot_only,
-                cursor,
-            );
-            start_journalctl(&mut command)
-        });
+        let batch_size = self.batch_size.unwrap_or(DEFAULT_BATCH_SIZE);
+        let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
 
         Ok(Box::pin(
             JournaldSource {
@@ -192,9 +243,10 @@ impl SourceConfig for JournaldConfig {
                 batch_size,
                 remap_priority: self.remap_priority,
                 out: cx.out,
-                acknowledgements: acknowledgements.enabled(),
+                acknowledgements,
+                starter,
             }
-            .run_shutdown(cx.shutdown, start),
+            .run_shutdown(cx.shutdown),
         ))
     }
 
@@ -204,6 +256,10 @@ impl SourceConfig for JournaldConfig {
 
     fn source_type(&self) -> &'static str {
         "journald"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 
@@ -215,15 +271,12 @@ struct JournaldSource {
     remap_priority: bool,
     out: SourceSender,
     acknowledgements: bool,
+    starter: StartJournalctl,
 }
 
 impl JournaldSource {
-    async fn run_shutdown(
-        self,
-        shutdown: ShutdownSignal,
-        start_journalctl: StartJournalctlFn,
-    ) -> Result<(), ()> {
-        let mut checkpointer = Checkpointer::new(self.checkpoint_path.clone())
+    async fn run_shutdown(self, shutdown: ShutdownSignal) -> Result<(), ()> {
+        let checkpointer = StatefulCheckpointer::new(self.checkpoint_path.clone())
             .await
             .map_err(|error| {
                 error!(
@@ -233,63 +286,50 @@ impl JournaldSource {
                 );
             })?;
 
-        let mut cursor = match checkpointer.get().await {
-            Ok(cursor) => cursor,
-            Err(error) => {
-                error!(
-                    message = "Could not retrieve saved journald checkpoint.",
-                    %error
-                );
-                None
-            }
-        };
+        let checkpointer = SharedCheckpointer::new(checkpointer);
+        let (finalizer, shutdown) = Finalizer::new(
+            self.acknowledgements,
+            checkpointer.clone(),
+            shutdown.clone(),
+        );
 
-        let mut on_stop = None;
-        let run = Box::pin(self.run(
-            &mut checkpointer,
-            &mut cursor,
-            &mut on_stop,
-            start_journalctl,
-        ));
-        future::select(run, shutdown).await;
-
-        if let Some(stop) = on_stop {
-            stop();
-        }
-
-        Self::save_checkpoint(&mut checkpointer, &cursor).await;
+        self.run(checkpointer, finalizer, shutdown).await;
 
         Ok(())
     }
 
-    async fn run<'a>(
+    async fn run(
         mut self,
-        checkpointer: &'a mut Checkpointer,
-        cursor: &'a mut Option<String>,
-        on_stop: &'a mut Option<StopJournalctlFn>,
-        start_journalctl: StartJournalctlFn,
+        checkpointer: SharedCheckpointer,
+        finalizer: Finalizer,
+        mut shutdown: BoxFuture<'static, ()>,
     ) {
         loop {
+            if matches!(poll!(&mut shutdown), Poll::Ready(_)) {
+                break;
+            }
+
             info!("Starting journalctl.");
-            match start_journalctl(&*cursor) {
-                Ok((stream, stop)) => {
-                    *on_stop = Some(stop);
-                    let should_restart = self.run_stream(stream, checkpointer, cursor).await;
-                    if let Some(stop) = on_stop.take() {
-                        stop();
-                    }
-                    if !should_restart {
+            let cursor = checkpointer.lock().await.cursor.clone();
+            match self.starter.start(cursor.as_deref()) {
+                Ok((stream, running)) => {
+                    if !self.run_stream(stream, &finalizer, &mut shutdown).await {
                         return;
                     }
+                    // Explicit drop to ensure it isn't dropped earlier.
+                    drop(running);
                 }
                 Err(error) => {
                     error!(message = "Error starting journalctl process.", %error);
                 }
-            };
+            }
 
             // journalctl process should never stop,
             // so it is an error if we reach here.
-            sleep(BACKOFF_DURATION).await;
+            tokio::select! {
+                _ = &mut shutdown => break,
+                _ = sleep(BACKOFF_DURATION) => (),
+            }
         }
     }
 
@@ -297,178 +337,225 @@ impl JournaldSource {
     /// Return `true` if should restart `journalctl`.
     async fn run_stream<'a>(
         &'a mut self,
-        mut stream: BoxStream<'static, Result<Bytes, BoxedFramingError>>,
-        checkpointer: &'a mut Checkpointer,
-        cursor: &'a mut Option<String>,
+        mut stream: JournalStream,
+        finalizer: &'a Finalizer,
+        shutdown: &'a mut BoxFuture<'static, ()>,
     ) -> bool {
+        let batch_size = self.batch_size;
         loop {
-            let mut record_size = 0;
-            let mut count = 0;
-            let mut byte_size = 0;
-            let mut events = Vec::new();
-            let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(self.acknowledgements);
-            let mut exiting = None;
+            let mut batch = Batch::new(self);
 
-            for _ in 0..self.batch_size {
-                let bytes = match stream.next().await {
-                    None => {
-                        warn!("Journalctl process stopped.");
-                        exiting = Some(true);
+            // Start the timeout counter only once we have received a
+            // valid and non-filtered event.
+            while batch.events.is_empty() {
+                let item = tokio::select! {
+                    _ = &mut *shutdown => return false,
+                    item = stream.next() => item,
+                };
+                if !batch.handle_next(item) {
+                    return true;
+                }
+            }
+
+            let timeout = tokio::time::sleep(BATCH_TIMEOUT);
+            tokio::pin!(timeout);
+
+            for _ in 1..batch_size {
+                tokio::select! {
+                    _ = &mut timeout => break,
+                    result = stream.next() => if !batch.handle_next(result) {
                         break;
                     }
-                    Some(Ok(text)) => text,
-                    Some(Err(error)) => {
-                        error!(
-                            message = "Could not read from journald source.",
-                            %error,
-                        );
-                        break;
-                    }
-                };
-
-                let mut record = match decode_record(&bytes, self.remap_priority) {
-                    Ok(record) => record,
-                    Err(error) => {
-                        emit!(&JournaldInvalidRecordError {
-                            error,
-                            text: String::from_utf8_lossy(&bytes).into_owned()
-                        });
-                        continue;
-                    }
-                };
-                if let Some(tmp) = record.remove(&*CURSOR) {
-                    *cursor = Some(tmp);
-                }
-
-                if !filter_matches(&record, &self.include_matches, &self.exclude_matches) {
-                    record_size += bytes.len();
-                    let event = create_event(record, &batch);
-                    count += 1;
-                    byte_size += event.size_of();
-                    events.push(event);
                 }
             }
-            drop(batch);
-
-            if record_size > 0 {
-                emit!(&BytesReceived {
-                    byte_size: record_size,
-                    protocol: "journald",
-                });
-            }
-
-            if count > 0 {
-                emit!(&JournaldEventsReceived { count, byte_size });
-                if !events.is_empty() {
-                    match self.out.send_all(&mut stream::iter(events)).await {
-                        Ok(_) => {
-                            if let Some(receiver) = receiver {
-                                // Ignore the received status, we can't do anything with failures here.
-                                receiver.await;
-                            }
-                        }
-                        Err(error) => {
-                            error!(message = "Could not send journald log.", %error);
-                            // `out` channel is closed, don't restart journalctl.
-                            exiting = Some(false);
-                        }
-                    }
-                }
-                if exiting != Some(false) {
-                    Self::save_checkpoint(checkpointer, &*cursor).await;
-                }
-            }
-
-            if let Some(x) = exiting {
+            if let Some(x) = batch.finish(finalizer).await {
                 break x;
             }
         }
     }
+}
 
-    async fn save_checkpoint(checkpointer: &mut Checkpointer, cursor: &Option<String>) {
-        if let Some(cursor) = cursor {
-            if let Err(error) = checkpointer.set(cursor).await {
-                error!(
-                    message = "Could not set journald checkpoint.",
-                    %error,
-                    filename = ?checkpointer.filename,
-                );
+struct Batch<'a> {
+    events: Vec<LogEvent>,
+    record_size: usize,
+    exiting: Option<bool>,
+    batch: Option<Arc<BatchNotifier>>,
+    receiver: Option<BatchStatusReceiver>,
+    source: &'a mut JournaldSource,
+    cursor: Option<String>,
+}
+
+impl<'a> Batch<'a> {
+    fn new(source: &'a mut JournaldSource) -> Self {
+        let (batch, receiver) = BatchNotifier::maybe_new_with_receiver(source.acknowledgements);
+        Self {
+            events: Vec::new(),
+            record_size: 0,
+            exiting: None,
+            batch,
+            receiver,
+            source,
+            cursor: None,
+        }
+    }
+
+    fn handle_next(&mut self, result: Option<Result<Bytes, BoxedFramingError>>) -> bool {
+        match result {
+            None => {
+                warn!("Journalctl process stopped.");
+                self.exiting = Some(true);
+                false
             }
+            Some(Err(error)) => {
+                error!(
+                    message = "Could not read from journald source.",
+                    %error,
+                );
+                false
+            }
+            Some(Ok(bytes)) => {
+                match decode_record(&bytes, self.source.remap_priority) {
+                    Ok(mut record) => {
+                        if let Some(tmp) = record.remove(&*CURSOR) {
+                            self.cursor = Some(tmp);
+                        }
+
+                        if !filter_matches(
+                            &record,
+                            &self.source.include_matches,
+                            &self.source.exclude_matches,
+                        ) {
+                            self.record_size += bytes.len();
+                            let event = create_event(record, &self.batch);
+                            self.events.push(event);
+                        }
+                    }
+                    Err(error) => {
+                        emit!(JournaldInvalidRecordError {
+                            error,
+                            text: String::from_utf8_lossy(&bytes).into_owned()
+                        });
+                    }
+                }
+                true
+            }
+        }
+    }
+
+    async fn finish(mut self, finalizer: &Finalizer) -> Option<bool> {
+        drop(self.batch);
+
+        if self.record_size > 0 {
+            emit!(BytesReceived {
+                byte_size: self.record_size,
+                protocol: "journald",
+            });
+        }
+
+        if !self.events.is_empty() {
+            emit!(OldEventsReceived {
+                count: self.events.len(),
+                byte_size: self.events.size_of(),
+            });
+
+            match self.source.out.send_batch(self.events).await {
+                Ok(_) => {
+                    if let Some(cursor) = self.cursor {
+                        finalizer.finalize(cursor, self.receiver).await;
+                    }
+                }
+                Err(error) => {
+                    error!(message = "Could not send journald log.", %error);
+                    // `out` channel is closed, don't restart journalctl.
+                    self.exiting = Some(false);
+                }
+            }
+        }
+        self.exiting
+    }
+}
+
+type JournalStream = BoxStream<'static, Result<Bytes, BoxedFramingError>>;
+
+struct StartJournalctl {
+    path: PathBuf,
+    journal_dir: Option<PathBuf>,
+    current_boot_only: bool,
+    since_now: bool,
+}
+
+impl StartJournalctl {
+    const fn new(
+        path: PathBuf,
+        journal_dir: Option<PathBuf>,
+        current_boot_only: bool,
+        since_now: bool,
+    ) -> Self {
+        Self {
+            path,
+            journal_dir,
+            current_boot_only,
+            since_now,
+        }
+    }
+
+    fn make_command(&self, checkpoint: Option<&str>) -> Command {
+        let mut command = Command::new(&self.path);
+        command.stdout(Stdio::piped());
+        command.arg("--follow");
+        command.arg("--all");
+        command.arg("--show-cursor");
+        command.arg("--output=json");
+
+        if let Some(dir) = &self.journal_dir {
+            command.arg(format!("--directory={}", dir.display()));
+        }
+
+        if self.current_boot_only {
+            command.arg("--boot");
+        }
+
+        if let Some(cursor) = checkpoint {
+            command.arg(format!("--after-cursor={}", cursor));
+        } else if self.since_now {
+            command.arg("--since=now");
+        } else {
+            // journalctl --follow only outputs a few lines without a starting point
+            command.arg("--since=2000-01-01");
+        }
+
+        command
+    }
+
+    fn start(
+        &mut self,
+        checkpoint: Option<&str>,
+    ) -> crate::Result<(JournalStream, RunningJournalctl)> {
+        let mut command = self.make_command(checkpoint);
+
+        let mut child = command.spawn().context(JournalctlSpawnSnafu)?;
+
+        let stream = FramedRead::new(
+            child.stdout.take().unwrap(),
+            CharacterDelimitedDecoder::new(b'\n'),
+        )
+        .boxed();
+
+        Ok((stream, RunningJournalctl(child)))
+    }
+}
+
+struct RunningJournalctl(Child);
+
+impl Drop for RunningJournalctl {
+    fn drop(&mut self) {
+        if let Some(pid) = self.0.id().and_then(|pid| pid.try_into().ok()) {
+            let _ = kill(Pid::from_raw(pid), Signal::SIGTERM);
         }
     }
 }
 
-/// A function that starts journalctl process.
-/// Return a stream of output split by '\n', and a `StopJournalctlFn`.
-///
-/// Code uses `start_journalctl` below,
-/// but we need this type to implement fake journald source in testing.
-type StartJournalctlFn = Box<
-    dyn Fn(
-            &Option<String>, // cursor
-        ) -> crate::Result<(
-            BoxStream<'static, Result<Bytes, BoxedFramingError>>,
-            StopJournalctlFn,
-        )> + Send
-        + Sync,
->;
-
-type StopJournalctlFn = Box<dyn FnOnce() + Send>;
-
-fn start_journalctl(
-    command: &mut Command,
-) -> crate::Result<(
-    BoxStream<'static, Result<Bytes, BoxedFramingError>>,
-    StopJournalctlFn,
-)> {
-    let mut child = command.spawn().context(JournalctlSpawnSnafu)?;
-
-    let stream = FramedRead::new(
-        child.stdout.take().unwrap(),
-        CharacterDelimitedDecoder::new(b'\n'),
-    )
-    .boxed();
-
-    let pid = Pid::from_raw(child.id().unwrap() as _);
-    let stop = Box::new(move || {
-        let _ = kill(pid, Signal::SIGTERM);
-    });
-
-    Ok((stream, stop))
-}
-
-fn create_command(
-    path: &Path,
-    journal_dir: Option<&PathBuf>,
-    current_boot_only: bool,
-    cursor: &Option<String>,
-) -> Command {
-    let mut command = Command::new(path);
-    command.stdout(Stdio::piped());
-    command.arg("--follow");
-    command.arg("--all");
-    command.arg("--show-cursor");
-    command.arg("--output=json");
-
-    if let Some(dir) = journal_dir {
-        command.arg(format!("--directory={}", dir.display()));
-    }
-
-    if current_boot_only {
-        command.arg("--boot");
-    }
-
-    if let Some(cursor) = cursor {
-        command.arg(format!("--after-cursor={}", cursor));
-    } else {
-        // journalctl --follow only outputs a few lines without a starting point
-        command.arg("--since=2000-01-01");
-    }
-
-    command
-}
-
-fn create_event(record: Record, batch: &Option<Arc<BatchNotifier>>) -> Event {
+fn create_event(record: Record, batch: &Option<Arc<BatchNotifier>>) -> LogEvent {
     let mut log = LogEvent::from_iter(record).with_batch_notifier_option(batch);
 
     // Convert some journald-specific field names into Vector standard ones.
@@ -494,7 +581,7 @@ fn create_event(record: Record, batch: &Option<Arc<BatchNotifier>>) -> Event {
     // Add source type
     log.try_insert(log_schema().source_type_key(), Bytes::from("journald"));
 
-    log.into()
+    log
 }
 
 /// Map the given unit name into a valid systemd unit
@@ -597,6 +684,61 @@ fn find_duplicate_match(a_matches: &Matches, b_matches: &Matches) -> Option<(Str
     None
 }
 
+enum Finalizer {
+    Sync(SharedCheckpointer),
+    Async(OrderedFinalizer<String>),
+}
+
+impl Finalizer {
+    /// Create a new batch finalization handler, which updates the
+    /// stored checkpointer, and a modified shutdown trigger. If
+    /// `acknowledgements` are enabled, the checkpointer is written in
+    /// a background task as acknowledgements are received from sinks,
+    /// and shutdown can be triggered by either the system shutdown or
+    /// a negative acknowledgement.
+    fn new(
+        acknowledgements: bool,
+        checkpointer: SharedCheckpointer,
+        shutdown: ShutdownSignal,
+    ) -> (Self, BoxFuture<'static, ()>) {
+        if acknowledgements {
+            let (finalizer, mut ack_stream) = OrderedFinalizer::new(shutdown.clone());
+            let (trigger, tripwire) = oneshot::channel();
+            tokio::spawn(async move {
+                while let Some((status, cursor)) = ack_stream.next().await {
+                    if status == BatchStatus::Delivered {
+                        checkpointer.lock().await.set(cursor).await;
+                    } else {
+                        emit!(JournaldNegativeAcknowledgmentError { cursor: &cursor });
+                        break;
+                    }
+                }
+                // We have either received the first negative
+                // acknowledgement, or the `OrderedFinalizer` has
+                // bailed out for some reason. In both cases, we need
+                // to cause the send loop above to stop, and so we do
+                // not need to handle any further status events.
+                // Simply send the trigger and exit this task
+                let _ = trigger.send(());
+            });
+            let shutdown = future::select(shutdown, tripwire).map(|_| ()).boxed();
+            (Self::Async(finalizer), shutdown)
+        } else {
+            (Self::Sync(checkpointer), shutdown.map(|_| ()).boxed())
+        }
+    }
+
+    async fn finalize(&self, cursor: String, receiver: Option<BatchStatusReceiver>) {
+        match (self, receiver) {
+            (Self::Sync(checkpointer), None) => checkpointer.lock().await.set(cursor).await,
+            (Self::Async(finalizer), Some(receiver)) => finalizer.add(cursor, receiver),
+            _ => {
+                unreachable!("Cannot have async finalization without a receiver in journald source")
+            }
+        }
+    }
+}
+
 struct Checkpointer {
     file: File,
     filename: PathBuf,
@@ -615,10 +757,7 @@ impl Checkpointer {
 
     async fn set(&mut self, token: &str) -> Result<(), io::Error> {
         self.file.seek(SeekFrom::Start(0)).await?;
-        self.file
-            .write_all(format!("{}\n", token).as_bytes())
-            .await?;
-        Ok(())
+        self.file.write_all(format!("{}\n", token).as_bytes()).await
     }
 
     async fn get(&mut self) -> Result<Option<String>, io::Error> {
@@ -635,6 +774,46 @@ impl Checkpointer {
                 }
             }
         }
+    }
+}
+
+struct StatefulCheckpointer {
+    checkpointer: Checkpointer,
+    cursor: Option<String>,
+}
+
+impl StatefulCheckpointer {
+    async fn new(filename: PathBuf) -> Result<Self, io::Error> {
+        let mut checkpointer = Checkpointer::new(filename).await?;
+        let cursor = checkpointer.get().await?;
+        Ok(Self {
+            checkpointer,
+            cursor,
+        })
+    }
+
+    async fn set(&mut self, token: String) {
+        if let Err(error) = self.checkpointer.set(&token).await {
+            error!(
+                message = "Could not set journald checkpoint.",
+                %error,
+                filename = ?self.checkpointer.filename,
+            );
+        }
+        self.cursor = Some(token);
+    }
+}
+
+#[derive(Clone)]
+struct SharedCheckpointer(Arc<Mutex<StatefulCheckpointer>>);
+
+impl SharedCheckpointer {
+    fn new(c: StatefulCheckpointer) -> Self {
+        Self(Arc::new(Mutex::new(c)))
+    }
+
+    async fn lock(&self) -> MutexGuard<'_, StatefulCheckpointer> {
+        self.0.lock().await
     }
 }
 
@@ -685,77 +864,20 @@ mod checkpointer_tests {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        io::{BufRead, BufReader, Cursor},
-        pin::Pin,
-        task::{Context, Poll},
-    };
+    use std::{fs, path::Path};
 
-    use futures::Stream;
+    use pretty_assertions::assert_eq;
     use tempfile::tempdir;
-    use tokio::time::{sleep, timeout, Duration};
+    use tokio::time::{sleep, timeout, Duration, Instant};
 
     use super::*;
-    use crate::{event::EventStatus, test_util::components};
+    use crate::{
+        config::ComponentKey, event::Event, event::EventStatus,
+        test_util::components::assert_source_compliance,
+    };
 
-    const FAKE_JOURNAL: &str = r#"{"_SYSTEMD_UNIT":"sysinit.target","MESSAGE":"System Initialization","__CURSOR":"1","_SOURCE_REALTIME_TIMESTAMP":"1578529839140001","PRIORITY":"6"}
-{"_SYSTEMD_UNIT":"unit.service","MESSAGE":"unit message","__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140002","PRIORITY":"7"}
-{"_SYSTEMD_UNIT":"badunit.service","MESSAGE":[194,191,72,101,108,108,111,63],"__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140003","PRIORITY":"5"}
-{"_SYSTEMD_UNIT":"stdout","MESSAGE":"Missing timestamp","__CURSOR":"3","__REALTIME_TIMESTAMP":"1578529839140004","PRIORITY":"2"}
-{"_SYSTEMD_UNIT":"stdout","MESSAGE":"Different timestamps","__CURSOR":"4","_SOURCE_REALTIME_TIMESTAMP":"1578529839140005","__REALTIME_TIMESTAMP":"1578529839140004","PRIORITY":"3"}
-{"_SYSTEMD_UNIT":"syslog.service","MESSAGE":"Non-ASCII in other field","__CURSOR":"5","_SOURCE_REALTIME_TIMESTAMP":"1578529839140005","__REALTIME_TIMESTAMP":"1578529839140004","PRIORITY":"3","SYSLOG_RAW":[194,191,87,111,114,108,100,63]}
-{"_SYSTEMD_UNIT":"NetworkManager.service","MESSAGE":"<info>  [1608278027.6016] dhcp-init: Using DHCP client 'dhclient'","__CURSOR":"6","_SOURCE_REALTIME_TIMESTAMP":"1578529839140005","__REALTIME_TIMESTAMP":"1578529839140004","PRIORITY":"6","SYSLOG_FACILITY":["DHCP4","DHCP6"]}
-{"PRIORITY":"5","SYSLOG_FACILITY":"0","SYSLOG_IDENTIFIER":"kernel","_TRANSPORT":"kernel","__REALTIME_TIMESTAMP":"1578529839140006","MESSAGE":"audit log"}
-"#;
-
-    struct FakeJournal {
-        reader: BufReader<Cursor<&'static str>>,
-    }
-
-    impl FakeJournal {
-        fn next(&mut self) -> Option<Result<Bytes, BoxedFramingError>> {
-            let mut line = String::new();
-            match self.reader.read_line(&mut line) {
-                Ok(0) => None,
-                Ok(_) => {
-                    line.pop();
-                    Some(Ok(Bytes::from(line)))
-                }
-                Err(err) => Some(Err(err.into())),
-            }
-        }
-    }
-
-    impl Stream for FakeJournal {
-        type Item = Result<Bytes, BoxedFramingError>;
-
-        fn poll_next(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Option<Self::Item>> {
-            Poll::Ready(Pin::into_inner(self).next())
-        }
-    }
-
-    impl FakeJournal {
-        fn new(
-            checkpoint: &Option<String>,
-        ) -> (
-            BoxStream<'static, Result<Bytes, BoxedFramingError>>,
-            StopJournalctlFn,
-        ) {
-            let cursor = Cursor::new(FAKE_JOURNAL);
-            let reader = BufReader::new(cursor);
-            let mut journal = FakeJournal { reader };
-
-            // The cursors are simply line numbers
-            if let Some(cursor) = checkpoint {
-                let cursor = cursor.parse::<usize>().expect("Invalid cursor");
-                for _ in 0..cursor {
-                    journal.next();
-                }
-            }
-
-            (Box::pin(journal), Box::new(|| ()))
-        }
-    }
+    const TEST_COMPONENT: &str = "journald-test";
+    const TEST_JOURNALCTL: &str = "tests/data/journalctl";
 
     async fn run_with_units(iunits: &[&str], xunits: &[&str], cursor: Option<&str>) -> Vec<Event> {
         let include_matches = create_unit_matches(iunits.to_vec());
@@ -766,48 +888,52 @@ mod tests {
     async fn run_journal(
         include_matches: Matches,
         exclude_matches: Matches,
-        cursor: Option<&str>,
+        checkpoint: Option<&str>,
     ) -> Vec<Event> {
-        components::init_test();
-        let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
-        let (trigger, shutdown, _) = ShutdownSignal::new_wired();
+        assert_source_compliance(&["protocol"], async move {
+            let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
 
-        let tempdir = tempdir().unwrap();
-        let mut checkpoint_path = tempdir.path().to_path_buf();
-        checkpoint_path.push(CHECKPOINT_FILENAME);
+            let tempdir = tempdir().unwrap();
+            let tempdir = tempdir.path().to_path_buf();
 
-        let mut checkpointer = Checkpointer::new(checkpoint_path.clone())
-            .await
-            .expect("Creating checkpointer failed!");
+            if let Some(cursor) = checkpoint {
+                let mut checkpoint_path = tempdir.clone();
+                checkpoint_path.push(TEST_COMPONENT);
+                fs::create_dir(&checkpoint_path).unwrap();
+                checkpoint_path.push(CHECKPOINT_FILENAME);
 
-        if let Some(cursor) = cursor {
-            checkpointer
-                .set(cursor)
-                .await
-                .expect("Could not set checkpoint");
-        }
+                let mut checkpointer = Checkpointer::new(checkpoint_path.clone())
+                    .await
+                    .expect("Creating checkpointer failed!");
 
-        let source = JournaldSource {
-            include_matches,
-            exclude_matches,
-            checkpoint_path,
-            batch_size: DEFAULT_BATCH_SIZE,
-            remap_priority: true,
-            out: tx,
-            acknowledgements: true,
-        }
-        .run_shutdown(
-            shutdown,
-            Box::new(|checkpoint| Ok(FakeJournal::new(checkpoint))),
-        );
-        tokio::spawn(source);
+                checkpointer
+                    .set(cursor)
+                    .await
+                    .expect("Could not set checkpoint");
+            }
 
-        sleep(Duration::from_millis(100)).await;
-        drop(trigger);
+            let (cx, shutdown) =
+                SourceContext::new_shutdown(&ComponentKey::from(TEST_COMPONENT), tx);
+            let config = JournaldConfig {
+                journalctl_path: Some(TEST_JOURNALCTL.into()),
+                include_matches,
+                exclude_matches,
+                data_dir: Some(tempdir),
+                remap_priority: true,
+                acknowledgements: false.into(),
+                ..Default::default()
+            };
+            let source = config.build(cx).await.unwrap();
+            tokio::spawn(async move { source.await.unwrap() });
 
-        let result = timeout(Duration::from_secs(1), rx.collect()).await.unwrap();
-        components::SOURCE_TESTS.assert(&["protocol"]);
-        result
+            sleep(Duration::from_millis(100)).await;
+            shutdown
+                .shutdown_all(Instant::now() + Duration::from_secs(1))
+                .await;
+
+            timeout(Duration::from_secs(1), rx.collect()).await.unwrap()
+        })
+        .await
     }
 
     fn create_unit_matches<S: Into<String>>(units: Vec<S>) -> Matches {
@@ -956,44 +1082,64 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn waits_for_acknowledgements() {
-        let (tx, mut rx) = SourceSender::new_test();
+    async fn handles_acknowledgements() {
+        let (count, checkpoint) = run_acknowledgements(usize::MAX).await;
+
+        assert_eq!(count, 8);
+        assert_eq!(checkpoint.as_deref(), Some("8"));
+    }
+
+    #[tokio::test]
+    async fn handles_negative_acknowledgements() {
+        let (_count, checkpoint) = run_acknowledgements(2).await;
+
+        assert_eq!(checkpoint.as_deref(), Some("2"));
+        // The acknowledgements for the events are delivered after the
+        // events are delivered to the pipeline, so this test would
+        // fail to show that deliveries have stopped.
+        // assert_eq!(count, 2);
+    }
+
+    async fn run_acknowledgements(error_after: usize) -> (usize, Option<String>) {
+        let (tx, mut rx) = SourceSender::new_test_error_after(error_after);
 
         let tempdir = tempdir().unwrap();
-        let mut checkpoint_path = tempdir.path().to_path_buf();
+        let tempdir = tempdir.path().to_path_buf();
+        let mut checkpoint_path = tempdir.clone();
+        checkpoint_path.push(TEST_COMPONENT);
+        fs::create_dir(&checkpoint_path).unwrap();
         checkpoint_path.push(CHECKPOINT_FILENAME);
 
         let mut checkpointer = Checkpointer::new(checkpoint_path.clone())
             .await
             .expect("Creating checkpointer failed!");
 
-        let mut cursor = checkpointer.get().await.unwrap();
-
-        let mut source = JournaldSource {
-            include_matches: Default::default(),
-            exclude_matches: Default::default(),
-            checkpoint_path,
-            batch_size: DEFAULT_BATCH_SIZE,
+        let config = JournaldConfig {
+            journalctl_path: Some(TEST_JOURNALCTL.into()),
+            data_dir: Some(tempdir),
             remap_priority: true,
-            out: tx,
-            acknowledgements: true,
+            acknowledgements: true.into(),
+            batch_size: Some(1),
+            ..Default::default()
         };
-        let (stream, _stop) = FakeJournal::new(&cursor);
-        let mut handle =
-            tokio_test::task::spawn(source.run_stream(stream, &mut checkpointer, &mut cursor));
+        let (cx, _shutdown) = SourceContext::new_shutdown(&ComponentKey::from(TEST_COMPONENT), tx);
+        let source = config.build(cx).await.unwrap();
+        tokio::spawn(async move { source.await.unwrap() });
 
-        // Drive the journal until it waits for the acknowledgement.
-        assert_eq!(handle.poll(), Poll::Pending);
-        assert!(!handle.is_woken());
+        // Make sure the checkpointer cursor is empty
+        assert_eq!(checkpointer.get().await.unwrap(), None);
+
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
         // Acknowledge all the received events.
         let mut count = 0;
-        while let Poll::Ready(Some(event)) = futures::poll!(rx.next()) {
-            event.metadata().update_status(EventStatus::Delivered);
+        while let Poll::Ready(Some(_)) = futures::poll!(rx.next()) {
             count += 1;
         }
-        assert_eq!(count, 8);
-        // Make sure it is woken up again after receiving the acknowledgement.
-        assert!(handle.is_woken());
+
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        let checkpoint = checkpointer.get().await.unwrap();
+        (count, checkpoint)
     }
 
     #[test]
@@ -1044,7 +1190,7 @@ mod tests {
         };
 
         let hashset =
-            |v: &[&str]| -> HashSet<String> { v.to_vec().into_iter().map(String::from).collect() };
+            |v: &[&str]| -> HashSet<String> { v.iter().copied().map(String::from).collect() };
 
         let matches = journald_config.merged_include_matches().unwrap();
         let units = matches.get("_SYSTEMD_UNIT").unwrap();
@@ -1091,22 +1237,41 @@ mod tests {
         let journal_dir = None;
         let current_boot_only = false;
         let cursor = None;
+        let since_now = false;
 
-        let command = create_command(&path, journal_dir, current_boot_only, &cursor);
+        let command = create_command(&path, journal_dir, current_boot_only, since_now, cursor);
         let cmd_line = format!("{:?}", command);
         assert!(!cmd_line.contains("--directory="));
         assert!(!cmd_line.contains("--boot"));
         assert!(cmd_line.contains("--since=2000-01-01"));
 
+        let since_now = true;
+        let journal_dir = None;
+
+        let command = create_command(&path, journal_dir, current_boot_only, since_now, cursor);
+        let cmd_line = format!("{:?}", command);
+        assert!(cmd_line.contains("--since=now"));
+
         let journal_dir = Some(PathBuf::from("/tmp/journal-dir"));
         let current_boot_only = true;
-        let cursor = Some(String::from("2021-01-01"));
+        let cursor = Some("2021-01-01");
 
-        let command = create_command(&path, journal_dir.as_ref(), current_boot_only, &cursor);
+        let command = create_command(&path, journal_dir, current_boot_only, since_now, cursor);
         let cmd_line = format!("{:?}", command);
         assert!(cmd_line.contains("--directory=/tmp/journal-dir"));
         assert!(cmd_line.contains("--boot"));
         assert!(cmd_line.contains("--after-cursor="));
+    }
+
+    fn create_command(
+        path: &Path,
+        journal_dir: Option<PathBuf>,
+        current_boot_only: bool,
+        since_now: bool,
+        cursor: Option<&str>,
+    ) -> Command {
+        StartJournalctl::new(path.into(), journal_dir, current_boot_only, since_now)
+            .make_command(cursor)
     }
 
     fn message(event: &Event) -> Value {

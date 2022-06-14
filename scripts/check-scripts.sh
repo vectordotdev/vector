@@ -8,6 +8,6 @@ set -euo pipefail
 #   Checks that scripts pass shellcheck.
 
 FILES=()
-while IFS='' read -r LINE; do FILES+=("$LINE"); done < <(git ls-files | grep '\.sh')
+while IFS='' read -r LINE; do FILES+=("$LINE"); done < <(git ls-files | grep '\.sh$')
 
 shellcheck --external-sources --shell bash "${FILES[@]}"

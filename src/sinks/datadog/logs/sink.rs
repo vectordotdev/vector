@@ -7,7 +7,9 @@ use std::{
 
 use async_trait::async_trait;
 use bytes::Bytes;
+use codecs::{encoding::Framer, CharacterDelimitedEncoder, JsonSerializer};
 use futures::{stream::BoxStream, StreamExt};
+use lookup::path;
 use snafu::Snafu;
 use tower::Service;
 use vector_core::{
@@ -22,9 +24,11 @@ use vector_core::{
 
 use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};
 use crate::{
+    codecs::Encoder,
     config::SinkContext,
     sinks::util::{
-        encoding::{Encoder, EncodingConfigFixed, StandardEncodings},
+        encoding::{Encoder as _, Transformer},
+        request_builder::EncodeResult,
         Compression, Compressor, RequestBuilder, SinkBuilderExt,
     },
 };
@@ -36,13 +40,13 @@ impl Partitioner for EventPartitioner {
     type Key = Option<Arc<str>>;
 
     fn partition(&self, item: &Self::Item) -> Self::Key {
-        item.metadata().datadog_api_key().clone()
+        item.metadata().datadog_api_key()
     }
 }
 
 #[derive(Debug)]
 pub struct LogSinkBuilder<S> {
-    encoding: EncodingConfigFixed<DatadogLogsJsonEncoding>,
+    encoding: JsonEncoding,
     service: S,
     context: SinkContext,
     batch_settings: BatcherSettings,
@@ -52,25 +56,20 @@ pub struct LogSinkBuilder<S> {
 
 impl<S> LogSinkBuilder<S> {
     pub fn new(
+        transformer: Transformer,
         service: S,
         context: SinkContext,
         default_api_key: Arc<str>,
         batch_settings: BatcherSettings,
     ) -> Self {
         Self {
-            encoding: Default::default(),
+            encoding: JsonEncoding::new(transformer),
             service,
             context,
             default_api_key,
             batch_settings,
             compression: None,
         }
-    }
-
-    #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
-    pub fn encoding(mut self, encoding: EncodingConfigFixed<DatadogLogsJsonEncoding>) -> Self {
-        self.encoding = encoding;
-        self
     }
 
     pub const fn compression(mut self, compression: Compression) -> Self {
@@ -82,6 +81,7 @@ impl<S> LogSinkBuilder<S> {
         LogSink {
             default_api_key: self.default_api_key,
             encoding: self.encoding,
+            schema_enabled: false,
             acker: self.context.acker(),
             service: self.service,
             batch_settings: self.batch_settings,
@@ -103,7 +103,9 @@ pub struct LogSink<S> {
     /// The API service
     service: S,
     /// The encoding of payloads
-    encoding: EncodingConfigFixed<DatadogLogsJsonEncoding>,
+    encoding: JsonEncoding,
+    /// Whether to enable schema support.
+    schema_enabled: bool,
     /// The compression technique to use when building the request body
     compression: Compression,
     /// Batch settings: timeout, max events, max bytes, etc.
@@ -112,33 +114,75 @@ pub struct LogSink<S> {
 
 /// Customized encoding specific to the Datadog Logs sink, as the logs API only accepts JSON encoded
 /// log lines, and requires some specific normalization of certain event fields.
-#[derive(Clone, Debug, PartialEq)]
-pub struct DatadogLogsJsonEncoding {
+#[derive(Clone, Debug)]
+pub struct JsonEncoding {
     log_schema: &'static LogSchema,
-    inner: StandardEncodings,
+    encoder: (Transformer, Encoder<Framer>),
 }
 
-impl Default for DatadogLogsJsonEncoding {
-    fn default() -> Self {
-        DatadogLogsJsonEncoding {
+impl JsonEncoding {
+    pub fn new(transformer: Transformer) -> Self {
+        Self {
             log_schema: log_schema(),
-            inner: StandardEncodings::Json,
+            encoder: (
+                transformer,
+                Encoder::<Framer>::new(
+                    CharacterDelimitedEncoder::new(b',').into(),
+                    JsonSerializer::new().into(),
+                ),
+            ),
         }
     }
 }
 
-impl Encoder<Vec<Event>> for DatadogLogsJsonEncoding {
+#[derive(Clone, Debug)]
+pub struct SemanticJsonEncoding {
+    log_schema: &'static LogSchema,
+    encoder: (Transformer, Encoder<Framer>),
+}
+
+impl crate::sinks::util::encoding::Encoder<Vec<Event>> for JsonEncoding {
     fn encode_input(&self, mut input: Vec<Event>, writer: &mut dyn io::Write) -> io::Result<usize> {
         for event in input.iter_mut() {
             let log = event.as_mut_log();
-            log.rename_key_flat(self.log_schema.message_key(), "message");
-            log.rename_key_flat(self.log_schema.host_key(), "host");
+            log.rename_key(self.log_schema.message_key(), path!("message"));
+            log.rename_key(self.log_schema.host_key(), path!("host"));
             if let Some(Value::Timestamp(ts)) = log.remove(self.log_schema.timestamp_key()) {
-                log.insert_flat("timestamp", Value::Integer(ts.timestamp_millis()));
+                log.insert(path!("timestamp"), Value::Integer(ts.timestamp_millis()));
             }
         }
 
-        self.inner.encode_input(input, writer)
+        self.encoder.encode_input(input, writer)
+    }
+}
+
+impl crate::sinks::util::encoding::Encoder<Vec<Event>> for SemanticJsonEncoding {
+    fn encode_input(&self, mut input: Vec<Event>, writer: &mut dyn io::Write) -> io::Result<usize> {
+        for event in input.iter_mut() {
+            let log = event.as_mut_log();
+
+            // message
+            let message_key = log
+                .find_key_by_meaning("message")
+                .expect("enforced by schema");
+            log.rename_key(message_key.as_str(), path!("message"));
+
+            // host
+            let host_key = log
+                .find_key_by_meaning("host")
+                .unwrap_or_else(|| self.log_schema.host_key().into());
+            log.rename_key(host_key.as_str(), path!("host"));
+
+            // timestamp
+            let ts = log
+                .get_by_meaning("timestamp")
+                .expect("enforced by schema")
+                .as_timestamp_unwrap();
+            let ms = ts.timestamp_millis();
+            log.insert(path!("timestamp"), Value::Integer(ms));
+        }
+
+        self.encoder.encode_input(input, writer)
     }
 }
 
@@ -158,14 +202,14 @@ impl From<io::Error> for RequestBuildError {
 
 struct LogRequestBuilder {
     default_api_key: Arc<str>,
-    encoding: EncodingConfigFixed<DatadogLogsJsonEncoding>,
+    encoding: JsonEncoding,
     compression: Compression,
 }
 
 impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
     type Metadata = (Arc<str>, usize, EventFinalizers, usize);
     type Events = Vec<Event>;
-    type Encoder = EncodingConfigFixed<DatadogLogsJsonEncoding>;
+    type Encoder = JsonEncoding;
     type Payload = Bytes;
     type Request = LogApiRequest;
     type Error = RequestBuildError;
@@ -188,32 +232,138 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
         ((api_key, events_len, finalizers, events_byte_size), events)
     }
 
-    fn encode_events(&self, events: Self::Events) -> Result<Self::Payload, Self::Error> {
+    fn encode_events(
+        &self,
+        events: Self::Events,
+    ) -> Result<EncodeResult<Self::Payload>, Self::Error> {
         // We need to first serialize the payload separately so that we can figure out how big it is
         // before compression.  The Datadog Logs API has a limit on uncompressed data, so we can't
         // use the default implementation of this method.
+        //
+        // TODO: We should probably make `build_request` fallible itself, because then this override of `encode_events`
+        // wouldn't even need to exist, and we could handle it in `build_request` which is required by all implementors.
+        //
+        // On the flip side, it would mean that we'd potentially be compressing payloads that we would inevitably end up
+        // rejecting anyways, which is meh. This might be a signal that the true "right" fix is to actually switch this
+        // sink to incremental encoding and simply put up with suboptimal batch sizes if we need to end up splitting due
+        // to (un)compressed size limitations.
         let mut buf = Vec::new();
-        let n = self.encoder().encode_input(events, &mut buf)?;
-        if n > MAX_PAYLOAD_BYTES {
+        let uncompressed_size = self.encoder().encode_input(events, &mut buf)?;
+        if uncompressed_size > MAX_PAYLOAD_BYTES {
             return Err(RequestBuildError::PayloadTooBig);
         }
 
         // Now just compress it like normal.
         let mut compressor = Compressor::from(self.compression);
         let _ = compressor.write_all(&buf)?;
+        let bytes = compressor.into_inner().freeze();
 
-        Ok(compressor.into_inner().freeze())
+        if self.compression.is_compressed() {
+            Ok(EncodeResult::compressed(bytes, uncompressed_size))
+        } else {
+            Ok(EncodeResult::uncompressed(bytes))
+        }
     }
 
-    fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
+    fn build_request(
+        &self,
+        metadata: Self::Metadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
         let (api_key, batch_size, finalizers, events_byte_size) = metadata;
+        let uncompressed_size = payload.uncompressed_byte_size;
         LogApiRequest {
             batch_size,
             api_key,
             compression: self.compression,
-            body: payload,
+            body: payload.into_payload(),
             finalizers,
             events_byte_size,
+            uncompressed_size,
+        }
+    }
+}
+
+struct SemanticLogRequestBuilder {
+    default_api_key: Arc<str>,
+    encoding: SemanticJsonEncoding,
+    compression: Compression,
+}
+
+impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for SemanticLogRequestBuilder {
+    type Metadata = (Arc<str>, usize, EventFinalizers, usize);
+    type Events = Vec<Event>;
+    type Encoder = SemanticJsonEncoding;
+    type Payload = Bytes;
+    type Request = LogApiRequest;
+    type Error = RequestBuildError;
+
+    fn compression(&self) -> Compression {
+        self.compression
+    }
+
+    fn encoder(&self) -> &Self::Encoder {
+        &self.encoding
+    }
+
+    fn split_input(&self, input: (Option<Arc<str>>, Vec<Event>)) -> (Self::Metadata, Self::Events) {
+        let (api_key, mut events) = input;
+        let events_len = events.len();
+        let finalizers = events.take_finalizers();
+        let events_byte_size = events.size_of();
+
+        let api_key = api_key.unwrap_or_else(|| Arc::clone(&self.default_api_key));
+        ((api_key, events_len, finalizers, events_byte_size), events)
+    }
+
+    fn encode_events(
+        &self,
+        events: Self::Events,
+    ) -> Result<EncodeResult<Self::Payload>, Self::Error> {
+        // We need to first serialize the payload separately so that we can figure out how big it is
+        // before compression.  The Datadog Logs API has a limit on uncompressed data, so we can't
+        // use the default implementation of this method.
+        //
+        // TODO: We should probably make `build_request` fallible itself, because then this override of `encode_events`
+        // wouldn't even need to exist, and we could handle it in `build_request` which is required by all implementors.
+        //
+        // On the flip side, it would mean that we'd potentially be compressing payloads that we would inevitably end up
+        // rejecting anyways, which is meh. This might be a signal that the true "right" fix is to actually switch this
+        // sink to incremental encoding and simply put up with suboptimal batch sizes if we need to end up splitting due
+        // to (un)compressed size limitations.
+        let mut buf = Vec::new();
+        let uncompressed_size = self.encoder().encode_input(events, &mut buf)?;
+        if uncompressed_size > MAX_PAYLOAD_BYTES {
+            return Err(RequestBuildError::PayloadTooBig);
+        }
+
+        // Now just compress it like normal.
+        let mut compressor = Compressor::from(self.compression);
+        let _ = compressor.write_all(&buf)?;
+        let bytes = compressor.into_inner().freeze();
+
+        if self.compression.is_compressed() {
+            Ok(EncodeResult::compressed(bytes, uncompressed_size))
+        } else {
+            Ok(EncodeResult::uncompressed(bytes))
+        }
+    }
+
+    fn build_request(
+        &self,
+        metadata: Self::Metadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
+        let (api_key, batch_size, finalizers, events_byte_size) = metadata;
+        let uncompressed_size = payload.uncompressed_byte_size;
+        LogApiRequest {
+            batch_size,
+            api_key,
+            compression: self.compression,
+            body: payload.into_payload(),
+            finalizers,
+            events_byte_size,
+            uncompressed_size,
         }
     }
 }
@@ -231,27 +381,56 @@ where
         let partitioner = EventPartitioner::default();
 
         let builder_limit = NonZeroUsize::new(64);
-        let request_builder = LogRequestBuilder {
-            default_api_key,
-            encoding: self.encoding,
-            compression: self.compression,
-        };
-
-        let sink = input
-            .batched_partitioned(partitioner, self.batch_settings)
-            .request_builder(builder_limit, request_builder)
-            .filter_map(|request| async move {
-                match request {
-                    Err(e) => {
-                        error!("Failed to build Datadog Logs request: {:?}.", e);
-                        None
+        if self.schema_enabled {
+            let sink = input
+                .batched_partitioned(partitioner, self.batch_settings)
+                .request_builder(
+                    builder_limit,
+                    SemanticLogRequestBuilder {
+                        default_api_key,
+                        encoding: SemanticJsonEncoding {
+                            log_schema: self.encoding.log_schema,
+                            encoder: self.encoding.encoder,
+                        },
+                        compression: self.compression,
+                    },
+                )
+                .filter_map(|request| async move {
+                    match request {
+                        Err(e) => {
+                            error!("Failed to build Datadog Logs request: {:?}.", e);
+                            None
+                        }
+                        Ok(req) => Some(req),
                     }
-                    Ok(req) => Some(req),
-                }
-            })
-            .into_driver(self.service, self.acker);
+                })
+                .into_driver(self.service, self.acker);
 
-        sink.run().await
+            sink.run().await
+        } else {
+            let sink = input
+                .batched_partitioned(partitioner, self.batch_settings)
+                .request_builder(
+                    builder_limit,
+                    LogRequestBuilder {
+                        default_api_key,
+                        encoding: self.encoding,
+                        compression: self.compression,
+                    },
+                )
+                .filter_map(|request| async move {
+                    match request {
+                        Err(e) => {
+                            error!("Failed to build Datadog Logs request: {:?}.", e);
+                            None
+                        }
+                        Ok(req) => Some(req),
+                    }
+                })
+                .into_driver(self.service, self.acker);
+
+            sink.run().await
+        }
     }
 }
 

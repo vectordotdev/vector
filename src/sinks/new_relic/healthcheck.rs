@@ -1,8 +1,10 @@
+use std::sync::Arc;
+
+use http::Request;
+use serde::{Deserialize, Serialize};
+
 use super::NewRelicCredentials;
 use crate::{http::HttpClient, sinks::HealthcheckError};
-use http::{Request, StatusCode};
-use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct NewRelicStatusModel {
@@ -24,7 +26,7 @@ struct NewRelicStatusComponent {
     status: String,
 }
 
-pub async fn healthcheck(
+pub(crate) async fn healthcheck(
     client: HttpClient,
     credentials: Arc<NewRelicCredentials>,
 ) -> crate::Result<()> {
@@ -36,7 +38,7 @@ pub async fn healthcheck(
     let response = client.send(request).await?;
 
     match response.status() {
-        StatusCode::OK => Ok(()),
+        status if status.is_success() => Ok(()),
         other => Err(HealthcheckError::UnexpectedStatus { status: other }.into()),
     }
 }

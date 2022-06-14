@@ -27,8 +27,8 @@ impl Function for EncodeLogfmt {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         // The encode_logfmt function is just an alias for `encode_key_value` with the following

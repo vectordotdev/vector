@@ -8,8 +8,10 @@ use crate::{
     },
     event::Event,
     internal_events::{JsonParserError, ParserTargetExistsError},
+    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
+use lookup::path;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(deny_unknown_fields, default)]
@@ -40,7 +42,7 @@ impl TransformConfig for JsonParserConfig {
         Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -81,14 +83,14 @@ impl From<JsonParserConfig> for JsonParser {
 impl FunctionTransform for JsonParser {
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let log = event.as_mut_log();
-        let value = log.get(&self.field);
+        let value = log.get(self.field.as_str());
 
         let parsed = value
             .and_then(|value| {
-                let to_parse = value.as_bytes();
+                let to_parse = value.coerce_to_bytes();
                 serde_json::from_slice::<Value>(to_parse.as_ref())
                     .map_err(|error| {
-                        emit!(&JsonParserError {
+                        emit!(JsonParserError {
                             field: &self.field,
                             value: value.to_string_lossy().as_str(),
                             error,
@@ -108,25 +110,25 @@ impl FunctionTransform for JsonParser {
         if let Some(object) = parsed {
             match self.target_field {
                 Some(ref target_field) => {
-                    let contains_target = log.contains(&target_field);
+                    let contains_target = log.contains(target_field.as_str());
 
                     if contains_target && !self.overwrite_target {
-                        emit!(&ParserTargetExistsError { target_field })
+                        emit!(ParserTargetExistsError { target_field })
                     } else {
                         if self.drop_field {
-                            log.remove(&self.field);
+                            log.remove(self.field.as_str());
                         }
 
-                        log.insert(&target_field, Value::Object(object));
+                        log.insert(target_field.as_str(), Value::Object(object));
                     }
                 }
                 None => {
                     if self.drop_field {
-                        log.remove(&self.field);
+                        log.remove(self.field.as_str());
                     }
 
                     for (key, value) in object {
-                        log.insert_flat(key, value);
+                        log.insert(path!(&key), value);
                     }
                 }
             }
@@ -140,6 +142,7 @@ impl FunctionTransform for JsonParser {
 
 #[cfg(test)]
 mod test {
+    use lookup::path;
     use serde_json::json;
 
     use super::*;
@@ -218,11 +221,11 @@ mod test {
         let event = transform_one(&mut parser, event).unwrap();
 
         assert_eq!(
-            event.as_log().get_flat("field.with.dots"),
+            event.as_log().get(path!("field.with.dots")),
             Some(&crate::event::Value::from("hello")),
         );
         assert_eq!(
-            event.as_log().get_flat("sub.field"),
+            event.as_log().get(path!("sub.field")),
             Some(&crate::event::Value::from(json!({ "another.one": "bob", }))),
         );
         assert_eq!(event.metadata(), &metadata);
@@ -446,8 +449,8 @@ mod test {
         assert_eq!(event.as_log()["null"], crate::event::Value::Null);
         assert_eq!(event.as_log()["float"], 12.34.into());
         assert_eq!(event.as_log()["int"], 56.into());
-        assert_eq!(event.as_log()["bool true"], true.into());
-        assert_eq!(event.as_log()["bool false"], false.into());
+        assert_eq!(event.as_log()["\"bool true\""], true.into());
+        assert_eq!(event.as_log()["\"bool false\""], false.into());
         assert_eq!(event.as_log()["array[0]"], "z".into());
         assert_eq!(event.as_log()["array[1]"], 7.into());
         assert_eq!(event.as_log()["object.nested"], "data".into());
@@ -548,7 +551,7 @@ mod test {
         let event = event.as_log();
 
         match event.get("message") {
-            Some(crate::event::Value::Map(_)) => (),
+            Some(crate::event::Value::Object(_)) => (),
             _ => panic!("\"message\" is not a map"),
         }
         assert_eq!(event["message.greeting"], "hello".into());

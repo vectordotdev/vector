@@ -7,6 +7,7 @@ use crate::{
     },
     event::Event,
     internal_events::RemoveFieldsFieldMissing,
+    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
@@ -49,7 +50,7 @@ impl TransformConfig for RemoveFieldsConfig {
         Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -69,9 +70,9 @@ impl FunctionTransform for RemoveFields {
         let log = event.as_mut_log();
         for field in &self.fields {
             let field_string = field.to_string();
-            let old_val = log.remove_prune(&field_string, self.drop_empty);
+            let old_val = log.remove_prune(field_string.as_str(), self.drop_empty);
             if old_val.is_none() {
-                emit!(&RemoveFieldsFieldMissing {
+                emit!(RemoveFieldsFieldMissing {
                     field: &field_string
                 });
             }

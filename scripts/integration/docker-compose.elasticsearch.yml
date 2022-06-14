@@ -1,21 +1,21 @@
+version: "3"
+
 services:
   localstack:
-    image: localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
+    image: docker.io/localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
     environment:
       - SERVICES=elasticsearch:4571
     networks:
       - backend
-
   elasticsearch:
-    image: elasticsearch:7.13.1
+    image: docker.io/elasticsearch:7.13.1
     environment:
       - discovery.type=single-node
       - "ES_JAVA_OPTS=-Xms400m -Xmx400m"
     networks:
       - backend
-
   elasticsearch-secure:
-    image: elasticsearch:7.13.1
+    image: docker.io/elasticsearch:7.13.1
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=true
@@ -31,7 +31,6 @@ services:
       - backend
     volumes:
       - ${PWD}/tests/data:/usr/share/elasticsearch/config/certs:ro
-
   runner:
     build:
       context: ${PWD}
@@ -41,15 +40,14 @@ services:
     working_dir: /code
     command:
       - "cargo"
-      - "test"
+      - "nextest"
+      - "run"
       - "--no-fail-fast"
       - "--no-default-features"
       - "--features"
       - "es-integration-tests"
       - "--lib"
       - "::elasticsearch::integration_tests::"
-      - "--"
-      - "--nocapture"
     depends_on:
       - localstack
       - elasticsearch
@@ -63,15 +61,15 @@ services:
     networks:
       - backend
     volumes:
+      - ${PWD}:/code
+      - target:/code/target
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
-      - ${PWD}:/code
 
 networks:
   backend: {}
 
-# this is made to improve the build when running locally
 volumes:
+  target: {}
   cargogit: {}
   cargoregistry: {}
-

@@ -6,8 +6,11 @@ use std::{
 
 use bytes::Bytes;
 use chrono::Utc;
+use codecs::{
+    decoding::{DeserializerConfig, FramingConfig},
+    StreamDecodingError,
+};
 use futures::{FutureExt, StreamExt};
-use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use snafu::Snafu;
 use tokio::{
@@ -18,67 +21,96 @@ use tokio::{
 };
 use tokio_stream::wrappers::IntervalStream;
 use tokio_util::codec::FramedRead;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
     async_read::VecAsyncReadExt,
-    codecs::{
-        self,
-        decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
-    },
-    config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
+    codecs::{Decoder, DecodingConfig},
+    config::{log_schema, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{
-        ExecCommandExecuted, ExecEventsReceived, ExecFailedError, ExecTimeoutError,
+        BytesReceived, ExecCommandExecuted, ExecEventsReceived, ExecFailedError, ExecTimeoutError,
         StreamClosedError,
     },
-    serde::{default_decoding, default_framing_stream_based},
+    serde::default_decoding,
     shutdown::ShutdownSignal,
-    sources::util::StreamDecodingError,
     SourceSender,
 };
+use lookup::path;
 
 pub mod sized_bytes_codec;
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `exec` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(default, deny_unknown_fields)]
 pub struct ExecConfig {
+    #[configurable(derived)]
     pub mode: Mode,
+
+    #[configurable(derived)]
     pub scheduled: Option<ScheduledConfig>,
+
+    #[configurable(derived)]
     pub streaming: Option<StreamingConfig>,
+
+    /// The command to be run, plus any arguments required.
     pub command: Vec<String>,
+
+    /// The directory in which to run the command.
     pub working_directory: Option<PathBuf>,
+
+    /// Whether or not the output from stderr should be included when generating events.
     #[serde(default = "default_include_stderr")]
     pub include_stderr: bool,
+
+    /// The maximum buffer size allowed before a log event will be generated.
     #[serde(default = "default_maximum_buffer_size")]
     pub maximum_buffer_size_bytes: usize,
-    #[serde(default = "default_framing_stream_based")]
-    framing: FramingConfig,
+
+    #[configurable(derived)]
+    framing: Option<FramingConfig>,
+
+    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
 }
 
-// TODO: Would be nice to combine the scheduled and streaming config with the mode enum once
-//       this serde ticket has been addressed (https://github.com/serde-rs/serde/issues/2013)
-#[derive(Deserialize, Serialize, Debug, Clone, Copy)]
+/// Mode of operation for running the command.
+#[configurable_component]
+#[derive(Clone, Copy, Debug)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Mode {
+    /// The command is run on a schedule.
     Scheduled,
+
+    /// The command is run until it exits, potentially being restarted.
     Streaming,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration options for scheduled commands.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ScheduledConfig {
+    /// The interval, in seconds, between scheduled command runs.
+    ///
+    /// If the command takes longer than `exec_interval_secs` to run, it will be killed.
     #[serde(default = "default_exec_interval_secs")]
     exec_interval_secs: u64,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration options for streaming commands.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct StreamingConfig {
+    /// Whether or not the command should be rerun if the command exits.
     #[serde(default = "default_respawn_on_exit")]
     respawn_on_exit: bool,
+
+    /// The amount of time, in seconds, that Vector will wait before rerunning a streaming command that exited.
     #[serde(default = "default_respawn_interval_secs")]
     respawn_interval_secs: u64,
 }
@@ -103,7 +135,7 @@ impl Default for ExecConfig {
             working_directory: None,
             include_stderr: default_include_stderr(),
             maximum_buffer_size_bytes: default_maximum_buffer_size(),
-            framing: default_framing_stream_based(),
+            framing: None,
             decoding: default_decoding(),
         }
     }
@@ -190,7 +222,13 @@ impl SourceConfig for ExecConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         self.validate()?;
         let hostname = get_hostname();
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
+
+        let framing = self
+            .framing
+            .clone()
+            .unwrap_or_else(|| self.decoding.default_stream_framing());
+        let decoder = DecodingConfig::new(framing, self.decoding.clone()).build();
+
         match &self.mode {
             Mode::Scheduled => {
                 let exec_interval_secs = self.exec_interval_secs_or_default();
@@ -222,11 +260,15 @@ impl SourceConfig for ExecConfig {
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+        vec![Output::default(self.decoding.output_type())]
     }
 
     fn source_type(&self) -> &'static str {
         EXEC
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 
@@ -234,7 +276,7 @@ async fn run_scheduled(
     config: ExecConfig,
     hostname: Option<String>,
     exec_interval_secs: u64,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
     shutdown: ShutdownSignal,
     out: SourceSender,
 ) -> Result<(), ()> {
@@ -260,14 +302,14 @@ async fn run_scheduled(
         match timeout {
             Ok(output) => {
                 if let Err(command_error) = output {
-                    emit!(&ExecFailedError {
+                    emit!(ExecFailedError {
                         command: config.command_line().as_str(),
                         error: command_error,
                     });
                 }
             }
             Err(error) => {
-                emit!(&ExecTimeoutError {
+                emit!(ExecTimeoutError {
                     command: config.command_line().as_str(),
                     elapsed_seconds: schedule.as_secs(),
                     error,
@@ -285,7 +327,7 @@ async fn run_streaming(
     hostname: Option<String>,
     respawn_on_exit: bool,
     respawn_interval_secs: u64,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
     shutdown: ShutdownSignal,
     out: SourceSender,
 ) -> Result<(), ()> {
@@ -305,7 +347,7 @@ async fn run_streaming(
                 ) => {
                     // handle command finished
                     if let Err(command_error) = output {
-                        emit!(&ExecFailedError {
+                        emit!(ExecFailedError {
                             command: config.command_line().as_str(),
                             error: command_error,
                         });
@@ -327,7 +369,7 @@ async fn run_streaming(
         let output = run_command(config.clone(), hostname, decoder, shutdown, out).await;
 
         if let Err(command_error) = output {
-            emit!(&ExecFailedError {
+            emit!(ExecFailedError {
                 command: config.command_line().as_str(),
                 error: command_error,
             });
@@ -340,7 +382,7 @@ async fn run_streaming(
 async fn run_command(
     config: ExecConfig,
     hostname: Option<String>,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
     shutdown: ShutdownSignal,
     mut out: SourceSender,
 ) -> Result<Option<ExitStatus>, Error> {
@@ -382,37 +424,25 @@ async fn run_command(
 
     spawn_reader_thread(stdout_reader, decoder.clone(), STDOUT, sender);
 
-    'send: while let Some(((events, _byte_size), stream)) = receiver.recv().await {
-        emit!(&ExecEventsReceived {
-            count: events.len(),
+    while let Some(((mut events, byte_size), stream)) = receiver.recv().await {
+        emit!(BytesReceived {
+            byte_size,
+            protocol: "exec",
+        });
+
+        let count = events.len();
+        emit!(ExecEventsReceived {
+            count,
             command: config.command_line().as_str(),
             byte_size: events.size_of(),
         });
 
-        let total_count = events.len();
-        let mut processed_count = 0;
-
-        for mut event in events {
-            handle_event(
-                &config,
-                &hostname,
-                &Some(stream.to_string()),
-                pid,
-                &mut event,
-            );
-
-            match out.send(event).await {
-                Ok(_) => {
-                    processed_count += 1;
-                }
-                Err(error) => {
-                    emit!(&StreamClosedError {
-                        count: total_count - processed_count,
-                        error,
-                    });
-                    break 'send;
-                }
-            }
+        for event in &mut events {
+            handle_event(&config, &hostname, &Some(stream.to_string()), pid, event);
+        }
+        if let Err(error) = out.send_batch(events).await {
+            emit!(StreamClosedError { count, error });
+            break;
         }
     }
 
@@ -441,7 +471,7 @@ async fn run_command(
 }
 
 fn handle_exit_status(config: &ExecConfig, exit_status: Option<i32>, exec_duration: Duration) {
-    emit!(&ExecCommandExecuted {
+    emit!(ExecCommandExecuted {
         command: config.command_line().as_str(),
         exit_status,
         exec_duration,
@@ -496,12 +526,12 @@ fn handle_event(
 
         // Add data stream of stdin or stderr (if needed)
         if let Some(data_stream) = data_stream {
-            log.try_insert_flat(STREAM_KEY, data_stream.clone());
+            log.try_insert(path!(STREAM_KEY), data_stream.clone());
         }
 
         // Add pid (if needed)
         if let Some(pid) = pid {
-            log.try_insert_flat(PID_KEY, pid as i64);
+            log.try_insert(path!(PID_KEY), pid as i64);
         }
 
         // Add hostname (if needed)
@@ -510,13 +540,13 @@ fn handle_event(
         }
 
         // Add command
-        log.try_insert_flat(COMMAND_KEY, config.command.clone());
+        log.try_insert(path!(COMMAND_KEY), config.command.clone());
     }
 }
 
 fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
     reader: BufReader<R>,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
     origin: &'static str,
     sender: Sender<((SmallVec<[Event; 1]>, usize), &'static str)>,
 ) {
@@ -617,7 +647,7 @@ mod tests {
             working_directory: Some(PathBuf::from("/tmp")),
             include_stderr: default_include_stderr(),
             maximum_buffer_size_bytes: default_maximum_buffer_size(),
-            framing: default_framing_stream_based(),
+            framing: None,
             decoding: default_decoding(),
         };
 
@@ -641,7 +671,7 @@ mod tests {
 
         let buf = Cursor::new("hello world\nhello rocket 🚀");
         let reader = BufReader::new(buf);
-        let decoder = codecs::Decoder::default();
+        let decoder = crate::codecs::Decoder::default();
         let (sender, mut receiver) = channel(1024);
 
         spawn_reader_thread(reader, decoder, STDOUT, sender);
@@ -677,7 +707,6 @@ mod tests {
     #[tokio::test]
     #[cfg(not(target_os = "windows"))]
     async fn test_run_command_linux() {
-        trace_init();
         let config = standard_scheduled_test_config();
         let hostname = Some("Some.Machine".to_string());
         let decoder = Default::default();
@@ -690,7 +719,8 @@ mod tests {
             run_command(config.clone(), hostname, decoder, shutdown, tx),
         );
 
-        let timeout_result = timeout.await;
+        let timeout_result =
+            crate::test_util::components::assert_source_compliance(&[], timeout).await;
 
         let exit_status = timeout_result
             .expect("command timed out")
@@ -707,7 +737,7 @@ mod tests {
             assert!(log.get(PID_KEY).is_some());
             assert!(log.get(log_schema().timestamp_key()).is_some());
 
-            assert_eq!(8, log.all_fields().count());
+            assert_eq!(8, log.all_fields().unwrap().count());
         } else {
             panic!("Expected to receive a linux event");
         }
@@ -729,7 +759,7 @@ mod tests {
             working_directory: None,
             include_stderr: default_include_stderr(),
             maximum_buffer_size_bytes: default_maximum_buffer_size(),
-            framing: default_framing_stream_based(),
+            framing: None,
             decoding: default_decoding(),
         }
     }

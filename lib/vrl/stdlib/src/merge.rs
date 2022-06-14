@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use ::value::Value;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -40,8 +41,8 @@ impl Function for Merge {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let to = arguments.required("to");
@@ -50,25 +51,10 @@ impl Function for Merge {
 
         Ok(Box::new(MergeFn { to, from, deep }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Resolved {
-        let to = arguments.required("to");
-        let mut to = to.try_object()?;
-        let from = arguments.required("from");
-        let from = from.try_object()?;
-        let deep = arguments
-            .optional("deep")
-            .map(|val| val.as_boolean().unwrap_or(false))
-            .unwrap_or_else(|| false);
-
-        merge_maps(&mut to, &from, deep);
-
-        Ok(to.into())
-    }
 }
 
 #[derive(Debug, Clone)]
-pub struct MergeFn {
+pub(crate) struct MergeFn {
     to: Box<dyn Expression>,
     from: Box<dyn Expression>,
     deep: Box<dyn Expression>,
@@ -85,10 +71,11 @@ impl Expression for MergeFn {
         Ok(to_value.into())
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         self.to
             .type_def(state)
-            .merge_shallow(self.from.type_def(state))
+            .restrict_object()
+            .merge_overwrite(self.from.type_def(state).restrict_object())
     }
 }
 
@@ -128,8 +115,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use value::Kind;
     use vector_common::btreemap;
+    use vrl::value::Kind;
 
     use super::*;
 

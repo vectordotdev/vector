@@ -10,7 +10,7 @@ use vrl::{
 };
 
 #[derive(Debug)]
-pub enum Error {
+pub(crate) enum Error {
     InvalidGrokPattern(datadog_grok::parse_grok_rules::Error),
 }
 
@@ -24,7 +24,7 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-impl DiagnosticError for Error {
+impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
         109
     }
@@ -60,11 +60,6 @@ impl Function for ParseGroks {
                 keyword: "patterns",
                 kind: kind::ARRAY,
                 required: true,
-            },
-            Parameter {
-                keyword: "remove_empty",
-                kind: kind::BOOLEAN,
-                required: false,
             },
             Parameter {
                 keyword: "aliases",
@@ -105,7 +100,7 @@ impl Function for ParseGroks {
     fn compile_argument(
         &self,
         args: &[(&'static str, Option<FunctionArgument>)],
-        _info: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         name: &str,
         expr: Option<&expression::Expr>,
     ) -> CompiledArgument {
@@ -119,10 +114,18 @@ impl Function for ParseGroks {
                     }
                 });
 
-                let patterns = expr.as_value().unwrap();
+                let patterns = expr.as_value().ok_or_else(|| {
+                    vrl::function::Error::ExpectedStaticExpression {
+                        keyword: "patterns",
+                        expr: expr.clone(),
+                    }
+                })?;
                 let patterns = patterns
                     .try_array()
-                    .unwrap()
+                    .map_err(|_| vrl::function::Error::ExpectedStaticExpression {
+                        keyword: "patterns",
+                        expr: expr.clone(),
+                    })?
                     .into_iter()
                     .map(|value| {
                         let pattern = value
@@ -155,7 +158,7 @@ impl Function for ParseGroks {
                 // We use a datadog library here because it is a superset of grok.
                 let grok_rules =
                     parse_grok_rules::parse_grok_rules(&patterns, aliases).map_err(|e| {
-                        Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticError>
+                        Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticMessage>
                     })?;
 
                 Ok(Some(Box::new(grok_rules) as _))
@@ -164,34 +167,10 @@ impl Function for ParseGroks {
         }
     }
 
-    fn call_by_vm(
-        &self,
-        _ctx: &mut Context,
-        args: &mut VmArgumentList,
-    ) -> std::result::Result<Value, ExpressionError> {
-        let value = args.required("value");
-        let bytes = value.try_bytes_utf8_lossy()?;
-
-        let remove_empty = args
-            .optional("remove_empty")
-            .map(|v| v.as_boolean().unwrap_or(false))
-            .unwrap_or(false);
-
-        let grok_rules = args
-            .required_any("patterns")
-            .downcast_ref::<Vec<GrokRule>>()
-            .unwrap();
-
-        let v = parse_grok::parse_grok(bytes.as_ref(), grok_rules, remove_empty)
-            .map_err(|e| format!("unable to parse grok: {}", e))?;
-
-        Ok(v)
-    }
-
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -235,17 +214,9 @@ impl Function for ParseGroks {
 
         // we use a datadog library here because it is a superset of grok
         let grok_rules = parse_grok_rules::parse_grok_rules(&patterns, aliases)
-            .map_err(|e| Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticError>)?;
+            .map_err(|e| Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticMessage>)?;
 
-        let remove_empty = arguments
-            .optional("remove_empty")
-            .unwrap_or_else(|| expr!(false));
-
-        Ok(Box::new(ParseGrokFn {
-            value,
-            grok_rules,
-            remove_empty,
-        }))
+        Ok(Box::new(ParseGrokFn { value, grok_rules }))
     }
 }
 
@@ -253,28 +224,27 @@ impl Function for ParseGroks {
 struct ParseGrokFn {
     value: Box<dyn Expression>,
     grok_rules: Vec<GrokRule>,
-    remove_empty: Box<dyn Expression>,
 }
 
 impl Expression for ParseGrokFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let bytes = value.try_bytes_utf8_lossy()?;
-        let remove_empty = self.remove_empty.resolve(ctx)?.try_boolean()?;
 
-        let v = parse_grok::parse_grok(bytes.as_ref(), &self.grok_rules, remove_empty)
+        let v = parse_grok::parse_grok(bytes.as_ref(), &self.grok_rules)
             .map_err(|err| format!("unable to parse grok: {}", err))?;
 
         Ok(v)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::object(Collection::any()).fallible()
     }
 }
 
 #[cfg(test)]
 mod test {
+    use ::value::Value;
     use vector_common::btreemap;
 
     use super::*;
@@ -321,17 +291,6 @@ mod test {
                 "timestamp" => "2020-10-02T23:22:12.223222Z",
                 "level" => "",
             })),
-            tdef: TypeDef::object(Collection::any()).fallible(),
-        }
-
-        remove_empty {
-            args: func_args![ value: "2020-10-02T23:22:12.223222Z",
-                              patterns: vec!["(%{TIMESTAMP_ISO8601:timestamp}|%{LOGLEVEL:level})"],
-                              remove_empty: true,
-            ],
-            want: Ok(Value::from(
-                btreemap! { "timestamp" => "2020-10-02T23:22:12.223222Z" },
-            )),
             tdef: TypeDef::object(Collection::any()).fallible(),
         }
 

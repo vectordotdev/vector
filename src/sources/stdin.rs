@@ -3,31 +3,45 @@ use std::{io, thread};
 use async_stream::stream;
 use bytes::Bytes;
 use chrono::Utc;
+use codecs::{
+    decoding::{DeserializerConfig, FramingConfig},
+    StreamDecodingError,
+};
 use futures::{channel::mpsc, executor, SinkExt, StreamExt};
-use serde::{Deserialize, Serialize};
 use tokio_util::{codec::FramedRead, io::StreamReader};
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    codecs::decoding::{DecodingConfig, DeserializerConfig, FramingConfig},
-    config::{
-        log_schema, DataType, Output, Resource, SourceConfig, SourceContext, SourceDescription,
-    },
-    internal_events::{BytesReceived, StdinEventsReceived, StreamClosedError},
-    serde::{default_decoding, default_framing_stream_based},
+    codecs::DecodingConfig,
+    config::{log_schema, Output, Resource, SourceConfig, SourceContext, SourceDescription},
+    internal_events::{BytesReceived, OldEventsReceived, StreamClosedError},
+    serde::default_decoding,
     shutdown::ShutdownSignal,
-    sources::util::StreamDecodingError,
     SourceSender,
 };
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `stdin` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct StdinConfig {
+    /// The maximum buffer size, in bytes, of incoming messages.
+    ///
+    /// Messages larger than this are truncated.
     #[serde(default = "crate::serde::default_max_length")]
     pub max_length: usize,
+
+    /// Overrides the name of the log field used to add the current hostname to each event.
+    ///
+    /// The value will be the current hostname for wherever Vector is running.
+    ///
+    /// By default, the [global `host_key` option](https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key) is used.
     pub host_key: Option<String>,
-    #[serde(default = "default_framing_stream_based")]
-    pub framing: FramingConfig,
+
+    #[configurable(derived)]
+    pub framing: Option<FramingConfig>,
+
+    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     pub decoding: DeserializerConfig,
 }
@@ -37,7 +51,7 @@ impl Default for StdinConfig {
         StdinConfig {
             max_length: crate::serde::default_max_length(),
             host_key: Default::default(),
-            framing: default_framing_stream_based(),
+            framing: None,
             decoding: default_decoding(),
         }
     }
@@ -62,7 +76,7 @@ impl SourceConfig for StdinConfig {
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+        vec![Output::default(self.decoding.output_type())]
     }
 
     fn source_type(&self) -> &'static str {
@@ -71,6 +85,10 @@ impl SourceConfig for StdinConfig {
 
     fn resources(&self) -> Vec<Resource> {
         vec![Resource::Stdin]
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 
@@ -87,7 +105,11 @@ where
         .host_key
         .unwrap_or_else(|| log_schema().host_key().to_string());
     let hostname = crate::get_hostname().ok();
-    let decoder = DecodingConfig::new(config.framing.clone(), config.decoding).build();
+
+    let framing = config
+        .framing
+        .unwrap_or_else(|| config.decoding.default_stream_framing());
+    let decoder = DecodingConfig::new(framing, config.decoding).build();
 
     let (mut sender, receiver) = mpsc::channel(1024);
 
@@ -109,10 +131,6 @@ where
 
             stdin.consume(len);
 
-            emit!(&BytesReceived {
-                byte_size: len,
-                protocol: "none"
-            });
             if executor::block_on(sender.send(buffer)).is_err() {
                 // Receiver has closed so we should shutdown.
                 break;
@@ -126,8 +144,10 @@ where
         let mut stream = stream! {
             while let Some(result) = stream.next().await {
                 match result {
-                    Ok((events, _byte_size)) => {
-                        emit!(&StdinEventsReceived {
+                    Ok((events, byte_size)) => {
+                        emit!(BytesReceived { byte_size, protocol: "none" });
+
+                        emit!(OldEventsReceived {
                             byte_size: events.size_of(),
                             count: events.len()
                         });
@@ -141,7 +161,7 @@ where
                             log.try_insert(log_schema().timestamp_key(), now);
 
                             if let Some(hostname) = &hostname {
-                                log.try_insert(&host_key, hostname.clone());
+                                log.try_insert(host_key.as_str(), hostname.clone());
                             }
 
                             yield event;
@@ -159,14 +179,14 @@ where
         }
         .boxed();
 
-        match out.send_all(&mut stream).await {
+        match out.send_event_stream(&mut stream).await {
             Ok(()) => {
                 info!("Finished sending.");
                 Ok(())
             }
             Err(error) => {
                 let (count, _) = stream.size_hint();
-                emit!(&StreamClosedError { error, count });
+                emit!(StreamClosedError { error, count });
                 Err(())
             }
         }
@@ -178,7 +198,7 @@ mod tests {
     use std::io::Cursor;
 
     use super::*;
-    use crate::{test_util::trace_init, SourceSender};
+    use crate::{test_util::components::assert_source_compliance, SourceSender};
 
     #[test]
     fn generate_config() {
@@ -187,32 +207,33 @@ mod tests {
 
     #[tokio::test]
     async fn stdin_decodes_line() {
-        trace_init();
+        assert_source_compliance(&["protocol"], async {
+            let (tx, rx) = SourceSender::new_test();
+            let config = StdinConfig::default();
+            let buf = Cursor::new("hello world\nhello world again");
 
-        let (tx, rx) = SourceSender::new_test();
-        let config = StdinConfig::default();
-        let buf = Cursor::new("hello world\nhello world again");
+            stdin_source(buf, config, ShutdownSignal::noop(), tx)
+                .unwrap()
+                .await
+                .unwrap();
 
-        stdin_source(buf, config, ShutdownSignal::noop(), tx)
-            .unwrap()
-            .await
-            .unwrap();
+            let mut stream = rx;
 
-        let mut stream = rx;
+            let event = stream.next().await;
+            assert_eq!(
+                Some("hello world".into()),
+                event.map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
+            );
 
-        let event = stream.next().await;
-        assert_eq!(
-            Some("hello world".into()),
-            event.map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
-        );
+            let event = stream.next().await;
+            assert_eq!(
+                Some("hello world again".into()),
+                event.map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
+            );
 
-        let event = stream.next().await;
-        assert_eq!(
-            Some("hello world again".into()),
-            event.map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
-        );
-
-        let event = stream.next().await;
-        assert!(event.is_none());
+            let event = stream.next().await;
+            assert!(event.is_none());
+        })
+        .await;
     }
 }

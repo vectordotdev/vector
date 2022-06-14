@@ -5,18 +5,18 @@ use hyper::Body;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 
-use super::util::batch::RealtimeSizeBasedDefaultBatchSettings;
 use crate::{
-    config::{Input, SinkConfig, SinkContext, SinkDescription},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     http::{Auth, HttpClient, HttpError, MaybeAuth},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http::{BatchedHttpSink, HttpRetryLogic, HttpSink},
+        http::{BatchedHttpSink, HttpEventEncoder, HttpRetryLogic, HttpSink},
         retries::{RetryAction, RetryLogic},
-        sink, BatchConfig, Buffer, Compression, TowerRequestConfig, UriSerde,
+        BatchConfig, Buffer, Compression, RealtimeSizeBasedDefaultBatchSettings,
+        TowerRequestConfig, UriSerde,
     },
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -41,7 +41,13 @@ pub struct ClickhouseConfig {
     pub auth: Option<Auth>,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 inventory::submit! {
@@ -83,7 +89,6 @@ impl SinkConfig for ClickhouseConfig {
             batch.timeout,
             client.clone(),
             cx.acker(),
-            sink::StdServiceLogic::default(),
         )
         .sink_map_err(|error| error!(message = "Fatal clickhouse sink error.", %error));
 
@@ -99,14 +104,18 @@ impl SinkConfig for ClickhouseConfig {
     fn sink_type(&self) -> &'static str {
         "clickhouse"
     }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
+    }
 }
 
-#[async_trait::async_trait]
-impl HttpSink for ClickhouseConfig {
-    type Input = BytesMut;
-    type Output = BytesMut;
+pub struct ClickhouseEventEncoder {
+    encoding: EncodingConfigWithDefault<Encoding>,
+}
 
-    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
+impl HttpEventEncoder<BytesMut> for ClickhouseEventEncoder {
+    fn encode_event(&mut self, mut event: Event) -> Option<BytesMut> {
         self.encoding.apply_rules(&mut event);
         let log = event.into_log();
 
@@ -114,6 +123,19 @@ impl HttpSink for ClickhouseConfig {
         body.put_u8(b'\n');
 
         Some(body)
+    }
+}
+
+#[async_trait::async_trait]
+impl HttpSink for ClickhouseConfig {
+    type Input = BytesMut;
+    type Output = BytesMut;
+    type Encoder = ClickhouseEventEncoder;
+
+    fn build_encoder(&self) -> Self::Encoder {
+        ClickhouseEventEncoder {
+            encoding: self.encoding.clone(),
+        }
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Bytes>> {
@@ -171,7 +193,7 @@ fn set_uri_query(uri: &Uri, database: &str, table: &str, skip_unknown: bool) -> 
             format!(
                 "INSERT INTO \"{}\".\"{}\" FORMAT JSONEachRow",
                 database,
-                table.replace("\"", "\\\"")
+                table.replace('\"', "\\\"")
             )
             .as_str(),
         )
@@ -285,7 +307,10 @@ mod integration_tests {
         },
     };
 
-    use futures::future;
+    use futures::{
+        future::{ok, ready},
+        stream,
+    };
     use serde_json::Value;
     use tokio::time::{timeout, Duration};
     use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
@@ -296,7 +321,7 @@ mod integration_tests {
         config::{log_schema, SinkConfig, SinkContext},
         sinks::util::encoding::TimestampFormat,
         test_util::{
-            components::{self, HTTP_SINK_TAGS},
+            components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
             random_string, trace_init,
         },
     };
@@ -342,7 +367,12 @@ mod integration_tests {
             .as_mut_log()
             .insert("items", vec!["item1", "item2"]);
 
-        components::run_sink_event(sink, input_event.clone(), &HTTP_SINK_TAGS).await;
+        run_and_assert_sink_compliance(
+            sink,
+            stream::once(ready(input_event.clone())),
+            &HTTP_SINK_TAGS,
+        )
+        .await;
 
         let output = client.select_all(&table).await;
         assert_eq!(1, output.rows);
@@ -386,7 +416,12 @@ mod integration_tests {
         let (mut input_event, mut receiver) = make_event();
         input_event.as_mut_log().insert("unknown", "mysteries");
 
-        components::run_sink_event(sink, input_event.clone(), &HTTP_SINK_TAGS).await;
+        run_and_assert_sink_compliance(
+            sink,
+            stream::once(ready(input_event.clone())),
+            &HTTP_SINK_TAGS,
+        )
+        .await;
 
         let output = client.select_all(&table).await;
         assert_eq!(1, output.rows);
@@ -437,7 +472,12 @@ mod integration_tests {
 
         let (mut input_event, _receiver) = make_event();
 
-        components::run_sink_event(sink, input_event.clone(), &HTTP_SINK_TAGS).await;
+        run_and_assert_sink_compliance(
+            sink,
+            stream::once(ready(input_event.clone())),
+            &HTTP_SINK_TAGS,
+        )
+        .await;
 
         let output = client.select_all(&table).await;
         assert_eq!(1, output.rows);
@@ -494,7 +534,12 @@ timestamp_format = "unix""#,
 
         let (mut input_event, _receiver) = make_event();
 
-        components::run_sink_event(sink, input_event.clone(), &HTTP_SINK_TAGS).await;
+        run_and_assert_sink_compliance(
+            sink,
+            stream::once(ready(input_event.clone())),
+            &HTTP_SINK_TAGS,
+        )
+        .await;
 
         let output = client.select_all(&table).await;
         assert_eq!(1, output.rows);
@@ -565,7 +610,7 @@ timestamp_format = "unix""#,
             assert!(!visited.load(Ordering::SeqCst), "Should not retry request.");
             visited.store(true, Ordering::SeqCst);
 
-            future::ok::<_, Infallible>(warp::reply::with_status(
+            ok::<_, Infallible>(warp::reply::with_status(
                 "Code: 117",
                 StatusCode::INTERNAL_SERVER_ERROR,
             ))

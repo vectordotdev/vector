@@ -1,6 +1,9 @@
+use std::str::FromStr;
 use std::{collections::BTreeMap, fs, path::Path};
 
-use vrl::{function::Example, Value};
+use ::value::Value;
+use lookup::LookupBuf;
+use vrl::function::Example;
 
 #[derive(Debug)]
 pub struct Test {
@@ -12,6 +15,10 @@ pub struct Test {
     pub result: String,
     pub result_approx: bool,
     pub skip: bool,
+
+    // paths set to read-only. (can be merged once paths support metadata)
+    pub read_only_paths: Vec<(LookupBuf, bool)>,
+    pub read_only_metadata_paths: Vec<(LookupBuf, bool)>,
 }
 
 enum CaptureMode {
@@ -37,6 +44,9 @@ impl Test {
             skip = true;
         }
 
+        let mut read_only_paths = vec![];
+        let mut read_only_metadata_paths = vec![];
+
         let mut capture_mode = CaptureMode::None;
         for mut line in content.lines() {
             if line.starts_with('#') && !matches!(capture_mode, CaptureMode::Done) {
@@ -53,6 +63,30 @@ impl Test {
                 } else if line.starts_with("result:") {
                     capture_mode = CaptureMode::Result;
                     line = line.strip_prefix("result:").expect("result").trim_start();
+                } else if line.starts_with("read_only:") {
+                    let path_str = line.strip_prefix("read_only:").expect("read-only");
+                    read_only_paths.push((FromStr::from_str(path_str).expect("valid path"), false));
+                    continue;
+                } else if line.starts_with("read_only_recursive:") {
+                    let path_str = line
+                        .strip_prefix("read_only_recursive:")
+                        .expect("read-only");
+                    read_only_paths.push((FromStr::from_str(path_str).expect("valid path"), true));
+                    continue;
+                } else if line.starts_with("read_only_metadata:") {
+                    let path_str = line
+                        .strip_prefix("read_only_metadata:")
+                        .expect("read_only_metadata");
+                    read_only_metadata_paths
+                        .push((FromStr::from_str(path_str).expect("valid path"), false));
+                    continue;
+                } else if line.starts_with("read_only_metadata_recursive:") {
+                    let path_str = line
+                        .strip_prefix("read_only_metadata_recursive:")
+                        .expect("read-read_only_metadata_recursive");
+                    read_only_metadata_paths
+                        .push((FromStr::from_str(path_str).expect("valid path"), true));
+                    continue;
                 }
 
                 match capture_mode {
@@ -97,10 +131,12 @@ impl Test {
             result,
             result_approx,
             skip,
+            read_only_paths,
+            read_only_metadata_paths,
         }
     }
 
-    pub fn from_example(func: &'static str, example: &Example) -> Self {
+    pub fn from_example(func: impl ToString, example: &Example) -> Self {
         let object = Value::Object(BTreeMap::default());
         let result = match example.result {
             Ok(string) => string.to_owned(),
@@ -109,13 +145,15 @@ impl Test {
 
         Self {
             name: example.title.to_owned(),
-            category: format!("functions/{}", func),
+            category: format!("functions/{}", func.to_string()),
             error: None,
             source: example.source.to_owned(),
             object,
             result,
             result_approx: false,
             skip: false,
+            read_only_paths: vec![],
+            read_only_metadata_paths: vec![],
         }
     }
 }
@@ -144,5 +182,5 @@ fn test_name(path: &Path) -> String {
         .unwrap()
         .1
         .trim_end_matches(".vrl")
-        .replace("_", " ")
+        .replace('_', " ")
 }

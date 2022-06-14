@@ -15,7 +15,7 @@ pub struct ConnectionOpen {
 }
 
 impl InternalEvent for ConnectionOpen {
-    fn emit_metrics(&self) {
+    fn emit(self) {
         gauge!("open_connections", self.count as f64);
     }
 }
@@ -42,6 +42,7 @@ impl OpenGauge {
         }
     }
 
+    #[cfg(all(feature = "sources-utils-unix", unix))]
     pub fn any_open(&self) -> bool {
         self.gauge.load(Ordering::Acquire) != 0
     }

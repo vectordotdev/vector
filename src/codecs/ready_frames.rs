@@ -47,7 +47,7 @@ where
     }
 
     /// Returns a reference to the underlying stream.
-    pub fn get_ref(&self) -> &T {
+    pub const fn get_ref(&self) -> &T {
         &self.inner
     }
 
@@ -115,8 +115,9 @@ where
 
 #[cfg(test)]
 mod test {
-    use super::ReadyFrames;
     use futures::{channel::mpsc, poll, task::Poll, SinkExt, StreamExt};
+
+    use super::ReadyFrames;
 
     #[tokio::test]
     async fn idle_passthrough() {

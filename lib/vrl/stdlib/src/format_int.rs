@@ -1,6 +1,28 @@
 use std::collections::VecDeque;
 
+use ::value::Value;
 use vrl::prelude::*;
+
+fn format_int(value: Value, base: Option<Value>) -> Resolved {
+    let value = value.try_integer()?;
+    let base = match base {
+        Some(base) => {
+            let value = base.try_integer()?;
+            if !(2..=36).contains(&value) {
+                return Err(format!(
+                    "invalid base {}: must be be between 2 and 36 (inclusive)",
+                    value
+                )
+                .into());
+            }
+
+            value as u32
+        }
+        None => 10u32,
+    };
+    let converted = format_radix(value, base as u32);
+    Ok(converted.into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct FormatInt;
@@ -27,8 +49,8 @@ impl Function for FormatInt {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -67,31 +89,18 @@ struct FormatIntFn {
 
 impl Expression for FormatIntFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?.try_integer()?;
-        let base = match &self.base {
-            Some(base) => base
-                .resolve(ctx)
-                .and_then(|value| value.try_integer().map_err(Into::into))
-                .and_then(|value| {
-                    if !(2..=36).contains(&value) {
-                        return Err(format!(
-                            "invalid base {}: must be be between 2 and 36 (inclusive)",
-                            value
-                        )
-                        .into());
-                    }
+        let value = self.value.resolve(ctx)?;
 
-                    Ok(value as u32)
-                }),
-            None => Ok(10u32),
-        }?;
+        let base = self
+            .base
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
 
-        let converted = format_radix(value, base as u32);
-
-        Ok(converted.into())
+        format_int(value, base)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::integer().fallible()
     }
 }

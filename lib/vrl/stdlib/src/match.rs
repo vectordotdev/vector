@@ -1,4 +1,11 @@
+use ::value::Value;
 use vrl::prelude::*;
+
+fn match_(value: Value, pattern: Value) -> Resolved {
+    let string = value.try_bytes_utf8_lossy()?;
+    let pattern = pattern.try_regex()?;
+    Ok(pattern.is_match(&string).into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Match;
@@ -40,8 +47,8 @@ impl Function for Match {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -60,14 +67,12 @@ pub(crate) struct MatchFn {
 impl Expression for MatchFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let string = value.try_bytes_utf8_lossy()?;
+        let pattern = self.pattern.resolve(ctx)?;
 
-        let pattern = self.pattern.resolve(ctx)?.try_regex()?;
-
-        Ok(pattern.is_match(&string).into())
+        match_(value, pattern)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().infallible()
     }
 }

@@ -1,6 +1,8 @@
+version: "3"
+
 services:
   clickhouse:
-    image: yandex/clickhouse-server:19
+    image: docker.io/yandex/clickhouse-server:19
 
   runner:
     build:
@@ -11,26 +13,25 @@ services:
     working_dir: /code
     command:
       - "cargo"
-      - "test"
+      - "nextest"
+      - "run"
       - "--no-fail-fast"
       - "--no-default-features"
       - "--features"
       - "clickhouse-integration-tests"
       - "--lib"
       - "::clickhouse::"
-      - "--"
-      - "--nocapture"
     environment:
       - CLICKHOUSE_ADDRESS=http://clickhouse:8123
     depends_on:
       - clickhouse
     volumes:
       - ${PWD}:/code
+      - target:/code/target
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
 
-# this is made to improve the build when running locally
 volumes:
+  target: {}
   cargogit: {}
   cargoregistry: {}
-

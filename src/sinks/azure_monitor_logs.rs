@@ -12,20 +12,20 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 
-use super::util::batch::RealtimeSizeBasedDefaultBatchSettings;
 use crate::{
-    config::{log_schema, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
     http::HttpClient,
     sinks::{
         util::{
-            encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpSink},
-            BatchConfig, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
+            encoding::Transformer,
+            http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
+            BatchConfig, BoxedRawValue, JsonArrayBuffer, RealtimeSizeBasedDefaultBatchSettings,
+            TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 fn default_host() -> String {
@@ -40,17 +40,23 @@ pub struct AzureMonitorLogsConfig {
     pub log_type: String,
     pub azure_resource_id: Option<String>,
     #[serde(default = "default_host")]
-    pub host: String,
+    pub(super) host: String,
     #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
+    pub encoding: Transformer,
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -127,24 +133,28 @@ impl SinkConfig for AzureMonitorLogsConfig {
     fn sink_type(&self) -> &'static str {
         "azure_monitor_logs"
     }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
+    }
 }
 
 #[derive(Clone)]
 struct AzureMonitorLogsSink {
     uri: Uri,
     customer_id: String,
-    encoding: EncodingConfigWithDefault<Encoding>,
+    transformer: Transformer,
     shared_key: pkey::PKey<pkey::Private>,
     default_headers: HeaderMap,
 }
 
-#[async_trait::async_trait]
-impl HttpSink for AzureMonitorLogsSink {
-    type Input = serde_json::Value;
-    type Output = Vec<BoxedRawValue>;
+struct AzureMonitorLogsEventEncoder {
+    transformer: Transformer,
+}
 
-    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
-        self.encoding.apply_rules(&mut event);
+impl HttpEventEncoder<serde_json::Value> for AzureMonitorLogsEventEncoder {
+    fn encode_event(&mut self, mut event: Event) -> Option<serde_json::Value> {
+        self.transformer.transform(&mut event);
 
         // it seems like Azure Monitor doesn't support full 9-digit nanosecond precision
         // adjust the timestamp format accordingly, keeping only milliseconds
@@ -165,6 +175,19 @@ impl HttpSink for AzureMonitorLogsSink {
         );
 
         Some(entry)
+    }
+}
+
+#[async_trait::async_trait]
+impl HttpSink for AzureMonitorLogsSink {
+    type Input = serde_json::Value;
+    type Output = Vec<BoxedRawValue>;
+    type Encoder = AzureMonitorLogsEventEncoder;
+
+    fn build_encoder(&self) -> Self::Encoder {
+        AzureMonitorLogsEventEncoder {
+            transformer: self.transformer.clone(),
+        }
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Bytes>> {
@@ -219,7 +242,7 @@ impl AzureMonitorLogsSink {
 
         Ok(AzureMonitorLogsSink {
             uri,
-            encoding: config.encoding.clone(),
+            transformer: config.encoding.clone(),
             customer_id: config.customer_id.clone(),
             shared_key,
             default_headers,
@@ -296,14 +319,70 @@ async fn healthcheck(sink: AzureMonitorLogsSink, client: HttpClient) -> crate::R
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
+    use futures::{future::ready, stream};
     use serde_json::value::RawValue;
 
     use super::*;
-    use crate::event::LogEvent;
+    use crate::{
+        event::LogEvent,
+        sinks::util::BatchSize,
+        test_util::{
+            components::{run_and_assert_sink_compliance, SINK_TAGS},
+            http::{always_200_response, spawn_blackhole_http_server},
+        },
+    };
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<AzureMonitorLogsConfig>();
+    }
+
+    #[tokio::test]
+    async fn component_spec_compliance() {
+        let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
+
+        // This is just a dummy shared key.
+        let shared_key_bytes = base64::decode_block(
+            "ZnNkO2Zhc2RrbGZqYXNkaixmaG5tZXF3dWlsamtmYXNjZmouYXNkbmZrbHFhc2ZtYXNrbA==",
+        )
+        .expect("should not fail to decode base64");
+        let shared_key =
+            pkey::PKey::hmac(&shared_key_bytes).expect("should not fail to create HMAC key");
+
+        let sink = AzureMonitorLogsSink {
+            uri: mock_endpoint,
+            customer_id: "weee".to_string(),
+            transformer: Default::default(),
+            shared_key,
+            default_headers: HeaderMap::new(),
+        };
+
+        let context = SinkContext::new_test();
+        let client =
+            HttpClient::new(None, &context.proxy).expect("should not fail to create HTTP client");
+
+        let request_settings =
+            TowerRequestConfig::default().unwrap_with(&TowerRequestConfig::default());
+
+        let sink = BatchedHttpSink::new(
+            sink,
+            JsonArrayBuffer::new(BatchSize::const_default()),
+            request_settings,
+            Duration::from_secs(1),
+            client,
+            context.acker(),
+        )
+        .sink_map_err(|error| error!(message = "Fatal azure_monitor_logs sink error.", %error));
+
+        let event = Event::from("simple message");
+        run_and_assert_sink_compliance(
+            VectorSink::from_event_sink(sink),
+            stream::once(ready(event)),
+            &SINK_TAGS,
+        )
+        .await;
     }
 
     fn insert_timestamp_kv(log: &mut LogEvent) -> (String, String) {
@@ -311,7 +390,7 @@ mod tests {
 
         let timestamp_key = log_schema().timestamp_key().to_string();
         let timestamp_value = now.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
-        log.insert(&timestamp_key, now);
+        log.insert(timestamp_key.as_str(), now);
 
         (timestamp_key, timestamp_value)
     }
@@ -336,7 +415,8 @@ mod tests {
         let (timestamp_key, timestamp_value) = insert_timestamp_kv(&mut log);
 
         let event = Event::from(log);
-        let json = sink.encode_event(event).unwrap();
+        let mut encoder = sink.build_encoder();
+        let json = encoder.encode_event(event).unwrap();
         let expected_json = serde_json::json!({
             timestamp_key: timestamp_value,
             "message": "hello world"
@@ -358,6 +438,7 @@ mod tests {
         .unwrap();
 
         let sink = AzureMonitorLogsSink::new(&config).unwrap();
+        let mut encoder = sink.build_encoder();
 
         let mut log1 = [("message", "hello")].iter().copied().collect::<LogEvent>();
         let (timestamp_key1, timestamp_value1) = insert_timestamp_kv(&mut log1);
@@ -365,8 +446,8 @@ mod tests {
         let mut log2 = [("message", "world")].iter().copied().collect::<LogEvent>();
         let (timestamp_key2, timestamp_value2) = insert_timestamp_kv(&mut log2);
 
-        let event1 = sink.encode_event(Event::from(log1)).unwrap();
-        let event2 = sink.encode_event(Event::from(log2)).unwrap();
+        let event1 = encoder.encode_event(Event::from(log1)).unwrap();
+        let event2 = encoder.encode_event(Event::from(log2)).unwrap();
 
         let json1 = serde_json::to_string(&event1).unwrap();
         let json2 = serde_json::to_string(&event2).unwrap();

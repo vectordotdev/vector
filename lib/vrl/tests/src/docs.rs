@@ -13,6 +13,8 @@ use crate::Test;
 ///
 /// This mostly consists of functions that have a non-deterministic result.
 const SKIP_FUNCTION_EXAMPLES: &[&str] = &[
+    "type_def", // Not supported on VM runtime
+    "random_bytes",
     "uuid_v4",
     "strip_ansi_escape_codes",
     "get_hostname",
@@ -72,7 +74,11 @@ pub enum Error {
     Runtime(String),
 }
 
-pub fn tests() -> Vec<Test> {
+pub fn tests(ignore_cue: bool) -> Vec<Test> {
+    if ignore_cue {
+        return vec![];
+    }
+
     let dir = fs::canonicalize("../../../scripts").unwrap();
 
     let output = Command::new("bash")
@@ -105,22 +111,17 @@ fn examples_to_tests(
     category: &'static str,
     examples: HashMap<String, Examples>,
 ) -> Box<dyn Iterator<Item = Test>> {
-    Box::new(
-        examples
+    Box::new(examples.into_iter().flat_map(move |(k, v)| {
+        v.examples
             .into_iter()
-            .map(move |(k, v)| {
-                v.examples
-                    .into_iter()
-                    .map(|example| Test::from_cue_example(category, k.clone(), example))
-                    .collect::<Vec<_>>()
-            })
-            .flatten(),
-    )
+            .map(|example| Test::from_cue_example(category, k.clone(), example))
+            .collect::<Vec<_>>()
+    }))
 }
 
 impl Test {
     fn from_cue_example(category: &'static str, name: String, example: Example) -> Self {
-        use vrl::Value;
+        use ::value::Value;
 
         let Example {
             title,
@@ -192,6 +193,8 @@ impl Test {
             result,
             result_approx: false,
             skip,
+            read_only_paths: vec![],
+            read_only_metadata_paths: vec![],
         }
     }
 }

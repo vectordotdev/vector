@@ -14,14 +14,14 @@ components: sinks: splunk_hec_logs: {
 	}
 
 	features: {
-		buffer: enabled:      true
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {
 				enabled:      true
 				common:       false
 				max_bytes:    10_000_000
-				timeout_secs: 1
+				timeout_secs: 1.0
 			}
 			compression: {
 				enabled: true
@@ -43,7 +43,6 @@ components: sinks: splunk_hec_logs: {
 			}
 			tls: {
 				enabled:                true
-				can_enable:             false
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        false
@@ -134,11 +133,25 @@ components: sinks: splunk_hec_logs: {
 				syntax: "template"
 			}
 		}
+		timestamp_key: {
+			common:      false
+			description: """
+				The name of the log field to be used as the timestamp sent to Splunk HEC. This overrides the
+				[global `timestamp_key` option](\(urls.vector_configuration)/global-options#log_schema.timestamp_key).
+				When set to "", vector omits setting a timestamp in the events sent to Splunk HEC.
+				"""
+			required:    false
+			type: string: {
+				default: null
+				examples: ["timestamp", ""]
+			}
+		}
 	}
 
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	telemetry: metrics: {

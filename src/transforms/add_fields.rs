@@ -10,9 +10,8 @@ use crate::{
         TransformDescription,
     },
     event::{Event, Value},
-    internal_events::{
-        AddFieldsFieldNotOverwritten, AddFieldsFieldOverwritten, TemplateRenderingError,
-    },
+    internal_events::{AddFieldsFieldNotOverwritten, FieldOverwritten, TemplateRenderingError},
+    schema,
     serde::Fields,
     template::Template,
     transforms::{FunctionTransform, OutputBuffer, Transform},
@@ -76,7 +75,7 @@ impl TransformConfig for AddFieldsConfig {
         Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -114,7 +113,7 @@ impl FunctionTransform for AddFields {
                 TemplateOrValue::Template(v) => match v.render_string(&event) {
                     Ok(v) => v,
                     Err(error) => {
-                        emit!(&TemplateRenderingError {
+                        emit!(TemplateRenderingError {
                             error,
                             field: Some(&key),
                             drop_event: false
@@ -126,13 +125,17 @@ impl FunctionTransform for AddFields {
                 TemplateOrValue::Value(v) => v,
             };
             if self.overwrite {
-                if event.as_mut_log().insert(&key_string, value).is_some() {
-                    emit!(&AddFieldsFieldOverwritten { field: &key });
+                if event
+                    .as_mut_log()
+                    .insert(key_string.as_str(), value)
+                    .is_some()
+                {
+                    emit!(FieldOverwritten { field: &key });
                 }
-            } else if event.as_mut_log().contains(&key_string) {
-                emit!(&AddFieldsFieldNotOverwritten { field: &key });
+            } else if event.as_mut_log().contains(key_string.as_str()) {
+                emit!(AddFieldsFieldNotOverwritten { field: &key });
             } else {
-                event.as_mut_log().insert(&key_string, value);
+                event.as_mut_log().insert(key_string.as_str(), value);
             }
         }
 
@@ -210,7 +213,7 @@ mod tests {
         );
         expected.insert(
             "table",
-            Value::Map(vec![("key".into(), "value".into())].into_iter().collect()),
+            Value::Object(vec![("key".into(), "value".into())].into_iter().collect()),
         );
 
         let mut fields = IndexMap::new();

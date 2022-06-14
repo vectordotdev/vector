@@ -1,8 +1,9 @@
 use std::str::FromStr;
 
+use ::value::Value;
 use vrl::{function::Error, prelude::*};
 
-fn to_unix_timestamp(value: Value, unit: Unit) -> std::result::Result<Value, ExpressionError> {
+fn to_unix_timestamp(value: Value, unit: Unit) -> Resolved {
     let ts = value.try_timestamp()?;
     let time = match unit {
         Unit::Seconds => ts.timestamp(),
@@ -57,8 +58,8 @@ impl Function for ToUnixTimestamp {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -77,7 +78,7 @@ impl Function for ToUnixTimestamp {
     fn compile_argument(
         &self,
         _args: &[(&'static str, Option<FunctionArgument>)],
-        _info: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         name: &str,
         expr: Option<&expression::Expr>,
     ) -> CompiledArgument {
@@ -99,16 +100,6 @@ impl Function for ToUnixTimestamp {
             },
             _ => Ok(None),
         }
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let unit = args
-            .optional_any("unit")
-            .map(|unit| *unit.downcast_ref::<Unit>().unwrap())
-            .unwrap_or_default();
-
-        to_unix_timestamp(value, unit)
     }
 }
 
@@ -175,7 +166,7 @@ impl Expression for ToUnixTimestampFn {
         to_unix_timestamp(value, unit)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::integer().infallible()
     }
 }

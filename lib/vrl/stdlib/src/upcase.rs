@@ -1,6 +1,7 @@
+use ::value::Value;
 use vrl::prelude::*;
 
-fn upcase(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn upcase(value: Value) -> Resolved {
     Ok(value.try_bytes_utf8_lossy()?.to_uppercase().into())
 }
 
@@ -30,18 +31,13 @@ impl Function for Upcase {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
         Ok(Box::new(UpcaseFn { value }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        upcase(value)
     }
 }
 
@@ -56,7 +52,7 @@ impl Expression for UpcaseFn {
         upcase(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().infallible()
     }
 }

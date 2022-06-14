@@ -1,6 +1,7 @@
+use ::value::Value;
 use vrl::prelude::*;
 
-fn object(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn object(value: Value) -> Resolved {
     match value {
         v @ Value::Object(_) => Ok(v),
         v => Err(format!("expected object, got {}", v.kind()).into()),
@@ -42,22 +43,13 @@ impl Function for Object {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
         Ok(Box::new(ObjectFn { value }))
-    }
-
-    fn call_by_vm(
-        &self,
-        _ctx: &mut Context,
-        args: &mut VmArgumentList,
-    ) -> std::result::Result<Value, ExpressionError> {
-        let value = args.required("value");
-        object(value)
     }
 }
 
@@ -71,7 +63,7 @@ impl Expression for ObjectFn {
         object(self.value.resolve(ctx)?)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         self.value
             .type_def(state)
             .fallible_unless(Kind::object(Collection::any()))

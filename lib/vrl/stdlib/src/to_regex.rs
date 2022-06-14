@@ -1,7 +1,8 @@
+use ::value::Value;
 use tracing::warn;
 use vrl::prelude::*;
 
-fn to_regex(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn to_regex(value: Value) -> Resolved {
     let string = value.try_bytes_utf8_lossy()?;
     let regex = regex::Regex::new(string.as_ref())
         .map_err(|err| format!("could not create regex: {}", err))
@@ -35,19 +36,13 @@ impl Function for ToRegex {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         warn!("`to_regex` is an expensive function that could impact throughput.");
         let value = arguments.required("value");
         Ok(Box::new(ToRegexFn { value }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-
-        to_regex(value)
     }
 }
 
@@ -62,7 +57,7 @@ impl Expression for ToRegexFn {
         to_regex(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::regex().fallible()
     }
 }

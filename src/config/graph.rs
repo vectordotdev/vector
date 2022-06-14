@@ -2,7 +2,9 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use indexmap::{set::IndexSet, IndexMap};
 
-use super::{ComponentKey, DataType, Output, OutputId, SinkOuter, SourceOuter, TransformOuter};
+use super::{
+    schema, ComponentKey, DataType, Output, OutputId, SinkOuter, SourceOuter, TransformOuter,
+};
 
 #[derive(Debug, Clone)]
 pub enum Node {
@@ -35,22 +37,25 @@ impl Graph {
         sources: &IndexMap<ComponentKey, SourceOuter>,
         transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
+        expansions: &IndexMap<String, Vec<String>>,
     ) -> Result<Self, Vec<String>> {
-        Self::new_inner(sources, transforms, sinks, false)
+        Self::new_inner(sources, transforms, sinks, expansions, false)
     }
 
     pub fn new_unchecked(
         sources: &IndexMap<ComponentKey, SourceOuter>,
         transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
+        expansions: &IndexMap<String, Vec<String>>,
     ) -> Self {
-        Self::new_inner(sources, transforms, sinks, true).expect("errors ignored")
+        Self::new_inner(sources, transforms, sinks, expansions, true).expect("errors ignored")
     }
 
     fn new_inner(
         sources: &IndexMap<ComponentKey, SourceOuter>,
         transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
+        expansions: &IndexMap<String, Vec<String>>,
         ignore_errors: bool,
     ) -> Result<Self, Vec<String>> {
         let mut graph = Graph::default();
@@ -71,7 +76,7 @@ impl Graph {
                 id.clone(),
                 Node::Transform {
                     in_ty: config.inner.input().data_type(),
-                    outputs: config.inner.outputs(),
+                    outputs: config.inner.outputs(&schema::Definition::empty()),
                 },
             );
         }
@@ -91,7 +96,7 @@ impl Graph {
 
         for (id, config) in transforms.iter() {
             for input in config.inputs.iter() {
-                if let Err(e) = graph.add_input(input, id, &available_inputs) {
+                if let Err(e) = graph.add_input(input, id, &available_inputs, expansions) {
                     errors.push(e);
                 }
             }
@@ -99,7 +104,7 @@ impl Graph {
 
         for (id, config) in sinks.iter() {
             for input in config.inputs.iter() {
-                if let Err(e) = graph.add_input(input, id, &available_inputs) {
+                if let Err(e) = graph.add_input(input, id, &available_inputs, expansions) {
                     errors.push(e);
                 }
             }
@@ -117,12 +122,18 @@ impl Graph {
         from: &str,
         to: &ComponentKey,
         available_inputs: &HashMap<String, OutputId>,
+        expansions: &IndexMap<String, Vec<String>>,
     ) -> Result<(), String> {
         if let Some(output_id) = available_inputs.get(from) {
             self.edges.push(Edge {
                 from: output_id.clone(),
                 to: to.clone(),
             });
+            Ok(())
+        } else if let Some(expanded) = expansions.get(from) {
+            for item in expanded {
+                self.add_input(item, to, available_inputs, expansions)?;
+            }
             Ok(())
         } else {
             let output_type = match self.nodes.get(to) {
@@ -176,9 +187,9 @@ impl Graph {
             let from_ty = self.get_output_type(&edge.from);
             let to_ty = self.get_input_type(&edge.to);
 
-            if from_ty != to_ty && from_ty != DataType::Any && to_ty != DataType::Any {
+            if !from_ty.intersects(to_ty) {
                 errors.push(format!(
-                    "Data type mismatch between {} ({:?}) and {} ({:?})",
+                    "Data type mismatch between {} ({}) and {} ({})",
                     edge.from, from_ty, edge.to, to_ty
                 ));
             }
@@ -386,7 +397,9 @@ mod test {
         fn add_transform_output(&mut self, id: &str, name: &str, ty: DataType) {
             let id = id.into();
             match self.nodes.get_mut(&id) {
-                Some(Node::Transform { outputs, .. }) => outputs.push(Output::from((name, ty))),
+                Some(Node::Transform { outputs, .. }) => {
+                    outputs.push(Output::default(ty).with_port(name))
+                }
                 _ => panic!("invalid transform"),
             }
         }
@@ -405,7 +418,8 @@ mod test {
 
         fn test_add_input(&mut self, node: &str, input: &str) -> Result<(), String> {
             let available_inputs = self.input_map().unwrap();
-            self.add_input(input, &node.into(), &available_inputs)
+            let expansions = IndexMap::new();
+            self.add_input(input, &node.into(), &available_inputs, &expansions)
         }
     }
 
@@ -488,7 +502,7 @@ mod test {
         graph.add_source("metric_source", DataType::Metric);
         graph.add_sink(
             "any_sink",
-            DataType::Any,
+            DataType::all(),
             vec!["log_source", "metric_source"],
         );
 
@@ -498,16 +512,16 @@ mod test {
     #[test]
     fn allows_any_into_log_or_metric() {
         let mut graph = Graph::default();
-        graph.add_source("any_source", DataType::Any);
+        graph.add_source("any_source", DataType::all());
         graph.add_transform(
             "log_to_any",
             DataType::Log,
-            DataType::Any,
+            DataType::all(),
             vec!["any_source"],
         );
         graph.add_transform(
             "any_to_log",
-            DataType::Any,
+            DataType::all(),
             DataType::Log,
             vec!["any_source"],
         );
@@ -544,19 +558,19 @@ mod test {
         );
         graph.add_transform(
             "any_to_any",
-            DataType::Any,
-            DataType::Any,
+            DataType::all(),
+            DataType::all(),
             vec!["log_to_log", "metric_to_metric"],
         );
         graph.add_transform(
             "any_to_log",
-            DataType::Any,
+            DataType::all(),
             DataType::Log,
             vec!["any_to_any"],
         );
         graph.add_transform(
             "any_to_metric",
-            DataType::Any,
+            DataType::all(),
             DataType::Metric,
             vec!["any_to_any"],
         );
@@ -604,22 +618,22 @@ mod test {
         graph.nodes.insert(
             ComponentKey::from("foo.bar"),
             Node::Source {
-                outputs: vec![Output::default(DataType::Any)],
+                outputs: vec![Output::default(DataType::all())],
             },
         );
         graph.nodes.insert(
             ComponentKey::from("foo.bar"),
             Node::Source {
-                outputs: vec![Output::default(DataType::Any)],
+                outputs: vec![Output::default(DataType::all())],
             },
         );
         graph.nodes.insert(
             ComponentKey::from("foo"),
             Node::Transform {
-                in_ty: DataType::Any,
+                in_ty: DataType::all(),
                 outputs: vec![
-                    Output::default(DataType::Any),
-                    Output::from(("bar", DataType::Any)),
+                    Output::default(DataType::all()),
+                    Output::default(DataType::all()).with_port("bar"),
                 ],
             },
         );
@@ -628,16 +642,16 @@ mod test {
         graph.nodes.insert(
             ComponentKey::from("baz.errors"),
             Node::Source {
-                outputs: vec![Output::default(DataType::Any)],
+                outputs: vec![Output::default(DataType::all())],
             },
         );
         graph.nodes.insert(
             ComponentKey::from("baz"),
             Node::Transform {
-                in_ty: DataType::Any,
+                in_ty: DataType::all(),
                 outputs: vec![
-                    Output::default(DataType::Any),
-                    Output::from(("errors", DataType::Any)),
+                    Output::default(DataType::all()),
+                    Output::default(DataType::all()).with_port("errors"),
                 ],
             },
         );

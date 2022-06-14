@@ -2,13 +2,15 @@ use std::{borrow::Cow, convert::TryFrom, fmt};
 
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, Utc};
-use diagnostic::{DiagnosticError, Label, Note, Urls};
+use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 use ordered_float::NotNan;
-use parser::ast::{self, Node};
+use regex::Regex;
+use value::{Value, ValueRegex};
 
 use crate::{
-    expression::Resolved, value::Regex, vm::OpCode, Context, Expression, Span, State, TypeDef,
-    Value,
+    expression::Resolved,
+    state::{ExternalEnv, LocalEnv},
+    Context, Expression, Span, TypeDef,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -17,12 +19,18 @@ pub enum Literal {
     Integer(i64),
     Float(NotNan<f64>),
     Boolean(bool),
-    Regex(Regex),
+    Regex(ValueRegex),
     Timestamp(DateTime<Utc>),
     Null,
 }
 
 impl Literal {
+    /// Get a `Value` type stored in the literal.
+    ///
+    /// This differs from `Expression::as_value` insofar as this *always*
+    /// returns a `Value`, whereas `as_value` returns `Option<Value>` which, in
+    /// the case of `Literal` means it always returns `Some(Value)`, requiring
+    /// an extra `unwrap()`.
     pub fn to_value(&self) -> Value {
         use Literal::*;
 
@@ -38,31 +46,6 @@ impl Literal {
     }
 }
 
-impl TryFrom<Node<ast::Literal>> for Literal {
-    type Error = Error;
-
-    fn try_from(node: Node<ast::Literal>) -> Result<Self, Self::Error> {
-        use ast::Literal::*;
-
-        let (span, lit) = node.take();
-
-        let literal = match lit {
-            String(v) => Literal::String(Bytes::from(v)),
-            Integer(v) => Literal::Integer(v),
-            Float(v) => Literal::Float(v),
-            Boolean(v) => Literal::Boolean(v),
-            Regex(v) => regex::Regex::new(&v)
-                .map_err(|err| (span, err))
-                .map(|r| Literal::Regex(r.into()))?,
-            // TODO: support more formats (similar to Vector's `Convert` logic)
-            Timestamp(v) => Literal::Timestamp(v.parse().map_err(|err| (span, err))?),
-            Null => Literal::Null,
-        };
-
-        Ok(literal)
-    }
-}
-
 impl Expression for Literal {
     fn resolve(&self, _: &mut Context) -> Resolved {
         Ok(self.to_value())
@@ -72,7 +55,7 @@ impl Expression for Literal {
         Some(self.to_value())
     }
 
-    fn type_def(&self, _: &State) -> TypeDef {
+    fn type_def(&self, _: (&LocalEnv, &ExternalEnv)) -> TypeDef {
         use Literal::*;
 
         let type_def = match self {
@@ -86,14 +69,6 @@ impl Expression for Literal {
         };
 
         type_def.infallible()
-    }
-
-    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
-        // Add the literal as a constant.
-        let constant = vm.add_constant(self.to_value());
-        vm.write_opcode(OpCode::Constant);
-        vm.write_primitive(constant);
-        Ok(())
     }
 }
 
@@ -232,13 +207,13 @@ impl From<bool> for Literal {
 
 impl From<Regex> for Literal {
     fn from(regex: Regex) -> Self {
-        Literal::Regex(regex)
+        Literal::Regex(ValueRegex::new(regex))
     }
 }
 
-impl From<regex::Regex> for Literal {
-    fn from(regex: regex::Regex) -> Self {
-        Literal::Regex(regex.into())
+impl From<ValueRegex> for Literal {
+    fn from(regex: ValueRegex) -> Self {
+        Literal::Regex(regex)
     }
 }
 
@@ -276,7 +251,7 @@ pub struct Error {
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum ErrorVariant {
+pub(crate) enum ErrorVariant {
     #[error("invalid regular expression")]
     InvalidRegex(#[from] regex::Error),
 
@@ -299,7 +274,7 @@ impl std::error::Error for Error {
     }
 }
 
-impl DiagnosticError for Error {
+impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
         use ErrorVariant::*;
 

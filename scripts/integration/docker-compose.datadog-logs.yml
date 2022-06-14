@@ -1,3 +1,5 @@
+version: "3"
+
 services:
   runner:
     build:
@@ -8,16 +10,23 @@ services:
     working_dir: /code
     command:
       - "cargo"
-      - "test"
+      - "nextest"
+      - "run"
       - "--no-fail-fast"
       - "--no-default-features"
       - "--features"
       - "datadog-logs-integration-tests"
       - "--lib"
       - "::datadog::logs::"
-      - "--"
-      - "--nocapture"
     environment:
-      - CI_TEST_DATADOG_API_KEY
+      - TEST_DATADOG_API_KEY
     volumes:
       - ${PWD}:/code
+      - target:/code/target
+      - cargogit:/usr/local/cargo/git
+      - cargoregistry:/usr/local/cargo/registry
+
+volumes:
+  target: {}
+  cargogit: {}
+  cargoregistry: {}

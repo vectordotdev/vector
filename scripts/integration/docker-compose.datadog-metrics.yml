@@ -1,3 +1,5 @@
+version: "3"
+
 services:
   runner:
     build:
@@ -8,24 +10,23 @@ services:
     working_dir: /code
     command:
       - "cargo"
-      - "test"
+      - "nextest"
+      - "run"
       - "--no-fail-fast"
       - "--no-default-features"
       - "--features"
       - "datadog-metrics-integration-tests"
       - "--lib"
       - "::datadog::metrics::"
-      - "--"
-      - "--nocapture"
     environment:
-      - cargogit:/usr/local/cargo/git
-      - cargoregistry:/usr/local/cargo/registry
-      - CI_TEST_DATADOG_API_KEY
+      - TEST_DATADOG_API_KEY
     volumes:
       - ${PWD}:/code
+      - target:/code/target
+      - cargogit:/usr/local/cargo/git
+      - cargoregistry:/usr/local/cargo/registry
 
-# this is made to improve the build when running locally
 volumes:
+  target: {}
   cargogit: {}
   cargoregistry: {}
-

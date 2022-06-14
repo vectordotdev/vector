@@ -15,8 +15,8 @@ fn generate_config() {
     crate::test_util::test_generate_config::<LokiConfig>();
 }
 
-#[test]
-fn interpolate_labels() {
+#[tokio::test]
+async fn interpolate_labels() {
     let (config, cx) = load_sink::<LokiConfig>(
         r#"
         endpoint = "http://localhost:3100"
@@ -27,13 +27,13 @@ fn interpolate_labels() {
     )
     .unwrap();
     let client = config.build_client(cx.clone()).unwrap();
-    let sink = LokiSink::new(config, client, cx).unwrap();
+    let mut sink = LokiSink::new(config, client, cx).unwrap();
 
     let mut e1 = Event::from("hello world");
 
     e1.as_mut_log().insert("foo", "bar");
 
-    let mut record = sink.encoder.encode_event(e1);
+    let mut record = sink.encoder.encode_event(e1).unwrap();
 
     // HashMap -> Vec doesn't like keeping ordering
     record.labels.sort();
@@ -56,8 +56,8 @@ fn interpolate_labels() {
     assert_eq!(record.labels[3], ("label3".to_string(), "bar".to_string()));
 }
 
-#[test]
-fn use_label_from_dropped_fields() {
+#[tokio::test]
+async fn use_label_from_dropped_fields() {
     let (config, cx) = load_sink::<LokiConfig>(
         r#"
             endpoint = "http://localhost:3100"
@@ -68,13 +68,13 @@ fn use_label_from_dropped_fields() {
     )
     .unwrap();
     let client = config.build_client(cx.clone()).unwrap();
-    let sink = LokiSink::new(config, client, cx).unwrap();
+    let mut sink = LokiSink::new(config, client, cx).unwrap();
 
     let mut e1 = Event::from("hello world");
 
     e1.as_mut_log().insert("foo", "bar");
 
-    let record = sink.encoder.encode_event(e1);
+    let record = sink.encoder.encode_event(e1).unwrap();
 
     let expected_line = serde_json::to_string(&serde_json::json!({
         "message": "hello world",

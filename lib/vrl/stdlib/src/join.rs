@@ -1,6 +1,23 @@
 use std::borrow::Cow;
 
+use ::value::Value;
 use vrl::prelude::*;
+
+fn join(array: Value, separator: Option<Value>) -> Resolved {
+    let array = array.try_array()?;
+    let string_vec = array
+        .iter()
+        .map(|s| s.try_bytes_utf8_lossy().map_err(Into::into))
+        .collect::<Result<Vec<Cow<'_, str>>>>()
+        .map_err(|_| "all array items must be strings")?;
+    let separator: String = separator
+        .map(Value::try_bytes)
+        .transpose()?
+        .map(|s| String::from_utf8_lossy(&s).to_string())
+        .unwrap_or_else(|| "".into());
+    let joined = string_vec.join(&separator);
+    Ok(Value::from(joined))
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Join;
@@ -27,8 +44,8 @@ impl Function for Join {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -54,31 +71,17 @@ struct JoinFn {
 
 impl Expression for JoinFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let array = self.value.resolve(ctx)?.try_array()?;
-
-        let string_vec = array
-            .iter()
-            .map(|s| s.try_bytes_utf8_lossy().map_err(Into::into))
-            .collect::<Result<Vec<Cow<'_, str>>>>()
-            .map_err(|_| "all array items must be strings")?;
-
-        let separator: String = self
+        let array = self.value.resolve(ctx)?;
+        let separator = self
             .separator
             .as_ref()
-            .map(|s| {
-                s.resolve(ctx)
-                    .and_then(|v| Value::try_bytes(v).map_err(Into::into))
-            })
-            .transpose()?
-            .map(|s| String::from_utf8_lossy(&s).to_string())
-            .unwrap_or_else(|| "".into());
+            .map(|s| s.resolve(ctx))
+            .transpose()?;
 
-        let joined = string_vec.join(&separator);
-
-        Ok(Value::from(joined))
+        join(array, separator)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().fallible()
     }
 }

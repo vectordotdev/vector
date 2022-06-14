@@ -1,4 +1,13 @@
+use ::value::Value;
 use vrl::prelude::*;
+
+fn encode_json(value: Value) -> Resolved {
+    // With `vrl::Value` it should not be possible to get `Err`.
+    match serde_json::to_string(&value) {
+        Ok(value) => Ok(value.into()),
+        Err(error) => unreachable!("unable encode to json: {}", error),
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct EncodeJson;
@@ -18,8 +27,8 @@ impl Function for EncodeJson {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -44,15 +53,10 @@ struct EncodeJsonFn {
 impl Expression for EncodeJsonFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-
-        // With `vrl::Value` it should not be possible to get `Err`.
-        match serde_json::to_string(&value) {
-            Ok(value) => Ok(value.into()),
-            Err(error) => unreachable!("unable encode to json: {}", error),
-        }
+        encode_json(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().infallible()
     }
 }
@@ -92,7 +96,7 @@ mod tests {
         }
 
         map {
-            args: func_args![value: map!["field": "value"]],
+            args: func_args![value: Value::from(BTreeMap::from([(String::from("field"), Value::from("value"))]))],
             want: Ok(r#"{"field":"value"}"#),
             tdef: TypeDef::bytes().infallible(),
         }

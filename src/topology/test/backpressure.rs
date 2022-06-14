@@ -2,18 +2,16 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use tokio::time::Duration;
-
-use crate::config::SinkOuter;
-
-use crate::topology::builder::SOURCE_SENDER_BUFFER_SIZE;
-use crate::{config::Config, test_util::start_topology};
-
 use vector_buffers::{BufferConfig, BufferType, WhenFull};
 use vector_core::config::MEMORY_BUFFER_DEFAULT_MAX_EVENTS;
 
+use crate::config::SinkOuter;
+use crate::topology::builder::SOURCE_SENDER_BUFFER_SIZE;
+use crate::{config::Config, test_util::start_topology};
+
 // Based on how we pump events from `SourceSender` into `Fanout`, there's always one extra event we
 // may pull out of `SourceSender` but can't yet send into `Fanout`, so we account for that here.
-pub const EXTRA_SOURCE_PUMP_EVENT: usize = 1;
+pub(self) const EXTRA_SOURCE_PUMP_EVENT: usize = 1;
 
 /// Connects a single source to a single sink and makes sure the sink backpressure is propagated
 /// to the source.
@@ -24,8 +22,8 @@ async fn serial_backpressure() {
     let events_to_sink = 100;
 
     let expected_sourced_events = events_to_sink
-        + MEMORY_BUFFER_DEFAULT_MAX_EVENTS
-        + SOURCE_SENDER_BUFFER_SIZE
+        + MEMORY_BUFFER_DEFAULT_MAX_EVENTS.get()
+        + *SOURCE_SENDER_BUFFER_SIZE
         + EXTRA_SOURCE_PUMP_EVENT;
 
     let source_counter = Arc::new(AtomicUsize::new(0));
@@ -46,7 +44,7 @@ async fn serial_backpressure() {
     let (_topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
     // allow the topology to run
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    wait_until_expected(&source_counter, expected_sourced_events).await;
 
     let sourced_events = source_counter.load(Ordering::Acquire);
 
@@ -62,8 +60,8 @@ async fn default_fan_out() {
     let events_to_sink = 100;
 
     let expected_sourced_events = events_to_sink
-        + MEMORY_BUFFER_DEFAULT_MAX_EVENTS
-        + SOURCE_SENDER_BUFFER_SIZE
+        + MEMORY_BUFFER_DEFAULT_MAX_EVENTS.get()
+        + *SOURCE_SENDER_BUFFER_SIZE
         + EXTRA_SOURCE_PUMP_EVENT;
 
     let source_counter = Arc::new(AtomicUsize::new(0));
@@ -92,7 +90,7 @@ async fn default_fan_out() {
     let (_topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
     // allow the topology to run
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    wait_until_expected(&source_counter, expected_sourced_events).await;
 
     let sourced_events = source_counter.load(Ordering::Relaxed);
 
@@ -109,8 +107,8 @@ async fn buffer_drop_fan_out() {
     let events_to_sink = 100;
 
     let expected_sourced_events = events_to_sink
-        + MEMORY_BUFFER_DEFAULT_MAX_EVENTS
-        + SOURCE_SENDER_BUFFER_SIZE
+        + MEMORY_BUFFER_DEFAULT_MAX_EVENTS.get()
+        + *SOURCE_SENDER_BUFFER_SIZE
         + EXTRA_SOURCE_PUMP_EVENT;
 
     let source_counter = Arc::new(AtomicUsize::new(0));
@@ -145,7 +143,7 @@ async fn buffer_drop_fan_out() {
     let (_topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
     // allow the topology to run
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    wait_until_expected(&source_counter, expected_sourced_events).await;
 
     let sourced_events = source_counter.load(Ordering::Relaxed);
 
@@ -161,22 +159,21 @@ async fn multiple_inputs_backpressure() {
     let events_to_sink = 100;
 
     let expected_sourced_events = events_to_sink
-        + MEMORY_BUFFER_DEFAULT_MAX_EVENTS
-        + SOURCE_SENDER_BUFFER_SIZE * 2
+        + MEMORY_BUFFER_DEFAULT_MAX_EVENTS.get()
+        + *SOURCE_SENDER_BUFFER_SIZE * 2
         + EXTRA_SOURCE_PUMP_EVENT * 2;
 
-    let source_counter_1 = Arc::new(AtomicUsize::new(0));
-    let source_counter_2 = Arc::new(AtomicUsize::new(0));
+    let source_counter = Arc::new(AtomicUsize::new(0));
     config.add_source(
         "in1",
         test_source::TestBackpressureSourceConfig {
-            counter: Arc::clone(&source_counter_1),
+            counter: Arc::clone(&source_counter),
         },
     );
     config.add_source(
         "in2",
         test_source::TestBackpressureSourceConfig {
-            counter: Arc::clone(&source_counter_2),
+            counter: Arc::clone(&source_counter),
         },
     );
     config.add_sink(
@@ -190,24 +187,30 @@ async fn multiple_inputs_backpressure() {
     let (_topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
     // allow the topology to run
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    wait_until_expected(&source_counter, expected_sourced_events).await;
 
-    let sourced_events_1 = source_counter_1.load(Ordering::Relaxed);
-    let sourced_events_2 = source_counter_2.load(Ordering::Relaxed);
-    let sourced_events_sum = sourced_events_1 + sourced_events_2;
+    let sourced_events_sum = source_counter.load(Ordering::Relaxed);
 
     assert_eq!(sourced_events_sum, expected_sourced_events);
 }
 
+// Wait until the source has sent at least the expected number of events, plus a small additional
+// margin to ensure we allow it to run over the expected amount if it's going to.
+async fn wait_until_expected(source_counter: impl AsRef<AtomicUsize>, expected: usize) {
+    crate::test_util::wait_for_atomic_usize(source_counter, |count| count >= expected).await;
+    tokio::time::sleep(Duration::from_millis(100)).await;
+}
+
 mod test_sink {
-    use crate::config::{Input, SinkConfig, SinkContext};
-    use crate::event::Event;
-    use crate::sinks::util::StreamSink;
-    use crate::sinks::{Healthcheck, VectorSink};
     use async_trait::async_trait;
     use futures::stream::BoxStream;
     use futures::{FutureExt, StreamExt};
     use serde::{Deserialize, Serialize};
+
+    use crate::config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext};
+    use crate::event::Event;
+    use crate::sinks::util::StreamSink;
+    use crate::sinks::{Healthcheck, VectorSink};
 
     #[derive(Debug)]
     struct TestBackpressureSink {
@@ -225,7 +228,7 @@ mod test_sink {
     }
 
     #[derive(Debug, Serialize, Deserialize)]
-    pub struct TestBackpressureSinkConfig {
+    pub(super) struct TestBackpressureSinkConfig {
         pub num_to_consume: usize,
     }
 
@@ -241,24 +244,30 @@ mod test_sink {
         }
 
         fn input(&self) -> Input {
-            Input::any()
+            Input::all()
         }
 
         fn sink_type(&self) -> &'static str {
             "test-backpressure-sink"
         }
+
+        fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+            None
+        }
     }
 }
 
 mod test_source {
-    use crate::config::{DataType, Output, SourceConfig, SourceContext};
-    use crate::event::Event;
-    use crate::sources::Source;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+
     use async_trait::async_trait;
     use futures::FutureExt;
     use serde::{Deserialize, Serialize};
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::sync::Arc;
+
+    use crate::config::{DataType, Output, SourceConfig, SourceContext};
+    use crate::event::Event;
+    use crate::sources::Source;
 
     #[derive(Debug, Serialize, Deserialize)]
     pub struct TestBackpressureSourceConfig {
@@ -274,8 +283,15 @@ mod test_source {
             let counter = Arc::clone(&self.counter);
             Ok(async move {
                 for i in 0.. {
-                    let _result = cx.out.send(Event::from(format!("event-{}", i))).await;
+                    let _result = cx.out.send_event(Event::from(format!("event-{}", i))).await;
                     counter.fetch_add(1, Ordering::AcqRel);
+                    // Place ourselves at the back of tokio's task queue, giving downstream
+                    // components a chance to process the event we just sent before sending more.
+                    // This helps the backpressure tests behave more deterministically when we use
+                    // opportunistic batching at the topology level. Yielding here makes it very
+                    // unlikely that a `ready_chunks` or similar will have a chance to see more
+                    // than one event available at a time.
+                    tokio::task::yield_now().await;
                 }
                 Ok(())
             }
@@ -283,11 +299,15 @@ mod test_source {
         }
 
         fn outputs(&self) -> Vec<Output> {
-            vec![Output::default(DataType::Any)]
+            vec![Output::default(DataType::all())]
         }
 
         fn source_type(&self) -> &'static str {
             "test-backpressure-source"
+        }
+
+        fn can_acknowledge(&self) -> bool {
+            false
         }
     }
 }

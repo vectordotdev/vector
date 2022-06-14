@@ -1,3 +1,5 @@
+version: "3"
+
 services:
   runner:
     build:
@@ -9,24 +11,23 @@ services:
     network_mode: host
     command:
       - "cargo"
-      - "test"
+      - "nextest"
+      - "run"
       - "--no-fail-fast"
       - "--no-default-features"
       - "--features"
       - "fluent-integration-tests"
       - "--lib"
       - "::fluent::"
-      - "--"
-      - "--nocapture"
     volumes:
+      - ${PWD}:/code
+      - target:/code/target
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp:/tmp
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
-      - ${PWD}:/code
 
-# this is made to improve the build when running locally
 volumes:
+  target: {}
   cargogit: {}
   cargoregistry: {}
-

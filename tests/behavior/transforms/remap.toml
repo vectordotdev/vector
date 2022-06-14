@@ -294,8 +294,8 @@
     insert_at = "remap_quoted_path"
     type = "log"
     [tests.input.log_fields]
-      "a.b\\.c" = "bar"
-      "d\\.e" = "baz"
+      "a.\"b.c\"" = "bar"
+      "\"d.e\"" = "baz"
   [[tests.outputs]]
     extract_from = "remap_quoted_path"
     [[tests.outputs.conditions]]
@@ -1188,7 +1188,7 @@
         .map == { "foo": { "string": "bar" } } &&
         .array == [{ "string": "foo" }] &&
         .timestamp == { "timestamp": to_timestamp!("2021-01-01T00:00:00.00Z") } &&
-        .regex == { "regex": ".*" } &&
+        .regex == { "regex": r'.*' } &&
         .null == null
       '''
 
@@ -1217,7 +1217,6 @@
 #   type = "remap"
 #   source = """
 #     .grokked = parse_grok!(.message, "%{TIMESTAMP_ISO8601:timestamp} (%{EMAILADDRESS:email}|%{LOGLEVEL:level}) %{GREEDYDATA:message}")
-#     .grokked2 = parse_grok!(.message, "%{TIMESTAMP_ISO8601:timestamp} (%{EMAILADDRESS:email}|%{LOGLEVEL:level}) %{GREEDYDATA:message}", remove_empty: true)
 #     """
 # [[tests]]
 #   name = "remap_function_parse_grok"

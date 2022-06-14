@@ -1,6 +1,15 @@
 use std::net::Ipv4Addr;
 
+use ::value::Value;
 use vrl::prelude::*;
+
+fn ip_aton(value: Value) -> Resolved {
+    let ip: Ipv4Addr = value
+        .try_bytes_utf8_lossy()?
+        .parse()
+        .map_err(|err| format!("unable to parse IPv4 address: {}", err))?;
+    Ok(u32::from(ip).into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct IpAton;
@@ -28,8 +37,8 @@ impl Function for IpAton {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -45,17 +54,11 @@ struct IpAtonFn {
 
 impl Expression for IpAtonFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let ip: Ipv4Addr = self
-            .value
-            .resolve(ctx)?
-            .try_bytes_utf8_lossy()?
-            .parse()
-            .map_err(|err| format!("unable to parse IPv4 address: {}", err))?;
-
-        Ok(u32::from(ip).into())
+        let value = self.value.resolve(ctx)?;
+        ip_aton(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::integer().fallible()
     }
 }

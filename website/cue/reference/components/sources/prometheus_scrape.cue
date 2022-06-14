@@ -14,6 +14,7 @@ components: sources: prometheus_scrape: {
 	}
 
 	features: {
+		acknowledgements: false
 		collect: {
 			checkpoint: enabled: false
 			from: {
@@ -32,7 +33,6 @@ components: sources: prometheus_scrape: {
 			proxy: enabled: true
 			tls: {
 				enabled:                true
-				can_enable:             false
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        false
@@ -55,7 +55,7 @@ components: sources: prometheus_scrape: {
 		endpoints: {
 			description: "Endpoints to scrape metrics from."
 			required:    true
-			warnings: ["You must explicitly add the path to your endpoints. Vector will _not_ automatically add `/metics`."]
+			warnings: ["You must explicitly add the path to your endpoints. Vector will _not_ automatically add `/metrics`."]
 			type: array: {
 				items: type: string: {
 					examples: ["http://localhost:9090/metrics"]
@@ -107,6 +107,40 @@ components: sources: prometheus_scrape: {
 			required: false
 			type: bool: {
 				default: false
+			}
+		}
+		query: {
+			common: false
+			description: """
+				Custom parameters for the scrape request query string.
+				One or more values for the same parameter key can be provided.
+				The parameters provided in this option are appended to any parameters manually provided in the `endpoints` option.
+				This option is especially useful when scraping the `/federate` endpoint.
+				"""
+			required: false
+			type: object: {
+				examples: [{"match[]": [#"{job="somejob"}"#, #"{__name__=~"job:.*"}"#]}]
+				options: {
+					"*": {
+						common:      false
+						description: "Any query key"
+						required:    false
+						type: array: {
+							default: null
+							examples: [[
+								#"{job="somejob"}"#,
+								#"{__name__=~"job:.*"}"#,
+							]]
+							items: type: string: {
+								examples: [
+									#"{job="somejob"}"#,
+									#"{__name__=~"job:.*"}"#,
+								]
+								syntax: "literal"
+							}
+						}
+					}
+				}
 			}
 		}
 		auth: configuration._http_auth & {_args: {

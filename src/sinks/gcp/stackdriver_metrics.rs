@@ -1,4 +1,6 @@
-use std::num::NonZeroU64;
+// TODO: In order to correctly assert component specification compliance, we would have to do some more advanced mocking
+// off the endpoint, which would include also providing a mock OAuth2 endpoint to allow for generating a token from the
+// mocked credentials. Let this TODO serve as a placeholder for doing that in the future.
 
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
@@ -7,19 +9,19 @@ use http::{header::AUTHORIZATION, HeaderValue, Uri};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::{Input, SinkConfig, SinkContext, SinkDescription},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Metric, MetricValue},
     http::HttpClient,
     sinks::{
         gcp,
         util::{
             buffer::metrics::MetricsBuffer,
-            http::{BatchedHttpSink, HttpSink},
+            http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
             BatchConfig, SinkBatchSettings, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -28,7 +30,7 @@ pub struct StackdriverMetricsDefaultBatchSettings;
 impl SinkBatchSettings for StackdriverMetricsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(1);
     const MAX_BYTES: Option<usize> = None;
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -43,7 +45,13 @@ pub struct StackdriverConfig {
     pub request: TowerRequestConfig,
     #[serde(default)]
     pub batch: BatchConfig<StackdriverMetricsDefaultBatchSettings>,
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 fn default_metric_namespace_value() -> String {
@@ -110,6 +118,10 @@ impl SinkConfig for StackdriverConfig {
     fn sink_type(&self) -> &'static str {
         "gcp_stackdriver_metrics"
     }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
+    }
 }
 
 struct HttpEventSink {
@@ -118,12 +130,10 @@ struct HttpEventSink {
     token: gouth::Token,
 }
 
-#[async_trait::async_trait]
-impl HttpSink for HttpEventSink {
-    type Input = Metric;
-    type Output = Vec<Metric>;
+struct StackdriverMetricsEncoder;
 
-    fn encode_event(&self, event: Event) -> Option<Self::Input> {
+impl HttpEventEncoder<Metric> for StackdriverMetricsEncoder {
+    fn encode_event(&mut self, event: Event) -> Option<Metric> {
         let metric = event.into_metric();
 
         match metric.value() {
@@ -134,6 +144,17 @@ impl HttpSink for HttpEventSink {
                 None
             }
         }
+    }
+}
+
+#[async_trait::async_trait]
+impl HttpSink for HttpEventSink {
+    type Input = Metric;
+    type Output = Vec<Metric>;
+    type Encoder = StackdriverMetricsEncoder;
+
+    fn build_encoder(&self) -> Self::Encoder {
+        StackdriverMetricsEncoder
     }
 
     async fn build_request(

@@ -1,10 +1,14 @@
 use std::io;
 
+use codecs::{
+    encoding::{FramingConfig, SerializerConfig},
+    JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
+};
 use serde::{Deserialize, Serialize};
-use vector_core::{config::log_schema, event::Event};
+use vector_core::config::log_schema;
+use vector_core::event::{Event, LogEvent, TraceEvent};
 
-use super::Encoder;
-use crate::event::LogEvent;
+use super::{Encoder, EncodingConfigMigrator, EncodingConfigWithFramingMigrator};
 
 static DEFAULT_TEXT_ENCODER: StandardTextEncoding = StandardTextEncoding;
 static DEFAULT_JSON_ENCODER: StandardJsonEncoding = StandardJsonEncoding;
@@ -154,6 +158,44 @@ impl Encoder<Vec<Event>> for StandardEncodings {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Migrate the legacy `StandardEncodings` to the new `SerializerConfig` based
+/// encoding system.
+pub struct StandardEncodingsMigrator;
+
+impl EncodingConfigMigrator for StandardEncodingsMigrator {
+    type Codec = StandardEncodings;
+
+    fn migrate(codec: &Self::Codec) -> SerializerConfig {
+        match codec {
+            StandardEncodings::Text => TextSerializerConfig::new().into(),
+            StandardEncodings::Json | StandardEncodings::Ndjson => {
+                JsonSerializerConfig::new().into()
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Migrate the legacy `StandardEncodings` to the new `FramingConfig`/
+/// `SerializerConfig` based encoding system.
+pub struct StandardEncodingsWithFramingMigrator;
+
+impl EncodingConfigWithFramingMigrator for StandardEncodingsWithFramingMigrator {
+    type Codec = StandardEncodings;
+
+    fn migrate(codec: &Self::Codec) -> (Option<FramingConfig>, SerializerConfig) {
+        match codec {
+            StandardEncodings::Text => (None, TextSerializerConfig::new().into()),
+            StandardEncodings::Json => (None, JsonSerializerConfig::new().into()),
+            StandardEncodings::Ndjson => (
+                Some(NewlineDelimitedEncoderConfig::new().into()),
+                JsonSerializerConfig::new().into(),
+            ),
+        }
+    }
+}
+
 /// Standard implementation for encoding events as JSON.
 ///
 /// All event types will be serialized to JSON, without pretty printing.  Uses
@@ -168,6 +210,7 @@ impl Encoder<Event> for StandardJsonEncoding {
             Event::Metric(metric) => as_tracked_write(writer, &metric, |writer, item| {
                 serde_json::to_writer(writer, item)
             }),
+            Event::Trace(trace) => self.encode_input(trace, writer),
         }
     }
 }
@@ -175,6 +218,14 @@ impl Encoder<Event> for StandardJsonEncoding {
 impl Encoder<LogEvent> for StandardJsonEncoding {
     fn encode_input(&self, log: LogEvent, writer: &mut dyn io::Write) -> io::Result<usize> {
         as_tracked_write(writer, &log, |writer, item| {
+            serde_json::to_writer(writer, item)
+        })
+    }
+}
+
+impl Encoder<TraceEvent> for StandardJsonEncoding {
+    fn encode_input(&self, trace: TraceEvent, writer: &mut dyn io::Write) -> io::Result<usize> {
+        as_tracked_write(writer, &trace, |writer, item| {
             serde_json::to_writer(writer, item)
         })
     }
@@ -195,7 +246,7 @@ impl Encoder<Event> for StandardTextEncoding {
             Event::Log(log) => {
                 let message = log
                     .get(log_schema().message_key())
-                    .map(|v| v.as_bytes())
+                    .map(|v| v.coerce_to_bytes())
                     .unwrap_or_default();
                 writer.write_all(&message[..]).map(|()| message.len())
             }
@@ -203,6 +254,7 @@ impl Encoder<Event> for StandardTextEncoding {
                 let message = metric.to_string().into_bytes();
                 writer.write_all(&message).map(|()| message.len())
             }
+            Event::Trace(_) => panic!("standard text encoding cannot be used for traces"),
         }
     }
 }
@@ -219,6 +271,7 @@ where
 
     impl<'inner> io::Write for Tracked<'inner> {
         fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            #[allow(clippy::disallowed_methods)] // We pass on the result of `write` to the caller.
             let n = self.inner.write(buf)?;
             self.count += n;
             Ok(n)

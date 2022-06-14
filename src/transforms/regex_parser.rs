@@ -12,6 +12,7 @@ use crate::{
     internal_events::{
         ParserConversionError, ParserMatchError, ParserMissingFieldError, ParserTargetExistsError,
     },
+    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_check_conversion_map, Conversion},
 };
@@ -54,7 +55,7 @@ impl TransformConfig for RegexParserConfig {
         Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -127,7 +128,7 @@ impl CompiledRegex {
                                 match conversion.convert(capture) {
                                     Ok(value) => Some((name.clone(), value)),
                                     Err(error) => {
-                                        emit!(&ParserConversionError { name, error });
+                                        emit!(ParserConversionError { name, error });
                                         None
                                     }
                                 }
@@ -136,7 +137,7 @@ impl CompiledRegex {
                 Some(values)
             }
             None => {
-                emit!(&ParserMatchError { value });
+                emit!(ParserMatchError { value });
                 None
             }
         }
@@ -187,35 +188,12 @@ impl RegexParser {
 
         let names = &patterns
             .iter()
-            .map(|regex| regex.capture_names().flatten().collect::<Vec<_>>())
-            .flatten()
+            .flat_map(|regex| regex.capture_names().flatten().collect::<Vec<_>>())
             .collect::<Vec<_>>();
 
         let types =
             parse_check_conversion_map(&config.types, names, config.timezone.unwrap_or(timezone))?;
 
-        Ok(Transform::function(RegexParser::new(
-            regexset,
-            patterns,
-            field,
-            config.drop_field,
-            config.drop_failed,
-            config.target_field.clone(),
-            config.overwrite_target,
-            types,
-        )))
-    }
-
-    pub fn new(
-        regexset: RegexSet,
-        patterns: Vec<Regex>,
-        field: String,
-        mut drop_field: bool,
-        drop_failed: bool,
-        target_field: Option<String>,
-        overwrite_target: bool,
-        types: HashMap<String, Conversion>,
-    ) -> Self {
         // Build a buffer of the regex capture locations and names to avoid
         // repeated allocations.
         let patterns: Vec<CompiledRegex> = patterns
@@ -224,36 +202,36 @@ impl RegexParser {
             .collect();
 
         // Pre-calculate if the source field name should be dropped.
-        drop_field = drop_field
+        let drop_field = config.drop_field
             && !patterns
                 .iter()
-                .map(|p| &p.capture_names)
-                .flatten()
+                .flat_map(|p| &p.capture_names)
                 .any(|(_, f, _)| *f == field);
 
-        Self {
+        let parser = Self {
             regexset,
             patterns,
             field,
             drop_field,
-            drop_failed,
-            target_field,
-            overwrite_target,
-        }
+            drop_failed: config.drop_failed,
+            target_field: config.target_field.clone(),
+            overwrite_target: config.overwrite_target,
+        };
+        Ok(Transform::function(parser))
     }
 }
 
 impl FunctionTransform for RegexParser {
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let log = event.as_mut_log();
-        let value = log.get(&self.field).map(|s| s.as_bytes());
+        let value = log.get(self.field.as_str()).map(|s| s.coerce_to_bytes());
 
         if let Some(value) = &value {
             let regex_id = self.regexset.matches(value).into_iter().next();
             let id = match regex_id {
                 Some(id) => id,
                 None => {
-                    emit!(&ParserMatchError { value });
+                    emit!(ParserMatchError { value });
                     if !self.drop_failed {
                         output.push(event);
                     };
@@ -271,11 +249,11 @@ impl FunctionTransform for RegexParser {
             if let Some(captures) = pattern.captures(value) {
                 // Handle optional overwriting of the target field
                 if let Some(target_field) = target_field {
-                    if log.contains(target_field) {
+                    if log.contains(target_field.as_str()) {
                         if self.overwrite_target {
-                            log.remove(target_field);
+                            log.remove(target_field.as_str());
                         } else {
-                            emit!(&ParserTargetExistsError { target_field });
+                            emit!(ParserTargetExistsError { target_field });
                             output.push(event);
                             return;
                         }
@@ -289,13 +267,13 @@ impl FunctionTransform for RegexParser {
                     (name, value)
                 }));
                 if self.drop_field {
-                    log.remove(&self.field);
+                    log.remove(self.field.as_str());
                 }
                 output.push(event);
                 return;
             }
         } else {
-            emit!(&ParserMissingFieldError { field: &self.field });
+            emit!(ParserMissingFieldError { field: &self.field });
         }
 
         if !self.drop_failed {
@@ -306,13 +284,14 @@ impl FunctionTransform for RegexParser {
 
 #[cfg(test)]
 mod tests {
+    use ordered_float::NotNan;
+
     use super::RegexParserConfig;
     use crate::{
         config::{TransformConfig, TransformContext},
         event::{Event, LogEvent, Value},
         transforms::OutputBuffer,
     };
-    use ordered_float::NotNan;
 
     #[test]
     fn generate_config() {
@@ -337,7 +316,7 @@ mod tests {
 
         let mut buf = OutputBuffer::with_capacity(1);
         parser.transform(&mut buf, event);
-        let result = buf.pop().map(|event| event.into_log());
+        let result = buf.into_events().next().map(|event| event.into_log());
         if let Some(event) = &result {
             assert_eq!(event.metadata(), &metadata);
         }
@@ -412,7 +391,7 @@ mod tests {
         .await
         .unwrap();
 
-        assert!(log.get(&"message").is_some());
+        assert!(log.get("message").is_some());
     }
 
     #[tokio::test]
@@ -430,7 +409,7 @@ mod tests {
 
         // timestamp is unpredictable, don't compare it
         log.remove("timestamp");
-        let log = serde_json::to_value(log.all_fields()).unwrap();
+        let log = serde_json::to_value(log.all_fields().unwrap()).unwrap();
         assert_eq!(
             log,
             serde_json::json!({
@@ -475,7 +454,7 @@ mod tests {
 
         // timestamp is unpredictable, don't compare it
         log.remove("timestamp");
-        let log = serde_json::to_value(log.all_fields()).unwrap();
+        let log = serde_json::to_value(log.all_fields().unwrap()).unwrap();
         assert_eq!(
             log,
             serde_json::json!({

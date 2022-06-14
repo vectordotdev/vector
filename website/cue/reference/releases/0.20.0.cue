@@ -5,7 +5,8 @@ releases: "0.20.0": {
 	codename: ""
 
 	known_issues: [
-		"If non-existent extract_from/no_outputs_from targets are included in unit testing configurations, `vector test` will panic. Fixed in `0.20.1`.",
+		"When unit testing targets that have multiple outputs, Vector logs a warning for untested outputs. Will be fixed in `0.20.1`.",
+		"If non-existent extract_from/no_outputs_from targets are included in unit testing configurations, `vector test` will panic. Will be fixed in `0.20.1`.",
 	]
 
 	description: """
@@ -419,7 +420,7 @@ releases: "0.20.0": {
 				"""
 		},
 		{
-			title: "Official release of end-to-end acknowledges feature"
+			title: "Official release of end-to-end acknowledgements feature"
 			description: """
 				We have started to add support for end-to-end acknowledgements from sources to sinks where sources will
 				not ack data until the data has been processed by all associated sinks. It is usable by some components

@@ -8,6 +8,7 @@ use crate::{
     config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
     internal_events::{ParserConversionError, ParserMissingFieldError},
+    schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
     types::{parse_check_conversion_map, Conversion},
 };
@@ -17,7 +18,7 @@ use crate::{
 pub struct SplitConfig {
     pub field_names: Vec<String>,
     pub separator: Option<String>,
-    pub field: Option<String>,
+    pub(self) field: Option<String>,
     pub drop_field: bool,
     pub types: HashMap<String, String>,
     pub timezone: Option<TimeZone>,
@@ -40,7 +41,7 @@ impl TransformConfig for SplitConfig {
 
         let timezone = self.timezone.unwrap_or(context.globals.timezone);
         let types = parse_check_conversion_map(&self.types, &self.field_names, timezone)
-            .map_err(|error| format!("{}", error))?;
+            .map_err(|error| error.to_string())?;
 
         // don't drop the source field if it's getting overwritten by a parsed value
         let drop_field = self.drop_field && !self.field_names.iter().any(|f| **f == *field);
@@ -58,7 +59,7 @@ impl TransformConfig for SplitConfig {
         Input::log()
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -102,7 +103,10 @@ impl Split {
 
 impl FunctionTransform for Split {
     fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
-        let value = event.as_log().get(&self.field).map(|s| s.to_string_lossy());
+        let value = event
+            .as_log()
+            .get(self.field.as_str())
+            .map(|s| s.to_string_lossy());
 
         if let Some(value) = &value {
             for ((name, conversion), value) in self
@@ -112,18 +116,18 @@ impl FunctionTransform for Split {
             {
                 match conversion.convert::<Value>(Bytes::copy_from_slice(value.as_bytes())) {
                     Ok(value) => {
-                        event.as_mut_log().insert(name.clone(), value);
+                        event.as_mut_log().insert(name.as_str(), value);
                     }
                     Err(error) => {
-                        emit!(&ParserConversionError { name, error });
+                        emit!(ParserConversionError { name, error });
                     }
                 }
             }
             if self.drop_field {
-                event.as_mut_log().remove(&self.field);
+                event.as_mut_log().remove(self.field.as_str());
             }
         } else {
-            emit!(&ParserMissingFieldError { field: &self.field });
+            emit!(ParserMissingFieldError { field: &self.field });
         };
 
         output.push(event);
@@ -141,12 +145,13 @@ pub fn split(input: &str, separator: Option<String>) -> Vec<&str> {
 
 #[cfg(test)]
 mod tests {
+    use ordered_float::NotNan;
+
     use super::*;
     use crate::{
         config::TransformConfig,
         event::{Event, LogEvent, Value},
     };
-    use ordered_float::NotNan;
 
     #[test]
     fn generate_config() {
@@ -201,7 +206,7 @@ mod tests {
         let metadata = event.metadata().clone();
         let mut buf = OutputBuffer::with_capacity(1);
         parser.transform(&mut buf, event);
-        let result = buf.pop().unwrap().into_log();
+        let result = buf.into_events().next().unwrap().into_log();
         assert_eq!(result.metadata(), &metadata);
         result
     }

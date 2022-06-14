@@ -3,11 +3,12 @@ mod field;
 mod index;
 mod unknown;
 
-use std::collections::BTreeMap;
+use std::{borrow::Cow, collections::BTreeMap};
 
 pub use field::Field;
 pub use index::Index;
-use unknown::Unknown;
+use lookup::{Lookup, Segment};
+pub use unknown::Unknown;
 
 use super::{merge, Kind};
 
@@ -15,7 +16,7 @@ use super::{merge, Kind};
 ///
 /// A collection contains one or more kinds for known positions within the collection (e.g. indices
 /// or fields), and contains a global "unknown" state that applies to all unknown paths.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
 pub struct Collection<T: Ord> {
     known: BTreeMap<T, Kind>,
 
@@ -212,27 +213,102 @@ impl<T: Ord> Collection<T> {
     /// - If a field exists in both collections, their `Kind`s are merged, or the `other` fields
     ///   are used (depending on the configured [`Strategy`](merge::Strategy)).
     ///
-    /// - If a field exists in one but not the other, the field is used.
+    /// - If a field exists in one but not the other, the field is merged with the "unknown"
+    ///   of the other if it exists, or just the field is used otherwise.
     ///
     /// For *unknown fields or indices*:
     ///
     /// - Both `Unknown`s are merged, similar to merging two `Kind`s.
     pub fn merge(&mut self, mut other: Self, strategy: merge::Strategy) {
-        self.known
-            .iter_mut()
-            .for_each(|(key, self_kind)| match other.known.remove(key) {
-                Some(other_kind) if strategy.depth.is_shallow() => *self_kind = other_kind,
-                Some(other_kind) => self_kind.merge(other_kind, strategy),
-                _ => {}
-            });
+        for (key, self_kind) in &mut self.known {
+            if let Some(other_kind) = other.known.remove(key) {
+                if strategy.depth.is_shallow() {
+                    *self_kind = other_kind;
+                } else {
+                    self_kind.merge(other_kind, strategy);
+                }
+            } else if let Some(other_unknown) = other.unknown() {
+                if strategy.depth.is_shallow() {
+                    *self_kind = other_unknown.to_kind().into_owned();
+                } else {
+                    self_kind.merge(other_unknown.to_kind().into_owned(), strategy);
+                }
+            }
+        }
 
-        self.known.extend(other.known);
+        let self_unknown_kind = self.unknown().map(|unknown| unknown.to_kind().into_owned());
+        if let Some(self_unknown_kind) = self_unknown_kind {
+            for (key, mut other_kind) in other.known {
+                if !strategy.depth.is_shallow() {
+                    other_kind.merge(self_unknown_kind.clone(), strategy);
+                }
+                self.known_mut().insert(key, other_kind);
+            }
+        } else {
+            self.known.extend(other.known);
+        }
 
         match (self.unknown.as_mut(), other.unknown) {
             (None, Some(rhs)) => self.unknown = Some(rhs),
             (Some(lhs), Some(rhs)) => lhs.merge(rhs, strategy),
             _ => {}
         };
+    }
+
+    /// Return the reduced `Kind` of the items within the collection.
+    pub fn reduced_kind(&self) -> Kind {
+        let strategy = merge::Strategy {
+            depth: merge::Depth::Deep,
+            indices: merge::Indices::Keep,
+        };
+
+        self.known
+            .values()
+            .cloned()
+            .reduce(|mut lhs, rhs| {
+                lhs.merge(rhs, strategy);
+                lhs
+            })
+            .map_or_else(Kind::any, |kind| {
+                self.unknown
+                    .as_ref()
+                    .map(|unknown| {
+                        let mut kind = kind.clone();
+                        kind.merge(unknown.to_kind().into_owned(), strategy);
+                        kind
+                    })
+                    .unwrap_or(kind)
+            })
+    }
+}
+
+impl Collection<Field> {
+    /// Find the `Kind` within the known set of fields.
+    ///
+    /// This currently has limited support for the first segment of the path. That is:
+    ///
+    /// - The path must not be root (`.`).
+    /// - The path must not start with an index segment (`.[2]`)
+    /// - The path must not start with a coalesced segment (`.(foo | bar)`).
+    ///
+    /// In all of the above cases, this method returns `Ok(None)`.
+    ///
+    /// # Errors
+    ///
+    /// See `Kind::find_at_path`.
+    pub fn find_known_at_path<'a>(
+        &'a self,
+        path: &'a mut Lookup<'a>,
+    ) -> Result<Option<Cow<'a, Kind>>, super::find::Error> {
+        if let Some(Segment::Field(field)) = path.pop_front() {
+            let field = Field::from(field);
+
+            if let Some(kind) = self.known.get(&(field)) {
+                return kind.find_at_path(path);
+            }
+        }
+
+        Ok(None)
     }
 }
 
@@ -242,6 +318,57 @@ impl<T: Ord> From<BTreeMap<T, Kind>> for Collection<T> {
             known,
             unknown: None,
         }
+    }
+}
+
+impl std::fmt::Display for Collection<Field> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.unknown.is_some() || self.known.is_empty() {
+            // Simple representation, we can improve upon this in the future.
+            return f.write_str("object");
+        }
+
+        f.write_str("{ ")?;
+
+        let mut known = self.known.iter().peekable();
+        while let Some((key, kind)) = known.next() {
+            write!(f, "{key}: {kind}")?;
+            if known.peek().is_some() {
+                f.write_str(", ")?;
+            }
+        }
+
+        f.write_str(" }")?;
+
+        Ok(())
+    }
+}
+
+impl std::fmt::Display for Collection<Index> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.unknown.is_some() || self.known.is_empty() {
+            // Simple representation, we can improve upon this in the future.
+            return f.write_str("array");
+        }
+
+        f.write_str("[")?;
+
+        let mut known = self.known.iter().peekable();
+
+        // This expects the invariant to hold that an array without "unknown"
+        // fields cannot have known fields with non-incremental indices. That
+        // is, an array of 5 elements has to define index 0 to 4, otherwise
+        // "unknown" has to be defined.
+        while let Some((_, kind)) = known.next() {
+            kind.fmt(f)?;
+            if known.peek().is_some() {
+                f.write_str(", ")?;
+            }
+        }
+
+        f.write_str("]")?;
+
+        Ok(())
     }
 }
 
@@ -644,6 +771,176 @@ mod tests {
             this.anonymize();
 
             assert_eq!(this, want, "{}", title);
+        }
+    }
+
+    #[test]
+    fn test_display_field() {
+        struct TestCase {
+            this: Collection<Field>,
+            want: &'static str,
+        }
+
+        for (title, TestCase { this, want }) in HashMap::from([
+            (
+                "any",
+                TestCase {
+                    this: Collection::any(),
+                    want: "object",
+                },
+            ),
+            (
+                "unknown",
+                TestCase {
+                    this: Collection::from_unknown(Kind::null()),
+                    want: "object",
+                },
+            ),
+            (
+                "known single",
+                TestCase {
+                    this: BTreeMap::from([("foo".into(), Kind::null())]).into(),
+                    want: r#"{ foo: null }"#,
+                },
+            ),
+            (
+                "known multiple",
+                TestCase {
+                    this: BTreeMap::from([
+                        ("1".into(), Kind::null()),
+                        ("2".into(), Kind::boolean()),
+                    ])
+                    .into(),
+                    want: r#"{ "1": null, "2": boolean }"#,
+                },
+            ),
+            (
+                "known multiple, nested",
+                TestCase {
+                    this: BTreeMap::from([
+                        ("1".into(), Kind::null()),
+                        (
+                            "2".into(),
+                            Kind::object(BTreeMap::from([("3".into(), Kind::integer())])),
+                        ),
+                    ])
+                    .into(),
+                    want: r#"{ "1": null, "2": { "3": integer } }"#,
+                },
+            ),
+        ]) {
+            assert_eq!(this.to_string(), want.to_string(), "{}", title);
+        }
+    }
+
+    #[test]
+    fn test_display_index() {
+        struct TestCase {
+            this: Collection<Index>,
+            want: &'static str,
+        }
+
+        for (title, TestCase { this, want }) in HashMap::from([
+            (
+                "any",
+                TestCase {
+                    this: Collection::any(),
+                    want: "array",
+                },
+            ),
+            (
+                "unknown",
+                TestCase {
+                    this: Collection::from_unknown(Kind::null()),
+                    want: "array",
+                },
+            ),
+            (
+                "known single",
+                TestCase {
+                    this: BTreeMap::from([(0.into(), Kind::null())]).into(),
+                    want: r#"[null]"#,
+                },
+            ),
+            (
+                "known multiple",
+                TestCase {
+                    this: BTreeMap::from([(0.into(), Kind::null()), (1.into(), Kind::boolean())])
+                        .into(),
+                    want: r#"[null, boolean]"#,
+                },
+            ),
+            (
+                "known multiple, nested",
+                TestCase {
+                    this: BTreeMap::from([
+                        (0.into(), Kind::null()),
+                        (
+                            1.into(),
+                            Kind::object(BTreeMap::from([("0".into(), Kind::integer())])),
+                        ),
+                    ])
+                    .into(),
+                    want: r#"[null, { "0": integer }]"#,
+                },
+            ),
+        ]) {
+            assert_eq!(this.to_string(), want.to_string(), "{}", title);
+        }
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn test_reduced_kind() {
+        struct TestCase {
+            this: Collection<&'static str>,
+            want: Kind,
+        }
+
+        for (title, TestCase { this, want }) in HashMap::from([
+            (
+                "any",
+                TestCase {
+                    this: Collection::any(),
+                    want: Kind::any(),
+                },
+            ),
+            (
+                "known bytes",
+                TestCase {
+                    this: BTreeMap::from([("foo", Kind::bytes())]).into(),
+                    want: Kind::bytes(),
+                },
+            ),
+            (
+                "multiple known",
+                TestCase {
+                    this: BTreeMap::from([("foo", Kind::bytes()), ("bar", Kind::boolean())]).into(),
+                    want: Kind::bytes().or_boolean(),
+                },
+            ),
+            (
+                "known bytes, unknown any",
+                TestCase {
+                    this: Collection::from_parts(
+                        BTreeMap::from([("foo", Kind::bytes())]),
+                        Kind::any(),
+                    ),
+                    want: Kind::any(),
+                },
+            ),
+            (
+                "known bytes, unknown timestamp",
+                TestCase {
+                    this: Collection::from_parts(
+                        BTreeMap::from([("foo", Kind::bytes())]),
+                        Kind::timestamp(),
+                    ),
+                    want: Kind::bytes().or_timestamp(),
+                },
+            ),
+        ]) {
+            assert_eq!(this.reduced_kind(), want, "{}", title);
         }
     }
 }

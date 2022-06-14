@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, fmt, path::Path};
 
 use chrono::{DateTime, Utc};
-use futures::{stream, StreamExt};
+use futures::StreamExt;
 use glob::{Pattern, PatternError};
 #[cfg(not(target_os = "windows"))]
 use heim::units::ratio::ratio;
@@ -12,16 +12,17 @@ use serde::{
 };
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
-#[cfg(unix)]
-use vector_common::btreemap;
+use vector_config::{
+    configurable_component,
+    schema::{finalize_schema, generate_string_schema},
+    schemars::{gen::SchemaGenerator, schema::SchemaObject},
+    Configurable, Metadata,
+};
 use vector_core::ByteSizeOf;
 
 use crate::{
     config::{DataType, Output, SourceConfig, SourceContext, SourceDescription},
-    event::{
-        metric::{Metric, MetricKind, MetricValue},
-        Event,
-    },
+    event::metric::{Metric, MetricKind, MetricValue},
     internal_events::{BytesReceived, EventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
     SourceSender,
@@ -35,62 +36,94 @@ mod filesystem;
 mod memory;
 mod network;
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Collector types.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
-enum Collector {
+pub enum Collector {
+    /// CGroups.
     #[cfg(target_os = "linux")]
     CGroups,
+
+    /// CPU.
     Cpu,
+
+    /// Disk.
     Disk,
+
+    /// Filesystem.
     Filesystem,
+
+    /// Load average.
     Load,
+
+    /// Host.
     Host,
+
+    /// Memory.
     Memory,
+
+    /// Network.
     Network,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+/// Filtering configuration.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
 pub(self) struct FilterList {
+    /// Any patterns which should be included.
     includes: Option<Vec<PatternWrapper>>,
+
+    /// Any patterns which should be excluded.
     excludes: Option<Vec<PatternWrapper>>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-struct Namespace(Option<String>);
-
-impl Default for Namespace {
-    fn default() -> Self {
-        Self(Some("host".into()))
-    }
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+/// Configuration for the `host_metrics` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug, Derivative)]
+#[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub struct HostMetricsConfig {
+    /// The interval between metric gathering, in seconds.
     #[serde(default = "default_scrape_interval")]
-    scrape_interval_secs: u64,
+    pub scrape_interval_secs: f64,
 
-    collectors: Option<Vec<Collector>>,
-    #[serde(default)]
-    namespace: Namespace,
-    #[serde(skip)]
-    version: Option<String>,
-    #[serde(skip)]
-    configuration_key: Option<String>,
+    /// The list of host metric collector services to use.
+    ///
+    /// Defaults to all collectors.
+    pub collectors: Option<Vec<Collector>>,
+
+    /// Overrides the default namespace for the metrics emitted by the source.
+    ///
+    /// By default, `host` is used.
+    #[derivative(Default(value = "default_namespace()"))]
+    #[serde(default = "default_namespace")]
+    pub namespace: Option<String>,
 
     #[cfg(target_os = "linux")]
+    #[configurable(derived)]
     #[serde(default)]
-    cgroups: cgroups::CGroupsConfig,
+    pub(crate) cgroups: cgroups::CGroupsConfig,
+
+    #[configurable(derived)]
     #[serde(default)]
-    disk: disk::DiskConfig,
+    pub disk: disk::DiskConfig,
+
+    #[configurable(derived)]
     #[serde(default)]
-    filesystem: filesystem::FilesystemConfig,
+    pub filesystem: filesystem::FilesystemConfig,
+
+    #[configurable(derived)]
     #[serde(default)]
-    network: network::NetworkConfig,
+    pub network: network::NetworkConfig,
 }
 
-const fn default_scrape_interval() -> u64 {
-    15
+const fn default_scrape_interval() -> f64 {
+    15.0
+}
+
+fn default_namespace() -> Option<String> {
+    Some(String::from("host"))
 }
 
 inventory::submit! {
@@ -106,7 +139,7 @@ impl SourceConfig for HostMetricsConfig {
         init_roots();
 
         let mut config = self.clone();
-        config.namespace.0 = config.namespace.0.filter(|namespace| !namespace.is_empty());
+        config.namespace = config.namespace.filter(|namespace| !namespace.is_empty());
 
         Ok(Box::pin(config.run(cx.out, cx.shutdown)))
     }
@@ -118,39 +151,33 @@ impl SourceConfig for HostMetricsConfig {
     fn source_type(&self) -> &'static str {
         "host_metrics"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 impl HostMetricsConfig {
-    /// Return a host metrics config with enterprise reporting defaults.
-    pub fn enterprise(version: impl Into<String>, configuration_key: impl Into<String>) -> Self {
-        Self {
-            namespace: Namespace(Some("pipelines".to_owned())),
-            version: Some(version.into()),
-            configuration_key: Some(configuration_key.into()),
-            ..Self::default()
-        }
-    }
-
     /// Set the interval to collect internal metrics.
-    pub fn scrape_interval_secs(&mut self, value: u64) {
+    pub fn scrape_interval_secs(&mut self, value: f64) {
         self.scrape_interval_secs = value;
     }
 
     async fn run(self, mut out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
-        let duration = time::Duration::from_secs(self.scrape_interval_secs);
+        let duration = time::Duration::from_secs_f64(self.scrape_interval_secs);
         let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
 
         let generator = HostMetrics::new(self);
 
         while interval.next().await.is_some() {
-            emit!(&BytesReceived {
+            emit!(BytesReceived {
                 byte_size: 0,
                 protocol: "none"
             });
             let metrics = generator.capture_metrics().await;
-            let (count, _) = metrics.size_hint();
-            if let Err(error) = out.send_all(&mut stream::iter(metrics)).await {
-                emit!(&StreamClosedError {
+            let count = metrics.len();
+            if let Err(error) = out.send_batch(metrics).await {
+                emit!(StreamClosedError {
                     count,
                     error: error.clone()
                 });
@@ -191,10 +218,8 @@ impl HostMetrics {
         }
     }
 
-    async fn capture_metrics(&self) -> impl Iterator<Item = Event> {
+    async fn capture_metrics(&self) -> Vec<Metric> {
         let hostname = crate::get_hostname();
-        let version = self.config.version.clone();
-        let configuration_key = self.config.configuration_key.clone();
 
         let mut metrics = Vec::new();
         #[cfg(target_os = "linux")]
@@ -228,21 +253,11 @@ impl HostMetrics {
                 metric.insert_tag("host".into(), hostname.into());
             }
         }
-        if let Some(version) = &version {
-            for metric in &mut metrics {
-                metric.insert_tag("version".to_owned(), version.clone());
-            }
-        }
-        if let Some(configuration_key) = &configuration_key {
-            for metric in &mut metrics {
-                metric.insert_tag("configuration_key".to_owned(), configuration_key.clone());
-            }
-        }
-        emit!(&EventsReceived {
+        emit!(EventsReceived {
             count: metrics.len(),
             byte_size: metrics.size_of(),
         });
-        metrics.into_iter().map(Into::into)
+        metrics
     }
 
     pub async fn loadavg_metrics(&self) -> Vec<Metric> {
@@ -255,19 +270,19 @@ impl HostMetrics {
                         "load1",
                         timestamp,
                         loadavg.0.get::<ratio>() as f64,
-                        btreemap! {},
+                        BTreeMap::new(),
                     ),
                     self.gauge(
                         "load5",
                         timestamp,
                         loadavg.1.get::<ratio>() as f64,
-                        btreemap! {},
+                        BTreeMap::new(),
                     ),
                     self.gauge(
                         "load15",
                         timestamp,
                         loadavg.2.get::<ratio>() as f64,
-                        btreemap! {},
+                        BTreeMap::new(),
                     ),
                 ]
             }
@@ -325,7 +340,7 @@ impl HostMetrics {
         tags: BTreeMap<String, String>,
     ) -> Metric {
         Metric::new(name, MetricKind::Absolute, MetricValue::Counter { value })
-            .with_namespace(self.config.namespace.0.clone())
+            .with_namespace(self.config.namespace.clone())
             .with_tags(Some(tags))
             .with_timestamp(Some(timestamp))
     }
@@ -338,7 +353,7 @@ impl HostMetrics {
         tags: BTreeMap<String, String>,
     ) -> Metric {
         Metric::new(name, MetricKind::Absolute, MetricValue::Gauge { value })
-            .with_namespace(self.config.namespace.0.clone())
+            .with_namespace(self.config.namespace.clone())
             .with_tags(Some(tags))
             .with_timestamp(Some(timestamp))
     }
@@ -486,6 +501,24 @@ impl Serialize for PatternWrapper {
     }
 }
 
+// NOTE: We have to do a manual implementation of `Configurable` because `configurable_component` derives
+// `Serialize`/`Deserialize` automatically, which we can't do here since they're already implemented by hand here.
+impl<'de> Configurable<'de> for PatternWrapper {
+    fn referencable_name() -> Option<&'static str> {
+        Some("glob::PatternWrapper")
+    }
+
+    fn description() -> Option<&'static str> {
+        Some("A compiled Unix shell style pattern.")
+    }
+
+    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
+        let mut schema = generate_string_schema();
+        finalize_schema(gen, &mut schema, overrides);
+        schema
+    }
+}
+
 #[cfg(test)]
 pub(self) mod tests {
     use std::{collections::HashSet, future::Future};
@@ -561,7 +594,7 @@ pub(self) mod tests {
         let all_metrics_count = HostMetrics::new(HostMetricsConfig::default())
             .capture_metrics()
             .await
-            .count();
+            .len();
 
         for collector in &[
             #[cfg(target_os = "linux")]
@@ -582,7 +615,7 @@ pub(self) mod tests {
             .await;
 
             assert!(
-                all_metrics_count > some_metrics.count(),
+                all_metrics_count > some_metrics.len(),
                 "collector={:?}",
                 collector
             );
@@ -591,12 +624,11 @@ pub(self) mod tests {
 
     #[tokio::test]
     async fn are_tagged_with_hostname() {
-        let mut metrics = HostMetrics::new(HostMetricsConfig::default())
+        let metrics = HostMetrics::new(HostMetricsConfig::default())
             .capture_metrics()
             .await;
         let hostname = crate::get_hostname().expect("Broken hostname");
-        assert!(!metrics.any(|event| event
-            .into_metric()
+        assert!(!metrics.into_iter().any(|event| event
             .tags()
             .expect("Missing tags")
             .get("host")
@@ -606,23 +638,27 @@ pub(self) mod tests {
 
     #[tokio::test]
     async fn uses_custom_namespace() {
-        let mut metrics = HostMetrics::new(HostMetricsConfig {
-            namespace: Namespace(Some("other".into())),
+        let metrics = HostMetrics::new(HostMetricsConfig {
+            namespace: Some("other".into()),
             ..Default::default()
         })
         .capture_metrics()
         .await;
 
-        assert!(metrics.all(|event| event.into_metric().namespace() == Some("other")));
+        assert!(metrics
+            .into_iter()
+            .all(|event| event.namespace() == Some("other")));
     }
 
     #[tokio::test]
     async fn uses_default_namespace() {
-        let mut metrics = HostMetrics::new(HostMetricsConfig::default())
+        let metrics = HostMetrics::new(HostMetricsConfig::default())
             .capture_metrics()
             .await;
 
-        assert!(metrics.all(|event| event.into_metric().namespace() == Some("host")));
+        assert!(metrics
+            .iter()
+            .all(|event| event.namespace() == Some("host")));
     }
 
     // Windows does not produce load average metrics.

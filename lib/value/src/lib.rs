@@ -22,6 +22,7 @@
     unused
 )]
 #![allow(
+    clippy::cast_lossless,
     clippy::cargo_common_metadata,
     clippy::single_match_else,
     clippy::cast_possible_wrap,
@@ -29,12 +30,16 @@
     clippy::module_name_repetitions,
     clippy::missing_const_for_fn,
     clippy::multiple_crate_versions,
+    clippy::fallible_impl_from,
     unreachable_code,
     unused_variables
 )]
 
 pub mod kind;
+pub mod secrets;
 pub mod value;
 
-pub use self::value::Value;
 pub use kind::Kind;
+
+pub use self::secrets::Secrets;
+pub use self::value::{Value, ValueRegex};

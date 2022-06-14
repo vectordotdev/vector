@@ -5,7 +5,7 @@ use std::{
 
 use futures::future::BoxFuture;
 use headers::{Authorization, HeaderMapExt};
-use http::{header::HeaderValue, request::Builder, uri::InvalidUri, HeaderMap, Request};
+use http::{header::HeaderValue, request::Builder, uri::InvalidUri, HeaderMap, Request, Uri};
 use hyper::{
     body::{Body, HttpBody},
     client,
@@ -13,10 +13,10 @@ use hyper::{
 };
 use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tower::Service;
-use tracing_futures::Instrument;
+use tracing::Instrument;
+use vector_config::configurable_component;
 
 use crate::{
     config::ProxyConfig,
@@ -83,7 +83,7 @@ where
 
         default_request_headers(&mut request, &self.user_agent);
 
-        emit!(&http_client::AboutToSendHttpRequest { request: &request });
+        emit!(http_client::AboutToSendHttpRequest { request: &request });
 
         let response = self.client.request(request);
 
@@ -103,7 +103,7 @@ where
             let response = response_result
                 .map_err(|error| {
                     // Emit the error into the internal events system.
-                    emit!(&http_client::GotHttpError {
+                    emit!(http_client::GotHttpError {
                         error: &error,
                         roundtrip
                     });
@@ -112,13 +112,13 @@ where
                 .context(CallRequestSnafu)?;
 
             // Emit the response into the internal events system.
-            emit!(&http_client::GotHttpResponse {
+            emit!(http_client::GotHttpResponse {
                 response: &response,
                 roundtrip
             });
             Ok(response)
         }
-        .instrument(span.clone());
+        .instrument(span.clone().or_current());
 
         Box::pin(fut)
     }
@@ -128,6 +128,17 @@ pub fn build_proxy_connector(
     tls_settings: MaybeTlsSettings,
     proxy_config: &ProxyConfig,
 ) -> Result<ProxyConnector<HttpsConnector<HttpConnector>>, HttpError> {
+    let https = build_tls_connector(tls_settings)?;
+    let mut proxy = ProxyConnector::new(https).unwrap();
+    proxy_config
+        .configure(&mut proxy)
+        .context(MakeProxyConnectorSnafu)?;
+    Ok(proxy)
+}
+
+pub fn build_tls_connector(
+    tls_settings: MaybeTlsSettings,
+) -> Result<HttpsConnector<HttpConnector>, HttpError> {
     let mut http = HttpConnector::new();
     http.enforce_http(false);
 
@@ -142,12 +153,7 @@ pub fn build_proxy_connector(
 
         Ok(())
     });
-
-    let mut proxy = ProxyConnector::new(https).unwrap();
-    proxy_config
-        .configure(&mut proxy)
-        .context(MakeProxyConnectorSnafu)?;
-    Ok(proxy)
+    Ok(https)
 }
 
 fn default_request_headers<B>(request: &mut Request<B>, user_agent: &HeaderValue) {
@@ -203,11 +209,32 @@ impl<B> fmt::Debug for HttpClient<B> {
     }
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+/// Configuration of the authentication strategy for HTTP requests.
+///
+/// HTTP authentication should almost always be used with HTTPS only, as the authentication credentials are passed as an
+/// HTTP header without any additional encryption beyond what is provided by the transport itself.
+#[configurable_component]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
 pub enum Auth {
-    Basic { user: String, password: String },
-    Bearer { token: String },
+    /// Basic authentication.
+    ///
+    /// The username and password are concatenated and encoded via base64.
+    Basic {
+        /// The username to send.
+        user: String,
+
+        /// The password to send.
+        password: String,
+    },
+
+    /// Bearer authentication.
+    ///
+    /// A bearer token (OAuth2, JWT, etc) is passed as-is.
+    Bearer {
+        /// The bearer token to send.
+        token: String,
+    },
 }
 
 pub trait MaybeAuth: Sized {
@@ -248,6 +275,20 @@ impl Auth {
             },
         }
     }
+}
+
+pub fn get_http_scheme_from_uri(uri: &Uri) -> &'static str {
+    // If there's no scheme, we just use "http" since it provides the most semantic relevance without inadvertently
+    // implying things it can't know i.e. returning "https" when we're not actually sure HTTPS was used.
+    uri.scheme_str().map_or("http", |scheme| match scheme {
+        "http" => "http",
+        "https" => "https",
+        // `http::Uri` ensures that we always get "http" or "https" if the URI is created with a well-formed scheme, but
+        // it also supports arbitrary schemes, which is where we bomb out down here, since we can't generate a static
+        // string for an arbitrary input string... and anything other than "http" and "https" makes no sense for an HTTP
+        // client anyways.
+        s => panic!("invalid URI scheme for HTTP client: {}", s),
+    })
 }
 
 #[cfg(test)]

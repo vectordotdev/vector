@@ -1,4 +1,8 @@
-use std::{fmt, path::PathBuf};
+use std::{
+    fmt,
+    num::{NonZeroU64, NonZeroUsize},
+    path::PathBuf,
+};
 
 use serde::{de, ser, Deserialize, Deserializer, Serialize, Serializer};
 use snafu::{ResultExt, Snafu};
@@ -9,7 +13,7 @@ use crate::{
         builder::{TopologyBuilder, TopologyError},
         channel::{BufferReceiver, BufferSender},
     },
-    variant::{DiskV1Buffer, DiskV2Buffer, MemoryBuffer},
+    variants::{DiskV1Buffer, DiskV2Buffer, MemoryBuffer},
     Acker, Bufferable, WhenFull,
 };
 
@@ -19,15 +23,17 @@ pub enum BufferBuildError {
     RequiresDataDir,
     #[snafu(display("error occurred when building buffer: {}", source))]
     FailedToBuildTopology { source: TopologyError },
+    #[snafu(display("`max_events` must be greater than zero"))]
+    InvalidMaxEvents,
 }
 
 #[derive(Deserialize, Serialize)]
 enum BufferTypeKind {
     #[serde(rename = "memory")]
     Memory,
-    #[serde(rename = "disk")]
+    #[serde(rename = "disk_v1")]
     DiskV1,
-    #[serde(rename = "disk_v2")]
+    #[serde(rename = "disk")]
     DiskV2,
 }
 
@@ -41,8 +47,8 @@ impl BufferTypeVisitor {
         A: de::MapAccess<'de>,
     {
         let mut kind: Option<BufferTypeKind> = None;
-        let mut max_events: Option<usize> = None;
-        let mut max_size: Option<u64> = None;
+        let mut max_events: Option<NonZeroUsize> = None;
+        let mut max_size: Option<NonZeroU64> = None;
         let mut when_full: Option<WhenFull> = None;
         while let Some(key) = map.next_key::<String>()? {
             match key.as_str() {
@@ -197,8 +203,8 @@ impl Serialize for BufferConfig {
     }
 }
 
-pub const fn memory_buffer_default_max_events() -> usize {
-    500
+pub const fn memory_buffer_default_max_events() -> NonZeroUsize {
+    unsafe { NonZeroUsize::new_unchecked(500) }
 }
 
 /// A specific type of buffer stage.
@@ -210,21 +216,21 @@ pub enum BufferType {
     #[serde(rename = "memory")]
     Memory {
         #[serde(default = "memory_buffer_default_max_events")]
-        max_events: usize,
+        max_events: NonZeroUsize,
         #[serde(default)]
         when_full: WhenFull,
     },
     /// A buffer stage backed by an on-disk database, powered by LevelDB.
-    #[serde(rename = "disk")]
+    #[serde(rename = "disk_v1")]
     DiskV1 {
-        max_size: u64,
+        max_size: NonZeroU64,
         #[serde(default)]
         when_full: WhenFull,
     },
     /// A buffer stage backed by disk.
-    #[serde(rename = "disk_v2")]
+    #[serde(rename = "disk")]
     DiskV2 {
-        max_size: u64,
+        max_size: NonZeroU64,
         #[serde(default)]
         when_full: WhenFull,
     },
@@ -264,7 +270,6 @@ impl BufferType {
                 when_full,
                 max_size,
             } => {
-                warn!("!!!! The `disk_v2` buffer type is not yet stable.  Data loss may be encountered. !!!!");
                 let data_dir = data_dir.ok_or(BufferBuildError::RequiresDataDir)?;
                 builder.stage(DiskV2Buffer::new(id, data_dir, max_size), when_full);
             }
@@ -287,6 +292,11 @@ impl BufferType {
 /// component, where you could only choose which buffer type to use.  As we expand buffer
 /// functionality to allow chaining buffers together, you'll see "buffer topology" used in internal
 /// documentation to correctly reflect the internal structure.
+///
+/// TODO: We need to limit chained buffers to only allowing a single copy of each buffer type to be
+/// defined, otherwise, for example, two instances of the same disk buffer type in a single chained
+/// buffer topology would try to both open the same buffer files on disk, which wouldn't work or
+/// would go horribly wrong.
 #[derive(Clone, Debug, PartialEq)]
 pub struct BufferConfig {
     pub stages: Vec<BufferType>,
@@ -335,12 +345,12 @@ impl BufferConfig {
     {
         let mut builder = TopologyBuilder::default();
 
-        for stage in self.stages.iter().copied() {
+        for stage in &self.stages {
             stage.add_to_builder(&mut builder, data_dir.clone(), buffer_id.clone())?;
         }
 
         builder
-            .build(span)
+            .build(buffer_id, span)
             .await
             .context(FailedToBuildTopologySnafu)
     }
@@ -348,6 +358,8 @@ impl BufferConfig {
 
 #[cfg(test)]
 mod test {
+    use std::num::{NonZeroU64, NonZeroUsize};
+
     use crate::{BufferConfig, BufferType, WhenFull};
 
     fn check_single_stage(source: &str, expected: BufferType) {
@@ -401,7 +413,7 @@ max_events: 42
           max_events: 100
           "#,
             BufferType::Memory {
-                max_events: 100,
+                max_events: NonZeroUsize::new(100).unwrap(),
                 when_full: WhenFull::Block,
             },
         );
@@ -417,11 +429,11 @@ max_events: 42
           "#,
             &[
                 BufferType::Memory {
-                    max_events: 42,
+                    max_events: NonZeroUsize::new(42).unwrap(),
                     when_full: WhenFull::Block,
                 },
                 BufferType::Memory {
-                    max_events: 100,
+                    max_events: NonZeroUsize::new(100).unwrap(),
                     when_full: WhenFull::DropNewest,
                 },
             ],
@@ -432,11 +444,11 @@ max_events: 42
     fn ensure_field_defaults_for_all_types() {
         check_single_stage(
             r#"
-          type: disk
+          type: disk_v1
           max_size: 1024
           "#,
             BufferType::DiskV1 {
-                max_size: 1024,
+                max_size: NonZeroU64::new(1024).unwrap(),
                 when_full: WhenFull::Block,
             },
         );
@@ -446,7 +458,7 @@ max_events: 42
           type: memory
           "#,
             BufferType::Memory {
-                max_events: 500,
+                max_events: NonZeroUsize::new(500).unwrap(),
                 when_full: WhenFull::Block,
             },
         );
@@ -457,7 +469,7 @@ max_events: 42
           max_events: 100
           "#,
             BufferType::Memory {
-                max_events: 100,
+                max_events: NonZeroUsize::new(100).unwrap(),
                 when_full: WhenFull::Block,
             },
         );
@@ -468,7 +480,7 @@ max_events: 42
           when_full: drop_newest
           "#,
             BufferType::Memory {
-                max_events: 500,
+                max_events: NonZeroUsize::new(500).unwrap(),
                 when_full: WhenFull::DropNewest,
             },
         );
@@ -479,18 +491,18 @@ max_events: 42
           when_full: overflow
           "#,
             BufferType::Memory {
-                max_events: 500,
+                max_events: NonZeroUsize::new(500).unwrap(),
                 when_full: WhenFull::Overflow,
             },
         );
 
         check_single_stage(
             r#"
-          type: disk_v2
+          type: disk
           max_size: 1024
           "#,
             BufferType::DiskV2 {
-                max_size: 1024,
+                max_size: NonZeroU64::new(1024).unwrap(),
                 when_full: WhenFull::Block,
             },
         );

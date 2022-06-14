@@ -1,15 +1,23 @@
 use std::convert::TryFrom;
 
 use headers::{Authorization, HeaderMapExt};
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 use warp::http::HeaderMap;
 
-#[cfg(feature = "sources-utils-http-prelude")]
+#[cfg(any(
+    feature = "sources-utils-http-prelude",
+    feature = "sources-utils-http-auth"
+))]
 use super::error::ErrorMessage;
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// HTTP Basic authentication configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct HttpSourceAuthConfig {
+    /// The username for basic authentication.
     pub username: String,
+
+    /// The password for basic authentication.
     pub password: String,
 }
 
@@ -37,13 +45,14 @@ impl TryFrom<Option<&HttpSourceAuthConfig>> for HttpSourceAuth {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct HttpSourceAuth {
-    pub token: Option<String>,
+    #[allow(unused)] // triggered by check-component-features
+    pub(self) token: Option<String>,
 }
 
-#[cfg(feature = "sources-utils-http-prelude")]
 impl HttpSourceAuth {
+    #[allow(unused)] // triggered by check-component-features
     pub fn is_valid(&self, header: &Option<String>) -> Result<(), ErrorMessage> {
         use warp::http::StatusCode;
 

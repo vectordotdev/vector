@@ -1,9 +1,11 @@
 use std::{collections::BTreeMap, fmt, ops::Deref};
 
+use value::Value;
+
 use crate::{
     expression::{Expr, Resolved},
-    vm::OpCode,
-    Context, Expression, State, TypeDef, Value,
+    state::{ExternalEnv, LocalEnv},
+    Context, Expression, TypeDef,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -42,7 +44,7 @@ impl Expression for Array {
             .map(Value::Array)
     }
 
-    fn type_def(&self, state: &State) -> TypeDef {
+    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
         let type_defs = self
             .inner
             .iter()
@@ -60,22 +62,6 @@ impl Expression for Array {
             .collect::<BTreeMap<_, _>>();
 
         TypeDef::array(collection).with_fallibility(fallible)
-    }
-
-    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
-        // Evaluate each of the elements of the array, the result of each
-        // will be added to the stack.
-        for value in self.inner.iter().rev() {
-            value.compile_to_vm(vm)?;
-        }
-
-        vm.write_opcode(OpCode::CreateArray);
-
-        // Add the length of the array as a primitive so the VM knows how
-        // many elements to move into the array.
-        vm.write_primitive(self.inner.len());
-
-        Ok(())
     }
 }
 
@@ -100,9 +86,10 @@ impl From<Vec<Expr>> for Array {
 
 #[cfg(test)]
 mod tests {
+    use value::kind::Collection;
+
     use super::*;
     use crate::{expr, test_type_def, value::Kind, TypeDef};
-    use value::kind::Collection;
 
     test_type_def![
         empty_array {

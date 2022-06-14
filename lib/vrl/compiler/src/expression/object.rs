@@ -1,9 +1,11 @@
 use std::{collections::BTreeMap, fmt, ops::Deref};
 
+use value::Value;
+
 use crate::{
     expression::{Expr, Resolved},
-    vm::OpCode,
-    Context, Expression, State, TypeDef, Value,
+    state::{ExternalEnv, LocalEnv},
+    Context, Expression, TypeDef,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -42,7 +44,7 @@ impl Expression for Object {
             .map(Value::Object)
     }
 
-    fn type_def(&self, state: &State) -> TypeDef {
+    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
         let type_defs = self
             .inner
             .iter()
@@ -59,26 +61,6 @@ impl Expression for Object {
             .collect::<BTreeMap<_, _>>();
 
         TypeDef::object(collection).with_fallibility(fallible)
-    }
-
-    fn compile_to_vm(&self, vm: &mut crate::vm::Vm) -> Result<(), String> {
-        for (key, value) in &self.inner {
-            // Write the key as a constant
-            let keyidx = vm.add_constant(Value::Bytes(key.clone().into()));
-            vm.write_opcode(OpCode::Constant);
-            vm.write_primitive(keyidx);
-
-            // Write the value
-            value.compile_to_vm(vm)?;
-        }
-
-        vm.write_opcode(OpCode::CreateObject);
-
-        // Write the number of key/value pairs in the object so the machine knows
-        // how many pairs to suck into the created object.
-        vm.write_primitive(self.inner.len());
-
-        Ok(())
     }
 }
 

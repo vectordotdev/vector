@@ -1,9 +1,11 @@
 use std::fmt;
 
+use value::Value;
+
 use crate::{
     expression::Resolved,
-    vm::{OpCode, Vm},
-    Context, Expression, State, TypeDef, Value,
+    state::{ExternalEnv, LocalEnv},
+    Context, Expression, TypeDef,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -14,16 +16,8 @@ impl Expression for Noop {
         Ok(Value::Null)
     }
 
-    fn type_def(&self, _: &State) -> TypeDef {
+    fn type_def(&self, _: (&LocalEnv, &ExternalEnv)) -> TypeDef {
         TypeDef::null().infallible()
-    }
-
-    fn compile_to_vm(&self, vm: &mut Vm) -> Result<(), String> {
-        // Noop just adds a Null to the stack.
-        let constant = vm.add_constant(Value::Null);
-        vm.write_opcode(OpCode::Constant);
-        vm.write_primitive(constant);
-        Ok(())
     }
 }
 

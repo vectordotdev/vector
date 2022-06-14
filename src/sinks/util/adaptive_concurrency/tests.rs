@@ -28,12 +28,12 @@ use tower::Service;
 
 use super::controller::ControllerStatistics;
 use crate::{
-    config::{self, Input, SinkConfig, SinkContext},
+    config::{self, AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     event::{metric::MetricValue, Event},
     metrics::{self},
     sinks::{
         util::{
-            retries::RetryLogic, sink, BatchSettings, Concurrency, EncodedEvent, EncodedLength,
+            retries::RetryLogic, BatchSettings, Concurrency, EncodedEvent, EncodedLength,
             TowerRequestConfig, VecBuffer,
         },
         Healthcheck, VectorSink,
@@ -91,7 +91,7 @@ impl LimitParams {
             self.knee_start
                 .map(|knee| {
                     self.knee_exp
-                        .unwrap_or_else(|| self.scale + 1.0)
+                        .unwrap_or(self.scale + 1.0)
                         .powf(level.saturating_sub(knee) as f64)
                         - 1.0
                 })
@@ -169,7 +169,6 @@ impl SinkConfig for TestConfig {
                 VecBuffer::new(batch_settings.size),
                 batch_settings.timeout,
                 cx.acker(),
-                sink::StdServiceLogic::default(),
             )
             .with_flat_map(|event| stream::iter(Some(Ok(EncodedEvent::new(event, 0)))))
             .sink_map_err(|error| panic!("Fatal test sink error: {}", error));
@@ -188,7 +187,7 @@ impl SinkConfig for TestConfig {
     }
 
     fn input(&self) -> Input {
-        Input::any()
+        Input::all()
     }
 
     fn sink_type(&self) -> &'static str {
@@ -197,6 +196,10 @@ impl SinkConfig for TestConfig {
 
     fn typetag_deserialize(&self) {
         unimplemented!("not intended for use in real configs")
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
     }
 }
 

@@ -1,14 +1,14 @@
 use std::path::PathBuf;
 
 use bytes::Bytes;
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use super::util::framestream::{build_framestream_unix_source, FrameHandler};
 use crate::{
     config::{log_schema, DataType, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
-    internal_events::{BytesReceived, DnstapEventsReceived, DnstapParseError},
+    internal_events::{BytesReceived, DnstapParseError, EventsReceived},
     Result,
 };
 
@@ -19,17 +19,54 @@ pub mod schema;
 use dnsmsg_parser::{dns_message, dns_message_parser};
 pub use schema::DnstapEventSchema;
 
-#[derive(Deserialize, Serialize, Debug)]
+/// Configuration for the `dnstap` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
 pub struct DnstapConfig {
+    /// Maximum length, in bytes, that a frame can be.
     #[serde(default = "default_max_frame_length")]
     pub max_frame_length: usize,
+
+    /// Overrides the name of the log field used to add the source path to each event.
+    ///
+    /// The value will be the socket path itself.
+    ///
+    /// By default, the [global `host_key` option](https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key) is
+    /// used.
     pub host_key: Option<String>,
+
+    /// Absolute path to the socket file to read DNSTAP data from.
+    ///
+    /// The DNS server must be configured to send its DNSTAP data to this socket file. The socket file will be created,
+    /// if it doesn't already exist, when the source first starts.
     pub socket_path: PathBuf,
-    pub raw_data_only: Option<bool>,
+
+    /// Whether or not to skip parsing/decoding of DNSTAP frames.
+    ///
+    /// If set to `true`, frames will not be parsed/decoded. The raw frame data will be set as a field on the event
+    /// (called `rawData`) and encoded as a base64 string.
+    raw_data_only: Option<bool>,
+
+    /// Whether or not to concurrently process DNSTAP frames.
     pub multithreaded: Option<bool>,
+
+    /// Maximum number of frames that can be processed concurrently.
     pub max_frame_handling_tasks: Option<u32>,
+
+    /// Unix file mode bits to be applied to the unix socket file as its designated file permissions.
+    ///
+    /// Note that the file mode value can be specified in any numeric format supported by your configuration
+    /// language, but it is most intuitive to use an octal number.
     pub socket_file_mode: Option<u32>,
+
+    /// The size, in bytes, of the receive buffer used for the socket.
+    ///
+    /// This should not typically needed to be changed.
     pub socket_receive_buffer_size: Option<usize>,
+
+    /// The size, in bytes, of the send buffer used for the socket.
+    ///
+    /// This should not typically needed to be changed.
     pub socket_send_buffer_size: Option<usize>,
 }
 
@@ -54,7 +91,7 @@ impl DnstapConfig {
 impl Default for DnstapConfig {
     fn default() -> Self {
         Self {
-            host_key: Some("host".to_string()),
+            host_key: None,
             max_frame_length: default_max_frame_length(),
             socket_path: PathBuf::from("/run/bind/dnstap.sock"),
             raw_data_only: None,
@@ -77,24 +114,7 @@ impl_generate_config_from_default!(DnstapConfig);
 #[typetag::serde(name = "dnstap")]
 impl SourceConfig for DnstapConfig {
     async fn build(&self, cx: SourceContext) -> Result<super::Source> {
-        let host_key = self
-            .host_key
-            .clone()
-            .unwrap_or_else(|| log_schema().host_key().to_string());
-
-        let frame_handler = DnstapFrameHandler::new(
-            self.max_frame_length,
-            self.socket_path.clone(),
-            self.content_type(),
-            self.raw_data_only.unwrap_or(false),
-            self.multithreaded.unwrap_or(false),
-            self.max_frame_handling_tasks.unwrap_or(1000),
-            self.socket_file_mode,
-            self.socket_receive_buffer_size,
-            self.socket_send_buffer_size,
-            host_key,
-            log_schema().timestamp_key(),
-        );
+        let frame_handler = DnstapFrameHandler::new(self);
         build_framestream_unix_source(frame_handler, cx.shutdown, cx.out)
     }
 
@@ -104,6 +124,10 @@ impl SourceConfig for DnstapConfig {
 
     fn source_type(&self) -> &'static str {
         "dnstap"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 
@@ -124,35 +148,30 @@ pub struct DnstapFrameHandler {
 }
 
 impl DnstapFrameHandler {
-    pub fn new(
-        max_frame_length: usize,
-        socket_path: PathBuf,
-        content_type: String,
-        raw_data_only: bool,
-        multithreaded: bool,
-        max_frame_handling_tasks: u32,
-        socket_file_mode: Option<u32>,
-        socket_receive_buffer_size: Option<usize>,
-        socket_send_buffer_size: Option<usize>,
-        host_key: String,
-        timestamp_key: &'static str,
-    ) -> Self {
+    pub fn new(config: &DnstapConfig) -> Self {
+        let timestamp_key = log_schema().timestamp_key();
+
         let mut schema = DnstapEventSchema::new();
         schema
             .dnstap_root_data_schema_mut()
             .set_timestamp(timestamp_key);
 
+        let host_key = config
+            .host_key
+            .clone()
+            .unwrap_or_else(|| log_schema().host_key().to_string());
+
         Self {
-            max_frame_length,
-            socket_path,
-            content_type,
+            max_frame_length: config.max_frame_length,
+            socket_path: config.socket_path.clone(),
+            content_type: config.content_type(),
             schema,
-            raw_data_only,
-            multithreaded,
-            max_frame_handling_tasks,
-            socket_file_mode,
-            socket_receive_buffer_size,
-            socket_send_buffer_size,
+            raw_data_only: config.raw_data_only.unwrap_or(false),
+            multithreaded: config.multithreaded.unwrap_or(false),
+            max_frame_handling_tasks: config.max_frame_handling_tasks.unwrap_or(1000),
+            socket_file_mode: config.socket_file_mode,
+            socket_receive_buffer_size: config.socket_receive_buffer_size,
+            socket_send_buffer_size: config.socket_send_buffer_size,
             host_key,
             timestamp_key: timestamp_key.to_string(),
         }
@@ -173,7 +192,7 @@ impl FrameHandler for DnstapFrameHandler {
      * Takes a data frame from the unix socket and turns it into a Vector Event.
      **/
     fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event> {
-        emit!(&BytesReceived {
+        emit!(BytesReceived {
             byte_size: frame.len(),
             protocol: "protobuf",
         });
@@ -182,28 +201,30 @@ impl FrameHandler for DnstapFrameHandler {
         let log_event = event.as_mut_log();
 
         if let Some(host) = received_from {
-            log_event.insert(self.host_key(), host);
+            log_event.insert(self.host_key().as_str(), host);
         }
 
         if self.raw_data_only {
             log_event.insert(
-                &self.schema.dnstap_root_data_schema().raw_data(),
+                self.schema.dnstap_root_data_schema().raw_data(),
                 base64::encode(&frame),
             );
-            emit!(&DnstapEventsReceived {
+            emit!(EventsReceived {
+                count: 1,
                 byte_size: event.size_of(),
             });
             Some(event)
         } else {
             match parse_dnstap_data(&self.schema, log_event, frame) {
                 Err(err) => {
-                    emit!(&DnstapParseError {
+                    emit!(DnstapParseError {
                         error: format!("Dnstap protobuf decode error {:?}.", err).as_str()
                     });
                     None
                 }
                 Ok(_) => {
-                    emit!(&DnstapEventsReceived {
+                    emit!(EventsReceived {
+                        count: 1,
                         byte_size: event.size_of(),
                     });
                     Some(event)
@@ -250,91 +271,95 @@ mod integration_tests {
 
     use bollard::exec::{CreateExecOptions, StartExecOptions};
     use bollard::Docker;
-    use std::{env, path::Path};
-
     use futures::StreamExt;
     use serde_json::json;
     use tokio::time;
 
     use super::*;
-    use crate::{event::Value, test_util::trace_init, SourceSender};
+    use crate::{
+        event::Value,
+        test_util::{
+            components::{assert_source_compliance, SOURCE_TAGS},
+            wait_for,
+        },
+        SourceSender,
+    };
 
     async fn test_dnstap(raw_data: bool, query_type: &'static str) {
-        trace_init();
+        assert_source_compliance(&SOURCE_TAGS, async {
+            let (sender, mut recv) = SourceSender::new_test();
 
-        let (sender, mut recv) = SourceSender::new_test();
+            tokio::spawn(async move {
+                let socket = get_socket(raw_data, query_type);
 
-        tokio::spawn(async move {
-            let socket = get_socket(raw_data, query_type);
-
-            DnstapConfig {
-                max_frame_length: 102400,
-                host_key: Some("key".to_string()),
-                socket_path: socket,
-                raw_data_only: Some(raw_data),
-                multithreaded: Some(false),
-                max_frame_handling_tasks: Some(100000),
-                socket_file_mode: Some(511),
-                socket_receive_buffer_size: Some(10485760),
-                socket_send_buffer_size: Some(10485760),
-            }
-            .build(SourceContext::new_test(sender))
-            .await
-            .unwrap()
-            .await
-            .unwrap()
-        });
-
-        send_query(raw_data, query_type);
-
-        let event = time::timeout(time::Duration::from_secs(10), recv.next())
-            .await
-            .expect("fetch dnstap source event timeout")
-            .expect("failed to get dnstap source event from a stream");
-        let mut events = vec![event];
-        loop {
-            match time::timeout(time::Duration::from_secs(1), recv.next()).await {
-                Ok(Some(event)) => events.push(event),
-                Ok(None) => {
-                    println!("None: No event");
-                    break;
+                DnstapConfig {
+                    max_frame_length: 102400,
+                    host_key: Some("key".to_string()),
+                    socket_path: socket,
+                    raw_data_only: Some(raw_data),
+                    multithreaded: Some(false),
+                    max_frame_handling_tasks: Some(100000),
+                    socket_file_mode: Some(511),
+                    socket_receive_buffer_size: Some(10485760),
+                    socket_send_buffer_size: Some(10485760),
                 }
-                Err(e) => {
-                    println!("Error: {}", e);
-                    break;
+                .build(SourceContext::new_test(sender, None))
+                .await
+                .unwrap()
+                .await
+                .unwrap()
+            });
+
+            send_query(raw_data, query_type);
+
+            let event = time::timeout(time::Duration::from_secs(10), recv.next())
+                .await
+                .expect("fetch dnstap source event timeout")
+                .expect("failed to get dnstap source event from a stream");
+            let mut events = vec![event];
+            loop {
+                match time::timeout(time::Duration::from_secs(1), recv.next()).await {
+                    Ok(Some(event)) => events.push(event),
+                    Ok(None) => {
+                        println!("None: No event");
+                        break;
+                    }
+                    Err(e) => {
+                        println!("Error: {}", e);
+                        break;
+                    }
                 }
             }
-        }
 
-        verify_events(raw_data, query_type, &events);
-
-        cleanup(raw_data, query_type).await;
+            verify_events(raw_data, query_type, &events);
+        })
+        .await;
     }
 
     fn send_query(raw_data: bool, query_type: &'static str) {
         tokio::spawn(async move {
-            let socket = get_socket(raw_data, query_type);
-            let dnstap_sock_file = Path::new(&socket);
-            let (bind, port) = get_bind_and_port(raw_data, query_type);
+            let socket_path = get_socket(raw_data, query_type);
+            let (query_port, control_port) = get_bind_ports(raw_data, query_type);
 
-            loop {
-                time::sleep(time::Duration::from_millis(100)).await;
-                time::sleep(time::Duration::from_millis(100)).await;
-                if dnstap_sock_file.exists() {
-                    time::sleep(time::Duration::from_millis(100)).await;
-                    start_bind(bind, port).await;
-                    time::sleep(time::Duration::from_millis(100)).await;
-                    match query_type {
-                        "query" => {
-                            nslookup(port).await;
-                        }
-                        "update" => {
-                            nsupdate().await;
-                        }
-                        _ => (),
-                    }
-                    break;
+            // Wait for the source to create its respective socket before telling BIND to reload, causing it to open
+            // that new socket file.
+            wait_for(move || {
+                let path = socket_path.clone();
+                async move { path.exists() }
+            })
+            .await;
+
+            // Now instruct BIND to reopen its DNSTAP socket file and execute the given query.
+            reload_bind_dnstap_socket(control_port).await;
+
+            match query_type {
+                "query" => {
+                    nslookup(query_port).await;
                 }
+                "update" => {
+                    nsupdate().await;
+                }
+                _ => (),
             }
         });
     }
@@ -391,7 +416,7 @@ mod integration_tests {
         }
 
         for event in events {
-            let json = serde_json::to_value(event.as_log().all_fields()).unwrap();
+            let json = serde_json::to_value(event.as_log().all_fields().unwrap()).unwrap();
             match query_event {
                 "query" => {
                     if json["messageType"] == json!("ClientQuery") {
@@ -433,28 +458,23 @@ mod integration_tests {
     fn get_socket(raw_data: bool, query_type: &'static str) -> PathBuf {
         let socket_folder = std::env::var("BIND_SOCKET")
             .map(PathBuf::from)
-            .unwrap_or_else(|_| {
-                env::current_dir()
-                    .unwrap()
-                    .join("tests")
-                    .join("data")
-                    .join("dnstap")
-                    .join("socket")
-            });
+            .expect("BIND socket directory must be specified via BIND_SOCKET");
+
         match query_type {
             "query" if raw_data => socket_folder.join("dnstap.sock1"),
             "query" => socket_folder.join("dnstap.sock2"),
             "update" => socket_folder.join("dnstap.sock3"),
-            _ => socket_folder.join("dnstap.sock4"),
+            _ => unreachable!("no other test variants should exist"),
         }
     }
 
-    fn get_bind_and_port(raw_data: bool, query_type: &'static str) -> (&str, &str) {
+    fn get_bind_ports(raw_data: bool, query_type: &'static str) -> (&str, &str) {
+        // Returns the query port and control port, respectively, for the given BIND instance.
         match query_type {
-            "query" if raw_data => ("/bind1", "8001"),
-            "query" => ("/bind2", "8002"),
-            "update" => ("/bind3", "8003"),
-            _ => ("", ""),
+            "query" if raw_data => ("8001", "9001"),
+            "query" => ("8002", "9002"),
+            "update" => ("8003", "9003"),
+            _ => unreachable!("no other test variants should exist"),
         }
     }
 
@@ -476,8 +496,15 @@ mod integration_tests {
             .expect("failed to execute command");
     }
 
-    async fn start_bind(bind: &str, port: &str) {
-        dnstap_exec(vec!["/usr/sbin/named", "-p", port, "-t", bind]).await
+    async fn reload_bind_dnstap_socket(control_port: &str) {
+        dnstap_exec(vec![
+            "/usr/sbin/rndc",
+            "-p",
+            control_port,
+            "dnstap",
+            "-reopen",
+        ])
+        .await
     }
 
     async fn nslookup(port: &str) {
@@ -495,41 +522,17 @@ mod integration_tests {
         dnstap_exec(vec!["nsupdate", "-v", "/bind3/etc/bind/nsupdate.txt"]).await
     }
 
-    fn get_rndc_port(raw_data: bool, query_type: &'static str) -> &str {
-        match query_type {
-            "query" if raw_data => "9001",
-            "query" => "9002",
-            "update" => "9003",
-            _ => "",
-        }
-    }
-
-    async fn stop_bind(port: &str) {
-        dnstap_exec(vec!["rndc", "-p", port, "stop"]).await
-    }
-
-    fn remove_socket(raw_data: bool, query_type: &'static str) {
-        let socket = get_socket(raw_data, query_type);
-        let dnstap_sock_file = Path::new(&socket);
-        let _ = std::fs::remove_file(dnstap_sock_file);
-    }
-
-    async fn cleanup(raw_data: bool, query_type: &'static str) {
-        stop_bind(get_rndc_port(raw_data, query_type)).await;
-        remove_socket(raw_data, query_type);
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_dnstap_raw_event() {
         test_dnstap(true, "query").await;
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_dnstap_query_event() {
         test_dnstap(false, "query").await;
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_dnstap_update_event() {
         test_dnstap(false, "update").await;
     }

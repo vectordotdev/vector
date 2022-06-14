@@ -1,8 +1,17 @@
+use ::value::Value;
 use chrono::{
     format::{strftime::StrftimeItems, Item},
     DateTime, Utc,
 };
 use vrl::prelude::*;
+
+fn format_timestamp(bytes: Value, ts: Value) -> Resolved {
+    let bytes = bytes.try_bytes()?;
+    let format = String::from_utf8_lossy(&bytes);
+    let ts = ts.try_timestamp()?;
+
+    try_format(&ts, &format).map(Into::into)
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct FormatTimestamp;
@@ -29,8 +38,8 @@ impl Function for FormatTimestamp {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -56,14 +65,13 @@ struct FormatTimestampFn {
 
 impl Expression for FormatTimestampFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.format.resolve(ctx)?.try_bytes()?;
-        let format = String::from_utf8_lossy(&bytes);
-        let ts = self.value.resolve(ctx)?.try_timestamp()?;
+        let bytes = self.format.resolve(ctx)?;
+        let ts = self.value.resolve(ctx)?;
 
-        try_format(&ts, &format).map(Into::into)
+        format_timestamp(bytes, ts)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().fallible()
     }
 }

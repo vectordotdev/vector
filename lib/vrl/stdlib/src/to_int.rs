@@ -1,7 +1,8 @@
+use ::value::Value;
 use vector_common::conversion::Conversion;
 use vrl::prelude::*;
 
-fn to_int(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn to_int(value: Value) -> Resolved {
     use Value::*;
 
     match value {
@@ -103,19 +104,13 @@ impl Function for ToInt {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
         Ok(Box::new(ToIntFn { value }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-
-        to_int(value)
     }
 }
 
@@ -131,7 +126,7 @@ impl Expression for ToIntFn {
         to_int(value)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         let td = self.value.type_def(state);
 
         TypeDef::integer().with_fallibility(

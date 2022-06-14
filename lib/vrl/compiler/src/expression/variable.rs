@@ -1,12 +1,12 @@
+use diagnostic::{DiagnosticMessage, Label};
 use std::fmt;
-
-use diagnostic::{DiagnosticError, Label};
+use value::Value;
 
 use crate::{
     expression::{levenstein, Resolved},
     parser::ast::Ident,
-    vm::{self, OpCode, Vm},
-    Context, Expression, Span, State, TypeDef, Value,
+    state::{ExternalEnv, LocalEnv},
+    Context, Expression, Span, TypeDef,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -16,11 +16,11 @@ pub struct Variable {
 }
 
 impl Variable {
-    pub(crate) fn new(span: Span, ident: Ident, state: &State) -> Result<Self, Error> {
-        let value = match state.variable(&ident) {
+    pub(crate) fn new(span: Span, ident: Ident, local: &LocalEnv) -> Result<Self, Error> {
+        let value = match local.variable(&ident) {
             Some(variable) => variable.value.as_ref().cloned(),
             None => {
-                let idents = state
+                let idents = local
                     .variable_idents()
                     .map(|s| s.to_owned())
                     .collect::<Vec<_>>();
@@ -39,10 +39,6 @@ impl Variable {
     pub fn value(&self) -> Option<&Value> {
         self.value.as_ref()
     }
-
-    pub fn noop(ident: Ident) -> Self {
-        Self { ident, value: None }
-    }
 }
 
 impl Expression for Variable {
@@ -54,23 +50,12 @@ impl Expression for Variable {
             .unwrap_or(Value::Null))
     }
 
-    fn type_def(&self, state: &State) -> TypeDef {
-        state
+    fn type_def(&self, (local, _): (&LocalEnv, &ExternalEnv)) -> TypeDef {
+        local
             .variable(&self.ident)
             .cloned()
             .map(|d| d.type_def)
             .unwrap_or_else(|| TypeDef::null().infallible())
-    }
-
-    fn compile_to_vm(&self, vm: &mut Vm) -> Result<(), String> {
-        vm.write_opcode(OpCode::GetPath);
-
-        // Store the required path in the targets list, write its index to the vm.
-        let variable = vm::Variable::Internal(self.ident().clone(), None);
-        let target = vm.get_target(&variable);
-        vm.write_primitive(target);
-
-        Ok(())
     }
 }
 
@@ -81,7 +66,7 @@ impl fmt::Display for Variable {
 }
 
 #[derive(Debug)]
-pub struct Error {
+pub(crate) struct Error {
     variant: ErrorVariant,
     ident: Ident,
     span: Span,
@@ -98,7 +83,7 @@ impl Error {
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum ErrorVariant {
+pub(crate) enum ErrorVariant {
     #[error("call to undefined variable")]
     Undefined { idents: Vec<Ident> },
 }
@@ -115,7 +100,7 @@ impl std::error::Error for Error {
     }
 }
 
-impl DiagnosticError for Error {
+impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
         use ErrorVariant::*;
 

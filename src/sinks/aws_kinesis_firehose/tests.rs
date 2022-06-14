@@ -29,13 +29,14 @@ async fn check_batch_size() {
 
     let config = KinesisFirehoseSinkConfig {
         stream_name: String::from("test"),
-        region: RegionOrEndpoint::with_endpoint("http://localhost:4566"),
-        encoding: EncodingConfig::from(StandardEncodings::Json),
+        region: RegionOrEndpoint::with_both("local", "http://localhost:4566"),
+        encoding: EncodingConfig::from(StandardEncodings::Json).into(),
         compression: Compression::None,
         batch,
         request: Default::default(),
-        assume_role: None,
+        tls: None,
         auth: Default::default(),
+        acknowledgements: Default::default(),
     };
 
     let cx = SinkContext::new_test();
@@ -56,13 +57,14 @@ async fn check_batch_events() {
 
     let config = KinesisFirehoseSinkConfig {
         stream_name: String::from("test"),
-        region: RegionOrEndpoint::with_endpoint("http://localhost:4566"),
-        encoding: EncodingConfig::from(StandardEncodings::Json),
+        region: RegionOrEndpoint::with_both("local", "http://localhost:4566"),
+        encoding: EncodingConfig::from(StandardEncodings::Json).into(),
         compression: Compression::None,
         batch,
         request: Default::default(),
-        assume_role: None,
+        tls: None,
         auth: Default::default(),
+        acknowledgements: Default::default(),
     };
 
     let cx = SinkContext::new_test();

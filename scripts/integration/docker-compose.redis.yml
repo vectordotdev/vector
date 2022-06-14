@@ -1,9 +1,10 @@
+version: "3"
+
 services:
   redis:
-    image: redis:6-alpine
+    image: docker.io/redis:6-alpine
     networks:
       - backend
-
   runner:
     build:
       context: ${PWD}
@@ -13,15 +14,14 @@ services:
     working_dir: /code
     command:
       - "cargo"
-      - "test"
+      - "nextest"
+      - "run"
       - "--no-fail-fast"
       - "--no-default-features"
       - "--features"
       - "redis-integration-tests"
       - "--lib"
       - "::redis::"
-      - "--"
-      - "--nocapture"
     depends_on:
       - redis
     environment:
@@ -30,6 +30,14 @@ services:
       - backend
     volumes:
       - ${PWD}:/code
+      - target:/code/target
+      - cargogit:/usr/local/cargo/git
+      - cargoregistry:/usr/local/cargo/registry
 
 networks:
   backend: {}
+
+volumes:
+  target: {}
+  cargogit: {}
+  cargoregistry: {}

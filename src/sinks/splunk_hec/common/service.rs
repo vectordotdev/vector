@@ -129,8 +129,10 @@ where
                                 match ack_finalizer_tx.send((ack_id, tx)).await {
                                     Ok(_) => rx.await.unwrap_or(EventStatus::Rejected),
                                     // If we cannot send ack ids to the ack client, fall back to default behavior
-                                    Err(_) => {
-                                        emit!(&SplunkIndexerAcknowledgementUnavailableError);
+                                    Err(error) => {
+                                        emit!(SplunkIndexerAcknowledgementUnavailableError {
+                                            error
+                                        });
                                         EventStatus::Delivered
                                     }
                                 }
@@ -141,7 +143,7 @@ where
                         }
                         Err(error) => {
                             // This may occur if Splunk changes the response format in future versions.
-                            emit!(&SplunkResponseParseError { error });
+                            emit!(SplunkResponseParseError { error });
                             EventStatus::Delivered
                         }
                     }
@@ -185,7 +187,7 @@ pub struct HttpRequestBuilder {
 
 impl HttpRequestBuilder {
     pub fn new(endpoint: String, default_token: String, compression: Compression) -> Self {
-        let channel = Uuid::new_v4().to_hyphenated().to_string();
+        let channel = Uuid::new_v4().hyphenated().to_string();
         Self {
             endpoint,
             default_token,

@@ -22,11 +22,21 @@ on:
       - "rust-toolchain"
   pull_request:
 
+concurrency:
+  # For pull requests, cancel running workflows, for master, run all
+  #
+  # `github.event.number` exists for pull requests, otherwise fall back to SHA
+  # for master
+  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
+  cancel-in-progress: true
+
 env:
   AUTOINSTALL: true
   AWS_ACCESS_KEY_ID: "dummy"
   AWS_SECRET_ACCESS_KEY: "dummy"
   CONTAINER_TOOL: "docker"
+  DD_ENV: "ci"
+  DD_API_KEY: ${{ secrets.DD_API_KEY }}
   RUST_BACKTRACE: full
   RUST_TEST_THREADS: 1
   TEST_LOG: vector=debug
@@ -35,50 +45,9 @@ env:
   PROFILE: debug
 
 jobs:
-  cancel-previous:
-    name: Cancel redundant jobs
-    runs-on: ubuntu-20.04
-    timeout-minutes: 3
-    if: github.ref != 'refs/heads/master'
-    steps:
-      - uses: styfle/cancel-workflow-action@0.9.1
-        with:
-          access_token: ${{ secrets.GITHUB_TOKEN }}
-          all_but_latest: true # can cancel workflows scheduled later
-
   test-integration:
     name: Integration - Linux, ${{ matrix.test }}
-    runs-on: ubuntu-20.04
-    if: |
-      !github.event.pull_request
-        || contains(github.event.pull_request.labels.*.name, 'ci-condition: integration tests enable')
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - test: 'humio'
-          - test: 'kafka'
-    steps:
-      - uses: actions/checkout@v2.4.0
-      - run: make ci-sweep
-      - uses: actions/cache@v2.1.7
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
-      - run: make test-integration-${{ matrix.test }}
-        env:
-          CI_TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
-
-  # just keep both during migration
-  test-integration-docker-compose:
-    name: Integration - Linux, ${{ matrix.test }}
-    runs-on: ubuntu-20.04
+    runs-on: [linux, test-runner]
     if: |
       !github.event.pull_request
         || contains(github.event.pull_request.labels.*.name, 'ci-condition: integration tests enable')
@@ -92,40 +61,49 @@ jobs:
           - test: 'datadog-agent'
           - test: 'datadog-logs'
           - test: 'datadog-metrics'
+          - test: 'datadog-traces'
           - test: 'dnstap'
-          - test: 'docker'
+          - test: 'docker-logs'
           - test: 'elasticsearch'
           - test: 'eventstoredb'
           - test: 'fluent'
           - test: 'gcp'
+          - test: 'humio'
           - test: 'influxdb'
+          - test: 'kafka'
           - test: 'logstash'
           - test: 'loki'
-          - test: 'mongo'
+          - test: 'mongodb'
+          - test: 'nats'
           - test: 'nginx'
           - test: 'postgres'
           - test: 'prometheus'
           - test: 'pulsar'
           - test: 'redis'
+          - test: 'shutdown'
           - test: 'splunk'
             env:
               SPLUNK_VERSION: 7.3.9
           - test: 'splunk'
     steps:
-      - uses: actions/checkout@v2.4.0
+      - uses: actions/checkout@v3
+      - run: make ci-sweep
+      - run: sudo npm -g install @datadog/datadog-ci
       - run: make test-integration-${{ matrix.test }}
         env:
-          CI_TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
+          TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
           SPLUNK_VERSION: ${{ matrix.env.SPLUNK_VERSION }}
+      - name: Upload test results
+        run: scripts/upload-test-results.sh
+        if: always()
       - run: make test-integration-${{ matrix.test }}-cleanup
         if: ${{ always() }}
 
   test-integration-check:
     name: test-integration-check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     needs:
       - test-integration
-      - test-integration-docker-compose
     steps:
       - name: validate
         run: echo "OK"
@@ -134,7 +112,6 @@ jobs:
     name: master-failure
     if: failure() && github.ref == 'refs/heads/master'
     needs:
-      - cancel-previous
       - test-integration-check
     runs-on: ubuntu-20.04
     steps:

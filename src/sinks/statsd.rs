@@ -1,13 +1,14 @@
 use std::{
     fmt::Display,
     net::{IpAddr, Ipv4Addr, SocketAddr},
-    num::NonZeroU64,
     task::{Context, Poll},
 };
 
 use bytes::{BufMut, BytesMut};
-use futures::{future, stream, FutureExt, SinkExt, TryFutureExt};
+use futures::{future, stream, SinkExt, TryFutureExt};
+use futures_util::FutureExt;
 use serde::{Deserialize, Serialize};
+use tokio_util::codec::Encoder;
 use tower::{Service, ServiceBuilder};
 use vector_core::ByteSizeOf;
 
@@ -15,12 +16,14 @@ use super::util::SinkBatchSettings;
 #[cfg(unix)]
 use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
-    config::{GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+    },
     event::{
         metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind},
         Event,
     },
-    internal_events::StatsdInvalidMetricReceived,
+    internal_events::StatsdInvalidMetricError,
     sinks::util::{
         buffer::metrics::compress_distribution,
         encode_namespace,
@@ -59,7 +62,7 @@ pub struct StatsdDefaultBatchSettings;
 impl SinkBatchSettings for StatsdDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(1000);
     const MAX_BYTES: Option<usize> = Some(1300);
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -100,12 +103,9 @@ impl SinkConfig for StatsdSinkConfig {
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let default_namespace = self.default_namespace.clone();
+        let mut encoder = StatsdEncoder { default_namespace };
         match &self.mode {
-            Mode::Tcp(config) => {
-                let encode_event =
-                    move |event| encode_event(event, default_namespace.as_deref()).map(Into::into);
-                config.build(cx, encode_event)
-            }
+            Mode::Tcp(config) => config.build(cx, Default::default(), encoder),
             Mode::Udp(config) => {
                 // 1432 bytes is a recommended packet size to fit into MTU
                 // https://github.com/statsd/statsd/blob/master/docs/metric_types.md#multi-metric-packets
@@ -125,19 +125,17 @@ impl SinkConfig for StatsdSinkConfig {
                 .with_flat_map(move |event: Event| {
                     stream::iter({
                         let byte_size = event.size_of();
-                        encode_event(event, default_namespace.as_deref())
-                            .map(|encoded| Ok(EncodedEvent::new(encoded, byte_size)))
+                        let mut bytes = BytesMut::new();
+                        encoder
+                            .encode(event, &mut bytes)
+                            .map(|_| Ok(EncodedEvent::new(bytes, byte_size)))
                     })
                 });
 
                 Ok((super::VectorSink::from_event_sink(sink), healthcheck))
             }
             #[cfg(unix)]
-            Mode::Unix(config) => {
-                let encode_event =
-                    move |event| encode_event(event, default_namespace.as_deref()).map(Into::into);
-                config.build(cx, encode_event)
-            }
+            Mode::Unix(config) => config.build(cx, Default::default(), encoder),
         }
     }
 
@@ -147,6 +145,10 @@ impl SinkConfig for StatsdSinkConfig {
 
     fn sink_type(&self) -> &'static str {
         "statsd"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
     }
 }
 
@@ -185,60 +187,82 @@ fn push_event<V: Display>(
     };
 }
 
-fn encode_event(event: Event, default_namespace: Option<&str>) -> Option<BytesMut> {
-    let mut buf = Vec::new();
+#[derive(Debug, Clone)]
+struct StatsdEncoder {
+    default_namespace: Option<String>,
+}
 
-    let metric = event.as_metric();
-    match metric.value() {
-        MetricValue::Counter { value } => {
-            push_event(&mut buf, metric, value, "c", None);
-        }
-        MetricValue::Gauge { value } => {
-            match metric.kind() {
-                MetricKind::Incremental => {
-                    push_event(&mut buf, metric, format!("{:+}", value), "g", None)
+impl Encoder<Event> for StatsdEncoder {
+    type Error = codecs::encoding::Error;
+
+    fn encode(&mut self, event: Event, bytes: &mut BytesMut) -> Result<(), Self::Error> {
+        let mut buf = Vec::new();
+
+        let metric = event.as_metric();
+        match metric.value() {
+            MetricValue::Counter { value } => {
+                push_event(&mut buf, metric, value, "c", None);
+            }
+            MetricValue::Gauge { value } => {
+                match metric.kind() {
+                    MetricKind::Incremental => {
+                        push_event(&mut buf, metric, format!("{:+}", value), "g", None)
+                    }
+                    MetricKind::Absolute => push_event(&mut buf, metric, value, "g", None),
+                };
+            }
+            MetricValue::Distribution { samples, statistic } => {
+                let metric_type = match statistic {
+                    StatisticKind::Histogram => "h",
+                    StatisticKind::Summary => "d",
+                };
+
+                // TODO: This would actually be good to potentially add a helper combinator for, in the same vein as
+                // `SinkBuilderExt::normalized`, that provides a metric "optimizer" for doing these sorts of things. We
+                // don't actually compress distributions as-is in other metrics sinks unless they use the old-style
+                // approach coupled with `MetricBuffer`. While not every sink would benefit from this -- the
+                // `datadog_metrics` sink always converts distributions to sketches anyways, for example -- a lot of
+                // them could.
+                //
+                // This would also imply rewriting this sink in the new style to take advantage of it.
+                let mut samples = samples.clone();
+                let compressed_samples = compress_distribution(&mut samples);
+                for sample in compressed_samples {
+                    push_event(
+                        &mut buf,
+                        metric,
+                        sample.value,
+                        metric_type,
+                        Some(sample.rate),
+                    );
                 }
-                MetricKind::Absolute => push_event(&mut buf, metric, value, "g", None),
-            };
-        }
-        MetricValue::Distribution { samples, statistic } => {
-            let metric_type = match statistic {
-                StatisticKind::Histogram => "h",
-                StatisticKind::Summary => "d",
-            };
-            let samples = compress_distribution(samples.clone());
-            for sample in samples {
-                push_event(
-                    &mut buf,
-                    metric,
-                    sample.value,
-                    metric_type,
-                    Some(sample.rate),
-                );
             }
-        }
-        MetricValue::Set { values } => {
-            for val in values {
-                push_event(&mut buf, metric, val, "s", None);
+            MetricValue::Set { values } => {
+                for val in values {
+                    push_event(&mut buf, metric, val, "s", None);
+                }
             }
-        }
-        _ => {
-            emit!(&StatsdInvalidMetricReceived {
-                value: metric.value(),
-                kind: &metric.kind(),
-            });
+            _ => {
+                emit!(StatsdInvalidMetricError {
+                    value: metric.value(),
+                    kind: &metric.kind(),
+                });
 
-            return None;
-        }
-    };
+                return Ok(());
+            }
+        };
 
-    let message = encode_namespace(metric.namespace().or(default_namespace), '.', buf.join("|"));
+        let message = encode_namespace(
+            metric.namespace().or(self.default_namespace.as_deref()),
+            '.',
+            buf.join("|"),
+        );
 
-    let mut body = BytesMut::new();
-    body.put_slice(&message.into_bytes());
-    body.put_u8(b'\n');
+        bytes.put_slice(&message.into_bytes());
+        bytes.put_u8(b'\n');
 
-    Some(body)
+        Ok(())
+    }
 }
 
 impl Service<BytesMut> for StatsdSvc {
@@ -265,7 +289,13 @@ mod test {
     use {crate::sources::statsd::parser::parse, std::str::from_utf8};
 
     use super::*;
-    use crate::{event::Metric, test_util::*};
+    use crate::{
+        event::Metric,
+        test_util::{
+            components::{run_and_assert_sink_compliance, SINK_TAGS},
+            *,
+        },
+    };
 
     #[test]
     fn generate_config() {
@@ -319,8 +349,12 @@ mod test {
         )
         .with_tags(Some(tags()));
         let event = Event::Metric(metric1.clone());
-        let frame = &encode_event(event, None).unwrap();
-        let metric2 = parse(from_utf8(frame).unwrap().trim()).unwrap();
+        let mut encoder = StatsdEncoder {
+            default_namespace: None,
+        };
+        let mut frame = BytesMut::new();
+        encoder.encode(event, &mut frame).unwrap();
+        let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         vector_common::assert_event_data_eq!(metric1, metric2);
     }
 
@@ -333,10 +367,14 @@ mod test {
             MetricValue::Counter { value: 1.5 },
         );
         let event = Event::Metric(metric1);
-        let frame = &encode_event(event, None).unwrap();
+        let mut encoder = StatsdEncoder {
+            default_namespace: None,
+        };
+        let mut frame = BytesMut::new();
+        encoder.encode(event, &mut frame).unwrap();
         // The statsd parser will parse the counter as Incremental,
         // so we can't compare it with the parsed value.
-        assert_eq!("counter:1.5|c\n", from_utf8(frame).unwrap());
+        assert_eq!("counter:1.5|c\n", from_utf8(&frame).unwrap());
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -349,8 +387,12 @@ mod test {
         )
         .with_tags(Some(tags()));
         let event = Event::Metric(metric1.clone());
-        let frame = &encode_event(event, None).unwrap();
-        let metric2 = parse(from_utf8(frame).unwrap().trim()).unwrap();
+        let mut encoder = StatsdEncoder {
+            default_namespace: None,
+        };
+        let mut frame = BytesMut::new();
+        encoder.encode(event, &mut frame).unwrap();
+        let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         vector_common::assert_event_data_eq!(metric1, metric2);
     }
 
@@ -364,8 +406,12 @@ mod test {
         )
         .with_tags(Some(tags()));
         let event = Event::Metric(metric1.clone());
-        let frame = &encode_event(event, None).unwrap();
-        let metric2 = parse(from_utf8(frame).unwrap().trim()).unwrap();
+        let mut encoder = StatsdEncoder {
+            default_namespace: None,
+        };
+        let mut frame = BytesMut::new();
+        encoder.encode(event, &mut frame).unwrap();
+        let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         vector_common::assert_event_data_eq!(metric1, metric2);
     }
 
@@ -393,8 +439,12 @@ mod test {
         .with_tags(Some(tags()));
 
         let event = Event::Metric(metric1);
-        let frame = &encode_event(event, None).unwrap();
-        let metric2 = parse(from_utf8(frame).unwrap().trim()).unwrap();
+        let mut encoder = StatsdEncoder {
+            default_namespace: None,
+        };
+        let mut frame = BytesMut::new();
+        encoder.encode(event, &mut frame).unwrap();
+        let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         vector_common::assert_event_data_eq!(metric1_compressed, metric2);
     }
 
@@ -410,8 +460,12 @@ mod test {
         )
         .with_tags(Some(tags()));
         let event = Event::Metric(metric1.clone());
-        let frame = &encode_event(event, None).unwrap();
-        let metric2 = parse(from_utf8(frame).unwrap().trim()).unwrap();
+        let mut encoder = StatsdEncoder {
+            default_namespace: None,
+        };
+        let mut frame = BytesMut::new();
+        encoder.encode(event, &mut frame).unwrap();
+        let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         vector_common::assert_event_data_eq!(metric1, metric2);
     }
 
@@ -469,7 +523,7 @@ mod test {
             }
         });
 
-        sink.run_events(events).await.unwrap();
+        run_and_assert_sink_compliance(sink, stream::iter(events), &SINK_TAGS).await;
 
         let messages = collect_n(rx, 1).await;
         assert_eq!(

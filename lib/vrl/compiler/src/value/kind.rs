@@ -1,9 +1,8 @@
-use std::collections::BTreeMap;
-
+use ::value::Value;
 use chrono::{TimeZone, Utc};
+use ordered_float::NotNan;
 use regex::Regex;
 
-use super::Value;
 use crate::value;
 
 pub const BYTES: u16 = 1 << 1;
@@ -25,12 +24,6 @@ pub use ::value::{
     Kind,
 };
 
-impl Value {
-    pub fn kind(&self) -> Kind {
-        self.into()
-    }
-}
-
 pub trait DefaultValue {
     /// Returns the default [`Value`] for a given [`Kind`].
     ///
@@ -51,11 +44,11 @@ impl DefaultValue for Kind {
         }
 
         if self.is_integer() {
-            return value!(0);
+            return value!(0_i64);
         }
 
         if self.is_float() {
-            return value!(0.0);
+            return value!(NotNan::new(0.0).unwrap());
         }
 
         if self.is_boolean() {
@@ -83,44 +76,9 @@ impl DefaultValue for Kind {
     }
 }
 
-impl From<&Value> for Kind {
-    fn from(value: &Value) -> Self {
-        match value {
-            Value::Bytes(_) => Kind::bytes(),
-            Value::Integer(_) => Kind::integer(),
-            Value::Float(_) => Kind::float(),
-            Value::Boolean(_) => Kind::boolean(),
-            Value::Timestamp(_) => Kind::timestamp(),
-            Value::Regex(_) => Kind::regex(),
-            Value::Null => Kind::null(),
-
-            Value::Object(object) => Kind::object(
-                object
-                    .iter()
-                    .map(|(k, v)| (k.clone().into(), v.into()))
-                    .collect::<BTreeMap<_, _>>(),
-            ),
-
-            Value::Array(array) => Kind::array(
-                array
-                    .iter()
-                    .enumerate()
-                    .map(|(i, v)| (i.into(), v.into()))
-                    .collect::<BTreeMap<_, _>>(),
-            ),
-        }
-    }
-}
-
-impl From<Value> for Kind {
-    fn from(value: Value) -> Self {
-        (&value).into()
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::collections::{BTreeMap, HashMap};
 
     use super::*;
 
@@ -142,14 +100,14 @@ mod tests {
             (
                 "integer",
                 TestCase {
-                    value: value!(3),
+                    value: value!(3_i64),
                     want: Kind::integer(),
                 },
             ),
             (
                 "float",
                 TestCase {
-                    value: value!(3.3),
+                    value: value!(NotNan::new(3.3).unwrap()),
                     want: Kind::float(),
                 },
             ),
@@ -184,7 +142,7 @@ mod tests {
             (
                 "object",
                 TestCase {
-                    value: value!({ "foo": { "bar": 12 }, "baz": true }),
+                    value: value!({ "foo": { "bar": 12_i64 }, "baz": true }),
                     want: Kind::object(BTreeMap::from([
                         (
                             "foo".into(),
@@ -197,7 +155,7 @@ mod tests {
             (
                 "array",
                 TestCase {
-                    value: value!([12, true, "foo", { "bar": null }]),
+                    value: value!([12_i64, true, "foo", { "bar": null }]),
                     want: Kind::array(BTreeMap::from([
                         (0.into(), Kind::integer()),
                         (1.into(), Kind::boolean()),

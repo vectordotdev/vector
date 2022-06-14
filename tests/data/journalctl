@@ -1,0 +1,32 @@
+#!/bin/bash
+for arg in "$@"
+do
+  if [[ $arg = --after-cursor=* ]]
+  then
+    after="${arg#--after-cursor=}"
+  fi
+done
+
+lines=(
+  '"_SYSTEMD_UNIT":"sysinit.target","MESSAGE":"System Initialization","_SOURCE_REALTIME_TIMESTAMP":"1578529839140001","PRIORITY":"6"'
+  '"_SYSTEMD_UNIT":"unit.service","MESSAGE":"unit message","_SOURCE_REALTIME_TIMESTAMP":"1578529839140002","PRIORITY":"7"'
+  '"_SYSTEMD_UNIT":"badunit.service","MESSAGE":[194,191,72,101,108,108,111,63],"_SOURCE_REALTIME_TIMESTAMP":"1578529839140003","PRIORITY":"5"'
+  '"_SYSTEMD_UNIT":"stdout","MESSAGE":"Missing timestamp","__REALTIME_TIMESTAMP":"1578529839140004","PRIORITY":"2"'
+  '"_SYSTEMD_UNIT":"stdout","MESSAGE":"Different timestamps","_SOURCE_REALTIME_TIMESTAMP":"1578529839140005","__REALTIME_TIMESTAMP":"1578529839140004","PRIORITY":"3"'
+  '"_SYSTEMD_UNIT":"syslog.service","MESSAGE":"Non-ASCII in other field","_SOURCE_REALTIME_TIMESTAMP":"1578529839140005","__REALTIME_TIMESTAMP":"1578529839140004","PRIORITY":"3","SYSLOG_RAW":[194,191,87,111,114,108,100,63]'
+  '"_SYSTEMD_UNIT":"NetworkManager.service","MESSAGE":"<info>  [1608278027.6016] dhcp-init: Using DHCP client 'dhclient'","_SOURCE_REALTIME_TIMESTAMP":"1578529839140005","__REALTIME_TIMESTAMP":"1578529839140004","PRIORITY":"6","SYSLOG_FACILITY":["DHCP4","DHCP6"]'
+  '"PRIORITY":"5","SYSLOG_FACILITY":"0","SYSLOG_IDENTIFIER":"kernel","_TRANSPORT":"kernel","__REALTIME_TIMESTAMP":"1578529839140006","MESSAGE":"audit log"'
+)
+
+cursor=0
+for line in "${lines[@]}"
+do
+  cursor=$(( $cursor + 1 ))
+  if [[ $cursor -gt $after ]]
+  then
+    echo "{$line,\"__CURSOR\":\"$cursor\"}"
+  fi
+done
+
+# The real journalctl will wait forever for new data in the journal.
+exec sleep 9999

@@ -116,7 +116,10 @@ pub trait Encodable: Sized {
     /// If there is an error while attempting to decode a value from the given buffer, or the given
     /// metadata is not valid for the implementation, an error variant will be returned describing
     /// the error.
-    fn decode<B: Buf>(metadata: Self::Metadata, buffer: B) -> Result<Self, Self::DecodeError>;
+    fn decode<B: Buf + Clone>(
+        metadata: Self::Metadata,
+        buffer: B,
+    ) -> Result<Self, Self::DecodeError>;
 }
 
 /// An object that can encode and decode itself to and from a buffer, with a fixed representation.
@@ -162,7 +165,7 @@ pub trait FixedEncodable: Sized {
     ///
     /// If there is an error while attempting to decode a value from the given buffer, an error
     /// variant will be returned describing the error.
-    fn decode<B: Buf>(buffer: B) -> Result<Self, Self::DecodeError>;
+    fn decode<B: Buf + Clone>(buffer: B) -> Result<Self, Self::DecodeError>;
 }
 
 impl<T: FixedEncodable> Encodable for T {
@@ -184,7 +187,7 @@ impl<T: FixedEncodable> Encodable for T {
         FixedEncodable::encoded_size(self)
     }
 
-    fn decode<B: Buf>(_: Self::Metadata, buffer: B) -> Result<Self, Self::DecodeError> {
+    fn decode<B: Buf + Clone>(_: Self::Metadata, buffer: B) -> Result<Self, Self::DecodeError> {
         <Self as FixedEncodable>::decode(buffer)
     }
 }

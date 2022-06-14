@@ -19,6 +19,7 @@ components: sources: vector: {
 	}
 
 	features: {
+		acknowledgements: true
 		multiline: enabled: false
 		receive: {
 			from: {
@@ -35,7 +36,6 @@ components: sources: vector: {
 			keepalive: enabled:            true
 			tls: {
 				enabled:                true
-				can_enable:             true
 				can_verify_certificate: true
 				enabled_default:        false
 			}
@@ -53,7 +53,7 @@ components: sources: vector: {
 	}
 
 	configuration: {
-		acknowledgements: configuration._acknowledgements
+		acknowledgements: configuration._source_acknowledgements
 		address: {
 			description: """
 				The HTTP address to listen for connections on. It _must_ include a port.

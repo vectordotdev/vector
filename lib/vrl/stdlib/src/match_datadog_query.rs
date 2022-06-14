@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use ::value::Value;
 use datadog_filter::{
     build_matcher,
     regex::{wildcard_regex, word_regex},
@@ -46,8 +47,8 @@ impl Function for MatchDatadogQuery {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -60,7 +61,7 @@ impl Function for MatchDatadogQuery {
 
         // Compile the Datadog search query to AST.
         let node = parse(&query).map_err(|e| {
-            Box::new(ExpressionError::from(e.to_string())) as Box<dyn DiagnosticError>
+            Box::new(ExpressionError::from(e.to_string())) as Box<dyn DiagnosticMessage>
         })?;
 
         // Build the matcher function that accepts a VRL event value. This will parse the `node`
@@ -74,7 +75,7 @@ impl Function for MatchDatadogQuery {
     fn compile_argument(
         &self,
         _args: &[(&'static str, Option<FunctionArgument>)],
-        _info: &FunctionCompileContext,
+        _ctx: &mut FunctionCompileContext,
         name: &str,
         expr: Option<&expression::Expr>,
     ) -> CompiledArgument {
@@ -94,7 +95,7 @@ impl Function for MatchDatadogQuery {
 
                 // Compile the Datadog search query to AST.
                 let node = parse(&query).map_err(|e| {
-                    Box::new(ExpressionError::from(e.to_string())) as Box<dyn DiagnosticError>
+                    Box::new(ExpressionError::from(e.to_string())) as Box<dyn DiagnosticMessage>
                 })?;
 
                 // Build the matcher function that accepts a VRL event value. This will parse the `node`
@@ -108,16 +109,6 @@ impl Function for MatchDatadogQuery {
             }
             _ => Ok(None),
         }
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Resolved {
-        let value = arguments.required("value");
-        let filter = arguments
-            .required_any("query")
-            .downcast_ref::<DynMatcher>()
-            .unwrap();
-
-        Ok(filter.0.run(&value).into())
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -151,7 +142,7 @@ impl Expression for MatchDatadogQueryFn {
         Ok(self.filter.run(&value).into())
     }
 
-    fn type_def(&self, _state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         type_def()
     }
 }
@@ -410,7 +401,7 @@ impl Filter<Value> for VrlFilter {
             Field::Tag(_) => resolve_value(
                 buf,
                 Run::boxed(move |value| match value {
-                    Value::Array(v) => v.iter().any(|v| match string_value(v).split_once(":") {
+                    Value::Array(v) => v.iter().any(|v| match string_value(v).split_once(':') {
                         Some((_, lhs)) => {
                             let lhs = Cow::from(lhs);
 

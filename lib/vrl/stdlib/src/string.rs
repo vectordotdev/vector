@@ -1,6 +1,7 @@
+use ::value::Value;
 use vrl::prelude::*;
 
-fn string(value: Value) -> std::result::Result<Value, ExpressionError> {
+fn string(value: Value) -> Resolved {
     match value {
         v @ Value::Bytes(_) => Ok(v),
         v => Err(format!("expected string, got {}", v.kind()).into()),
@@ -42,18 +43,13 @@ impl Function for String {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
 
         Ok(Box::new(StringFn { value }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Resolved {
-        let value = arguments.required("value");
-        string(value)
     }
 }
 
@@ -67,7 +63,7 @@ impl Expression for StringFn {
         string(self.value.resolve(ctx)?)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         let non_bytes = !self.value.type_def(state).is_bytes();
 
         TypeDef::bytes().with_fallibility(non_bytes)

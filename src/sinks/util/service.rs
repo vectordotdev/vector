@@ -1,4 +1,4 @@
-use std::{hash::Hash, sync::Arc, time::Duration};
+use std::{hash::Hash, marker::PhantomData, sync::Arc, time::Duration};
 
 use serde::{Deserialize, Serialize};
 use tower::{
@@ -6,7 +6,6 @@ use tower::{
     limit::RateLimit,
     retry::Retry,
     timeout::Timeout,
-    util::BoxService,
     Service, ServiceBuilder,
 };
 use vector_buffers::Acker;
@@ -21,7 +20,7 @@ use crate::sinks::util::{
     },
     retries::{FixedRetryPolicy, RetryLogic},
     service::map::MapLayer,
-    sink::{Response, ServiceLogic},
+    sink::Response,
     Batch, BatchSink, Partition, PartitionBatchSink,
 };
 
@@ -29,8 +28,8 @@ mod concurrency;
 mod map;
 
 pub type Svc<S, L> = RateLimit<AdaptiveConcurrencyLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>, L>>;
-pub type TowerBatchedSink<S, B, RL, SL> = BatchSink<Svc<S, RL>, B, SL>;
-pub type TowerPartitionSink<S, B, RL, K, SL> = PartitionBatchSink<Svc<S, RL>, B, K, SL>;
+pub type TowerBatchedSink<S, B, RL> = BatchSink<Svc<S, RL>, B>;
+pub type TowerPartitionSink<S, B, RL, K> = PartitionBatchSink<Svc<S, RL>, B, K>;
 
 pub trait ServiceBuilderExt<L> {
     fn map<R1, R2, F>(self, f: F) -> ServiceBuilder<Stack<MapLayer<R1, R2>, L>>
@@ -192,7 +191,7 @@ pub struct TowerRequestSettings {
 }
 
 impl TowerRequestSettings {
-    pub fn retry_policy<L: RetryLogic>(&self, logic: L) -> FixedRetryPolicy<L> {
+    pub const fn retry_policy<L: RetryLogic>(&self, logic: L) -> FixedRetryPolicy<L> {
         FixedRetryPolicy::new(
             self.retry_attempts,
             self.retry_initial_backoff_secs,
@@ -201,15 +200,14 @@ impl TowerRequestSettings {
         )
     }
 
-    pub fn partition_sink<B, RL, S, K, SL>(
+    pub fn partition_sink<B, RL, S, K>(
         &self,
         retry_logic: RL,
         service: S,
         batch: B,
         batch_timeout: Duration,
         acker: Acker,
-        service_logic: SL,
-    ) -> TowerPartitionSink<S, B, RL, K, SL>
+    ) -> TowerPartitionSink<S, B, RL, K>
     where
         RL: RetryLogic<Response = S::Response>,
         S: Service<B::Output> + Clone + Send + 'static,
@@ -220,26 +218,21 @@ impl TowerRequestSettings {
         B::Input: Partition<K>,
         B::Output: Send + Clone + 'static,
         K: Hash + Eq + Clone + Send + 'static,
-        SL: ServiceLogic<Response = S::Response> + Send + 'static,
     {
-        PartitionBatchSink::new_with_logic(
-            self.service(retry_logic, service),
-            batch,
-            batch_timeout,
-            acker,
-            service_logic,
-        )
+        let service = ServiceBuilder::new()
+            .settings(self.clone(), retry_logic)
+            .service(service);
+        PartitionBatchSink::new(service, batch, batch_timeout, acker)
     }
 
-    pub fn batch_sink<B, RL, S, SL>(
+    pub fn batch_sink<B, RL, S>(
         &self,
         retry_logic: RL,
         service: S,
         batch: B,
         batch_timeout: Duration,
         acker: Acker,
-        service_logic: SL,
-    ) -> TowerBatchedSink<S, B, RL, SL>
+    ) -> TowerBatchedSink<S, B, RL>
     where
         RL: RetryLogic<Response = S::Response>,
         S: Service<B::Output> + Clone + Send + 'static,
@@ -248,37 +241,11 @@ impl TowerRequestSettings {
         S::Future: Send + 'static,
         B: Batch,
         B::Output: Send + Clone + 'static,
-        SL: ServiceLogic<Response = S::Response> + Send + 'static,
     {
-        BatchSink::new_with_logic(
-            self.service(retry_logic, service),
-            batch,
-            batch_timeout,
-            acker,
-            service_logic,
-        )
-    }
-
-    pub fn service<RL, S, Request>(&self, retry_logic: RL, service: S) -> Svc<S, RL>
-    where
-        RL: RetryLogic<Response = S::Response>,
-        S: Service<Request> + Clone + Send + 'static,
-        S::Error: Into<crate::Error> + Send + Sync + 'static,
-        S::Response: Send + Response,
-        S::Future: Send + 'static,
-        Request: Send + Clone + 'static,
-    {
-        let policy = self.retry_policy(retry_logic.clone());
-        ServiceBuilder::new()
-            .rate_limit(self.rate_limit_num, self.rate_limit_duration)
-            .layer(AdaptiveConcurrencyLimitLayer::new(
-                self.concurrency,
-                self.adaptive_concurrency,
-                retry_logic,
-            ))
-            .retry(policy)
-            .timeout(self.timeout)
-            .service(service)
+        let service = ServiceBuilder::new()
+            .settings(self.clone(), retry_logic)
+            .service(service);
+        BatchSink::new(service, batch, batch_timeout, acker)
     }
 }
 
@@ -286,34 +253,35 @@ impl TowerRequestSettings {
 pub struct TowerRequestLayer<L, Request> {
     settings: TowerRequestSettings,
     retry_logic: L,
-    _pd: std::marker::PhantomData<Request>,
+    _pd: PhantomData<Request>,
 }
 
 impl<S, RL, Request> Layer<S> for TowerRequestLayer<RL, Request>
 where
-    S: Service<Request> + Send + Clone + 'static,
+    S: Service<Request> + Send + 'static,
     S::Response: Send + 'static,
     S::Error: Into<crate::Error> + Send + Sync + 'static,
     S::Future: Send + 'static,
     RL: RetryLogic<Response = S::Response> + Send + 'static,
     Request: Clone + Send + 'static,
 {
-    type Service = BoxService<Request, S::Response, crate::Error>;
+    type Service = Svc<S, RL>;
 
     fn layer(&self, inner: S) -> Self::Service {
         let policy = self.settings.retry_policy(self.retry_logic.clone());
-
-        let l = ServiceBuilder::new()
-            .concurrency_limit(self.settings.concurrency.unwrap_or(5))
+        ServiceBuilder::new()
             .rate_limit(
                 self.settings.rate_limit_num,
                 self.settings.rate_limit_duration,
             )
+            .layer(AdaptiveConcurrencyLimitLayer::new(
+                self.settings.concurrency,
+                self.settings.adaptive_concurrency,
+                self.retry_logic.clone(),
+            ))
             .retry(policy)
             .timeout(self.settings.timeout)
-            .service(inner);
-
-        BoxService::new(l)
+            .service(inner)
     }
 }
 
@@ -330,7 +298,6 @@ mod tests {
     use super::*;
     use crate::sinks::util::{
         retries::{RetryAction, RetryLogic},
-        sink::StdServiceLogic,
         BatchSettings, EncodedEvent, PartitionBuffer, PartitionInnerBuffer, VecBuffer,
     };
 
@@ -406,7 +373,6 @@ mod tests {
             PartitionBuffer::new(VecBuffer::new(batch_settings.size)),
             TIMEOUT,
             acker,
-            StdServiceLogic::default(),
         );
         sink.ordered();
 

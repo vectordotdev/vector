@@ -1,6 +1,11 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 use crate::util;
+
+fn is_nullish(value: Value) -> Resolved {
+    Ok(util::is_nullish(&value).into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct IsNullish;
@@ -28,12 +33,11 @@ impl Function for IsNullish {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
-
         Ok(Box::new(IsNullishFn { value }))
     }
 }
@@ -45,10 +49,11 @@ struct IsNullishFn {
 
 impl Expression for IsNullishFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        Ok(util::is_nullish(&self.value.resolve(ctx)?).into())
+        let value = self.value.resolve(ctx)?;
+        is_nullish(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().infallible()
     }
 }

@@ -1,17 +1,13 @@
+use std::io;
+
+use serde::Serialize;
+
 use super::{NewRelicApiModel, NewRelicSinkError};
-use crate::sinks::util::encoding::{as_tracked_write, Encoder, EncodingConfigFixed};
-use serde::{Deserialize, Serialize};
-use std::{fmt::Debug, io};
+use crate::sinks::util::encoding::{as_tracked_write, Encoder};
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-pub enum Encoding {
-    #[derivative(Default)]
-    Default,
-}
+pub struct NewRelicEncoder;
 
-impl Encoder<Result<NewRelicApiModel, NewRelicSinkError>> for EncodingConfigFixed<Encoding> {
+impl Encoder<Result<NewRelicApiModel, NewRelicSinkError>> for NewRelicEncoder {
     fn encode_input(
         &self,
         input: Result<NewRelicApiModel, NewRelicSinkError>,

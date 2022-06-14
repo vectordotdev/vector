@@ -1,7 +1,35 @@
 use std::collections::BTreeMap;
 
+use ::value::Value;
 use url::form_urlencoded;
 use vrl::prelude::*;
+
+fn parse_query_string(bytes: Value) -> Resolved {
+    let bytes = bytes.try_bytes()?;
+    let mut query_string = bytes.as_ref();
+    if !query_string.is_empty() && query_string[0] == b'?' {
+        query_string = &query_string[1..];
+    }
+    let mut result = BTreeMap::new();
+    let parsed = form_urlencoded::parse(query_string);
+    for (k, value) in parsed {
+        let value = value.as_ref();
+        result
+            .entry(k.into_owned())
+            .and_modify(|v| {
+                match v {
+                    Value::Array(v) => {
+                        v.push(value.into());
+                    }
+                    v => {
+                        *v = Value::Array(vec![v.to_owned(), value.into()]);
+                    }
+                };
+            })
+            .or_insert_with(|| value.into());
+    }
+    Ok(result.into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseQueryString;
@@ -26,8 +54,8 @@ impl Function for ParseQueryString {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -50,35 +78,11 @@ struct ParseQueryStringFn {
 
 impl Expression for ParseQueryStringFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.try_bytes()?;
-
-        let mut query_string = bytes.as_ref();
-        if !query_string.is_empty() && query_string[0] == b'?' {
-            query_string = &query_string[1..];
-        }
-
-        let mut result = BTreeMap::new();
-        let parsed = form_urlencoded::parse(query_string);
-        for (k, value) in parsed {
-            let value = value.as_ref();
-            result
-                .entry(k.into_owned())
-                .and_modify(|v| {
-                    match v {
-                        Value::Array(v) => {
-                            v.push(value.into());
-                        }
-                        v => {
-                            *v = Value::Array(vec![v.to_owned(), value.into()]);
-                        }
-                    };
-                })
-                .or_insert_with(|| value.into());
-        }
-        Ok(result.into())
+        let bytes = self.value.resolve(ctx)?;
+        parse_query_string(bytes)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::object(inner_kind())
     }
 }
