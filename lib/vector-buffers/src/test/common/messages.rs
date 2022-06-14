@@ -3,6 +3,9 @@ use std::{error, fmt, io, mem};
 use bytes::{Buf, BufMut};
 use quickcheck::{Arbitrary, Gen};
 use vector_common::byte_size_of::ByteSizeOf;
+use vector_common::finalization::{
+    AddBatchNotifier, BatchNotifier, EventFinalizer, EventFinalizers,
+};
 
 use crate::{encoding::FixedEncodable, EventCount};
 
@@ -90,8 +93,20 @@ impl FixedEncodable for Message {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct SizedRecord(pub u32);
+#[derive(Clone, Debug, Eq)]
+pub(crate) struct SizedRecord(pub u32, EventFinalizers);
+
+impl SizedRecord {
+    pub(crate) const fn new(n: u32) -> Self {
+        Self(n, EventFinalizers::DEFAULT)
+    }
+}
+
+impl AddBatchNotifier for SizedRecord {
+    fn add_batch_notifier(&mut self, batch: BatchNotifier) {
+        self.1.add(EventFinalizer::new(batch));
+    }
+}
 
 impl ByteSizeOf for SizedRecord {
     fn allocated_bytes(&self) -> usize {
@@ -102,6 +117,12 @@ impl ByteSizeOf for SizedRecord {
 impl EventCount for SizedRecord {
     fn event_count(&self) -> usize {
         1
+    }
+}
+
+impl PartialEq for SizedRecord {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
     }
 }
 
@@ -131,12 +152,18 @@ impl FixedEncodable for SizedRecord {
     {
         let buf_len = buffer.get_u32();
         buffer.advance(buf_len as usize);
-        Ok(SizedRecord(buf_len))
+        Ok(SizedRecord::new(buf_len))
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct UndecodableRecord;
+
+impl AddBatchNotifier for UndecodableRecord {
+    fn add_batch_notifier(&mut self, batch: BatchNotifier) {
+        drop(batch); // We never check acknowledgements for this type
+    }
+}
 
 impl ByteSizeOf for UndecodableRecord {
     fn allocated_bytes(&self) -> usize {
@@ -186,6 +213,12 @@ impl MultiEventRecord {
     }
 }
 
+impl AddBatchNotifier for MultiEventRecord {
+    fn add_batch_notifier(&mut self, batch: BatchNotifier) {
+        drop(batch); // We never check acknowledgements for this type
+    }
+}
+
 impl ByteSizeOf for MultiEventRecord {
     fn allocated_bytes(&self) -> usize {
         0
@@ -230,6 +263,12 @@ impl FixedEncodable for MultiEventRecord {
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct PoisonPillMultiEventRecord(pub u32);
+
+impl AddBatchNotifier for PoisonPillMultiEventRecord {
+    fn add_batch_notifier(&mut self, batch: BatchNotifier) {
+        drop(batch); // We never check acknowledgements for this type
+    }
+}
 
 impl PoisonPillMultiEventRecord {
     pub fn poisoned() -> Self {

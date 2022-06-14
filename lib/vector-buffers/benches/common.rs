@@ -14,6 +14,7 @@ use vector_buffers::{
     BufferType, EventCount,
 };
 use vector_common::byte_size_of::ByteSizeOf;
+use vector_common::finalization::{AddBatchNotifier, BatchNotifier};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Message<const N: usize> {
@@ -27,6 +28,12 @@ impl<const N: usize> Message<N> {
             id,
             _padding: [0; N],
         }
+    }
+}
+
+impl<const N: usize> AddBatchNotifier for Message<N> {
+    fn add_batch_notifier(&mut self, batch: BatchNotifier) {
+        drop(batch); // Incorrect but fast
     }
 }
 

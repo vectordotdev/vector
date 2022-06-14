@@ -396,8 +396,9 @@ fn build<T: Bufferable>(
         let ack_counter = Arc::clone(&ack_counter);
         let read_waker = Arc::clone(&read_waker);
         tokio::spawn(async move {
-            while let Some((_status, amount)) = stream.next().await {
-                ack_counter.fetch_add(amount as usize, Ordering::Relaxed);
+            while let Some((_status, amount)) = dbg!(stream.next().await) {
+                let amount = amount.try_into().expect("too many records on 32-bit");
+                ack_counter.fetch_add(amount, Ordering::Relaxed);
                 read_waker.notify_one();
             }
         });

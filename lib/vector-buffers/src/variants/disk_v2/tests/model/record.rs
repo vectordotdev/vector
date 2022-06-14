@@ -2,6 +2,9 @@ use std::{error, fmt, mem};
 
 use bytes::{Buf, BufMut};
 use vector_common::byte_size_of::ByteSizeOf;
+use vector_common::finalization::{
+    AddBatchNotifier, BatchNotifier, EventFinalizer, EventFinalizers,
+};
 
 use crate::{encoding::FixedEncodable, EventCount};
 
@@ -32,6 +35,7 @@ pub struct Record {
     id: u32,
     size: u32,
     event_count: u32,
+    finalizers: EventFinalizers,
 }
 
 impl Record {
@@ -40,6 +44,7 @@ impl Record {
             id,
             size,
             event_count,
+            finalizers: EventFinalizers::DEFAULT,
         }
     }
 
@@ -49,6 +54,12 @@ impl Record {
 
     pub const fn len(&self) -> usize {
         Self::header_len() + self.size as usize
+    }
+}
+
+impl AddBatchNotifier for Record {
+    fn add_batch_notifier(&mut self, batch: BatchNotifier) {
+        self.finalizers.add(EventFinalizer::new(batch));
     }
 }
 

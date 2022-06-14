@@ -18,7 +18,7 @@ use leveldb::database::{
     Database,
 };
 use tokio::{sync::Notify, task::JoinHandle, time::Instant};
-use vector_common::finalizer::OrderedFinalizer;
+use vector_common::{finalization::BatchNotifier, finalizer::OrderedFinalizer};
 
 use super::Key;
 use crate::{
@@ -129,8 +129,12 @@ where
             if let Some((key, item_bytes, decode_result)) = self.decode_next_record() {
                 trace!(?key, item_bytes, "Got record decode attempt.");
                 match decode_result {
-                    Ok(item) => {
-                        self.track_unacked_read(key.0, Some(item.event_count()), item_bytes);
+                    Ok(mut item) => {
+                        let count = item.event_count();
+                        self.track_unacked_read(key.0, Some(count), item_bytes);
+                        let (batch, receiver) = BatchNotifier::new_with_receiver();
+                        item.add_batch_notifier(batch);
+                        self.finalizer.add(count as u64, receiver);
                         return Some(item);
                     }
                     Err(error) => {

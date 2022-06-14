@@ -34,7 +34,7 @@ async fn writer_error_when_record_is_over_the_limit() {
 
             // First write should always complete because the size of the encoded record should be
             // right at 99 bytes, below our max record limit of 100 bytes.
-            let first_record = SizedRecord(first_write_size);
+            let first_record = SizedRecord::new(first_write_size);
             let first_bytes_written = writer
                 .write_record(first_record)
                 .await
@@ -45,7 +45,7 @@ async fn writer_error_when_record_is_over_the_limit() {
             assert_buffer_size!(ledger, 1, first_bytes_written as u64);
 
             // This write should fail because it exceeds the 100 byte max record size limit.
-            let second_record = SizedRecord(second_write_size);
+            let second_record = SizedRecord::new(second_write_size);
             let _result = writer
                 .write_record(second_record)
                 .await
@@ -83,7 +83,7 @@ async fn writer_waits_when_buffer_is_full() {
             // haven't exceed our total buffer size limit yet, or the size limit of the data file
             // itself.  We do need this write to be big enough to exceed the total buffer size
             // limit, though.
-            let first_record = SizedRecord(first_write_size);
+            let first_record = SizedRecord::new(first_write_size);
             let first_bytes_written = writer
                 .write_record(first_record)
                 .await
@@ -96,7 +96,7 @@ async fn writer_waits_when_buffer_is_full() {
             // This write should block because will have exceeded our 100 byte total buffer size
             // limit handily with the first write we did.
             let mut second_record_write = spawn(async {
-                let record = SizedRecord(second_write_size);
+                let record = SizedRecord::new(second_write_size);
                 writer
                     .write_record(record)
                     .await
@@ -126,7 +126,7 @@ async fn writer_waits_when_buffer_is_full() {
             // actually have to acknowledge the read, too, to update the buffer size.  This read
             // will complete but the second write should still be blocked/not woken up:
             let first_record_read = reader.next().await.expect("read should not fail");
-            assert_eq!(first_record_read, Some(SizedRecord(first_write_size)));
+            assert_eq!(first_record_read, Some(SizedRecord::new(first_write_size)));
 
             // We haven't yet acknowledged the record, so nothing has changed yet:
             assert_pending!(second_record_write.poll());
@@ -188,7 +188,7 @@ async fn writer_waits_when_buffer_is_full() {
             let second_record_read_result = second_record_read.await;
             assert_eq!(
                 second_record_read_result,
-                Some(SizedRecord(second_write_size))
+                Some(SizedRecord::new(second_write_size))
             );
             assert_buffer_size!(ledger, 1, second_bytes_written);
 
@@ -229,7 +229,7 @@ async fn writer_rolls_data_files_when_the_limit_is_exceeded() {
             // haven't exceed our total buffer size limit yet, or the size limit of the data file
             // itself.  We do need this write to be big enough to exceed the max data file limit,
             // though.
-            let first_record = SizedRecord(first_write_size);
+            let first_record = SizedRecord::new(first_write_size);
             let first_bytes_written = writer
                 .write_record(first_record)
                 .await
@@ -242,7 +242,7 @@ async fn writer_rolls_data_files_when_the_limit_is_exceeded() {
 
             // Second write should also always complete, but at this point, we should have rolled
             // over to the next data file.
-            let second_record = SizedRecord(second_write_size);
+            let second_record = SizedRecord::new(second_write_size);
             let second_bytes_written = writer
                 .write_record(second_record)
                 .await
@@ -257,14 +257,17 @@ async fn writer_rolls_data_files_when_the_limit_is_exceeded() {
 
             // Now read both records, make sure they are what we expect, etc.
             let first_record_read = reader.next().await.expect("read should not fail");
-            assert_eq!(first_record_read, Some(SizedRecord(first_write_size)));
+            assert_eq!(first_record_read, Some(SizedRecord::new(first_write_size)));
             acker.ack(1);
 
             assert_buffer_size!(ledger, 2, (first_bytes_written + second_bytes_written));
             assert_reader_writer_v2_file_positions!(ledger, 0, 1);
 
             let second_record_read = reader.next().await.expect("read should not fail");
-            assert_eq!(second_record_read, Some(SizedRecord(second_write_size)));
+            assert_eq!(
+                second_record_read,
+                Some(SizedRecord::new(second_write_size))
+            );
             acker.ack(1);
 
             assert_buffer_size!(ledger, 1, second_bytes_written);
@@ -304,7 +307,7 @@ async fn writer_rolls_data_files_when_the_limit_is_exceeded_after_reload() {
             // haven't exceed our total buffer size limit yet, or the size limit of the data file
             // itself.  We do need this write to be big enough to exceed the max data file limit,
             // though.
-            let first_record = SizedRecord(first_write_size);
+            let first_record = SizedRecord::new(first_write_size);
             let first_bytes_written = writer
                 .write_record(first_record)
                 .await
@@ -332,7 +335,7 @@ async fn writer_rolls_data_files_when_the_limit_is_exceeded_after_reload() {
 
             // Second write should also always complete, but at this point, we should have rolled
             // over to the next data file.
-            let second_record = SizedRecord(second_write_size);
+            let second_record = SizedRecord::new(second_write_size);
             let second_bytes_written = writer
                 .write_record(second_record)
                 .await
@@ -347,14 +350,17 @@ async fn writer_rolls_data_files_when_the_limit_is_exceeded_after_reload() {
 
             // Now read both records, make sure they are what we expect, etc.
             let first_record_read = reader.next().await.expect("read should not fail");
-            assert_eq!(first_record_read, Some(SizedRecord(first_write_size)));
+            assert_eq!(first_record_read, Some(SizedRecord::new(first_write_size)));
             acker.ack(1);
 
             assert_buffer_size!(ledger, 2, (first_bytes_written + second_bytes_written));
             assert_reader_writer_v2_file_positions!(ledger, 0, 1);
 
             let second_record_read = reader.next().await.expect("read should not fail");
-            assert_eq!(second_record_read, Some(SizedRecord(second_write_size)));
+            assert_eq!(
+                second_record_read,
+                Some(SizedRecord::new(second_write_size))
+            );
             acker.ack(1);
 
             assert_buffer_size!(ledger, 1, second_bytes_written);
@@ -394,7 +400,7 @@ async fn writer_try_write_returns_when_buffer_is_full() {
             // haven't exceed our total buffer size limit yet, or the size limit of the data file
             // itself.  We do need this write to be big enough to exceed the total buffer size
             // limit, though.
-            let first_record = SizedRecord(first_write_size);
+            let first_record = SizedRecord::new(first_write_size);
             let first_write_result = writer
                 .try_write_record(first_record)
                 .await
@@ -406,7 +412,7 @@ async fn writer_try_write_returns_when_buffer_is_full() {
             // buffer size limit handily with the first write we did, but since it's a fallible
             // write attempt, it can already tell that the write will not fit anyways:
             let mut second_record_write = spawn(async {
-                let record = SizedRecord(second_write_size);
+                let record = SizedRecord::new(second_write_size);
                 writer
                     .try_write_record(record)
                     .await
@@ -414,7 +420,10 @@ async fn writer_try_write_returns_when_buffer_is_full() {
             });
 
             let second_write_result = assert_ready!(second_record_write.poll());
-            assert_eq!(second_write_result, Some(SizedRecord(second_write_size)));
+            assert_eq!(
+                second_write_result,
+                Some(SizedRecord::new(second_write_size))
+            );
         }
     })
     .await;
@@ -440,7 +449,7 @@ async fn writer_can_validate_last_write_when_buffer_is_full() {
             // haven't exceed our total buffer size limit yet, or the size limit of the data file
             // itself.  We do need this write to be big enough to exceed the total buffer size
             // limit, though.
-            let first_record = SizedRecord(first_write_size);
+            let first_record = SizedRecord::new(first_write_size);
             let first_write_result = writer
                 .try_write_record(first_record)
                 .await
@@ -452,7 +461,7 @@ async fn writer_can_validate_last_write_when_buffer_is_full() {
             // buffer size limit handily with the first write we did, but since it's a fallible
             // write attempt, it can already tell that the write will not fit anyways:
             let mut second_record_write = spawn(async {
-                let record = SizedRecord(second_write_size);
+                let record = SizedRecord::new(second_write_size);
                 writer
                     .try_write_record(record)
                     .await
@@ -460,7 +469,10 @@ async fn writer_can_validate_last_write_when_buffer_is_full() {
             });
 
             let second_write_result = assert_ready!(second_record_write.poll());
-            assert_eq!(second_write_result, Some(SizedRecord(second_write_size)));
+            assert_eq!(
+                second_write_result,
+                Some(SizedRecord::new(second_write_size))
+            );
 
             // Now that we know that the buffer is truly full, close it and reopen it. Even though
             // it's full, this should succeed because being full should not block things like

@@ -11,7 +11,7 @@ use crc32fast::Hasher;
 use rkyv::{archived_root, AlignedVec};
 use snafu::{ResultExt, Snafu};
 use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
-use vector_common::{finalizer::OrderedFinalizer, internal_event::emit};
+use vector_common::{finalization::BatchNotifier, finalizer::OrderedFinalizer};
 
 use super::{
     common::create_crc32c_hasher,
@@ -1073,7 +1073,7 @@ where
             .reader
             .as_mut()
             .expect("reader should exist after `ensure_ready_for_read`");
-        let record = reader.read_record(token)?;
+        let mut record = reader.read_record(token)?;
 
         let record_events: u64 = record
             .event_count()
@@ -1083,6 +1083,10 @@ where
             .try_into()
             .map_err(|_| ReaderError::EmptyRecord)?;
         self.track_read(record_id, record_bytes, record_events);
+
+        let (batch, receiver) = BatchNotifier::new_with_receiver();
+        record.add_batch_notifier(batch);
+        self.finalizer.add(record_events.get(), receiver);
 
         if self.ready_to_read {
             trace!(
