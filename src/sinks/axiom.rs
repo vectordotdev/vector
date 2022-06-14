@@ -58,7 +58,7 @@ impl GenerateConfig for AxiomConfig {
 impl SinkConfig for AxiomConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let mut request = self.request.clone();
-        self.request.headers.insert(
+        request.headers.insert(
             "X-Axiom-Org-Id".to_string(),
             self.org_id.clone().unwrap_or_default(),
         );
@@ -67,6 +67,12 @@ impl SinkConfig for AxiomConfig {
             "timestamp-field".to_string(),
             log_schema().timestamp_key().to_string(),
         );
+
+        // Axiom has a custom high-performance database that can be ingested
+        // into using our HTTP endpoints, including one compatible with the
+        // Elasticsearch Bulk API.
+        // This configuration wraps the Elasticsearch config to minimize the
+        // amount of code.
         let elasticsearch_config = ElasticsearchConfig {
             endpoint: self.build_endpoint(),
             compression: self.compression,
@@ -79,6 +85,7 @@ impl SinkConfig for AxiomConfig {
             request,
             ..Default::default()
         };
+
         elasticsearch_config.build(cx).await
     }
 
