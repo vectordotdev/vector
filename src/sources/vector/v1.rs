@@ -83,7 +83,7 @@ impl VectorConfig {
     pub(super) async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let vector = VectorSource;
         let tls_config = self.tls.as_ref().map(|tls| tls.tls_config.clone());
-        let tls_peer_key = self.tls.as_ref().and_then(|tls| tls.peer_key.clone());
+        let tls_client_metadata_key = self.tls.as_ref().and_then(|tls| tls.client_metadata_key.clone());
 
         let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
         vector.run(
@@ -91,7 +91,7 @@ impl VectorConfig {
             self.keepalive,
             self.shutdown_timeout_secs,
             tls,
-            tls_peer_key,
+            tls_client_metadata_key,
             self.receive_buffer_bytes,
             cx,
             false.into(),
@@ -264,7 +264,7 @@ mod test {
                     let mut config = VectorConfig::from_address(addr.into());
                     config.set_tls(Some(TlsSourceConfig {
                         tls_config: TlsEnableableConfig::test_config(),
-                        peer_key: None,
+                        client_metadata_key: None,
                     }));
                     config
                 },

@@ -123,7 +123,7 @@ where
         keepalive: Option<TcpKeepaliveConfig>,
         shutdown_timeout_secs: u64,
         tls: MaybeTlsSettings,
-        tls_peer_key: Option<String>,
+        tls_client_metadata_key: Option<String>,
         receive_buffer_bytes: Option<usize>,
         cx: SourceContext,
         acknowledgements: AcknowledgementsConfig,
@@ -169,7 +169,7 @@ where
                     let out = cx.out.clone();
                     let connection_gauge = connection_gauge.clone();
                     let request_limiter = request_limiter.clone();
-                    let tls_peer_key = tls_peer_key.clone();
+                    let tls_client_metadata_key = tls_client_metadata_key.clone();
 
                     async move {
                         let socket = match connection {
@@ -212,7 +212,7 @@ where
                                 out,
                                 acknowledgements,
                                 request_limiter,
-                                tls_peer_key.clone(),
+                                tls_client_metadata_key.clone(),
                             );
 
                             tokio::spawn(
@@ -243,7 +243,7 @@ async fn handle_stream<T>(
     mut out: SourceSender,
     acknowledgements: bool,
     request_limiter: RequestLimiter,
-    tls_peer_key: Option<String>,
+    tls_client_metadata_key: Option<String>,
 ) where
     <<T as TcpSource>::Decoder as tokio_util::codec::Decoder>::Item: std::marker::Send,
     T: TcpSource,
@@ -350,13 +350,13 @@ async fn handle_stream<T>(
                             }
                         }
 
-                        if let Some(tls_peer_key) = &tls_peer_key {
+                        if let Some(tls_client_metadata_key) = &tls_client_metadata_key {
                             if let Some(certificate_metadata) = &certificate_metadata {
                                 let mut metadata: BTreeMap<String, value::Value> = BTreeMap::new();
                                 metadata.insert("subject".to_string(), certificate_metadata.subject().into());
                                 for event in &mut events {
                                     let log = event.as_mut_log();
-                                    log.insert(&tls_peer_key[..], value::Value::from(metadata.clone()));
+                                    log.insert(&tls_client_metadata_key[..], value::Value::from(metadata.clone()));
                                 }
                             }
                         }

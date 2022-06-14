@@ -73,7 +73,7 @@ impl TlsEnableableConfig {
 #[derive(Clone, Debug, Default)]
 pub struct TlsSourceConfig {
     /// Event field for client certificate metadata.
-    pub peer_key: Option<String>,
+    pub client_metadata_key: Option<String>,
     #[serde(flatten)]
     pub tls_config: TlsEnableableConfig,
 }

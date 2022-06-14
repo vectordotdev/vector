@@ -130,14 +130,14 @@ impl SourceConfig for SocketConfig {
 
                 let tcp = tcp::RawTcpSource::new(config.clone(), decoder);
                 let tls_config = config.tls().as_ref().map(|tls| tls.tls_config.clone());
-                let tls_peer_key = config.tls().as_ref().and_then(|tls| tls.peer_key.clone());
+                let tls_client_metadata_key = config.tls().as_ref().and_then(|tls| tls.client_metadata_key.clone());
                 let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
                 tcp.run(
                     config.address(),
                     config.keepalive(),
                     config.shutdown_timeout_secs(),
                     tls,
-                    tls_peer_key,
+                    tls_client_metadata_key,
                     config.receive_buffer_bytes(),
                     cx,
                     false.into(),
@@ -435,7 +435,7 @@ mod test {
                         ..Default::default()
                     },
                 },
-                peer_key: Some("tls_peer".into()),
+                client_metadata_key: Some("tls_peer".into()),
             }));
 
             let server = SocketConfig::from(config)
