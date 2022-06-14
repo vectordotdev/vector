@@ -32,7 +32,7 @@ impl Function for SetMetadataField {
         &[
             Parameter {
                 keyword: "key",
-                kind: kind::BYTES,
+                kind: kind::ANY,
                 required: true,
             },
             Parameter {
@@ -53,15 +53,24 @@ impl Function for SetMetadataField {
 
     fn compile(
         &self,
-        state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        (local, external): (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let key = get_metadata_key(&mut arguments)?;
         let value = arguments.required_expr("value");
 
+        if let MetadataKey::Query(query) = &key {
+            if external.is_read_only_metadata_path(query.path()) {
+                return Err(vrl::function::Error::ReadOnlyMutation {
+                    context: format!("{} is read-only, and cannot be modified", query),
+                }
+                .into());
+            }
+        }
+
         // for backwards compatibility, make sure value is a string when using legacy.
-        if matches!(key, MetadataKey::Legacy(_)) && !value.type_def((state.0, state.1)).is_bytes() {
+        if matches!(key, MetadataKey::Legacy(_)) && !value.type_def((local, external)).is_bytes() {
             return Err(vrl::function::Error::UnexpectedExpression {
                 keyword: "value",
                 expected: "string",
