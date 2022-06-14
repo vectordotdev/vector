@@ -1,9 +1,9 @@
 use std::iter;
 
-use serde::{Deserialize, Serialize};
 use vector_common::aws_cloudwatch_logs_subscription::{
     AwsCloudWatchLogsSubscriptionMessage, AwsCloudWatchLogsSubscriptionMessageType,
 };
+use vector_config::configurable_component;
 
 use super::Transform;
 use crate::{
@@ -17,10 +17,15 @@ use crate::{
     transforms::{FunctionTransform, OutputBuffer},
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
+/// Configuration for the `aws_cloudwatch_logs_subscription_parser` transform.
+#[configurable_component(transform)]
+#[derive(Clone, Debug, Derivative)]
 #[serde(deny_unknown_fields, default)]
 #[derivative(Default)]
 pub struct AwsCloudwatchLogsSubscriptionParserConfig {
+    /// The log field to decode as an AWS CloudWatch Logs Subscription JSON event.
+    ///
+    /// The field must hold a string value.
     pub field: Option<String>,
 }
 

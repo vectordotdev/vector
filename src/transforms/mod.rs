@@ -18,12 +18,16 @@ pub mod geoip;
 pub mod log_to_metric;
 #[cfg(feature = "transforms-lua")]
 pub mod lua;
+#[cfg(feature = "sources-kubernetes_logs")]
+pub mod merge;
 #[cfg(feature = "transforms-metric_to_log")]
 pub mod metric_to_log;
 #[cfg(feature = "transforms-pipelines")]
 pub mod pipelines;
 #[cfg(feature = "transforms-reduce")]
 pub mod reduce;
+#[cfg(feature = "sources-kubernetes_logs")]
+pub mod regex_parser;
 #[cfg(feature = "transforms-remap")]
 pub mod remap;
 #[cfg(feature = "transforms-route")]

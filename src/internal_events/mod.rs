@@ -1,6 +1,7 @@
 pub mod prelude;
 
 mod adaptive_concurrency;
+#[cfg(feature = "transforms-aggregate")]
 mod aggregate;
 #[cfg(feature = "sources-apache_metrics")]
 mod apache_metrics;
@@ -129,9 +130,8 @@ mod websocket;
 mod file;
 mod windows;
 
-#[cfg(feature = "sources-mongodb_metrics")]
-pub(crate) use mongodb_metrics::*;
-
+#[cfg(feature = "transforms-aggregate")]
+pub(crate) use self::aggregate::*;
 #[cfg(feature = "sources-apache_metrics")]
 pub(crate) use self::apache_metrics::*;
 #[cfg(feature = "api")]
@@ -270,6 +270,8 @@ pub(crate) use self::{
     adaptive_concurrency::*, batch::*, common::*, conditions::*, encoding_transcode::*,
     heartbeat::*, open::*, process::*, socket::*, tcp::*, template::*, udp::*,
 };
+#[cfg(feature = "sources-mongodb_metrics")]
+pub(crate) use mongodb_metrics::*;
 
 // this version won't be needed once all `InternalEvent`s implement `name()`
 #[cfg(test)]

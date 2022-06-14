@@ -264,10 +264,7 @@ mod tests {
     use value::Value;
 
     use super::*;
-    use crate::{
-        event::Event,
-        transforms::test::transform_one,
-    };
+    use crate::{event::Event, transforms::test::transform_one};
 
     #[test]
     fn generate_config() {
@@ -445,15 +442,17 @@ mod tests {
     fn parse_one(text: &str, database: &str) -> Event {
         let parsed_text = serde_json::from_str::<Value>(text)
             .ok()
-            .and_then(|value| if let Value::Object(object) = value {
-                Some(object)
-            } else {
-                None
+            .and_then(|value| {
+                if let Value::Object(object) = value {
+                    Some(object)
+                } else {
+                    None
+                }
             })
             .expect("Input JSON string must represent a JSON object.");
-    
+
         let event = Event::from(parsed_text);
- 
+
         let mut augment = Geoip::new(
             database.to_string(),
             "remote_addr".to_string(),

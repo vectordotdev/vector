@@ -10,7 +10,8 @@ use crate::{
     sinks::blackhole::BlackholeConfig,
     sources::{stdin::StdinConfig, Source},
     test_util::{start_topology, trace_init},
-    Error, transforms::remap::RemapConfig,
+    transforms::remap::RemapConfig,
+    Error,
 };
 
 #[derive(Debug, Deserialize, Serialize)]
