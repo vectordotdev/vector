@@ -49,7 +49,7 @@ jobs:
     needs: generate-publish-metadata
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
-      VECTOR_BUILD_DESC ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
+      VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
       CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
     steps:
       - uses: actions/checkout@v3
@@ -69,7 +69,7 @@ jobs:
     needs: generate-publish-metadata
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
-      VECTOR_BUILD_DESC ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
+      VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
       CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
     steps:
       - uses: actions/checkout@v3
@@ -89,7 +89,7 @@ jobs:
     needs: generate-publish-metadata
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
-      VECTOR_BUILD_DESC ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
+      VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
       CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
     steps:
       - uses: actions/checkout@v3
@@ -110,7 +110,7 @@ jobs:
     needs: generate-publish-metadata
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
-      VECTOR_BUILD_DESC ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
+      VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
       CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
     steps:
       - uses: actions/checkout@v3
@@ -131,7 +131,7 @@ jobs:
     needs: generate-publish-metadata
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
-      VECTOR_BUILD_DESC ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
+      VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
       CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
     steps:
       - uses: actions/checkout@v3
@@ -151,7 +151,7 @@ jobs:
     needs: generate-publish-metadata
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
-      VECTOR_BUILD_DESC ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
+      VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
       CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
     steps:
       - uses: actions/checkout@v3
@@ -171,7 +171,7 @@ jobs:
     needs: generate-publish-metadata
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
-      VECTOR_BUILD_DESC ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
+      VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
       CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
     steps:
       - uses: actions/checkout@v3
@@ -197,7 +197,7 @@ jobs:
     needs: generate-publish-metadata
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
-      VECTOR_BUILD_DESC ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
+      VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
       CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
       RUSTFLAGS: "-D warnings -Ctarget-feature=+crt-static"
       RELEASE_BUILDER: "true"
@@ -354,7 +354,7 @@ jobs:
       - deb-verify
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
-      VECTOR_BUILD_DESC ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
+      VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
       CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
     steps:
       - uses: actions/checkout@v3
