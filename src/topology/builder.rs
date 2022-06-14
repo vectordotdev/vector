@@ -14,8 +14,6 @@ use tokio::{
     time::{timeout, Duration},
 };
 use tracing::Instrument;
-use value::Kind;
-use vector_core::config::LogNamespace;
 use vector_core::{
     buffers::{
         topology::{
@@ -278,11 +276,8 @@ pub async fn build_pieces(
         debug!(component = %key, "Building new transform.");
 
         let mut schema_definitions = HashMap::new();
-        let merged_definition = if config.schema.enabled {
-            schema::merged_definition(&transform.inputs, config, &mut definition_cache)
-        } else {
-            schema::Definition::empty()
-        };
+        let merged_definition =
+            schema::merged_definition(&transform.inputs, config, &mut definition_cache);
 
         for output in transform.inner.outputs(&merged_definition) {
             let definition = match output.log_schema_definition {

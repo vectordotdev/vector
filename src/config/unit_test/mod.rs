@@ -15,6 +15,8 @@ use tokio::sync::{
     Mutex,
 };
 use uuid::Uuid;
+use value::Kind;
+use vector_core::config::LogNamespace;
 
 use self::unit_test_components::{
     UnitTestSinkCheck, UnitTestSinkConfig, UnitTestSinkResult, UnitTestSourceConfig,
@@ -179,7 +181,7 @@ impl UnitTestBuildMetadata {
             .flat_map(|(key, transform)| {
                 transform
                     .inner
-                    .outputs(&schema::Definition::empty())
+                    .outputs(&schema::Definition::any())
                     .into_iter()
                     .map(|output| OutputId {
                         component: key.clone(),
@@ -460,7 +462,10 @@ fn get_loose_end_outputs_sink(config: &ConfigBuilder) -> Option<SinkOuter<String
     let transform_ids = config.transforms.iter().flat_map(|(key, transform)| {
         transform
             .inner
-            .outputs(&schema::Definition::empty())
+            .outputs(&schema::Definition::empty_kind(
+                Kind::any(),
+                [LogNamespace::Legacy, LogNamespace::Vector],
+            ))
             .iter()
             .map(|output| {
                 if let Some(port) = &output.port {

@@ -3,9 +3,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::config::LogNamespace;
 use lookup::LookupBuf;
 use value::kind::insert;
-use value::kind::insert::InnerConflict;
 use value::{
-    kind::{merge, nest, Collection, Field, Unknown},
+    kind::{merge, Collection},
     Kind,
 };
 
@@ -94,6 +93,10 @@ impl Definition {
             // this is incorrect, but the func is being deleted anyway...
             log_namespaces: BTreeSet::new(),
         }
+    }
+
+    pub fn any() -> Self {
+        Self::empty_kind(Kind::any(), [LogNamespace::Legacy, LogNamespace::Vector])
     }
 
     /// Creates an empty definition that is of the kind specified.

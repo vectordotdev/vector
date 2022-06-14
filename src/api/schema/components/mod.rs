@@ -21,7 +21,7 @@ use crate::{
         relay, sort,
     },
     config::{ComponentKey, Config},
-    filter_check, schema,
+    filter_check,
 };
 
 #[derive(Debug, Clone, Interface)]

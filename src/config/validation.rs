@@ -1,12 +1,9 @@
-use std::collections::HashMap;
-use value::Kind;
-use vector_core::config::LogNamespace;
-
 use crate::config::schema::Definition;
 use crate::topology::schema::merged_definition;
+use std::collections::HashMap;
 use vector_core::internal_event::DEFAULT_OUTPUT;
 
-use super::{builder::ConfigBuilder, schema, ComponentKey, Config, OutputId, Resource};
+use super::{builder::ConfigBuilder, ComponentKey, Config, OutputId, Resource};
 
 /// Check that provide + topology config aren't present in the same builder, which is an error.
 pub fn check_provider(config: &ConfigBuilder) -> Result<(), Vec<String>> {
@@ -164,8 +161,7 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
 
     for (key, transform) in config.transforms.iter() {
         // use the most general definition possible, since the real value isn't known yet.
-        let definition =
-            Definition::empty_kind(Kind::any(), [LogNamespace::Legacy, LogNamespace::Vector]);
+        let definition = Definition::any();
 
         if let Err(errs) = transform.inner.validate(&definition) {
             errors.extend(errs.into_iter().map(|msg| format!("Transform {key} {msg}")));

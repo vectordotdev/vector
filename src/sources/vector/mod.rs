@@ -1,7 +1,6 @@
 pub mod v1;
 pub mod v2;
 
-use serde::{Deserialize, Serialize};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 

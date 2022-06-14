@@ -65,8 +65,8 @@ impl Default for TransformContext {
             globals: Default::default(),
             #[cfg(feature = "vrl")]
             enrichment_tables: Default::default(),
-            schema_definitions: HashMap::from([(None, schema::Definition::empty())]),
-            merged_schema_definition: schema::Definition::empty(),
+            schema_definitions: HashMap::from([(None, schema::Definition::any())]),
+            merged_schema_definition: schema::Definition::any(),
         }
     }
 }

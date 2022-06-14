@@ -11,7 +11,7 @@ use crate::event::LogEvent;
 pub use global_options::GlobalOptions;
 pub use id::ComponentKey;
 pub use log_schema::{init_log_schema, log_schema, LogSchema};
-use lookup::lookup_v2::{BorrowedSegment, Path};
+use lookup::lookup_v2::Path;
 use lookup::path;
 use serde::{Deserialize, Serialize};
 use value::Value;

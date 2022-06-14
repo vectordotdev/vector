@@ -76,12 +76,13 @@ impl Graph {
             );
         }
 
-        for (id, config) in transforms.iter() {
+        for (id, transform) in transforms.iter() {
             graph.nodes.insert(
                 id.clone(),
                 Node::Transform {
-                    in_ty: config.inner.input().data_type(),
-                    outputs: config.inner.outputs(&schema::Definition::empty()),
+                    in_ty: transform.inner.input().data_type(),
+                    // TODO: double check what this definition should be
+                    outputs: transform.inner.outputs(&schema::Definition::any()),
                 },
             );
         }

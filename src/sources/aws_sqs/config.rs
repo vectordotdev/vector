@@ -1,7 +1,6 @@
 use std::cmp;
 
 use codecs::decoding::{DeserializerConfig, FramingConfig};
-use serde::{Deserialize, Serialize};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 

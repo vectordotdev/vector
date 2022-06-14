@@ -3,7 +3,6 @@ use std::{collections::HashMap, net::SocketAddr};
 use bytes::Bytes;
 use prometheus_parser::proto;
 use prost::Message;
-use serde::{Deserialize, Serialize};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use warp::http::{HeaderMap, StatusCode};

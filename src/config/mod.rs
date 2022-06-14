@@ -52,7 +52,6 @@ pub use source::{SourceConfig, SourceContext, SourceDescription, SourceOuter};
 pub use transform::{TransformDescription, TransformOuter};
 pub use unit_test::{build_unit_tests, build_unit_tests_main, UnitTestResult};
 pub use validation::warnings;
-use vector_core::config::LogNamespace;
 pub use vector_core::config::{log_schema, proxy::ProxyConfig, LogSchema};
 
 /// Loads Log Schema from configurations and sets global schema.

@@ -19,7 +19,6 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tracing::Span;
-use value::kind::Collection;
 use value::Kind;
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
@@ -40,7 +39,6 @@ use crate::{
     tls::{MaybeTlsSettings, TlsEnableableConfig},
     SourceSender,
 };
-// use serde::{Serialize, Deserialize}
 
 pub const LOGS: &str = "logs";
 pub const METRICS: &str = "metrics";
