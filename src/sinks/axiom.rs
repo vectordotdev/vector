@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
-use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     config::{
-        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+        log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
+        SinkDescription,
     },
     sinks::{
         elasticsearch::{ElasticsearchAuth, ElasticsearchConfig},
@@ -24,6 +24,8 @@ pub(self) struct AxiomConfig {
     token: String,
     dataset: String,
 
+    #[serde(default)]
+    request: RequestConfig,
     #[serde(default)]
     compression: Compression,
     tls: Option<TlsConfig>,
@@ -55,13 +57,16 @@ impl GenerateConfig for AxiomConfig {
 #[typetag::serde(name = "axiom")]
 impl SinkConfig for AxiomConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let mut headers = IndexMap::with_capacity(1);
-        headers.insert(
+        let mut request = self.request.clone();
+        self.request.headers.insert(
             "X-Axiom-Org-Id".to_string(),
             self.org_id.clone().unwrap_or_default(),
         );
         let mut query = HashMap::with_capacity(1);
-        query.insert("timestamp-field".to_string(), "timestamp".to_string());
+        query.insert(
+            "timestamp-field".to_string(),
+            log_schema().timestamp_key().to_string(),
+        );
         let elasticsearch_config = ElasticsearchConfig {
             endpoint: self.build_endpoint(),
             compression: self.compression,
@@ -71,14 +76,10 @@ impl SinkConfig for AxiomConfig {
             }),
             query: Some(query),
             tls: self.tls.clone(),
-            request: RequestConfig {
-                headers,
-                ..Default::default()
-            },
+            request,
             ..Default::default()
         };
-        let config = elasticsearch_config.build(cx).await?;
-        Ok(config)
+        elasticsearch_config.build(cx).await
     }
 
     fn input(&self) -> Input {
