@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::config::LogNamespace;
-use lookup::{Look, LookupBuf};
+use lookup::LookupBuf;
 use value::kind::insert;
 use value::kind::insert::InnerConflict;
 use value::{
@@ -113,11 +113,18 @@ impl Definition {
         Self::empty_kind(Kind::any_object(), [LogNamespace::Legacy])
     }
 
-    /// All sources should set a schema definition, but they are not all implemented yet
-    /// This is the default used for a source that does not yet implement it.
-    /// This assumes the source does not yet implement the "Vector" log namespace.
-    pub fn source_default() -> Self {
-        Self::empty_kind(Kind::any_object(), [LogNamespace::Legacy])
+    /// Returns the default source schema for a source that produce the listed log namespaces
+    pub fn default_for_namespace(log_namespaces: &BTreeSet<LogNamespace>) -> Self {
+        let is_legacy = log_namespaces.contains(&LogNamespace::Legacy);
+        let is_vector = log_namespaces.contains(&LogNamespace::Vector);
+        match (is_legacy, is_vector) {
+            (false, false) => Self::empty_kind(Kind::any(), []),
+            (true, false) => Self::legacy_default(),
+            (false, true) => Self::empty_kind(Kind::any(), [LogNamespace::Vector]),
+            (true, true) => {
+                Self::empty_kind(Kind::any(), [LogNamespace::Legacy, LogNamespace::Vector])
+            }
+        }
     }
 
     pub fn log_namespaces(&self) -> &BTreeSet<LogNamespace> {
@@ -138,7 +145,7 @@ impl Definition {
         kind: Kind,
         meaning: Option<&str>,
     ) -> Self {
-        let mut path = path.into();
+        let path = path.into();
         let meaning = meaning.map(ToOwned::to_owned);
 
         if !path.is_root() {
@@ -149,15 +156,17 @@ impl Definition {
                 .into();
         }
 
-        self.kind.insert_at_path(
+        if let Err(err) = self.kind.insert_at_path(
             &path.to_lookup(),
             kind,
             insert::Strategy {
                 inner_conflict: insert::InnerConflict::Replace,
                 leaf_conflict: insert::LeafConflict::Replace,
-                coalesced_path: insert::CoalescedPath::InsertValid,
+                coalesced_path: insert::CoalescedPath::Reject,
             },
-        );
+        ) {
+            panic!("Field definition not valid: {:?}", err);
+        }
 
         if let Some(meaning) = meaning {
             self.meaning.insert(meaning, MeaningPointer::Valid(path));

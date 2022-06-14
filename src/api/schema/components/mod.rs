@@ -13,6 +13,7 @@ use once_cell::sync::Lazy;
 use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
 use vector_core::internal_event::DEFAULT_OUTPUT;
 
+use crate::topology::schema::merged_definition;
 use crate::{
     api::schema::{
         components::state::component_by_component_key,
@@ -252,6 +253,7 @@ impl ComponentsSubscription {
 
 /// Update the 'global' configuration that will be consumed by component queries
 pub fn update_config(config: &Config) {
+    let mut cache = HashMap::new();
     let mut new_components = HashMap::new();
 
     // Sources
@@ -290,7 +292,7 @@ pub fn update_config(config: &Config) {
                 inputs: transform.inputs.clone(),
                 outputs: transform
                     .inner
-                    .outputs(&schema::Definition::empty())
+                    .outputs(&merged_definition(&transform.inputs, config, &mut cache))
                     .into_iter()
                     .map(|output| output.port.unwrap_or_else(|| DEFAULT_OUTPUT.to_string()))
                     .collect(),

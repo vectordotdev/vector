@@ -31,13 +31,13 @@ use crate::{
 ///
 /// Finally, The merged definition (named `Definition 1 & 2`), and `Definition 4` are merged
 /// together to produce the new `Definition` returned by this method.
-pub(super) fn merged_definition(
+pub fn merged_definition(
     inputs: &[OutputId],
     config: &dyn ComponentContainer,
-    cache: &mut HashMap<Vec<OutputId>, Definition>,
+    cache: &mut HashMap<(bool, Vec<OutputId>), Definition>,
 ) -> Definition {
     // Try to get the definition from the cache.
-    if let Some(definition) = cache.get(inputs) {
+    if let Some(definition) = cache.get(&(config.schema_enabled(), inputs.to_vec())) {
         return definition.clone();
     }
 
@@ -55,9 +55,15 @@ pub(super) fn merged_definition(
                 ))
                 .log_schema_definition
                 .clone()
-                .unwrap_or_else(Definition::source_default);
+                .unwrap_or_else(Definition::legacy_default);
 
-            definition = definition.merge(source_definition);
+            if config.schema_enabled() {
+                definition = definition.merge(source_definition);
+            } else {
+                definition = definition.merge(Definition::default_for_namespace(
+                    source_definition.log_namespaces(),
+                ));
+            }
         }
 
         // Merge the schema if it's a transform
@@ -81,11 +87,20 @@ pub(super) fn merged_definition(
                 None => merged_definition,
             };
 
-            definition = definition.merge(transform_definition);
+            if config.schema_enabled() {
+                definition = definition.merge(transform_definition);
+            } else {
+                definition = definition.merge(Definition::default_for_namespace(
+                    transform_definition.log_namespaces(),
+                ));
+            }
         }
     }
 
-    cache.insert(inputs.to_vec(), definition.clone());
+    cache.insert(
+        (config.schema_enabled(), inputs.to_vec()),
+        definition.clone(),
+    );
 
     definition
 }
@@ -106,10 +121,10 @@ pub(super) fn merged_definition(
 pub(super) fn expanded_definitions(
     inputs: &[OutputId],
     config: &dyn ComponentContainer,
-    cache: &mut HashMap<Vec<OutputId>, Vec<Definition>>,
+    cache: &mut HashMap<(bool, Vec<OutputId>), Vec<Definition>>,
 ) -> Vec<Definition> {
     // Try to get the definition from the cache.
-    if let Some(definitions) = cache.get(inputs) {
+    if let Some(definitions) = cache.get(&(config.schema_enabled(), inputs.to_vec())) {
         return definitions.clone();
     }
 
@@ -132,7 +147,7 @@ pub(super) fn expanded_definitions(
                             .log_schema_definition
                             .clone()
                             // For sources, a `None` schema definition is equal to an "empty" definition.
-                            .unwrap_or_else(Definition::empty),
+                            .unwrap_or_else(Definition::legacy_default),
                     )
                 } else {
                     None
@@ -143,7 +158,7 @@ pub(super) fn expanded_definitions(
                 Some(source_definition) => source_definition,
                 // If we find no match, it means the topology is misconfigured. This is a fatal
                 // error, but other parts of the topology builder deal with this state.
-                None => unreachable!("source output misconfigured"),
+                None => unreachable!("source output mis-configured"),
             };
 
             definitions.push(source_definition);
@@ -189,7 +204,10 @@ pub(super) fn expanded_definitions(
         }
     }
 
-    cache.insert(inputs.to_vec(), definitions.clone());
+    cache.insert(
+        (config.schema_enabled(), inputs.to_vec()),
+        definitions.clone(),
+    );
 
     definitions
 }
@@ -231,7 +249,9 @@ pub(super) fn validate_sink_expectations(
     Ok(())
 }
 
-pub(super) trait ComponentContainer {
+pub trait ComponentContainer {
+    fn schema_enabled(&self) -> bool;
+
     fn source_outputs(&self, key: &ComponentKey) -> Option<Vec<Output>>;
 
     fn transform_inputs(&self, key: &ComponentKey) -> Option<&[OutputId]>;
@@ -286,6 +306,10 @@ fn get_output_for_port(outputs: Vec<Output>, port: &Option<String>) -> Option<Ou
 }
 
 impl ComponentContainer for Config {
+    fn schema_enabled(&self) -> bool {
+        self.schema.enabled
+    }
+
     fn source_outputs(&self, key: &ComponentKey) -> Option<Vec<Output>> {
         self.source(key)
             .map(|source| source.inner.outputs(self.global.log_namespace()))

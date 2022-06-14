@@ -1,5 +1,9 @@
 use std::collections::HashMap;
+use value::Kind;
+use vector_core::config::LogNamespace;
 
+use crate::config::schema::Definition;
+use crate::topology::schema::merged_definition;
 use vector_core::internal_event::DEFAULT_OUTPUT;
 
 use super::{builder::ConfigBuilder, schema, ComponentKey, Config, OutputId, Resource};
@@ -159,12 +163,17 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     }
 
     for (key, transform) in config.transforms.iter() {
-        let definition = schema::Definition::empty();
+        // use the most general definition possible, since the real value isn't known yet.
+        let definition =
+            Definition::empty_kind(Kind::any(), [LogNamespace::Legacy, LogNamespace::Vector]);
+
         if let Err(errs) = transform.inner.validate(&definition) {
             errors.extend(errs.into_iter().map(|msg| format!("Transform {key} {msg}")));
         }
-        let outputs = transform.inner.outputs(&definition);
-        if outputs
+
+        if transform
+            .inner
+            .outputs(&definition)
             .iter()
             .map(|output| output.port.as_deref().unwrap_or(""))
             .any(|name| name == DEFAULT_OUTPUT)
@@ -184,6 +193,7 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
 
 pub fn warnings(config: &Config) -> Vec<String> {
     let mut warnings = vec![];
+    let mut cache = HashMap::new();
 
     let source_ids = config.sources.iter().flat_map(|(key, source)| {
         source
@@ -202,7 +212,7 @@ pub fn warnings(config: &Config) -> Vec<String> {
     let transform_ids = config.transforms.iter().flat_map(|(key, transform)| {
         transform
             .inner
-            .outputs(&schema::Definition::empty())
+            .outputs(&merged_definition(&transform.inputs, config, &mut cache))
             .iter()
             .map(|output| {
                 if let Some(port) = &output.port {
