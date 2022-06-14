@@ -400,7 +400,7 @@ impl PubsubSource {
     async fn parse_messages(
         &self,
         response: Vec<proto::ReceivedMessage>,
-        batch: Option<Arc<BatchNotifier>>,
+        batch: Option<BatchNotifier>,
     ) -> (Vec<Event>, Vec<String>) {
         let mut ack_ids = Vec::with_capacity(response.len());
         let events = response
@@ -419,7 +419,7 @@ impl PubsubSource {
     fn parse_message<'a>(
         &self,
         message: proto::PubsubMessage,
-        batch: &'a Option<Arc<BatchNotifier>>,
+        batch: &'a Option<BatchNotifier>,
     ) -> impl Iterator<Item = Event> + 'a {
         let attributes = Value::Object(
             message

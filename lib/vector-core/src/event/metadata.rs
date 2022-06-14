@@ -124,15 +124,15 @@ impl EventMetadata {
 
     /// Replace the finalizer with a new one created from the given batch notifier.
     #[must_use]
-    pub fn with_batch_notifier(self, batch: &Arc<BatchNotifier>) -> Self {
-        self.with_finalizer(EventFinalizer::new(Arc::clone(batch)))
+    pub fn with_batch_notifier(self, batch: &BatchNotifier) -> Self {
+        self.with_finalizer(EventFinalizer::new(batch.clone()))
     }
 
     /// Replace the finalizer with a new one created from the given optional batch notifier.
     #[must_use]
-    pub fn with_batch_notifier_option(self, batch: &Option<Arc<BatchNotifier>>) -> Self {
+    pub fn with_batch_notifier_option(self, batch: &Option<BatchNotifier>) -> Self {
         match batch {
-            Some(batch) => self.with_finalizer(EventFinalizer::new(Arc::clone(batch))),
+            Some(batch) => self.with_finalizer(EventFinalizer::new(batch.clone())),
             None => self,
         }
     }
