@@ -10,7 +10,7 @@ badges:
   type: enhancement
 ---
 
-VRL now contains facilicities for encrypting and decrypting field values using [AES][AES] encryption with user
+VRL now contains facilities for encrypting and decrypting field values using [AES][AES] encryption with user
 provided keys via new [`encrypt`][encrypt] and [`decrypt`][decrypt] functions. A [`random_bytes`][random_bytes] function
 was added to make it easy to generate initialization vectors for the [`encrypt`][encrypt] function.
 

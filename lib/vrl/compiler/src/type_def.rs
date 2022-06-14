@@ -196,6 +196,11 @@ impl TypeDef {
     }
 
     #[inline]
+    pub fn never() -> Self {
+        Kind::never().into()
+    }
+
+    #[inline]
     pub fn add_null(mut self) -> Self {
         self.kind.add_null();
         self
@@ -321,17 +326,6 @@ impl TypeDef {
         self
     }
 
-    pub fn merge_shallow(mut self, other: Self) -> Self {
-        self.merge(
-            other,
-            merge::Strategy {
-                depth: merge::Depth::Shallow,
-                indices: merge::Indices::Keep,
-            },
-        );
-        self
-    }
-
     /// Merge two type definitions.
     ///
     /// When merging arrays, the elements of `other` are *appended* to the elements of `self`.
@@ -351,6 +345,14 @@ impl TypeDef {
     pub fn merge(&mut self, other: Self, strategy: merge::Strategy) {
         self.fallible |= other.fallible;
         self.kind.merge(other.kind, strategy);
+    }
+
+    pub fn with_type_set_at_path(self, path: &Lookup, other: Self) -> Self {
+        if path.is_root() {
+            other
+        } else {
+            self.merge_overwrite(other.for_path(path))
+        }
     }
 
     pub fn merge_overwrite(mut self, other: Self) -> Self {
@@ -396,21 +398,6 @@ impl Details {
             } else {
                 None
             },
-        }
-    }
-
-    pub(crate) fn merge_optional(
-        a: Option<Self>,
-        b: Option<Self>,
-        none_type: TypeDef,
-    ) -> Option<Self> {
-        match (a, b) {
-            (Some(a), Some(b)) => Some(a.merge(b)),
-            (Some(_), None) | (None, Some(_)) => Some(Details {
-                type_def: none_type,
-                value: None,
-            }),
-            (None, None) => None,
         }
     }
 }

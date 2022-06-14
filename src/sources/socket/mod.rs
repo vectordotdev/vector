@@ -4,7 +4,7 @@ mod udp;
 mod unix;
 
 use codecs::NewlineDelimitedDecoderConfig;
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 #[cfg(unix)]
 use crate::serde::default_framing_message_based;
@@ -18,24 +18,33 @@ use crate::{
     tls::MaybeTlsSettings,
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
-// TODO: add back when https://github.com/serde-rs/serde/issues/1358 is addressed
-// #[serde(deny_unknown_fields)]
+/// Configuration for the `socket` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
 pub struct SocketConfig {
     #[serde(flatten)]
     pub mode: Mode,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Listening mode for the `socket` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum Mode {
-    Tcp(tcp::TcpConfig),
-    Udp(udp::UdpConfig),
+    /// Listen on TCP.
+    Tcp(#[configurable(derived)] tcp::TcpConfig),
+
+    /// Listen on UDP.
+    Udp(#[configurable(derived)] udp::UdpConfig),
+
+    /// Listen on UDS, in datagram mode. (Unix domain socket)
     #[cfg(unix)]
-    UnixDatagram(unix::UnixConfig),
+    UnixDatagram(#[configurable(derived)] unix::UnixConfig),
+
+    /// Listen on UDS, in stream mode. (Unix domain socket)
     #[cfg(unix)]
     #[serde(alias = "unix")]
-    UnixStream(unix::UnixConfig),
+    UnixStream(#[configurable(derived)] unix::UnixConfig),
 }
 
 impl SocketConfig {
@@ -257,7 +266,9 @@ mod test {
     #[cfg(unix)]
     use {
         super::{unix::UnixConfig, Mode},
+        crate::test_util::wait_for,
         futures::{SinkExt, Stream},
+        std::future::ready,
         std::os::unix::fs::PermissionsExt,
         std::path::PathBuf,
         tokio::{
@@ -1095,9 +1106,19 @@ mod test {
             .unwrap();
         tokio::spawn(server);
 
-        let meta = std::fs::metadata(in_path).unwrap();
-        // S_IFSOCK   0140000   socket
-        assert_eq!(0o140555, meta.permissions().mode());
+        wait_for(|| {
+            match std::fs::metadata(&in_path) {
+                Ok(meta) => {
+                    match meta.permissions().mode() {
+                        // S_IFSOCK   0140000   socket
+                        0o140555 => ready(true),
+                        _ => ready(false),
+                    }
+                }
+                Err(_) => ready(false),
+            }
+        })
+        .await;
     }
 
     ////////////// UNIX STREAM TESTS //////////////
@@ -1201,8 +1222,18 @@ mod test {
             .unwrap();
         tokio::spawn(server);
 
-        let meta = std::fs::metadata(in_path).unwrap();
-        // S_IFSOCK   0140000   socket
-        assert_eq!(0o140421, meta.permissions().mode());
+        wait_for(|| {
+            match std::fs::metadata(&in_path) {
+                Ok(meta) => {
+                    match meta.permissions().mode() {
+                        // S_IFSOCK   0140000   socket
+                        0o140421 => ready(true),
+                        _ => ready(false),
+                    }
+                }
+                Err(_) => ready(false),
+            }
+        })
+        .await;
     }
 }

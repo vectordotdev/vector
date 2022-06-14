@@ -6,18 +6,18 @@ use vector_core::event::{EventFinalizers, Finalizable};
 use super::{encoder::HecLogsEncoder, sink::HecProcessedEvent};
 use crate::sinks::{
     splunk_hec::common::request::HecRequest,
-    util::{encoding::EncodingConfig, request_builder::EncodeResult, Compression, RequestBuilder},
+    util::{request_builder::EncodeResult, Compression, RequestBuilder},
 };
 
 pub struct HecLogsRequestBuilder {
+    pub encoder: HecLogsEncoder,
     pub compression: Compression,
-    pub encoding: EncodingConfig<HecLogsEncoder>,
 }
 
 impl RequestBuilder<(Option<Arc<str>>, Vec<HecProcessedEvent>)> for HecLogsRequestBuilder {
     type Metadata = (usize, usize, EventFinalizers, Option<Arc<str>>);
     type Events = Vec<HecProcessedEvent>;
-    type Encoder = EncodingConfig<HecLogsEncoder>;
+    type Encoder = HecLogsEncoder;
     type Payload = Bytes;
     type Request = HecRequest;
     type Error = std::io::Error;
@@ -27,7 +27,7 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<HecProcessedEvent>)> for HecLogsReque
     }
 
     fn encoder(&self) -> &Self::Encoder {
-        &self.encoding
+        &self.encoder
     }
 
     fn split_input(

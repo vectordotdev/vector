@@ -23,8 +23,6 @@ services:
       - "pulsar-integration-tests"
       - "--lib"
       - "::pulsar::"
-      - "--"
-      - "--nocapture"
     depends_on:
       - pulsar
     environment:

@@ -21,6 +21,7 @@ async fn sources_finished() {
         ConsoleSinkConfig {
             target: Target::Stdout,
             encoding: EncodingConfig::from(StandardEncodings::Text).into(),
+            acknowledgements: Default::default(),
         },
     );
 

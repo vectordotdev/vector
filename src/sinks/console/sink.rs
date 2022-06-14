@@ -12,7 +12,7 @@ use vector_core::{
 
 use crate::{
     codecs::Encoder,
-    event::Event,
+    event::{Event, EventStatus, Finalizable},
     sinks::util::{encoding::Transformer, StreamSink},
 };
 
@@ -33,28 +33,36 @@ where
             let event_byte_size = event.size_of();
             self.transformer.transform(&mut event);
 
+            let finalizers = event.take_finalizers();
             let mut bytes = BytesMut::new();
             self.encoder.encode(event, &mut bytes).map_err(|_| {
                 // Error is handled by `Encoder`.
+                finalizers.update_status(EventStatus::Errored);
             })?;
 
-            self.output.write_all(&bytes).await.map_err(|error| {
-                // Error when writing to stdout/stderr is likely irrecoverable,
-                // so stop the sink.
-                error!(message = "Error writing to output. Stopping sink.", %error);
-            })?;
+            match self.output.write_all(&bytes).await {
+                Err(error) => {
+                    // Error when writing to stdout/stderr is likely irrecoverable,
+                    // so stop the sink.
+                    error!(message = "Error writing to output. Stopping sink.", %error);
+                    finalizers.update_status(EventStatus::Errored);
+                    return Err(());
+                }
+                Ok(()) => {
+                    finalizers.update_status(EventStatus::Delivered);
+                    self.acker.ack(1);
 
-            self.acker.ack(1);
-
-            emit!(EventsSent {
-                byte_size: event_byte_size,
-                count: 1,
-                output: None,
-            });
-            emit!(BytesSent {
-                byte_size: bytes.len(),
-                protocol: "console"
-            });
+                    emit!(EventsSent {
+                        byte_size: event_byte_size,
+                        count: 1,
+                        output: None,
+                    });
+                    emit!(BytesSent {
+                        byte_size: bytes.len(),
+                        protocol: "console"
+                    });
+                }
+            }
         }
 
         Ok(())

@@ -75,7 +75,7 @@ impl Expression for MergeFn {
         self.to
             .type_def(state)
             .restrict_object()
-            .merge_shallow(self.from.type_def(state).restrict_object())
+            .merge_overwrite(self.from.type_def(state).restrict_object())
     }
 }
 

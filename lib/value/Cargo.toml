@@ -18,7 +18,7 @@ tracing = { version = "0.1.34", default-features = false, features = ["attribute
 
 # Optional
 async-graphql = { version = "3.0.38", default-features = false, optional = true }
-mlua = { version = "0.7.4", default-features = false, features = ["lua54", "send", "vendored"], optional = true}
+mlua = { version = "0.8.0", default-features = false, features = ["lua54", "send", "vendored"], optional = true}
 serde = { version = "1.0.137", default-features = false, features = ["derive", "rc"], optional = true }
 serde_json = { version = "1.0.81", optional = true }
 toml = { version = "0.5.9", default-features = false, optional = true }
@@ -39,4 +39,4 @@ lookup = { path = "../lookup", default-features = false, features = ["arbitrary"
 serde = { version = "1.0.137", default-features = false, features = ["derive", "rc"]}
 serde_json = { version = "1.0.81"}
 toml = { version = "0.5.9", default-features = false }
-mlua = { version = "0.7.4", default-features = false, features = ["lua54", "send", "vendored"]}
+mlua = { version = "0.8.0", default-features = false, features = ["lua54", "send", "vendored"]}

@@ -4,7 +4,7 @@ use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 use value::Value;
 
 use crate::{
-    expression::{Expr, FallibleInfo, Resolved},
+    expression::{Expr, Resolved},
     parser::Node,
     state::{ExternalEnv, LocalEnv},
     value::Kind,
@@ -22,7 +22,7 @@ impl Predicate {
     pub(crate) fn new(
         node: Node<Vec<Expr>>,
         state: (&LocalEnv, &ExternalEnv),
-        fallible_predicate: Option<FallibleInfo>,
+        fallible_predicate: Option<&dyn DiagnosticMessage>,
     ) -> Result {
         let (span, exprs) = node.take();
         let type_def = exprs
@@ -30,16 +30,17 @@ impl Predicate {
             .map(|expr| expr.type_def(state))
             .unwrap_or_else(TypeDef::null);
 
-        if let Some(info) = fallible_predicate {
-            return Err(Error {
-                variant: ErrorVariant::Fallible,
-                span: info.span,
+        if let Some(error) = fallible_predicate {
+            return Err(Error::Fallible {
+                code: error.code(),
+                labels: error.labels(),
+                notes: error.notes(),
             });
         }
 
         if !type_def.is_boolean() {
-            return Err(Error {
-                variant: ErrorVariant::NonBoolean(type_def.into()),
+            return Err(Error::NonBoolean {
+                kind: type_def.into(),
                 span,
             });
         }
@@ -121,70 +122,53 @@ impl fmt::Debug for Predicate {
 
 // -----------------------------------------------------------------------------
 
-#[derive(Debug)]
-pub(crate) struct Error {
-    pub(crate) variant: ErrorVariant,
-
-    span: Span,
-}
-
 #[derive(thiserror::Error, Debug)]
-pub(crate) enum ErrorVariant {
+pub(crate) enum Error {
     #[error("non-boolean predicate")]
-    NonBoolean(Kind),
+    NonBoolean { kind: Kind, span: Span },
+
     #[error("fallible predicate")]
-    Fallible,
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:#}", self.variant)
-    }
-}
-
-impl std::error::Error for Error {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        Some(&self.variant)
-    }
+    Fallible {
+        code: usize,
+        labels: Vec<Label>,
+        notes: Vec<Note>,
+    },
 }
 
 impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
-        use ErrorVariant::*;
+        use Error::*;
 
-        match &self.variant {
-            NonBoolean(..) => 102,
-            Fallible => 111,
+        match self {
+            NonBoolean { .. } => 102,
+            Fallible { code, .. } => *code,
         }
     }
 
     fn labels(&self) -> Vec<Label> {
-        use ErrorVariant::*;
+        use Error::*;
 
-        match &self.variant {
-            NonBoolean(kind) => vec![
-                Label::primary("this predicate must resolve to a boolean", self.span),
-                Label::context(format!("instead it resolves to {}", kind), self.span),
+        match self {
+            NonBoolean { kind, span } => vec![
+                Label::primary("this predicate must resolve to a boolean", span),
+                Label::context(format!("instead it resolves to {}", kind), span),
             ],
-            Fallible => vec![
-                Label::primary("this predicate can result in runtime error", self.span),
-                Label::context("handle the error case to ensure runtime success", self.span),
-            ],
+            Fallible { labels, .. } => labels.clone(),
         }
     }
 
     fn notes(&self) -> Vec<Note> {
-        use ErrorVariant::*;
+        use Error::*;
 
-        match &self.variant {
-            NonBoolean(..) => vec![
+        match self {
+            NonBoolean { .. } => vec![
                 Note::CoerceValue,
                 Note::SeeDocs(
                     "if expressions".to_owned(),
                     Urls::expression_docs_url("#if"),
                 ),
             ],
-            Fallible => vec![Note::SeeErrorDocs],
+            Fallible { notes, .. } => notes.clone(),
         }
     }
 }

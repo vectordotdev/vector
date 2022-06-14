@@ -8,16 +8,14 @@ use crate::{
             encoder::{ElasticsearchEncoder, ProcessedEvent},
             service::ElasticsearchRequest,
         },
-        util::{
-            encoding::EncodingConfigFixed, request_builder::EncodeResult, Compression,
-            RequestBuilder,
-        },
+        util::{request_builder::EncodeResult, Compression, RequestBuilder},
     },
 };
 
+#[derive(Debug, Clone)]
 pub struct ElasticsearchRequestBuilder {
     pub compression: Compression,
-    pub encoder: EncodingConfigFixed<ElasticsearchEncoder>,
+    pub encoder: ElasticsearchEncoder,
 }
 
 pub struct Metadata {
@@ -29,7 +27,7 @@ pub struct Metadata {
 impl RequestBuilder<Vec<ProcessedEvent>> for ElasticsearchRequestBuilder {
     type Metadata = Metadata;
     type Events = Vec<ProcessedEvent>;
-    type Encoder = EncodingConfigFixed<ElasticsearchEncoder>;
+    type Encoder = ElasticsearchEncoder;
     type Payload = Bytes;
     type Request = ElasticsearchRequest;
     type Error = std::io::Error;

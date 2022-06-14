@@ -13,7 +13,6 @@ pub mod remove;
 
 use std::collections::BTreeMap;
 
-pub use builder::EmptyKindError;
 pub use collection::{Collection, Field, Index, Unknown};
 
 use crate::Value;
@@ -22,13 +21,6 @@ use crate::Value;
 ///
 /// This struct tracks the known states a type can have. By allowing one type to have multiple
 /// states, the type definition can be progressively refined.
-///
-/// At the start, a type is in the "any" state, meaning its type can be any of the valid states, as
-/// more information becomes available, states can be removed, until one state is left.
-///
-/// A state without any type information (e.g. all fields are `None`) indicates no type information
-/// can be inferred from the value. This is usually a programming error, but it's a valid state for
-/// this library to expose.
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
 pub struct Kind {
     // NOTE: The internal API uses `Option` over `bool` for primitive types, as it makes internal
@@ -89,25 +81,21 @@ impl std::fmt::Display for Kind {
         if self.contains_object() {
             kinds.push("object");
         }
-
-        let last = kinds.remove(0);
-
         if kinds.is_empty() {
-            return last.fmt(f);
+            return f.write_str("never");
         }
 
-        let mut kinds = kinds.into_iter().peekable();
-
-        while let Some(kind) = kinds.next() {
-            kind.fmt(f)?;
-
-            if kinds.peek().is_some() {
-                f.write_str(", ")?;
+        let len = kinds.len();
+        for (i, kind) in kinds.into_iter().enumerate() {
+            if i != 0 {
+                if i == len - 1 {
+                    f.write_str(" or ")?;
+                } else {
+                    f.write_str(", ")?;
+                }
             }
+            kind.fmt(f)?;
         }
-
-        f.write_str(" or ")?;
-        last.fmt(f)?;
 
         Ok(())
     }
