@@ -199,6 +199,7 @@ impl StreamSink<Event> for NatsSink {
             self.encoder.encode(event, &mut bytes).map_err(|_| {
                 // Error is handled by `Encoder`.
                 finalizers.update_status(EventStatus::Errored);
+                continue;
             })?;
 
             match self.connection.publish(&subject, &bytes).await {
@@ -209,7 +210,6 @@ impl StreamSink<Event> for NatsSink {
                 }
                 Ok(_) => {
                     finalizers.update_status(EventStatus::Delivered);
-                    self.acker.ack(1);
 
                     emit!(EventsSent {
                         byte_size: event_byte_size,
@@ -222,6 +222,8 @@ impl StreamSink<Event> for NatsSink {
                     });
                 }
             }
+
+            self.acker.ack(1);
         }
 
         Ok(())
