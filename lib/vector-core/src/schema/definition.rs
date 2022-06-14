@@ -152,11 +152,18 @@ impl Definition {
         let meaning = meaning.map(ToOwned::to_owned);
 
         if !path.is_root() {
-            self.kind = self
-                .kind
-                .into_object()
-                .expect("required field implies the type can be an object")
-                .into();
+            if kind.contains_null() {
+                if self.kind.as_object().is_none() {
+                    panic!("Setting a field on a value that cannot be an object");
+                }
+            } else {
+                println!("Def kind: {:?}", self.kind.debug_info());
+                self.kind = self
+                    .kind
+                    .into_object()
+                    .expect("required field implies the type can be an object")
+                    .into();
+            }
         }
 
         if let Err(err) = self.kind.insert_at_path(
@@ -242,7 +249,7 @@ impl Definition {
     /// means that the object at `.foo` is allowed to be missing, but if it's present, then it's
     /// required to have a `bar` field.
     #[must_use]
-    pub fn merge(mut self, other: Self) -> Self {
+    pub fn merge(mut self, mut other: Self) -> Self {
         for (other_id, other_meaning) in other.meaning {
             let meaning = match self.meaning.remove(&other_id) {
                 Some(this_meaning) => this_meaning.merge(other_meaning),
@@ -260,6 +267,7 @@ impl Definition {
             },
         );
 
+        self.log_namespaces.append(&mut other.log_namespaces);
         self
     }
 

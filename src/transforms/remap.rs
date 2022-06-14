@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use value::Kind;
 use vector_common::TimeZone;
+use vector_core::config::LogNamespace;
 use vector_core::schema::Definition;
 use vector_vrl_functions::set_semantic_meaning::MeaningList;
 use vrl::{
@@ -133,17 +134,16 @@ impl TransformConfig for RemapConfig {
         Input::all()
     }
 
-    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
-        println!("Remap input definition: {:?}\n", merged_definition);
+    fn outputs(&self, input_definition: &schema::Definition) -> Vec<Output> {
+        println!("Remap input definition: {:?}\n", input_definition);
         // We need to compile the VRL program in order to know the schema definition output of this
         // transform. We ignore any compilation errors, as those are caught by the transform build
         // step.
         let default_definition = self
             .compile_vrl_program(
                 enrichment::TableRegistry::default(),
-                merged_definition.clone(),
+                input_definition.clone(),
             )
-            .ok()
             .map(|(_, _, _, state)| {
                 let meaning = state
                     .get_external_context::<MeaningList>()
@@ -153,35 +153,48 @@ impl TransformConfig for RemapConfig {
 
                 let mut new_type_def = Definition::empty_kind(
                     state.target_kind().clone(),
-                    merged_definition.log_namespaces().clone(),
+                    input_definition.log_namespaces().clone(),
                 );
                 for (id, path) in meaning {
                     new_type_def = new_type_def.with_known_meaning(path, &id);
                 }
                 new_type_def
             })
-            .unwrap_or_else(|| {
-                Definition::empty_kind(Kind::never(), merged_definition.log_namespaces().clone())
+            .unwrap_or_else(|_| {
+                Definition::empty_kind(Kind::never(), input_definition.log_namespaces().clone())
             });
+
+        println!("b: {:?}", default_definition);
 
         // When a message is dropped and re-routed, we keep the original event, but also annotate
         // it with additional metadata.
-        let dropped_definition = merged_definition.clone().with_field(
-            log_schema().metadata_key(),
-            Kind::object(BTreeMap::from([
-                ("reason".into(), Kind::bytes()),
-                ("message".into(), Kind::bytes()),
-                ("component_id".into(), Kind::bytes()),
-                ("component_type".into(), Kind::bytes()),
-                ("component_kind".into(), Kind::bytes()),
-            ])),
-            Some("metadata"),
-        );
+        let mut dropped_definition =
+            Definition::empty_kind(Kind::never(), input_definition.log_namespaces().clone());
 
+        // The vector namespace appends the dropped fields to the "event metadata", which doesn't yet have a schema
+        if input_definition
+            .log_namespaces()
+            .contains(&LogNamespace::Legacy)
+        {
+            dropped_definition = dropped_definition.merge(input_definition.clone().with_field(
+                log_schema().metadata_key(),
+                Kind::object(BTreeMap::from([
+                    ("reason".into(), Kind::bytes()),
+                    ("message".into(), Kind::bytes()),
+                    ("component_id".into(), Kind::bytes()),
+                    ("component_type".into(), Kind::bytes()),
+                    ("component_kind".into(), Kind::bytes()),
+                ])),
+                Some("metadata"),
+            ));
+        }
+
+        println!("c");
         let default_output =
             Output::default(DataType::all()).with_schema_definition(default_definition);
 
-        if self.reroute_dropped {
+        println!("d");
+        let output = if self.reroute_dropped {
             vec![
                 default_output,
                 Output::default(DataType::all())
@@ -190,7 +203,9 @@ impl TransformConfig for RemapConfig {
             ]
         } else {
             vec![default_output]
-        }
+        };
+        println!("remap type def done");
+        output
     }
 
     fn transform_type(&self) -> &'static str {
