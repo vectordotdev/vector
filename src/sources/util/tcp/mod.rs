@@ -281,7 +281,6 @@ async fn handle_stream<T>(
         .get_ref()
         .ssl_stream()
         .and_then(|stream| {
-            dbg!(stream.ssl().peer_certificate());
             stream.ssl().peer_certificate()
         })
         .map(CertificateMetadata::from_x509);
@@ -358,7 +357,6 @@ async fn handle_stream<T>(
                                     log.insert(&tls_peer_key[..], value::Value::from(metadata.clone()));
                                 }
                             }
-                            dbg!("No client certificate metadata");
                         }
 
                         source.handle_events(&mut events, peer_addr);

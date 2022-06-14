@@ -191,7 +191,6 @@ pub async fn send_lines_tls(
 
     let mut stream = tokio_openssl::SslStream::new(ssl, stream).unwrap();
     Pin::new(&mut stream).connect().await.unwrap();
-    dbg!(&stream);
     let mut sink = FramedWrite::new(stream, LinesCodec::new());
 
     let mut lines = stream::iter(lines).map(Ok);
