@@ -16,7 +16,7 @@ use crate::{
     config::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
     },
-    event::Event,
+    event::{Event, Finalizable},
     internal_events::{NatsEventSendError, TemplateRenderingError},
     nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
     sinks::util::{
@@ -186,6 +186,7 @@ impl StreamSink<Event> for NatsSink {
 
             let event_byte_size = event.size_of();
 
+            let finalizers = event.take_finalizers();
             let mut bytes = BytesMut::new();
             if self.encoder.encode(event, &mut bytes).is_err() {
                 // Error is logged by `Encoder`.
@@ -211,6 +212,7 @@ impl StreamSink<Event> for NatsSink {
                 }
             }
 
+            drop(finalizers);
             self.acker.ack(1);
         }
 
