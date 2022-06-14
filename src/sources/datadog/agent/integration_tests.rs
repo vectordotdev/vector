@@ -1,6 +1,5 @@
 use std::{
     collections::HashMap,
-    net::UdpSocket,
     time::{Duration, SystemTime},
 };
 
@@ -11,9 +10,9 @@ use tokio::{io::AsyncWriteExt, net::TcpStream};
 use super::{DatadogAgentConfig, LOGS, METRICS};
 use crate::{
     config::{GenerateConfig, SourceConfig, SourceContext},
-    event::{EventStatus, Metric, MetricValue, Value},
+    event::{EventStatus, Value},
     schema,
-    test_util::{next_addr, spawn_collect_n, spawn_collect_ready, wait_for_tcp},
+    test_util::{spawn_collect_n, wait_for_tcp},
     SourceSender,
 };
 
@@ -28,24 +27,6 @@ fn trace_agent_url() -> String {
 
 fn agent_health_address() -> String {
     std::env::var("AGENT_HEALTH_ADDRESS").unwrap_or_else(|_| "http://0.0.0.0:8182".to_owned())
-}
-
-fn metrics_v1_agent_health_address() -> String {
-    std::env::var("METRICS_V1_AGENT_HEALTH_ADDRESS")
-        .unwrap_or_else(|_| "http://0.0.0.0:8184".to_owned())
-}
-
-fn metrics_v2_agent_health_address() -> String {
-    std::env::var("METRICS_V2_AGENT_HEALTH_ADDRESS")
-        .unwrap_or_else(|_| "http://0.0.0.0:8185".to_owned())
-}
-
-fn metrics_v1_dsd_address() -> String {
-    std::env::var("METRICS_V1_DSD_ADDRESS").unwrap_or_else(|_| "127.0.0.1:8125".to_owned())
-}
-
-fn metrics_v2_dsd_address() -> String {
-    std::env::var("METRICS_V2_DSD_ADDRESS").unwrap_or_else(|_| "127.0.0.1:8126".to_owned())
 }
 
 fn trace_agent_health_address() -> String {
@@ -76,14 +57,6 @@ async fn wait_for_healthy(address: String) {
 
 async fn wait_for_healthy_agent() {
     wait_for_healthy(agent_health_address()).await
-}
-
-async fn wait_for_healthy_metrics_v1_agent() {
-    wait_for_healthy(metrics_v1_agent_health_address()).await
-}
-
-async fn wait_for_healthy_metrics_v2_agent() {
-    wait_for_healthy(metrics_v2_agent_health_address()).await
 }
 
 async fn wait_for_healthy_trace_agent() {
@@ -202,84 +175,4 @@ fn get_simple_trace() -> String {
         "#},
         Utc::now().timestamp_nanos()
     )
-}
-
-#[tokio::test]
-async fn wait_for_metrics_v1() {
-    wait_for_healthy_metrics_v1_agent().await;
-    wait_for_metrics(8082, metrics_v1_dsd_address()).await
-}
-
-#[tokio::test]
-async fn wait_for_metrics_v2() {
-    wait_for_healthy_metrics_v2_agent().await;
-    wait_for_metrics(8083, metrics_v2_dsd_address()).await
-}
-
-async fn wait_for_metrics(vector_port: u16, dsd_address: String) {
-    let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
-    let schema_definitions = HashMap::from([
-        (Some(LOGS.to_owned()), schema::Definition::empty()),
-        (Some(METRICS.to_owned()), schema::Definition::empty()),
-    ]);
-    let context = SourceContext::new_test(sender, Some(schema_definitions));
-    tokio::spawn(async move {
-        let config_raw = format!("address = \"0.0.0.0:{}\"", vector_port);
-        let config = toml::from_str::<DatadogAgentConfig>(config_raw.as_str()).unwrap();
-        config.build(context).await.unwrap().await.unwrap()
-    });
-
-    let events = spawn_collect_ready(
-        async move {
-            // Earlier wait_for_healthy_agent() should be enough to have a working agent
-            let bind = next_addr();
-            let socket = UdpSocket::bind(bind)
-                .map_err(|error| panic!("{:}", error))
-                .ok()
-                .unwrap();
-            let statsd_metrics = (indoc! { r#"
-                    custom_gauge_test:60|g|#vector-intg-test,tag:value
-                    custom_count_test:42|c|#vector-intg-test,foo:bar
-                "# })
-            .to_string();
-            assert_eq!(
-                socket
-                    .send_to(statsd_metrics.as_bytes(), dsd_address)
-                    .map_err(|error| panic!("{:}", error))
-                    .ok()
-                    .unwrap(),
-                statsd_metrics.as_bytes().len()
-            );
-        },
-        recv,
-        // We wait 30 seconds to let agent enough time to notice there is a valid endpoint
-        // for metrics and flush pending metrics (the agent config has been tuned for
-        // fast retries).
-        30,
-    )
-    .await;
-
-    // clean up everything that was not
-    let mut filtered_metrics = events
-        .into_iter()
-        .filter_map(|m| m.try_into_metric())
-        .filter(|m| m.name() == "custom_gauge_test" || m.name() == "custom_count_test")
-        .collect::<Vec<Metric>>();
-
-    filtered_metrics.sort_by(|m1, m2| m1.name().cmp(m2.name()));
-
-    // Strictly two elements should remain
-    assert_eq!(filtered_metrics.len(), 2);
-
-    let metric = filtered_metrics.get(0).unwrap();
-    assert_eq!(metric.name(), "custom_count_test");
-    assert_eq!(metric.value(), &MetricValue::Counter { value: 42.0 });
-    assert_eq!(metric.tags().unwrap().get("vector-intg-test").unwrap(), "");
-    assert_eq!(metric.tags().unwrap().get("foo").unwrap(), "bar");
-
-    let metric = filtered_metrics.get(1).unwrap();
-    assert_eq!(metric.name(), "custom_gauge_test");
-    assert_eq!(metric.value(), &MetricValue::Gauge { value: 60.0 });
-    assert_eq!(metric.tags().unwrap().get("vector-intg-test").unwrap(), "");
-    assert_eq!(metric.tags().unwrap().get("tag").unwrap(), "value");
 }

@@ -1,7 +1,7 @@
 version: "3"
 
 services:
-  datadog-agent-for-logs:
+  datadog-agent:
     image: docker.io/datadog/agent:7
     networks:
       - backend
@@ -17,49 +17,7 @@ services:
       - DD_USE_DOGSTATSD=false
     volumes:
       - ${PWD}/tests/data/datadog-agent/conf.yaml:/etc/datadog-agent/conf.d/test.d/conf.yaml
-  datadog-agent-for-metrics-v1:
-    image: docker.io/datadog/agent:7
-    networks:
-      - backend
-    environment:
-      - DD_API_KEY=${TEST_DATADOG_API_KEY}
-      - DD_FORWARDER_BACKOFF_MAX=2
-      - DD_FORWARDER_RECOVERY_INTERVAL=1
-      - DD_FORWARDER_RECOVERY_RESET=true
-      - DD_APM_ENABLED=false
-      - DD_LOGS_ENABLED=false
-      - DD_HEALTH_PORT=8184
-      - DD_CMD_PORT=5003
-      - DD_USE_DOGSTATSD=true
-      - DD_DOGSTATSD_PORT=8125
-      - DD_DOGSTATSD_NON_LOCAL_TRAFFIC=true
-      - DD_USE_V2_API_SERIES=false
-      - DD_VECTOR_METRICS_ENABLED=true
-      - DD_VECTOR_METRICS_URL=http://runner:8082
-    volumes:
-      - ${PWD}/tests/data/datadog-agent/conf.yaml:/etc/datadog-agent/conf.d/test.d/conf.yaml
-  datadog-agent-for-metrics-v2:
-    image: docker.io/datadog/agent:7
-    networks:
-      - backend
-    environment:
-      - DD_API_KEY=${TEST_DATADOG_API_KEY}
-      - DD_FORWARDER_BACKOFF_MAX=2
-      - DD_FORWARDER_RECOVERY_INTERVAL=1
-      - DD_FORWARDER_RECOVERY_RESET=true
-      - DD_APM_ENABLED=false
-      - DD_LOGS_ENABLED=false
-      - DD_HEALTH_PORT=8185
-      - DD_CMD_PORT=5004
-      - DD_USE_DOGSTATSD=true
-      - DD_DOGSTATSD_PORT=8126
-      - DD_DOGSTATSD_NON_LOCAL_TRAFFIC=true
-      - DD_USE_V2_API_SERIES=true
-      - DD_VECTOR_METRICS_ENABLED=true
-      - DD_VECTOR_METRICS_URL=http://runner:8083
-    volumes:
-      - ${PWD}/tests/data/datadog-agent/conf.yaml:/etc/datadog-agent/conf.d/test.d/conf.yaml
-  datadog-agent-for-traces:
+  datadog-trace-agent:
     # Using 7.31.0 image to have the ability mimic tracing lib using json
     image: docker.io/datadog/agent:7.31.0
     networks:
@@ -92,19 +50,13 @@ services:
       - "--lib"
       - "sources::datadog::agent::integration_tests::"
     environment:
-      - LOGS_AGENT_ADDRESS=datadog-agent-for-logs:8181
-      - LOGS_AGENT_HEALTH_ADDRESS=http://datadog-agent-for-logs:8182
-      - METRICS_V1_AGENT_HEALTH_ADDRESS=http://datadog-agent-for-metrics-v1:8184
-      - METRICS_V2_AGENT_HEALTH_ADDRESS=http://datadog-agent-for-metrics-v2:8185
-      - METRICS_V1_DSD_ADDRESS=datadog-agent-for-metrics-v1:8125
-      - METRICS_V2_DSD_ADDRESS=datadog-agent-for-metrics-v2:8126
-      - TRACE_AGENT_URL=http://datadog-agent-for-traces:8126/v0.4/traces
-      - TRACE_AGENT_HEALTH_ADDRESS=http://datadog-agent-for-traces:8183
+      - AGENT_ADDRESS=datadog-agent:8181
+      - AGENT_HEALTH_ADDRESS=http://datadog-agent:8182
+      - TRACE_AGENT_URL=http://datadog-trace-agent:8126/v0.4/traces
+      - TRACE_AGENT_HEALTH_ADDRESS=http://datadog-trace-agent:8183
     depends_on:
-      - datadog-agent-for-logs
-      - datadog-agent-for-metrics-v1
-      - datadog-agent-for-metrics-v2
-      - datadog-agent-for-traces
+      - datadog-agent
+      - datadog-trace-agent
     volumes:
       - ${PWD}:/code
       - target:/code/target
