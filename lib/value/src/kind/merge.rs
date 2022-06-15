@@ -1,12 +1,20 @@
 //! All types related to merging one [`Kind`] into another.
 
 use std::{collections::BTreeMap, ops::BitOr};
+use crate::kind::Field;
 
 use super::{Collection, Kind};
 
 impl Kind {
     /// Merge `other` into `self`, using the provided `Strategy`.
-    pub fn merge(&mut self, other: Self, mut strategy: Strategy) {
+    pub fn merge(&mut self, other: Self, strategy: Strategy) {
+        match strategy.indices {
+            Indices::Keep => self.merge_keep(other, strategy.collisions.is_shallow()),
+            Indices::Append => self.merge_append(other, strategy.collisions.is_shallow()),
+        }
+    }
+
+    fn merge_primitives(&mut self, other: &Self) {
         self.bytes = self.bytes.or(other.bytes);
         self.integer = self.integer.or(other.integer);
         self.float = self.float.or(other.float);
@@ -14,20 +22,41 @@ impl Kind {
         self.timestamp = self.timestamp.or(other.timestamp);
         self.regex = self.regex.or(other.regex);
         self.null = self.null.or(other.null);
+    }
 
-        match (self.object.as_mut(), other.object) {
+    fn merge_objects(&mut self, other: Option<Collection<Field>>, overwrite: bool) {
+        match (self.object.as_mut(), other) {
             (None, rhs @ Some(_)) => self.object = rhs,
-            (Some(lhs), Some(rhs)) => lhs.merge(rhs, strategy),
+            (Some(lhs), Some(rhs)) => lhs.merge(rhs, overwrite),
             _ => {}
         };
+    }
+
+    /// Merge `other` into `self`, optionally overwriting on conflicts.
+    pub fn merge_keep(&mut self, other: Self, overwrite: bool) {
+        self.merge_primitives(&other);
+        self.merge_objects(other.object, overwrite);
 
         match (self.array.as_mut(), other.array) {
-            (None, rhs @ Some(_)) => self.array = rhs,
+            (None, Some(rhs)) => self.array = Some(rhs),
+            (Some(lhs), Some(rhs)) => lhs.merge(rhs, overwrite),
+            _ => {}
+        }
+    }
 
-            // When the `append` strategy is enabled, we take the higest index of the lhs
-            // collection, and increase all known indices of the rhs collection by that value.
-            // Then we merge them, similar to the non-append strategy.
-            (Some(lhs), Some(rhs)) if strategy.indices.is_append() => {
+    /// Merge `other` into `self`, using the provided `Strategy`.
+    /// We take the higest index of the lhs
+    /// collection, and increase all known indices of the rhs collection by that value.
+    /// Then we merge them, similar to the non-append strategy.
+    fn merge_append(&mut self, other: Self, overwrite: bool) {
+        self.merge_primitives(&other);
+        self.merge_objects(other.object, overwrite);
+
+        match (self.array.as_mut(), other.array) {
+            (None, Some(rhs)) => self.array = Some(rhs),
+
+
+            (Some(lhs), Some(rhs)) => {
                 let last_index = lhs.known().keys().max().map(|i| *i + 1).unwrap_or_default();
 
                 let (rhs_known, rhs_unknown) = rhs.into_parts();
@@ -40,14 +69,8 @@ impl Kind {
 
                 // The indices cannot collide since they are being appended, so switch to overwrite mode.
                 // otherwise the union of the types will include "null"
-                strategy.collisions = CollisionStrategy::Overwrite;
-
-                // it doesn't make sense to recursively apply this, so turn it off.
-                strategy.indices = Indices::Keep;
-                lhs.merge(Collection::from_parts(known, rhs_unknown), strategy);
+                lhs.merge(Collection::from_parts(known, rhs_unknown), true);
             }
-
-            (Some(lhs), Some(rhs)) => lhs.merge(rhs, strategy),
             _ => {}
         }
     }

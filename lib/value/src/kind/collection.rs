@@ -133,16 +133,11 @@ impl<T: Ord> Collection<T> {
     /// has an object with a field "bar" results in a collection of which any field can have an
     /// object that has a field "bar".
     pub fn anonymize(&mut self) {
-        let strategy = merge::Strategy {
-            collisions: merge::CollisionStrategy::Overwrite,
-            indices: merge::Indices::Keep,
-        };
-
         let known_unknown = self
             .known
             .values_mut()
             .reduce(|lhs, rhs| {
-                lhs.merge(rhs.clone(), strategy);
+                lhs.merge_keep(rhs.clone(), true);
                 lhs
             })
             .cloned();
@@ -151,7 +146,7 @@ impl<T: Ord> Collection<T> {
 
         match (self.unknown.as_mut(), known_unknown) {
             (None, Some(rhs)) => self.unknown = Some(rhs.into()),
-            (Some(lhs), Some(rhs)) => lhs.merge(rhs.into(), strategy),
+            (Some(lhs), Some(rhs)) => lhs.merge(rhs.into(), true),
             _ => {}
         };
     }
@@ -219,21 +214,21 @@ impl<T: Ord> Collection<T> {
     /// For *unknown fields or indices*:
     ///
     /// - Both `Unknown`s are merged, similar to merging two `Kind`s.
-    pub fn merge(&mut self, mut other: Self, strategy: merge::Strategy) {
+    pub fn merge(&mut self, mut other: Self, overwrite: bool) {
         for (key, self_kind) in &mut self.known {
             if let Some(other_kind) = other.known.remove(key) {
-                if strategy.collisions.is_shallow() {
+                if overwrite {
                     *self_kind = other_kind;
                 } else {
-                    self_kind.merge(other_kind, strategy);
+                    self_kind.merge_keep(other_kind, overwrite);
                 }
             } else if let Some(other_unknown) = other.unknown() {
-                if strategy.collisions.is_shallow() {
+                if overwrite {
                     *self_kind = other_unknown.to_kind().into_owned();
                 } else {
-                    self_kind.merge(other_unknown.to_kind().into_owned(), strategy);
+                    self_kind.merge_keep(other_unknown.to_kind().into_owned(), overwrite);
                 }
-            } else if strategy.collisions.is_deep() {
+            } else if !overwrite {
                 // other is missing this field, which returns null
                 self_kind.add_null();
             }
@@ -242,12 +237,12 @@ impl<T: Ord> Collection<T> {
         let self_unknown_kind = self.unknown().map(|unknown| unknown.to_kind().into_owned());
         if let Some(self_unknown_kind) = self_unknown_kind {
             for (key, mut other_kind) in other.known {
-                if strategy.collisions.is_deep() {
-                    other_kind.merge(self_unknown_kind.clone(), strategy);
+                if !overwrite {
+                    other_kind.merge_keep(self_unknown_kind.clone(), overwrite);
                 }
                 self.known_mut().insert(key, other_kind);
             }
-        } else if strategy.collisions.is_shallow() {
+        } else if overwrite {
             self.known.extend(other.known);
         } else {
             for (key, other_kind) in other.known {
@@ -258,7 +253,7 @@ impl<T: Ord> Collection<T> {
 
         match (self.unknown.as_mut(), other.unknown) {
             (None, Some(rhs)) => self.unknown = Some(rhs),
-            (Some(lhs), Some(rhs)) => lhs.merge(rhs, strategy),
+            (Some(lhs), Some(rhs)) => lhs.merge(rhs, overwrite),
             _ => {}
         };
     }
@@ -492,7 +487,7 @@ mod tests {
         struct TestCase {
             this: Collection<&'static str>,
             other: Collection<&'static str>,
-            strategy: merge::Strategy,
+            overwrite: bool,
             want: Collection<&'static str>,
         }
 
@@ -501,7 +496,7 @@ mod tests {
             TestCase {
                 mut this,
                 other,
-                strategy,
+                overwrite: strategy,
                 want,
             },
         ) in HashMap::from([
@@ -510,10 +505,7 @@ mod tests {
                 TestCase {
                     this: Collection::any(),
                     other: Collection::any(),
-                    strategy: merge::Strategy {
-                        collisions: merge::CollisionStrategy::Union,
-                        indices: merge::Indices::Keep,
-                    },
+                    overwrite: false,
                     want: Collection::any(),
                 },
             ),
@@ -522,10 +514,7 @@ mod tests {
                 TestCase {
                     this: Collection::any(),
                     other: Collection::any(),
-                    strategy: merge::Strategy {
-                        collisions: merge::CollisionStrategy::Overwrite,
-                        indices: merge::Indices::Keep,
-                    },
+                    overwrite: true,
                     want: Collection::any(),
                 },
             ),
@@ -534,10 +523,7 @@ mod tests {
                 TestCase {
                     this: Collection::json(),
                     other: Collection::json(),
-                    strategy: merge::Strategy {
-                        collisions: merge::CollisionStrategy::Union,
-                        indices: merge::Indices::Keep,
-                    },
+                    overwrite: false,
                     want: Collection::json(),
                 },
             ),
@@ -546,10 +532,7 @@ mod tests {
                 TestCase {
                     this: Collection::json(),
                     other: Collection::json(),
-                    strategy: merge::Strategy {
-                        collisions: merge::CollisionStrategy::Overwrite,
-                        indices: merge::Indices::Keep,
-                    },
+                    overwrite: true,
                     want: Collection::json(),
                 },
             ),
@@ -558,10 +541,7 @@ mod tests {
                 TestCase {
                     this: Collection::any(),
                     other: Collection::json(),
-                    strategy: merge::Strategy {
-                        collisions: merge::CollisionStrategy::Union,
-                        indices: merge::Indices::Keep,
-                    },
+                    overwrite: false,
                     want: Collection::any(),
                 },
             ),
@@ -570,10 +550,7 @@ mod tests {
                 TestCase {
                     this: Collection::any(),
                     other: Collection::json(),
-                    strategy: merge::Strategy {
-                        collisions: merge::CollisionStrategy::Overwrite,
-                        indices: merge::Indices::Keep,
-                    },
+                    overwrite: true,
                     want: Collection::any(),
                 },
             ),
@@ -582,10 +559,7 @@ mod tests {
                 TestCase {
                     this: Collection::from(BTreeMap::from([("foo", Kind::integer())])),
                     other: Collection::from(BTreeMap::from([("foo", Kind::bytes())])),
-                    strategy: merge::Strategy {
-                        collisions: merge::CollisionStrategy::Union,
-                        indices: merge::Indices::Keep,
-                    },
+                    overwrite: false,
                     want: Collection::from(BTreeMap::from([("foo", Kind::integer().or_bytes())])),
                 },
             ),
@@ -594,10 +568,7 @@ mod tests {
                 TestCase {
                     this: Collection::from(BTreeMap::from([("foo", Kind::integer())])),
                     other: Collection::from(BTreeMap::from([("foo", Kind::bytes())])),
-                    strategy: merge::Strategy {
-                        collisions: merge::CollisionStrategy::Overwrite,
-                        indices: merge::Indices::Keep,
-                    },
+                    overwrite: true,
                     want: Collection::from(BTreeMap::from([("foo", Kind::bytes())])),
                 },
             ),
@@ -606,10 +577,7 @@ mod tests {
                 TestCase {
                     this: Collection::from(BTreeMap::from([("foo", Kind::integer())])),
                     other: Collection::from(BTreeMap::from([("bar", Kind::bytes())])),
-                    strategy: merge::Strategy {
-                        collisions: merge::CollisionStrategy::Union,
-                        indices: merge::Indices::Keep,
-                    },
+                    overwrite: false,
                     want: Collection::from(BTreeMap::from([
                         ("foo", Kind::integer().or_null()),
                         ("bar", Kind::bytes().or_null()),
@@ -621,10 +589,7 @@ mod tests {
                 TestCase {
                     this: Collection::from(BTreeMap::from([("foo", Kind::integer())])),
                     other: Collection::from(BTreeMap::from([("bar", Kind::bytes())])),
-                    strategy: merge::Strategy {
-                        collisions: merge::CollisionStrategy::Overwrite,
-                        indices: merge::Indices::Keep,
-                    },
+                    overwrite: true,
                     want: Collection::from(BTreeMap::from([
                         ("foo", Kind::integer()),
                         ("bar", Kind::bytes()),
@@ -639,10 +604,7 @@ mod tests {
                         ("foo", Kind::bytes()),
                         ("bar", Kind::boolean()),
                     ])),
-                    strategy: merge::Strategy {
-                        collisions: merge::CollisionStrategy::Union,
-                        indices: merge::Indices::Keep,
-                    },
+                    overwrite: false,
                     want: Collection::from(BTreeMap::from([
                         ("foo", Kind::integer().or_bytes()),
                         ("bar", Kind::boolean().or_null()),
@@ -657,10 +619,7 @@ mod tests {
                         ("foo", Kind::bytes()),
                         ("bar", Kind::boolean()),
                     ])),
-                    strategy: merge::Strategy {
-                        collisions: merge::CollisionStrategy::Overwrite,
-                        indices: merge::Indices::Keep,
-                    },
+                    overwrite: true,
                     want: Collection::from(BTreeMap::from([
                         ("foo", Kind::bytes()),
                         ("bar", Kind::boolean()),
@@ -672,10 +631,7 @@ mod tests {
                 TestCase {
                     this: Collection::from_unknown(Kind::bytes()),
                     other: Collection::from_unknown(Kind::integer()),
-                    strategy: merge::Strategy {
-                        collisions: merge::CollisionStrategy::Union,
-                        indices: merge::Indices::Keep,
-                    },
+                    overwrite: false,
                     want: Collection::from_unknown(Kind::bytes().or_integer()),
                 },
             ),
@@ -684,10 +640,7 @@ mod tests {
                 TestCase {
                     this: Collection::from_unknown(Kind::bytes()),
                     other: Collection::from_unknown(Kind::integer()),
-                    strategy: merge::Strategy {
-                        collisions: merge::CollisionStrategy::Overwrite,
-                        indices: merge::Indices::Keep,
-                    },
+                    overwrite: true,
                     want: Collection::from_unknown(Kind::bytes().or_integer()),
                 },
             ),

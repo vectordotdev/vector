@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use lookup::LookupBuf;
 use value::{
-    kind::{merge, nest, Collection, Field, Unknown},
+    kind::{nest, Collection, Field, Unknown},
     Kind,
 };
 
@@ -130,10 +130,7 @@ impl Definition {
 
         self.collection.merge(
             collection,
-            merge::Strategy {
-                collisions: merge::CollisionStrategy::Overwrite,
-                indices: merge::Indices::Keep,
-            },
+            true,
         );
 
         if let Some(meaning) = meaning {
@@ -203,10 +200,7 @@ impl Definition {
 
         self.collection.merge(
             other.collection,
-            merge::Strategy {
-                collisions: merge::CollisionStrategy::Union,
-                indices: merge::Indices::Keep,
-            },
+            false,
         );
 
         self
