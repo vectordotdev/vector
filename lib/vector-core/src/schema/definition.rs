@@ -131,7 +131,7 @@ impl Definition {
         self.collection.merge(
             collection,
             merge::Strategy {
-                depth: merge::Depth::Deep,
+                depth: merge::Depth::Shallow,
                 indices: merge::Indices::Keep,
             },
         );

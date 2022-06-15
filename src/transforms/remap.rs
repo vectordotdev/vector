@@ -1177,16 +1177,16 @@ mod tests {
         };
 
         let schema_definition = schema::Definition::empty()
-            .with_field("foo", Kind::bytes(), None)
+            .with_field("foo", Kind::bytes().or_null(), None)
             .with_field(
                 "tags",
-                Kind::object(BTreeMap::from([("foo".into(), Kind::bytes())])),
+                Kind::object(BTreeMap::from([("foo".into(), Kind::bytes())])).or_null(),
                 None,
             );
 
         assert_eq!(
-            vec![Output::default(DataType::all()).with_schema_definition(schema_definition)],
             conf.outputs(&schema::Definition::empty()),
+            vec![Output::default(DataType::all()).with_schema_definition(schema_definition)]
         );
 
         let context = TransformContext {
