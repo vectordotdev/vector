@@ -77,6 +77,12 @@ status = 301
 force = true
 
 [[redirects]]
+from = "/support/"
+to = "https://www.datadoghq.com/product/observability-pipelines"
+status = 301
+force = true
+
+[[redirects]]
 from = "/support-services/"
 to = "https://www.datadoghq.com/product/observability-pipelines"
 status = 301
