@@ -7,11 +7,8 @@ on:
         type: string
         required: true
       mode:
-        type: choice
+        type: string
         required: true
-        options:
-          - Nightly
-          - Release
 
 env:
   AUTOINSTALL: true
