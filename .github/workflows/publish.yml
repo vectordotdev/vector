@@ -61,7 +61,7 @@ jobs:
         env:
           PASS_FEATURES: "default-cmake"
         run: make package-x86_64-unknown-linux-musl-all
-      - name: Stage package artifacts for publish 
+      - name: Stage package artifacts for publish
         uses: actions/upload-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl
@@ -87,7 +87,7 @@ jobs:
         env:
           PASS_FEATURES: "default"
         run: make package-x86_64-unknown-linux-gnu-all
-      - name: Stage package artifacts for publish 
+      - name: Stage package artifacts for publish
         uses: actions/upload-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
@@ -118,7 +118,7 @@ jobs:
         run: |
           mv "target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu.tar.gz" \
              "target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu-debug.tar.gz"
-      - name: Stage package artifacts for publish 
+      - name: Stage package artifacts for publish
         uses: actions/upload-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu-debug
@@ -145,7 +145,7 @@ jobs:
           DOCKER_PRIVILEGED: "true"
           PASS_FEATURES: "default-cmake"
         run: make package-aarch64-unknown-linux-musl-all
-      - name: Stage package artifacts for publish 
+      - name: Stage package artifacts for publish
         uses: actions/upload-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl
@@ -172,7 +172,7 @@ jobs:
           DOCKER_PRIVILEGED: "true"
           PASS_FEATURES: "default"
         run: make package-aarch64-unknown-linux-gnu-all
-      - name: Stage package artifacts for publish 
+      - name: Stage package artifacts for publish
         uses: actions/upload-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu
@@ -198,7 +198,7 @@ jobs:
         env:
           DOCKER_PRIVILEGED: "true"
         run: make package-armv7-unknown-linux-gnueabihf-all
-      - name: Stage package artifacts for publish 
+      - name: Stage package artifacts for publish
         uses: actions/upload-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-gnueabihf
@@ -224,7 +224,7 @@ jobs:
         env:
           DOCKER_PRIVILEGED: "true"
         run: make package-armv7-unknown-linux-musleabihf
-      - name: Stage package artifacts for publish 
+      - name: Stage package artifacts for publish
         uses: actions/upload-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf
@@ -251,7 +251,7 @@ jobs:
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           make package
-      - name: Stage package artifacts for publish 
+      - name: Stage package artifacts for publish
         uses: actions/upload-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin
@@ -296,7 +296,7 @@ jobs:
         run: |
           export PATH="/c/wix:$PATH"
           ./scripts/package-msi.sh
-      - name: Stage package artifacts for publish 
+      - name: Stage package artifacts for publish
         uses: actions/upload-artifact@v3
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc
