@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Metric, MetricValue},
+    gcp::{GcpAuthConfig, GcpCredentials},
     http::HttpClient,
     sinks::{
         gcp,
@@ -22,7 +23,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
-    tls::{TlsConfig, TlsSettings}, gcp::{GcpAuthConfig, GcpCredentials},
+    tls::{TlsConfig, TlsSettings},
 };
 
 #[derive(Clone, Copy, Debug, Default)]

@@ -1,4 +1,4 @@
-use std::{convert::TryFrom, string::ToString, fmt};
+use std::{convert::TryFrom, fmt, string::ToString};
 
 use ordered_float::NotNan;
 use value::Value;

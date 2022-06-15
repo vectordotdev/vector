@@ -48,10 +48,15 @@ impl Source {
         self.0.component_type.as_str()
     }
     pub fn get_output_types(&self) -> Vec<SourceOutputType> {
-        [SourceOutputType::Log, SourceOutputType::Metric, SourceOutputType::Trace].iter()
-            .copied()
-            .filter(|s| self.0.output_type.contains(s.into()))
-            .collect()
+        [
+            SourceOutputType::Log,
+            SourceOutputType::Metric,
+            SourceOutputType::Trace,
+        ]
+        .iter()
+        .copied()
+        .filter(|s| self.0.output_type.contains(s.into()))
+        .collect()
     }
 
     pub fn get_outputs(&self) -> &[String] {
