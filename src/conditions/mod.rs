@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{config::component::ComponentDescription, event::Event};
+use crate::{
+    config::component::ComponentDescription,
+    event::{Event, EventArray, EventContainer, LogEvent, Metric, TraceEvent},
+};
 
 mod check_fields;
 pub(self) mod datadog_search;
@@ -36,42 +39,151 @@ impl Condition {
 }
 
 impl Condition {
-    pub(crate) fn check(&self, e: Event) -> (bool, Event) {
+    pub(crate) fn check(&self, event: Event) -> (bool, Event) {
+        match event {
+            Event::Log(log) => {
+                let (result, log) = self.check_log(log);
+                (result, Event::from(log))
+            }
+            Event::Metric(metric) => {
+                let (result, metric) = self.check_metric(metric);
+                (result, Event::from(metric))
+            }
+            Event::Trace(trace) => {
+                let (result, trace) = self.check_trace(trace);
+                (result, Event::from(trace))
+            }
+        }
+    }
+
+    pub(crate) fn check_log(&self, log: LogEvent) -> (bool, LogEvent) {
         match self {
-            Condition::IsLog(x) => x.check(e),
-            Condition::IsMetric(x) => x.check(e),
-            Condition::Not(x) => x.check(e),
-            Condition::CheckFields(x) => x.check(e),
-            Condition::DatadogSearch(x) => x.check(e),
-            Condition::Vrl(x) => x.check(e),
-            Condition::AlwaysPass => (true, e),
-            Condition::AlwaysFail => (false, e),
+            Condition::IsLog(x) => x.check_log(log),
+            Condition::IsMetric(x) => x.check_log(log),
+            Condition::Not(x) => x.check_log(log),
+            Condition::CheckFields(x) => x.check_log(log),
+            Condition::DatadogSearch(x) => x.check_log(log),
+            Condition::Vrl(x) => x.check_log(log),
+            Condition::AlwaysPass => (true, log),
+            Condition::AlwaysFail => (false, log),
+        }
+    }
+
+    pub(crate) fn check_metric(&self, metric: Metric) -> (bool, Metric) {
+        match self {
+            Condition::IsLog(x) => x.check_metric(metric),
+            Condition::IsMetric(x) => x.check_metric(metric),
+            Condition::Not(x) => x.check_metric(metric),
+            Condition::CheckFields(x) => x.check_metric(metric),
+            Condition::DatadogSearch(x) => x.check_metric(metric),
+            Condition::Vrl(x) => x.check_metric(metric),
+            Condition::AlwaysPass => (true, metric),
+            Condition::AlwaysFail => (false, metric),
+        }
+    }
+
+    pub(crate) fn check_trace(&self, trace: TraceEvent) -> (bool, TraceEvent) {
+        match self {
+            Condition::IsLog(x) => x.check_trace(trace),
+            Condition::IsMetric(x) => x.check_trace(trace),
+            Condition::Not(x) => x.check_trace(trace),
+            Condition::CheckFields(x) => x.check_trace(trace),
+            Condition::DatadogSearch(x) => x.check_trace(trace),
+            Condition::Vrl(x) => x.check_trace(trace),
+            Condition::AlwaysPass => (true, trace),
+            Condition::AlwaysFail => (false, trace),
+        }
+    }
+
+    pub(crate) fn check_all(&self, events: EventArray) -> Vec<(bool, Event)> {
+        match self {
+            Condition::IsLog(x) => x.check_all(events),
+            Condition::IsMetric(x) => x.check_all(events),
+            Condition::Not(x) => x.check_all(events),
+            Condition::CheckFields(x) => x.check_all(events),
+            Condition::DatadogSearch(x) => x.check_all(events),
+            Condition::Vrl(x) => x.check_all(events),
+            Condition::AlwaysPass => events.into_events().map(|event| (true, event)).collect(),
+            Condition::AlwaysFail => events.into_events().map(|event| (false, event)).collect(),
         }
     }
 
     /// Provides context for a failure. This is potentially mildly expensive if
     /// it involves string building and so should be avoided in hot paths.
-    pub(crate) fn check_with_context(&self, e: Event) -> (Result<(), String>, Event) {
+    pub(crate) fn check_with_context(&self, event: Event) -> (Result<(), String>, Event) {
         match self {
-            Condition::IsLog(x) => x.check_with_context(e),
-            Condition::IsMetric(x) => x.check_with_context(e),
-            Condition::Not(x) => x.check_with_context(e),
-            Condition::CheckFields(x) => x.check_with_context(e),
-            Condition::DatadogSearch(x) => x.check_with_context(e),
-            Condition::Vrl(x) => x.check_with_context(e),
-            Condition::AlwaysPass => (Ok(()), e),
-            Condition::AlwaysFail => (Ok(()), e),
+            Condition::IsLog(x) => x.check_with_context(event),
+            Condition::IsMetric(x) => x.check_with_context(event),
+            Condition::Not(x) => x.check_with_context(event),
+            Condition::CheckFields(x) => x.check_with_context(event),
+            Condition::DatadogSearch(x) => x.check_with_context(event),
+            Condition::Vrl(x) => x.check_with_context(event),
+            Condition::AlwaysPass => (Ok(()), event),
+            Condition::AlwaysFail => (Ok(()), event),
         }
     }
 }
 
 pub trait Conditional {
-    /// Checks if a condition is true. The event should not be modified, it is only
-    /// mutable so it can be passed into VRL, but VRL type checking prevents mutation.
-    fn check(&self, event: Event) -> (bool, Event);
+    /// Checks if a condition is true. The event should not be modified, it is only mutable so it
+    /// can be passed into VRL, but VRL type checking prevents mutation.
+    fn check(&self, event: Event) -> (bool, Event) {
+        match event {
+            Event::Log(log) => {
+                let (result, log) = self.check_log(log);
+                (result, Event::from(log))
+            }
+            Event::Metric(metric) => {
+                let (result, metric) = self.check_metric(metric);
+                (result, Event::from(metric))
+            }
+            Event::Trace(trace) => {
+                let (result, trace) = self.check_trace(trace);
+                (result, Event::from(trace))
+            }
+        }
+    }
 
-    /// Provides context for a failure. This is potentially mildly expensive if
-    /// it involves string building and so should be avoided in hot paths.
+    /// Checks if a condition is true. The log should not be modified, it is only mutable so it can
+    /// be passed into VRL, but VRL type checking prevents mutation.
+    fn check_log(&self, log: LogEvent) -> (bool, LogEvent);
+
+    /// Checks if a condition is true. The metric should not be modified, it is only mutable so it
+    /// can be passed into VRL, but VRL type checking prevents mutation.
+    fn check_metric(&self, metric: Metric) -> (bool, Metric);
+
+    /// Checks if a condition is true. The trace should not be modified, it is only mutable so it
+    /// can be passed into VRL, but VRL type checking prevents mutation.
+    fn check_trace(&self, trace: TraceEvent) -> (bool, TraceEvent);
+
+    fn check_all(&self, events: EventArray) -> Vec<(bool, Event)> {
+        match events {
+            EventArray::Logs(logs) => logs
+                .into_iter()
+                .map(|log| {
+                    let (result, log) = self.check_log(log);
+                    (result, Event::from(log))
+                })
+                .collect::<Vec<_>>(),
+            EventArray::Metrics(metrics) => metrics
+                .into_iter()
+                .map(|metric| {
+                    let (result, metric) = self.check_metric(metric);
+                    (result, Event::from(metric))
+                })
+                .collect::<Vec<_>>(),
+            EventArray::Traces(traces) => traces
+                .into_iter()
+                .map(|trace| {
+                    let (result, trace) = self.check_trace(trace);
+                    (result, Event::from(trace))
+                })
+                .collect::<Vec<_>>(),
+        }
+    }
+
+    /// Provides context for a failure. This is potentially mildly expensive if it involves string
+    /// building and so should be avoided in hot paths.
     fn check_with_context(&self, e: Event) -> (Result<(), String>, Event) {
         let (result, event) = self.check(e);
         if result {

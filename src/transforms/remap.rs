@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use value::Kind;
 use vector_common::TimeZone;
+use vector_core::event::{EventArray, EventContainer};
 use vector_vrl_functions::set_semantic_meaning::MeaningList;
 use vrl::{
     diagnostic::{Formatter, Note},
@@ -226,6 +227,13 @@ pub trait VrlRunner {
         program: &Program,
         timezone: &TimeZone,
     ) -> std::result::Result<value::Value, Terminate>;
+
+    fn run_batch(
+        &mut self,
+        targets: &mut Vec<VrlTarget>,
+        program: &Program,
+        timezone: &TimeZone,
+    ) -> Vec<std::result::Result<value::Value, Terminate>>;
 }
 
 #[derive(Debug)]
@@ -251,6 +259,21 @@ impl VrlRunner for AstRunner {
         let result = self.runtime.resolve(target, program, timezone);
         self.runtime.clear();
         result
+    }
+
+    fn run_batch(
+        &mut self,
+        targets: &mut Vec<VrlTarget>,
+        program: &Program,
+        timezone: &TimeZone,
+    ) -> Vec<std::result::Result<value::Value, Terminate>> {
+        targets
+            .iter_mut()
+            .map(|target| {
+                self.runtime.clear();
+                self.runtime.resolve(target, program, timezone)
+            })
+            .collect()
     }
 }
 
@@ -364,6 +387,14 @@ where
     fn run_vrl(&mut self, target: &mut VrlTarget) -> std::result::Result<value::Value, Terminate> {
         self.runner.run(target, &self.program, &self.timezone)
     }
+
+    fn run_vrl_batch(
+        &mut self,
+        targets: &mut Vec<VrlTarget>,
+    ) -> Vec<std::result::Result<value::Value, Terminate>> {
+        self.runner
+            .run_batch(targets, &self.program, &self.timezone)
+    }
 }
 
 impl<Runner> SyncTransform for Remap<Runner>
@@ -378,7 +409,7 @@ where
         //
         // The `drop_on_{error, abort}` transform config allows operators to remove events from the
         // main output if they're failed or aborted, in which case we can skip the cloning, since
-        // any mutations made by VRL will be ignored regardless. If they hav configured
+        // any mutations made by VRL will be ignored regardless. If they have configured
         // `reroute_dropped`, however, we still need to do the clone to ensure that we can forward
         // the event to the `dropped` output.
         let forward_on_error = !self.drop_on_error || self.reroute_dropped;
@@ -432,6 +463,107 @@ where
 
                     self.annotate_dropped(&mut event, reason, error);
                     push_dropped(event, output, &self.dropped_schema_definition);
+                }
+            }
+        }
+    }
+
+    fn transform_all(&mut self, events: EventArray, output: &mut TransformOutputsBuf) {
+        let events_len = events.len();
+        let output_capacity = output.capacity();
+        if events_len > output_capacity {
+            output.reserve(events_len - output_capacity);
+        }
+
+        // If a program can fail or abort at runtime and we know that we will still need to forward
+        // the event in that case (either to the main output or `dropped`, depending on the
+        // config), we need to clone the original event and keep it around, to allow us to discard
+        // any mutations made to the event while the VRL program runs, before it failed or aborted.
+        //
+        // The `drop_on_{error, abort}` transform config allows operators to remove events from the
+        // main output if they're failed or aborted, in which case we can skip the cloning, since
+        // any mutations made by VRL will be ignored regardless. If they have configured
+        // `reroute_dropped`, however, we still need to do the clone to ensure that we can forward
+        // the event to the `dropped` output.
+        let forward_on_error = !self.drop_on_error || self.reroute_dropped;
+        let forward_on_abort = !self.drop_on_abort || self.reroute_dropped;
+        let mut original_events = if (self.program.info().fallible && forward_on_error)
+            || (self.program.info().abortable && forward_on_abort)
+        {
+            Some(events.clone())
+        } else {
+            None
+        };
+
+        let program_info = self.program.info();
+        let mut targets = events
+            .into_events()
+            .map(|event| VrlTarget::new(event, program_info))
+            .collect::<Vec<_>>();
+        let results = self.run_vrl_batch(&mut targets);
+
+        for (i, (result, target)) in results.into_iter().zip(targets.into_iter()).enumerate() {
+            match result {
+                Ok(_) => match target.into_events() {
+                    TargetEvents::One(event) => {
+                        push_default(event, output, &self.default_schema_definition)
+                    }
+                    TargetEvents::Logs(events) => events.for_each(|event| {
+                        push_default(event, output, &self.default_schema_definition)
+                    }),
+                    TargetEvents::Traces(events) => events.for_each(|event| {
+                        push_default(event, output, &self.default_schema_definition)
+                    }),
+                },
+                Err(reason) => {
+                    let (reason, error, drop) = match reason {
+                        Terminate::Abort(error) => {
+                            emit!(RemapMappingAbort {
+                                event_dropped: self.drop_on_abort,
+                            });
+
+                            ("abort", error, self.drop_on_abort)
+                        }
+                        Terminate::Error(error) => {
+                            emit!(RemapMappingError {
+                                error: error.to_string(),
+                                event_dropped: self.drop_on_error,
+                            });
+
+                            ("error", error, self.drop_on_error)
+                        }
+                    };
+
+                    if !drop {
+                        let event = match original_events.as_mut().expect("event will be set") {
+                            EventArray::Logs(logs) => {
+                                let log = std::mem::take(&mut logs[i]);
+                                Event::from(log)
+                            }
+                            EventArray::Metrics(metrics) => Event::from(metrics[i].clone()),
+                            EventArray::Traces(traces) => {
+                                let trace = std::mem::take(&mut traces[i]);
+                                Event::from(trace)
+                            }
+                        };
+
+                        push_default(event, output, &self.default_schema_definition);
+                    } else if self.reroute_dropped {
+                        let mut event = match original_events.as_mut().expect("event will be set") {
+                            EventArray::Logs(logs) => {
+                                let log = std::mem::take(&mut logs[i]);
+                                Event::from(log)
+                            }
+                            EventArray::Metrics(metrics) => Event::from(metrics[i].clone()),
+                            EventArray::Traces(traces) => {
+                                let trace = std::mem::take(&mut traces[i]);
+                                Event::from(trace)
+                            }
+                        };
+
+                        self.annotate_dropped(&mut event, reason, error);
+                        push_dropped(event, output, &self.dropped_schema_definition);
+                    }
                 }
             }
         }
