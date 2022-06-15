@@ -13,7 +13,6 @@ use crate::{
     filter_check,
 };
 
-//#[derive(Debug, Enum, EnumIter, Eq, PartialEq, Copy, Clone, Ord, PartialOrd)]
 #[derive(Debug, Enum, Eq, PartialEq, Copy, Clone, Ord, PartialOrd)]
 pub enum SourceOutputType {
     Log,
