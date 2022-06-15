@@ -128,10 +128,7 @@ impl Definition {
             .into_object()
             .expect("always object");
 
-        self.collection.merge(
-            collection,
-            true,
-        );
+        self.collection.merge(collection, true);
 
         if let Some(meaning) = meaning {
             self.meaning.insert(meaning, MeaningPointer::Valid(path));
@@ -198,10 +195,7 @@ impl Definition {
             self.meaning.insert(other_id, meaning);
         }
 
-        self.collection.merge(
-            other.collection,
-            false,
-        );
+        self.collection.merge(other.collection, false);
 
         self
     }

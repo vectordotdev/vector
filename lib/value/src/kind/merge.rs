@@ -1,7 +1,7 @@
 //! All types related to merging one [`Kind`] into another.
 
-use std::{collections::BTreeMap, ops::BitOr};
 use crate::kind::Field;
+use std::{collections::BTreeMap, ops::BitOr};
 
 use super::{Collection, Kind};
 
@@ -54,7 +54,6 @@ impl Kind {
 
         match (self.array.as_mut(), other.array) {
             (None, Some(rhs)) => self.array = Some(rhs),
-
 
             (Some(lhs), Some(rhs)) => {
                 let last_index = lhs.known().keys().max().map(|i| *i + 1).unwrap_or_default();
