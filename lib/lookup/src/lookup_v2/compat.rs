@@ -72,13 +72,7 @@ mod test {
         for test in tests {
             let lookup_buf = LookupBuf::from_str(test).unwrap();
             if !Path::eq(&test, &lookup_buf) {
-                println!("Equality failed for {:?}", test);
-                println!("V2: {:?}", test.segment_iter().collect::<Vec<_>>());
-                println!(
-                    "Compact: {:?}",
-                    (&lookup_buf).segment_iter().collect::<Vec<_>>()
-                );
-                panic!("Equality failed");
+                panic!("Equality failed.");
             }
         }
     }
