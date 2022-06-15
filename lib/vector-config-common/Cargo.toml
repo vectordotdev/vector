@@ -7,5 +7,5 @@ edition = "2021"
 darling = { version = "0.13", default-features = false, features = ["suggestions"] }
 proc-macro2 = { version = "1.0", default-features = false }
 schemars = { version = "0.8.10", default-features = false }
-syn = { version = "1.0", default-features = false }
+syn = { version = "1.0" }
 quote = { version = "1.0", default-features = false }
