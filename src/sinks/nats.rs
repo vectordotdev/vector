@@ -177,6 +177,8 @@ impl NatsSink {
 impl StreamSink<Event> for NatsSink {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         while let Some(mut event) = input.next().await {
+            let finalizers = event.take_finalizers();
+
             let subject = match self.subject.render_string(&event) {
                 Ok(subject) => subject,
                 Err(error) => {
@@ -185,6 +187,7 @@ impl StreamSink<Event> for NatsSink {
                         field: Some("subject"),
                         drop_event: true,
                     });
+                    finalizers.update_status(EventStatus::Errored);
                     self.acker.ack(1);
                     continue;
                 }
@@ -194,19 +197,19 @@ impl StreamSink<Event> for NatsSink {
 
             let event_byte_size = event.size_of();
 
-            let finalizers = event.take_finalizers();
             let mut bytes = BytesMut::new();
-            self.encoder.encode(event, &mut bytes).map_err(|_| {
+            if self.encoder.encode(event, &mut bytes).is_err() {
                 // Error is handled by `Encoder`.
                 finalizers.update_status(EventStatus::Errored);
+                self.acker.ack(1);
                 continue;
-            })?;
+            };
 
             match self.connection.publish(&subject, &bytes).await {
                 Err(error) => {
-                    emit!(NatsEventSendError { error });
                     finalizers.update_status(EventStatus::Errored);
-                    continue;
+
+                    emit!(NatsEventSendError { error });
                 }
                 Ok(_) => {
                     finalizers.update_status(EventStatus::Delivered);
