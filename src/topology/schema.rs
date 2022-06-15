@@ -122,7 +122,7 @@ pub(super) fn merged_definition(
         }
     }
 
-    let definition = definition.unwrap_or_else(|| Definition::empty());
+    let definition = definition.unwrap_or_else(Definition::empty);
 
     cache.insert(inputs.to_vec(), definition.clone());
 
