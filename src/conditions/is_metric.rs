@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription, Conditional},
-    event::Event,
+    event::{Event, LogEvent, Metric, TraceEvent},
 };
 
 //------------------------------------------------------------------------------
@@ -29,12 +29,20 @@ impl ConditionConfig for IsMetricConfig {
 pub struct IsMetric {}
 
 impl Conditional for IsMetric {
-    fn check(&self, e: Event) -> (bool, Event) {
-        (matches!(e, Event::Metric(_)), e)
+    fn check_log(&self, log: LogEvent) -> (bool, LogEvent) {
+        (false, log)
     }
 
-    fn check_with_context(&self, e: Event) -> (Result<(), String>, Event) {
-        let (result, event) = self.check(e);
+    fn check_metric(&self, metric: Metric) -> (bool, Metric) {
+        (true, metric)
+    }
+
+    fn check_trace(&self, trace: TraceEvent) -> (bool, TraceEvent) {
+        (false, trace)
+    }
+
+    fn check_with_context(&self, event: Event) -> (Result<(), String>, Event) {
+        let (result, event) = self.check(event);
         if result {
             (Ok(()), event)
         } else {

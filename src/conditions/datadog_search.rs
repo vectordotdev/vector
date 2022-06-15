@@ -9,9 +9,11 @@ use datadog_filter::{
 use datadog_search_syntax::parse;
 use datadog_search_syntax::{Comparison, ComparisonValue, Field};
 use serde::{Deserialize, Serialize};
-use vector_core::event::{Event, LogEvent, Value};
 
-use crate::conditions::{Condition, ConditionConfig, ConditionDescription, Conditional};
+use crate::{
+    conditions::{Condition, ConditionConfig, ConditionDescription, Conditional},
+    event::{LogEvent, Metric, TraceEvent, Value},
+};
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone, PartialEq)]
 pub(crate) struct DatadogSearchConfig {
@@ -28,13 +30,21 @@ impl_generate_config_from_default!(DatadogSearchConfig);
 /// a Datadog Search Syntax query.
 #[derive(Debug, Clone)]
 pub struct DatadogSearchRunner {
-    matcher: Box<dyn Matcher<Event>>,
+    matcher: Box<dyn Matcher<LogEvent>>,
 }
 
 impl Conditional for DatadogSearchRunner {
-    fn check(&self, e: Event) -> (bool, Event) {
-        let result = self.matcher.run(&e);
-        (result, e)
+    fn check_log(&self, log: LogEvent) -> (bool, LogEvent) {
+        let result = self.matcher.run(&log);
+        (result, log)
+    }
+
+    fn check_metric(&self, _: Metric) -> (bool, Metric) {
+        panic!("runner does not accept metrics");
+    }
+
+    fn check_trace(&self, _: TraceEvent) -> (bool, TraceEvent) {
+        panic!("runner does not accept traces");
     }
 }
 
@@ -42,18 +52,10 @@ impl Conditional for DatadogSearchRunner {
 impl ConditionConfig for DatadogSearchConfig {
     fn build(&self, _enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition> {
         let node = parse(&self.source)?;
-        let matcher = as_log(build_matcher(&node, &EventFilter::default()));
+        let matcher = build_matcher(&node, &EventFilter::default());
 
         Ok(Condition::DatadogSearch(DatadogSearchRunner { matcher }))
     }
-}
-
-/// Run the provided `Matcher` when we're dealing with `LogEvent`s. Otherwise, return false.
-fn as_log(matcher: Box<dyn Matcher<LogEvent>>) -> Box<dyn Matcher<Event>> {
-    Run::boxed(move |ev| match ev {
-        Event::Log(log) => matcher.run(log),
-        _ => false,
-    })
 }
 
 //------------------------------------------------------------------------------
