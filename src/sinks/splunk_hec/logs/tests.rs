@@ -213,7 +213,6 @@ async fn splunk_passthrough_token() {
         timestamp_nanos_key: None,
         timestamp_key: log_schema().timestamp_key().into(),
         endpoint_target: EndpointTarget::Event,
-        splunk_metadata: Default::default(),
     };
     let cx = SinkContext::new_test();
 

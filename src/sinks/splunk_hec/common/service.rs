@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     fmt,
     sync::Arc,
     task::{Context, Poll},
@@ -202,8 +201,17 @@ impl HttpRequestBuilder {
         body: Bytes,
         path: &str,
         passthrough_token: Option<Arc<str>>,
-        metadata: Option<HashMap<String, String>>,
+        source: Option<String>,
+        sourcetype: Option<String>,
+        index: Option<String>,
     ) -> Result<Request<Bytes>, crate::Error> {
+        let metadata = [
+            ("source", source),
+            ("sourcetype", sourcetype),
+            ("index", index),
+        ]
+        .into_iter()
+        .filter_map(|(key, value)| value.map(|value| (key, value)));
         let uri = build_uri(self.endpoint.as_str(), path, metadata).context(UriParseSnafu)?;
 
         let mut builder = Request::post(uri)
@@ -300,7 +308,9 @@ mod tests {
             events_byte_size,
             finalizers: EventFinalizers::default(),
             passthrough_token: None,
-            metadata: Default::default(),
+            index: None,
+            source: None,
+            sourcetype: None,
         }
     }
 

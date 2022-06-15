@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap, sync::Arc};
+use std::{borrow::Cow, sync::Arc};
 
 use bytes::Bytes;
 use futures_util::future::BoxFuture;
@@ -61,7 +61,9 @@ pub fn build_http_batch_service(
                         EndpointTarget::Raw => "/services/collector/raw",
                     },
                     req.passthrough_token,
-                    req.metadata,
+                    req.source,
+                    req.sourcetype,
+                    req.index,
                 )
             });
         future
@@ -73,8 +75,12 @@ pub async fn build_healthcheck(
     token: String,
     client: HttpClient,
 ) -> crate::Result<()> {
-    let uri = build_uri(endpoint.as_str(), "/services/collector/health/1.0", None)
-        .context(UriParseSnafu)?;
+    let uri = build_uri(
+        endpoint.as_str(),
+        "/services/collector/health/1.0",
+        None,
+    )
+    .context(UriParseSnafu)?;
 
     let request = Request::get(uri)
         .header("Authorization", format!("Splunk {}", token))
@@ -93,30 +99,28 @@ pub async fn build_healthcheck(
 pub fn build_uri(
     host: &str,
     path: &str,
-    query: Option<HashMap<String, String>>,
+    query: impl IntoIterator<Item = (&'static str, String)>,
 ) -> Result<Uri, http::uri::InvalidUri> {
     let mut uri = format!("{}{}", host.trim_end_matches('/'), path);
 
     let mut first = true;
 
-    if let Some(query) = query {
-        uri.push('?');
-        for (key, value) in query {
-            if !first {
-                uri.push('&');
-            } else {
-                first = false;
-            }
-            uri.push_str(&Cow::<str>::from(percent_encoding::utf8_percent_encode(
-                &key,
-                percent_encoding::NON_ALPHANUMERIC,
-            )));
-            uri.push('=');
-            uri.push_str(&Cow::<str>::from(percent_encoding::utf8_percent_encode(
-                &value,
-                percent_encoding::NON_ALPHANUMERIC,
-            )));
+    for (key, value) in query.into_iter() {
+        if first {
+            uri.push('?');
+            first = false;
+        } else {
+            uri.push('&');
         }
+        uri.push_str(&Cow::<str>::from(percent_encoding::utf8_percent_encode(
+            &key,
+            percent_encoding::NON_ALPHANUMERIC,
+        )));
+        uri.push('=');
+        uri.push_str(&Cow::<str>::from(percent_encoding::utf8_percent_encode(
+            &value,
+            percent_encoding::NON_ALPHANUMERIC,
+        )));
     }
 
     uri.parse::<Uri>()
@@ -252,7 +256,14 @@ mod tests {
             HttpRequestBuilder::new(String::from(endpoint), String::from(token), compression);
 
         let request = http_request_builder
-            .build_request(events.clone(), "/services/collector/event", None, None)
+            .build_request(
+                events.clone(),
+                "/services/collector/event",
+                None,
+                None,
+                None,
+                None,
+            )
             .unwrap();
 
         assert_eq!(
@@ -285,7 +296,14 @@ mod tests {
             HttpRequestBuilder::new(String::from(endpoint), String::from(token), compression);
 
         let request = http_request_builder
-            .build_request(events.clone(), "/services/collector/event", None, None)
+            .build_request(
+                events.clone(),
+                "/services/collector/event",
+                None,
+                None,
+                None,
+                None,
+            )
             .unwrap();
 
         assert_eq!(
@@ -321,7 +339,7 @@ mod tests {
             HttpRequestBuilder::new(String::from(endpoint), String::from(token), compression);
 
         let err = http_request_builder
-            .build_request(events, "/services/collector/event", None, None)
+            .build_request(events, "/services/collector/event", None, None, None, None)
             .unwrap_err();
         assert_eq!(err.to_string(), "URI parse error: invalid format")
     }
@@ -329,9 +347,9 @@ mod tests {
     #[test]
     fn test_build_uri() {
         let mut query = HashMap::new();
-        query.insert("host".to_string(), "zork flork".to_string());
-        query.insert("source".to_string(), "zam".to_string());
-        let uri = build_uri("http://sproink.com", "/thing/thang", Some(query)).unwrap();
+        query.insert("host", "zork flork".to_string());
+        query.insert("source", "zam".to_string());
+        let uri = build_uri("http://sproink.com", "/thing/thang", query).unwrap();
 
         assert_eq!(
             "http://sproink.com/thing/thang?host=zork%20flork&source=zam"

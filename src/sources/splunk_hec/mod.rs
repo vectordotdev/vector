@@ -1092,7 +1092,6 @@ mod tests {
             timestamp_nanos_key: None,
             timestamp_key: timestamp_key(),
             endpoint_target: Default::default(),
-            splunk_metadata: Default::default(),
         }
         .build(SinkContext::new_test())
         .await

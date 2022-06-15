@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt, num::NonZeroUsize, sync::Arc};
+use std::{fmt, num::NonZeroUsize, sync::Arc};
 
 use async_trait::async_trait;
 use futures_util::{stream::BoxStream, StreamExt};
@@ -37,7 +37,6 @@ pub struct HecLogsSink<S> {
     pub host: String,
     pub timestamp_nanos_key: Option<String>,
     pub timestamp_key: String,
-    pub splunk_metadata: HashMap<String, Template>,
     pub endpoint_target: EndpointTarget,
 }
 
@@ -76,7 +75,17 @@ where
         let sink = input
             .map(move |event| process_log(event, &data))
             .batched_partitioned(
-                EventPartitioner::new(self.splunk_metadata.clone()),
+                if self.endpoint_target == EndpointTarget::Raw {
+                    // We only need to partition by the metadata fields for the raw endpoint since those fields
+                    // are sent via query parameters in the request.
+                    EventPartitioner::new(
+                        self.sourcetype.clone(),
+                        self.source.clone(),
+                        self.index.clone(),
+                    )
+                } else {
+                    EventPartitioner::new(None, None, None)
+                },
                 self.batch_settings,
             )
             .request_builder(builder_limit, self.request_builder)
@@ -108,44 +117,41 @@ where
     }
 }
 
-#[derive(Clone, Debug, Eq)]
+#[derive(Clone, Debug, PartialEq, Hash, Eq)]
 pub(super) struct Partitioned {
     pub(super) token: Option<Arc<str>>,
-    pub(super) splunk_metadata: HashMap<String, String>,
+    pub(super) source: Option<String>,
+    pub(super) sourcetype: Option<String>,
+    pub(super) index: Option<String>,
 }
 
+/*
 impl Partitioned {
     #[allow(clippy::missing_const_for_fn)]
     pub(super) fn into_parts(self) -> (Option<Arc<str>>, HashMap<String, String>) {
         (self.token, self.splunk_metadata)
     }
 }
-
-impl PartialEq for Partitioned {
-    fn eq(&self, other: &Self) -> bool {
-        self.token == other.token && self.splunk_metadata == other.splunk_metadata
-    }
-}
-
-impl std::hash::Hash for Partitioned {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.token.hash(state);
-
-        for (key, value) in &self.splunk_metadata {
-            key.hash(state);
-            value.hash(state);
-        }
-    }
-}
+*/
 
 #[derive(Default)]
 struct EventPartitioner {
-    splunk_metadata: HashMap<String, Template>,
+    pub sourcetype: Option<Template>,
+    pub source: Option<Template>,
+    pub index: Option<Template>,
 }
 
 impl EventPartitioner {
-    const fn new(splunk_metadata: HashMap<String, Template>) -> Self {
-        Self { splunk_metadata }
+    const fn new(
+        sourcetype: Option<Template>,
+        source: Option<Template>,
+        index: Option<Template>,
+    ) -> Self {
+        Self {
+            sourcetype,
+            source,
+            index,
+        }
     }
 }
 
@@ -154,26 +160,41 @@ impl Partitioner for EventPartitioner {
     type Key = Option<Partitioned>;
 
     fn partition(&self, item: &Self::Item) -> Self::Key {
-        self.splunk_metadata
-            .iter()
-            .map(|(key, value)| {
-                value
-                    .render_string(&item.event)
-                    .map_err(|error| {
-                        emit!(TemplateRenderingError {
-                            error,
-                            field: Some(key.as_str()),
-                            drop_event: false,
-                        })
-                    })
-                    .ok()
-                    .map(|rendered| (key.clone(), rendered))
+        let emit_err = |error, field| {
+            emit!(TemplateRenderingError {
+                error,
+                field: Some(field),
+                drop_event: false,
             })
-            .collect::<Option<_>>()
-            .map(|splunk_metadata| Partitioned {
-                token: item.event.metadata().splunk_hec_token(),
-                splunk_metadata,
-            })
+        };
+
+        let source = self.source.as_ref().and_then(|source| {
+            source
+                .render_string(&item.event)
+                .map_err(|error| emit_err(error, "source"))
+                .ok()
+        });
+
+        let sourcetype = self.sourcetype.as_ref().and_then(|sourcetype| {
+            sourcetype
+                .render_string(&item.event)
+                .map_err(|error| emit_err(error, "sourcetype"))
+                .ok()
+        });
+
+        let index = self.index.as_ref().and_then(|index| {
+            index
+                .render_string(&item.event)
+                .map_err(|error| emit_err(error, "index"))
+                .ok()
+        });
+
+        Some(Partitioned {
+            token: item.event.metadata().splunk_hec_token(),
+            source,
+            sourcetype,
+            index,
+        })
     }
 }
 

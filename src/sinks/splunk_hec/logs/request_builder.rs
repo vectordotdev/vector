@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use bytes::Bytes;
 use vector_core::event::{EventFinalizers, Finalizable};
@@ -23,7 +23,9 @@ pub struct RequestMetadata {
     events_byte_size: usize,
     finalizers: EventFinalizers,
     partition: Option<Arc<str>>,
-    metadata: Option<HashMap<String, String>>,
+    source: Option<String>,
+    sourcetype: Option<String>,
+    index: Option<String>,
 }
 
 impl RequestBuilder<(Option<Partitioned>, Vec<HecProcessedEvent>)> for HecLogsRequestBuilder {
@@ -46,14 +48,7 @@ impl RequestBuilder<(Option<Partitioned>, Vec<HecProcessedEvent>)> for HecLogsRe
         &self,
         input: (Option<Partitioned>, Vec<HecProcessedEvent>),
     ) -> (Self::Metadata, Self::Events) {
-        let (partition, mut events) = input;
-        let (partition, metadata) = match partition {
-            None => (None, None),
-            Some(partition) => {
-                let (p, m) = partition.into_parts();
-                (p, Some(m))
-            }
-        };
+        let (mut partition, mut events) = input;
 
         let finalizers = events.take_finalizers();
         let events_byte_size: usize = events.iter().map(|e| e.metadata.event_byte_size).sum();
@@ -63,8 +58,10 @@ impl RequestBuilder<(Option<Partitioned>, Vec<HecProcessedEvent>)> for HecLogsRe
                 events_count: events.len(),
                 events_byte_size,
                 finalizers,
-                partition,
-                metadata,
+                partition: partition.as_ref().and_then(|p| p.token.clone()),
+                source: partition.as_mut().and_then(|p| p.source.take()),
+                sourcetype: partition.as_mut().and_then(|p| p.sourcetype.take()),
+                index: partition.as_mut().and_then(|p| p.index.take()),
             },
             events,
         )
@@ -81,7 +78,9 @@ impl RequestBuilder<(Option<Partitioned>, Vec<HecProcessedEvent>)> for HecLogsRe
             events_count: metadata.events_count,
             events_byte_size: metadata.events_byte_size,
             passthrough_token: metadata.partition,
-            metadata: metadata.metadata,
+            source: metadata.source,
+            sourcetype: metadata.sourcetype,
+            index: metadata.index,
         }
     }
 }
