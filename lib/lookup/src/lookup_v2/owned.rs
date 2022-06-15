@@ -154,7 +154,7 @@ pub enum OwnedSegment {
 
 impl OwnedSegment {
     pub fn field(value: &str) -> OwnedSegment {
-        OwnedSegment::Field(value.to_string().into())
+        OwnedSegment::Field(value.to_string())
     }
     pub fn index(value: isize) -> OwnedSegment {
         OwnedSegment::Index(value)

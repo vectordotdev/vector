@@ -1,7 +1,7 @@
 use crate::Value;
+use lookup::lookup_v2::BorrowedSegment;
 use std::borrow::{Borrow, Cow};
 use std::collections::BTreeMap;
-use lookup::lookup_v2::BorrowedSegment;
 
 mod get;
 mod get_mut;
@@ -142,7 +142,9 @@ impl ValueCollection for Vec<Value> {
 }
 
 /// Returns the last coalesce key
-pub(crate) fn skip_remaining_coalesce_segments<'a>(path_iter: &mut impl Iterator<Item=BorrowedSegment<'a>>) -> Cow<'a, str> {
+pub fn skip_remaining_coalesce_segments<'a>(
+    path_iter: &mut impl Iterator<Item = BorrowedSegment<'a>>,
+) -> Cow<'a, str> {
     loop {
         match path_iter.next() {
             Some(BorrowedSegment::CoalesceField(field)) => { /* skip */ }
@@ -156,10 +158,10 @@ pub(crate) fn skip_remaining_coalesce_segments<'a>(path_iter: &mut impl Iterator
 
 /// Returns the first matching coalesce key.
 /// If none matches, returns Err with the last key.
-pub(crate) fn get_matching_coalesce_key<'a>(
+pub fn get_matching_coalesce_key<'a>(
     initial_key: Cow<'a, str>,
     map: &BTreeMap<String, Value>,
-    path_iter: &mut impl Iterator<Item=BorrowedSegment<'a>>,
+    path_iter: &mut impl Iterator<Item = BorrowedSegment<'a>>,
 ) -> Result<Cow<'a, str>, Cow<'a, str>> {
     let mut key = initial_key;
     let mut coalesce_finished = false;

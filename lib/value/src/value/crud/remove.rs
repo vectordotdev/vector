@@ -37,7 +37,6 @@ pub fn remove<'a, T: ValueCollection>(
     .map(|prev| (prev, value.is_empty_collection()))
 }
 
-
 #[cfg(test)]
 mod test {
     use crate::Value;
@@ -51,7 +50,10 @@ mod test {
         }));
         assert_eq!(value.remove("(foo|bar)", false), None);
         assert_eq!(value.remove("(foo|field2)", false), Some(Value::from(321)));
-        assert_eq!(value.remove(".(field|field2)", false), Some(Value::from(123)));
+        assert_eq!(
+            value.remove(".(field|field2)", false),
+            Some(Value::from(123))
+        );
         assert_eq!(value.remove("(field|field2)", false), None);
     }
 
@@ -64,7 +66,6 @@ mod test {
         assert_eq!(value.remove("(x|y).z", false), None);
         assert_eq!(value.remove("(x|y).z", false), None);
     }
-
 
     #[test]
     fn array_remove_from_middle() {

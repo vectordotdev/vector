@@ -266,10 +266,7 @@ impl<'a> Iterator for JitLookup<'a> {
                             }
                             ')' => {
                                 if self.coalesce_count == 0 {
-                                    (
-                                        Some(Some(BorrowedSegment::Invalid)),
-                                        JitState::End,
-                                    )
+                                    (Some(Some(BorrowedSegment::Invalid)), JitState::End)
                                 } else {
                                     self.coalesce_count = 0;
                                     (
@@ -295,10 +292,7 @@ impl<'a> Iterator for JitLookup<'a> {
                             }
                             ')' => {
                                 if self.coalesce_count == 0 {
-                                    (
-                                        Some(Some(BorrowedSegment::Invalid)),
-                                        JitState::End,
-                                    )
+                                    (Some(Some(BorrowedSegment::Invalid)), JitState::End)
                                 } else {
                                     self.coalesce_count = 0;
                                     (
@@ -308,7 +302,7 @@ impl<'a> Iterator for JitLookup<'a> {
                                         JitState::Continue,
                                     )
                                 }
-                            },
+                            }
                             _ => (Some(Some(BorrowedSegment::Invalid)), JitState::End),
                         },
                         JitState::CoalesceEscapedFieldEnd => match c {
@@ -324,10 +318,7 @@ impl<'a> Iterator for JitLookup<'a> {
                             }
                             ')' => {
                                 if self.coalesce_count == 0 {
-                                    (
-                                        Some(Some(BorrowedSegment::Invalid)),
-                                        JitState::End,
-                                    )
+                                    (Some(Some(BorrowedSegment::Invalid)), JitState::End)
                                 } else {
                                     self.coalesce_count = 0;
                                     (
@@ -337,8 +328,7 @@ impl<'a> Iterator for JitLookup<'a> {
                                         JitState::Continue,
                                     )
                                 }
-
-                            },
+                            }
                             _ => (Some(Some(BorrowedSegment::Invalid)), JitState::End),
                         },
                         JitState::CoalesceQuote { start } => match c {
@@ -529,12 +519,7 @@ mod test {
                     OwnedSegment::coalesce_end("a")
                 ),
             ),
-            (
-                "(a)",
-                owned_path!(
-                    OwnedSegment::Invalid
-                ),
-            ),
+            ("(a)", owned_path!(OwnedSegment::Invalid)),
         ];
 
         for (path, expected) in test_cases {
