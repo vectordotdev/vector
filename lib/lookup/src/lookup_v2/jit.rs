@@ -5,7 +5,7 @@
 //! This contains a hand-written state machine to maximize performance of the parser.
 //! This is important since a lot of parsing happens at runtime. Eventually Vector
 //! should pre-compile all paths. Once that happens it might make sense to re-write in something
-//! more readable like `nom` and simplify the coalescing segments.
+//! more readable.
 
 use std::borrow::Cow;
 use std::str::CharIndices;
@@ -66,7 +66,6 @@ enum JitState {
     EscapedQuote,
     CoalesceStart,
     CoalesceField { start: usize },
-    // using u32 to not increase the size of `JitState`
     CoalesceFieldEnd { start: usize, end: usize },
     CoalesceEscapedFieldEnd,
     CoalesceQuote { start: usize },
@@ -390,8 +389,6 @@ mod test {
 
     #[test]
     fn parsing() {
-        // test .[0]
-
         let test_cases: Vec<(_, OwnedPath)> = vec![
             ("", owned_path!(OwnedSegment::Invalid)),
             (".", owned_path!()),
