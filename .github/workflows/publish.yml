@@ -14,6 +14,7 @@ env:
   AUTOINSTALL: true
   VERBOSE: true
   CI: true
+  DISABLE_MOLD: true
   DEBIAN_FRONTEND: noninteractive
   CONTAINER_TOOL: docker
   CARGO_PROFILE_RELEASE_LTO: fat
