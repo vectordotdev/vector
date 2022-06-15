@@ -165,7 +165,7 @@ impl vrl_lib::Target for VrlTarget {
     fn target_insert(&mut self, path: &LookupBuf, value: ::value::Value) -> Result<(), String> {
         match self {
             VrlTarget::LogEvent(ref mut log, _) | VrlTarget::Trace(ref mut log, _) => {
-                log.insert_by_path(path, value);
+                log.insert(path, value);
                 Ok(())
             }
             VrlTarget::Metric {
