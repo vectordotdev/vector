@@ -7,7 +7,7 @@ on:
       - v1.*
 
 jobs:
-  trigger-release-publish:
+  Release:
     uses: ./.github/workflows/publish.yml
     with:
       git_ref: ${{ github.ref }}

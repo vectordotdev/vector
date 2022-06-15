@@ -6,8 +6,8 @@ on:
     - cron: "0 4 * * *"
 
 jobs:
-  trigger-nightly-publish:
+  Nightly:
     uses: ./.github/workflows/publish.yml
     with:
-      git_ref: ${{ github.ref }}
+      git_ref: master
       mode: Nightly
