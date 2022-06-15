@@ -157,9 +157,8 @@ impl TransformConfig for RemapConfig {
                     .map(schema::Definition::from)
                     .map(|mut def| {
                         for (id, path) in meaning {
-                            def.register_known_meaning(path, &id)
+                            def = def.with_known_meaning(path, &id);
                         }
-
                         def
                     })
             })

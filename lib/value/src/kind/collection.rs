@@ -32,7 +32,7 @@ pub struct Collection<T: Ord> {
     unknown: Option<Unknown>,
 }
 
-impl<T: Ord> Collection<T> {
+impl<T: Ord + std::fmt::Debug> Collection<T> {
     /// Create a new collection from its parts.
     #[must_use]
     pub(super) fn from_parts(known: BTreeMap<T, Kind>, unknown: impl Into<Option<Kind>>) -> Self {

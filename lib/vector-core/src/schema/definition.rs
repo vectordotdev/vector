@@ -163,7 +163,7 @@ impl Definition {
     /// # Panics
     ///
     /// This method panics if the provided path points to an unknown location in the collection.
-    pub fn register_known_meaning(&mut self, path: impl Into<LookupBuf>, meaning: &str) {
+    pub fn with_known_meaning(mut self, path: impl Into<LookupBuf>, meaning: &str) -> Self {
         let path = path.into();
 
         // Ensure the path exists in the collection.
@@ -176,7 +176,9 @@ impl Definition {
 
         self.meaning
             .insert(meaning.to_owned(), MeaningPointer::Valid(path));
+        self
     }
+
 
     /// Set the kind for all unknown fields.
     #[must_use]
@@ -187,18 +189,7 @@ impl Definition {
 
     /// Merge `other` definition into `self`.
     ///
-    /// The merge strategy for optional fields is as follows:
-    ///
-    /// If the field is marked as optional in both definitions, _or_ if it's optional in one,
-    /// and unspecified in the other, then the field remains optional.
-    ///
-    /// If it's marked as "required" in either of the two definitions, then it becomes
-    /// a required field in the merged definition.
-    ///
-    /// Note that it is allowed to have required field nested under optional fields. For
-    /// example, `.foo` might be set as optional, but `.foo.bar` as required. In this case, it
-    /// means that the object at `.foo` is allowed to be missing, but if it's present, then it's
-    /// required to have a `bar` field.
+    /// This just takes the union of both definitions.
     #[must_use]
     pub fn merge(mut self, other: Self) -> Self {
         for (other_id, other_meaning) in other.meaning {
