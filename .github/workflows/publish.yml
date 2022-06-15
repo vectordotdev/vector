@@ -31,8 +31,6 @@ jobs:
     steps:
       - name: Checkout Vector
         uses: actions/checkout@v3
-        with:
-          ref: ${{ inputs.git_ref }}
       - name: Generate publish metadata
         id: generate-publish-metadata
         run: make ci-generate-publish-metadata
