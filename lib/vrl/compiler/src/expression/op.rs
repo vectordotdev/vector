@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, ptr::addr_of_mut};
 
 use diagnostic::{DiagnosticMessage, Label, Note, Span, Urls};
 use value::Value;
@@ -8,7 +8,7 @@ use crate::{
     parser::{ast, Node},
     state::{ExternalEnv, LocalEnv},
     value::VrlValueArithmetic,
-    Context, Expression, TypeDef,
+    BatchContext, Context, Expression, TypeDef,
 };
 
 #[derive(Clone, PartialEq)]
@@ -16,6 +16,9 @@ pub struct Op {
     pub(crate) lhs: Box<Expr>,
     pub(crate) rhs: Box<Expr>,
     pub(crate) opcode: ast::Opcode,
+    selection_vector_lhs_ok: Vec<usize>,
+    selection_vector_ok: Vec<usize>,
+    resolved_values_rhs: Vec<Resolved>,
 }
 
 impl Op {
@@ -73,6 +76,9 @@ impl Op {
             lhs: Box::new(lhs),
             rhs: Box::new(rhs),
             opcode,
+            selection_vector_lhs_ok: vec![],
+            selection_vector_ok: vec![],
+            resolved_values_rhs: vec![],
         })
     }
 }
@@ -98,7 +104,7 @@ impl Expression for Op {
                 };
             }
             _ => (),
-        };
+        }
 
         let lhs = self.lhs.resolve(ctx)?;
         let rhs = self.rhs.resolve(ctx)?;
@@ -119,6 +125,226 @@ impl Expression for Op {
             And | Or | Err => unreachable!(),
         }
         .map_err(Into::into)
+    }
+
+    fn resolve_batch(&mut self, ctx: &mut BatchContext, selection_vector: &[usize]) {
+        use ast::Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Merge, Mul, Ne, Or, Rem, Sub};
+        use value::Value::{Boolean, Null};
+
+        match self.opcode {
+            Err => {
+                return for index in selection_vector {
+                    let index = *index;
+                    let target = &mut *ctx.targets[index];
+                    let state = &mut ctx.states[index];
+                    let resolved = &mut ctx.resolved_values[index];
+                    let mut ctx = Context::new(target, state, &ctx.timezone);
+                    let ctx = &mut ctx;
+                    *resolved = self.lhs.resolve(ctx).or_else(|_| self.rhs.resolve(ctx));
+                }
+            }
+            Or => {
+                return for index in selection_vector {
+                    let index = *index;
+                    let target = &mut *ctx.targets[index];
+                    let state = &mut ctx.states[index];
+                    let resolved = &mut ctx.resolved_values[index];
+                    let mut ctx = Context::new(target, state, &ctx.timezone);
+                    let ctx = &mut ctx;
+                    *resolved = (|| {
+                        self.lhs
+                            .resolve(ctx)?
+                            .try_or(|| self.rhs.resolve(ctx))
+                            .map_err(Into::into)
+                    })();
+                }
+            }
+            And => {
+                return for index in selection_vector {
+                    let index = *index;
+                    let target = &mut *ctx.targets[index];
+                    let state = &mut ctx.states[index];
+                    let resolved = &mut ctx.resolved_values[index];
+                    let mut ctx = Context::new(target, state, &ctx.timezone);
+                    let ctx = &mut ctx;
+                    *resolved = (|| match self.lhs.resolve(ctx)? {
+                        Null | Boolean(false) => Ok(false.into()),
+                        v => v.try_and(self.rhs.resolve(ctx)?).map_err(Into::into),
+                    })();
+                }
+            }
+            _ => (),
+        }
+
+        self.lhs.resolve_batch(ctx, selection_vector);
+
+        self.selection_vector_lhs_ok.truncate(0);
+        for index in selection_vector {
+            let index = *index;
+            if ctx.resolved_values[index].is_ok() {
+                self.selection_vector_lhs_ok.push(index);
+            }
+        }
+
+        self.resolved_values_rhs.truncate(0);
+        self.resolved_values_rhs
+            .resize(ctx.resolved_values.len(), Ok(Value::Null));
+
+        std::mem::swap(ctx.resolved_values, &mut self.resolved_values_rhs);
+        self.rhs.resolve_batch(ctx, &self.selection_vector_lhs_ok);
+        std::mem::swap(ctx.resolved_values, &mut self.resolved_values_rhs);
+
+        self.selection_vector_ok.truncate(0);
+        for index in &self.selection_vector_lhs_ok {
+            let index = *index;
+            if self.resolved_values_rhs[index].is_ok() {
+                self.selection_vector_ok.push(index);
+            } else {
+                std::mem::swap(
+                    &mut ctx.resolved_values[index],
+                    &mut self.resolved_values_rhs[index],
+                );
+                self.resolved_values_rhs[index] = Ok(Null);
+            }
+        }
+
+        match self.opcode {
+            Mul => {
+                for index in &self.selection_vector_ok {
+                    let index = *index;
+                    let resolved = addr_of_mut!(ctx.resolved_values[index]);
+                    let lhs = unsafe { resolved.read() }.expect("value is not an error");
+                    let rhs = unsafe { addr_of_mut!(self.resolved_values_rhs[index]).read() }
+                        .expect("value is not an error");
+                    let result = lhs.try_mul(rhs).map_err(Into::into);
+                    unsafe { resolved.write(result) };
+                }
+            }
+            Div => {
+                for index in &self.selection_vector_ok {
+                    let index = *index;
+                    let resolved = addr_of_mut!(ctx.resolved_values[index]);
+                    let lhs = unsafe { resolved.read() }.expect("value is not an error");
+                    let rhs = unsafe { addr_of_mut!(self.resolved_values_rhs[index]).read() }
+                        .expect("value is not an error");
+                    let result = lhs.try_div(rhs).map_err(Into::into);
+                    unsafe { resolved.write(result) };
+                }
+            }
+            Add => {
+                for index in &self.selection_vector_ok {
+                    let index = *index;
+                    let resolved = addr_of_mut!(ctx.resolved_values[index]);
+                    let lhs = unsafe { resolved.read() }.expect("value is not an error");
+                    let rhs = unsafe { addr_of_mut!(self.resolved_values_rhs[index]).read() }
+                        .expect("value is not an error");
+                    let result = lhs.try_add(rhs).map_err(Into::into);
+                    unsafe { resolved.write(result) };
+                }
+            }
+            Sub => {
+                for index in &self.selection_vector_ok {
+                    let index = *index;
+                    let resolved = addr_of_mut!(ctx.resolved_values[index]);
+                    let lhs = unsafe { resolved.read() }.expect("value is not an error");
+                    let rhs = unsafe { addr_of_mut!(self.resolved_values_rhs[index]).read() }
+                        .expect("value is not an error");
+                    let result = lhs.try_sub(rhs).map_err(Into::into);
+                    unsafe { resolved.write(result) };
+                }
+            }
+            Rem => {
+                for index in &self.selection_vector_ok {
+                    let index = *index;
+                    let resolved = addr_of_mut!(ctx.resolved_values[index]);
+                    let lhs = unsafe { resolved.read() }.expect("value is not an error");
+                    let rhs = unsafe { addr_of_mut!(self.resolved_values_rhs[index]).read() }
+                        .expect("value is not an error");
+                    let result = lhs.try_rem(rhs).map_err(Into::into);
+                    unsafe { resolved.write(result) };
+                }
+            }
+            Eq => {
+                for index in &self.selection_vector_ok {
+                    let index = *index;
+                    let resolved = addr_of_mut!(ctx.resolved_values[index]);
+                    let lhs = unsafe { resolved.read() }.expect("value is not an error");
+                    let rhs = unsafe { addr_of_mut!(self.resolved_values_rhs[index]).read() }
+                        .expect("value is not an error");
+                    let result = Ok(lhs.eq_lossy(&rhs).into());
+                    unsafe { resolved.write(result) };
+                }
+            }
+            Ne => {
+                for index in &self.selection_vector_ok {
+                    let index = *index;
+                    let resolved = addr_of_mut!(ctx.resolved_values[index]);
+                    let lhs = unsafe { resolved.read() }.expect("value is not an error");
+                    let rhs = unsafe { addr_of_mut!(self.resolved_values_rhs[index]).read() }
+                        .expect("value is not an error");
+                    let result = Ok((!lhs.eq_lossy(&rhs)).into());
+                    unsafe { resolved.write(result) };
+                }
+            }
+            Gt => {
+                for index in &self.selection_vector_ok {
+                    let index = *index;
+                    let resolved = addr_of_mut!(ctx.resolved_values[index]);
+                    let lhs = unsafe { resolved.read() }.expect("value is not an error");
+                    let rhs = unsafe { addr_of_mut!(self.resolved_values_rhs[index]).read() }
+                        .expect("value is not an error");
+                    let result = lhs.try_gt(rhs).map_err(Into::into);
+                    unsafe { resolved.write(result) };
+                }
+            }
+            Ge => {
+                for index in &self.selection_vector_ok {
+                    let index = *index;
+                    let resolved = addr_of_mut!(ctx.resolved_values[index]);
+                    let lhs = unsafe { resolved.read() }.expect("value is not an error");
+                    let rhs = unsafe { addr_of_mut!(self.resolved_values_rhs[index]).read() }
+                        .expect("value is not an error");
+                    let result = lhs.try_ge(rhs).map_err(Into::into);
+                    unsafe { resolved.write(result) };
+                }
+            }
+            Lt => {
+                for index in &self.selection_vector_ok {
+                    let index = *index;
+                    let resolved = addr_of_mut!(ctx.resolved_values[index]);
+                    let lhs = unsafe { resolved.read() }.expect("value is not an error");
+                    let rhs = unsafe { addr_of_mut!(self.resolved_values_rhs[index]).read() }
+                        .expect("value is not an error");
+                    let result = lhs.try_lt(rhs).map_err(Into::into);
+                    unsafe { resolved.write(result) };
+                }
+            }
+            Le => {
+                for index in &self.selection_vector_ok {
+                    let index = *index;
+                    let resolved = addr_of_mut!(ctx.resolved_values[index]);
+                    let lhs = unsafe { resolved.read() }.expect("value is not an error");
+                    let rhs = unsafe { addr_of_mut!(self.resolved_values_rhs[index]).read() }
+                        .expect("value is not an error");
+                    let result = lhs.try_le(rhs).map_err(Into::into);
+                    unsafe { resolved.write(result) };
+                }
+            }
+            Merge => {
+                for index in &self.selection_vector_ok {
+                    let index = *index;
+                    let resolved = addr_of_mut!(ctx.resolved_values[index]);
+                    let lhs = unsafe { resolved.read() }.expect("value is not an error");
+                    let rhs = unsafe { addr_of_mut!(self.resolved_values_rhs[index]).read() }
+                        .expect("value is not an error");
+                    let result = lhs.try_merge(rhs).map_err(Into::into);
+                    unsafe { resolved.write(result) };
+                }
+            }
+            And | Or | Err => unreachable!(),
+        }
+
+        unsafe { self.resolved_values_rhs.set_len(0) };
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
@@ -418,6 +644,9 @@ mod tests {
             lhs: Box::new(lhs.into()),
             rhs: Box::new(rhs.into()),
             opcode,
+            selection_vector_lhs_ok: vec![],
+            selection_vector_ok: vec![],
+            resolved_values_rhs: vec![],
         }
     }
 
@@ -591,6 +820,9 @@ mod tests {
                 lhs: Box::new(Literal::from(true).into()),
                 rhs: Box::new(Literal::from(NotNan::new(1.0).unwrap()).into()),
                 opcode: Div,
+                selection_vector_lhs_ok: vec![],
+                selection_vector_ok: vec![],
+                resolved_values_rhs: vec![],
             },
             want: TypeDef::float().fallible(),
         }
@@ -606,6 +838,9 @@ mod tests {
                     lhs: Box::new(Literal::from(1).into()),
                     rhs: Box::new(Variable::new(Span::default(), Ident::new("foo"), local).unwrap().into()),
                     opcode: Div,
+                    selection_vector_lhs_ok: vec![],
+                    selection_vector_ok: vec![],
+                    resolved_values_rhs: vec![],
                 }
             },
             want: TypeDef::float().fallible(),
@@ -752,9 +987,15 @@ mod tests {
                     lhs: Box::new(Literal::from("foo").into()),
                     rhs: Box::new(Literal::from(1).into()),
                     opcode: Div,
+                    selection_vector_lhs_ok: vec![],
+                    selection_vector_ok: vec![],
+                    resolved_values_rhs: vec![],
                 }.into()),
                 rhs: Box::new(Literal::from(true).into()),
                 opcode: Err,
+                selection_vector_lhs_ok: vec![],
+                selection_vector_ok: vec![],
+                resolved_values_rhs: vec![],
             },
             want: TypeDef::float().add_boolean(),
         }
@@ -765,13 +1006,22 @@ mod tests {
                     lhs: Box::new(Literal::from("foo").into()),
                     rhs: Box::new(Literal::from(NotNan::new(0.0).unwrap()).into()),
                     opcode: Div,
+                    selection_vector_lhs_ok: vec![],
+                    selection_vector_ok: vec![],
+                    resolved_values_rhs: vec![],
                 }.into()),
                 rhs: Box::new(Op {
                     lhs: Box::new(Literal::from(true).into()),
                     rhs: Box::new(Literal::from(NotNan::new(0.0).unwrap()).into()),
                     opcode: Div,
+                    selection_vector_lhs_ok: vec![],
+                    selection_vector_ok: vec![],
+                    resolved_values_rhs: vec![],
                 }.into()),
                 opcode: Err,
+                selection_vector_lhs_ok: vec![],
+                selection_vector_ok: vec![],
+                resolved_values_rhs: vec![],
             },
             want: TypeDef::float().fallible(),
         }
@@ -782,17 +1032,29 @@ mod tests {
                     lhs: Box::new(Literal::from("foo").into()),
                     rhs: Box::new(Literal::from(1).into()),
                     opcode: Div,
+                    selection_vector_lhs_ok: vec![],
+                    selection_vector_ok: vec![],
+                    resolved_values_rhs: vec![],
                 }.into()),
                 rhs: Box::new(Op {
                     lhs: Box::new(Op {
                         lhs: Box::new(Literal::from(true).into()),
                         rhs: Box::new(Literal::from(1).into()),
                         opcode: Div,
+                        selection_vector_lhs_ok: vec![],
+                        selection_vector_ok: vec![],
+                        resolved_values_rhs: vec![],
                     }.into()),
                     rhs: Box::new(Literal::from("foo").into()),
                     opcode: Err,
+                    selection_vector_lhs_ok: vec![],
+                    selection_vector_ok: vec![],
+                    resolved_values_rhs: vec![],
                 }.into()),
                 opcode: Err,
+                selection_vector_lhs_ok: vec![],
+                selection_vector_ok: vec![],
+                resolved_values_rhs: vec![],
             },
             want: TypeDef::float().add_bytes(),
         }
@@ -800,13 +1062,17 @@ mod tests {
         or_nullable {
             expr: |_| Op {
                 lhs: Box::new(
-                    IfStatement {
-                        predicate: Predicate::new_unchecked(vec![Literal::from(true).into()]),
-                        consequent: Block::new(vec![Literal::from("string").into()], LocalEnv::default()),
-                        alternative: None,
-                    }.into()),
+                    IfStatement::new(
+                        Predicate::new_unchecked(vec![Literal::from(true).into()]),
+                        Block::new(vec![Literal::from("string").into()], LocalEnv::default()),
+                        None
+                    ).into()
+                ),
                 rhs: Box::new(Literal::from("another string").into()),
                 opcode: Or,
+                selection_vector_lhs_ok: vec![],
+                selection_vector_ok: vec![],
+                resolved_values_rhs: vec![],
             },
             want: TypeDef::bytes(),
         }
@@ -814,13 +1080,17 @@ mod tests {
         or_not_nullable {
             expr: |_| Op {
                 lhs: Box::new(
-                    IfStatement {
-                        predicate: Predicate::new_unchecked(vec![Literal::from(true).into()]),
-                        consequent: Block::new(vec![Literal::from("string").into()], LocalEnv::default()),
-                        alternative:  Some(Block::new(vec![Literal::from(42).into()], LocalEnv::default()))
-                }.into()),
+                    IfStatement::new(
+                        Predicate::new_unchecked(vec![Literal::from(true).into()]),
+                        Block::new(vec![Literal::from("string").into()], LocalEnv::default()),
+                        Some(Block::new(vec![Literal::from(42).into()], LocalEnv::default()))
+                    ).into()
+                ),
                 rhs: Box::new(Literal::from("another string").into()),
                 opcode: Or,
+                selection_vector_lhs_ok: vec![],
+                selection_vector_ok: vec![],
+                resolved_values_rhs: vec![],
             },
             want: TypeDef::bytes().add_integer(),
         }

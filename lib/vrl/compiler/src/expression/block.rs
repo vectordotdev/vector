@@ -3,7 +3,7 @@ use std::fmt;
 use crate::{
     expression::{Expr, Resolved},
     state::{ExternalEnv, LocalEnv},
-    Context, Expression, TypeDef,
+    BatchContext, Context, Expression, TypeDef,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -16,12 +16,19 @@ pub struct Block {
     /// environment, but once the block ends, the environment is reset to the
     /// state of the parent expression of the block.
     pub(crate) local_env: LocalEnv,
+    selection_vector_this: Vec<usize>,
+    selection_vector_other: Vec<usize>,
 }
 
 impl Block {
     #[must_use]
     pub fn new(inner: Vec<Expr>, local_env: LocalEnv) -> Self {
-        Self { inner, local_env }
+        Self {
+            inner,
+            local_env,
+            selection_vector_this: vec![],
+            selection_vector_other: vec![],
+        }
     }
 
     #[must_use]
@@ -35,7 +42,7 @@ impl Expression for Block {
         // NOTE:
         //
         // Technically, this invalidates the scoping invariant of variables
-        // defined in child scopes to not be accessible in parrent scopes.
+        // defined in child scopes to not be accessible in parent scopes.
         //
         // However, because we guard against this (using the "undefined
         // variable" check) at compile-time, we can omit any (costly) run-time
@@ -50,6 +57,32 @@ impl Expression for Block {
             .try_for_each(|expr| expr.resolve(ctx).map(|_| ()))?;
 
         last.resolve(ctx)
+    }
+
+    fn resolve_batch(&mut self, ctx: &mut BatchContext, selection_vector: &[usize]) {
+        if self.inner.len() == 1 {
+            self.inner[0].resolve_batch(ctx, selection_vector);
+        } else {
+            self.selection_vector_this.resize(selection_vector.len(), 0);
+            self.selection_vector_this.copy_from_slice(selection_vector);
+
+            for block in &mut self.inner {
+                block.resolve_batch(ctx, &self.selection_vector_this);
+                self.selection_vector_other.truncate(0);
+
+                for index in selection_vector {
+                    let index = *index;
+                    if ctx.resolved_values[index].is_ok() {
+                        self.selection_vector_other.push(index);
+                    }
+                }
+
+                std::mem::swap(
+                    &mut self.selection_vector_this,
+                    &mut self.selection_vector_other,
+                );
+            }
+        }
     }
 
     /// If an expression has a "never" type, it is considered a "terminating" expression.

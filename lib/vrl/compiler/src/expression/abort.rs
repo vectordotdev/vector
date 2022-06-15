@@ -2,19 +2,21 @@ use std::fmt;
 
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 use parser::ast::Node;
+use value::Value;
 
 use super::Expr;
 use crate::{
     expression::{ExpressionError, Resolved},
     state::{ExternalEnv, LocalEnv},
     value::{Kind, VrlValueConvert},
-    Context, Expression, Span, TypeDef,
+    BatchContext, Context, Expression, Span, TypeDef,
 };
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Abort {
     span: Span,
     message: Option<Box<Expr>>,
+    messages: Vec<Option<String>>,
 }
 
 impl Abort {
@@ -48,7 +50,11 @@ impl Abort {
             })
             .transpose()?;
 
-        Ok(Self { span, message })
+        Ok(Self {
+            span,
+            message,
+            messages: vec![],
+        })
     }
 }
 
@@ -66,6 +72,39 @@ impl Expression for Abort {
             span: self.span,
             message,
         })
+    }
+
+    fn resolve_batch(&mut self, ctx: &mut BatchContext, selection_vector: &[usize]) {
+        self.messages.resize(selection_vector.len(), None);
+
+        if let Some(expr) = &mut self.message {
+            expr.resolve_batch(ctx, selection_vector);
+
+            for index in selection_vector {
+                let index = *index;
+                let resolved = &mut ctx.resolved_values[index];
+                let resolved = {
+                    let mut moved = Ok(Value::Null);
+                    std::mem::swap(resolved, &mut moved);
+                    moved
+                };
+
+                self.messages[index] = (|| -> Result<_, ExpressionError> {
+                    Ok(Some(resolved?.try_bytes_utf8_lossy()?.to_string()))
+                })()
+                .unwrap_or(None);
+            }
+        }
+
+        for index in selection_vector {
+            let index = *index;
+            let message = self.messages[index].take();
+
+            ctx.resolved_values[index] = Err(ExpressionError::Abort {
+                span: self.span,
+                message,
+            });
+        }
     }
 
     fn type_def(&self, _: (&LocalEnv, &ExternalEnv)) -> TypeDef {

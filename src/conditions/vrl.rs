@@ -1,13 +1,14 @@
 use serde::{Deserialize, Serialize};
 use value::Value;
 use vector_common::TimeZone;
-use vrl::{diagnostic::Formatter, Program, Runtime, VrlRuntime};
+use vrl::{diagnostic::Formatter, Program, Runtime, Terminate, VrlRuntime};
 
-use crate::event::TargetEvents;
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription, Conditional},
     emit,
-    event::{Event, VrlTarget},
+    event::{
+        Event, EventArray, EventContainer, LogEvent, Metric, TargetEvents, TraceEvent, VrlTarget,
+    },
     internal_events::VrlConditionExecutionError,
 };
 
@@ -60,7 +61,12 @@ impl ConditionConfig for VrlConfig {
         }
 
         match self.runtime {
-            VrlRuntime::Ast => Ok(Condition::Vrl(Vrl {
+            // TODO: Support condition transform that can evaluate a batch of VRL conditions.
+            // This is not trivially possible at the moment since the output events are not
+            // guaranteed to be in the same order as the input. However, `if` expressions are the
+            // only ones which may reorder the event output. We can add a flag to the compilation of
+            // a VRL program where these are disallowed.
+            VrlRuntime::Ast | VrlRuntime::Vectorized => Ok(Condition::Vrl(Vrl {
                 program,
                 source: self.source.clone(),
             })),
@@ -82,12 +88,37 @@ impl Vrl {
         // TODO: use timezone from remap config
         let timezone = TimeZone::default();
 
-        let result = Runtime::default().resolve(&mut target, &self.program, &timezone);
+        let result = Runtime::default()
+            .resolve(&mut target, &self.program, &timezone)
+            .map_err(Terminate::from);
         let original_event = match target.into_events() {
             TargetEvents::One(event) => event,
             _ => panic!("Event was modified in a condition. This is an internal compiler error."),
         };
         (original_event, result)
+    }
+
+    fn run_batch(&self, events: EventArray) -> Vec<(Event, vrl::RuntimeResult)> {
+        // TODO: use timezone from remap config
+        let timezone = TimeZone::default();
+
+        let program_info = self.program.info();
+        events
+            .into_events()
+            .map(|event| {
+                let mut target = VrlTarget::new(event, program_info);
+                let result = Runtime::default()
+                    .resolve(&mut target, &self.program, &timezone)
+                    .map_err(Terminate::from);
+                let original_event = match target.into_events() {
+                    TargetEvents::One(event) => event,
+                    _ => panic!(
+                        "Event was modified in a condition. This is an internal compiler error."
+                    ),
+                };
+                (original_event, result)
+            })
+            .collect()
     }
 }
 
@@ -107,6 +138,44 @@ impl Conditional for Vrl {
                 false
             });
         (result, event)
+    }
+
+    fn check_log(&self, log: LogEvent) -> (bool, LogEvent) {
+        let event = Event::from(log);
+        let (result, event) = self.check(event);
+        (result, event.into_log())
+    }
+
+    fn check_metric(&self, metric: Metric) -> (bool, Metric) {
+        let event = Event::from(metric);
+        let (result, event) = self.check(event);
+        (result, event.into_metric())
+    }
+
+    fn check_trace(&self, trace: TraceEvent) -> (bool, TraceEvent) {
+        let event = Event::from(trace);
+        let (result, event) = self.check(event);
+        (result, event.into_trace())
+    }
+
+    fn check_all(&self, events: EventArray) -> Vec<(bool, Event)> {
+        self.run_batch(events)
+            .into_iter()
+            .map(|(event, result)| {
+                let result = result
+                    .map(|value| match value {
+                        Value::Boolean(boolean) => boolean,
+                        _ => false,
+                    })
+                    .unwrap_or_else(|err| {
+                        emit!(VrlConditionExecutionError {
+                            error: err.to_string().as_ref()
+                        });
+                        false
+                    });
+                (result, event)
+            })
+            .collect()
     }
 
     fn check_with_context(&self, event: Event) -> (Result<(), String>, Event) {

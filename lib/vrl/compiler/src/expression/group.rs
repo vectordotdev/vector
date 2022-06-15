@@ -3,7 +3,7 @@ use std::fmt;
 use crate::{
     expression::{Expr, Resolved},
     state::{ExternalEnv, LocalEnv},
-    Context, Expression, TypeDef,
+    BatchContext, Context, Expression, TypeDef,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -22,6 +22,10 @@ impl Group {
 impl Expression for Group {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         self.inner.resolve(ctx)
+    }
+
+    fn resolve_batch(&mut self, ctx: &mut BatchContext, selection_vector: &[usize]) {
+        self.inner.resolve_batch(ctx, selection_vector);
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {

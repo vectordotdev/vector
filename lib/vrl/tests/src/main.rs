@@ -15,8 +15,8 @@ use value::Secrets;
 use vector_common::TimeZone;
 use vrl::{
     diagnostic::Formatter,
-    prelude::{BTreeMap, VrlValueConvert},
-    state, Runtime, SecretTarget, TargetValueRef, Terminate, VrlRuntime,
+    prelude::{BTreeMap, ExpressionError, VrlValueConvert},
+    state, BatchRuntime, Runtime, SecretTarget, Target, TargetValueRef, VrlRuntime,
 };
 use vrl_tests::{docs, Test};
 
@@ -173,8 +173,6 @@ fn main() {
             println!("{}", Colour::Yellow.bold().paint("SKIPPED"));
         }
 
-        let state = state::Runtime::default();
-        let runtime = Runtime::new(state);
         let mut functions = stdlib::all();
         functions.append(&mut enrichment::vrl_functions());
         functions.append(&mut vector_vrl_functions::vrl_functions());
@@ -203,17 +201,53 @@ fn main() {
             .then(|| format!("comp: {:>9.3?}", compile_end))
             .unwrap_or_default();
 
+        test_enrichment.finish_load();
+
         match program {
-            Ok((program, warnings)) if warnings.is_empty() => {
+            Ok((mut program, warnings)) if warnings.is_empty() => {
                 let run_start = Instant::now();
-                let result = run_vrl(
-                    runtime,
-                    program,
-                    &mut test,
-                    timezone,
-                    cmd.runtime,
-                    test_enrichment,
-                );
+
+                let mut metadata = vec![Value::from(BTreeMap::new())];
+                let mut secret = Secrets::new();
+                let mut target = TargetValueRef {
+                    value: &mut test.object,
+                    metadata: &mut metadata[0],
+                    secrets: &mut secret,
+                };
+
+                // Insert a dummy secret for examples to use
+                target.insert_secret("my_secret", "secret value");
+                target.insert_secret("datadog_api_key", "secret value");
+
+                let mut targets = vec![target];
+
+                let result = match cmd.runtime {
+                    VrlRuntime::Ast => {
+                        let state = state::Runtime::default();
+                        let mut runtime = Runtime::new(state);
+                        runtime.resolve(&mut targets[0], &program, &timezone)
+                    }
+                    VrlRuntime::Vectorized => {
+                        let mut runtime = BatchRuntime::new();
+                        let mut values = vec![Ok(Value::Null); targets.len()];
+                        let mut states = (0..targets.len())
+                            .map(|_| vrl::state::Runtime::default())
+                            .collect::<Vec<_>>();
+                        let mut batch_targets = targets
+                            .iter_mut()
+                            .map(|target| target as &mut dyn Target)
+                            .collect::<Vec<_>>();
+                        runtime.resolve_batch(
+                            &mut values,
+                            &mut batch_targets,
+                            &mut states,
+                            &mut program,
+                            timezone,
+                        );
+                        values.pop().expect("one element")
+                    }
+                };
+
                 let run_end = run_start.elapsed();
 
                 let timings_fmt = cmd
@@ -293,7 +327,7 @@ fn main() {
                                 || got == want
                             {
                                 println!("{}{}", Colour::Green.bold().paint("OK"), timings);
-                            } else if matches!(err, Terminate::Abort { .. }) {
+                            } else if matches!(err, ExpressionError::Abort { .. }) {
                                 let want =
                                     match serde_json::from_str::<'_, serde_json::Value>(&want) {
                                         Ok(want) => want,
@@ -385,34 +419,6 @@ fn main() {
     }
 
     print_result(failed_count)
-}
-
-#[allow(clippy::too_many_arguments)]
-fn run_vrl(
-    mut runtime: Runtime,
-    program: vrl::Program,
-    test: &mut Test,
-    timezone: TimeZone,
-    vrl_runtime: VrlRuntime,
-    test_enrichment: enrichment::TableRegistry,
-) -> Result<Value, Terminate> {
-    let mut metadata = Value::from(BTreeMap::new());
-    let mut target = TargetValueRef {
-        value: &mut test.object,
-        metadata: &mut metadata,
-        secrets: &mut Secrets::new(),
-    };
-
-    // Insert a dummy secret for examples to use
-    target.insert_secret("my_secret", "secret value");
-    target.insert_secret("datadog_api_key", "secret value");
-
-    match vrl_runtime {
-        VrlRuntime::Ast => {
-            test_enrichment.finish_load();
-            runtime.resolve(&mut target, &program, &timezone)
-        }
-    }
 }
 
 fn compare_partial_diagnostic(got: &str, want: &str) -> bool {

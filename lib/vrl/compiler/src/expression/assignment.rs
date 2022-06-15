@@ -13,7 +13,7 @@ use crate::{
     state::{ExternalEnv, LocalEnv},
     type_def::Details,
     value::kind::DefaultValue,
-    Context, Expression, Span, TypeDef,
+    BatchContext, Context, Expression, Span, TypeDef,
 };
 
 #[derive(Clone, PartialEq)]
@@ -31,7 +31,11 @@ impl Assignment {
         let (_, variant) = node.take();
 
         let variant = match variant {
-            Variant::Single { target, expr } => {
+            Variant::Single {
+                target,
+                expr,
+                selection_vector_ok: _,
+            } => {
                 let target_span = target.span();
                 let expr_span = expr.span();
                 let assignment_span = Span::new(target_span.start(), expr_span.start() - 1);
@@ -68,6 +72,7 @@ impl Assignment {
                 Variant::Single {
                     target,
                     expr: Box::new(expr),
+                    selection_vector_ok: vec![],
                 }
             }
 
@@ -125,12 +130,7 @@ impl Assignment {
 
                 err.insert_type_def(local, external, type_def, None);
 
-                Variant::Infallible {
-                    ok,
-                    err,
-                    expr: Box::new(expr),
-                    default: default_value,
-                }
+                Variant::infallible(ok, err, Box::new(expr), default_value)
             }
         };
 
@@ -183,6 +183,10 @@ impl Expression for Assignment {
         self.variant.resolve(ctx)
     }
 
+    fn resolve_batch(&mut self, ctx: &mut BatchContext, selection_vector: &[usize]) {
+        self.variant.resolve_batch(ctx, selection_vector)
+    }
+
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
         self.variant.type_def(state)
     }
@@ -193,7 +197,11 @@ impl fmt::Display for Assignment {
         use Variant::{Infallible, Single};
 
         match &self.variant {
-            Single { target, expr } => write!(f, "{} = {}", target, expr),
+            Single {
+                target,
+                expr,
+                selection_vector_ok: _,
+            } => write!(f, "{} = {}", target, expr),
             Infallible { ok, err, expr, .. } => write!(f, "{}, {} = {}", ok, err, expr),
         }
     }
@@ -204,8 +212,20 @@ impl fmt::Debug for Assignment {
         use Variant::{Infallible, Single};
 
         match &self.variant {
-            Single { target, expr } => write!(f, "{:?} = {:?}", target, expr),
-            Infallible { ok, err, expr, .. } => {
+            Single {
+                target,
+                expr,
+                selection_vector_ok: _,
+            } => write!(f, "{:?} = {:?}", target, expr),
+            Infallible {
+                ok,
+                err,
+                expr,
+                default: _,
+                selection_vector_ok: _,
+                selection_vector_err: _,
+                resolved_values_temp: _,
+            } => {
                 write!(f, "Ok({:?}), Err({:?}) = {:?}", ok, err, expr)
             }
         }
@@ -277,16 +297,68 @@ impl Target {
 
                 // Update existing variable using the provided path, or create a
                 // new value in the store.
-                match ctx.state_mut().variable_mut(ident) {
+                let state = ctx.state_mut();
+                match state.variable_mut(ident) {
                     Some(stored) => stored.insert_by_path(path, value),
-                    None => ctx
-                        .state_mut()
-                        .insert_variable(ident.clone(), value.at_path(path)),
+                    None => state.insert_variable(ident.clone(), value.at_path(path)),
                 }
             }
 
             External(path) => {
                 let _ = ctx.target_mut().target_insert(path, value);
+            }
+        }
+    }
+
+    fn insert_batch(&self, ctx: &mut BatchContext, selection_vector: &[usize]) {
+        use Target::{External, Internal, Noop};
+
+        match self {
+            Noop => {}
+            Internal(ident, path) => {
+                // Get the provided path, or else insert into the variable
+                // without any path appended and return early.
+                let path = match path.is_root() {
+                    false => path,
+                    true => {
+                        return for index in selection_vector {
+                            let index = *index;
+                            let state = &mut ctx.states[index];
+                            let value = ctx.resolved_values[index]
+                                .clone()
+                                .expect("value must not be an error");
+
+                            state.insert_variable(ident.clone(), value);
+                        };
+                    }
+                };
+
+                // Update existing variable using the provided path, or create a
+                // new value in the store.
+                for index in selection_vector {
+                    let index = *index;
+                    let state = &mut ctx.states[index];
+                    let value = ctx.resolved_values[index]
+                        .clone()
+                        .expect("value must not be an error");
+
+                    match state.variable_mut(ident) {
+                        Some(stored) => stored.insert_by_path(path, value),
+                        None => state.insert_variable(ident.clone(), value.at_path(path)),
+                    }
+                }
+            }
+
+            External(path) => {
+                for index in selection_vector {
+                    let index = *index;
+                    let target = &mut *ctx.targets[index];
+                    let value = ctx.resolved_values[index]
+                        .clone()
+                        .expect("value is not an error");
+
+                    let _ = target.target_insert(path, value);
+                }
             }
         }
     }
@@ -365,6 +437,7 @@ pub(crate) enum Variant<T, U> {
     Single {
         target: T,
         expr: Box<U>,
+        selection_vector_ok: Vec<usize>,
     },
     Infallible {
         ok: T,
@@ -373,7 +446,32 @@ pub(crate) enum Variant<T, U> {
 
         /// The default `ok` value used when the expression results in an error.
         default: Value,
+        selection_vector_ok: Vec<usize>,
+        selection_vector_err: Vec<usize>,
+        resolved_values_temp: Vec<Resolved>,
     },
+}
+
+impl<T, U> Variant<T, U> {
+    pub(crate) fn single(target: T, expr: Box<U>) -> Self {
+        Self::Single {
+            target,
+            expr,
+            selection_vector_ok: vec![],
+        }
+    }
+
+    pub(crate) fn infallible(ok: T, err: T, expr: Box<U>, default: Value) -> Self {
+        Self::Infallible {
+            ok,
+            err,
+            expr,
+            default,
+            selection_vector_ok: vec![],
+            selection_vector_err: vec![],
+            resolved_values_temp: vec![],
+        }
+    }
 }
 
 impl<U> Expression for Variant<Target, U>
@@ -384,7 +482,11 @@ where
         use Variant::{Infallible, Single};
 
         let value = match self {
-            Single { target, expr } => {
+            Single {
+                target,
+                expr,
+                selection_vector_ok: _,
+            } => {
                 let value = expr.resolve(ctx)?;
                 target.insert(value.clone(), ctx);
                 value
@@ -394,6 +496,9 @@ where
                 err,
                 expr,
                 default,
+                selection_vector_ok: _,
+                selection_vector_err: _,
+                resolved_values_temp: _,
             } => match expr.resolve(ctx) {
                 Ok(value) => {
                     ok.insert(value.clone(), ctx);
@@ -410,6 +515,72 @@ where
         };
 
         Ok(value)
+    }
+
+    fn resolve_batch(&mut self, ctx: &mut BatchContext, selection_vector: &[usize]) {
+        use Variant::{Infallible, Single};
+
+        match self {
+            Single {
+                target,
+                expr,
+                ref mut selection_vector_ok,
+            } => {
+                expr.resolve_batch(ctx, selection_vector);
+
+                selection_vector_ok.truncate(0);
+                for index in selection_vector {
+                    let index = *index;
+                    if ctx.resolved_values[index].is_ok() {
+                        selection_vector_ok.push(index);
+                    }
+                }
+
+                target.insert_batch(ctx, selection_vector_ok);
+            }
+            Infallible {
+                ok,
+                err,
+                expr,
+                default,
+                ref mut selection_vector_ok,
+                ref mut selection_vector_err,
+                ref mut resolved_values_temp,
+            } => {
+                expr.resolve_batch(ctx, selection_vector);
+
+                selection_vector_ok.truncate(0);
+                selection_vector_err.truncate(0);
+
+                for index in selection_vector {
+                    let index = *index;
+                    if let Err(error) = &ctx.resolved_values[index] {
+                        selection_vector_err.push(index);
+                        ctx.resolved_values[index] = Ok(Value::from(error.to_string()));
+                    } else {
+                        selection_vector_ok.push(index);
+                    }
+                }
+
+                resolved_values_temp.resize(selection_vector.len(), Ok(Value::Null));
+
+                ok.insert_batch(ctx, selection_vector_ok);
+                std::mem::swap(ctx.resolved_values, resolved_values_temp);
+                for index in selection_vector_err.iter() {
+                    ctx.resolved_values[*index] = Ok(default.clone());
+                }
+                ok.insert_batch(ctx, selection_vector_err);
+                std::mem::swap(ctx.resolved_values, resolved_values_temp);
+
+                std::mem::swap(ctx.resolved_values, resolved_values_temp);
+                for index in selection_vector_ok.iter() {
+                    ctx.resolved_values[*index] = Ok(Value::Null);
+                }
+                err.insert_batch(ctx, selection_vector_ok);
+                std::mem::swap(ctx.resolved_values, resolved_values_temp);
+                err.insert_batch(ctx, selection_vector_err);
+            }
+        }
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
@@ -431,7 +602,11 @@ where
         use Variant::{Infallible, Single};
 
         match self {
-            Single { target, expr } => write!(f, "{} = {}", target, expr),
+            Single {
+                target,
+                expr,
+                selection_vector_ok: _,
+            } => write!(f, "{} = {}", target, expr),
             Infallible { ok, err, expr, .. } => write!(f, "{}, {} = {}", ok, err, expr),
         }
     }

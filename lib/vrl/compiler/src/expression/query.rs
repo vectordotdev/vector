@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, ptr::addr_of_mut};
 
 use lookup::LookupBuf;
 use value::{kind::remove, Kind, Value};
@@ -8,7 +8,7 @@ use crate::{
     parser::ast::Ident,
     state::{ExternalEnv, LocalEnv},
     type_def::Details,
-    Context, Expression, TypeDef,
+    BatchContext, Context, Expression, TypeDef,
 };
 
 #[derive(Clone, PartialEq)]
@@ -103,6 +103,39 @@ impl Expression for Query {
             .get_by_path(&self.path)
             .cloned()
             .unwrap_or(Value::Null))
+    }
+
+    fn resolve_batch(&mut self, ctx: &mut BatchContext, selection_vector: &[usize]) {
+        use Target::{Container, External, FunctionCall, Internal};
+
+        match &mut self.target {
+            External => {
+                return for index in selection_vector {
+                    let index = *index;
+                    ctx.resolved_values[index] = Ok(ctx.targets[index]
+                        .target_get(&self.path)
+                        .ok()
+                        .flatten()
+                        .cloned()
+                        .unwrap_or(Value::Null));
+                };
+            }
+            Internal(variable) => variable.resolve_batch(ctx, selection_vector),
+            FunctionCall(call) => call.resolve_batch(ctx, selection_vector),
+            Container(container) => container.resolve_batch(ctx, selection_vector),
+        };
+
+        for index in selection_vector {
+            let resolved = addr_of_mut!(ctx.resolved_values[*index]);
+            let result = unsafe { resolved.read() }.map(|value| {
+                value
+                    .get_by_path(&self.path)
+                    .cloned()
+                    .unwrap_or(Value::Null)
+            });
+
+            unsafe { resolved.write(result) };
+        }
     }
 
     fn as_value(&self) -> Option<Value> {
