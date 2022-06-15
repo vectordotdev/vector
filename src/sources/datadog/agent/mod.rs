@@ -171,7 +171,9 @@ impl SourceConfig for DatadogAgentConfig {
     fn outputs(&self) -> Vec<Output> {
         let definition = match self.decoding {
             // See: `LogMsg` struct.
-            DeserializerConfig::Bytes => self.decoding.schema_definition()
+            DeserializerConfig::Bytes => self
+                .decoding
+                .schema_definition()
                 .with_field("message", Kind::bytes(), Some("message"))
                 .with_field("status", Kind::bytes(), Some("severity"))
                 .with_field("timestamp", Kind::timestamp(), Some("timestamp"))

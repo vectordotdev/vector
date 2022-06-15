@@ -180,7 +180,6 @@ impl Definition {
         self
     }
 
-
     /// Set the kind for all unknown fields.
     #[must_use]
     pub fn unknown_fields(mut self, unknown: impl Into<Option<Kind>>) -> Self {

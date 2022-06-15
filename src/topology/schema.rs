@@ -41,7 +41,7 @@ pub(super) fn merged_definition(
     }
 
     // This should be "never", but that isn't supported yet (coming soon!)
-    let mut definition:Option<Definition> = None;
+    let mut definition: Option<Definition> = None;
 
     for input in inputs {
         let key = &input.component;
@@ -409,8 +409,12 @@ mod tests {
                     ]),
                     transforms: IndexMap::default(),
                     want: Definition::empty()
-                        .with_field("foo", Kind::integer().or_bytes().or_timestamp(), Some("foo bar"))
-                        .with_known_meaning("foo", "baz qux")
+                        .with_field(
+                            "foo",
+                            Kind::integer().or_bytes().or_timestamp(),
+                            Some("foo bar"),
+                        )
+                        .with_known_meaning("foo", "baz qux"),
                 },
             ),
         ]) {
