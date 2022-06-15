@@ -618,4 +618,3 @@ Here are original events with all of the additional context!
 [AWS Kinesis Firehose]: https://aws.amazon.com/kinesis/data-firehose/?kinesis-blogs.sort-by=item.additionalFields.createdDate&kinesis-blogs.sort-order=desc
 [flog]: https://github.com/mingrammer/flog
 [json_parser]: /docs/reference/vrl/functions/#parse_json
-m
