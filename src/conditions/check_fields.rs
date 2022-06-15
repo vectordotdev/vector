@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription, Conditional},
-    event::{Event, Value},
+    event::{Event, LogEvent, Metric, TraceEvent, Value},
 };
 
 #[derive(Deserialize, Serialize, Clone, Derivative)]
@@ -29,7 +29,11 @@ pub(crate) enum CheckFieldsPredicateArg {
 pub(crate) trait CheckFieldsPredicate:
     std::fmt::Debug + Send + Sync + dyn_clone::DynClone
 {
-    fn check(&self, e: &Event) -> bool;
+    fn check_log(&self, log: &LogEvent) -> bool;
+
+    fn check_metric(&self, metric: &Metric) -> bool;
+
+    fn check_trace(&self, trace: &TraceEvent) -> bool;
 }
 
 dyn_clone::clone_trait_object!(CheckFieldsPredicate);
@@ -78,18 +82,22 @@ impl EqualsPredicate {
 }
 
 impl CheckFieldsPredicate for EqualsPredicate {
-    fn check(&self, event: &Event) -> bool {
-        match event {
-            Event::Log(l) => self.check_field(l.get(self.target.as_str())),
-            Event::Metric(m) => m
-                .tags()
-                .and_then(|t| t.get(&self.target))
-                .map_or(false, |v| match &self.arg {
-                    CheckFieldsPredicateArg::String(s) => s.as_bytes() == v.as_bytes(),
-                    _ => false,
-                }),
-            Event::Trace(t) => self.check_field(t.get(&self.target)),
-        }
+    fn check_log(&self, log: &LogEvent) -> bool {
+        self.check_field(log.get(self.target.as_str()))
+    }
+
+    fn check_metric(&self, metric: &Metric) -> bool {
+        metric
+            .tags()
+            .and_then(|tags| tags.get(&self.target))
+            .map_or(false, |tag| match &self.arg {
+                CheckFieldsPredicateArg::String(string) => string.as_bytes() == tag.as_bytes(),
+                _ => false,
+            })
+    }
+
+    fn check_trace(&self, trace: &TraceEvent) -> bool {
+        self.check_field(trace.get(&self.target))
     }
 }
 
@@ -121,14 +129,19 @@ impl ContainsPredicate {
 }
 
 impl CheckFieldsPredicate for ContainsPredicate {
-    fn check(&self, event: &Event) -> bool {
-        match event {
-            Event::Log(l) => l.get(self.target.as_str()).map_or(false, |v| {
-                let v = v.to_string_lossy();
-                self.arg.iter().any(|s| v.contains(s))
-            }),
-            _ => false,
-        }
+    fn check_log(&self, log: &LogEvent) -> bool {
+        log.get(self.target.as_str()).map_or(false, |v| {
+            let v = v.to_string_lossy();
+            self.arg.iter().any(|s| v.contains(s))
+        })
+    }
+
+    fn check_metric(&self, _: &Metric) -> bool {
+        false
+    }
+
+    fn check_trace(&self, _: &TraceEvent) -> bool {
+        false
     }
 }
 
@@ -162,14 +175,19 @@ impl StartsWithPredicate {
 }
 
 impl CheckFieldsPredicate for StartsWithPredicate {
-    fn check(&self, event: &Event) -> bool {
-        match event {
-            Event::Log(l) => l.get(self.target.as_str()).map_or(false, |v| {
-                let v = v.to_string_lossy();
-                self.arg.iter().any(|s| v.starts_with(s))
-            }),
-            _ => false,
-        }
+    fn check_log(&self, log: &LogEvent) -> bool {
+        log.get(self.target.as_str()).map_or(false, |v| {
+            let v = v.to_string_lossy();
+            self.arg.iter().any(|s| v.starts_with(s))
+        })
+    }
+
+    fn check_metric(&self, _: &Metric) -> bool {
+        false
+    }
+
+    fn check_trace(&self, _: &TraceEvent) -> bool {
+        false
     }
 }
 
@@ -201,14 +219,19 @@ impl EndsWithPredicate {
 }
 
 impl CheckFieldsPredicate for EndsWithPredicate {
-    fn check(&self, event: &Event) -> bool {
-        match event {
-            Event::Log(l) => l.get(self.target.as_str()).map_or(false, |v| {
-                let v = v.to_string_lossy();
-                self.arg.iter().any(|s| v.ends_with(s))
-            }),
-            _ => false,
-        }
+    fn check_log(&self, log: &LogEvent) -> bool {
+        log.get(self.target.as_str()).map_or(false, |v| {
+            let v = v.to_string_lossy();
+            self.arg.iter().any(|s| v.ends_with(s))
+        })
+    }
+
+    fn check_metric(&self, _: &Metric) -> bool {
+        false
+    }
+
+    fn check_trace(&self, _: &TraceEvent) -> bool {
+        false
     }
 }
 
@@ -239,30 +262,32 @@ impl NotEqualsPredicate {
 }
 
 impl CheckFieldsPredicate for NotEqualsPredicate {
-    fn check(&self, event: &Event) -> bool {
-        match event {
-            Event::Log(l) => l
-                .get(self.target.as_str())
-                .map(|f| f.coerce_to_bytes())
-                .map_or(false, |b| {
-                    //false if any match, else true
-                    !self.arg.iter().any(|s| b == s.as_bytes())
-                }),
-            Event::Metric(m) => m
-                .tags()
-                .and_then(|t| t.get(&self.target))
-                .map_or(false, |v| {
-                    !self.arg.iter().any(|s| v.as_bytes() == s.as_bytes())
-                }),
-            Event::Trace(t) => {
-                t.get(&self.target)
-                    .map(|f| f.coerce_to_bytes())
-                    .map_or(false, |b| {
-                        //false if any match, else true
-                        !self.arg.iter().any(|s| b == s.as_bytes())
-                    })
-            }
-        }
+    fn check_log(&self, log: &LogEvent) -> bool {
+        log.get(self.target.as_str())
+            .map(|f| f.coerce_to_bytes())
+            .map_or(false, |b| {
+                //false if any match, else true
+                !self.arg.iter().any(|s| b == s.as_bytes())
+            })
+    }
+
+    fn check_metric(&self, metric: &Metric) -> bool {
+        metric
+            .tags()
+            .and_then(|t| t.get(&self.target))
+            .map_or(false, |v| {
+                !self.arg.iter().any(|s| v.as_bytes() == s.as_bytes())
+            })
+    }
+
+    fn check_trace(&self, trace: &TraceEvent) -> bool {
+        trace
+            .get(&self.target)
+            .map(|f| f.coerce_to_bytes())
+            .map_or(false, |b| {
+                //false if any match, else true
+                !self.arg.iter().any(|s| b == s.as_bytes())
+            })
     }
 }
 
@@ -290,21 +315,24 @@ impl RegexPredicate {
 }
 
 impl CheckFieldsPredicate for RegexPredicate {
-    fn check(&self, event: &Event) -> bool {
-        match event {
-            Event::Log(log) => log
-                .get(self.target.as_str())
-                .map(|field| field.to_string_lossy())
-                .map_or(false, |field| self.regex.is_match(&field)),
-            Event::Metric(metric) => metric
-                .tags()
-                .and_then(|tags| tags.get(&self.target))
-                .map_or(false, |field| self.regex.is_match(field)),
-            Event::Trace(trace) => trace
-                .get(&self.target)
-                .map(|field| field.to_string_lossy())
-                .map_or(false, |field| self.regex.is_match(&field)),
-        }
+    fn check_log(&self, log: &LogEvent) -> bool {
+        log.get(self.target.as_str())
+            .map(|field| field.to_string_lossy())
+            .map_or(false, |field| self.regex.is_match(&field))
+    }
+
+    fn check_metric(&self, metric: &Metric) -> bool {
+        metric
+            .tags()
+            .and_then(|tags| tags.get(&self.target))
+            .map_or(false, |field| self.regex.is_match(field))
+    }
+
+    fn check_trace(&self, trace: &TraceEvent) -> bool {
+        trace
+            .get(&self.target)
+            .map(|field| field.to_string_lossy())
+            .map_or(false, |field| self.regex.is_match(&field))
     }
 }
 
@@ -329,12 +357,19 @@ impl ExistsPredicate {
 }
 
 impl CheckFieldsPredicate for ExistsPredicate {
-    fn check(&self, event: &Event) -> bool {
-        (match event {
-            Event::Log(l) => l.get(self.target.as_str()).is_some(),
-            Event::Metric(m) => m.tags().map_or(false, |t| t.contains_key(&self.target)),
-            Event::Trace(t) => t.get(&self.target).is_some(),
-        }) == self.arg
+    fn check_log(&self, log: &LogEvent) -> bool {
+        log.get(self.target.as_str()).is_some() == self.arg
+    }
+
+    fn check_metric(&self, metric: &Metric) -> bool {
+        metric
+            .tags()
+            .map_or(false, |tags| tags.contains_key(&self.target))
+            == self.arg
+    }
+
+    fn check_trace(&self, trace: &TraceEvent) -> bool {
+        trace.get(&self.target).is_some() == self.arg
     }
 }
 
@@ -370,16 +405,21 @@ impl IpCidrPredicate {
 }
 
 impl CheckFieldsPredicate for IpCidrPredicate {
-    fn check(&self, event: &Event) -> bool {
-        match event {
-            Event::Log(l) => l.get(self.target.as_str()).map_or(false, |v| {
-                let v = v.to_string_lossy();
-                IpAddr::from_str(&v).map_or(false, |ip_addr| {
-                    self.cidrs.iter().any(|cidr| cidr.contains(ip_addr))
-                })
-            }),
-            _ => false,
-        }
+    fn check_log(&self, log: &LogEvent) -> bool {
+        log.get(self.target.as_str()).map_or(false, |value| {
+            let v = value.to_string_lossy();
+            IpAddr::from_str(&v).map_or(false, |ip_addr| {
+                self.cidrs.iter().any(|cidr| cidr.contains(ip_addr))
+            })
+        })
+    }
+
+    fn check_metric(&self, _: &Metric) -> bool {
+        false
+    }
+
+    fn check_trace(&self, _: &TraceEvent) -> bool {
+        false
     }
 }
 
@@ -402,8 +442,16 @@ impl NegatePredicate {
 }
 
 impl CheckFieldsPredicate for NegatePredicate {
-    fn check(&self, event: &Event) -> bool {
-        !self.subpred.check(event)
+    fn check_log(&self, log: &LogEvent) -> bool {
+        !self.subpred.check_log(log)
+    }
+
+    fn check_metric(&self, metric: &Metric) -> bool {
+        !self.subpred.check_metric(metric)
+    }
+
+    fn check_trace(&self, trace: &TraceEvent) -> bool {
+        !self.subpred.check_trace(trace)
     }
 }
 
@@ -434,21 +482,26 @@ impl LengthEqualsPredicate {
 }
 
 impl CheckFieldsPredicate for LengthEqualsPredicate {
-    fn check(&self, event: &Event) -> bool {
-        match event {
-            Event::Log(l) => l.get(self.target.as_str()).map_or(false, |v| {
-                let len = match v {
-                    Value::Bytes(value) => value.len(),
-                    Value::Array(value) => value.len(),
-                    Value::Object(value) => value.len(),
-                    Value::Null => 0,
-                    value => value.to_string_lossy().len(),
-                };
+    fn check_log(&self, log: &LogEvent) -> bool {
+        log.get(self.target.as_str()).map_or(false, |v| {
+            let len = match v {
+                Value::Bytes(value) => value.len(),
+                Value::Array(value) => value.len(),
+                Value::Object(value) => value.len(),
+                Value::Null => 0,
+                value => value.to_string_lossy().len(),
+            };
 
-                len as i64 == self.arg
-            }),
-            _ => false,
-        }
+            len as i64 == self.arg
+        })
+    }
+
+    fn check_metric(&self, _: &Metric) -> bool {
+        false
+    }
+
+    fn check_trace(&self, _: &TraceEvent) -> bool {
+        false
     }
 }
 
@@ -555,27 +608,53 @@ pub struct CheckFields {
 }
 
 impl Conditional for CheckFields {
-    fn check(&self, e: Event) -> (bool, Event) {
-        let result = self.predicates.iter().all(|(_, p)| p.check(&e));
-        (result, e)
+    fn check_log(&self, log: LogEvent) -> (bool, LogEvent) {
+        (
+            self.predicates
+                .iter()
+                .all(|(_, predicate)| predicate.check_log(&log)),
+            log,
+        )
     }
 
-    fn check_with_context(&self, e: Event) -> (Result<(), String>, Event) {
+    fn check_metric(&self, metric: Metric) -> (bool, Metric) {
+        (
+            self.predicates
+                .iter()
+                .all(|(_, predicate)| predicate.check_metric(&metric)),
+            metric,
+        )
+    }
+
+    fn check_trace(&self, trace: TraceEvent) -> (bool, TraceEvent) {
+        (
+            self.predicates
+                .iter()
+                .all(|(_, predicate)| predicate.check_trace(&trace)),
+            trace,
+        )
+    }
+
+    fn check_with_context(&self, event: Event) -> (Result<(), String>, Event) {
         let failed_preds = self
             .predicates
             .iter()
-            .filter(|(_, p)| !p.check(&e))
+            .filter(|(_, predicate)| match &event {
+                Event::Log(log) => !predicate.check_log(log),
+                Event::Metric(metric) => !predicate.check_metric(metric),
+                Event::Trace(trace) => !predicate.check_trace(trace),
+            })
             .map(|(n, _)| n.to_owned())
             .collect::<Vec<_>>();
         if failed_preds.is_empty() {
-            (Ok(()), e)
+            (Ok(()), event)
         } else {
             (
                 Err(format!(
                     "predicates failed: [ {} ]",
                     failed_preds.join(", ")
                 )),
-                e,
+                event,
             )
         }
     }

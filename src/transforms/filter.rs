@@ -8,7 +8,7 @@ use crate::{
         DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
-    event::Event,
+    event::{Event, EventArray},
     internal_events::FilterEventDiscarded,
     schema,
     transforms::{FunctionTransform, OutputBuffer, Transform},
@@ -100,6 +100,23 @@ impl FunctionTransform for Filter {
             self.last_emission = Instant::now();
         } else {
             self.emissions_deferred += 1;
+        }
+    }
+
+    fn transform_all(&mut self, output: &mut OutputBuffer, events: EventArray) {
+        let results = self.condition.check_all(events);
+        for (result, event) in results.into_iter() {
+            if result {
+                output.push(event);
+            } else if self.last_emission.elapsed() >= self.emissions_max_delay {
+                emit!(FilterEventDiscarded {
+                    total: self.emissions_deferred,
+                });
+                self.emissions_deferred = 0;
+                self.last_emission = Instant::now();
+            } else {
+                self.emissions_deferred += 1;
+            }
         }
     }
 }

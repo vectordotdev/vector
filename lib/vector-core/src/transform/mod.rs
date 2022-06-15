@@ -141,6 +141,18 @@ impl Transform {
 ///   `TaskTransform` or vice versa.
 pub trait FunctionTransform: Send + dyn_clone::DynClone + Sync {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event);
+
+    fn transform_all(&mut self, output: &mut OutputBuffer, events: EventArray) {
+        let events_len = events.len();
+        let output_capacity = output.capacity();
+        if events_len > output_capacity {
+            output.reserve(events_len - output_capacity);
+        }
+
+        for event in events.into_events() {
+            self.transform(output, event);
+        }
+    }
 }
 
 dyn_clone::clone_trait_object!(FunctionTransform);
@@ -183,6 +195,12 @@ pub trait SyncTransform: Send + dyn_clone::DynClone + Sync {
     fn transform(&mut self, event: Event, output: &mut TransformOutputsBuf);
 
     fn transform_all(&mut self, events: EventArray, output: &mut TransformOutputsBuf) {
+        let events_len = events.len();
+        let output_capacity = output.capacity();
+        if events_len > output_capacity {
+            output.reserve(events_len - output_capacity);
+        }
+
         for event in events.into_events() {
             self.transform(event, output);
         }
@@ -202,6 +220,14 @@ where
             event,
         );
     }
+
+    fn transform_all(&mut self, events: EventArray, output: &mut TransformOutputsBuf) {
+        FunctionTransform::transform_all(
+            self,
+            output.primary_buffer.as_mut().expect("no default output"),
+            events,
+        );
+    }
 }
 
 // TODO: this is a bit ugly when we already have the above impl
@@ -211,6 +237,14 @@ impl SyncTransform for Box<dyn FunctionTransform> {
             self.as_mut(),
             output.primary_buffer.as_mut().expect("no default output"),
             event,
+        );
+    }
+
+    fn transform_all(&mut self, events: EventArray, output: &mut TransformOutputsBuf) {
+        FunctionTransform::transform_all(
+            self.as_mut(),
+            output.primary_buffer.as_mut().expect("no default output"),
+            events,
         );
     }
 }
@@ -310,6 +344,20 @@ impl TransformOutputsBuf {
             primary_buffer,
             named_buffers,
         }
+    }
+
+    pub fn capacity(&self) -> usize {
+        self.primary_buffer
+            .as_ref()
+            .expect("no default output")
+            .capacity()
+    }
+
+    pub fn reserve(&mut self, additional: usize) {
+        self.primary_buffer
+            .as_mut()
+            .expect("no default output")
+            .reserve(additional);
     }
 
     pub fn push(&mut self, event: Event) {
@@ -442,6 +490,10 @@ impl OutputBuffer {
 
     pub fn capacity(&self) -> usize {
         self.0.capacity()
+    }
+
+    pub fn reserve(&mut self, additional: usize) {
+        self.0.reserve(additional);
     }
 
     pub fn first(&self) -> Option<EventRef> {
