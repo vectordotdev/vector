@@ -976,7 +976,7 @@ dependencies = [
  "sync_wrapper",
  "tokio",
  "tower",
- "tower-http 0.3.3",
+ "tower-http",
  "tower-layer",
  "tower-service",
 ]
@@ -3867,9 +3867,9 @@ dependencies = [
 
 [[package]]
 name = "k8s-openapi"
-version = "0.14.0"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0489fc937cc7616a9abfa61bf39c250d7e32e1325ef028c8d9278dd24ea395b3"
+checksum = "d2ae2c04fcee6b01b04e3aadd56bb418932c8e0a9d8a93f48bc68c6bdcdb559d"
 dependencies = [
  "base64 0.13.0",
  "bytes 1.1.0",
@@ -3921,9 +3921,9 @@ dependencies = [
 
 [[package]]
 name = "kube"
-version = "0.71.0"
+version = "0.73.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "342744dfeb81fe186b84f485b33f12c6a15d3396987d933b06a566a3db52ca38"
+checksum = "f68b954ea9ad888de953fb1488bd8f377c4c78d82d4642efa5925189210b50b7"
 dependencies = [
  "k8s-openapi",
  "kube-client",
@@ -3933,9 +3933,9 @@ dependencies = [
 
 [[package]]
 name = "kube-client"
-version = "0.71.0"
+version = "0.73.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f69a504997799340408635d6e351afb8aab2c34ca3165e162f41b3b34a69a79"
+checksum = "9150dc7107d9acf4986088f284a0a6dddc5ae37ef1ffdf142f6811dc5998dd58"
 dependencies = [
  "base64 0.13.0",
  "bytes 1.1.0",
@@ -3963,15 +3963,15 @@ dependencies = [
  "tokio-native-tls",
  "tokio-util 0.7.1",
  "tower",
- "tower-http 0.2.5",
+ "tower-http",
  "tracing 0.1.34",
 ]
 
 [[package]]
 name = "kube-core"
-version = "0.71.0"
+version = "0.73.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4a247487699941baaf93438d65b12d4e32450bea849d619d19ed394e8a4a645"
+checksum = "bc8c429676abe6a73b374438d5ca02caaf9ae7a635441253c589b779fa5d0622"
 dependencies = [
  "chrono",
  "form_urlencoded",
@@ -3986,9 +3986,9 @@ dependencies = [
 
 [[package]]
 name = "kube-runtime"
-version = "0.71.0"
+version = "0.73.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02ea50e6ed56578e1d1d02548901b12fe6d3edbf110269a396955e285d487973"
+checksum = "b6e9e9da456f0101b77f864a9da44866b9891ad4740db508b4b269343ebeb01d"
 dependencies = [
  "ahash",
  "backoff",
@@ -7879,30 +7879,11 @@ dependencies = [
 
 [[package]]
 name = "tower-http"
-version = "0.2.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aba3f3efabf7fb41fae8534fc20a817013dd1c12cb45441efb6c82e6556b4cd8"
-dependencies = [
- "base64 0.13.0",
- "bitflags",
- "bytes 1.1.0",
- "futures-core",
- "futures-util",
- "http",
- "http-body",
- "http-range-header",
- "pin-project-lite",
- "tower-layer",
- "tower-service",
- "tracing 0.1.34",
-]
-
-[[package]]
-name = "tower-http"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d342c6d58709c0a6d48d48dabbb62d4ef955cf5f0f3bbfd845838e7ae88dbae"
 dependencies = [
+ "base64 0.13.0",
  "bitflags",
  "bytes 1.1.0",
  "futures-core",
@@ -7914,6 +7895,7 @@ dependencies = [
  "tower",
  "tower-layer",
  "tower-service",
+ "tracing 0.1.34",
 ]
 
 [[package]]
