@@ -74,11 +74,11 @@ impl Eq for Value {}
 impl PartialEq<Self> for Value {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Value::Array(a), Value::Array(b)) => a.eq(b),
-            (Value::Boolean(a), Value::Boolean(b)) => a.eq(b),
-            (Value::Bytes(a), Value::Bytes(b)) => a.eq(b),
-            (Value::Regex(a), Value::Regex(b)) => a.eq(b),
-            (Value::Float(a), Value::Float(b)) => {
+            (Self::Array(a), Self::Array(b)) => a.eq(b),
+            (Self::Boolean(a), Self::Boolean(b)) => a.eq(b),
+            (Self::Bytes(a), Self::Bytes(b)) => a.eq(b),
+            (Self::Regex(a), Self::Regex(b)) => a.eq(b),
+            (Self::Float(a), Self::Float(b)) => {
                 // This compares floats with the following rules:
                 // * NaNs compare as equal
                 // * Positive and negative infinity are not equal
@@ -94,10 +94,10 @@ impl PartialEq<Self> for Value {
                     false
                 }
             }
-            (Value::Integer(a), Value::Integer(b)) => a.eq(b),
-            (Value::Object(a), Value::Object(b)) => a.eq(b),
-            (Value::Null, Value::Null) => true,
-            (Value::Timestamp(a), Value::Timestamp(b)) => a.eq(b),
+            (Self::Integer(a), Self::Integer(b)) => a.eq(b),
+            (Self::Object(a), Self::Object(b)) => a.eq(b),
+            (Self::Null, Self::Null) => true,
+            (Self::Timestamp(a), Self::Timestamp(b)) => a.eq(b),
             _ => false,
         }
     }
@@ -139,7 +139,7 @@ impl Hash for Value {
             Value::Object(v) => {
                 v.hash(state);
             }
-            Value::Null => {
+            Self::Null => {
                 //covered by discriminant hash
             }
             Value::Timestamp(v) => {
@@ -160,7 +160,7 @@ impl Value {
             Value::Boolean(_) => "boolean",
             Value::Object(_) => "map",
             Value::Array(_) => "array",
-            Value::Null => "null",
+            Self::Null => "null",
         }
     }
 
@@ -211,7 +211,7 @@ impl Value {
             | Value::Timestamp(_)
             | Value::Float(_)
             | Value::Integer(_) => false,
-            Value::Null => true,
+            Self::Null => true,
             Value::Object(v) => v.is_empty(),
             Value::Array(v) => v.is_empty(),
         }

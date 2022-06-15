@@ -145,7 +145,7 @@ where
 {
     /// Create a new `LineAgg` using the specified `inner` stream and
     /// preconfigured `logic`.
-    pub fn new(inner: T, logic: Logic<K, C>) -> Self {
+    pub const fn new(inner: T, logic: Logic<K, C>) -> Self {
         Self {
             inner,
             logic,

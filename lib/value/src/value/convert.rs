@@ -150,7 +150,7 @@ impl Value {
             Value::Array(_a) => Err("cannot convert array to bytes.".to_string()),
             Value::Timestamp(t) => Ok(Bytes::copy_from_slice(&t.timestamp().to_le_bytes())),
             Value::Regex(r) => Ok(r.to_string().into()),
-            Value::Null => Ok(Bytes::copy_from_slice(&[0_u8])),
+            Self::Null => Ok(Bytes::copy_from_slice(&[0_u8])),
         }
     }
 
@@ -182,13 +182,13 @@ impl Value {
 
     /// Returns true if self is `Value::Null`.
     pub fn is_null(&self) -> bool {
-        matches!(self, Value::Null)
+        matches!(self, Self::Null)
     }
 
     /// Returns self as `())`, only if self is `Value::Null`.
     pub fn as_null(&self) -> Option<()> {
         match self {
-            Value::Null => Some(()),
+            Self::Null => Some(()),
             _ => None,
         }
     }

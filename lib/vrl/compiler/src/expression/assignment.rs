@@ -60,6 +60,7 @@ impl Assignment {
 
                 let expr = expr.into_inner();
                 let target = Target::try_from(target.into_inner())?;
+                verify_mutable(&target, external, target_span, assignment_span)?;
                 let value = expr.as_value();
 
                 target.insert_type_def(local, external, type_def, value);
@@ -109,6 +110,7 @@ impl Assignment {
                 // set to being infallible, as the error will be captured by the
                 // "err" target.
                 let ok = Target::try_from(ok.into_inner())?;
+                verify_mutable(&ok, external, expr_span, ok_span)?;
                 let type_def = type_def.infallible();
                 let default_value = type_def.default_value();
                 let value = expr.as_value();
@@ -118,6 +120,7 @@ impl Assignment {
                 // "err" target is assigned `null` or a string containing the
                 // error message.
                 let err = Target::try_from(err.into_inner())?;
+                verify_mutable(&err, external, expr_span, err_span)?;
                 let type_def = TypeDef::bytes().add_null().infallible();
 
                 err.insert_type_def(local, external, type_def, None);
@@ -150,6 +153,28 @@ impl Assignment {
         }
 
         targets
+    }
+}
+
+fn verify_mutable(
+    target: &Target,
+    external: &ExternalEnv,
+    expr_span: Span,
+    assignment_span: Span,
+) -> Result<(), Error> {
+    match target {
+        Target::External(lookup_buf) => {
+            if external.is_read_only_event_path(lookup_buf) {
+                Err(Error {
+                    variant: ErrorVariant::ReadOnly,
+                    expr_span,
+                    assignment_span,
+                })
+            } else {
+                Ok(())
+            }
+        }
+        Target::Internal(_, _) | Target::Noop => Ok(()),
     }
 }
 
@@ -434,6 +459,9 @@ pub(crate) enum ErrorVariant {
 
     #[error("invalid assignment target")]
     InvalidTarget(Span),
+
+    #[error("mutation of read-only value")]
+    ReadOnly,
 }
 
 impl fmt::Display for Error {
@@ -457,6 +485,7 @@ impl DiagnosticMessage for Error {
             FallibleAssignment(..) => 103,
             InfallibleAssignment(..) => 104,
             InvalidTarget(..) => 641,
+            ReadOnly => 315,
         }
     }
 
@@ -487,6 +516,10 @@ impl DiagnosticMessage for Error {
                 Label::primary("invalid assignment target", span),
                 Label::context("use one of variable or path", span),
             ],
+            ReadOnly => vec![Label::primary(
+                "mutation of read-only value",
+                self.assignment_span,
+            )],
         }
     }
 

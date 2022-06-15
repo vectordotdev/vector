@@ -200,7 +200,8 @@ impl SyncTransform for Pipeline {
         let ev_container = events.into_events();
         if let Some(condition) = &self.condition {
             for event in ev_container {
-                if condition.check(&event) {
+                let (result, event) = condition.check(event);
+                if result {
                     self.buf_out.push(event);
                 } else {
                     output.push(event);

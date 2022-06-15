@@ -237,16 +237,15 @@ impl Reduce {
     }
 
     fn transform_one(&mut self, output: &mut Vec<Event>, event: Event) {
-        let starts_here = self
-            .starts_when
-            .as_ref()
-            .map(|c| c.check(&event))
-            .unwrap_or(false);
-        let ends_here = self
-            .ends_when
-            .as_ref()
-            .map(|c| c.check(&event))
-            .unwrap_or(false);
+        let (starts_here, event) = match &self.starts_when {
+            Some(condition) => condition.check(event),
+            None => (false, event),
+        };
+
+        let (ends_here, event) = match &self.ends_when {
+            Some(condition) => condition.check(event),
+            None => (false, event),
+        };
 
         let event = event.into_log();
         let discriminant = Discriminant::from_log_event(&event, &self.group_by);
