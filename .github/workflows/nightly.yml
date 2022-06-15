@@ -11,3 +11,4 @@ jobs:
     with:
       git_ref: master
       mode: Nightly
+    secrets: inherit
