@@ -1,11 +1,9 @@
 ///! Contains backwards compatibility with lookup "v1"
-
 use crate::lookup_v2::{BorrowedSegment, Path};
 use crate::{LookupBuf, SegmentBuf};
 use std::borrow::Cow;
 
-
-impl <'a> Path<'a> for &'a LookupBuf {
+impl<'a> Path<'a> for &'a LookupBuf {
     type Iter = LookupBufPathIter<'a>;
 
     fn segment_iter(&self) -> Self::Iter {
@@ -23,7 +21,7 @@ pub struct LookupBufPathIter<'a> {
     coalesce_i: usize,
 }
 
-impl <'a> Iterator for LookupBufPathIter<'a> {
+impl<'a> Iterator for LookupBufPathIter<'a> {
     type Item = BorrowedSegment<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -36,26 +34,23 @@ impl <'a> Iterator for LookupBufPathIter<'a> {
                 self.segment_i += 1;
                 Some(BorrowedSegment::Index(*index))
             }
-            Some(SegmentBuf::Coalesce(fields)) => {
-                match fields.get(self.coalesce_i) {
-                    Some(field) => {
-                        if self.coalesce_i == fields.len() - 1 {
-                            self.coalesce_i = 0;
-                            self.segment_i += 1;
-                            Some(BorrowedSegment::CoalesceEnd(Cow::Borrowed(&field.name)))
-                        } else {
-                            self.coalesce_i += 1;
-                            Some(BorrowedSegment::CoalesceField(Cow::Borrowed(&field.name)))
-                        }
-                    },
-                    None => unreachable!()
+            Some(SegmentBuf::Coalesce(fields)) => match fields.get(self.coalesce_i) {
+                Some(field) => {
+                    if self.coalesce_i == fields.len() - 1 {
+                        self.coalesce_i = 0;
+                        self.segment_i += 1;
+                        Some(BorrowedSegment::CoalesceEnd(Cow::Borrowed(&field.name)))
+                    } else {
+                        self.coalesce_i += 1;
+                        Some(BorrowedSegment::CoalesceField(Cow::Borrowed(&field.name)))
+                    }
                 }
-            }
-            None => None
+                None => unreachable!(),
+            },
+            None => None,
         }
     }
 }
-
 
 #[cfg(test)]
 mod test {
@@ -71,7 +66,7 @@ mod test {
             "[-5]",
             ".(a|b|c)",
             ".(a|b)",
-            ".(a|b|c).foo.bar[42]"
+            ".(a|b|c).foo.bar[42]",
         ];
 
         for test in tests {
@@ -79,7 +74,10 @@ mod test {
             if !Path::eq(&test, &lookup_buf) {
                 println!("Equality failed for {:?}", test);
                 println!("V2: {:?}", test.segment_iter().collect::<Vec<_>>());
-                println!("Compact: {:?}", (&lookup_buf).segment_iter().collect::<Vec<_>>());
+                println!(
+                    "Compact: {:?}",
+                    (&lookup_buf).segment_iter().collect::<Vec<_>>()
+                );
                 panic!("Equality failed");
             }
         }

@@ -40,7 +40,8 @@ pub fn insert<'a, T: ValueCollection>(
         }
         Some(BorrowedSegment::CoalesceField(field)) => {
             if let Some(Value::Object(map)) = value.get_mut_value(key.borrow()) {
-                let (Ok(matched_key) | Err(matched_key)) = get_matching_coalesce_key(field, map, &mut path_iter);
+                let (Ok(matched_key) | Err(matched_key)) =
+                    get_matching_coalesce_key(field, map, &mut path_iter);
                 insert(map, matched_key.to_string(), path_iter, insert_value)
             } else {
                 let mut map = BTreeMap::new();
