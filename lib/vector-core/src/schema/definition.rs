@@ -131,7 +131,7 @@ impl Definition {
         self.collection.merge(
             collection,
             merge::Strategy {
-                depth: merge::Depth::Shallow,
+                collisions: merge::CollisionStrategy::Overwrite,
                 indices: merge::Indices::Keep,
             },
         );
@@ -204,7 +204,7 @@ impl Definition {
         self.collection.merge(
             other.collection,
             merge::Strategy {
-                depth: merge::Depth::Deep,
+                collisions: merge::CollisionStrategy::Union,
                 indices: merge::Indices::Keep,
             },
         );

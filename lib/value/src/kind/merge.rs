@@ -6,7 +6,7 @@ use super::{Collection, Kind};
 
 impl Kind {
     /// Merge `other` into `self`, using the provided `Strategy`.
-    pub fn merge(&mut self, other: Self, strategy: Strategy) {
+    pub fn merge(&mut self, other: Self, mut strategy: Strategy) {
         self.bytes = self.bytes.or(other.bytes);
         self.integer = self.integer.or(other.integer);
         self.float = self.float.or(other.float);
@@ -38,6 +38,12 @@ impl Kind {
                     known.insert(index, kind);
                 }
 
+                // The indices cannot collide since they are being appended, so switch to overwrite mode.
+                // otherwise the union of the types will include "null"
+                strategy.collisions = CollisionStrategy::Overwrite;
+
+                // it doesn't make sense to recursively apply this, so turn it off.
+                strategy.indices = Indices::Keep;
                 lhs.merge(Collection::from_parts(known, rhs_unknown), strategy);
             }
 
@@ -50,11 +56,9 @@ impl Kind {
 /// The strategy to apply to the merge between two `Kind`s.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct Strategy {
-    /// The maximum depth at which to merge nested `Kind`s.
-    ///
-    /// This can be either "shallow" or "deep", meaning don't merge nested collections, or do merge
-    /// them.
-    pub depth: Depth,
+    /// How to deal with types in a collection if both specify a type.
+    /// This only applies to types in a collection (not the root type)
+    pub collisions: CollisionStrategy,
 
     /// The strategy used when merging array indices.
     ///
@@ -65,31 +69,25 @@ pub struct Strategy {
 
 /// The choice of "depth" to apply when merging two [`Kind`]s.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum Depth {
-    /// Do a "shallow" merge for a collection.
-    ///
-    /// Meaning, only the first-level of elements in the collection are merged. If the collection
-    /// contains nested collections, its elements aren't merged, but the collection is swapped out
-    /// for the new one.
-    Shallow,
+pub enum CollisionStrategy {
+    /// Use the 2nd value
+    Overwrite,
 
-    /// Do a "deep" merge for a collection.
-    ///
-    /// Meaning, collections are recursively merged.
-    Deep,
+    /// Merge both together
+    Union,
 }
 
-impl Depth {
+impl CollisionStrategy {
     /// Check if `shallow` strategy is enabled.
     #[must_use]
     pub const fn is_shallow(self) -> bool {
-        matches!(self, Self::Shallow)
+        matches!(self, Self::Overwrite)
     }
 
     /// Check if `deep` strategy is enabled.
     #[must_use]
     pub const fn is_deep(self) -> bool {
-        matches!(self, Self::Deep)
+        matches!(self, Self::Union)
     }
 }
 
@@ -129,7 +127,7 @@ impl BitOr for Kind {
         self.merge(
             rhs,
             Strategy {
-                depth: Depth::Deep,
+                collisions: CollisionStrategy::Union,
                 indices: Indices::Keep,
             },
         );
@@ -169,7 +167,7 @@ mod tests {
                     this: Kind::object(Collection::any()),
                     other: Kind::object(BTreeMap::from([("x".into(), Kind::integer())])),
                     strategy: Strategy {
-                        depth: Depth::Deep,
+                        collisions: CollisionStrategy::Union,
                         indices: Indices::Keep,
                     },
                     merged: {
@@ -186,7 +184,7 @@ mod tests {
                     this: Kind::bytes(),
                     other: Kind::integer(),
                     strategy: Strategy {
-                        depth: Depth::Shallow,
+                        collisions: CollisionStrategy::Overwrite,
                         indices: Indices::Keep,
                     },
                     merged: Kind::bytes().or_integer(),
@@ -198,7 +196,7 @@ mod tests {
                     this: Kind::bytes(),
                     other: Kind::integer(),
                     strategy: Strategy {
-                        depth: Depth::Deep,
+                        collisions: CollisionStrategy::Union,
 
                         indices: Indices::Keep,
                     },
@@ -211,7 +209,7 @@ mod tests {
                     this: Kind::bytes().or_object(Collection::from_unknown(Kind::integer())),
                     other: Kind::bytes().or_object(Collection::from_unknown(Kind::bytes())),
                     strategy: Strategy {
-                        depth: Depth::Shallow,
+                        collisions: CollisionStrategy::Overwrite,
                         indices: Indices::Keep,
                     },
                     merged: Kind::bytes()
@@ -224,7 +222,7 @@ mod tests {
                     this: Kind::bytes().or_object(Collection::from_unknown(Kind::integer())),
                     other: Kind::bytes().or_object(Collection::from_unknown(Kind::bytes())),
                     strategy: Strategy {
-                        depth: Depth::Deep,
+                        collisions: CollisionStrategy::Union,
                         indices: Indices::Keep,
                     },
                     merged: Kind::bytes()
@@ -257,7 +255,7 @@ mod tests {
                         ("baz".into(), Kind::boolean()),
                     ])),
                     strategy: Strategy {
-                        depth: Depth::Shallow,
+                        collisions: CollisionStrategy::Overwrite,
                         indices: Indices::Keep,
                     },
                     merged: Kind::bytes().or_integer().or_object(BTreeMap::from([
@@ -300,7 +298,7 @@ mod tests {
                         ("baz".into(), Kind::boolean()),
                     ])),
                     strategy: Strategy {
-                        depth: Depth::Deep,
+                        collisions: CollisionStrategy::Union,
                         indices: Indices::Keep,
                     },
                     merged: Kind::bytes().or_integer().or_object(BTreeMap::from([
@@ -309,12 +307,12 @@ mod tests {
                             Kind::object(BTreeMap::from([
                                 ("qux".into(), Kind::bytes().or_integer()),
                                 ("quux".into(), Kind::boolean().or_regex()),
-                                ("this".into(), Kind::timestamp()),
+                                ("this".into(), Kind::timestamp().or_null()),
                                 ("that".into(), Kind::null()),
                             ])),
                         ),
-                        ("bar".into(), Kind::integer()),
-                        ("baz".into(), Kind::boolean()),
+                        ("bar".into(), Kind::integer().or_null()),
+                        ("baz".into(), Kind::boolean().or_null()),
                     ])),
                 },
             ),
@@ -343,7 +341,7 @@ mod tests {
                         (5.into(), Kind::timestamp()),
                     ])),
                     strategy: Strategy {
-                        depth: Depth::Shallow,
+                        collisions: CollisionStrategy::Overwrite,
                         indices: Indices::Append,
                     },
                     merged: Kind::array(BTreeMap::from([
@@ -392,7 +390,7 @@ mod tests {
                         (5.into(), Kind::timestamp()),
                     ])),
                     strategy: Strategy {
-                        depth: Depth::Deep,
+                        collisions: CollisionStrategy::Union,
                         indices: Indices::Append,
                     },
                     merged: Kind::array(BTreeMap::from([
