@@ -17,7 +17,6 @@ env:
   DEBIAN_FRONTEND: noninteractive
   CONTAINER_TOOL: docker
   GIT_REF: ${{ github.event.inputs.git_ref }}
-  WORKFLOW_MODE: ${{ github.event.inputs.mode }}
   CARGO_PROFILE_RELEASE_LTO: fat
   CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 1
 
@@ -578,7 +577,7 @@ jobs:
   publish-github:
     name: Publish to Github
     # We only publish to Github for versioned releases, not nightlies.
-    if: ${{ env.WORKFLOW_MODE == 'Release' }}
+    if: ${{ github.event.inputs.mode == 'Release' }}
     runs-on: ubuntu-20.04
     needs:
       - generate-publish-metadata
@@ -648,7 +647,7 @@ jobs:
   publish-homebrew:
     name: Publish to Homebrew
     # We only publish to Homebrew for versioned releases, not nightlies.
-    if: ${{ env.WORKFLOW_MODE == 'Release' }}
+    if: ${{ github.event.inputs.mode == 'Release' }}
     runs-on: ubuntu-20.04
     needs:
       - generate-publish-metadata
@@ -805,4 +804,4 @@ jobs:
         DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
       uses: Ilshidur/action-discord@0.3.2
       with:
-        args: "${{ env.WORKFLOW_MODE }} failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
+        args: "${{ github.event.inputs.mode }} failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
