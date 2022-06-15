@@ -193,7 +193,6 @@ prost-types = { version = "0.10.1", default-features = false, optional = true }
 
 # GCP
 goauth = { version = "0.13.0", optional = true }
-gouth = { version = "0.2.1", default-features = false, optional = true }
 smpl_jwt = { version = "0.7.1", default-features = false, optional = true }
 
 # API
@@ -290,8 +289,6 @@ snap = { version = "1.0.5", default-features = false, optional = true }
 socket2 = { version = "0.4.4", default-features = false }
 stream-cancel = { version = "0.8.1", default-features = false }
 strip-ansi-escapes = { version = "0.1.1", default-features = false }
-strum = { version = "0.24", default-features = false }
-strum_macros = { version = "0.24", default-features = false }
 syslog = { version = "6.0.1", default-features = false, optional = true }
 tikv-jemallocator = { version = "0.5.0", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.6", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
@@ -676,7 +673,7 @@ sinks-datadog_metrics = ["protobuf-build", "sinks-azure_blob"]
 sinks-datadog_traces = ["protobuf-build", "rmpv", "rmp-serde", "serde_bytes"]
 sinks-elasticsearch = ["aws-core", "aws-sigv4", "transforms-metric_to_log"]
 sinks-file = ["async-compression"]
-sinks-gcp = ["base64", "gcp", "gouth"]
+sinks-gcp = ["base64", "gcp"]
 sinks-honeycomb = []
 sinks-http = []
 sinks-humio = ["sinks-splunk_hec", "transforms-metric_to_log"]
