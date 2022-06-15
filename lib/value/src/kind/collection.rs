@@ -32,7 +32,7 @@ pub struct Collection<T: Ord> {
     unknown: Option<Unknown>,
 }
 
-impl<T: Ord> Collection<T> {
+impl<T: Ord + std::fmt::Debug> Collection<T> {
     /// Create a new collection from its parts.
     #[must_use]
     pub(super) fn from_parts(known: BTreeMap<T, Kind>, unknown: impl Into<Option<Kind>>) -> Self {
@@ -233,19 +233,31 @@ impl<T: Ord> Collection<T> {
                 } else {
                     self_kind.merge(other_unknown.to_kind().into_owned(), strategy);
                 }
+            } else {
+                if strategy.depth.is_deep() {
+                    // other is missing this field, which returns null
+                    self_kind.add_null();
+                }
             }
         }
 
         let self_unknown_kind = self.unknown().map(|unknown| unknown.to_kind().into_owned());
         if let Some(self_unknown_kind) = self_unknown_kind {
             for (key, mut other_kind) in other.known {
-                if !strategy.depth.is_shallow() {
+                if strategy.depth.is_deep() {
                     other_kind.merge(self_unknown_kind.clone(), strategy);
                 }
                 self.known_mut().insert(key, other_kind);
             }
         } else {
-            self.known.extend(other.known);
+            if strategy.depth.is_shallow() {
+                self.known.extend(other.known);
+            } else {
+                for (key, other_kind) in other.known {
+                    // self is missing this field, which returns null
+                    self.known.insert(key, other_kind.or_null());
+                }
+            }
         }
 
         match (self.unknown.as_mut(), other.unknown) {
