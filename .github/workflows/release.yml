@@ -12,3 +12,4 @@ jobs:
     with:
       git_ref: ${{ github.ref }}
       mode: Release
+   secrets: inherit
