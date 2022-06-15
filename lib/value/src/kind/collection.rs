@@ -256,7 +256,6 @@ impl<T: Ord> Collection<T> {
             }
         }
 
-
         match (self.unknown.as_mut(), other.unknown) {
             (None, Some(rhs)) => self.unknown = Some(rhs),
             (Some(lhs), Some(rhs)) => lhs.merge(rhs, strategy),
@@ -819,7 +818,7 @@ mod tests {
                         ("1".into(), Kind::null()),
                         ("2".into(), Kind::boolean()),
                     ])
-                        .into(),
+                    .into(),
                     want: r#"{ "1": null, "2": boolean }"#,
                 },
             ),
@@ -833,7 +832,7 @@ mod tests {
                             Kind::object(BTreeMap::from([("3".into(), Kind::integer())])),
                         ),
                     ])
-                        .into(),
+                    .into(),
                     want: r#"{ "1": null, "2": { "3": integer } }"#,
                 },
             ),
@@ -889,7 +888,7 @@ mod tests {
                             Kind::object(BTreeMap::from([("0".into(), Kind::integer())])),
                         ),
                     ])
-                        .into(),
+                    .into(),
                     want: r#"[null, { "0": integer }]"#,
                 },
             ),
