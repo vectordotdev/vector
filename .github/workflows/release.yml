@@ -11,4 +11,4 @@ jobs:
     uses: ./.github/workflows/publish.yml
     with:
       git_ref: ${{ github.ref }}
-      mode: release
+      mode: Release

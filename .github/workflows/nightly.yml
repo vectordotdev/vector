@@ -10,5 +10,4 @@ jobs:
     uses: ./.github/workflows/publish.yml
     with:
       git_ref: ${{ github.ref }}
-      mode: nightly
-      debug_symbols: true
+      mode: Nightly
