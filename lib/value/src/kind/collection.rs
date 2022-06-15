@@ -233,11 +233,9 @@ impl<T: Ord> Collection<T> {
                 } else {
                     self_kind.merge(other_unknown.to_kind().into_owned(), strategy);
                 }
-            } else {
-                if strategy.depth.is_deep() {
-                    // other is missing this field, which returns null
-                    self_kind.add_null();
-                }
+            } else if strategy.depth.is_deep() {
+                // other is missing this field, which returns null
+                self_kind.add_null();
             }
         }
 
@@ -249,16 +247,15 @@ impl<T: Ord> Collection<T> {
                 }
                 self.known_mut().insert(key, other_kind);
             }
+        } else if strategy.depth.is_shallow() {
+            self.known.extend(other.known);
         } else {
-            if strategy.depth.is_shallow() {
-                self.known.extend(other.known);
-            } else {
-                for (key, other_kind) in other.known {
-                    // self is missing this field, which returns null
-                    self.known.insert(key, other_kind.or_null());
-                }
+            for (key, other_kind) in other.known {
+                // self is missing this field, which returns null
+                self.known.insert(key, other_kind.or_null());
             }
         }
+
 
         match (self.unknown.as_mut(), other.unknown) {
             (None, Some(rhs)) => self.unknown = Some(rhs),
@@ -822,7 +819,7 @@ mod tests {
                         ("1".into(), Kind::null()),
                         ("2".into(), Kind::boolean()),
                     ])
-                    .into(),
+                        .into(),
                     want: r#"{ "1": null, "2": boolean }"#,
                 },
             ),
@@ -836,7 +833,7 @@ mod tests {
                             Kind::object(BTreeMap::from([("3".into(), Kind::integer())])),
                         ),
                     ])
-                    .into(),
+                        .into(),
                     want: r#"{ "1": null, "2": { "3": integer } }"#,
                 },
             ),
@@ -892,7 +889,7 @@ mod tests {
                             Kind::object(BTreeMap::from([("0".into(), Kind::integer())])),
                         ),
                     ])
-                    .into(),
+                        .into(),
                     want: r#"[null, { "0": integer }]"#,
                 },
             ),
