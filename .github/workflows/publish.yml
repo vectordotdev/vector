@@ -578,7 +578,7 @@ jobs:
   publish-github:
     name: Publish to Github
     # We only publish to Github for versioned releases, not nightlies.
-    if: env.WORKFLOW_MODE == 'Release'
+    if: ${{ env.WORKFLOW_MODE == 'Release' }}
     runs-on: ubuntu-20.04
     needs:
       - generate-publish-metadata
@@ -648,7 +648,7 @@ jobs:
   publish-homebrew:
     name: Publish to Homebrew
     # We only publish to Homebrew for versioned releases, not nightlies.
-    if: env.WORKFLOW_MODE == 'Release'
+    if: ${{ env.WORKFLOW_MODE == 'Release' }}
     runs-on: ubuntu-20.04
     needs:
       - generate-publish-metadata
