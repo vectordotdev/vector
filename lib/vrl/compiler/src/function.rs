@@ -543,6 +543,9 @@ pub enum Error {
 
     #[error(r#"missing function closure"#)]
     ExpectedFunctionClosure,
+
+    #[error(r#"mutation of read-only value"#)]
+    ReadOnlyMutation { context: String },
 }
 
 impl diagnostic::DiagnosticMessage for Error {
@@ -555,6 +558,7 @@ impl diagnostic::DiagnosticMessage for Error {
             ExpectedStaticExpression { .. } => 402,
             InvalidArgument { .. } => 403,
             ExpectedFunctionClosure => 420,
+            ReadOnlyMutation { .. } => 315,
         }
     }
 
@@ -620,6 +624,10 @@ impl diagnostic::DiagnosticMessage for Error {
             ],
 
             ExpectedFunctionClosure => vec![],
+            ReadOnlyMutation { context } => vec![
+                Label::primary(r#"mutation of read-only value"#, Span::default()),
+                Label::context(context, Span::default()),
+            ],
         }
     }
 

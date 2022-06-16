@@ -1,11 +1,13 @@
+#![allow(clippy::module_name_repetitions)]
+
 use std::marker::{PhantomData, Unpin};
 use std::{fmt::Debug, future::Future, pin::Pin, task::Context, task::Poll};
 
-use futures::stream::{FuturesOrdered, FuturesUnordered};
+use futures::stream::{BoxStream, FuturesOrdered, FuturesUnordered};
 use futures::{FutureExt, Stream, StreamExt};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
-use crate::event::{BatchStatus, BatchStatusReceiver};
+use crate::finalization::{BatchStatus, BatchStatusReceiver};
 use crate::shutdown::ShutdownSignal;
 
 /// The `OrderedFinalizer` framework produces a stream of acknowledged
@@ -45,7 +47,7 @@ where
         (
             Self {
                 sender: Some(todo_tx),
-                _phantom: Default::default(),
+                _phantom: PhantomData::default(),
             },
             FinalizerStream {
                 shutdown,
@@ -60,13 +62,11 @@ where
     /// stream of acknowledged identifiers. In the case the finalizer
     /// is not to be used, a special empty stream is returned that is
     /// always pending and so never wakes.
+    #[must_use]
     pub fn maybe_new(
         maybe: bool,
         shutdown: ShutdownSignal,
-    ) -> (
-        Option<Self>,
-        Pin<Box<dyn Stream<Item = (BatchStatus, T)> + Send + 'static>>,
-    ) {
+    ) -> (Option<Self>, BoxStream<'static, (BatchStatus, T)>) {
         if maybe {
             let (finalizer, stream) = Self::new(shutdown);
             (Some(finalizer), stream.boxed())
@@ -183,9 +183,14 @@ impl<T> Future for FinalizerFuture<T> {
     }
 }
 
-#[derive(Clone, Copy, Derivative)]
-#[derivative(Default(bound = ""))]
+#[derive(Clone, Copy)]
 pub struct EmptyStream<T>(PhantomData<T>);
+
+impl<T> Default for EmptyStream<T> {
+    fn default() -> Self {
+        Self(PhantomData::default())
+    }
+}
 
 impl<T> Stream for EmptyStream<T> {
     type Item = T;

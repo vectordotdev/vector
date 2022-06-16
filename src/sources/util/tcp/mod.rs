@@ -1,7 +1,7 @@
 mod request_limiter;
 
 use std::net::SocketAddr;
-use std::{fmt, io, mem::drop, sync::Arc, time::Duration};
+use std::{fmt, io, mem::drop, time::Duration};
 
 use bytes::Bytes;
 use codecs::StreamDecodingError;
@@ -17,6 +17,7 @@ use tokio::{
 };
 use tokio_util::codec::{Decoder, FramedRead};
 use tracing::Instrument;
+use vector_common::finalization::AddBatchNotifier;
 use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
@@ -331,7 +332,7 @@ async fn handle_stream<T>(
 
                         if let Some(batch) = batch {
                             for event in &mut events {
-                                event.add_batch_notifier(Arc::clone(&batch));
+                                event.add_batch_notifier(batch.clone());
                             }
                         }
 

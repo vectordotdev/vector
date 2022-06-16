@@ -6,14 +6,15 @@ use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
 
 use super::{
-    healthcheck, Encoding, NewRelicApiResponse, NewRelicApiService, NewRelicSink, NewRelicSinkError,
+    healthcheck, NewRelicApiResponse, NewRelicApiService, NewRelicEncoder, NewRelicSink,
+    NewRelicSinkError,
 };
 use crate::{
     config::{AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::util::{
-        encoding::EncodingConfigFixed, retries::RetryLogic, service::ServiceBuilderExt,
-        BatchConfig, Compression, SinkBatchSettings, TowerRequestConfig,
+        encoding::Transformer, retries::RetryLogic, service::ServiceBuilderExt, BatchConfig,
+        Compression, SinkBatchSettings, TowerRequestConfig,
     },
     tls::TlsSettings,
 };
@@ -69,10 +70,10 @@ pub struct NewRelicConfig {
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
     #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub encoding: EncodingConfigFixed<Encoding>,
+    pub encoding: Transformer,
     #[serde(default)]
     pub batch: BatchConfig<NewRelicDefaultBatchSettings>,
     #[serde(default)]
@@ -106,8 +107,6 @@ impl SinkConfig for NewRelicConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let encoding = self.encoding.clone();
-
         let batcher_settings = self
             .batch
             .validate()?
@@ -128,7 +127,8 @@ impl SinkConfig for NewRelicConfig {
         let sink = NewRelicSink {
             service,
             acker: cx.acker(),
-            encoding,
+            transformer: self.encoding.clone(),
+            encoder: NewRelicEncoder,
             credentials,
             compression: self.compression,
             batcher_settings,

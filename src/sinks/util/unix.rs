@@ -118,7 +118,7 @@ impl<E> UnixSink<E>
 where
     E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
 {
-    pub fn new(
+    pub const fn new(
         connector: UnixConnector,
         acker: Acker,
         transformer: Transformer,

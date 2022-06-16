@@ -172,13 +172,13 @@ impl SourceConfig for DatadogAgentConfig {
         let definition = match self.decoding {
             // See: `LogMsg` struct.
             DeserializerConfig::Bytes => schema::Definition::empty()
-                .required_field("message", Kind::bytes(), Some("message"))
-                .required_field("status", Kind::bytes(), Some("severity"))
-                .required_field("timestamp", Kind::timestamp(), Some("timestamp"))
-                .required_field("hostname", Kind::bytes(), Some("host"))
-                .required_field("service", Kind::bytes(), Some("service"))
-                .required_field("ddsource", Kind::bytes(), Some("source"))
-                .required_field("ddtags", Kind::bytes(), Some("tags"))
+                .with_field("message", Kind::bytes(), Some("message"))
+                .with_field("status", Kind::bytes(), Some("severity"))
+                .with_field("timestamp", Kind::timestamp(), Some("timestamp"))
+                .with_field("hostname", Kind::bytes(), Some("host"))
+                .with_field("service", Kind::bytes(), Some("service"))
+                .with_field("ddsource", Kind::bytes(), Some("source"))
+                .with_field("ddtags", Kind::bytes(), Some("tags"))
                 .merge(self.decoding.schema_definition()),
 
             // JSON deserializer can overwrite existing fields at runtime, so we have to treat
@@ -393,7 +393,7 @@ pub(crate) async fn handle_request(
 ) -> Result<Response, Rejection> {
     match events {
         Ok(mut events) => {
-            let receiver = BatchNotifier::maybe_apply_to_events(acknowledgements, &mut events);
+            let receiver = BatchNotifier::maybe_apply_to(acknowledgements, &mut events);
             let count = events.len();
 
             if let Some(name) = output {

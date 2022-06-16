@@ -29,15 +29,16 @@ impl ConditionConfig for IsMetricConfig {
 pub struct IsMetric {}
 
 impl Conditional for IsMetric {
-    fn check(&self, e: &Event) -> bool {
-        matches!(e, Event::Metric(_))
+    fn check(&self, e: Event) -> (bool, Event) {
+        (matches!(e, Event::Metric(_)), e)
     }
 
-    fn check_with_context(&self, e: &Event) -> Result<(), String> {
-        if self.check(e) {
-            Ok(())
+    fn check_with_context(&self, e: Event) -> (Result<(), String>, Event) {
+        let (result, event) = self.check(e);
+        if result {
+            (Ok(()), event)
         } else {
-            Err("event is not a metric type".to_string())
+            (Err("event is not a metric type".to_string()), event)
         }
     }
 }
@@ -61,11 +62,14 @@ mod test {
     fn is_metric_basic() {
         let cond = IsMetricConfig {}.build(&Default::default()).unwrap();
 
-        assert!(!cond.check(&Event::from("just a log")));
-        assert!(cond.check(&Event::from(Metric::new(
-            "test metric",
-            MetricKind::Incremental,
-            MetricValue::Counter { value: 1.0 },
-        ))),);
+        assert!(!cond.check(Event::from("just a log")).0);
+        assert!(
+            cond.check(Event::from(Metric::new(
+                "test metric",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 1.0 },
+            )))
+            .0,
+        );
     }
 }

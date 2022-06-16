@@ -7,6 +7,7 @@ publish = false
 
 [dependencies]
 enrichment = { path = "../../enrichment" }
+lookup = { path = "../../lookup" }
 stdlib = { package = "vrl-stdlib", path = "../stdlib" }
 vector_common = { path = "../../vector-common", default-features = false }
 vrl = { path = "../vrl" }

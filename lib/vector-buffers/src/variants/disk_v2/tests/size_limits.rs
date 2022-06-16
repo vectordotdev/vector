@@ -20,7 +20,7 @@ async fn writer_error_when_record_is_over_the_limit() {
         let data_dir = dir.to_path_buf();
 
         async move {
-            // Create our buffer with and arbitrarily low max buffer size, and two write sizes where
+            // Create our buffer with and arbitrarily low max record size, and two write sizes where
             // the first will fit but the second will not.
             //
             // The sizes are different so that we can assert that we got back the expected record at

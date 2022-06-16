@@ -22,6 +22,14 @@ on:
       - "rust-toolchain"
   pull_request:
 
+concurrency:
+  # For pull requests, cancel running workflows, for master, run all
+  #
+  # `github.event.number` exists for pull requests, otherwise fall back to SHA
+  # for master
+  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
+  cancel-in-progress: true
+
 env:
   AUTOINSTALL: true
   AWS_ACCESS_KEY_ID: "dummy"
@@ -37,20 +45,9 @@ env:
   PROFILE: debug
 
 jobs:
-  cancel-previous:
-    name: Cancel redundant jobs
-    runs-on: ubuntu-20.04
-    timeout-minutes: 3
-    if: github.ref != 'refs/heads/master'
-    steps:
-      - uses: styfle/cancel-workflow-action@0.9.1
-        with:
-          access_token: ${{ secrets.GITHUB_TOKEN }}
-          all_but_latest: true # can cancel workflows scheduled later
-
   test-integration:
     name: Integration - Linux, ${{ matrix.test }}
-    runs-on: ubuntu-20.04
+    runs-on: [linux, test-runner]
     if: |
       !github.event.pull_request
         || contains(github.event.pull_request.labels.*.name, 'ci-condition: integration tests enable')
@@ -104,7 +101,7 @@ jobs:
 
   test-integration-check:
     name: test-integration-check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     needs:
       - test-integration
     steps:
@@ -115,7 +112,6 @@ jobs:
     name: master-failure
     if: failure() && github.ref == 'refs/heads/master'
     needs:
-      - cancel-previous
       - test-integration-check
     runs-on: ubuntu-20.04
     steps:

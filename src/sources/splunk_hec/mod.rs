@@ -14,6 +14,7 @@ use serde::Serialize;
 use serde_json::{de::Read as JsonRead, Deserializer, Value as JsonValue};
 use snafu::Snafu;
 use tracing::Span;
+use vector_common::finalization::AddBatchNotifier;
 use vector_config::configurable_component;
 use vector_core::{event::BatchNotifier, ByteSizeOf};
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
@@ -519,7 +520,7 @@ struct EventIterator<'de, R: JsonRead<'de>> {
     /// Remaining extracted default values
     extractors: [DefaultExtractor; 4],
     /// Event finalization
-    batch: Option<Arc<BatchNotifier>>,
+    batch: Option<BatchNotifier>,
     /// Splunk HEC Token for passthrough
     token: Option<Arc<str>>,
 }
@@ -530,7 +531,7 @@ impl<'de, R: JsonRead<'de>> EventIterator<'de, R> {
         channel: Option<String>,
         remote: Option<SocketAddr>,
         remote_addr: Option<String>,
-        batch: Option<Arc<BatchNotifier>>,
+        batch: Option<BatchNotifier>,
         token: Option<Arc<str>>,
     ) -> Self {
         EventIterator {
@@ -783,7 +784,7 @@ fn raw_event(
     channel: String,
     remote: Option<SocketAddr>,
     xff: Option<String>,
-    batch: Option<Arc<BatchNotifier>>,
+    batch: Option<BatchNotifier>,
 ) -> Result<Event, Rejection> {
     // Process gzip
     let message: Value = if gzip {

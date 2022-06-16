@@ -4,6 +4,10 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{FutureExt, TryFutureExt};
 use tracing::Span;
+use vector_core::{
+    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
+    ByteSizeOf,
+};
 use warp::{
     filters::{
         path::{FullPath, Tail},
@@ -12,11 +16,6 @@ use warp::{
     http::{HeaderMap, StatusCode},
     reject::Rejection,
     Filter,
-};
-
-use vector_core::{
-    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
-    ByteSizeOf,
 };
 
 use crate::{
@@ -71,6 +70,8 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 HttpMethod::Delete => warp::delete().boxed(),
             };
 
+            // https://github.com/rust-lang/rust-clippy/issues/8148
+            #[allow(clippy::unnecessary_to_owned)]
             for s in path.split('/').filter(|&x| !x.is_empty()) {
                 filter = filter.and(warp::path(s.to_string())).boxed()
             }
@@ -172,7 +173,7 @@ async fn handle_request(
 ) -> Result<impl warp::Reply, Rejection> {
     match events {
         Ok(mut events) => {
-            let receiver = BatchNotifier::maybe_apply_to_events(acknowledgements, &mut events);
+            let receiver = BatchNotifier::maybe_apply_to(acknowledgements, &mut events);
 
             out.send_batch(events)
                 .map_err(move |error: crate::source_sender::ClosedError| {

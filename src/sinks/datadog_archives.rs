@@ -16,6 +16,7 @@ use std::{
 use azure_storage_blobs::prelude::ContainerClient;
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{SecondsFormat, Utc};
+use codecs::{encoding::Framer, JsonSerializer, NewlineDelimitedEncoder};
 use goauth::scopes::Scope;
 use http::header::{HeaderName, HeaderValue};
 use lookup::path;
@@ -30,14 +31,9 @@ use vector_core::{
     ByteSizeOf,
 };
 
-use super::util::{
-    encoding::{Encoder, StandardEncodings},
-    metadata::RequestMetadataBuilder,
-    request_builder::EncodeResult,
-    BatchConfig, Compression, RequestBuilder, SinkBatchSettings,
-};
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
+    codecs::Encoder,
     config::{GenerateConfig, Input, SinkConfig, SinkContext},
     gcp::{GcpAuthConfig, GcpCredentials},
     http::HttpClient,
@@ -64,7 +60,11 @@ use crate::{
             sink::S3Sink,
         },
         util::{
-            metadata::RequestMetadata, partitioner::KeyPartitioner, ServiceBuilderExt,
+            encoding::Transformer,
+            metadata::{RequestMetadata, RequestMetadataBuilder},
+            partitioner::KeyPartitioner,
+            request_builder::EncodeResult,
+            BatchConfig, Compression, RequestBuilder, ServiceBuilderExt, SinkBatchSettings,
             TowerRequestConfig,
         },
         VectorSink,
@@ -103,6 +103,11 @@ pub struct DatadogArchivesSinkConfig {
     #[serde(default)]
     pub gcp_cloud_storage: Option<GcsConfig>,
     tls: Option<TlsConfig>,
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub encoding: Transformer,
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -163,6 +168,7 @@ impl GenerateConfig for DatadogArchivesSinkConfig {
             gcp_cloud_storage: None,
             tls: None,
             azure_blob: None,
+            encoding: Default::default(),
             acknowledgements: Default::default(),
         })
         .unwrap()
@@ -279,8 +285,12 @@ impl DatadogArchivesSinkConfig {
             .as_ref()
             .expect("s3 config wasn't provided")
             .clone();
-        let request_builder =
-            DatadogS3RequestBuilder::new(self.bucket.clone(), self.key_prefix.clone(), s3_config);
+        let request_builder = DatadogS3RequestBuilder::new(
+            self.bucket.clone(),
+            self.key_prefix.clone(),
+            s3_config,
+            self.encoding.clone(),
+        );
 
         let sink = S3Sink::new(cx, service, request_builder, partitioner, batcher_settings);
 
@@ -331,7 +341,7 @@ impl DatadogArchivesSinkConfig {
             acl,
             storage_class,
             metadata,
-            encoding: DatadogArchivesEncoding::default(),
+            encoding: DatadogArchivesEncoding::new(self.encoding.clone()),
             compression: DEFAULT_COMPRESSION,
         };
 
@@ -360,7 +370,7 @@ impl DatadogArchivesSinkConfig {
         let request_builder = DatadogAzureRequestBuilder {
             container_name: self.bucket.clone(),
             blob_prefix: self.key_prefix.clone(),
-            encoding: DatadogArchivesEncoding::default(),
+            encoding: DatadogArchivesEncoding::new(self.encoding.clone()),
         };
 
         let sink = AzureBlobSink::new(cx, service, request_builder, partitioner, batcher_settings);
@@ -379,7 +389,7 @@ const RESERVED_ATTRIBUTES: [&str; 10] = [
 
 #[derive(Debug)]
 struct DatadogArchivesEncoding {
-    inner: StandardEncodings,
+    encoder: (Transformer, Encoder<Framer>),
     reserved_attributes: HashSet<&'static str>,
     id_rnd_bytes: [u8; 8],
     id_seq_number: AtomicU32,
@@ -411,10 +421,16 @@ impl DatadogArchivesEncoding {
     }
 }
 
-impl Default for DatadogArchivesEncoding {
-    fn default() -> Self {
+impl DatadogArchivesEncoding {
+    pub fn new(transformer: Transformer) -> Self {
         Self {
-            inner: StandardEncodings::Ndjson,
+            encoder: (
+                transformer,
+                Encoder::<Framer>::new(
+                    NewlineDelimitedEncoder::new().into(),
+                    JsonSerializer::new().into(),
+                ),
+            ),
             reserved_attributes: RESERVED_ATTRIBUTES.iter().copied().collect(),
             id_rnd_bytes: thread_rng().gen::<[u8; 8]>(),
             id_seq_number: AtomicU32::new(0),
@@ -423,7 +439,7 @@ impl Default for DatadogArchivesEncoding {
     }
 }
 
-impl Encoder<Vec<Event>> for DatadogArchivesEncoding {
+impl crate::sinks::util::encoding::Encoder<Vec<Event>> for DatadogArchivesEncoding {
     /// Applies the following transformations to align event's schema with DD:
     /// - `_id` is generated in the sink(format described below);
     /// - `date` is set from the Global Log Schema's `timestamp` mapping, or to the current time if missing;
@@ -469,7 +485,7 @@ impl Encoder<Vec<Event>> for DatadogArchivesEncoding {
             log_event.insert("attributes", attributes);
         }
 
-        self.inner.encode_input(input, writer)
+        self.encoder.encode_input(input, writer)
     }
 }
 #[derive(Debug)]
@@ -481,12 +497,17 @@ struct DatadogS3RequestBuilder {
 }
 
 impl DatadogS3RequestBuilder {
-    pub fn new(bucket: String, key_prefix: Option<String>, config: S3Config) -> Self {
+    pub fn new(
+        bucket: String,
+        key_prefix: Option<String>,
+        config: S3Config,
+        transformer: Transformer,
+    ) -> Self {
         Self {
             bucket,
             key_prefix,
             config,
-            encoding: DatadogArchivesEncoding::default(),
+            encoding: DatadogArchivesEncoding::new(transformer),
         }
     }
 }
@@ -607,7 +628,7 @@ impl RequestBuilder<(String, Vec<Event>)> for DatadogGcsRequestBuilder {
             ?key
         );
 
-        let content_type = HeaderValue::from_str(StandardEncodings::Ndjson.content_type()).unwrap();
+        let content_type = HeaderValue::from_str(self.encoding.encoder.1.content_type()).unwrap();
         let content_encoding = DEFAULT_COMPRESSION
             .content_encoding()
             .map(|ce| HeaderValue::from_str(&to_string(ce)).unwrap());
@@ -755,7 +776,7 @@ mod tests {
     use vector_core::partition::Partitioner;
 
     use super::*;
-    use crate::event::LogEvent;
+    use crate::{event::LogEvent, sinks::util::encoding::Encoder as _};
 
     #[test]
     fn generate_config() {
@@ -775,7 +796,7 @@ mod tests {
         log_mut.insert("timestamp", timestamp);
 
         let mut writer = Cursor::new(Vec::new());
-        let encoding = DatadogArchivesEncoding::default();
+        let encoding = DatadogArchivesEncoding::new(Default::default());
         let _ = encoding.encode_input(vec![event], &mut writer);
 
         let encoded = writer.into_inner();
@@ -861,7 +882,7 @@ mod tests {
     fn generates_valid_id() {
         let log1 = Event::from("test event 1");
         let mut writer = Cursor::new(Vec::new());
-        let encoding = DatadogArchivesEncoding::default();
+        let encoding = DatadogArchivesEncoding::new(Default::default());
         let _ = encoding.encode_input(vec![log1], &mut writer);
         let encoded = writer.into_inner();
         let json: BTreeMap<String, serde_json::Value> =
@@ -893,7 +914,7 @@ mod tests {
     fn generates_date_if_missing() {
         let log = Event::from("test message");
         let mut writer = Cursor::new(Vec::new());
-        let encoding = DatadogArchivesEncoding::default();
+        let encoding = DatadogArchivesEncoding::new(Default::default());
         let _ = encoding.encode_input(vec![log], &mut writer);
         let encoded = writer.into_inner();
         let json: BTreeMap<String, serde_json::Value> =
@@ -942,6 +963,7 @@ mod tests {
             "dd-logs".into(),
             Some("audit".into()),
             S3Config::default(),
+            Default::default(),
         );
 
         let (metadata, _events) = request_builder.split_input((key, vec![log]));
@@ -995,6 +1017,7 @@ mod tests {
                 azure_blob: None,
                 gcp_cloud_storage: None,
                 tls: None,
+                encoding: Default::default(),
                 acknowledgements: Default::default(),
             };
 

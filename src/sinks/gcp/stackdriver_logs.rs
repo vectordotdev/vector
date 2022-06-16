@@ -16,7 +16,7 @@ use crate::{
     sinks::{
         gcs_common::config::healthcheck_response,
         util::{
-            encoding::{EncodingConfigWithDefault, EncodingConfiguration},
+            encoding::Transformer,
             http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
             BatchConfig, BoxedRawValue, JsonArrayBuffer, RealtimeSizeBasedDefaultBatchSettings,
             TowerRequestConfig,
@@ -49,10 +49,10 @@ pub struct StackdriverConfig {
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
     #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
+    pub encoding: Transformer,
 
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
@@ -83,14 +83,6 @@ struct StackdriverSink {
 
 // 10MB limit for entries.write: https://cloud.google.com/logging/quotas#api-limits
 const MAX_BATCH_PAYLOAD_SIZE: usize = 10_000_000;
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-pub enum Encoding {
-    #[derivative(Default)]
-    Default,
-}
 
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
@@ -216,7 +208,7 @@ impl HttpEventEncoder<serde_json::Value> for StackdriverEventEncoder {
             .unwrap_or_else(|| 0.into());
 
         let mut event = Event::Log(log);
-        self.config.encoding.apply_rules(&mut event);
+        self.config.encoding.transform(&mut event);
 
         let log = event.into_log();
 
