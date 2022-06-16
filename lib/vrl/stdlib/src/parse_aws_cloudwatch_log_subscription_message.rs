@@ -138,13 +138,11 @@ fn inner_kind() -> BTreeMap<Field, Kind> {
         ),
         (
             Field::from("log_events"),
-            Kind::array(Collection::from_unknown(
-                Kind::object(BTreeMap::from([
-                    (Field::from("id"), Kind::bytes()),
-                    (Field::from("timestamp"), Kind::timestamp()),
-                    (Field::from("message"), Kind::bytes()),
-                ])),
-            ))
+            Kind::array(Collection::from_unknown(Kind::object(BTreeMap::from([
+                (Field::from("id"), Kind::bytes()),
+                (Field::from("timestamp"), Kind::timestamp()),
+                (Field::from("message"), Kind::bytes()),
+            ])))),
         ),
     ])
 }
