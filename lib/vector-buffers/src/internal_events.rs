@@ -69,6 +69,7 @@ impl InternalEvent for BufferEventsDropped {
                 count = %self.count,
                 intentional = %intentional_str,
                 reason = %self.reason,
+                stage = %self.idx,
             );
         } else {
             error!(
@@ -76,6 +77,7 @@ impl InternalEvent for BufferEventsDropped {
                 count = %self.count,
                 intentional = %intentional_str,
                 reason = %self.reason,
+                stage = %self.idx,
             );
         }
         counter!(
