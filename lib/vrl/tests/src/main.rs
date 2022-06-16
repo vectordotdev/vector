@@ -183,7 +183,7 @@ fn main() {
         state.set_external_context(test_enrichment.clone());
 
         let compile_start = Instant::now();
-        let program = vrl::compile_with_state(&test.source, &functions, &mut state);
+        let program = vrl::compile_with_external(&test.source, &functions, &mut state);
         let compile_end = compile_start.elapsed();
 
         let want = test.result.clone();

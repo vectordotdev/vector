@@ -84,7 +84,7 @@ impl RemapConfig {
         state.set_external_context(enrichment_tables);
         state.set_external_context(MeaningList::default());
 
-        vrl::compile_with_state(&source, &functions, &mut state)
+        vrl::compile_with_external(&source, &functions, &mut state)
             .map_err(|diagnostics| {
                 Formatter::new(&source, diagnostics)
                     .colored()

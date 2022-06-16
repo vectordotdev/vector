@@ -21,28 +21,27 @@ pub use runtime::{Runtime, RuntimeResult, Terminate};
 pub fn compile(source: &str, fns: &[Box<dyn Function>]) -> compiler::Result {
     let mut state = state::ExternalEnv::default();
 
-    compile_with_state(source, fns, &mut state)
+    compile_with_external(source, fns, &mut state)
+}
+
+pub fn compile_with_external(
+    source: &str,
+    fns: &[Box<dyn Function>],
+    external: &mut state::ExternalEnv,
+) -> compiler::Result {
+    compile_with_state(source, fns, external, state::LocalEnv::default())
 }
 
 pub fn compile_with_state(
     source: &str,
     fns: &[Box<dyn Function>],
     external: &mut state::ExternalEnv,
+    local: state::LocalEnv,
 ) -> compiler::Result {
     let ast = parser::parse(source)
         .map_err(|err| diagnostic::DiagnosticList::from(vec![Box::new(err) as Box<_>]))?;
 
-    Compiler::compile(fns, ast, external, state::LocalEnv::default())
-}
+    // TODO: set `vector` metadata to read-only
 
-pub fn compile_for_repl(
-    source: &str,
-    fns: &[Box<dyn Function>],
-    external: &mut state::ExternalEnv,
-    local: state::LocalEnv,
-) -> compiler::Result<Program> {
-    let ast = parser::parse(source)
-        .map_err(|err| diagnostic::DiagnosticList::from(vec![Box::new(err) as Box<_>]))?;
-
-    Compiler::compile(fns, ast, external, local).map(|(program, _)| program)
+    Compiler::compile(fns, ast, external, local)
 }

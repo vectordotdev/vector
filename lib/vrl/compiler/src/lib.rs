@@ -31,7 +31,6 @@ pub use expression::Expression;
 pub use function::{Function, Parameter};
 pub use paste::paste;
 pub use program::{Program, ProgramInfo};
-use state::ExternalEnv;
 pub use type_def::TypeDef;
 
 pub type Result<T = (Program, DiagnosticList)> = std::result::Result<T, DiagnosticList>;
@@ -74,8 +73,5 @@ impl Display for VrlRuntime {
 
 /// re-export of commonly used parser types.
 pub(crate) mod parser {
-    pub(crate) use ::parser::{
-        ast::{self, Ident, Node},
-        Program,
-    };
+    pub(crate) use ::parser::ast::{self, Ident, Node};
 }

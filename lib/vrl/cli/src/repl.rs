@@ -159,8 +159,8 @@ fn resolve(
 ) -> (state::LocalEnv, Result<Value, String>) {
     let mut functions = stdlib::all();
     functions.extend(vector_vrl_functions::vrl_functions());
-    let program = match vrl::compile_for_repl(program, &functions, external, local.clone()) {
-        Ok(result) => result,
+    let program = match vrl::compile_with_state(program, &functions, external, local.clone()) {
+        Ok((program, _)) => program,
         Err(diagnostics) => {
             return (
                 local,
