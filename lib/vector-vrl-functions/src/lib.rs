@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 pub mod get_metadata_field;
 pub mod get_secret;
 pub mod remove_metadata_field;

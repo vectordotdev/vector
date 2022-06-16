@@ -1,3 +1,4 @@
+#![deny(warnings)]
 #![deny(clippy::all)]
 #![deny(unreachable_pub)]
 #![deny(unused_allocation)]
