@@ -26,15 +26,18 @@ const PEM_START_MARKER: &str = "-----BEGIN ";
 
 #[cfg(test)]
 pub const TEST_PEM_CA_PATH: &str = "tests/data/ca/certs/ca.cert.pem";
+#[cfg(all(test, feature = "kafka-integration-tests"))]
+pub const TEST_PEM_INTERMEDIATE_CA_PATH: &str =
+    "tests/data/ca/intermediate_server/certs/ca-chain.cert.pem";
 #[cfg(test)]
 pub const TEST_PEM_CRT_PATH: &str =
     "tests/data/ca/intermediate_server/certs/localhost-chain.cert.pem";
 #[cfg(test)]
 pub const TEST_PEM_KEY_PATH: &str = "tests/data/ca/intermediate_server/private/localhost.key.pem";
-#[cfg(test)]
+#[cfg(all(test, feature = "sources-socket"))]
 pub const TEST_PEM_CLIENT_CRT_PATH: &str =
     "tests/data/ca/intermediate_client/certs/localhost-chain.cert.pem";
-#[cfg(test)]
+#[cfg(all(test, feature = "sources-socket"))]
 pub const TEST_PEM_CLIENT_KEY_PATH: &str =
     "tests/data/ca/intermediate_client/private/localhost.key.pem";
 

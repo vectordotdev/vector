@@ -61,11 +61,89 @@ ca/intermediate_server/certs/localhost.cert.pem: ca/intermediate_server/csr/loca
 ca/intermediate_server/certs/localhost-chain.cert.pem: ca/intermediate_server/certs/ca-chain.cert.pem ca/intermediate_server/certs/localhost.cert.pem
 	cat ca/intermediate_server/certs/localhost.cert.pem ca/intermediate_server/certs/ca-chain.cert.pem > ca/intermediate_server/certs/localhost-chain.cert.pem
 
-ca/intermediate_client/private/localhost.p12: ca/intermediate_server/private/localhost.key.pem ca/intermediate_server/certs/localhost.cert.pem
-	openssl pkcs12 -export -password pass:NOPASS \
+ca/intermediate_server/private/elasticsearch-secure.key.pem:
+	openssl genrsa -out ca/intermediate_server/private/elasticsearch-secure.key.pem 2048
+
+ca/intermediate_server/csr/elasticsearch-secure.csr.pem: ca/intermediate_server/private/elasticsearch-secure.key.pem
+	openssl req -config ca/intermediate_server/openssl.cnf \
+		-key ca/intermediate_server/private/elasticsearch-secure.key.pem \
+		-subj '/CN=elasticsearch-secure/OU=Vector/O=Datadog/ST=New York/L=New York/C=US' \
+		-new -sha256 -out ca/intermediate_server/csr/elasticsearch-secure.csr.pem
+
+ca/intermediate_server/certs/elasticsearch-secure.cert.pem: ca/intermediate_server/csr/elasticsearch-secure.csr.pem
+	openssl ca -batch -config ca/intermediate_server/openssl.cnf \
+		-extensions server_cert -days 3650 -notext -md sha256 \
+		-in ca/intermediate_server/csr/elasticsearch-secure.csr.pem \
+		-out ca/intermediate_server/certs/elasticsearch-secure.cert.pem
+
+ca/intermediate_server/certs/elasticsearch-secure-chain.cert.pem: ca/intermediate_server/certs/ca-chain.cert.pem ca/intermediate_server/certs/elasticsearch-secure.cert.pem
+	cat ca/intermediate_server/certs/elasticsearch-secure.cert.pem ca/intermediate_server/certs/ca-chain.cert.pem > ca/intermediate_server/certs/elasticsearch-secure-chain.cert.pem
+
+ca/intermediate_server/private/influxdb-v1-tls.key.pem:
+	openssl genrsa -out ca/intermediate_server/private/influxdb-v1-tls.key.pem 2048
+
+ca/intermediate_server/csr/influxdb-v1-tls.csr.pem: ca/intermediate_server/private/influxdb-v1-tls.key.pem
+	openssl req -config ca/intermediate_server/openssl.cnf \
+		-key ca/intermediate_server/private/influxdb-v1-tls.key.pem \
+		-subj '/CN=influxdb-v1-tls/OU=Vector/O=Datadog/ST=New York/L=New York/C=US' \
+		-new -sha256 -out ca/intermediate_server/csr/influxdb-v1-tls.csr.pem
+
+ca/intermediate_server/certs/influxdb-v1-tls.cert.pem: ca/intermediate_server/csr/influxdb-v1-tls.csr.pem
+	openssl ca -batch -config ca/intermediate_server/openssl.cnf \
+		-extensions server_cert -days 3650 -notext -md sha256 \
+		-in ca/intermediate_server/csr/influxdb-v1-tls.csr.pem \
+		-out ca/intermediate_server/certs/influxdb-v1-tls.cert.pem
+
+ca/intermediate_server/certs/influxdb-v1-tls-chain.cert.pem: ca/intermediate_server/certs/ca-chain.cert.pem ca/intermediate_server/certs/influxdb-v1-tls.cert.pem
+	cat ca/intermediate_server/certs/influxdb-v1-tls.cert.pem ca/intermediate_server/certs/ca-chain.cert.pem > ca/intermediate_server/certs/influxdb-v1-tls-chain.cert.pem
+
+ca/intermediate_server/private/postgres.key.pem:
+	openssl genrsa -out ca/intermediate_server/private/postgres.key.pem 2048
+
+ca/intermediate_server/csr/postgres.csr.pem: ca/intermediate_server/private/postgres.key.pem
+	openssl req -config ca/intermediate_server/openssl.cnf \
+		-key ca/intermediate_server/private/postgres.key.pem \
+		-subj '/CN=postgres/OU=Vector/O=Datadog/ST=New York/L=New York/C=US' \
+		-new -sha256 -out ca/intermediate_server/csr/postgres.csr.pem
+
+ca/intermediate_server/certs/postgres.cert.pem: ca/intermediate_server/csr/postgres.csr.pem
+	openssl ca -batch -config ca/intermediate_server/openssl.cnf \
+		-extensions server_cert -days 3650 -notext -md sha256 \
+		-in ca/intermediate_server/csr/postgres.csr.pem \
+		-out ca/intermediate_server/certs/postgres.cert.pem
+
+ca/intermediate_server/certs/postgres-chain.cert.pem: ca/intermediate_server/certs/ca-chain.cert.pem ca/intermediate_server/certs/postgres.cert.pem
+	cat ca/intermediate_server/certs/postgres.cert.pem ca/intermediate_server/certs/ca-chain.cert.pem > ca/intermediate_server/certs/postgres-chain.cert.pem
+
+ca/intermediate_server/private/kafka.key.pem:
+	openssl genrsa -out ca/intermediate_server/private/kafka.key.pem 2048
+
+ca/intermediate_server/csr/kafka.csr.pem: ca/intermediate_server/private/kafka.key.pem
+	openssl req -config ca/intermediate_server/openssl.cnf \
+		-key ca/intermediate_server/private/kafka.key.pem \
+		-subj '/CN=kafka/OU=Vector/O=Datadog/ST=New York/L=New York/C=US' \
+		-new -sha256 -out ca/intermediate_server/csr/kafka.csr.pem
+
+ca/intermediate_server/certs/kafka.cert.pem: ca/intermediate_server/csr/kafka.csr.pem
+	openssl ca -batch -config ca/intermediate_server/openssl.cnf \
+		-extensions server_cert -days 3650 -notext -md sha256 \
+		-in ca/intermediate_server/csr/kafka.csr.pem \
+		-out ca/intermediate_server/certs/kafka.cert.pem
+
+ca/intermediate_server/certs/kafka-chain.cert.pem: ca/intermediate_server/certs/ca-chain.cert.pem ca/intermediate_server/certs/kafka.cert.pem
+	cat ca/intermediate_server/certs/kafka.cert.pem ca/intermediate_server/certs/ca-chain.cert.pem > ca/intermediate_server/certs/kafka-chain.cert.pem
+
+ca/intermediate_server/private/kafka.p12: ca/intermediate_server/private/kafka.key.pem ca/intermediate_server/certs/kafka.cert.pem ca/intermediate_server/certs/ca-chain.cert.pem
+	openssl pkcs12 -chain -export -password pass:NOPASS -CAfile ca/intermediate_server/certs/ca-chain.cert.pem \
+		-out ca/intermediate_server/private/kafka.p12 \
+		-in ca/intermediate_server/certs/kafka.cert.pem \
+		-inkey ca/intermediate_server/private/kafka.key.pem
+
+ca/intermediate_client/private/localhost.p12: ca/intermediate_client/private/localhost.key.pem ca/intermediate_client/certs/localhost.cert.pem ca/intermediate_client/certs/ca-chain.cert.pem
+	openssl pkcs12 -chain -export -password pass:NOPASS -CAfile ca/intermediate_client/certs/ca-chain.cert.pem\
 		-out ca/intermediate_client/private/localhost.p12 \
-		-in ca/intermediate_server/certs/localhost.cert.pem \
-		-inkey ca/intermediate_server/private/localhost.key.pem
+		-in ca/intermediate_client/certs/localhost.cert.pem \
+		-inkey ca/intermediate_client/private/localhost.key.pem
 
 ca/intermediate_client/private/intermediate_client.key.pem:
 	mkdir -p ca/intermediate_client/private
