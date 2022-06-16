@@ -13,7 +13,7 @@ use crate::{
             common::{
                 acknowledgements::HecClientAcknowledgementsConfig,
                 integration_test_helpers::{get_token, splunk_api_address, splunk_hec_address},
-                EndpointTarget,
+                EndpointTarget, SOURCE_FIELD,
             },
             logs::config::{HecEncoding, HecLogsSinkConfig},
         },
@@ -120,7 +120,6 @@ async fn config(
         timestamp_nanos_key: None,
         timestamp_key: Default::default(),
         endpoint_target: EndpointTarget::Event,
-        splunk_metadata: Default::default(),
     }
 }
 
@@ -150,7 +149,7 @@ async fn splunk_insert_raw_message() {
 
     let config = HecLogsSinkConfig {
         endpoint_target: EndpointTarget::Raw,
-        source: "zork",
+        source: Some(Template::try_from("zork").unwrap()),
         ..config(HecEncoding::Text, vec![]).await
     };
     let (sink, _) = config.build(cx).await.unwrap();

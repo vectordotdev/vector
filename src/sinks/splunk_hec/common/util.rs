@@ -7,7 +7,7 @@ use hyper::Body;
 use snafu::{ResultExt, Snafu};
 use vector_core::{config::proxy::ProxyConfig, event::EventRef};
 
-use super::{request::HecRequest, service::HttpRequestBuilder, EndpointTarget};
+use super::{request::HecRequest, service::{HttpRequestBuilder, MetadataFields}, EndpointTarget};
 use crate::{
     http::HttpClient,
     internal_events::TemplateRenderingError,
@@ -61,10 +61,12 @@ pub fn build_http_batch_service(
                         EndpointTarget::Raw => "/services/collector/raw",
                     },
                     req.passthrough_token,
-                    req.source,
-                    req.sourcetype,
-                    req.index,
-                    req.host,
+                    MetadataFields {
+                        source: req.source,
+                        sourcetype: req.sourcetype,
+                        index: req.index,
+                        host: req.host,
+                    },
                 )
             });
         future
@@ -110,7 +112,7 @@ pub fn build_uri(
             uri.push('&');
         }
         uri.push_str(&Cow::<str>::from(percent_encoding::utf8_percent_encode(
-            &key,
+            key,
             percent_encoding::NON_ALPHANUMERIC,
         )));
         uri.push('=');
@@ -152,7 +154,6 @@ pub fn render_template_string<'a>(
 mod tests {
     use bytes::Bytes;
     use http::{HeaderValue, Uri};
-    use std::collections::HashMap;
     use vector_core::config::proxy::ProxyConfig;
     use wiremock::{
         matchers::{header, method, path},
@@ -161,8 +162,8 @@ mod tests {
 
     use crate::sinks::{
         splunk_hec::common::{
-            build_healthcheck, build_uri, create_client, service::HttpRequestBuilder,
-            EndpointTarget,
+            build_healthcheck, build_uri, create_client, service::{HttpRequestBuilder, MetadataFields},
+            EndpointTarget, HOST_FIELD, SOURCE_FIELD,
         },
         util::Compression,
     };
@@ -262,10 +263,7 @@ mod tests {
                 events.clone(),
                 "/services/collector/event",
                 None,
-                None,
-                None,
-                None,
-                None,
+                MetadataFields::default(),
             )
             .unwrap();
 
@@ -307,10 +305,7 @@ mod tests {
                 events.clone(),
                 "/services/collector/event",
                 None,
-                None,
-                None,
-                None,
-                None,
+                MetadataFields::default(),
             )
             .unwrap();
 
@@ -355,10 +350,7 @@ mod tests {
                 events,
                 "/services/collector/event",
                 None,
-                None,
-                None,
-                None,
-                None,
+                MetadataFields::default(),
             )
             .unwrap_err();
         assert_eq!(err.to_string(), "URI parse error: invalid format")

@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc::Receiver, oneshot::Sender};
 use vector_core::event::EventStatus;
 
-use super::service::HttpRequestBuilder;
+use super::service::{HttpRequestBuilder, MetadataFields};
 use crate::{
     config::AcknowledgementsConfig,
     http::HttpClient,
@@ -205,10 +205,7 @@ impl HecAckClient {
                 request_body_bytes,
                 "/services/collector/ack",
                 None,
-                None,
-                None,
-                None,
-                None,
+                MetadataFields::default(),
             )
             .map_err(|_| HecAckApiError::ClientBuildRequest)?;
 

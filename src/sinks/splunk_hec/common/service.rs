@@ -189,6 +189,14 @@ pub struct HttpRequestBuilder {
     pub channel: String,
 }
 
+#[derive(Default)]
+pub(super) struct MetadataFields {
+        pub(super) source: Option<String>,
+        pub(super) sourcetype: Option<String>,
+        pub(super) index: Option<String>,
+        pub(super) host: Option<String>,
+}
+
 impl HttpRequestBuilder {
     pub fn new(
         endpoint: String,
@@ -206,23 +214,20 @@ impl HttpRequestBuilder {
         }
     }
 
-    pub fn build_request(
+    pub(super) fn build_request(
         &self,
         body: Bytes,
         path: &str,
         passthrough_token: Option<Arc<str>>,
-        source: Option<String>,
-        sourcetype: Option<String>,
-        index: Option<String>,
-        host: Option<String>,
+        metadata_fields: MetadataFields
     ) -> Result<Request<Bytes>, crate::Error> {
         let uri = match self.endpoint_target {
             EndpointTarget::Raw => {
                 let metadata = [
-                    (super::SOURCE_FIELD, source),
-                    (super::SOURCETYPE_FIELD, sourcetype),
-                    (super::INDEX_FIELD, index),
-                    (super::HOST_FIELD, host),
+                    (super::SOURCE_FIELD, metadata_fields.source),
+                    (super::SOURCETYPE_FIELD, metadata_fields.sourcetype),
+                    (super::INDEX_FIELD, metadata_fields.index),
+                    (super::HOST_FIELD, metadata_fields.host),
                 ]
                 .into_iter()
                 .filter_map(|(key, value)| value.map(|value| (key, value)));
