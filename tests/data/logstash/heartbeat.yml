@@ -5,4 +5,4 @@ heartbeat.monitors:
     - https://google.com
 
 output.logstash:
-  hosts: ['0.0.0.0:8080']
+  hosts: ['runner:8080']

@@ -30,8 +30,6 @@ services:
       - "splunk-integration-tests"
       - "--lib"
       - "${FILTER:-::splunk_hec::}"
-      - "--"
-      - "--nocapture"
     depends_on:
       - splunk-hec
     environment:

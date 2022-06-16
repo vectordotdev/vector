@@ -707,7 +707,8 @@ mod integration_tests {
     };
 
     fn heartbeat_address() -> String {
-        std::env::var("HEARTBEAT_ADDRESS").unwrap_or_else(|_| "0.0.0.0:8080".into())
+        std::env::var("HEARTBEAT_ADDRESS")
+            .expect("Address of Beats Heartbeat service must be specified.")
     }
 
     #[tokio::test]
@@ -734,7 +735,8 @@ mod integration_tests {
     }
 
     fn logstash_address() -> String {
-        std::env::var("LOGSTASH_ADDRESS").unwrap_or_else(|_| "0.0.0.0:8081".into())
+        std::env::var("LOGSTASH_ADDRESS")
+            .expect("Listen address for `logstash` source must be specified.")
     }
 
     #[tokio::test]

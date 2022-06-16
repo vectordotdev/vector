@@ -125,28 +125,49 @@ mv --force --verbose "$TEMP"/bin/protoc /usr/bin/protoc
 # Apt cleanup
 apt clean
 
-# Install mold, because the system linker wastes a bunch of time.
-TEMP=$(mktemp -d)
-MOLD_VERSION=1.2.1
-MOLD_TARGET=mold-${MOLD_VERSION}-x86_64-linux
-curl -fsSL "https://github.com/rui314/mold/releases/download/v${MOLD_VERSION}/${MOLD_TARGET}.tar.gz" \
-     --output "$TEMP/${MOLD_TARGET}.tar.gz"
-tar \
-    -xvf "${TEMP}/${MOLD_TARGET}.tar.gz" \
-    -C "${TEMP}"
-cp "${TEMP}/${MOLD_TARGET}/bin/mold" /usr/bin/mold
-
-# Set Cargo to use mold as its linker.
+# Set up the default "deny all warnings" build flags
 CARGO_OVERRIDE_DIR="${HOME}/.cargo"
-mkdir -p "${CARGO_OVERRIDE_DIR}"
-
 CARGO_OVERRIDE_CONF="${CARGO_OVERRIDE_DIR}/config.toml"
-cat <<EOF >>"${CARGO_OVERRIDE_CONF}"
-[target.x86_64-unknown-linux-gnu]
-rustflags = ["-D", "warnings", "-C", "linker=clang", "-C", "link-arg=-fuse-ld=/usr/bin/mold"]
+cat <<EOF >>"$CARGO_OVERRIDE_CONF"
+[target.'cfg(linux)']
+rustflags = [ "-D", "warnings" ]
 EOF
 
-# Install clang if we don't already have it, as we need it for overriding the linker.
-if ! [ -x "$(command -v clang)" ]; then
-    apt install --yes clang
+# Install mold, because the system linker wastes a bunch of time.
+#
+# Notably, we don't install/configure it when we're going to do anything with `cross`, as `cross` takes the Cargo
+# configuration from the host system and ships it over...  which isn't good when we're overriding the `rustc-wrapper`
+# and all of that.
+if [ -z "${DISABLE_MOLD:-""}" ] ; then
+    # We explicitly put `mold-wrapper.so` right beside `mold` itself because it's hard-coded to look in the same directory
+    # first when trying to load the shared object, so we can dodge having to care about the "right" lib folder to put it in.
+    TEMP=$(mktemp -d)
+    MOLD_VERSION=1.2.1
+    MOLD_TARGET=mold-${MOLD_VERSION}-x86_64-linux
+    curl -fsSL "https://github.com/rui314/mold/releases/download/v${MOLD_VERSION}/${MOLD_TARGET}.tar.gz" \
+        --output "$TEMP/${MOLD_TARGET}.tar.gz"
+    tar \
+        -xvf "${TEMP}/${MOLD_TARGET}.tar.gz" \
+        -C "${TEMP}"
+    cp "${TEMP}/${MOLD_TARGET}/bin/mold" /usr/bin/mold
+    cp "${TEMP}/${MOLD_TARGET}/lib/mold/mold-wrapper.so" /usr/bin/mold-wrapper.so
+
+    # Create our rustc wrapper script that we'll use to actually invoke `rustc` such that `mold` will wrap it and intercept
+    # anything linking calls to use `mold` instead of `ld`, etc.
+    CARGO_BIN_DIR="${CARGO_OVERRIDE_DIR}/bin"
+    mkdir -p "$CARGO_BIN_DIR"
+
+    RUSTC_WRAPPER="${CARGO_BIN_DIR}/wrap-rustc"
+    cat <<EOF >"$RUSTC_WRAPPER"
+#!/bin/sh
+set -x
+exec mold -run "\$@"
+EOF
+    chmod +x "$RUSTC_WRAPPER"
+
+    # Now configure Cargo to use our rustc wrapper script.
+    cat <<EOF >>"$CARGO_OVERRIDE_CONF"
+[build]
+rustc-wrapper = "$RUSTC_WRAPPER"
+EOF
 fi

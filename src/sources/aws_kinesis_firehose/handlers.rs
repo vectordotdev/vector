@@ -8,6 +8,7 @@ use futures::StreamExt;
 use lookup::path;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
+use vector_common::finalization::AddBatchNotifier;
 use vector_core::{event::BatchNotifier, ByteSizeOf};
 use warp::reject;
 

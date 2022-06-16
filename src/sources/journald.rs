@@ -9,6 +9,20 @@ use std::{
     time::Duration,
 };
 
+use crate::{
+    config::{
+        log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext,
+        SourceDescription,
+    },
+    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent, Value},
+    internal_events::{
+        BytesReceived, JournaldInvalidRecordError, JournaldNegativeAcknowledgmentError,
+        OldEventsReceived,
+    },
+    serde::bool_or_struct,
+    shutdown::ShutdownSignal,
+    SourceSender,
+};
 use bytes::Bytes;
 use chrono::TimeZone;
 use codecs::{decoding::BoxedFramingError, CharacterDelimitedDecoder};
@@ -30,24 +44,9 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::FramedRead;
+use vector_common::{byte_size_of::ByteSizeOf, finalizer::OrderedFinalizer};
 use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
-use vector_core::{finalizer::OrderedFinalizer, ByteSizeOf};
-
-use crate::{
-    config::{
-        log_schema, AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext,
-        SourceDescription,
-    },
-    event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent, Value},
-    internal_events::{
-        BytesReceived, JournaldInvalidRecordError, JournaldNegativeAcknowledgmentError,
-        OldEventsReceived,
-    },
-    serde::bool_or_struct,
-    shutdown::ShutdownSignal,
-    SourceSender,
-};
 
 const DEFAULT_BATCH_SIZE: usize = 16;
 const BATCH_TIMEOUT: Duration = Duration::from_millis(10);

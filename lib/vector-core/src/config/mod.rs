@@ -3,18 +3,17 @@ use std::{fmt, num::NonZeroUsize};
 use bitmask_enum::bitmask;
 
 mod global_options;
-mod id;
 mod log_schema;
 pub mod proxy;
 
 use crate::event::LogEvent;
 pub use global_options::GlobalOptions;
-pub use id::ComponentKey;
 pub use log_schema::{init_log_schema, log_schema, LogSchema};
 use lookup::lookup_v2::Path;
 use lookup::path;
 use serde::{Deserialize, Serialize};
 use value::Value;
+pub use vector_common::config::ComponentKey;
 use vector_config::configurable_component;
 
 use crate::schema;
