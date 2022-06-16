@@ -15,7 +15,12 @@ mod configurable_component;
 /// in any other type also deriving `Configurable`:
 ///
 /// ```no_run
+/// use vector_config_macros::configurable_component;
+/// use serde;
+///
+/// /// Configuration for the Something struct
 /// #[configurable_component]
+/// #[derive(Clone, Debug)]
 /// pub struct Something {
 ///   // ...
 /// }
@@ -25,7 +30,12 @@ mod configurable_component;
 /// for a component by specifying the component type (`source`, `transform`, or `sink`) as the sole parameter:
 ///
 /// ```no_run
+/// use vector_config_macros::configurable_component;
+/// use serde;
+///
+/// /// Configuration for the `kafka` source
 /// #[configurable_component(source)]
+/// #[derive(Clone, Debug)]
 /// pub struct KafkaSourceConfig {
 ///   // ...
 /// }

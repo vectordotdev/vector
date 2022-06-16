@@ -8664,8 +8664,10 @@ dependencies = [
  "darling",
  "proc-macro2",
  "quote",
+ "serde",
  "serde_derive_internals",
  "syn",
+ "vector_config",
  "vector_config_common",
 ]
 
