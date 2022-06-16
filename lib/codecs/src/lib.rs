@@ -8,11 +8,12 @@ pub mod encoding;
 
 pub use decoding::{
     BytesDecoder, BytesDecoderConfig, BytesDeserializer, BytesDeserializerConfig,
-    CharacterDelimitedDecoder, CharacterDelimitedDecoderConfig, JsonDeserializer,
-    JsonDeserializerConfig, LengthDelimitedDecoder, LengthDelimitedDecoderConfig,
-    NativeDeserializer, NativeDeserializerConfig, NativeJsonDeserializer,
-    NativeJsonDeserializerConfig, NewlineDelimitedDecoder, NewlineDelimitedDecoderConfig,
-    OctetCountingDecoder, OctetCountingDecoderConfig, StreamDecodingError,
+    CharacterDelimitedDecoder, CharacterDelimitedDecoderConfig, GelfDeserializer,
+    GelfDeserializerConfig, JsonDeserializer, JsonDeserializerConfig, LengthDelimitedDecoder,
+    LengthDelimitedDecoderConfig, NativeDeserializer, NativeDeserializerConfig,
+    NativeJsonDeserializer, NativeJsonDeserializerConfig, NewlineDelimitedDecoder,
+    NewlineDelimitedDecoderConfig, OctetCountingDecoder, OctetCountingDecoderConfig,
+    StreamDecodingError,
 };
 #[cfg(feature = "syslog")]
 pub use decoding::{SyslogDeserializer, SyslogDeserializerConfig};
