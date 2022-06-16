@@ -63,6 +63,7 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<HecProcessedEvent>)> for HecMetricsRe
             index: None,
             source: None,
             sourcetype: None,
+            host: None,
         }
     }
 }

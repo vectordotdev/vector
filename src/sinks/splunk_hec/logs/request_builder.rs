@@ -26,6 +26,7 @@ pub struct RequestMetadata {
     source: Option<String>,
     sourcetype: Option<String>,
     index: Option<String>,
+    host: Option<String>,
 }
 
 impl RequestBuilder<(Option<Partitioned>, Vec<HecProcessedEvent>)> for HecLogsRequestBuilder {
@@ -62,6 +63,7 @@ impl RequestBuilder<(Option<Partitioned>, Vec<HecProcessedEvent>)> for HecLogsRe
                 source: partition.as_mut().and_then(|p| p.source.take()),
                 sourcetype: partition.as_mut().and_then(|p| p.sourcetype.take()),
                 index: partition.as_mut().and_then(|p| p.index.take()),
+                host: partition.as_mut().and_then(|p| p.host.take()),
             },
             events,
         )
@@ -81,6 +83,7 @@ impl RequestBuilder<(Option<Partitioned>, Vec<HecProcessedEvent>)> for HecLogsRe
             source: metadata.source,
             sourcetype: metadata.sourcetype,
             index: metadata.index,
+            host: metadata.host,
         }
     }
 }

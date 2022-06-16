@@ -82,9 +82,10 @@ where
                         self.sourcetype.clone(),
                         self.source.clone(),
                         self.index.clone(),
+                        Some(self.host.clone()),
                     )
                 } else {
-                    EventPartitioner::new(None, None, None)
+                    EventPartitioner::new(None, None, None, None)
                 },
                 self.batch_settings,
             )
@@ -123,22 +124,15 @@ pub(super) struct Partitioned {
     pub(super) source: Option<String>,
     pub(super) sourcetype: Option<String>,
     pub(super) index: Option<String>,
+    pub(super) host: Option<String>,
 }
-
-/*
-impl Partitioned {
-    #[allow(clippy::missing_const_for_fn)]
-    pub(super) fn into_parts(self) -> (Option<Arc<str>>, HashMap<String, String>) {
-        (self.token, self.splunk_metadata)
-    }
-}
-*/
 
 #[derive(Default)]
 struct EventPartitioner {
     pub sourcetype: Option<Template>,
     pub source: Option<Template>,
     pub index: Option<Template>,
+    pub host_key: Option<String>,
 }
 
 impl EventPartitioner {
@@ -146,11 +140,13 @@ impl EventPartitioner {
         sourcetype: Option<Template>,
         source: Option<Template>,
         index: Option<Template>,
+        host_key: Option<String>,
     ) -> Self {
         Self {
             sourcetype,
             source,
             index,
+            host_key,
         }
     }
 }
@@ -189,11 +185,18 @@ impl Partitioner for EventPartitioner {
                 .ok()
         });
 
+        let host = self
+            .host_key
+            .as_ref()
+            .and_then(|host_key| item.event.get(host_key.as_str()))
+            .and_then(|value| value.as_str().map(|s| s.to_string()));
+
         Some(Partitioned {
             token: item.event.metadata().splunk_hec_token(),
             source,
             sourcetype,
             index,
+            host,
         })
     }
 }

@@ -18,7 +18,10 @@ use tower::Service;
 use uuid::Uuid;
 use vector_core::event::EventStatus;
 
-use super::acknowledgements::{run_acknowledgements, HecClientAcknowledgementsConfig};
+use super::{
+    acknowledgements::{run_acknowledgements, HecClientAcknowledgementsConfig},
+    EndpointTarget,
+};
 use crate::{
     http::HttpClient,
     internal_events::{SplunkIndexerAcknowledgementUnavailableError, SplunkResponseParseError},
@@ -177,6 +180,7 @@ impl ResponseExt for http::Response<Bytes> {
 }
 
 pub struct HttpRequestBuilder {
+    pub endpoint_target: EndpointTarget,
     pub endpoint: String,
     pub default_token: String,
     pub compression: Compression,
@@ -186,10 +190,16 @@ pub struct HttpRequestBuilder {
 }
 
 impl HttpRequestBuilder {
-    pub fn new(endpoint: String, default_token: String, compression: Compression) -> Self {
+    pub fn new(
+        endpoint: String,
+        endpoint_target: EndpointTarget,
+        default_token: String,
+        compression: Compression,
+    ) -> Self {
         let channel = Uuid::new_v4().hyphenated().to_string();
         Self {
             endpoint,
+            endpoint_target,
             default_token,
             compression,
             channel,
@@ -204,15 +214,24 @@ impl HttpRequestBuilder {
         source: Option<String>,
         sourcetype: Option<String>,
         index: Option<String>,
+        host: Option<String>,
     ) -> Result<Request<Bytes>, crate::Error> {
-        let metadata = [
-            ("source", source),
-            ("sourcetype", sourcetype),
-            ("index", index),
-        ]
-        .into_iter()
-        .filter_map(|(key, value)| value.map(|value| (key, value)));
-        let uri = build_uri(self.endpoint.as_str(), path, metadata).context(UriParseSnafu)?;
+        let uri = match self.endpoint_target {
+            EndpointTarget::Raw => {
+                let metadata = [
+                    ("source", source),
+                    ("sourcetype", sourcetype),
+                    ("index", index),
+                    ("host", host),
+                ]
+                .into_iter()
+                .filter_map(|(key, value)| value.map(|value| (key, value)));
+                build_uri(self.endpoint.as_str(), path, metadata).context(UriParseSnafu)?
+            }
+            EndpointTarget::Event => {
+                build_uri(self.endpoint.as_str(), path, None).context(UriParseSnafu)?
+            }
+        };
 
         let mut builder = Request::post(uri)
             .header("Content-Type", "application/json")
@@ -283,6 +302,7 @@ mod tests {
         let client = HttpClient::new(None, &ProxyConfig::default()).unwrap();
         let http_request_builder = Arc::new(HttpRequestBuilder::new(
             endpoint,
+            EndpointTarget::default(),
             String::from(TOKEN),
             Compression::default(),
         ));
@@ -311,6 +331,7 @@ mod tests {
             index: None,
             source: None,
             sourcetype: None,
+            host: None,
         }
     }
 

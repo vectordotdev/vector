@@ -19,6 +19,7 @@ pub struct HecRequest {
     pub index: Option<String>,
     pub source: Option<String>,
     pub sourcetype: Option<String>,
+    pub host: Option<String>,
 }
 
 impl ByteSizeOf for HecRequest {

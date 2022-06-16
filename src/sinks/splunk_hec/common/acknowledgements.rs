@@ -201,7 +201,15 @@ impl HecAckClient {
             .freeze();
         let request = self
             .http_request_builder
-            .build_request(request_body_bytes, "/services/collector/ack", None, None, None, None)
+            .build_request(
+                request_body_bytes,
+                "/services/collector/ack",
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
             .map_err(|_| HecAckApiError::ClientBuildRequest)?;
 
         let response = self
@@ -271,7 +279,7 @@ mod tests {
         http::HttpClient,
         sinks::{
             splunk_hec::common::{
-                acknowledgements::HecAckStatusRequest, service::HttpRequestBuilder,
+                acknowledgements::HecAckStatusRequest, service::HttpRequestBuilder, EndpointTarget,
             },
             util::Compression,
         },
@@ -279,8 +287,12 @@ mod tests {
 
     fn get_ack_client(retry_limit: u8) -> HecAckClient {
         let client = HttpClient::new(None, &ProxyConfig::default()).unwrap();
-        let http_request_builder =
-            HttpRequestBuilder::new(String::from(""), String::from(""), Compression::default());
+        let http_request_builder = HttpRequestBuilder::new(
+            String::from(""),
+            EndpointTarget::default(),
+            String::from(""),
+            Compression::default(),
+        );
         HecAckClient::new(retry_limit, client, Arc::new(http_request_builder))
     }
 

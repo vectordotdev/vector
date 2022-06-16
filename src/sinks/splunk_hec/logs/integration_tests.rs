@@ -150,6 +150,7 @@ async fn splunk_insert_raw_message() {
 
     let config = HecLogsSinkConfig {
         endpoint_target: EndpointTarget::Raw,
+        source: "zork",
         ..config(HecEncoding::Text, vec![]).await
     };
     let (sink, _) = config.build(cx).await.unwrap();
@@ -164,7 +165,7 @@ async fn splunk_insert_raw_message() {
     let entry = find_entry(message.as_str()).await;
 
     assert_eq!(message, entry["_raw"].as_str().unwrap());
-    assert_eq!("zork", entry["host"].as_str().unwrap());
+    assert_eq!("zork", entry["source"].as_str().unwrap());
     assert!(entry.get("message").is_none());
 }
 
