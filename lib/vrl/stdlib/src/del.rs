@@ -83,7 +83,7 @@ impl Function for Del {
 
     fn compile(
         &self,
-        (_, external): (&mut state::LocalEnv, &mut state::ExternalEnv),
+        (local, external): (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -96,7 +96,9 @@ impl Function for Del {
             .into());
         }
 
-        Ok(Box::new(DelFn { query }))
+        let return_type = query.type_def((local, external));
+
+        Ok(Box::new(DelFn { query, return_type }))
     }
 
     fn compile_argument(
@@ -129,6 +131,7 @@ impl Function for Del {
 #[derive(Debug, Clone)]
 pub(crate) struct DelFn {
     query: expression::Query,
+    return_type: TypeDef,
 }
 
 impl DelFn {
@@ -165,7 +168,8 @@ impl Expression for DelFn {
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
-        TypeDef::any()
+        // The return type can't be queried from the state since it was deleted in "update_state"
+        self.return_type.clone()
     }
 
     fn update_state(
