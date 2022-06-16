@@ -14,20 +14,30 @@ mod configurable_component;
 /// In its most basic form, this attribute macro can be used to simply derive the aforementioned traits, making it using
 /// in any other type also deriving `Configurable`:
 ///
-/// ```norun
+/// ```no_run
+/// use vector_config_macros::configurable_component;
+/// use serde;
+///
+/// /// Configuration for the Something struct
 /// #[configurable_component]
+/// #[derive(Clone, Debug)]
 /// pub struct Something {
-///   ...
+///   // ...
 /// }
 /// ```
 ///
 /// Additionally, callers can specify the component type, when being used directly on the top-level configuration object
 /// for a component by specifying the component type (`source`, `transform`, or `sink`) as the sole parameter:
 ///
-/// ```norun
+/// ```no_run
+/// use vector_config_macros::configurable_component;
+/// use serde;
+///
+/// /// Configuration for the `kafka` source
 /// #[configurable_component(source)]
+/// #[derive(Clone, Debug)]
 /// pub struct KafkaSourceConfig {
-///   ...
+///   // ...
 /// }
 /// ```
 ///

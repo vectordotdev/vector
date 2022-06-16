@@ -110,13 +110,20 @@ impl Sample {
 }
 
 impl FunctionTransform for Sample {
-    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
-        if let Some(condition) = self.exclude.as_ref() {
-            if condition.check(&event) {
-                output.push(event);
-                return;
+    fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
+        let mut event = {
+            if let Some(condition) = self.exclude.as_ref() {
+                let (result, event) = condition.check(event);
+                if result {
+                    output.push(event);
+                    return;
+                } else {
+                    event
+                }
+            } else {
+                event
             }
-        }
+        };
 
         let value = self
             .key_field

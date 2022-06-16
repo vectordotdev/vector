@@ -5,16 +5,16 @@ rustflags = [
   "-Dclippy::dbg_macro",
 ]
 
-# for these musl targets libstdc++ will be linked statically (that's configured in e.g. leveldb-sys)
-# we provide the location of that library here
+# We need to bring in `libstdc++` for things that build against C++ (LevelDB, librdkafka, etc) which comes along in the
+# `cross` base image but _isn't_ in a path searched by the linker normally. Additionally, our custom Docker image that
+# we base on the `cross` image moves `libstdc++` into this custom-looking directory to avoid some _other_ libraries
+# included in the `cross` base image from having a higher precedence than some of the "self-contained" libraries that
+# Rust will bundle/use for specific targets like MUSL.
 [target.x86_64-unknown-linux-musl]
-rustflags = "-Lnative=/usr/local/x86_64-linux-musl/lib"
-
-[target.i686-unknown-linux-musl]
-rustflags = "-Lnative=/usr/local/i686-linux-musl/lib"
+rustflags = "-Lnative=/lib/native-libs"
 
 [target.aarch64-unknown-linux-musl]
-rustflags = "-Lnative=/usr/local/aarch64-linux-musl/lib"
+rustflags = "-Lnative=/lib/native-libs"
 
 [target.armv7-unknown-linux-musleabihf]
-rustflags = "-Lnative=/usr/local/arm-linux-musleabihf/lib"
+rustflags = "-Lnative=/lib/native-libs"

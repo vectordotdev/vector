@@ -2,7 +2,6 @@ use std::{
     collections::{BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
     fmt::Debug,
-    sync::Arc,
 };
 
 pub use ::value::Value;
@@ -250,7 +249,7 @@ impl Event {
     }
 
     #[must_use]
-    pub fn with_batch_notifier(self, batch: &Arc<BatchNotifier>) -> Self {
+    pub fn with_batch_notifier(self, batch: &BatchNotifier) -> Self {
         match self {
             Self::Log(log) => log.with_batch_notifier(batch).into(),
             Self::Metric(metric) => metric.with_batch_notifier(batch).into(),
@@ -259,7 +258,7 @@ impl Event {
     }
 
     #[must_use]
-    pub fn with_batch_notifier_option(self, batch: &Option<Arc<BatchNotifier>>) -> Self {
+    pub fn with_batch_notifier_option(self, batch: &Option<BatchNotifier>) -> Self {
         match self {
             Self::Log(log) => log.with_batch_notifier_option(batch).into(),
             Self::Metric(metric) => metric.with_batch_notifier_option(batch).into(),
@@ -280,7 +279,7 @@ impl EventDataEq for Event {
 }
 
 impl finalization::AddBatchNotifier for Event {
-    fn add_batch_notifier(&mut self, batch: Arc<BatchNotifier>) {
+    fn add_batch_notifier(&mut self, batch: BatchNotifier) {
         let finalizer = EventFinalizer::new(batch);
         match self {
             Self::Log(log) => log.add_finalizer(finalizer),

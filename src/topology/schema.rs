@@ -234,8 +234,8 @@ pub(super) fn validate_sink_expectations(
             errors.append(
                 &mut err
                     .errors()
-                    .to_vec()
-                    .into_iter()
+                    .iter()
+                    .cloned()
                     .map(|err| format!("schema error in component {}: {}", key, err))
                     .collect(),
             );

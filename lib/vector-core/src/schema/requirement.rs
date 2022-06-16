@@ -63,6 +63,7 @@ impl Requirement {
     /// This differs from `required_meaning` in that it is valid for the event to not have the
     /// specified meaning defined, but invalid for that meaning to be defined, but its [`Kind`] not
     /// matching the configured expectation.
+    #[must_use]
     pub fn optional_meaning(mut self, meaning: &'static str, kind: Kind) -> Self {
         self.insert_meaning(meaning, kind, true);
         self

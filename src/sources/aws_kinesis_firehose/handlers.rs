@@ -1,4 +1,4 @@
-use std::{io::Read, sync::Arc};
+use std::io::Read;
 
 use bytes::Bytes;
 use chrono::Utc;
@@ -67,7 +67,7 @@ pub async fn firehose(
 
                     for event in &mut events {
                         if let Some(batch) = &batch {
-                            event.add_batch_notifier(Arc::clone(batch));
+                            event.add_batch_notifier(batch.clone());
                         }
                         if let Event::Log(ref mut log) = event {
                             log.try_insert(

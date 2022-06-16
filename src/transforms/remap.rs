@@ -316,7 +316,7 @@ where
     }
 
     #[cfg(test)]
-    fn runner(&self) -> &Runner {
+    const fn runner(&self) -> &Runner {
         &self.runner
     }
 

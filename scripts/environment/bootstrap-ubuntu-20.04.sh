@@ -131,6 +131,7 @@ CARGO_OVERRIDE_CONF="${CARGO_OVERRIDE_DIR}/config.toml"
 cat <<EOF >>"$CARGO_OVERRIDE_CONF"
 [target.'cfg(linux)']
 rustflags = [ "-D", "warnings" ]
+rustdocflags = [ "-D", "warnings" ]
 EOF
 
 # Install mold, because the system linker wastes a bunch of time.
