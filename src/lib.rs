@@ -159,3 +159,9 @@ where
     #[cfg(not(tokio_unstable))]
     tokio::spawn(task)
 }
+
+pub fn num_threads() -> usize {
+    std::thread::available_parallelism()
+        .expect("Could not determine available parallelism")
+        .into()
+}
