@@ -40,7 +40,7 @@ pub mod internal_logs;
 pub mod internal_metrics;
 #[cfg(all(unix, feature = "sources-journald"))]
 pub mod journald;
-#[cfg(all(feature = "sources-kafka", feature = "rdkafka"))]
+#[cfg(feature = "sources-kafka")]
 pub mod kafka;
 #[cfg(feature = "sources-kubernetes_logs")]
 pub mod kubernetes_logs;
@@ -173,7 +173,7 @@ pub enum Sources {
     Journald(#[configurable(derived)] journald::JournaldConfig),
 
     /// Kafka.
-    #[cfg(all(feature = "sources-kafka", feature = "rdkafka"))]
+    #[cfg(feature = "sources-kafka")]
     Kafka(#[configurable(derived)] kafka::KafkaSourceConfig),
 
     /// Kubernetes Logs.
