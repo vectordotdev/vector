@@ -363,7 +363,6 @@ jobs:
         container:
           - "quay.io/centos/centos:stream8"
           - "quay.io/centos/centos:stream9"
-          - "amazonlinux:1"
           - "amazonlinux:2"
           - "fedora:34"
           - "fedora:35"
