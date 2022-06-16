@@ -316,9 +316,9 @@ impl ReaderModel {
             pending_data_file_acks: VecDeque::new(),
         };
 
-        // We do a dummy call to `is_ready` to simulate what happens when a real buffer is created,
+        // We do a dummy call to `check_ready` to simulate what happens when a real buffer is created,
         // as the real initialization process always ensures the current reader data file exists/is opened.
-        reader.is_ready();
+        reader.check_ready();
 
         reader
     }
@@ -404,7 +404,7 @@ impl ReaderModel {
             && reader_file_id == writer_file_id
     }
 
-    fn is_ready(&mut self) -> bool {
+    fn check_ready(&mut self) -> bool {
         // If we have a data file open already, then we're good:
         if self.current_file.is_some() {
             return true;
@@ -429,7 +429,7 @@ impl ReaderModel {
             self.handle_acks();
 
             // If we can't open our desired current data file, we wait.
-            if !self.is_ready() {
+            if !self.check_ready() {
                 return Progress::Blocked;
             }
 
@@ -553,9 +553,9 @@ impl WriterModel {
             record_writer,
         };
 
-        // We do a dummy call to `is_ready` to simulate what happens when a real buffer is created,
+        // We do a dummy call to `check_ready` to simulate what happens when a real buffer is created,
         // as the real initialization process always ensures the current writer data file is created/exists.
-        writer.is_ready();
+        writer.check_ready();
 
         writer
     }
@@ -597,7 +597,7 @@ impl WriterModel {
         self.ledger.increment_buffer_size(flushed_bytes);
     }
 
-    fn is_ready(&mut self) -> bool {
+    fn check_ready(&mut self) -> bool {
         // If our buffer size is over the maximum buffer size, we have to wait for reader progress:
         let unflushed_bytes = self
             .current_file
@@ -648,7 +648,7 @@ impl WriterModel {
 
         loop {
             // If we can't open our desired current data file, or the buffer is full, we wait.
-            if !self.is_ready() {
+            if !self.check_ready() {
                 return Progress::Blocked;
             }
 

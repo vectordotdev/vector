@@ -1,7 +1,6 @@
 #!/bin/sh
 
 apt-get update
-
 apt-get install -y \
   apt-transport-https \
   wget

@@ -36,7 +36,7 @@ impl Condition {
 }
 
 impl Condition {
-    pub(crate) fn check(&self, e: &Event) -> bool {
+    pub(crate) fn check(&self, e: Event) -> (bool, Event) {
         match self {
             Condition::IsLog(x) => x.check(e),
             Condition::IsMetric(x) => x.check(e),
@@ -44,14 +44,14 @@ impl Condition {
             Condition::CheckFields(x) => x.check(e),
             Condition::DatadogSearch(x) => x.check(e),
             Condition::Vrl(x) => x.check(e),
-            Condition::AlwaysPass => true,
-            Condition::AlwaysFail => false,
+            Condition::AlwaysPass => (true, e),
+            Condition::AlwaysFail => (false, e),
         }
     }
 
     /// Provides context for a failure. This is potentially mildly expensive if
     /// it involves string building and so should be avoided in hot paths.
-    pub(crate) fn check_with_context(&self, e: &Event) -> Result<(), String> {
+    pub(crate) fn check_with_context(&self, e: Event) -> (Result<(), String>, Event) {
         match self {
             Condition::IsLog(x) => x.check_with_context(e),
             Condition::IsMetric(x) => x.check_with_context(e),
@@ -59,22 +59,25 @@ impl Condition {
             Condition::CheckFields(x) => x.check_with_context(e),
             Condition::DatadogSearch(x) => x.check_with_context(e),
             Condition::Vrl(x) => x.check_with_context(e),
-            Condition::AlwaysPass => Ok(()),
-            Condition::AlwaysFail => Ok(()),
+            Condition::AlwaysPass => (Ok(()), e),
+            Condition::AlwaysFail => (Ok(()), e),
         }
     }
 }
 
 pub trait Conditional {
-    fn check(&self, e: &Event) -> bool;
+    /// Checks if a condition is true. The event should not be modified, it is only
+    /// mutable so it can be passed into VRL, but VRL type checking prevents mutation.
+    fn check(&self, event: Event) -> (bool, Event);
 
     /// Provides context for a failure. This is potentially mildly expensive if
     /// it involves string building and so should be avoided in hot paths.
-    fn check_with_context(&self, e: &Event) -> Result<(), String> {
-        if self.check(e) {
-            Ok(())
+    fn check_with_context(&self, e: Event) -> (Result<(), String>, Event) {
+        let (result, event) = self.check(e);
+        if result {
+            (Ok(()), event)
         } else {
-            Err("condition failed".into())
+            (Err("condition failed".into()), event)
         }
     }
 }

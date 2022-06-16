@@ -18,7 +18,7 @@ use crate::{
     http::HttpClient,
     sinks::{
         util::{
-            encoding::{EncodingConfigWithDefault, EncodingConfiguration},
+            encoding::Transformer,
             http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
             BatchConfig, BoxedRawValue, JsonArrayBuffer, RealtimeSizeBasedDefaultBatchSettings,
             TowerRequestConfig,
@@ -42,10 +42,10 @@ pub struct AzureMonitorLogsConfig {
     #[serde(default = "default_host")]
     pub(super) host: String,
     #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
+    pub encoding: Transformer,
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
     #[serde(default)]
@@ -143,18 +143,18 @@ impl SinkConfig for AzureMonitorLogsConfig {
 struct AzureMonitorLogsSink {
     uri: Uri,
     customer_id: String,
-    encoding: EncodingConfigWithDefault<Encoding>,
+    transformer: Transformer,
     shared_key: pkey::PKey<pkey::Private>,
     default_headers: HeaderMap,
 }
 
 struct AzureMonitorLogsEventEncoder {
-    encoding: EncodingConfigWithDefault<Encoding>,
+    transformer: Transformer,
 }
 
 impl HttpEventEncoder<serde_json::Value> for AzureMonitorLogsEventEncoder {
     fn encode_event(&mut self, mut event: Event) -> Option<serde_json::Value> {
-        self.encoding.apply_rules(&mut event);
+        self.transformer.transform(&mut event);
 
         // it seems like Azure Monitor doesn't support full 9-digit nanosecond precision
         // adjust the timestamp format accordingly, keeping only milliseconds
@@ -186,7 +186,7 @@ impl HttpSink for AzureMonitorLogsSink {
 
     fn build_encoder(&self) -> Self::Encoder {
         AzureMonitorLogsEventEncoder {
-            encoding: self.encoding.clone(),
+            transformer: self.transformer.clone(),
         }
     }
 
@@ -242,7 +242,7 @@ impl AzureMonitorLogsSink {
 
         Ok(AzureMonitorLogsSink {
             uri,
-            encoding: config.encoding.clone(),
+            transformer: config.encoding.clone(),
             customer_id: config.customer_id.clone(),
             shared_key,
             default_headers,
@@ -354,7 +354,7 @@ mod tests {
         let sink = AzureMonitorLogsSink {
             uri: mock_endpoint,
             customer_id: "weee".to_string(),
-            encoding: EncodingConfigWithDefault::from(Encoding::Default),
+            transformer: Default::default(),
             shared_key,
             default_headers: HeaderMap::new(),
         };

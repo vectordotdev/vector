@@ -35,5 +35,7 @@ pub fn record_internal_event(event: &str) {
     // Remove trailing '{fields…}'
     let event = event.strip_prefix('&').unwrap_or(event);
     let event = event.find('{').map_or(event, |par| &event[..par]);
+    let event = event.trim();
+
     EVENTS_RECORDED.with(|er| er.borrow_mut().insert(event.into()));
 }

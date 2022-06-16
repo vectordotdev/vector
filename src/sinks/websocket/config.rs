@@ -4,7 +4,9 @@ use snafu::ResultExt;
 use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::{
-        util::encoding::{EncodingConfig, StandardEncodings},
+        util::encoding::{
+            EncodingConfig, EncodingConfigAdapter, StandardEncodings, StandardEncodingsMigrator,
+        },
         websocket::sink::{ConnectSnafu, WebSocketConnector, WebSocketError, WebSocketSink},
         Healthcheck, VectorSink,
     },
@@ -15,7 +17,9 @@ use crate::{
 pub struct WebSocketSinkConfig {
     pub uri: String,
     pub tls: Option<TlsEnableableConfig>,
-    pub encoding: EncodingConfig<StandardEncodings>,
+    #[serde(flatten)]
+    pub encoding:
+        EncodingConfigAdapter<EncodingConfig<StandardEncodings>, StandardEncodingsMigrator>,
     pub ping_interval: Option<u64>,
     pub ping_timeout: Option<u64>,
 }
@@ -25,7 +29,7 @@ impl GenerateConfig for WebSocketSinkConfig {
         toml::Value::try_from(Self {
             uri: "ws://127.0.0.1:9000/endpoint".into(),
             tls: None,
-            encoding: StandardEncodings::Json.into(),
+            encoding: EncodingConfig::from(StandardEncodings::Json).into(),
             ping_interval: None,
             ping_timeout: None,
         })
