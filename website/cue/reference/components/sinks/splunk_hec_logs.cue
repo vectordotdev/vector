@@ -150,19 +150,6 @@ components: sinks: splunk_hec_logs: {
 				syntax: "template"
 			}
 		}
-		splunk_metadata: {
-			common:      false
-			description: """
-				 A set of fields that can be sent as [metadata](\(urls.splunk_hec_metadata)). The value is templatable, which enables
-				 you to attach dynamic data to the event.
-				"""
-			required:    false
-			type: object: {
-				examples: [
-					{
-						"host": "{{ hostname }}"
-					},
-				]
 		timestamp_key: {
 			common:      false
 			description: """
