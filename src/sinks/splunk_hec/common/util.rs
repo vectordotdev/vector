@@ -367,8 +367,8 @@ mod tests {
     #[test]
     fn test_build_uri() {
         let query = [
-            ("host", "zork flork".to_string()),
-            ("source", "zam".to_string()),
+            (HOST_FIELD, "zork flork".to_string()),
+            (SOURCE_FIELD, "zam".to_string()),
         ];
         let uri = build_uri("http://sproink.com", "/thing/thang", query).unwrap();
 

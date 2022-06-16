@@ -219,10 +219,10 @@ impl HttpRequestBuilder {
         let uri = match self.endpoint_target {
             EndpointTarget::Raw => {
                 let metadata = [
-                    ("source", source),
-                    ("sourcetype", sourcetype),
-                    ("index", index),
-                    ("host", host),
+                    (super::SOURCE_FIELD, source),
+                    (super::SOURCETYPE_FIELD, sourcetype),
+                    (super::INDEX_FIELD, index),
+                    (super::HOST_FIELD, host),
                 ]
                 .into_iter()
                 .filter_map(|(key, value)| value.map(|value| (key, value)));

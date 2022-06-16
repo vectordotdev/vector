@@ -18,7 +18,10 @@ use crate::{
     internal_events::SplunkEventTimestampMissing,
     internal_events::TemplateRenderingError,
     sinks::{
-        splunk_hec::common::{render_template_string, request::HecRequest, EndpointTarget},
+        splunk_hec::common::{
+            render_template_string, request::HecRequest, EndpointTarget, INDEX_FIELD,
+            SOURCETYPE_FIELD, SOURCE_FIELD,
+        },
         util::{processed_event::ProcessedEvent, SinkBuilderExt},
     },
     template::Template,
@@ -167,21 +170,21 @@ impl Partitioner for EventPartitioner {
         let source = self.source.as_ref().and_then(|source| {
             source
                 .render_string(&item.event)
-                .map_err(|error| emit_err(error, "source"))
+                .map_err(|error| emit_err(error, SOURCE_FIELD))
                 .ok()
         });
 
         let sourcetype = self.sourcetype.as_ref().and_then(|sourcetype| {
             sourcetype
                 .render_string(&item.event)
-                .map_err(|error| emit_err(error, "sourcetype"))
+                .map_err(|error| emit_err(error, SOURCETYPE_FIELD))
                 .ok()
         });
 
         let index = self.index.as_ref().and_then(|index| {
             index
                 .render_string(&item.event)
-                .map_err(|error| emit_err(error, "index"))
+                .map_err(|error| emit_err(error, INDEX_FIELD))
                 .ok()
         });
 
@@ -225,22 +228,21 @@ impl ByteSizeOf for HecLogsProcessedEventMetadata {
 
 pub type HecProcessedEvent = ProcessedEvent<LogEvent, HecLogsProcessedEventMetadata>;
 
-#[allow(clippy::too_many_arguments)]
 pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
     let event_byte_size = event.size_of();
     let mut log = event.into_log();
 
     let sourcetype = data
         .sourcetype
-        .and_then(|sourcetype| render_template_string(sourcetype, &log, "sourcetype"));
+        .and_then(|sourcetype| render_template_string(sourcetype, &log, SOURCETYPE_FIELD));
 
     let source = data
         .source
-        .and_then(|source| render_template_string(source, &log, "source"));
+        .and_then(|source| render_template_string(source, &log, SOURCE_FIELD));
 
     let index = data
         .index
-        .and_then(|index| render_template_string(index, &log, "index"));
+        .and_then(|index| render_template_string(index, &log, INDEX_FIELD));
 
     let host = log.get(data.host_key).cloned();
 

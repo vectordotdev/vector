@@ -165,7 +165,7 @@ async fn splunk_insert_raw_message() {
     let entry = find_entry(message.as_str()).await;
 
     assert_eq!(message, entry["_raw"].as_str().unwrap());
-    assert_eq!("zork", entry["source"].as_str().unwrap());
+    assert_eq!("zork", entry[SOURCE_FIELD].as_str().unwrap());
     assert!(entry.get("message").is_none());
 }
 
@@ -200,7 +200,7 @@ async fn splunk_insert_source() {
 
     let entry = find_entry(message.as_str()).await;
 
-    assert_eq!(entry["source"].as_str(), Some("/var/log/syslog"));
+    assert_eq!(entry[SOURCE_FIELD].as_str(), Some("/var/log/syslog"));
 }
 
 #[tokio::test]
