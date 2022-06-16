@@ -83,7 +83,8 @@ components: sinks: splunk_hec_logs: {
 			common:      false
 			description: """
                                      The Splunk endpoint to send to. Either the [event endpoint](\(urls.splunk_hec_event_endpoint)) or the
-                                     [raw endpoint](\(urls.splunk_hec_raw_endpoint)).
+                                     [raw endpoint](\(urls.splunk_hec_raw_endpoint)). [metadata](\(urls.splunk_hec_metadata)) for the event
+                                     endpoint is sent with each event. For the raw endpoint it is sent via the url parameters.
                                      """
 			required:    false
 			warnings: []
