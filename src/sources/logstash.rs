@@ -80,7 +80,10 @@ impl SourceConfig for LogstashConfig {
         };
         let shutdown_secs = 30;
         let tls_config = self.tls.as_ref().map(|tls| tls.tls_config.clone());
-        let tls_client_metadata_key = self.tls.as_ref().and_then(|tls| tls.client_metadata_key.clone());
+        let tls_client_metadata_key = self
+            .tls
+            .as_ref()
+            .and_then(|tls| tls.client_metadata_key.clone());
         let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
         source.run(
             self.address,

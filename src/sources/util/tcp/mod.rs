@@ -282,9 +282,7 @@ async fn handle_stream<T>(
     let certificate_metadata = socket
         .get_ref()
         .ssl_stream()
-        .and_then(|stream| {
-            stream.ssl().peer_certificate()
-        })
+        .and_then(|stream| stream.ssl().peer_certificate())
         .map(CertificateMetadata::from_x509);
 
     let reader = FramedRead::new(socket, source.decoder());
