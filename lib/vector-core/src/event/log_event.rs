@@ -21,7 +21,9 @@ use super::{
     metadata::EventMetadata,
     util, EventFinalizers, Finalizable, Value,
 };
+use crate::config::LogNamespace;
 use crate::{config::log_schema, event::MaybeAsLogMut, ByteSizeOf};
+use lookup::path;
 
 #[derive(Debug, Deserialize)]
 struct Inner {
@@ -135,6 +137,18 @@ impl LogEvent {
 
     pub fn metadata_mut(&mut self) -> &mut EventMetadata {
         &mut self.metadata
+    }
+
+    pub fn namespace(&self) -> LogNamespace {
+        // The (read-only) vector prefix on metadata is used to determine which namespace
+        // is being used. The user is prevented from modifying data here.
+        // This prefix should always exist for logs with the "Vector" namespace,
+        // and should never exist otherwise.
+        if self.metadata().value().contains(path!("vector")) {
+            LogNamespace::Vector
+        } else {
+            LogNamespace::Legacy
+        }
     }
 }
 

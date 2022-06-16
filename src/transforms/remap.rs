@@ -320,7 +320,7 @@ where
         &self.runner
     }
 
-    fn anotate_data(&self, reason: &str, error: ExpressionError) -> serde_json::Value {
+    fn annotate_data(&self, reason: &str, error: ExpressionError) -> serde_json::Value {
         let message = error
             .notes()
             .iter()
@@ -344,7 +344,7 @@ where
             Event::Log(ref mut log) => {
                 log.insert(
                     log_schema().metadata_key(),
-                    self.anotate_data(reason, error),
+                    self.annotate_data(reason, error),
                 );
             }
             Event::Metric(ref mut metric) => {
@@ -363,7 +363,7 @@ where
             Event::Trace(ref mut trace) => {
                 trace.insert(
                     log_schema().metadata_key(),
-                    self.anotate_data(reason, error),
+                    self.annotate_data(reason, error),
                 );
             }
         }

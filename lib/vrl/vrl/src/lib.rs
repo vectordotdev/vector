@@ -9,6 +9,7 @@
 pub mod prelude;
 mod runtime;
 
+use compiler::Compiler;
 pub use compiler::{
     function, state, value, Context, Expression, Function, MetadataTarget, Program, ProgramInfo,
     SecretTarget, Target, TargetValue, TargetValueRef, VrlRuntime,
@@ -26,12 +27,12 @@ pub fn compile(source: &str, fns: &[Box<dyn Function>]) -> compiler::Result {
 pub fn compile_with_state(
     source: &str,
     fns: &[Box<dyn Function>],
-    state: &mut state::ExternalEnv,
+    external: &mut state::ExternalEnv,
 ) -> compiler::Result {
     let ast = parser::parse(source)
         .map_err(|err| diagnostic::DiagnosticList::from(vec![Box::new(err) as Box<_>]))?;
 
-    compiler::compile_with_state(ast, fns, state)
+    Compiler::compile(fns, ast, external, state::LocalEnv::default())
 }
 
 pub fn compile_for_repl(
@@ -43,5 +44,5 @@ pub fn compile_for_repl(
     let ast = parser::parse(source)
         .map_err(|err| diagnostic::DiagnosticList::from(vec![Box::new(err) as Box<_>]))?;
 
-    compiler::compile_for_repl(ast, fns, local, external)
+    Compiler::compile(fns, ast, external, local).map(|(program, _)| program)
 }
