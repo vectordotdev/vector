@@ -17,7 +17,7 @@ mod configurable_component;
 /// ```no_run
 /// #[configurable_component]
 /// pub struct Something {
-///   ...
+///   // ...
 /// }
 /// ```
 ///
@@ -27,7 +27,7 @@ mod configurable_component;
 /// ```no_run
 /// #[configurable_component(source)]
 /// pub struct KafkaSourceConfig {
-///   ...
+///   // ...
 /// }
 /// ```
 ///
