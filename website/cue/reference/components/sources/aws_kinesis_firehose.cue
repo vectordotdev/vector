@@ -185,8 +185,8 @@ components: sources: aws_kinesis_firehose: {
 
 				1. Deploy vector with a publicly exposed HTTP endpoint using
 				   this source. You will likely also want to use the
-				   [`aws_cloudwatch_logs_subscription_parser`](\(urls.vector_transform_aws_cloudwatch_logs_subscription_parser))
-				   transform to extract the log events. Make sure to set
+				   [`parse_aws_cloudwatch_log_subscription_message`](\(urls.vrl_functions)/#parse_aws_cloudwatch_log_subscription_message)
+				   function to extract the log events. Make sure to set
 				   the `access_key` to secure this endpoint. Your
 				   configuration might look something like:
 
@@ -198,8 +198,12 @@ components: sources: aws_kinesis_firehose: {
 					access_key = "secret"
 
 					[transforms.cloudwatch]
-					type = "aws_cloudwatch_logs_subscription_parser"
+					type = "remap"
 					inputs = ["firehose"]
+					drop_on_error = false
+					source = '''
+					. |= parse_aws_cloudwatch_log_subscription_message!(.message)
+					'''
 
 					[sinks.console]
 					type = "console"
