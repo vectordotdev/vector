@@ -25,7 +25,7 @@ use crate::{
     transforms::metric_to_log::MetricToLog,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ElasticsearchCommon {
     pub base_url: String,
     pub bulk_uri: Uri,

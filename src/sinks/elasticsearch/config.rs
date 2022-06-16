@@ -6,7 +6,7 @@ use std::{
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
-use tower::ServiceBuilder;
+use tower::{balance::p2c::Balance, discover::ServiceList, ServiceBuilder};
 
 use crate::{
     aws::RegionOrEndpoint,
@@ -14,7 +14,7 @@ use crate::{
     event::{EventRef, LogEvent, Value},
     http::HttpClient,
     internal_events::TemplateRenderingError,
-    sinks::util::encoding::Transformer,
+    sinks::util::{encoding::Transformer, service::CloneableService},
     sinks::{
         elasticsearch::{
             retry::ElasticsearchRetryLogic,
@@ -293,9 +293,10 @@ impl DataStreamConfig {
 #[typetag::serde(name = "elasticsearch")]
 impl SinkConfig for ElasticsearchConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        // TODO: For each endpoint create a new common
         let common = ElasticsearchCommon::parse_config(self).await?;
+        let commons = vec![common.clone()];
 
-        let http_client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
         let batch_settings = self.batch.into_batcher_settings()?;
 
         let request_limits = self
@@ -303,19 +304,30 @@ impl SinkConfig for ElasticsearchConfig {
             .tower
             .unwrap_with(&TowerRequestConfig::default());
 
-        let http_request_builder = HttpRequestBuilder {
-            bulk_uri: common.bulk_uri.clone(),
-            http_request_config: self.request.clone(),
-            http_auth: common.http_auth.clone(),
-            query_params: common.query_params.clone(),
-            region: common.region.clone(),
-            compression: self.compression,
-            credentials_provider: common.aws_auth.clone(),
-        };
+        let mut endpoints = Vec::new();
+        for common in commons {
+            let http_client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
 
+            let http_request_builder = HttpRequestBuilder {
+                bulk_uri: common.bulk_uri.clone(),
+                http_request_config: self.request.clone(),
+                http_auth: common.http_auth.clone(),
+                query_params: common.query_params.clone(),
+                region: common.region.clone(),
+                compression: self.compression,
+                credentials_provider: common.aws_auth.clone(),
+            };
+
+            endpoints.push(ElasticsearchService::new(http_client, http_request_builder));
+        }
+
+        let discover = ServiceList::new(endpoints);
+
+        // TODO: Retry logic should account that the request can be retry even if it regularly could not be.
+        // TODO  But, it should still fail at some point. Maybe that can be done through configuration of the retry logic.
         let service = ServiceBuilder::new()
             .settings(request_limits, ElasticsearchRetryLogic)
-            .service(ElasticsearchService::new(http_client, http_request_builder));
+            .service(CloneableService::new(Balance::new(discover)));
 
         let sink = ElasticsearchSink {
             batch_settings,
