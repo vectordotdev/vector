@@ -11,7 +11,7 @@ use super::{
     io::{AsyncFile, Metadata, ProductionFilesystem, ReadableMemoryMap, WritableMemoryMap},
     Buffer, DiskBufferConfigBuilder, Ledger, Reader, Writer,
 };
-use crate::{buffer_usage_data::BufferUsageHandle, Acker, Bufferable, WhenFull};
+use crate::{buffer_usage_data::BufferUsageHandle, Acker, Bufferable};
 
 type FilesystemUnderTest = ProductionFilesystem;
 
@@ -181,7 +181,7 @@ where
     let config = DiskBufferConfigBuilder::from_path(data_dir)
         .build()
         .expect("creating buffer should not fail");
-    let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
+    let usage_handle = BufferUsageHandle::noop();
     Buffer::from_config_inner(config, usage_handle)
         .await
         .expect("should not fail to create buffer")
@@ -203,7 +203,7 @@ where
     let config = DiskBufferConfigBuilder::from_path(data_dir)
         .build()
         .expect("creating buffer should not fail");
-    let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
+    let usage_handle = BufferUsageHandle::noop();
     let (writer, reader, acker, ledger) = Buffer::from_config_inner(config, usage_handle.clone())
         .await
         .expect("should not fail to create buffer");
@@ -229,7 +229,7 @@ where
         .build()
         .expect("creating buffer should not fail");
     config.max_buffer_size = max_buffer_size;
-    let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
+    let usage_handle = BufferUsageHandle::noop();
 
     Buffer::from_config_inner(config, usage_handle)
         .await
@@ -253,7 +253,7 @@ where
         .max_record_size(max_record_size)
         .build()
         .expect("creating buffer should not fail");
-    let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
+    let usage_handle = BufferUsageHandle::noop();
 
     Buffer::from_config_inner(config, usage_handle)
         .await
@@ -277,7 +277,7 @@ where
         .max_data_file_size(max_data_file_size)
         .build()
         .expect("creating buffer should not fail");
-    let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
+    let usage_handle = BufferUsageHandle::noop();
 
     Buffer::from_config_inner(config, usage_handle)
         .await
@@ -301,7 +301,7 @@ where
         .write_buffer_size(write_buffer_size)
         .build()
         .expect("creating buffer should not fail");
-    let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
+    let usage_handle = BufferUsageHandle::noop();
 
     Buffer::from_config_inner(config, usage_handle)
         .await

@@ -12,7 +12,7 @@ use vector_common::internal_event::emit;
 
 use crate::{
     internal_events::{BufferCreated, BufferEventsDropped, BufferEventsReceived, BufferEventsSent},
-    spawn_named, WhenFull,
+    spawn_named,
 };
 
 #[derive(Clone, Debug)]
@@ -24,9 +24,9 @@ impl BufferUsageHandle {
     /// Creates a no-op [`BufferUsageHandle`] handle.
     ///
     /// No usage data is written or stored.
-    pub(crate) fn noop(when_full: WhenFull) -> Self {
+    pub(crate) fn noop() -> Self {
         BufferUsageHandle {
-            state: Arc::new(BufferUsageData::new(when_full, 0)),
+            state: Arc::new(BufferUsageData::new(0)),
         }
     }
 
@@ -78,14 +78,26 @@ impl BufferUsageHandle {
             .fetch_add(byte_size, Ordering::Relaxed);
     }
 
-    /// Attempts to increment the number of dropped events (and their total size) for this buffer component.
-    ///
-    /// If the component itself is not configured to drop events, this call does nothing.
-    pub fn try_increment_dropped_event_count_and_byte_size(&self, count: u64, byte_size: u64) {
-        if let Some(dropped_event_data) = &self.state.dropped_event_data {
-            dropped_event_data.count.fetch_add(count, Ordering::Relaxed);
-            dropped_event_data
-                .size
+    /// Increment the number of dropped events (and their total size) for this buffer component.
+    pub fn increment_dropped_event_count_and_byte_size(
+        &self,
+        count: u64,
+        byte_size: u64,
+        intentional: bool,
+    ) {
+        if intentional {
+            self.state
+                .dropped_event_count_intentional
+                .fetch_add(count, Ordering::Relaxed);
+            self.state
+                .dropped_event_byte_size_intentional
+                .fetch_add(byte_size, Ordering::Relaxed);
+        } else {
+            self.state
+                .dropped_event_count
+                .fetch_add(count, Ordering::Relaxed);
+            self.state
+                .dropped_event_byte_size
                 .fetch_add(byte_size, Ordering::Relaxed);
         }
     }
@@ -98,31 +110,26 @@ pub struct BufferUsageData {
     received_byte_size: AtomicU64,
     sent_event_count: AtomicU64,
     sent_byte_size: AtomicU64,
-    dropped_event_data: Option<BufferUsageDroppedEventData>,
+    dropped_event_count: AtomicU64,
+    dropped_event_byte_size: AtomicU64,
+    dropped_event_count_intentional: AtomicU64,
+    dropped_event_byte_size_intentional: AtomicU64,
     max_size_bytes: AtomicU64,
     max_size_events: AtomicUsize,
 }
 
-#[derive(Debug, Default)]
-struct BufferUsageDroppedEventData {
-    count: AtomicU64,
-    size: AtomicU64,
-}
-
 impl BufferUsageData {
-    pub fn new(mode: WhenFull, idx: usize) -> Self {
-        let dropped_event_data = match mode {
-            WhenFull::Block | WhenFull::Overflow => None,
-            WhenFull::DropNewest => Some(BufferUsageDroppedEventData::default()),
-        };
-
+    pub fn new(idx: usize) -> Self {
         Self {
             idx,
             received_event_count: AtomicU64::new(0),
             received_byte_size: AtomicU64::new(0),
             sent_event_count: AtomicU64::new(0),
             sent_byte_size: AtomicU64::new(0),
-            dropped_event_data,
+            dropped_event_count: AtomicU64::new(0),
+            dropped_event_byte_size: AtomicU64::new(0),
+            dropped_event_count_intentional: AtomicU64::new(0),
+            dropped_event_byte_size_intentional: AtomicU64::new(0),
             max_size_bytes: AtomicU64::new(0),
             max_size_events: AtomicUsize::new(0),
         }
@@ -134,14 +141,14 @@ impl BufferUsageData {
             received_byte_size: self.received_byte_size.load(Ordering::Relaxed),
             sent_event_count: self.sent_event_count.load(Ordering::Relaxed),
             sent_byte_size: self.sent_byte_size.load(Ordering::Relaxed),
-            dropped_event_count: self
-                .dropped_event_data
-                .as_ref()
-                .map(|inner| inner.count.load(Ordering::Relaxed)),
-            dropped_event_size: self
-                .dropped_event_data
-                .as_ref()
-                .map(|inner| inner.size.load(Ordering::Relaxed)),
+            dropped_event_count: self.dropped_event_count.load(Ordering::Relaxed),
+            dropped_event_byte_size: self.dropped_event_byte_size.load(Ordering::Relaxed),
+            dropped_event_count_intentional: self
+                .dropped_event_count_intentional
+                .load(Ordering::Relaxed),
+            dropped_event_byte_size_intentional: self
+                .dropped_event_byte_size_intentional
+                .load(Ordering::Relaxed),
             max_size_bytes: self.max_size_bytes.load(Ordering::Relaxed),
             max_size_events: self.max_size_events.load(Ordering::Relaxed),
         }
@@ -154,8 +161,10 @@ pub struct BufferUsageSnapshot {
     pub received_byte_size: u64,
     pub sent_event_count: u64,
     pub sent_byte_size: u64,
-    pub dropped_event_count: Option<u64>,
-    pub dropped_event_size: Option<u64>,
+    pub dropped_event_count: u64,
+    pub dropped_event_byte_size: u64,
+    pub dropped_event_count_intentional: u64,
+    pub dropped_event_byte_size_intentional: u64,
     pub max_size_bytes: u64,
     pub max_size_events: usize,
 }
@@ -181,8 +190,8 @@ impl BufferUsage {
     /// A [`BufferUsageHandle`] is returned that the caller can use to actually update the usage
     /// metrics with.  This handle will only update the usage metrics for the particular stage it
     /// was added for.
-    pub fn add_stage(&mut self, idx: usize, mode: WhenFull) -> BufferUsageHandle {
-        let data = Arc::new(BufferUsageData::new(mode, idx));
+    pub fn add_stage(&mut self, idx: usize) -> BufferUsageHandle {
+        let data = Arc::new(BufferUsageData::new(idx));
         let handle = BufferUsageHandle {
             state: Arc::clone(&data),
         };
@@ -229,13 +238,25 @@ impl BufferUsage {
                         byte_size: stage.sent_byte_size.swap(0, Ordering::Relaxed),
                     });
 
-                    if let Some(dropped_event_data) = &stage.dropped_event_data {
-                        emit(BufferEventsDropped {
-                            idx: stage.idx,
-                            count: dropped_event_data.count.swap(0, Ordering::Relaxed),
-                            byte_size: dropped_event_data.size.swap(0, Ordering::Relaxed),
-                        });
-                    }
+                    emit(BufferEventsDropped {
+                        idx: stage.idx,
+                        intentional: true,
+                        reason: "drop_newest",
+                        count: stage
+                            .dropped_event_count_intentional
+                            .swap(0, Ordering::Relaxed),
+                        byte_size: stage
+                            .dropped_event_byte_size_intentional
+                            .swap(0, Ordering::Relaxed),
+                    });
+
+                    emit(BufferEventsDropped {
+                        idx: stage.idx,
+                        intentional: false,
+                        reason: "corrupted_events",
+                        count: stage.dropped_event_count.swap(0, Ordering::Relaxed),
+                        byte_size: stage.dropped_event_byte_size.swap(0, Ordering::Relaxed),
+                    });
                 }
             }
         };

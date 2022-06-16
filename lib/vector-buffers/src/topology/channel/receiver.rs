@@ -8,6 +8,7 @@ use async_recursion::async_recursion;
 use futures::{ready, Stream};
 use tokio::select;
 use tokio_util::sync::ReusableBoxFuture;
+use vector_common::internal_event::emit;
 
 use super::limited_queue::LimitedReceiver;
 use crate::{
@@ -58,10 +59,20 @@ where
         match self {
             ReceiverAdapter::InMemory(rx) => rx.next().await,
             ReceiverAdapter::DiskV1(reader) => reader.next().await,
-            ReceiverAdapter::DiskV2(reader) => reader
-                .next()
-                .await
-                .expect("reader encountered unrecoverable error"),
+            ReceiverAdapter::DiskV2(reader) => loop {
+                match reader.next().await {
+                    Ok(result) => break result,
+                    Err(e) => match e.as_recoverable_error() {
+                        Some(re) => {
+                            // If we've hit a recoverable error, we'll emit an event to indicate as much but we'll still
+                            // keep trying to read the next available record.
+                            emit(re);
+                            continue;
+                        }
+                        None => panic!("Reader encountered unrecoverable error: {:?}", e),
+                    },
+                }
+            },
         }
     }
 }
