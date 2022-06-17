@@ -161,7 +161,7 @@ where
 }
 
 pub fn num_threads() -> usize {
-    std::thread::available_parallelism()
-        .expect("Could not determine available parallelism")
-        .into()
+    usize::from(
+        std::thread::available_parallelism().unwrap_or(std::num::NonZeroUsize::new(1).unwrap()),
+    )
 }
