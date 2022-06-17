@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use vector_config::configurable_component;
 pub use vector_core::event::lua;
 use vector_core::transform::runtime_transform::{RuntimeTransform, Timer};
 
@@ -42,15 +42,30 @@ pub enum BuildError {
     RuntimeErrorGc { source: mlua::Error },
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the version two of the `lua` transform.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct LuaConfig {
+    /// The Lua program to initialize the transform with.
+    ///
+    /// The program can be used to to import external dependencies, as well as define the functions used for the various
+    /// lifecycle hooks. However, it's not strictly required, as the lifecycle hooks can be configured directly with
+    /// inline Lua source for each respective hook.
+    source: Option<String>,
+
+    /// A list of directories to search when loading a Lua file via the `require` function.
+    ///
+    /// If not specified, the modules are looked up in the directories of Vector’s configs.
     #[serde(default = "default_config_paths")]
     search_dirs: Vec<PathBuf>,
+
+    #[configurable(derived)]
     hooks: HooksConfig,
+
+    /// A list of timers which should be configured and executed periodically.
     #[serde(default)]
     timers: Vec<TimerConfig>,
-    source: Option<String>,
 }
 
 fn default_config_paths() -> Vec<PathBuf> {
@@ -70,17 +85,52 @@ fn default_config_paths() -> Vec<PathBuf> {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Lifecycle hooks.
+///
+/// These hooks can be set to perform additional processing during the lifecycle of the transform.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 struct HooksConfig {
+    /// A function which is called when the first event comes, before calling `hooks.process`.
+    ///
+    /// It can produce new events using the `emit` function.
+    ///
+    /// This can either be inline Lua that defines a closure to use, or the name of the Lua function to call. In both
+    /// cases, the closure/function takes a single parameter, `emit`, which is a reference to a function for emitting events.
     init: Option<String>,
+
+    /// A function which is called for each incoming event.
+    ///
+    /// It can produce new events using the `emit` function.
+    ///
+    /// This can either be inline Lua that defines a closure to use, or the name of the Lua function to call. In both
+    /// cases, the closure/function takes two parameters. The first parameter, `event`, is the event being processed,
+    /// while the second parameter, `emit`, is a reference to a function for emitting events.
     process: String,
+
+    /// A function which is called when Vector is stopped.
+    ///
+    /// It can produce new events using the `emit` function.
+    ///
+    /// This can either be inline Lua that defines a closure to use, or the name of the Lua function to call. In both
+    /// cases, the closure/function takes a single parameter, `emit`, which is a reference to a function for emitting events.
     shutdown: Option<String>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// A Lua timer.
+#[configurable_component]
+#[derive(Clone, Debug)]
 struct TimerConfig {
+    /// The interval to execute the handler, in seconds.
     interval_seconds: u64,
+
+    /// The handler function which is called when the timer ticks.
+    ///
+    /// It can produce new events using the `emit` function.
+    ///
+    /// This can either be inline Lua that defines a closure to use, or the name of the Lua function to call. In both
+    /// cases, the closure/function takes a single parameter, `emit`, which is a reference to a function for emitting events.
     handler: String,
 }
 

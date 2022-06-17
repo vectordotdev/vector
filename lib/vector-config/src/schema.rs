@@ -10,7 +10,7 @@ use schemars::{
 };
 use serde_json::{Map, Value};
 
-use crate::{num::ConfigurableNumber, Configurable, Metadata};
+use crate::{num::ConfigurableNumber, Configurable, CustomAttribute, Metadata};
 
 /// Finalizes the schema by ensuring all metadata is applied and registering it in the generator.
 ///
@@ -92,8 +92,15 @@ where
 
     // Set any custom attributes as extensions on the schema.
     let mut custom_map = Map::new();
-    for (key, value) in metadata.custom_attributes() {
-        custom_map.insert(key.to_string(), Value::String(value.to_string()));
+    for attribute in metadata.custom_attributes() {
+        match attribute {
+            CustomAttribute::Flag(key) => {
+                custom_map.insert(key.to_string(), Value::Bool(true));
+            }
+            CustomAttribute::KeyValue { key, value } => {
+                custom_map.insert(key.to_string(), Value::String(value.to_string()));
+            }
+        }
     }
 
     if !custom_map.is_empty() && !is_schema_ref {

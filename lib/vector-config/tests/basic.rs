@@ -192,6 +192,10 @@ pub struct AdvancedSinkConfig {
     /// Overridden TLS description.
     #[configurable(derived)]
     tls: Option<TlsEnablableConfig>,
+    /// The partition key to use for each event.
+    #[configurable(metadata(templateable))]
+    #[serde(default = "default_partition_key")]
+    partition_key: String,
     /// The tags to apply to each event.
     tags: HashMap<String, String>,
 }
@@ -202,6 +206,10 @@ fn default_advanced_sink_batch() -> BatchConfig {
         max_bytes: Some(NonZeroU64::new(36_000_000).expect("must be nonzero")),
         timeout: Some(SpecialDuration(15)),
     }
+}
+
+fn default_partition_key() -> String {
+    "foo".to_string()
 }
 
 const fn default_advanced_sink_encoding() -> Encoding {

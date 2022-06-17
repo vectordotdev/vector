@@ -41,7 +41,7 @@ pub struct GeoipConfig {
     ///
     /// MaxMind includes localized versions of some of the fields within their database, such as country name. This
     /// setting can control which of those localized versions are returned by the transform.
-    /// 
+    ///
     /// More information on which portions of the geolocation data are localized, and what languages are available, can
     /// be found
     /// [here](https://support.maxmind.com/hc/en-us/articles/4414877149467-IP-Geolocation-Data#h_01FRRGRYTGZB29ERDBZCX3MR8Q).

@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use crate::{
     conditions::{AnyCondition, Condition},
@@ -12,11 +13,24 @@ use crate::{
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `sample` transform.
+#[configurable_component(transform)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct SampleConfig {
+    /// The rate at which events will be forwarded, expressed as `1/N`.
+    ///
+    /// For example, `rate = 10` means 1 out of every 10 events will be forwarded and the rest will be dropped.
     pub rate: u64,
+
+    /// The name of the log field whose value will be hashed to determine if the event should be passed.
+    ///
+    /// Consistently samples the same events. Actual rate of sampling may differ from the configured one if values in
+    /// the field are not uniformly distributed. If left unspecified, or if the event doesn’t have `key_field`, events
+    /// will be count rated.
     pub key_field: Option<String>,
+
+    /// A logical condition used to exclude events from sampling.
     pub exclude: Option<AnyCondition>,
 }
 

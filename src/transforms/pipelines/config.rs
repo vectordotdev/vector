@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
 use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 use vector_core::{
     config::Input,
     event::{Event, EventArray, EventContainer},
@@ -20,14 +21,17 @@ use crate::{
 // constant.
 const INTERIOR_BUFFER_SIZE: usize = 64;
 
-//------------------------------------------------------------------------------
-
-/// This represents the configuration of a single pipeline, not the pipelines transform
-/// itself, which can contain multiple individual pipelines
-#[derive(Debug, Default, Deserialize, Serialize)]
+/// A single pipeline.
+#[configurable_component]
+#[derive(Debug, Default)]
 pub(crate) struct PipelineConfig {
+    /// The name of the pipeline.
     name: String,
+
+    /// A logical condition used to determine if an event should be processed by this pipeline.
     filter: Option<AnyCondition>,
+
+    /// A list of sequential transforms that will process any event that is passed to the pipeline.
     #[serde(default)]
     transforms: Vec<Box<dyn TransformConfig>>,
 }
@@ -228,11 +232,10 @@ impl SyncTransform for Pipeline {
     }
 }
 
-//------------------------------------------------------------------------------
-
-/// This represent an ordered list of pipelines depending on the event type.
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub(crate) struct EventTypeConfig(Vec<PipelineConfig>);
+/// An ordered list of transformations.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
+pub(crate) struct EventTypeConfig(#[configuration(transparent)] Vec<PipelineConfig>);
 
 impl AsRef<Vec<PipelineConfig>> for EventTypeConfig {
     fn as_ref(&self) -> &Vec<PipelineConfig> {

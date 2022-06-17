@@ -1,10 +1,12 @@
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
-use super::{AnyCondition, Condition, ConditionConfig, Conditional};
+use super::{AnyCondition, Condition, Conditional, ConditionalConfig};
 use crate::event::Event;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub(crate) struct NotConfig(AnyCondition);
+/// A condition that uses the negated version of another condition.
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub(crate) struct NotConfig(#[configurable(derived)] Box<AnyCondition>);
 
 impl From<AnyCondition> for NotConfig {
     fn from(value: AnyCondition) -> Self {
@@ -12,8 +14,7 @@ impl From<AnyCondition> for NotConfig {
     }
 }
 
-#[typetag::serde(name = "not")]
-impl ConditionConfig for NotConfig {
+impl ConditionalConfig for NotConfig {
     fn build(&self, enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition> {
         Ok(Condition::Not(Not(Box::new(
             self.0.build(enrichment_tables)?,

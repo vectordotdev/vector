@@ -1,29 +1,22 @@
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use crate::{
-    conditions::{Condition, ConditionConfig, ConditionDescription, Conditional},
+    conditions::{Condition, Conditional, ConditionalConfig},
     event::Event,
 };
 
-//------------------------------------------------------------------------------
-
-#[derive(Deserialize, Serialize, Debug, Default, Clone)]
+/// A condition that asserts whether or not an event is a metric.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct IsMetricConfig {}
-
-inventory::submit! {
-    ConditionDescription::new::<IsMetricConfig>("is_metric")
-}
 
 impl_generate_config_from_default!(IsMetricConfig);
 
-#[typetag::serde(name = "is_metric")]
-impl ConditionConfig for IsMetricConfig {
+impl ConditionalConfig for IsMetricConfig {
     fn build(&self, _enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition> {
         Ok(Condition::is_metric())
     }
 }
-
-//------------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
 pub struct IsMetric {}
@@ -42,8 +35,6 @@ impl Conditional for IsMetric {
         }
     }
 }
-
-//------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod test {

@@ -100,6 +100,8 @@ pub struct Ec2Metadata {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     proxy: ProxyConfig,
+
+    /// Requires the transform to be able to successfully query the EC2 metadata before Vector can start.
     required: Option<bool>,
 }
 

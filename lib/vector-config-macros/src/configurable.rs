@@ -2,7 +2,7 @@ use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput, ExprPath, GenericParam, Ident, Lifetime, LifetimeDef};
-use vector_config_common::validation::Validation;
+use vector_config_common::{attributes::CustomAttribute, validation::Validation};
 
 use crate::ast::{Container, Data, Field, Style, Tagging, Variant};
 
@@ -303,11 +303,7 @@ fn generate_container_metadata(
     let maybe_description = get_metadata_description(meta_ident, container.description());
     let maybe_default_value = get_metadata_default_value(meta_ident, container.default_value());
     let maybe_deprecated = get_metadata_deprecated(meta_ident, container.deprecated());
-    let maybe_custom_attributes = container.metadata().map(|(key, value)| {
-        quote! {
-            #meta_ident.add_custom_attribute(#key, #value);
-        }
-    });
+    let maybe_custom_attributes = get_metadata_custom_attributes(meta_ident, container.metadata());
 
     quote! {
         let mut #meta_ident = ::vector_config::Metadata::default();
@@ -315,7 +311,7 @@ fn generate_container_metadata(
         #maybe_description
         #maybe_default_value
         #maybe_deprecated
-        #(#maybe_custom_attributes)*
+        #maybe_custom_attributes
     }
 }
 
@@ -328,6 +324,7 @@ fn generate_field_metadata(meta_ident: &Ident, field: &Field<'_>) -> proc_macro2
     let maybe_deprecated = get_metadata_deprecated(meta_ident, field.deprecated());
     let maybe_transparent = get_metadata_transparent(meta_ident, field.transparent());
     let maybe_validation = get_metadata_validation(meta_ident, field.validation());
+    let maybe_custom_attributes = get_metadata_custom_attributes(meta_ident, field.metadata());
 
     quote! {
         let mut #meta_ident = #field_as_configurable::metadata();
@@ -337,6 +334,7 @@ fn generate_field_metadata(meta_ident: &Ident, field: &Field<'_>) -> proc_macro2
         #maybe_deprecated
         #maybe_transparent
         #maybe_validation
+        #maybe_custom_attributes
     }
 }
 
@@ -350,12 +348,14 @@ fn generate_variant_metadata(
     let description = get_metadata_description(meta_ident, variant.description())
         .expect("enum variants without a description should be rejected during AST parsing");
     let maybe_deprecated = get_metadata_deprecated(meta_ident, variant.deprecated());
+    let maybe_custom_attributes = get_metadata_custom_attributes(meta_ident, variant.metadata());
 
     quote! {
         let mut #meta_ident = #variant_as_configurable::metadata();
         #maybe_title
         #description
         #maybe_deprecated
+        #maybe_custom_attributes
     }
 }
 
@@ -440,6 +440,28 @@ fn get_metadata_validation(
 
     quote! {
         #(#mapped_validation)*
+    }
+}
+
+fn get_metadata_custom_attributes(
+    meta_ident: &Ident,
+    custom_attributes: impl Iterator<Item = CustomAttribute>,
+) -> proc_macro2::TokenStream {
+    let mapped_custom_attributes = custom_attributes
+        .map(|attr| match attr {
+            CustomAttribute::Flag(key) => quote! {
+                #meta_ident.add_custom_attribute(::vector_config_common::attributes::CustomAttribute::Flag(#key.to_string()));
+            },
+            CustomAttribute::KeyValue { key, value } => quote! {
+                #meta_ident.add_custom_attribute(::vector_config_common::attributes::CustomAttribute::KeyValue {
+                    key: #key.to_string(),
+                    value: #value.to_string(),
+                });
+            },
+        });
+
+    quote! {
+        #(#mapped_custom_attributes)*
     }
 }
 

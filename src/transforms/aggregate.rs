@@ -60,8 +60,6 @@ impl TransformConfig for AggregateConfig {
 
 type MetricEntry = (metric::MetricData, EventMetadata);
 
-//------------------------------------------------------------------------------
-
 #[derive(Debug)]
 pub struct Aggregate {
     interval: Duration,

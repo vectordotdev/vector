@@ -1,17 +1,14 @@
-use darling::{
-    error::Accumulator,
-    util::{path_to_string, Flag},
-    FromAttributes, FromMeta,
-};
+use darling::{error::Accumulator, util::Flag, FromAttributes};
 use serde_derive_internals::{ast as serde_ast, Ctxt, Derive};
-use syn::{DeriveInput, ExprPath, Generics, Ident, NestedMeta};
+use syn::{DeriveInput, ExprPath, Generics, Ident};
+use vector_config_common::attributes::CustomAttribute;
 
 use super::{
     util::{
         err_serde_failed, get_serde_default_value, try_extract_doc_title_description,
         DarlingResultIterator,
     },
-    Data, Field, Style, Tagging, Variant,
+    Data, Field, Metadata, Style, Tagging, Variant,
 };
 
 const ERR_NO_ENUM_TUPLES: &str = "enum variants cannot be tuples (multiple unnamed fields)";
@@ -178,11 +175,12 @@ impl<'a> Container<'a> {
         self.attrs.deprecated.is_some()
     }
 
-    pub fn metadata(&self) -> impl Iterator<Item = &(String, String)> {
+    pub fn metadata(&self) -> impl Iterator<Item = CustomAttribute> {
         self.attrs
             .metadata
-            .iter()
-            .flat_map(|metadata| &metadata.pairs)
+            .clone()
+            .into_iter()
+            .flat_map(|metadata| metadata.attributes())
     }
 }
 
@@ -209,53 +207,5 @@ impl Attributes {
         self.description = self.description.or(doc_description);
 
         Ok(self)
-    }
-}
-
-#[derive(Debug)]
-struct Metadata {
-    pairs: Vec<(String, String)>,
-}
-
-impl FromMeta for Metadata {
-    fn from_list(items: &[NestedMeta]) -> darling::Result<Self> {
-        let mut errors = Accumulator::default();
-
-        // Can't be empty.
-        if items.is_empty() {
-            errors.push(darling::Error::too_few_items(1));
-        }
-
-        errors = errors.checkpoint()?;
-
-        // Can't be anything other than name/value pairs.
-        let pairs = items
-            .iter()
-            .filter_map(|nmeta| match nmeta {
-                NestedMeta::Meta(meta) => match meta {
-                    syn::Meta::Path(_) => {
-                        errors.push(darling::Error::unexpected_type("path").with_span(nmeta));
-                        None
-                    }
-                    syn::Meta::List(_) => {
-                        errors.push(darling::Error::unexpected_type("list").with_span(nmeta));
-                        None
-                    }
-                    syn::Meta::NameValue(nv) => match &nv.lit {
-                        syn::Lit::Str(s) => Some((path_to_string(&nv.path), s.value())),
-                        lit => {
-                            errors.push(darling::Error::unexpected_lit_type(lit));
-                            None
-                        }
-                    },
-                },
-                NestedMeta::Lit(_) => {
-                    errors.push(darling::Error::unexpected_type("literal").with_span(nmeta));
-                    None
-                }
-            })
-            .collect::<Vec<(String, String)>>();
-
-        errors.finish_with(Metadata { pairs })
     }
 }

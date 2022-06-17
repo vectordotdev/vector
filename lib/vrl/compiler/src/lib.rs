@@ -22,7 +22,6 @@ pub use core::{
 };
 use std::{fmt::Display, str::FromStr};
 
-use ::serde::{Deserialize, Serialize};
 pub use context::Context;
 use diagnostic::DiagnosticList;
 pub(crate) use diagnostic::Span;
@@ -32,13 +31,18 @@ pub use paste::paste;
 pub use program::{Program, ProgramInfo};
 use state::ExternalEnv;
 pub use type_def::TypeDef;
+use vector_config::configurable_component;
 
 pub type Result<T = (Program, DiagnosticList)> = std::result::Result<T, DiagnosticList>;
 
-/// The choice of available runtimes.
-#[derive(Deserialize, Serialize, Debug, Copy, Clone, PartialEq)]
+/// Available VRL runtimes.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum VrlRuntime {
+    /// Tree-walking runtime.
+    ///
+    /// This is the only, and default, runtime.
     Ast,
 }
 

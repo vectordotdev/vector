@@ -1,29 +1,22 @@
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use crate::{
-    conditions::{Condition, ConditionConfig, ConditionDescription, Conditional},
+    conditions::{Condition, Conditional, ConditionalConfig},
     event::Event,
 };
 
-//------------------------------------------------------------------------------
-
-#[derive(Deserialize, Serialize, Debug, Default, Clone)]
+/// A condition that asserts whether or not an event is a log.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct IsLogConfig {}
-
-inventory::submit! {
-    ConditionDescription::new::<IsLogConfig>("is_log")
-}
 
 impl_generate_config_from_default!(IsLogConfig);
 
-#[typetag::serde(name = "is_log")]
-impl ConditionConfig for IsLogConfig {
+impl ConditionalConfig for IsLogConfig {
     fn build(&self, _enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition> {
         Ok(Condition::is_log())
     }
 }
-
-//------------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
 pub struct IsLog {}
@@ -42,8 +35,6 @@ impl Conditional for IsLog {
         }
     }
 }
-
-//------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod test {

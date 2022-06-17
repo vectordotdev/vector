@@ -1,7 +1,7 @@
 use schemars::{gen::SchemaGenerator, schema::SchemaObject};
 
 use crate::{
-    schema::{finalize_schema, generate_map_schema, generate_string_schema, generate_array_schema},
+    schema::{finalize_schema, generate_array_schema, generate_map_schema, generate_string_schema},
     Configurable, Metadata,
 };
 

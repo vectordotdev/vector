@@ -38,7 +38,7 @@ impl NoProxyInterceptor {
 }
 
 /// Proxy configuration.
-/// 
+///
 /// Vector can be configured to proxy traffic through an HTTP(S) proxy when making external requests. Similar to common
 /// proxy configuration convention, users can set different proxieds to use based on the type of traffic being proxied,
 /// as well as set specific hosts that should not be proxied.
@@ -54,21 +54,21 @@ pub struct ProxyConfig {
     pub enabled: bool,
 
     /// Proxy endpoint to use when proxying HTTP traffic.
-    /// 
+    ///
     /// Must be a valid URI string.
     #[serde(default)]
     pub http: Option<String>,
 
     /// Proxy endpoint to use when proxying HTTPS traffic.
-    /// 
+    ///
     /// Must be a valid URI string.
     #[serde(default)]
     pub https: Option<String>,
 
     /// A list of hosts to avoid proxying.
-    /// 
+    ///
     /// Multiple patterns are allowed:
-    /// 
+    ///
     /// | Pattern             | Example match                                                               |
     /// | ------------------- | --------------------------------------------------------------------------- |
     /// | Domain names        | `**example.com**` matches requests to `**example.com**`                     |

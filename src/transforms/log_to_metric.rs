@@ -38,14 +38,14 @@ pub struct CounterConfig {
     field: String,
 
     /// Overrides the name of the counter.
-    /// 
+    ///
     /// If not specified, `field` is used as the name of the counter.
     name: Option<String>,
 
     /// Sets the namespace for the counter.
     namespace: Option<String>,
 
-    /// Enables incrementing the counter by the value in `field`, instead of only by `1`.
+    /// Increments the counter by the value in `field`, instead of only by `1`.
     #[serde(default = "default_increment_by_value")]
     increment_by_value: bool,
 
@@ -65,7 +65,7 @@ pub struct GaugeConfig {
     field: String,
 
     /// Overrides the name of the gauge.
-    /// 
+    ///
     /// If not specified, `field` is used as the name of the gauge.
     name: Option<String>,
 
@@ -84,7 +84,7 @@ pub struct SetConfig {
     field: String,
 
     /// Overrides the name of the set.
-    /// 
+    ///
     /// If not specified, `field` is used as the name of the set.
     name: Option<String>,
 
@@ -99,19 +99,19 @@ pub struct SetConfig {
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct HistogramConfig {
-   /// Name of the field in the event to generate the histogram from.
-   field: String,
+    /// Name of the field in the event to generate the histogram from.
+    field: String,
 
-   /// Overrides the name of the histogram.
-   /// 
-   /// If not specified, `field` is used as the name of the histogram.
-   name: Option<String>,
+    /// Overrides the name of the histogram.
+    ///
+    /// If not specified, `field` is used as the name of the histogram.
+    name: Option<String>,
 
-   /// Sets the namespace for the histogram.
-   namespace: Option<String>,
+    /// Sets the namespace for the histogram.
+    namespace: Option<String>,
 
-   /// Tags to apply to the histogram.
-   tags: Option<IndexMap<String, String>>,
+    /// Tags to apply to the histogram.
+    tags: Option<IndexMap<String, String>>,
 }
 
 /// Specification of a summary derived from a log event.
@@ -122,7 +122,7 @@ pub struct SummaryConfig {
     field: String,
 
     /// Overrides the name of the summary.
-    /// 
+    ///
     /// If not specified, `field` is used as the name of the summary.
     name: Option<String>,
 

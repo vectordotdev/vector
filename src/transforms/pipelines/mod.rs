@@ -109,7 +109,7 @@ use std::{collections::HashSet, fmt::Debug};
 
 use config::EventTypeConfig;
 use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 use vector_core::{
     config::{ComponentKey, DataType, Input, Output},
     transform::{
@@ -126,17 +126,19 @@ use crate::{
     transforms::route::{RouteConfig, UNMATCHED_ROUTE},
 };
 
-//------------------------------------------------------------------------------
-
 inventory::submit! {
     TransformDescription::new::<PipelinesConfig>("pipelines")
 }
 
-/// The configuration of the pipelines transform itself.
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+/// Configuration for the `pipelines` transform.
+#[configurable_component(transform)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct PipelinesConfig {
+    /// Configuration for the logs-specific side of the pipeline.
     #[serde(default)]
     logs: EventTypeConfig,
+
+    /// Configuration for the metrics-specific side of the pipeline.
     #[serde(default)]
     metrics: EventTypeConfig,
 }

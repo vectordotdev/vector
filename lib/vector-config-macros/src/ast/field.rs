@@ -1,10 +1,13 @@
 use darling::{util::Flag, FromAttributes};
 use serde_derive_internals::ast as serde_ast;
 use syn::{ExprPath, Ident};
-use vector_config_common::validation::Validation;
+use vector_config_common::{attributes::CustomAttribute, validation::Validation};
 
-use super::util::{
-    err_field_missing_description, get_serde_default_value, try_extract_doc_title_description,
+use super::{
+    util::{
+        err_field_missing_description, get_serde_default_value, try_extract_doc_title_description,
+    },
+    Metadata,
 };
 
 pub struct Field<'a> {
@@ -73,6 +76,14 @@ impl<'a> Field<'a> {
     pub fn flatten(&self) -> bool {
         self.attrs.flatten
     }
+
+    pub fn metadata(&self) -> impl Iterator<Item = CustomAttribute> {
+        self.attrs
+            .metadata
+            .clone()
+            .into_iter()
+            .flat_map(|metadata| metadata.attributes())
+    }
 }
 
 #[derive(Debug, Default, FromAttributes)]
@@ -87,6 +98,8 @@ struct Attributes {
     visible: bool,
     #[darling(skip)]
     flatten: bool,
+    #[darling(multiple)]
+    metadata: Vec<Metadata>,
     #[darling(multiple)]
     validation: Vec<Validation>,
 }

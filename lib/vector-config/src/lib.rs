@@ -103,6 +103,7 @@ mod external;
 mod num;
 mod stdlib;
 
+use vector_config_common::attributes::CustomAttribute;
 // Re-export of the `#[configurable_component]` and `#[derive(Configurable)]` proc macros.
 pub use vector_config_macros::*;
 
@@ -120,7 +121,7 @@ pub struct Metadata<'de, T: Configurable<'de>> {
     title: Option<&'static str>,
     description: Option<&'static str>,
     default_value: Option<T>,
-    custom_attributes: Vec<(&'static str, &'static str)>,
+    custom_attributes: Vec<CustomAttribute>,
     deprecated: bool,
     transparent: bool,
     validations: Vec<validation::Validation>,
@@ -226,12 +227,12 @@ impl<'de, T: Configurable<'de>> Metadata<'de, T> {
         self.transparent = false;
     }
 
-    pub fn custom_attributes(&self) -> &[(&'static str, &'static str)] {
+    pub fn custom_attributes(&self) -> &[CustomAttribute] {
         &self.custom_attributes
     }
 
-    pub fn add_custom_attribute(&mut self, key: &'static str, value: &'static str) {
-        self.custom_attributes.push((key, value));
+    pub fn add_custom_attribute(&mut self, attribute: CustomAttribute) {
+        self.custom_attributes.push(attribute);
     }
 
     pub fn clear_custom_attributes(&mut self) {
