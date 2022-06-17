@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{BTreeSet, HashMap},
     convert::Infallible,
     fs::File,
     future::{ready, Future},
@@ -10,19 +10,27 @@ use std::{
     pin::Pin,
     sync::{
         atomic::{AtomicUsize, Ordering},
-        Arc,
+        Arc, Mutex,
     },
     task::{Context, Poll},
 };
 
+use async_trait::async_trait;
 use flate2::read::MultiGzDecoder;
 use futures::{
     ready, stream, task::noop_waker_ref, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt,
+};
+use futures_util::{
+    future::{err, ok},
+    stream::BoxStream,
+    Sink,
 };
 use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
 use portpicker::pick_unused_port;
 use rand::{thread_rng, Rng};
 use rand_distr::Alphanumeric;
+use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 use tokio::{
     io::{AsyncRead, AsyncWrite, AsyncWriteExt, Result as IoResult},
     net::{TcpListener, TcpStream, ToSocketAddrs},
@@ -35,13 +43,30 @@ use tokio_stream::wrappers::TcpListenerStream;
 #[cfg(unix)]
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
-use vector_buffers::topology::channel::LimitedReceiver;
-use vector_core::event::{BatchNotifier, Event, EventArray, LogEvent};
+use value::Value;
+use vector_buffers::{
+    topology::channel::{limited, LimitedReceiver},
+    Acker,
+};
+use vector_core::{
+    config::{AcknowledgementsConfig, DataType, Input, Output},
+    event::{
+        metric::{MetricData, Sample},
+        BatchNotifier, Event, EventArray, EventContainer, LogEvent, MetricValue,
+    },
+    schema,
+    sink::{StreamSink, VectorSink},
+    source::Source,
+    transform::{FunctionTransform, OutputBuffer, Transform, TransformConfig, TransformContext},
+};
 
 use crate::{
-    config::{Config, ConfigDiff, GenerateConfig},
+    config::{
+        Config, ConfigDiff, GenerateConfig, SinkConfig, SinkContext, SourceConfig, SourceContext,
+    },
+    sinks::Healthcheck,
     topology::{self, RunningTopology},
-    trace,
+    trace, SourceSender,
 };
 
 const WAIT_FOR_SECS: u64 = 5; // The default time to wait in `wait_for`
@@ -688,4 +713,584 @@ where
     let events = collect_ready(stream).await;
     sender.await.expect("Failed to send data");
     events
+}
+
+pub fn sink(channel_size: usize) -> (impl Stream<Item = EventArray>, MockSinkConfig) {
+    let (tx, rx) = SourceSender::new_with_buffer(channel_size);
+    let sink = MockSinkConfig::new(tx, true);
+    (rx.into_stream(), sink)
+}
+
+pub fn sink_with_data(
+    channel_size: usize,
+    data: &str,
+) -> (impl Stream<Item = EventArray>, MockSinkConfig) {
+    let (tx, rx) = SourceSender::new_with_buffer(channel_size);
+    let sink = MockSinkConfig::new_with_data(tx, true, data);
+    (rx.into_stream(), sink)
+}
+
+pub fn sink_failing_healthcheck(
+    channel_size: usize,
+) -> (impl Stream<Item = EventArray>, MockSinkConfig) {
+    let (tx, rx) = SourceSender::new_with_buffer(channel_size);
+    let sink = MockSinkConfig::new(tx, false);
+    (rx.into_stream(), sink)
+}
+
+pub fn source() -> (SourceSender, MockSourceConfig) {
+    let (tx, rx) = SourceSender::new_with_buffer(1);
+    let source = MockSourceConfig::new(rx);
+    (tx, source)
+}
+
+pub fn source_with_data(data: &str) -> (SourceSender, MockSourceConfig) {
+    let (tx, rx) = SourceSender::new_with_buffer(1);
+    let source = MockSourceConfig::new_with_data(rx, data);
+    (tx, source)
+}
+
+pub fn source_with_event_counter() -> (SourceSender, MockSourceConfig, Arc<AtomicUsize>) {
+    let event_counter = Arc::new(AtomicUsize::new(0));
+    let (tx, rx) = SourceSender::new_with_buffer(1);
+    let source = MockSourceConfig::new_with_event_counter(rx, Arc::clone(&event_counter));
+    (tx, source, event_counter)
+}
+
+pub fn transform(suffix: &str, increase: f64) -> MockTransformConfig {
+    MockTransformConfig::new(suffix.to_owned(), increase)
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct MockSourceConfig {
+    #[serde(skip)]
+    receiver: Arc<Mutex<Option<LimitedReceiver<EventArray>>>>,
+    #[serde(skip)]
+    event_counter: Option<Arc<AtomicUsize>>,
+    #[serde(skip)]
+    data_type: Option<DataType>,
+    #[serde(skip)]
+    force_shutdown: bool,
+    // something for serde to use, so we can trigger rebuilds
+    data: Option<String>,
+}
+
+impl Default for MockSourceConfig {
+    fn default() -> Self {
+        let (_, receiver) = limited(1000);
+        Self {
+            receiver: Arc::new(Mutex::new(Some(receiver))),
+            event_counter: None,
+            data_type: Some(DataType::all()),
+            force_shutdown: false,
+            data: None,
+        }
+    }
+}
+
+impl_generate_config_from_default!(MockSourceConfig);
+
+impl MockSourceConfig {
+    pub fn new(receiver: LimitedReceiver<EventArray>) -> Self {
+        Self {
+            receiver: Arc::new(Mutex::new(Some(receiver))),
+            event_counter: None,
+            data_type: Some(DataType::all()),
+            force_shutdown: false,
+            data: None,
+        }
+    }
+
+    pub fn new_with_data(receiver: LimitedReceiver<EventArray>, data: &str) -> Self {
+        Self {
+            receiver: Arc::new(Mutex::new(Some(receiver))),
+            event_counter: None,
+            data_type: Some(DataType::all()),
+            force_shutdown: false,
+            data: Some(data.into()),
+        }
+    }
+
+    pub fn new_with_event_counter(
+        receiver: LimitedReceiver<EventArray>,
+        event_counter: Arc<AtomicUsize>,
+    ) -> Self {
+        Self {
+            receiver: Arc::new(Mutex::new(Some(receiver))),
+            event_counter: Some(event_counter),
+            data_type: Some(DataType::all()),
+            force_shutdown: false,
+            data: None,
+        }
+    }
+
+    pub fn set_force_shutdown(&mut self, force_shutdown: bool) {
+        self.force_shutdown = force_shutdown;
+    }
+}
+
+#[async_trait]
+#[typetag::serde(name = "mock")]
+impl SourceConfig for MockSourceConfig {
+    async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
+        let wrapped = Arc::clone(&self.receiver);
+        let event_counter = self.event_counter.clone();
+        let mut recv = wrapped.lock().unwrap().take().unwrap();
+        let shutdown1 = cx.shutdown.clone();
+        let shutdown2 = cx.shutdown;
+        let mut out = cx.out;
+        let force_shutdown = self.force_shutdown;
+
+        Ok(Box::pin(async move {
+            tokio::pin!(shutdown1);
+            tokio::pin!(shutdown2);
+
+            loop {
+                tokio::select! {
+                    biased;
+
+                    _ = &mut shutdown1, if force_shutdown => break,
+
+                    Some(array) = recv.next() => {
+                        if let Some(counter) = &event_counter {
+                            counter.fetch_add(array.len(), Ordering::Relaxed);
+                        }
+
+                        if let Err(e) = out.send_event(array).await {
+                            error!(message = "Error sending in sink..", %e);
+                            return Err(())
+                        }
+                    },
+
+                    _ = &mut shutdown2, if !force_shutdown => break,
+                }
+            }
+
+            info!("Finished sending.");
+            Ok(())
+        }))
+    }
+
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(self.data_type.unwrap())]
+    }
+
+    fn source_type(&self) -> &'static str {
+        "mock"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct MockTransform {
+    suffix: String,
+    increase: f64,
+}
+
+impl FunctionTransform for MockTransform {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
+        match &mut event {
+            Event::Log(log) => {
+                let mut v = log
+                    .get(crate::config::log_schema().message_key())
+                    .unwrap()
+                    .to_string_lossy();
+                v.push_str(&self.suffix);
+                log.insert(crate::config::log_schema().message_key(), Value::from(v));
+            }
+            Event::Metric(metric) => {
+                let increment = match metric.value() {
+                    MetricValue::Counter { .. } => Some(MetricValue::Counter {
+                        value: self.increase,
+                    }),
+                    MetricValue::Gauge { .. } => Some(MetricValue::Gauge {
+                        value: self.increase,
+                    }),
+                    MetricValue::Distribution { statistic, .. } => {
+                        Some(MetricValue::Distribution {
+                            samples: vec![Sample {
+                                value: self.increase,
+                                rate: 1,
+                            }],
+                            statistic: *statistic,
+                        })
+                    }
+                    MetricValue::AggregatedHistogram { .. } => None,
+                    MetricValue::AggregatedSummary { .. } => None,
+                    MetricValue::Sketch { .. } => None,
+                    MetricValue::Set { .. } => {
+                        let mut values = BTreeSet::new();
+                        values.insert(self.suffix.clone());
+                        Some(MetricValue::Set { values })
+                    }
+                };
+                if let Some(increment) = increment {
+                    assert!(metric.add(&MetricData {
+                        kind: metric.kind(),
+                        timestamp: metric.timestamp(),
+                        value: increment,
+                    }));
+                }
+            }
+            Event::Trace(trace) => {
+                let mut v = trace
+                    .get(crate::config::log_schema().message_key())
+                    .unwrap()
+                    .to_string_lossy();
+                v.push_str(&self.suffix);
+                trace.insert(crate::config::log_schema().message_key(), Value::from(v));
+            }
+        };
+        output.push(event);
+    }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct MockTransformConfig {
+    suffix: String,
+    increase: f64,
+}
+
+impl_generate_config_from_default!(MockTransformConfig);
+
+impl MockTransformConfig {
+    pub const fn new(suffix: String, increase: f64) -> Self {
+        Self { suffix, increase }
+    }
+}
+
+#[async_trait]
+#[typetag::serde(name = "mock")]
+impl TransformConfig for MockTransformConfig {
+    async fn build(&self, _globals: &TransformContext) -> crate::Result<Transform> {
+        Ok(Transform::function(MockTransform {
+            suffix: self.suffix.clone(),
+            increase: self.increase,
+        }))
+    }
+
+    fn input(&self) -> Input {
+        Input::all()
+    }
+
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+        vec![Output::default(DataType::all())]
+    }
+
+    fn transform_type(&self) -> &'static str {
+        "mock"
+    }
+}
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+pub struct MockSinkConfig {
+    #[serde(skip)]
+    sink: Mode,
+    #[serde(skip)]
+    healthy: bool,
+    // something for serde to use, so we can trigger rebuilds
+    data: Option<String>,
+}
+
+impl_generate_config_from_default!(MockSinkConfig);
+
+#[derive(Debug, Clone)]
+enum Mode {
+    Normal(SourceSender),
+    Dead,
+}
+
+impl Default for Mode {
+    fn default() -> Self {
+        Mode::Dead
+    }
+}
+
+impl MockSinkConfig {
+    pub const fn new(sink: SourceSender, healthy: bool) -> Self {
+        Self {
+            sink: Mode::Normal(sink),
+            healthy,
+            data: None,
+        }
+    }
+
+    pub fn new_with_data(sink: SourceSender, healthy: bool, data: &str) -> Self {
+        Self {
+            sink: Mode::Normal(sink),
+            healthy,
+            data: Some(data.into()),
+        }
+    }
+}
+
+#[derive(Debug, Snafu)]
+enum HealthcheckError {
+    #[snafu(display("unhealthy"))]
+    Unhealthy,
+}
+
+#[async_trait]
+#[typetag::serialize(name = "mock")]
+impl SinkConfig for MockSinkConfig {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        // If this sink is set to not be healthy, just send the healthcheck error immediately over
+        // the oneshot.. otherwise, pass the sender to the sink so it can send it only once it has
+        // started running, so that tests can request the topology be healthy before proceeding.
+        let (tx, rx) = oneshot::channel();
+
+        let health_tx = if self.healthy {
+            Some(tx)
+        } else {
+            let _ = tx.send(Err(HealthcheckError::Unhealthy.into()));
+            None
+        };
+
+        let sink = MockSink {
+            acker: cx.acker(),
+            sink: self.sink.clone(),
+            health_tx,
+        };
+
+        let healthcheck = async move { rx.await.unwrap() };
+
+        Ok((VectorSink::from_event_streamsink(sink), healthcheck.boxed()))
+    }
+
+    fn input(&self) -> Input {
+        Input::all()
+    }
+
+    fn sink_type(&self) -> &'static str {
+        "mock"
+    }
+
+    fn typetag_deserialize(&self) {
+        unimplemented!("not intended for use in real configs")
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
+    }
+}
+
+struct MockSink {
+    acker: Acker,
+    sink: Mode,
+    health_tx: Option<oneshot::Sender<crate::Result<()>>>,
+}
+
+#[async_trait]
+impl StreamSink<Event> for MockSink {
+    async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+        match self.sink {
+            Mode::Normal(mut sink) => {
+                if let Some(tx) = self.health_tx.take() {
+                    let _ = tx.send(Ok(()));
+                }
+
+                // We have an inner sink, so forward the input normally
+                while let Some(event) = input.next().await {
+                    if let Err(error) = sink.send_event(event).await {
+                        error!(message = "Ingesting an event failed at mock sink.", %error);
+                    }
+
+                    self.acker.ack(1);
+                }
+            }
+            Mode::Dead => {
+                // Simulate a dead sink and never poll the input
+                futures::future::pending::<()>().await;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+/// A source that immediately panics.
+#[derive(Debug, Default, Deserialize, Serialize)]
+pub struct PanicSourceConfig;
+
+impl_generate_config_from_default!(PanicSourceConfig);
+
+#[async_trait]
+#[typetag::serde(name = "panic_source")]
+impl SourceConfig for PanicSourceConfig {
+    async fn build(&self, _cx: SourceContext) -> crate::Result<Source> {
+        Ok(Box::pin(async { panic!() }))
+    }
+
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
+    }
+
+    fn source_type(&self) -> &'static str {
+        "panic_source"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
+}
+
+/// A source that immediately returns an error.
+#[derive(Debug, Default, Deserialize, Serialize)]
+pub struct ErrorSourceConfig;
+
+impl_generate_config_from_default!(ErrorSourceConfig);
+
+#[async_trait]
+#[typetag::serde(name = "error_source")]
+impl SourceConfig for ErrorSourceConfig {
+    async fn build(&self, _cx: SourceContext) -> crate::Result<Source> {
+        Ok(err(()).boxed())
+    }
+
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
+    }
+
+    fn source_type(&self) -> &'static str {
+        "error_source"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+pub struct PanicSinkConfig;
+
+impl_generate_config_from_default!(PanicSinkConfig);
+
+#[async_trait]
+#[typetag::serde(name = "panic_sink")]
+impl SinkConfig for PanicSinkConfig {
+    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        Ok((VectorSink::from_event_sink(PanicSink), ok(()).boxed()))
+    }
+
+    fn input(&self) -> Input {
+        Input::log()
+    }
+
+    fn sink_type(&self) -> &'static str {
+        "panic_sink"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
+    }
+}
+
+struct PanicSink;
+
+impl Sink<Event> for PanicSink {
+    type Error = ();
+
+    fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        panic!()
+    }
+
+    fn start_send(self: Pin<&mut Self>, _item: Event) -> Result<(), Self::Error> {
+        panic!()
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        panic!()
+    }
+
+    fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        panic!()
+    }
+}
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+pub struct ErrorSinkConfig;
+
+impl_generate_config_from_default!(ErrorSinkConfig);
+
+#[async_trait]
+#[typetag::serde(name = "error_sink")]
+impl SinkConfig for ErrorSinkConfig {
+    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        Ok((VectorSink::from_event_sink(ErrorSink), ok(()).boxed()))
+    }
+
+    fn input(&self) -> Input {
+        Input::log()
+    }
+
+    fn sink_type(&self) -> &'static str {
+        "panic"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
+    }
+}
+
+struct ErrorSink;
+
+impl Sink<Event> for ErrorSink {
+    type Error = ();
+
+    fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Err(()))
+    }
+
+    fn start_send(self: Pin<&mut Self>, _item: Event) -> Result<(), Self::Error> {
+        Err(())
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Err(()))
+    }
+
+    fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Err(()))
+    }
+}
+
+#[cfg(test)]
+mod register {
+    use crate::config::{SinkDescription, SourceDescription, TransformDescription};
+
+    use super::{
+        ErrorSinkConfig, ErrorSourceConfig, MockSinkConfig, MockSourceConfig, MockTransformConfig,
+        PanicSinkConfig, PanicSourceConfig,
+    };
+
+    inventory::submit! {
+        SourceDescription::new::<MockSourceConfig>("mock_source")
+    }
+
+    inventory::submit! {
+        SourceDescription::new::<PanicSourceConfig>("panic_source")
+    }
+
+    inventory::submit! {
+        SourceDescription::new::<ErrorSourceConfig>("error_source")
+    }
+
+    inventory::submit! {
+        TransformDescription::new::<MockTransformConfig>("mock_transform")
+    }
+
+    inventory::submit! {
+        SinkDescription::new::<MockSinkConfig>("mock_sink")
+    }
+
+    inventory::submit! {
+        SinkDescription::new::<PanicSinkConfig>("panic_sink")
+    }
+
+    inventory::submit! {
+        SinkDescription::new::<ErrorSinkConfig>("error_sink")
+    }
 }
