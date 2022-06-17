@@ -992,7 +992,7 @@ mod tests {
         assert_eq!(config.global.proxy.https, Some("http://other:3128".into()));
         let source = config.sources.get(&ComponentKey::from("in")).unwrap();
         assert_eq!(source.proxy.http, Some("http://server:3129".into()));
-        assert_eq!(source.proxy.https, Some("http://other:3128".into()));
+        assert_eq!(source.proxy.https, None);
         assert!(source.proxy.no_proxy.matches("localhost"));
     }
 
