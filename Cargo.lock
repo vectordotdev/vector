@@ -8447,7 +8447,6 @@ dependencies = [
  "nom",
  "notify",
  "num-format",
- "num_cpus",
  "number_prefix",
  "once_cell",
  "openssl",

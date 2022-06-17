@@ -661,3 +661,7 @@ git-hooks: ## Add Vector-local git hooks for commit sign-off
 cargo-install-%: override TOOL = $(@:cargo-install-%=%)
 cargo-install-%:
 	$(if $(findstring true,$(AUTOINSTALL)),cargo install ${TOOL} --quiet; cargo clean,)
+
+.PHONY: ci-generate-publish-metadata
+ci-generate-publish-metadata: ## Generates the necessary metadata required for building/publishing Vector.
+	@scripts/ci-generate-publish-metadata.sh
