@@ -196,7 +196,7 @@ goauth = { version = "0.13.0", optional = true }
 smpl_jwt = { version = "0.7.1", default-features = false, optional = true }
 
 # API
-async-graphql = { version = "3.0.38", default-features = false, optional = true, features = ["chrono"] }
+async-graphql = { version = "4.0.2", default-features = false, optional = true, features = ["chrono"] }
 async-graphql-warp = { version = "3.0.38", default-features = false, optional = true }
 itertools = { version = "0.10.3", default-features = false, optional = true }
 
