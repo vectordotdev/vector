@@ -20,6 +20,7 @@ use vector::{
     sources,
     test_util::{next_addr, random_lines, send_lines, start_topology, wait_for_tcp, CountReceiver},
 };
+use vector_core::config::LogNamespace;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct PanicSink;
@@ -211,7 +212,7 @@ impl SourceConfig for ErrorSourceConfig {
         Ok(Box::pin(future::err(())))
     }
 
-    fn outputs(&self) -> Vec<config::Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<config::Output> {
         vec![config::Output::default(config::DataType::Log)]
     }
 
@@ -276,7 +277,7 @@ impl SourceConfig for PanicSourceConfig {
         Ok(Box::pin(async { panic!() }))
     }
 
-    fn outputs(&self) -> Vec<config::Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<config::Output> {
         vec![config::Output::default(config::DataType::Log)]
     }
 

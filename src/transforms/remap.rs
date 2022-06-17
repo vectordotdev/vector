@@ -151,7 +151,6 @@ impl TransformConfig for RemapConfig {
                     .cloned()
                     .expect("context exists")
                     .0;
-
                 let mut new_type_def = Definition::empty_kind(
                     state.target_kind().clone(),
                     input_definition.log_namespaces().clone(),
@@ -511,7 +510,7 @@ mod tests {
     };
 
     fn test_default_schema_definition() -> schema::Definition {
-        schema::Definition::empty().with_field(
+        schema::Definition::legacy_empty().with_field(
             "a default field",
             Kind::integer().or_bytes(),
             Some("default"),
@@ -519,7 +518,7 @@ mod tests {
     }
 
     fn test_dropped_schema_definition() -> schema::Definition {
-        schema::Definition::empty().with_field(
+        schema::Definition::legacy_empty().with_field(
             "a dropped field",
             Kind::boolean().or_null(),
             Some("dropped"),
@@ -942,7 +941,7 @@ mod tests {
         let context = TransformContext {
             key: Some(ComponentKey::from("remapper")),
             schema_definitions,
-            merged_schema_definition: schema::Definition::empty().with_field(
+            merged_schema_definition: schema::Definition::legacy_empty().with_field(
                 "hello",
                 Kind::bytes(),
                 None,
@@ -1191,7 +1190,7 @@ mod tests {
             ..Default::default()
         };
 
-        let schema_definition = schema::Definition::empty()
+        let schema_definition = schema::Definition::legacy_empty()
             .with_field("foo", Kind::bytes(), None)
             .with_field(
                 "tags",
@@ -1200,8 +1199,8 @@ mod tests {
             );
 
         assert_eq!(
-            vec![Output::default(DataType::all()).with_schema_definition(schema_definition)],
-            conf.outputs(&schema::Definition::empty()),
+            conf.outputs(&schema::Definition::legacy_empty()),
+            vec![Output::default(DataType::all()).with_schema_definition(schema_definition)]
         );
 
         let context = TransformContext {

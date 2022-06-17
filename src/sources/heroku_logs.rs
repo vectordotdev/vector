@@ -291,7 +291,7 @@ fn line_to_events(mut decoder: Decoder, line: String) -> SmallVec<[Event; 1]> {
             internal_log_rate_secs = 10
         );
 
-        events.push(Event::from(line))
+        events.push(Event::from_str_legacy(&line))
     };
 
     let now = Utc::now();

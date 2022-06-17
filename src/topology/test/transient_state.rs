@@ -4,6 +4,7 @@ use futures::{future, FutureExt};
 use serde::{Deserialize, Serialize};
 use stream_cancel::{Trigger, Tripwire};
 use tokio::sync::Mutex;
+use vector_core::config::LogNamespace;
 
 use crate::{
     config::{Config, DataType, Output, SourceConfig, SourceContext},

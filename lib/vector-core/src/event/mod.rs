@@ -1,12 +1,13 @@
+use bytes::Bytes;
 use std::{
     collections::{BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
     fmt::Debug,
 };
 
+use crate::ByteSizeOf;
 pub use ::value::Value;
 pub use array::{into_event_stream, EventArray, EventContainer, LogArray, MetricArray, TraceArray};
-use bytes::Bytes;
 pub use finalization::{
     BatchNotifier, BatchStatus, BatchStatusReceiver, EventFinalizer, EventFinalizers, EventStatus,
     Finalizable,
@@ -21,8 +22,6 @@ use vector_buffers::EventCount;
 use vector_common::{finalization, EventDataEq};
 #[cfg(feature = "vrl")]
 pub use vrl_target::{TargetEvents, VrlTarget};
-
-use crate::ByteSizeOf;
 
 pub mod array;
 pub mod discriminant;
@@ -83,6 +82,18 @@ impl Event {
     #[must_use]
     pub fn new_empty_log() -> Self {
         Event::Log(LogEvent::default())
+    }
+
+    /// This used to be the implementation for `Event::from(&'str)`, but this is now only
+    /// valid for LogNamespace::Legacy
+    pub fn from_str_legacy(msg: impl Into<String>) -> Self {
+        LogEvent::from_str_legacy(msg).into()
+    }
+
+    /// This used to be the implementation for `LogEvent::from(Bytes)`, but this is now only
+    /// valid for LogNamespace::Legacy
+    pub fn from_bytes_legacy(msg: Bytes) -> Self {
+        LogEvent::from_bytes_legacy(msg).into()
     }
 
     /// Return self as a `LogEvent`
@@ -394,21 +405,29 @@ impl From<proto::SummaryQuantile> for metric::Quantile {
     }
 }
 
-impl From<Bytes> for Event {
-    fn from(message: Bytes) -> Self {
-        Event::Log(LogEvent::from(message))
-    }
-}
+#[cfg(any(test, feature = "test"))]
+mod test_utils {
+    use super::*;
 
-impl From<&str> for Event {
-    fn from(line: &str) -> Self {
-        LogEvent::from(line).into()
-    }
-}
+    // these rely on the global log schema, which is no longer supported when using the
+    // "LogNamespace::Vector" namespace.
 
-impl From<String> for Event {
-    fn from(line: String) -> Self {
-        LogEvent::from(line).into()
+    impl From<Bytes> for Event {
+        fn from(message: Bytes) -> Self {
+            Event::Log(LogEvent::from(message))
+        }
+    }
+
+    impl From<&str> for Event {
+        fn from(line: &str) -> Self {
+            LogEvent::from(line).into()
+        }
+    }
+
+    impl From<String> for Event {
+        fn from(line: String) -> Self {
+            LogEvent::from(line).into()
+        }
     }
 }
 

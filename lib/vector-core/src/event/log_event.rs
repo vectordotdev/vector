@@ -1,3 +1,5 @@
+use bytes::Bytes;
+use chrono::Utc;
 use std::{
     cmp,
     collections::{BTreeMap, HashMap},
@@ -9,8 +11,6 @@ use std::{
     sync::Arc,
 };
 
-use bytes::Bytes;
-use chrono::Utc;
 use crossbeam_utils::atomic::AtomicCell;
 use lookup::{lookup_v2::Path, LookupBuf};
 use serde::{Deserialize, Serialize, Serializer};
@@ -21,8 +21,9 @@ use super::{
     metadata::EventMetadata,
     util, EventFinalizers, Finalizable, Value,
 };
+use crate::config::log_schema;
 use crate::config::LogNamespace;
-use crate::{config::log_schema, event::MaybeAsLogMut, ByteSizeOf};
+use crate::{event::MaybeAsLogMut, ByteSizeOf};
 use lookup::path;
 
 #[derive(Debug, Deserialize)]
@@ -119,6 +120,21 @@ pub struct LogEvent {
 }
 
 impl LogEvent {
+    /// This used to be the implementation for `LogEvent::from(&'str)`, but this is now only
+    /// valid for LogNamespace::Legacy
+    pub fn from_str_legacy(msg: impl Into<String>) -> Self {
+        let mut log = LogEvent::default();
+        log.insert(log_schema().message_key(), msg.into());
+        log.insert(log_schema().timestamp_key(), Utc::now());
+        log
+    }
+
+    /// This used to be the implementation for `LogEvent::from(Bytes)`, but this is now only
+    /// valid for LogNamespace::Legacy
+    pub fn from_bytes_legacy(msg: Bytes) -> Self {
+        Self::from_str_legacy(String::from_utf8_lossy(msg.as_ref()).to_string())
+    }
+
     pub fn value(&self) -> &Value {
         self.inner.as_ref().as_value()
     }
@@ -350,26 +366,34 @@ impl EventDataEq for LogEvent {
     }
 }
 
-impl From<Bytes> for LogEvent {
-    fn from(message: Bytes) -> Self {
-        let mut log = LogEvent::default();
+#[cfg(any(test, feature = "test"))]
+mod test_utils {
+    use super::*;
 
-        log.insert(log_schema().message_key(), message);
-        log.insert(log_schema().timestamp_key(), Utc::now());
+    // these rely on the global log schema, which is no longer supported when using the
+    // "LogNamespace::Vector" namespace.
 
-        log
+    impl From<Bytes> for LogEvent {
+        fn from(message: Bytes) -> Self {
+            let mut log = LogEvent::default();
+
+            log.insert(log_schema().message_key(), message);
+            log.insert(log_schema().timestamp_key(), Utc::now());
+
+            log
+        }
     }
-}
 
-impl From<&str> for LogEvent {
-    fn from(message: &str) -> Self {
-        message.to_owned().into()
+    impl From<&str> for LogEvent {
+        fn from(message: &str) -> Self {
+            message.to_owned().into()
+        }
     }
-}
 
-impl From<String> for LogEvent {
-    fn from(message: String) -> Self {
-        Bytes::from(message).into()
+    impl From<String> for LogEvent {
+        fn from(message: String) -> Self {
+            Bytes::from(message).into()
+        }
     }
 }
 

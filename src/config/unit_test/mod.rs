@@ -584,12 +584,12 @@ fn build_outputs(
 fn build_input_event(input: &TestInput) -> Result<Event, String> {
     match input.type_str.as_ref() {
         "raw" => match input.value.as_ref() {
-            Some(v) => Ok(Event::from(v.clone())),
+            Some(v) => Ok(Event::from_str_legacy(v.clone())),
             None => Err("input type 'raw' requires the field 'value'".to_string()),
         },
         "log" => {
             if let Some(log_fields) = &input.log_fields {
-                let mut event = Event::from("");
+                let mut event = Event::from_str_legacy("");
                 for (path, value) in log_fields {
                     let value: Value = match value {
                         TestInputValue::String(s) => Value::from(s.to_owned()),

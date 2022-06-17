@@ -31,7 +31,7 @@ impl JsonDeserializerConfig {
     /// The schema produced by the deserializer.
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match log_namespace {
-            LogNamespace::Legacy => schema::Definition::legacy_default()
+            LogNamespace::Legacy => schema::Definition::legacy_empty()
                 .with_field(
                     log_schema().timestamp_key(),
                     // The JSON decoder will try to insert a new `timestamp`-type value into the

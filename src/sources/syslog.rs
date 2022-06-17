@@ -356,6 +356,7 @@ fn enrich_syslog_event(event: &mut Event, host_key: &str, default_host: Option<B
 
 #[cfg(test)]
 mod test {
+    use lookup::path;
     use std::{
         collections::{BTreeMap, HashMap},
         fmt,
@@ -389,7 +390,7 @@ mod test {
         bytes: Bytes,
     ) -> Option<Event> {
         let parser = SyslogDeserializer;
-        let mut events = parser.parse(bytes).ok()?;
+        let mut events = parser.parse(bytes, LogNamespace::Legacy).ok()?;
         handle_events(&mut events, host_key, default_host);
         Some(events.remove(0))
     }
@@ -733,8 +734,8 @@ mod test {
             expected.insert("appname", "liblogging-stdlog");
             expected.insert("origin.software", "rsyslogd");
             expected.insert("origin.swVersion", "8.24.0");
-            expected.insert("origin.x-pid", "8979");
-            expected.insert("origin.x-info", "http://www.rsyslog.com");
+            expected.insert(path!("origin", "x-pid"), "8979");
+            expected.insert(path!("origin", "x-info"), "http://www.rsyslog.com");
         }
 
         assert_event_data_eq!(event, expected);
@@ -765,8 +766,8 @@ mod test {
             expected.insert("appname", "liblogging-stdlog");
             expected.insert("origin.software", "rsyslogd");
             expected.insert("origin.swVersion", "8.24.0");
-            expected.insert("origin.x-pid", "9043");
-            expected.insert("origin.x-info", "http://www.rsyslog.com");
+            expected.insert(path!("origin", "x-pid"), "9043");
+            expected.insert(path!("origin", "x-info"), "http://www.rsyslog.com");
         }
 
         assert_event_data_eq!(

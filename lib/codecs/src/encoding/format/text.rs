@@ -85,7 +85,7 @@ mod tests {
 
     #[test]
     fn serialize_bytes_event() {
-        let input = Event::from("foo");
+        let input = Event::from_str_legacy("foo");
         let mut serializer = TextSerializer;
 
         let mut buffer = BytesMut::new();

@@ -111,18 +111,25 @@ impl Definition {
     }
 
     /// An object with any fields, and the `Legacy` namespace.
-    /// This is what most sources use for the legacy namespace.
-    pub fn legacy_default() -> Self {
+    /// This is the default schema for a source that does not explicitely provide one yet
+    pub fn legacy_default2() -> Self {
         Self::empty_kind(Kind::any_object(), [LogNamespace::Legacy])
     }
 
-    /// Returns the default source schema for a source that produce the listed log namespaces
+    /// An object with any fields, and the `Legacy` namespace.
+    /// This is what most sources use for the legacy namespace.
+    pub fn legacy_empty() -> Self {
+        Self::empty_kind(Kind::object(Collection::empty()), [LogNamespace::Legacy])
+    }
+
+    /// Returns the source schema for a source that produce the listed log namespaces,
+    /// but an explicit schema was not provided.
     pub fn default_for_namespace(log_namespaces: &BTreeSet<LogNamespace>) -> Self {
         let is_legacy = log_namespaces.contains(&LogNamespace::Legacy);
         let is_vector = log_namespaces.contains(&LogNamespace::Vector);
         match (is_legacy, is_vector) {
             (false, false) => Self::empty_kind(Kind::any(), []),
-            (true, false) => Self::legacy_default(),
+            (true, false) => Self::legacy_default2(),
             (false, true) => Self::empty_kind(Kind::any(), [LogNamespace::Vector]),
             (true, true) => {
                 Self::empty_kind(Kind::any(), [LogNamespace::Legacy, LogNamespace::Vector])
