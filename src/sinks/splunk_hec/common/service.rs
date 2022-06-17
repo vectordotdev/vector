@@ -191,10 +191,10 @@ pub struct HttpRequestBuilder {
 
 #[derive(Default)]
 pub(super) struct MetadataFields {
-        pub(super) source: Option<String>,
-        pub(super) sourcetype: Option<String>,
-        pub(super) index: Option<String>,
-        pub(super) host: Option<String>,
+    pub(super) source: Option<String>,
+    pub(super) sourcetype: Option<String>,
+    pub(super) index: Option<String>,
+    pub(super) host: Option<String>,
 }
 
 impl HttpRequestBuilder {
@@ -219,7 +219,7 @@ impl HttpRequestBuilder {
         body: Bytes,
         path: &str,
         passthrough_token: Option<Arc<str>>,
-        metadata_fields: MetadataFields
+        metadata_fields: MetadataFields,
     ) -> Result<Request<Bytes>, crate::Error> {
         let uri = match self.endpoint_target {
             EndpointTarget::Raw => {

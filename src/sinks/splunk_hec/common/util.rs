@@ -7,7 +7,11 @@ use hyper::Body;
 use snafu::{ResultExt, Snafu};
 use vector_core::{config::proxy::ProxyConfig, event::EventRef};
 
-use super::{request::HecRequest, service::{HttpRequestBuilder, MetadataFields}, EndpointTarget};
+use super::{
+    request::HecRequest,
+    service::{HttpRequestBuilder, MetadataFields},
+    EndpointTarget,
+};
 use crate::{
     http::HttpClient,
     internal_events::TemplateRenderingError,
@@ -162,7 +166,8 @@ mod tests {
 
     use crate::sinks::{
         splunk_hec::common::{
-            build_healthcheck, build_uri, create_client, service::{HttpRequestBuilder, MetadataFields},
+            build_healthcheck, build_uri, create_client,
+            service::{HttpRequestBuilder, MetadataFields},
             EndpointTarget, HOST_FIELD, SOURCE_FIELD,
         },
         util::Compression,
