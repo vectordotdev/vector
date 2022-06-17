@@ -1,7 +1,9 @@
 use bytes::Bytes;
 use chrono::{DateTime, NaiveDateTime, Utc};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
+use std::collections::HashMap;
 use value::Kind;
 use vector_core::{
     config::{log_schema, DataType},
@@ -16,21 +18,29 @@ use super::Deserializer;
 pub mod fields {
     /// (required) GELF spec version – “1.1”.
     pub const VERSION         : &str     = "version";
+
     /// (required) The name of the host, source or application that sent this message.
     pub const HOST            : &str     = "host";
+
     /// (required) A short descriptive message.
     pub const SHORT_MESSAGE   : &str     = "short_message";
+
     /// (optional) A long message that can i.e. contain a backtrace
     pub const FULL_MESSAGE    : &str     = "full_message";
+
     /// (optional) Seconds since UNIX epoch with optional decimal places for milliseconds.
     ///  SHOULD be set by client library. Will be set to the current timestamp (now) by the server if absent.
     pub const TIMESTAMP       : &str     = "timestamp";
+
     /// (optional) The level equal to the standard syslog levels. default is 1 (ALERT).
     pub const LEVEL           : &str     = "level";
+
     /// (optional) (deprecated) Send as additional field instead.
     pub const FACILITY        : &str     = "facility";
+
     /// (optional) (deprecated) The line in a file that caused the error (decimal). Send as additional field instead.
     pub const LINE            : &str     = "line";
+
     /// (optional) (deprecated) The file (with path if you want) that caused the error. Send as additional field instead.
     pub const FILE            : &str     = "file";
 }
@@ -63,11 +73,11 @@ impl GelfDeserializerConfig {
             .optional_field(FACILITY, Kind::bytes(), None)
             .optional_field(LINE, Kind::integer(), None)
             .optional_field(FILE, Kind::bytes(), None)
+            // Every field with an underscore (_) prefix will be treated as an additional field.
+            // Allowed characters in field names are any word character (letter, number, underscore), dashes and dots.
+            // Libraries SHOULD not allow to send id as additional field ( _id). Graylog server nodes omit this field automatically.
+            .unknown_fields(Kind::bytes())
         //
-        // (optional) Every field you send and prefix with an underscore ( _) will be treated as an additional field.
-        //            Allowed characters in field names are any word character (letter, number, underscore), dashes and dots.
-        //            Libraries SHOULD not allow to send id as additional field ( _id). Graylog server nodes omit this field automatically.
-        // TODO .optional_field("_", Kind::regex("."), None)
     }
 }
 
@@ -87,6 +97,8 @@ struct GelfMessage {
     facility: Option<String>,
     line: Option<usize>,
     file: Option<String>,
+    #[serde(flatten)]
+    additional_fields: Option<HashMap<String, serde_json::Value>>,
 }
 
 impl Deserializer for GelfDeserializer {
@@ -132,10 +144,38 @@ fn insert_fields_from_gelf(event: &mut Event, parsed: &GelfMessage) -> vector_co
         log.insert(FACILITY, facility.to_string());
     }
     if let Some(line) = &parsed.line {
-        log.insert(LINE, line.to_string());
+        log.insert(LINE, *line);
     }
     if let Some(file) = &parsed.file {
         log.insert(FILE, file.to_string());
+    }
+
+    if let Some(add) = &parsed.additional_fields {
+        for (key, val) in add.iter() {
+            println!("val: {}", val);
+            // per GELF spec, filter out _id
+            if key == "_id" {
+                continue;
+            }
+            // per GELF spec, Additional field names must be characters dashes or dots
+            let re = Regex::new(r"^[\w\.\-]*$")?;
+            if !re.is_match(key) {
+                println!("key is not match");
+                continue;
+            }
+            // TODO Vector seems to not accept "." or "-" for log field names...
+            // not sure if this is the best approach...
+            let key = key.replace(".", "_");
+            let key = key.replace("-", "_");
+            // per GELF spec, values to additional fields can be strings or numbers
+            if val.is_string() {
+                log.insert(key.as_str(), val.as_str());
+            } else if val.is_number() {
+                log.insert(key.as_str(), val.as_i64());
+            } else {
+                println!("value: {}", val);
+            }
+        }
     }
 
     Ok(())
