@@ -161,7 +161,12 @@ where
 }
 
 pub fn num_threads() -> usize {
-    usize::from(
-        std::thread::available_parallelism().unwrap_or(std::num::NonZeroUsize::new(1).unwrap()),
-    )
+    let count = match std::thread::available_parallelism() {
+        Ok(count) => count,
+        Err(error) => {
+            warn!(message = "Failed to acquire thread count... defaulting to 1.", %error);
+            std::num::NonZeroUsize::new(1).unwrap()
+        }
+    };
+    usize::from(count)
 }
