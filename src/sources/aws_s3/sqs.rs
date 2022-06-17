@@ -110,7 +110,7 @@ const fn default_true() -> bool {
 }
 
 fn default_client_concurrency() -> u32 {
-    cmp::max(1, num_cpus::get() as u32)
+    cmp::max(1, crate::num_threads() as u32)
 }
 
 #[derive(Debug, Snafu)]

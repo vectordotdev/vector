@@ -393,7 +393,7 @@ pub(crate) async fn handle_request(
 ) -> Result<Response, Rejection> {
     match events {
         Ok(mut events) => {
-            let receiver = BatchNotifier::maybe_apply_to_events(acknowledgements, &mut events);
+            let receiver = BatchNotifier::maybe_apply_to(acknowledgements, &mut events);
             let count = events.len();
 
             if let Some(name) = output {

@@ -258,7 +258,12 @@ impl<E> UdpSink<E>
 where
     E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
 {
-    fn new(connector: UdpConnector, acker: Acker, transformer: Transformer, encoder: E) -> Self {
+    const fn new(
+        connector: UdpConnector,
+        acker: Acker,
+        transformer: Transformer,
+        encoder: E,
+    ) -> Self {
         Self {
             connector,
             acker,

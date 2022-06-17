@@ -13,7 +13,7 @@ use tokio::{
 };
 use tracing::Instrument;
 use vector_buffers::topology::channel::BufferSender;
-use vector_core::trigger::DisabledTrigger;
+use vector_common::trigger::DisabledTrigger;
 
 use super::{TapOutput, TapResource};
 use crate::{

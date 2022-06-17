@@ -10,8 +10,9 @@ tags: ["lua", "csv", "logs", "transform", "advanced", "guides", "guide"]
 
 {{< requirement title="Pre-requisites" >}}
 
-* You understand the [basic Lua concepts][docs.transforms.lua].
-* You understand the [basic Vector concepts][docs.about.concepts] and understand [how to set up a pipeline][docs.setup.quickstart].
+* You understand the <a href="/docs/reference/configuration/transforms/lua">basic Lua concepts</a>.
+* You understand the <a href="/docs/about/concepts">basic Vector concepts</a> and understand <a href="/docs/setup/quickstart/">how to set up a pipeline</a>
+
 {{< /requirement >}}
 
 Vector has many built-in [parsers][urls.vector_parsing_transforms] for structured logs formats. However, when you need
@@ -236,9 +237,7 @@ built-in functions, such as [`tonumber`][urls.lua_tonumber]. Alternatively, it i
 [`coercer`][docs.transforms.coercer] transform after the `lua` transform, for example, to
 [parse timestamps][docs.transforms.coercer#timestamps].
 
-[docs.about.concepts]: /docs/about/concepts
 [docs.meta.glossary#pipeline]: /docs/reference/glossary/#pipeline
-[docs.setup.quickstart]: /docs/setup/quickstart/
 [docs.sinks.console]: /docs/reference/configuration/sinks/console/
 [docs.sources.file#multiline]: /docs/reference/configuration/sources/file/#multiline
 [docs.sources.file]: /docs/reference/configuration/sources/file/

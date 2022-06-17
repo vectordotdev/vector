@@ -89,7 +89,8 @@ impl Filter {
 
 impl FunctionTransform for Filter {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
-        if self.condition.check(&event) {
+        let (result, event) = self.condition.check(event);
+        if result {
             output.push(event);
         } else if self.last_emission.elapsed() >= self.emissions_max_delay {
             emit!(FilterEventDiscarded {

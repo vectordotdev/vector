@@ -42,8 +42,6 @@ services:
       - "prometheus-integration-tests"
       - "--lib"
       - "${FILTER:-::prometheus::}"
-      - "--"
-      - "--nocapture"
     depends_on:
       - influxdb
       - influxdb-tls

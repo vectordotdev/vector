@@ -1,6 +1,7 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use anymap::AnyMap;
+use lookup::LookupBuf;
 use value::{Kind, Value};
 
 use crate::value::Collection;
@@ -61,8 +62,24 @@ pub struct ExternalEnv {
     /// The external target of the program.
     target: Details,
 
+    read_only_paths: Vec<ReadOnlyPath>,
+
     /// Custom context injected by the external environment
     custom: AnyMap,
+}
+
+// temporary until paths can point to metadata
+#[derive(Debug, PartialEq)]
+pub enum PathRoot {
+    Event,
+    Metadata,
+}
+
+#[derive(Debug)]
+pub struct ReadOnlyPath {
+    path: LookupBuf,
+    recursive: bool,
+    root: PathRoot,
 }
 
 impl Default for ExternalEnv {
@@ -81,7 +98,63 @@ impl ExternalEnv {
                 value: None,
             },
             custom: AnyMap::new(),
+            read_only_paths: vec![],
         }
+    }
+
+    pub fn is_read_only_event_path(&self, path: &LookupBuf) -> bool {
+        self.is_read_only_path(path, PathRoot::Event)
+    }
+
+    pub fn is_read_only_metadata_path(&self, path: &LookupBuf) -> bool {
+        self.is_read_only_path(path, PathRoot::Metadata)
+    }
+
+    pub(crate) fn is_read_only_path(&self, path: &LookupBuf, root: PathRoot) -> bool {
+        for read_only_path in &self.read_only_paths {
+            if read_only_path.root != root {
+                continue;
+            }
+
+            // any paths that are a parent of read-only paths also can't be modified
+            if read_only_path.path.starts_with(path) {
+                return true;
+            }
+
+            if read_only_path.recursive {
+                if path.starts_with(&read_only_path.path) {
+                    return true;
+                }
+            } else if path == &read_only_path.path {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Adds a path that is considered read only. Assignments to any paths that match
+    /// will fail at compile time.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the path contains coalescing.
+    pub(crate) fn add_read_only_path(&mut self, path: LookupBuf, recursive: bool, root: PathRoot) {
+        if path.as_segments().iter().any(|x| x.is_coalesce()) {
+            panic!("Coalesced paths not supported for read-only paths");
+        }
+        self.read_only_paths.push(ReadOnlyPath {
+            path,
+            recursive,
+            root,
+        });
+    }
+
+    pub fn add_read_only_event_path(&mut self, path: LookupBuf, recursive: bool) {
+        self.add_read_only_path(path, recursive, PathRoot::Event);
+    }
+
+    pub fn add_read_only_metadata_path(&mut self, path: LookupBuf, recursive: bool) {
+        self.add_read_only_path(path, recursive, PathRoot::Metadata);
     }
 
     pub(crate) fn target(&self) -> &Details {
@@ -104,6 +177,14 @@ impl ExternalEnv {
     /// Sets the external context data for VRL functions to use.
     pub fn set_external_context<T: 'static>(&mut self, data: T) {
         self.custom.insert::<T>(data);
+    }
+
+    /// Marks everything as read only. Any mutations on read-only values will result in a
+    /// compile time error.
+    pub fn read_only(mut self) -> Self {
+        self.add_read_only_event_path(LookupBuf::root(), true);
+        self.add_read_only_metadata_path(LookupBuf::root(), true);
+        self
     }
 
     /// Get external context data from the external environment.

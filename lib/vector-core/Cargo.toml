@@ -11,9 +11,8 @@ async-trait = { version = "0.1", default-features = false }
 bitmask-enum = { version = "2.0.0", default-features = false }
 bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
-crossbeam-utils = { version = "0.8.8", default-features = false }
+crossbeam-utils = { version = "0.8.9", default-features = false }
 db-key = { version = "0.0.5", default-features = false, optional = true }
-derivative = { version = "2.2.0", default-features = false }
 dyn-clone = { version = "1.0.5", default-features = false }
 enrichment = { path = "../enrichment", optional = true }
 enumflags2 = { version = "0.7.5", default-features = false }
@@ -29,7 +28,7 @@ metrics = { version = "0.17.1", default-features = false, features = ["std"]}
 metrics-tracing-context = { version = "0.9.0", default-features = false }
 metrics-util = { version = "0.10.2", default-features = false, features = ["std"] }
 mlua = { version = "0.8.0", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
-no-proxy = { version  = "0.3.1", default-features = false, features = ["serialize"] }
+no-proxy = { version  = "0.3.2", default-features = false, features = ["serialize"] }
 once_cell = { version = "1.12", default-features = false }
 ordered-float = { version = "3.0.0", default-features = false }
 pin-project = { version = "1.0.10", default-features = false }
@@ -39,7 +38,6 @@ regex = { version = "1.5.6", default-features = false, features = ["std", "perf"
 serde = { version = "1.0.137", default-features = false, features = ["derive", "rc"] }
 serde_json = { version = "1.0.81", default-features = false }
 snafu = { version = "0.7.1", default-features = false }
-stream-cancel = { version = "0.8.1", default-features = false }
 tokio = { version = "1.19.2", default-features = false }
 tokio-stream = { version = "0.1", default-features = false, features = ["time"], optional = true }
 tokio-util = { version = "0.7.0", default-features = false, features = ["time"] }
@@ -83,10 +81,10 @@ value = { path = "../value", default-features = false, features = ["lua", "toml"
 vrl-lib = { package = "vrl", path = "../vrl/vrl"}
 
 [features]
-api = ["async-graphql", "value/api"]
+api = ["dep:async-graphql", "value/api"]
 default = []
-lua = ["mlua", "tokio-stream"]
-vrl = ["vrl-lib", "enrichment"]
+lua = ["dep:mlua", "dep:tokio-stream"]
+vrl = ["dep:vrl-lib", "dep:enrichment"]
 test = ["vector_common/test"]
 
 [[bench]]

@@ -33,7 +33,7 @@ path = "../stdlib"
 
 [features]
 default = ["repl", "expressions"]
-repl = ["once_cell", "prettytable-rs", "regex", "rustyline", "webbrowser"]
+repl = ["dep:once_cell", "dep:prettytable-rs", "dep:regex", "dep:rustyline", "dep:webbrowser"]
 expressions = [
   "expr-abort",
   "expr-assignment",
