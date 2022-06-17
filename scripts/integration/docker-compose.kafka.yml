@@ -14,8 +14,10 @@ services:
       - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
       - KAFKA_LISTENERS=PLAINTEXT://:9091,SSL://:9092,SASL_PLAINTEXT://:9093
       - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9091,SSL://kafka:9092,SASL_PLAINTEXT://kafka:9093
+      - KAFKA_SSL_KEYSTORE_TYPE=PKCS12
       - KAFKA_SSL_KEYSTORE_LOCATION=/certs/kafka.p12
       - KAFKA_SSL_KEYSTORE_PASSWORD=NOPASS
+      - KAFKA_SSL_TRUSTSTORE_TYPE=PKCS12
       - KAFKA_SSL_TRUSTSTORE_LOCATION=/certs/kafka.p12
       - KAFKA_SSL_TRUSTSTORE_PASSWORD=NOPASS
       - KAFKA_SSL_KEY_PASSWORD=NOPASS
@@ -29,7 +31,7 @@ services:
       - 9092:9092
       - 9093:9093
     volumes:
-      - ${PWD}/tests/data/kafka.p12:/certs/kafka.p12:ro
+      - ${PWD}/tests/data/ca/intermediate_server/private/kafka.p12:/certs/kafka.p12:ro
       - ${PWD}/tests/data/kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf
   runner:
     build:
