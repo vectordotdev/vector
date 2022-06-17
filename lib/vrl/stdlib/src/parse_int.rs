@@ -21,7 +21,7 @@ fn parse_int(value: Value, base: Option<Value>) -> Resolved {
                 Some('b') => (2, 2),
                 Some('o') => (8, 2),
                 Some('x') => (16, 2),
-                _ => (8, 1),
+                _ => (8, 0),
             },
             Some(_) => (10u32, 0),
             None => return Err("value is empty".into()),
@@ -141,6 +141,12 @@ mod tests {
              args: func_args![value: "0x2a"],
              want: Ok(42),
              tdef: TypeDef::integer().fallible(),
+        }
+
+        zero {
+            args: func_args![value: "0"],
+            want: Ok(0),
+            tdef: TypeDef::integer().fallible(),
         }
 
         explicit_hexadecimal {
