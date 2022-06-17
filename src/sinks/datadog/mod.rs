@@ -66,7 +66,7 @@ pub enum DatadogApiError {
 impl DatadogApiError {
     /// Common DatadogApiError handling for HTTP Responses.
     /// Returns Ok(response) if the response was Ok/Accepted.
-    fn from_result(
+    pub fn from_result(
         result: Result<http::Response<Body>, HttpError>,
     ) -> Result<http::Response<Body>, DatadogApiError> {
         match result {
