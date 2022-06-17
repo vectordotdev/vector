@@ -15,31 +15,31 @@ default = [
 ]
 
 aws_cloudwatch_logs_subscription = [
-  "chrono/serde",
+  "chrono?/serde",
   "serde/derive",
 ]
 
 btreemap = []
 
-byte_size_of = ["bytes", "chrono"]
+byte_size_of = ["dep:bytes", "dep:chrono"]
 
 conversion = [
-  "bytes",
-  "chrono",
-  "snafu",
+  "dep:bytes",
+  "dep:chrono",
+  "dep:snafu",
 ]
 
 encoding = [
   "serde",
-  "nom",
-  "snafu",
+  "dep:nom",
+  "dep:snafu",
   "btreemap"
 ]
 
 test = []
 
 tokenize = [
-  "nom",
+  "dep:nom",
 ]
 
 [dependencies]

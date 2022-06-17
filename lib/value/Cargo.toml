@@ -25,11 +25,11 @@ toml = { version = "0.5.9", default-features = false, optional = true }
 quickcheck = { version = "1.0.3", optional = true }
 
 [features]
-lua = ["mlua"]
-api = ["async-graphql", "json"]
-json = ["serde", "serde_json"]
+lua = ["dep:mlua"]
+api = ["dep:async-graphql", "json"]
+json = ["dep:serde", "dep:serde_json"]
 test = []
-arbitrary = ["quickcheck"]
+arbitrary = ["dep:quickcheck"]
 
 [dev-dependencies]
 async-graphql = { version = "3.0.38", default-features = false }
