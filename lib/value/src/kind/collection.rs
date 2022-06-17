@@ -256,6 +256,8 @@ impl<T: Ord> Collection<T> {
     }
 
     /// Return the reduced `Kind` of the items within the collection.
+    /// This only returns the type of _existing_ values in the collection. Accessing
+    /// a non-existing value can return null which is not added to the type here.
     pub fn reduced_kind(&self) -> Kind {
         let strategy = merge::Strategy {
             depth: merge::Depth::Deep,
