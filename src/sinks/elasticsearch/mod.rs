@@ -1,6 +1,7 @@
 mod common;
 mod config;
 mod encoder;
+mod load;
 mod request_builder;
 mod retry;
 mod service;

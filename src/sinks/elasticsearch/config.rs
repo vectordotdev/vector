@@ -35,6 +35,8 @@ use crate::{
 };
 use lookup::path;
 
+use super::load::LoadService;
+
 /// The field name for the timestamp required by data stream mode
 pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
 
@@ -291,7 +293,7 @@ impl DataStreamConfig {
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
-struct DistributionConfig {
+pub struct DistributionConfig {
     endpoints: Vec<String>,
     reactivate_delay_secs: Option<u64>, // 5 seconds
 }
@@ -335,11 +337,37 @@ impl SinkConfig for ElasticsearchConfig {
                 credentials_provider: common.aws_auth.clone(),
             };
 
-            endpoints.push(ElasticsearchService::new(http_client, http_request_builder));
+            endpoints.push((
+                ElasticsearchService::new(http_client, http_request_builder),
+                common,
+            ));
         }
 
         let stream = if let Some(distribution) = self.distribution.as_ref() {
-            let service = CloneableService::new(Balance::new(ServiceList::new(endpoints)));
+            let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
+            let service = CloneableService::new(Balance::new(ServiceList::new(
+                endpoints
+                    .into_iter()
+                    .map(|(service, common)| {
+                        let client = client.clone();
+                        LoadService::new(
+                            service,
+                            move || {
+                                common
+                                    .clone()
+                                    .healthcheck(client.clone())
+                                    .map(|result| result.is_ok())
+                                    .boxed()
+                            },
+                            tokio::time::Duration::from_secs(
+                                distribution
+                                    .reactivate_delay_secs
+                                    .unwrap_or(REACTIVATE_DELAY_SECONDS_DEFAULT),
+                            ),
+                        )
+                    })
+                    .collect::<Vec<_>>(),
+            )));
 
             let service = ServiceBuilder::new()
                 .settings(request_limits, ElasticsearchRetryLogic)
@@ -359,7 +387,7 @@ impl SinkConfig for ElasticsearchConfig {
         } else {
             let service = ServiceBuilder::new()
                 .settings(request_limits, ElasticsearchRetryLogic)
-                .service(endpoints.remove(0));
+                .service(endpoints.remove(0).0);
 
             let sink = ElasticsearchSink {
                 batch_settings,

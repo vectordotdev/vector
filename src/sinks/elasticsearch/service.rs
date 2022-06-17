@@ -10,7 +10,7 @@ use bytes::Bytes;
 use futures::future::BoxFuture;
 use http::{Response, Uri};
 use hyper::{service::Service, Body, Request};
-use tower::{load::Load, ServiceExt};
+use tower::ServiceExt;
 use vector_core::{
     buffers::Ackable, internal_event::EventsSent, stream::DriverResponse, ByteSizeOf,
 };
@@ -79,20 +79,6 @@ impl ElasticsearchService {
             future
         });
         ElasticsearchService { batch_service }
-    }
-}
-
-impl Load for ElasticsearchService {
-    /// A comparable load metric.
-    ///
-    /// Lesser values indicate that the service is less loaded, and should be preferred for new
-    /// requests over another service with a higher value.
-    type Metric = usize;
-
-    /// Estimate the service's current load.
-    fn load(&self) -> Self::Metric {
-        // TODO
-        1
     }
 }
 
