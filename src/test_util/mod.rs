@@ -830,7 +830,7 @@ impl MockSourceConfig {
 }
 
 #[async_trait]
-#[typetag::serde(name = "mock")]
+#[typetag::serde(name = "mock_source")]
 impl SourceConfig for MockSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let wrapped = Arc::clone(&self.receiver);
@@ -876,7 +876,7 @@ impl SourceConfig for MockSourceConfig {
     }
 
     fn source_type(&self) -> &'static str {
-        "mock"
+        "mock_source"
     }
 
     fn can_acknowledge(&self) -> bool {
@@ -963,7 +963,7 @@ impl MockTransformConfig {
 }
 
 #[async_trait]
-#[typetag::serde(name = "mock")]
+#[typetag::serde(name = "mock_transform")]
 impl TransformConfig for MockTransformConfig {
     async fn build(&self, _globals: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(MockTransform {
@@ -981,7 +981,7 @@ impl TransformConfig for MockTransformConfig {
     }
 
     fn transform_type(&self) -> &'static str {
-        "mock"
+        "mock_transform"
     }
 }
 
@@ -1034,7 +1034,7 @@ enum HealthcheckError {
 }
 
 #[async_trait]
-#[typetag::serialize(name = "mock")]
+#[typetag::serde(name = "mock_sink")]
 impl SinkConfig for MockSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         // If this sink is set to not be healthy, just send the healthcheck error immediately over
@@ -1065,11 +1065,7 @@ impl SinkConfig for MockSinkConfig {
     }
 
     fn sink_type(&self) -> &'static str {
-        "mock"
-    }
-
-    fn typetag_deserialize(&self) {
-        unimplemented!("not intended for use in real configs")
+        "mock_sink"
     }
 
     fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
@@ -1113,7 +1109,9 @@ impl StreamSink<Event> for MockSink {
 
 /// A source that immediately panics.
 #[derive(Debug, Default, Deserialize, Serialize)]
-pub struct PanicSourceConfig;
+pub struct PanicSourceConfig {
+    dummy: Option<String>,
+}
 
 impl_generate_config_from_default!(PanicSourceConfig);
 
@@ -1139,7 +1137,9 @@ impl SourceConfig for PanicSourceConfig {
 
 /// A source that immediately returns an error.
 #[derive(Debug, Default, Deserialize, Serialize)]
-pub struct ErrorSourceConfig;
+pub struct ErrorSourceConfig {
+    dummy: Option<String>,
+}
 
 impl_generate_config_from_default!(ErrorSourceConfig);
 
@@ -1164,7 +1164,9 @@ impl SourceConfig for ErrorSourceConfig {
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
-pub struct PanicSinkConfig;
+pub struct PanicSinkConfig {
+    dummy: Option<String>,
+}
 
 impl_generate_config_from_default!(PanicSinkConfig);
 
@@ -1211,7 +1213,9 @@ impl Sink<Event> for PanicSink {
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
-pub struct ErrorSinkConfig;
+pub struct ErrorSinkConfig {
+    dummy: Option<String>,
+}
 
 impl_generate_config_from_default!(ErrorSinkConfig);
 
