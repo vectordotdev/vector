@@ -414,11 +414,10 @@ impl CertificateMetadata {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "sources-utils-tcp-socket"))]
 mod test {
     use super::*;
 
-    #[cfg(feature = "sources-utils-tcp-socket")]
     #[test]
     fn certificate_metadata_full() {
         let example_meta = CertificateMetadata {
@@ -442,7 +441,6 @@ mod test {
         assert_eq!(expected, example_meta.subject())
     }
 
-    #[cfg(feature = "sources-utils-tcp-socket")]
     #[test]
     fn certificate_metadata_partial() {
         let example_meta = CertificateMetadata {
