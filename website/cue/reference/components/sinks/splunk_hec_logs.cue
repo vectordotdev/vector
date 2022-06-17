@@ -84,15 +84,16 @@ components: sinks: splunk_hec_logs: {
 			description: """
                                      The Splunk endpoint to send to. Either the [event endpoint](\(urls.splunk_hec_event_endpoint)) or the
                                      [raw endpoint](\(urls.splunk_hec_raw_endpoint)). [metadata](\(urls.splunk_hec_metadata)) for the event
-                                     endpoint is sent with each event. For the raw endpoint it is sent via the url parameters.
+                                     endpoint is sent with each event. For the `raw` endpoint, configured [event metadata](\(urls.splunk_hec_metadata))
+                                     is sent as query parameters - except the `timestamp` field.
                                      """
 			required:    false
 			warnings: []
 			type: string: {
 				default: "event"
 				enum: {
-					event: "Event endpoint"
-					raw:   "Raw endpoint"
+					event: "[Event endpoint](\(urls.splunk_hec_event_endpoint))"
+					raw:   "[Raw endpoint](\(urls.splunk_hec_raw_endpoint))"
 				}
 				syntax: "literal"
 			}
