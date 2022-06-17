@@ -6,6 +6,8 @@ use std::{
     path::PathBuf,
 };
 
+use lookup::lookup_v2::Path;
+use lookup::path;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use value::Kind;
@@ -320,7 +322,7 @@ where
         &self.runner
     }
 
-    fn annotate_data(&self, reason: &str, error: ExpressionError) -> serde_json::Value {
+    fn dropped_data(&self, reason: &str, error: ExpressionError) -> serde_json::Value {
         let message = error
             .notes()
             .iter()
@@ -329,24 +331,29 @@ where
             .map(|note| note.to_string())
             .unwrap_or_else(|| error.to_string());
         serde_json::json!({
-            "dropped": {
                 "reason": reason,
                 "message": message,
                 "component_id": self.component_key,
                 "component_type": "remap",
                 "component_kind": "transform",
-            }
         })
     }
 
     fn annotate_dropped(&self, event: &mut Event, reason: &str, error: ExpressionError) {
         match event {
-            Event::Log(ref mut log) => {
-                log.insert(
-                    log_schema().metadata_key(),
-                    self.annotate_data(reason, error),
-                );
-            }
+            Event::Log(ref mut log) => match log.namespace() {
+                LogNamespace::Legacy => {
+                    log.insert(
+                        log_schema().metadata_key().concat(path!("dropped")),
+                        self.dropped_data(reason, error),
+                    );
+                }
+                LogNamespace::Vector => {
+                    log.metadata_mut()
+                        .value_mut()
+                        .insert(path!("vector", "dropped"), self.dropped_data(reason, error));
+                }
+            },
             Event::Metric(ref mut metric) => {
                 let m = log_schema().metadata_key();
                 metric.insert_tag(format!("{}.dropped.reason", m), reason.into());
@@ -363,7 +370,7 @@ where
             Event::Trace(ref mut trace) => {
                 trace.insert(
                     log_schema().metadata_key(),
-                    self.annotate_data(reason, error),
+                    self.dropped_data(reason, error),
                 );
             }
         }
