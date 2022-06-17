@@ -262,23 +262,20 @@ impl<T: Ord> Collection<T> {
             indices: merge::Indices::Keep,
         };
 
-        self.known
+        let mut kind = self
+            .known
             .values()
             .cloned()
             .reduce(|mut lhs, rhs| {
                 lhs.merge(rhs, strategy);
                 lhs
             })
-            .map_or_else(Kind::any, |kind| {
-                self.unknown
-                    .as_ref()
-                    .map(|unknown| {
-                        let mut kind = kind.clone();
-                        kind.merge(unknown.to_kind().into_owned(), strategy);
-                        kind
-                    })
-                    .unwrap_or(kind)
-            })
+            .unwrap_or_else(Kind::never);
+
+        if let Some(unknown) = &self.unknown {
+            kind.merge(unknown.to_kind().into_owned(), strategy);
+        }
+        kind
     }
 }
 
