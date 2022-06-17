@@ -1,6 +1,7 @@
 use std::{
     collections::{BTreeMap, HashMap},
     convert::TryFrom,
+    time::Duration,
 };
 
 use futures::FutureExt;
@@ -14,7 +15,10 @@ use crate::{
     event::{EventRef, LogEvent, Value},
     http::HttpClient,
     internal_events::TemplateRenderingError,
-    sinks::util::{encoding::Transformer, service::CloneableService},
+    sinks::util::{
+        encoding::Transformer,
+        service::{CloneableService, LoadService},
+    },
     sinks::{
         elasticsearch::{
             retry::ElasticsearchRetryLogic,
@@ -34,8 +38,6 @@ use crate::{
     transforms::metric_to_log::MetricToLogConfig,
 };
 use lookup::path;
-
-use super::load::LoadService;
 
 /// The field name for the timestamp required by data stream mode
 pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
@@ -305,104 +307,75 @@ pub const REACTIVATE_DELAY_SECONDS_DEFAULT: u64 = 5; // 5 seconds
 impl SinkConfig for ElasticsearchConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let common = ElasticsearchCommon::parse_config(self).await?;
-
-        let batch_settings = self.batch.into_batcher_settings()?;
+        let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
 
         let request_limits = self
             .request
             .tower
             .unwrap_with(&TowerRequestConfig::default());
 
-        let mut commons = vec![common.clone()];
-
-        if let Some(distribution) = self.distribution.as_ref() {
-            for endpoint in distribution.endpoints.iter() {
-                let mut config = self.clone();
-                config.endpoint = endpoint.clone();
-                commons.push(ElasticsearchCommon::parse_config(&config).await?);
-            }
-        }
-
-        let mut endpoints = Vec::new();
-        for common in commons {
-            let http_client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
-
-            let http_request_builder = HttpRequestBuilder {
-                bulk_uri: common.bulk_uri.clone(),
-                http_request_config: self.request.clone(),
-                http_auth: common.http_auth.clone(),
-                query_params: common.query_params.clone(),
-                region: common.region.clone(),
-                compression: self.compression,
-                credentials_provider: common.aws_auth.clone(),
-            };
-
-            endpoints.push((
-                ElasticsearchService::new(http_client, http_request_builder),
-                common,
-            ));
-        }
-
         let stream = if let Some(distribution) = self.distribution.as_ref() {
-            let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
-            let service = CloneableService::new(Balance::new(ServiceList::new(
-                endpoints
-                    .into_iter()
-                    .map(|(service, common)| {
-                        let client = client.clone();
-                        LoadService::new(
-                            service,
-                            move || {
-                                common
-                                    .clone()
-                                    .healthcheck(client.clone())
-                                    .map(|result| result.is_ok())
-                                    .boxed()
-                            },
-                            tokio::time::Duration::from_secs(
-                                distribution
-                                    .reactivate_delay_secs
-                                    .unwrap_or(REACTIVATE_DELAY_SECONDS_DEFAULT),
-                            ),
-                        )
-                    })
-                    .collect::<Vec<_>>(),
-            )));
+            // Distributed services
+
+            // Multiply configuration, one for each endpoint
+            let mut commons = vec![common.clone()];
+            for endpoint in distribution.endpoints.clone() {
+                let config = Self {
+                    endpoint,
+                    ..self.clone()
+                };
+                let common = ElasticsearchCommon::parse_config(&config).await?;
+
+                commons.push(common);
+            }
+
+            let services = commons
+                .into_iter()
+                .map(|common| {
+                    let http_request_builder = HttpRequestBuilder::new(&common, self);
+                    let service = ElasticsearchService::new(client.clone(), http_request_builder);
+
+                    let client = client.clone();
+                    let healthcheck = move || {
+                        common
+                            .clone()
+                            .healthcheck(client.clone())
+                            .map(|result| result.is_ok())
+                            .boxed()
+                    };
+
+                    let reactivate_delay = Duration::from_secs(
+                        distribution
+                            .reactivate_delay_secs
+                            .unwrap_or(REACTIVATE_DELAY_SECONDS_DEFAULT),
+                    );
+
+                    LoadService::new(service, healthcheck, reactivate_delay)
+                })
+                .collect::<Vec<_>>();
+
+            let service = ServiceBuilder::new()
+                .settings(request_limits, ElasticsearchRetryLogic)
+                .service(CloneableService::new(Balance::new(ServiceList::new(
+                    services,
+                ))));
+
+            let sink = ElasticsearchSink::new(&common, self, cx.acker(), service)?;
+            VectorSink::from_event_streamsink(sink)
+        } else {
+            // Single service
+
+            let service =
+                ElasticsearchService::new(client.clone(), HttpRequestBuilder::new(&common, self));
 
             let service = ServiceBuilder::new()
                 .settings(request_limits, ElasticsearchRetryLogic)
                 .service(service);
 
-            let sink = ElasticsearchSink {
-                batch_settings,
-                request_builder: common.request_builder.clone(),
-                transformer: self.encoding.clone(),
-                service,
-                acker: cx.acker(),
-                metric_to_log: common.metric_to_log.clone(),
-                mode: common.mode.clone(),
-                id_key_field: self.id_key.clone(),
-            };
-            VectorSink::from_event_streamsink(sink)
-        } else {
-            let service = ServiceBuilder::new()
-                .settings(request_limits, ElasticsearchRetryLogic)
-                .service(endpoints.remove(0).0);
-
-            let sink = ElasticsearchSink {
-                batch_settings,
-                request_builder: common.request_builder.clone(),
-                transformer: self.encoding.clone(),
-                service,
-                acker: cx.acker(),
-                metric_to_log: common.metric_to_log.clone(),
-                mode: common.mode.clone(),
-                id_key_field: self.id_key.clone(),
-            };
+            let sink = ElasticsearchSink::new(&common, self, cx.acker(), service)?;
             VectorSink::from_event_streamsink(sink)
         };
 
-        let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
         let healthcheck = common.healthcheck(client).boxed();
         Ok((stream, healthcheck))
     }

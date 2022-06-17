@@ -1,15 +1,5 @@
-use std::{
-    future::Future,
-    hash::Hash,
-    marker::PhantomData,
-    pin::Pin,
-    sync::{Arc, Mutex},
-    task::{Context, Poll},
-    time::Duration,
-};
+use std::{hash::Hash, marker::PhantomData, sync::Arc, time::Duration};
 
-use futures::ready;
-use pin_project::pin_project;
 use serde::{Deserialize, Serialize};
 use tower::{
     layer::{util::Stack, Layer},
@@ -21,7 +11,9 @@ use tower::{
 use vector_buffers::Acker;
 
 pub use crate::sinks::util::service::{
+    clone::{CloneableService, PollReadyFuture},
     concurrency::{concurrency_is_none, Concurrency},
+    load::{LoadFuture, LoadService},
     map::Map,
 };
 use crate::sinks::util::{
@@ -34,7 +26,9 @@ use crate::sinks::util::{
     Batch, BatchSink, Partition, PartitionBatchSink,
 };
 
+mod clone;
 mod concurrency;
+mod load;
 mod map;
 
 pub type Svc<S, L> = RateLimit<AdaptiveConcurrencyLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>, L>>;
@@ -292,80 +286,6 @@ where
             .retry(policy)
             .timeout(self.settings.timeout)
             .service(inner)
-    }
-}
-
-/// Makes otherwise uncloneable `Service` cloneable.
-/// This is done through blocking Mutex.
-pub struct CloneableService<S> {
-    inner: Arc<Mutex<S>>,
-}
-
-impl<S> CloneableService<S> {
-    pub fn new(inner: S) -> Self {
-        CloneableService {
-            inner: Arc::new(Mutex::new(inner)),
-        }
-    }
-}
-
-impl<S, Req> Service<Req> for CloneableService<S>
-where
-    S: Service<Req>,
-{
-    type Response = S::Response;
-    type Error = S::Error;
-    type Future = PollReadyFuture<S, Req>;
-
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.inner
-            .lock()
-            .expect("Service mutex is poisoned")
-            .poll_ready(cx)
-    }
-
-    fn call(&mut self, req: Req) -> Self::Future {
-        PollReadyFuture::PollReady(self.inner.clone(), Some(req))
-    }
-}
-
-impl<S> Clone for CloneableService<S> {
-    fn clone(&self) -> Self {
-        CloneableService {
-            inner: self.inner.clone(),
-        }
-    }
-}
-
-#[pin_project(project = PollReadyProj, project_replace = PollReadyOwn)]
-pub enum PollReadyFuture<S: Service<Req>, Req> {
-    PollReady(Arc<Mutex<S>>, Option<Req>),
-    Called(#[pin] S::Future),
-}
-
-impl<S, Req> Future for PollReadyFuture<S, Req>
-where
-    S: Service<Req>,
-{
-    type Output = Result<S::Response, S::Error>;
-
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.as_mut().project();
-        match this {
-            PollReadyProj::PollReady(inner, req) => {
-                let mut inner = inner.lock().expect("Service mutex is poisoned");
-                // Poll_ready must be called again since some other thread
-                // could have used it up with its own call.
-                ready!(inner.poll_ready(cx)?);
-
-                let fut = inner.call(req.take().expect("Request is taken"));
-                drop(inner);
-
-                self.as_mut().project_replace(PollReadyFuture::Called(fut));
-                self.poll(cx)
-            }
-            PollReadyProj::Called(future) => return future.poll(cx),
-        }
     }
 }
 

@@ -35,11 +35,11 @@ impl<S> LoadService<S> {
     pub fn new(
         service: S,
         healthcheck: impl Fn() -> BoxFuture<'static, bool> + Send + 'static,
-        reactivate_delay: Duration,
+        reactivate_delay: std::time::Duration,
     ) -> Self {
         LoadService {
             service,
-            reactivate_delay,
+            reactivate_delay: reactivate_delay.into(),
             request_handle: Arc::new(AtomicBool::new(false)),
             state: ServiceState::Healthcheck(healthcheck()),
             healthcheck: Box::new(healthcheck) as Box<_>,
@@ -98,8 +98,6 @@ impl<S> Load for LoadService<S> {
     type Metric = usize;
 
     fn load(&self) -> Self::Metric {
-        // TODO: ARC for each service would be useful here
-
         // The number of request handles is correlated to the number of requests
         // which is correlated with load.
         Arc::strong_count(&self.request_handle)
@@ -133,7 +131,7 @@ where
             request_handle.store(true, Ordering::Release);
         }
 
-        // TODO: If we could extract status code here then
+        // Note: If we could extract status code here then
         // we could force backoff on StatusCode::TOO_MANY_REQUESTS
         // for this specific service.
 
