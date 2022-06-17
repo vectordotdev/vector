@@ -4,6 +4,7 @@
 #![deny(unused_allocation)]
 #![deny(unused_assignments)]
 #![deny(unused_comparisons)]
+#![deny(warnings)]
 #![allow(clippy::approx_constant)]
 #![allow(clippy::float_cmp)]
 #![allow(clippy::match_wild_err_arm)]
@@ -157,4 +158,10 @@ where
 
     #[cfg(not(tokio_unstable))]
     tokio::spawn(task)
+}
+
+pub fn num_threads() -> usize {
+    std::thread::available_parallelism()
+        .expect("Could not determine available parallelism")
+        .into()
 }

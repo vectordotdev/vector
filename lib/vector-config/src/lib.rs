@@ -82,6 +82,8 @@
 // Vector's template syntax, since doing `templateable = true` is weird given that we never otherwise specifically
 // disable it. In other words, we want a way to define feature flags in metadata.
 
+#![deny(warnings)]
+
 use core::fmt;
 use core::marker::PhantomData;
 

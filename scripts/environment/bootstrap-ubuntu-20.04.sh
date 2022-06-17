@@ -131,7 +131,6 @@ CARGO_OVERRIDE_CONF="${CARGO_OVERRIDE_DIR}/config.toml"
 cat <<EOF >>"$CARGO_OVERRIDE_CONF"
 [target.'cfg(linux)']
 rustflags = [ "-D", "warnings" ]
-rustdocflags = [ "-D", "warnings" ]
 EOF
 
 # Install mold, because the system linker wastes a bunch of time.
@@ -161,7 +160,6 @@ if [ -z "${DISABLE_MOLD:-""}" ] ; then
     RUSTC_WRAPPER="${CARGO_BIN_DIR}/wrap-rustc"
     cat <<EOF >"$RUSTC_WRAPPER"
 #!/bin/sh
-set -x
 exec mold -run "\$@"
 EOF
     chmod +x "$RUSTC_WRAPPER"
