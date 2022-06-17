@@ -67,6 +67,7 @@ pub struct ElasticsearchConfig {
     pub query: Option<HashMap<String, String>>,
     pub aws: Option<RegionOrEndpoint>,
     pub tls: Option<TlsConfig>,
+    pub distribution: Option<DistributionConfig>,
 
     #[serde(alias = "normal")]
     pub bulk: Option<BulkConfig>,
@@ -289,13 +290,19 @@ impl DataStreamConfig {
     }
 }
 
+#[derive(Deserialize, Serialize, Clone, Debug)]
+struct DistributionConfig {
+    endpoints: Vec<String>,
+    reactivate_delay_secs: Option<u64>, // 5 seconds
+}
+
+pub const REACTIVATE_DELAY_SECONDS_DEFAULT: u64 = 5; // 5 seconds
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "elasticsearch")]
 impl SinkConfig for ElasticsearchConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        // TODO: For each endpoint create a new common
         let common = ElasticsearchCommon::parse_config(self).await?;
-        let commons = vec![common.clone()];
 
         let batch_settings = self.batch.into_batcher_settings()?;
 
@@ -303,6 +310,16 @@ impl SinkConfig for ElasticsearchConfig {
             .request
             .tower
             .unwrap_with(&TowerRequestConfig::default());
+
+        let mut commons = vec![common.clone()];
+
+        if let Some(distribution) = self.distribution.as_ref() {
+            for endpoint in distribution.endpoints.iter() {
+                let mut config = self.clone();
+                config.endpoint = endpoint.clone();
+                commons.push(ElasticsearchCommon::parse_config(&config).await?);
+            }
+        }
 
         let mut endpoints = Vec::new();
         for common in commons {
@@ -321,28 +338,44 @@ impl SinkConfig for ElasticsearchConfig {
             endpoints.push(ElasticsearchService::new(http_client, http_request_builder));
         }
 
-        let discover = ServiceList::new(endpoints);
+        let stream = if let Some(distribution) = self.distribution.as_ref() {
+            let service = CloneableService::new(Balance::new(ServiceList::new(endpoints)));
 
-        // TODO: Retry logic should account that the request can be retry even if it regularly could not be.
-        // TODO  But, it should still fail at some point. Maybe that can be done through configuration of the retry logic.
-        let service = ServiceBuilder::new()
-            .settings(request_limits, ElasticsearchRetryLogic)
-            .service(CloneableService::new(Balance::new(discover)));
+            let service = ServiceBuilder::new()
+                .settings(request_limits, ElasticsearchRetryLogic)
+                .service(service);
 
-        let sink = ElasticsearchSink {
-            batch_settings,
-            request_builder: common.request_builder.clone(),
-            transformer: self.encoding.clone(),
-            service,
-            acker: cx.acker(),
-            metric_to_log: common.metric_to_log.clone(),
-            mode: common.mode.clone(),
-            id_key_field: self.id_key.clone(),
+            let sink = ElasticsearchSink {
+                batch_settings,
+                request_builder: common.request_builder.clone(),
+                transformer: self.encoding.clone(),
+                service,
+                acker: cx.acker(),
+                metric_to_log: common.metric_to_log.clone(),
+                mode: common.mode.clone(),
+                id_key_field: self.id_key.clone(),
+            };
+            VectorSink::from_event_streamsink(sink)
+        } else {
+            let service = ServiceBuilder::new()
+                .settings(request_limits, ElasticsearchRetryLogic)
+                .service(endpoints.remove(0));
+
+            let sink = ElasticsearchSink {
+                batch_settings,
+                request_builder: common.request_builder.clone(),
+                transformer: self.encoding.clone(),
+                service,
+                acker: cx.acker(),
+                metric_to_log: common.metric_to_log.clone(),
+                mode: common.mode.clone(),
+                id_key_field: self.id_key.clone(),
+            };
+            VectorSink::from_event_streamsink(sink)
         };
 
         let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
         let healthcheck = common.healthcheck(client).boxed();
-        let stream = VectorSink::from_event_streamsink(sink);
         Ok((stream, healthcheck))
     }
 
