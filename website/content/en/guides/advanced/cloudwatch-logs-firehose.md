@@ -85,31 +85,26 @@ Let's take a look at the configuration we will be using:
   address = "0.0.0.0:8080" # the public URL will be set when configuring Firehose
   access_key = "${FIREHOSE_ACCESS_KEY}"my secret key" # this will also be set when configuring Firehose
 
-[transforms.cloudwatch]
+[transforms.parse]
   type = "remap"
   inputs = ["firehose"]
   drop_on_error = false
   source = '''
     parsed = parse_aws_cloudwatch_log_subscription_message!(.message)
     . = unnest(parsed.log_events)
-  '''
-
-[transforms.json]
-  type = "remap"
-  inputs = ["cloudwatch"]
-  drop_on_error = false
-  source = '''
-    log_events = del(.log_events)
-    . |= object!(log_events)
-    message = del(.message)
-    . |= object!(parse_json!(message))
+    . = map_values(.) -> |value| {
+       event = del(value.log_events)
+       value |= event
+       message = del(.message)
+       . |= object!(parse_json!(message))
+    }
   '''
 
 # you may want to add more transforms here
 
 [sinks.console]
   type = "console"
-  inputs = ["json"]
+  inputs = ["parse"]
   encoding.codec = "json"
 ```
 
@@ -479,7 +474,36 @@ Firehose) and `timestamp` (parsed from the `timestamp` field of the request
 body). The `message` field is the decoded record data. In our case, this is an
 AWS CloudWatch Logs Subscription event.
 
-If we formatted it, it would look like:
+To extract and parse the originating events from this subscription event, we
+can use a [`remap`][remap] transform and leverage the [`parse_aws_cloudwatch_log_subscription_message`][parse_aws_cloudwatch_log_subscription_message],
+[`unnest`][unnest], [`map_values`][map_values], and [`parse_json`][parse_json]
+functions:
+
+```toml
+[transforms.parse]
+  type = "remap"
+  inputs = ["firehose"]
+  drop_on_error = false
+  source = '''
+    parsed = parse_aws_cloudwatch_log_subscription_message!(.message)
+    . = unnest(parsed.log_events)
+    . = map_values(.) -> |value| {
+       event = del(value.log_events)
+       value |= event
+       message = del(.message)
+       . |= object!(parse_json!(message))
+    }
+  '''
+```
+
+Let's step through this program one function at a time.
+
+```coffee
+parsed = parse_aws_cloudwatch_log_subscription_message!(.message)
+```
+
+This line will parse the `.message` field and store the results in a variable
+`parsed`. The contents of that variable would look like:
 
 ```json
 {
@@ -505,19 +529,8 @@ If we formatted it, it would look like:
 }
 ```
 
-To extract the originating events from this subscription event, we can use the
-[`parse_aws_cloudwatch_log_subscription_message`][parse_aws_cloudwatch_log_subscription_message]
-and [`unnest`][unnest] functions:
-
-```toml
-[transforms.cloudwatch]
-  type = "remap"
-  inputs = ["firehose"]
-  drop_on_error = false
-  source = '''
-    parsed = parse_aws_cloudwatch_log_subscription_message!(.message)
-    . = unnest(parsed.log_events)
-  '''
+```coffee
+. = unnest(parsed.log_events)
 ```
 
 This will take the above event and output two new events:
@@ -565,23 +578,30 @@ context:
 * `subcription_filters` the filters that matched to send the event
 * `timestamp` is overwritten with the timestamp from the log event
 
-This is pretty good, but, our original events are also JSON, so let's parse
-those out using the [`parse_json`][parse_json] function:
+This is pretty good, but, our original events are also JSON and the `.id`,
+`.message`, and `.timestamp` fields are nested. The next function uses
+iteration to finish up our processing.
 
-```toml
-[transforms.json]
-  type = "remap"
-  inputs = ["cloudwatch"]
-  drop_on_error = false
-  source = '''
-    log_events = del(.log_events)
-    . |= object!(log_events)
-    message = del(.message)
-    . |= object!(parse_json!(message))
-  '''
+```coffee
+. = map_values(.) -> |value| {
+   event = del(value.log_events)
+   value |= event
+   message = del(.message)
+   . |= object!(parse_json!(message))
+}
 ```
 
-This will give us the final result of:
+This snippet will iterate through the values in the root of the event,
+the two objects shown above. For each "value" (an object) we delete the
+`.log_events` field, saving it's contents in a variable `event`. We then
+merge the contents into `value`, which moves the `.id`, `.message`,
+and `.timestamp` fields into the root of that object.
+
+We then delete the `.message` field, storing the contents in a variable
+`message`. Finally we parse the variable as JSON, and merge the now structured
+fields into the root of the object.
+
+This will give us the final result of the following two events:
 
 ```json
 {
@@ -589,7 +609,7 @@ This will give us the final result of:
   "datetime": "14/Sep/2020:11:45:41 -0400",
   "host": "157.130.216.193",
   "id": "35683658089614582423604394983260738922885519999578275840",
-  "log_group": "/jesse/test",
+  "log_group": "/test/vector",
   "log_stream": "test",
   "method": "PUT",
   "owner": "071959437513",
@@ -611,7 +631,7 @@ This will give us the final result of:
   "datetime": "14/Sep/2020:11:45:41 -0400",
   "host": "109.81.244.252",
   "id": "35683658089659183914001456229543810359430816722590236673",
-  "log_group": "/jesse/test",
+  "log_group": "/test/vector",
   "log_stream": "test",
   "method": "GET",
   "owner": "071959437513",
