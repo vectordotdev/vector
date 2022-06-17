@@ -7,8 +7,8 @@ use futures::{stream, Stream, StreamExt, TryFutureExt};
 use http::uri::{InvalidUri, Scheme, Uri};
 use once_cell::sync::Lazy;
 use snafu::{ResultExt, Snafu};
-use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
-use tokio_stream::wrappers::UnboundedReceiverStream;
+use tokio::sync::mpsc::{self, Receiver, Sender};
+use tokio_stream::wrappers::ReceiverStream;
 use tonic::{
     metadata::{errors::InvalidMetadataValue, MetadataValue},
     transport::{Certificate, Channel, ClientTlsConfig, Endpoint, Identity},
@@ -37,6 +37,12 @@ use crate::{
 
 const MIN_ACK_DEADLINE_SECONDS: i32 = 10;
 const MAX_ACK_DEADLINE_SECONDS: i32 = 600;
+
+// We use a bounded channel for the acknowledgement ID communication
+// between the request stream and receiver. During benchmark runs,
+// this channel had only a single element over 80% of the time and
+// rarely went over 8 elements.
+const ACK_QUEUE_SIZE: usize = 128;
 
 type Finalizer = UnorderedFinalizer<Vec<String>>;
 
@@ -290,7 +296,7 @@ impl PubsubSource {
             },
         );
 
-        let (ack_ids_sender, ack_ids_receiver) = mpsc::unbounded_channel();
+        let (ack_ids_sender, ack_ids_receiver) = mpsc::channel(ACK_QUEUE_SIZE);
 
         // Handle shutdown during startup, the streaming pull doesn't
         // start if there is no data in the subscription.
@@ -322,6 +328,7 @@ impl PubsubSource {
                     if status == BatchStatus::Delivered {
                         ack_ids_sender
                             .send(receipts)
+                            .await
                             .unwrap_or_else(|_| unreachable!("request stream never closes"));
                     }
                 },
@@ -349,12 +356,12 @@ impl PubsubSource {
 
     fn request_stream(
         &self,
-        ack_ids: UnboundedReceiver<Vec<String>>,
+        ack_ids: Receiver<Vec<String>>,
     ) -> impl Stream<Item = proto::StreamingPullRequest> + 'static {
         let subscription = self.subscription.clone();
         let client_id = CLIENT_ID.clone();
         let stream_ack_deadline_seconds = self.ack_deadline_seconds;
-        let ack_ids = UnboundedReceiverStream::new(ack_ids);
+        let ack_ids = ReceiverStream::new(ack_ids);
 
         stream::once(async move {
             // These fields are only valid on the first request in the
@@ -366,14 +373,14 @@ impl PubsubSource {
                 ..Default::default()
             }
         })
-        .chain(ack_ids.map(|ack_ids| {
+        .chain(ack_ids.ready_chunks(ACK_QUEUE_SIZE).map(|chunks| {
             // These "requests" serve only to send updates about
             // acknowledgements to the server. None of the above
             // fields need to be repeated and, in fact, will cause
             // an stream error and cancellation if they are
             // present.
             proto::StreamingPullRequest {
-                ack_ids,
+                ack_ids: chunks.into_iter().flatten().collect(),
                 ..Default::default()
             }
         }))
@@ -383,7 +390,7 @@ impl PubsubSource {
         &mut self,
         response: proto::StreamingPullResponse,
         finalizer: &Option<Finalizer>,
-        ack_ids: &UnboundedSender<Vec<String>>,
+        ack_ids: &Sender<Vec<String>>,
     ) {
         emit!(BytesReceived {
             byte_size: response.size_of(),
@@ -399,6 +406,7 @@ impl PubsubSource {
             Ok(()) => match notifier {
                 None => ack_ids
                     .send(ids)
+                    .await
                     .unwrap_or_else(|_| unreachable!("request stream never closes")),
                 Some(notifier) => finalizer
                     .as_ref()
