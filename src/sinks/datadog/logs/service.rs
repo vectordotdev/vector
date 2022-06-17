@@ -7,7 +7,7 @@ use bytes::Bytes;
 use futures::future::BoxFuture;
 use http::{
     header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
-    Request, StatusCode, Uri,
+    Request, Uri,
 };
 use hyper::Body;
 use tower::Service;
@@ -22,7 +22,7 @@ use vector_core::{
 
 use crate::{
     http::HttpClient,
-    sinks::datadog::{is_retriable_error, DatadogApiError},
+    sinks::datadog::DatadogApiError,
     sinks::util::{retries::RetryLogic, Compression},
 };
 
@@ -34,7 +34,7 @@ impl RetryLogic for LogApiRetry {
     type Response = LogApiResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        is_retriable_error(error)
+        DatadogApiError::is_retriable_error(error)
     }
 }
 
@@ -154,36 +154,16 @@ impl Service<LogApiRequest> for LogApiService {
             .expect("building HTTP request failed unexpectedly");
 
         Box::pin(async move {
-            match client.call(http_request).in_current_span().await {
-                Ok(response) => {
-                    let status = response.status();
-                    // From https://docs.datadoghq.com/api/latest/logs/:
-                    //
-                    // The status codes answered by the HTTP API are:
-                    // 200: OK (v1)
-                    // 202: Accepted (v2)
-                    // 400: Bad request (likely an issue in the payload
-                    //      formatting)
-                    // 403: Permission issue (likely using an invalid API Key)
-                    // 413: Payload too large (batch is above 5MB uncompressed)
-                    // 5xx: Internal error, request should be retried after some
-                    //      time
-                    match status {
-                        StatusCode::BAD_REQUEST => Err(DatadogApiError::BadRequest),
-                        StatusCode::FORBIDDEN => Err(DatadogApiError::Forbidden),
-                        StatusCode::OK | StatusCode::ACCEPTED => Ok(LogApiResponse {
-                            event_status: EventStatus::Delivered,
-                            count,
-                            events_byte_size,
-                            raw_byte_size,
-                            protocol,
-                        }),
-                        StatusCode::PAYLOAD_TOO_LARGE => Err(DatadogApiError::PayloadTooLarge),
-                        _ => Err(DatadogApiError::ServerError),
-                    }
-                }
-                Err(error) => Err(DatadogApiError::HttpError { error }),
-            }
+            let result = client.call(http_request).in_current_span().await;
+            DatadogApiError::from_result(result)?;
+
+            Ok(LogApiResponse {
+                event_status: EventStatus::Delivered,
+                count,
+                events_byte_size,
+                raw_byte_size,
+                protocol,
+            })
         })
     }
 }
