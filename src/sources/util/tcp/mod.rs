@@ -2,7 +2,7 @@ mod request_limiter;
 
 use std::collections::BTreeMap;
 use std::net::SocketAddr;
-use std::{fmt, io, mem::drop, sync::Arc, time::Duration};
+use std::{fmt, io, mem::drop, time::Duration};
 
 use bytes::Bytes;
 use codecs::StreamDecodingError;
@@ -157,7 +157,8 @@ where
             let connection_gauge = OpenGauge::new();
             let shutdown_clone = cx.shutdown.clone();
 
-            let request_limiter = RequestLimiter::new(MAX_IN_FLIGHT_EVENTS_TARGET, num_cpus::get());
+            let request_limiter =
+                RequestLimiter::new(MAX_IN_FLIGHT_EVENTS_TARGET, crate::num_threads());
 
             listener
                 .accept_stream_limited(max_connections)
@@ -344,7 +345,7 @@ async fn handle_stream<T>(
 
                         if let Some(batch) = batch {
                             for event in &mut events {
-                                event.add_batch_notifier(Arc::clone(&batch));
+                                event.add_batch_notifier(batch.clone());
                             }
                         }
 

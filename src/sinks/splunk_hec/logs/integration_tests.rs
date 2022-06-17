@@ -1,4 +1,4 @@
-use std::{convert::TryFrom, iter, num::NonZeroU8, sync::Arc};
+use std::{convert::TryFrom, iter, num::NonZeroU8};
 
 use futures::{future::ready, stream};
 
@@ -338,7 +338,7 @@ async fn splunk_indexer_acknowledgements() {
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (tx, mut rx) = BatchNotifier::new_with_receiver();
-    let (messages, events) = random_lines_with_stream(100, 10, Some(Arc::clone(&tx)));
+    let (messages, events) = random_lines_with_stream(100, 10, Some(tx.clone()));
     drop(tx);
     run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
 
@@ -354,7 +354,7 @@ async fn splunk_indexer_acknowledgements_disabled_on_server() {
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (tx, mut rx) = BatchNotifier::new_with_receiver();
-    let (messages, events) = random_lines_with_stream(100, 10, Some(Arc::clone(&tx)));
+    let (messages, events) = random_lines_with_stream(100, 10, Some(tx.clone()));
     drop(tx);
     run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
 

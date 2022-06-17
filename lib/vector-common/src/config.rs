@@ -3,11 +3,6 @@ use std::{
     fmt,
 };
 
-use serde::{
-    de::{self, Visitor},
-    Deserialize, Deserializer, Serialize, Serializer,
-};
-
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct ComponentKey {
     id: String,
@@ -55,15 +50,6 @@ impl fmt::Display for ComponentKey {
     }
 }
 
-impl Serialize for ComponentKey {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(&self.to_string())
-    }
-}
-
 impl Ord for ComponentKey {
     fn cmp(&self, other: &Self) -> Ordering {
         self.id.cmp(&other.id)
@@ -76,29 +62,50 @@ impl PartialOrd for ComponentKey {
     }
 }
 
-struct ComponentKeyVisitor;
+#[cfg(feature = "serde")]
+mod serde {
+    use std::fmt;
 
-impl<'de> Visitor<'de> for ComponentKeyVisitor {
-    type Value = ComponentKey;
+    use serde::{
+        de::{self, Visitor},
+        Deserialize, Deserializer, Serialize, Serializer,
+    };
 
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("a string")
+    use super::ComponentKey;
+
+    impl Serialize for ComponentKey {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            serializer.serialize_str(&self.to_string())
+        }
     }
 
-    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        Ok(ComponentKey::from(value))
-    }
-}
+    struct ComponentKeyVisitor;
 
-impl<'de> Deserialize<'de> for ComponentKey {
-    fn deserialize<D>(deserializer: D) -> Result<ComponentKey, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        deserializer.deserialize_string(ComponentKeyVisitor)
+    impl<'de> Visitor<'de> for ComponentKeyVisitor {
+        type Value = ComponentKey;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a string")
+        }
+
+        fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(ComponentKey::from(value))
+        }
+    }
+
+    impl<'de> Deserialize<'de> for ComponentKey {
+        fn deserialize<D>(deserializer: D) -> Result<ComponentKey, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            deserializer.deserialize_string(ComponentKeyVisitor)
+        }
     }
 }
 

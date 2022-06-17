@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 pub mod docs;
 mod test;
 

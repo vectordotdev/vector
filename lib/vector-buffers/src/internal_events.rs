@@ -1,6 +1,24 @@
 use metrics::{counter, decrement_gauge, gauge, increment_gauge};
 use vector_common::internal_event::InternalEvent;
 
+pub struct BufferCreated {
+    pub idx: usize,
+    pub max_size_events: Option<usize>,
+    pub max_size_bytes: Option<u64>,
+}
+
+impl InternalEvent for BufferCreated {
+    #[allow(clippy::cast_precision_loss)]
+    fn emit(self) {
+        if let Some(max_size) = self.max_size_events {
+            gauge!("buffer_max_event_size", max_size as f64, "stage" => self.idx.to_string());
+        }
+        if let Some(max_size) = self.max_size_bytes {
+            gauge!("buffer_max_byte_size", max_size as f64, "stage" => self.idx.to_string());
+        }
+    }
+}
+
 pub struct BufferEventsReceived {
     pub idx: usize,
     pub count: u64,
@@ -37,41 +55,60 @@ pub struct BufferEventsDropped {
     pub idx: usize,
     pub count: u64,
     pub byte_size: u64,
+    pub intentional: bool,
+    pub reason: &'static str,
 }
 
 impl InternalEvent for BufferEventsDropped {
     #[allow(clippy::cast_precision_loss)]
     fn emit(self) {
-        counter!("buffer_discarded_events_total", self.count, "stage" => self.idx.to_string());
+        let intentional_str = if self.intentional { "true" } else { "false" };
+        if self.intentional {
+            debug!(
+                message = "Events dropped.",
+                count = %self.count,
+                intentional = %intentional_str,
+                reason = %self.reason,
+                stage = %self.idx,
+            );
+        } else {
+            error!(
+                message = "Events dropped.",
+                count = %self.count,
+                intentional = %intentional_str,
+                reason = %self.reason,
+                stage = %self.idx,
+            );
+        }
+        counter!(
+            "buffer_discarded_events_total", self.count,
+            "intentional" => intentional_str,
+        );
         decrement_gauge!("buffer_events", self.count as f64, "stage" => self.idx.to_string());
         decrement_gauge!("buffer_byte_size", self.byte_size as f64, "stage" => self.idx.to_string());
     }
 }
 
-pub struct EventsCorrupted {
-    pub count: u64,
+pub struct BufferReadError {
+    pub error_code: &'static str,
+    pub error: String,
 }
 
-impl InternalEvent for EventsCorrupted {
+impl InternalEvent for BufferReadError {
     fn emit(self) {
-        counter!("buffer_corrupted_events_total", self.count);
-    }
-}
-
-pub struct BufferCreated {
-    pub idx: usize,
-    pub max_size_events: Option<usize>,
-    pub max_size_bytes: Option<u64>,
-}
-
-impl InternalEvent for BufferCreated {
-    #[allow(clippy::cast_precision_loss)]
-    fn emit(self) {
-        if let Some(max_size) = self.max_size_events {
-            gauge!("buffer_max_event_size", max_size as f64, "stage" => self.idx.to_string());
-        }
-        if let Some(max_size) = self.max_size_bytes {
-            gauge!("buffer_max_byte_size", max_size as f64, "stage" => self.idx.to_string());
-        }
+        error!(
+            message = "Error encountered during buffer read.",
+            error = %self.error,
+            error_code = self.error_code,
+            error_type = "reader_failed",
+            stage = "processing",
+            internal_log_rate_secs = 10,
+        );
+        counter!(
+            "buffer_errors_total", 1,
+            "error_code" => self.error_code,
+            "error_type" => "reader_failed",
+            "stage" => "processing",
+        );
     }
 }

@@ -55,11 +55,11 @@ impl<'a> Field<'a> {
     }
 
     pub fn transparent(&self) -> bool {
-        self.attrs.transparent.is_present()
+        self.attrs.transparent.is_some()
     }
 
     pub fn deprecated(&self) -> bool {
-        self.attrs.deprecated.is_present()
+        self.attrs.deprecated.is_some()
     }
 
     pub fn validation(&self) -> &[Validation] {
@@ -75,8 +75,8 @@ impl<'a> Field<'a> {
     }
 }
 
-#[derive(Debug, FromAttributes)]
-#[darling(attributes(configurable))]
+#[derive(Debug, Default, FromAttributes)]
+#[darling(default, attributes(configurable))]
 struct Attributes {
     title: Option<String>,
     description: Option<String>,
@@ -120,8 +120,8 @@ impl Attributes {
         // If a field is flattened, that's also another form of derivation so we don't require a description in that
         // scenario either.
         if self.description.is_none()
-            && !self.derived.is_present()
-            && !self.transparent.is_present()
+            && !self.derived.is_some()
+            && !self.transparent.is_some()
             && self.visible
             && !self.flatten
         {
