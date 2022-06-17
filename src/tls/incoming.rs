@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::{
     future::Future,
@@ -9,7 +8,6 @@ use std::{
 
 use futures::{future::BoxFuture, stream, FutureExt, Stream};
 use openssl::ssl::{Ssl, SslAcceptor, SslMethod};
-use openssl::x509::X509;
 use snafu::ResultExt;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio::{
@@ -22,10 +20,10 @@ use super::{
     CreateAcceptorSnafu, HandshakeSnafu, IncomingListenerSnafu, MaybeTlsSettings, MaybeTlsStream,
     SslBuildSnafu, TcpBindSnafu, TlsError, TlsSettings,
 };
-#[cfg(feature = "sources-utils-tcp-socket")]
-use crate::tcp;
 #[cfg(feature = "sources-utils-tcp-keepalive")]
 use crate::tcp::TcpKeepaliveConfig;
+#[cfg(feature = "sources-utils-tcp-socket")]
+use {crate::tcp, openssl::x509::X509, std::collections::HashMap};
 
 impl TlsSettings {
     pub(crate) fn acceptor(&self) -> crate::tls::Result<SslAcceptor> {
@@ -360,6 +358,7 @@ impl AsyncWrite for MaybeTlsIncomingStream<TcpStream> {
     }
 }
 
+#[cfg(feature = "sources-utils-tcp-socket")]
 #[derive(Debug)]
 pub struct CertificateMetadata {
     pub country_name: Option<String>,
@@ -370,6 +369,7 @@ pub struct CertificateMetadata {
     pub common_name: Option<String>,
 }
 
+#[cfg(feature = "sources-utils-tcp-socket")]
 impl CertificateMetadata {
     pub(crate) fn from_x509(cert: X509) -> CertificateMetadata {
         let mut subject_metadata: HashMap<String, String> = HashMap::new();
@@ -418,6 +418,7 @@ impl CertificateMetadata {
 mod test {
     use super::*;
 
+    #[cfg(feature = "sources-utils-tcp-socket")]
     #[test]
     fn certificate_metadata_full() {
         let example_meta = CertificateMetadata {
@@ -441,6 +442,7 @@ mod test {
         assert_eq!(expected, example_meta.subject())
     }
 
+    #[cfg(feature = "sources-utils-tcp-socket")]
     #[test]
     fn certificate_metadata_partial() {
         let example_meta = CertificateMetadata {
