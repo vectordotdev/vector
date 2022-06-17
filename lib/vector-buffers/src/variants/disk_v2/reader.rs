@@ -11,7 +11,6 @@ use crc32fast::Hasher;
 use rkyv::{archived_root, AlignedVec};
 use snafu::{ResultExt, Snafu};
 use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
-use vector_common::internal_event::emit;
 
 use super::{
     common::create_crc32c_hasher,
@@ -21,7 +20,7 @@ use super::{
 };
 use crate::{
     encoding::{AsMetadata, Encodable},
-    internal_events::EventsCorrupted,
+    internal_events::BufferReadError,
     topology::acks::{EligibleMarker, EligibleMarkerLength, MarkerError, OrderedAcknowledgements},
     variants::disk_v2::{io::AsyncFile, record::try_as_record_archive},
     Bufferable,
@@ -136,6 +135,32 @@ where
                 | ReaderError::Deserialization { .. }
                 | ReaderError::PartialWrite
         )
+    }
+
+    fn as_error_code(&self) -> &'static str {
+        match self {
+            ReaderError::Io { .. } => "io_error",
+            ReaderError::Deserialization { .. } => "deser_failed",
+            ReaderError::Checksum { .. } => "checksum_mismatch",
+            ReaderError::Decode { .. } => "decode_failed",
+            ReaderError::Incompatible { .. } => "incompatible_record_version",
+            ReaderError::PartialWrite => "partial_write",
+            ReaderError::EmptyRecord => "empty_record",
+        }
+    }
+
+    pub fn as_recoverable_error(&self) -> Option<BufferReadError> {
+        let error = self.to_string();
+        let error_code = self.as_error_code();
+
+        match self {
+            ReaderError::Io { .. } | ReaderError::EmptyRecord => None,
+            ReaderError::Deserialization { .. }
+            | ReaderError::Checksum { .. }
+            | ReaderError::Decode { .. }
+            | ReaderError::Incompatible { .. }
+            | ReaderError::PartialWrite => Some(BufferReadError { error_code, error }),
+        }
     }
 }
 
@@ -610,18 +635,7 @@ where
 
             // If any events were skipped, do our logging/metrics for that.
             if events_skipped > 0 {
-                error!(
-                    dropped_events = events_skipped,
-                    "Detected missing/dropped events.  Buffer data loss has occurred."
-                );
-
-                // TODO: We probably need to make this actually decrement the buffer events gauge directly.
-                //
-                // We don't update it unless there's a received/sent event emitted, which these
-                // events naturally will not be part of as they don't flow out of the buffer.
-                emit(EventsCorrupted {
-                    count: events_skipped,
-                });
+                self.ledger.track_dropped_events(events_skipped);
             }
         }
 

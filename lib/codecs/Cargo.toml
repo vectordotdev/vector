@@ -31,4 +31,4 @@ tokio = { version = "1", features = ["test-util"] }
 pretty_assertions = "1"
 
 [features]
-syslog = ["syslog_loose"]
+syslog = ["dep:syslog_loose"]

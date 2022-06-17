@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 use std::{collections::BTreeMap, env};
 
 use indoc::formatdoc;
