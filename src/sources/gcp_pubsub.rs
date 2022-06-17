@@ -351,11 +351,14 @@ impl PubsubSource {
         &self,
         ack_ids: UnboundedReceiver<Vec<String>>,
     ) -> impl Stream<Item = proto::StreamingPullRequest> + 'static {
-        let ack_ids = UnboundedReceiverStream::new(ack_ids);
         let subscription = self.subscription.clone();
         let client_id = CLIENT_ID.clone();
         let stream_ack_deadline_seconds = self.ack_deadline_seconds;
+        let ack_ids = UnboundedReceiverStream::new(ack_ids);
+
         stream::once(async move {
+            // These fields are only valid on the first request in the
+            // stream, and so must not be repeated below.
             proto::StreamingPullRequest {
                 subscription,
                 client_id,
@@ -363,9 +366,16 @@ impl PubsubSource {
                 ..Default::default()
             }
         })
-        .chain(ack_ids.map(|ack_ids| proto::StreamingPullRequest {
-            ack_ids,
-            ..Default::default()
+        .chain(ack_ids.map(|ack_ids| {
+            // These "requests" serve only to send updates about
+            // acknowledgements to the server. None of the above
+            // fields need to be repeated and, in fact, will cause
+            // an stream error and cancellation if they are
+            // present.
+            proto::StreamingPullRequest {
+                ack_ids,
+                ..Default::default()
+            }
         }))
     }
 
