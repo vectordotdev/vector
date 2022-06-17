@@ -81,10 +81,10 @@ value = { path = "../value", default-features = false, features = ["lua", "toml"
 vrl-lib = { package = "vrl", path = "../vrl/vrl"}
 
 [features]
-api = ["async-graphql", "value/api"]
+api = ["dep:async-graphql", "value/api"]
 default = []
-lua = ["mlua", "tokio-stream"]
-vrl = ["vrl-lib", "enrichment"]
+lua = ["dep:mlua", "dep:tokio-stream"]
+vrl = ["dep:vrl-lib", "dep:enrichment"]
 test = ["vector_common/test"]
 
 [[bench]]
