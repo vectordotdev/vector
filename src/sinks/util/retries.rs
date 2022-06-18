@@ -11,7 +11,7 @@ use futures::FutureExt;
 use tokio::time::{sleep, Sleep};
 use tower::{retry::Policy, timeout::error::Elapsed};
 
-use crate::Error;
+use crate::{http::HttpError, Error};
 
 pub enum RetryAction {
     /// Indicate that this request should be retried with a reason
@@ -31,6 +31,42 @@ pub trait RetryLogic: Clone + Send + Sync + 'static {
     fn should_retry_response(&self, _response: &Self::Response) -> RetryAction {
         // Treat the default as the request is successful
         RetryAction::Successful
+    }
+
+    /// None if request was successful, Some(is_back_pressure) if failed
+    fn is_back_pressure(&self, response: &Result<Self::Response, crate::Error>) -> Option<bool> {
+        // It would be better to avoid generating the string in Retry(_)
+        // just to throw it away here, but it's probably not worth the
+        // effort.
+        let response_action = response
+            .as_ref()
+            .map(|resp| self.should_retry_response(resp));
+
+        if matches!(response_action, Ok(RetryAction::Successful)) {
+            None
+        } else {
+            let is_back_pressure = match &response_action {
+                Ok(action) => matches!(action, RetryAction::Retry(_)),
+                Err(error) => {
+                    if let Some(error) = error.downcast_ref::<Self::Error>() {
+                        self.is_retriable_error(error)
+                    } else if error.downcast_ref::<Elapsed>().is_some() {
+                        true
+                    } else if error.downcast_ref::<HttpError>().is_some() {
+                        // HTTP protocol-level errors are not backpressure
+                        false
+                    } else {
+                        warn!(
+                            message = "Unhandled error response.",
+                            %error,
+                            internal_log_rate_secs = 5
+                        );
+                        false
+                    }
+                }
+            };
+            Some(is_back_pressure)
+        }
     }
 }
 

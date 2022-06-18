@@ -5,18 +5,16 @@ use std::{
 };
 
 use tokio::sync::OwnedSemaphorePermit;
-use tower::timeout::error::Elapsed;
 
 use super::{instant_now, semaphore::ShrinkableSemaphore, AdaptiveConcurrencySettings};
 #[cfg(test)]
 use crate::test_util::stats::{TimeHistogram, TimeWeightedSum};
 use crate::{
-    http::HttpError,
     internal_events::{
         AdaptiveConcurrencyAveragedRtt, AdaptiveConcurrencyInFlight, AdaptiveConcurrencyLimit,
         AdaptiveConcurrencyObservedRtt,
     },
-    sinks::util::retries::{RetryAction, RetryLogic},
+    sinks::util::retries::RetryLogic,
     stats::{EwmaVar, Mean, MeanVariance},
 };
 
@@ -252,34 +250,12 @@ where
         start: Instant,
         response: &Result<L::Response, crate::Error>,
     ) {
-        // It would be better to avoid generating the string in Retry(_)
-        // just to throw it away here, but it's probably not worth the
-        // effort.
-        let response_action = response
-            .as_ref()
-            .map(|resp| self.logic.should_retry_response(resp));
-        let is_back_pressure = match &response_action {
-            Ok(action) => matches!(action, RetryAction::Retry(_)),
-            Err(error) => {
-                if let Some(error) = error.downcast_ref::<L::Error>() {
-                    self.logic.is_retriable_error(error)
-                } else if error.downcast_ref::<Elapsed>().is_some() {
-                    true
-                } else if error.downcast_ref::<HttpError>().is_some() {
-                    // HTTP protocol-level errors are not backpressure
-                    false
-                } else {
-                    warn!(
-                        message = "Unhandled error response.",
-                        %error,
-                        internal_log_rate_secs = 5
-                    );
-                    false
-                }
-            }
+        let (use_rtt, is_back_pressure) = match self.logic.is_back_pressure(response) {
+            Some(is_back_pressure) => (false, is_back_pressure),
+            // Only adjust to the RTT when the request was successfully processed.
+            None => (true, false),
         };
-        // Only adjust to the RTT when the request was successfully processed.
-        let use_rtt = matches!(response_action, Ok(RetryAction::Successful));
+
         self.adjust_to_response_inner(start, is_back_pressure, use_rtt)
     }
 }

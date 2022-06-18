@@ -269,7 +269,10 @@ impl TowerRequestSettings {
                 Pin<
                     Box<
                         dyn Stream<
-                                Item = Result<Change<K, HealthService<Timeout<S>>>, crate::Error>,
+                                Item = Result<
+                                    Change<K, HealthService<Timeout<S>, RL>>,
+                                    crate::Error,
+                                >,
                             > + Send,
                     >,
                 >,
@@ -291,12 +294,14 @@ impl TowerRequestSettings {
     {
         let service_layer = ServiceBuilder::new().timeout(self.timeout);
 
+        let logic = retry_logic.clone();
         let services = services.map_ok(move |change| match change {
             Change::Insert(key, (service, healthcheck)) => Change::Insert(
                 key,
                 HealthService::new(
                     service_layer.service(service),
                     healthcheck,
+                    logic.clone(),
                     reactivate_delay,
                 ),
             ),
