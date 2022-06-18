@@ -18,7 +18,10 @@ use crate::sinks::util::retries::RetryLogic;
 
 enum ServiceState {
     Healthcheck(BoxFuture<'static, bool>),
-    Backoff(BoxFuture<'static, ()>),
+    Backoff {
+        timer: BoxFuture<'static, ()>,
+        healthcheck: bool,
+    },
     Ready,
 }
 
@@ -75,12 +78,22 @@ where
                         self.request_handle.store(0, Ordering::Release);
                         ServiceState::Ready
                     } else {
-                        ServiceState::Backoff(sleep(self.reactivate_delay).boxed())
+                        ServiceState::Backoff {
+                            timer: sleep(self.reactivate_delay).boxed(),
+                            healthcheck: true,
+                        }
                     }
                 }
-                ServiceState::Backoff(ref mut backoff) => {
-                    ready!(backoff.as_mut().poll(cx));
-                    ServiceState::Healthcheck((self.healthcheck)())
+                ServiceState::Backoff {
+                    ref mut timer,
+                    healthcheck,
+                } => {
+                    ready!(timer.as_mut().poll(cx));
+                    if healthcheck {
+                        ServiceState::Healthcheck((self.healthcheck)())
+                    } else {
+                        ServiceState::Ready
+                    }
                 }
                 ServiceState::Ready => {
                     // Check for errors
@@ -90,7 +103,10 @@ where
                         // Check if the service is healthy
                         1 => ServiceState::Healthcheck((self.healthcheck)()),
                         // Backoff
-                        2 => ServiceState::Backoff(sleep(self.reactivate_delay).boxed()),
+                        2 => ServiceState::Backoff {
+                            timer: sleep(self.reactivate_delay).boxed(),
+                            healthcheck: false,
+                        },
                         _ => unreachable!(),
                     }
                 }
@@ -143,16 +159,16 @@ where
             // Successful request
             None => (),
             // Backpressure
-            Some(true) => this.request_handle.store(2, Ordering::Release),
-            // Failure
-            Some(false) => {
+            Some(true) => {
                 let _ = this.request_handle.compare_exchange_weak(
                     0,
-                    1,
+                    2,
                     Ordering::Release,
                     Ordering::Relaxed,
                 );
             }
+            // Failure
+            Some(false) => this.request_handle.store(1, Ordering::Release),
         }
 
         Poll::Ready(output)
