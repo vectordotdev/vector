@@ -7,23 +7,34 @@ use std::{
 
 use futures::ready;
 use pin_project::pin_project;
-use tower::Service;
+use tower::{Layer, Service};
 
 /// Makes otherwise uncloneable `Service` cloneable.
 /// This is done through blocking Mutex.
-pub struct CloneableService<S> {
+pub struct CloneLayer;
+
+impl<S> Layer<S> for CloneLayer {
+    type Service = CloneService<S>;
+
+    fn layer(&self, inner: S) -> Self::Service {
+        CloneService::new(inner)
+    }
+}
+
+/// Service of CloneLayer.
+pub struct CloneService<S> {
     inner: Arc<Mutex<S>>,
 }
 
-impl<S> CloneableService<S> {
+impl<S> CloneService<S> {
     pub fn new(inner: S) -> Self {
-        CloneableService {
+        CloneService {
             inner: Arc::new(Mutex::new(inner)),
         }
     }
 }
 
-impl<S, Req> Service<Req> for CloneableService<S>
+impl<S, Req> Service<Req> for CloneService<S>
 where
     S: Service<Req>,
 {
@@ -43,9 +54,9 @@ where
     }
 }
 
-impl<S> Clone for CloneableService<S> {
+impl<S> Clone for CloneService<S> {
     fn clone(&self) -> Self {
-        CloneableService {
+        CloneService {
             inner: self.inner.clone(),
         }
     }

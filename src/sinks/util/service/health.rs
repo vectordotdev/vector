@@ -10,7 +10,7 @@ use std::{
 
 use futures::{ready, FutureExt};
 use futures_util::{future::BoxFuture, TryFuture};
-use pin_project::{pin_project, pinned_drop};
+use pin_project::pin_project;
 use tokio::time::{sleep, Duration};
 use tower::{load::Load, Service};
 
@@ -20,9 +20,9 @@ enum ServiceState {
     Ready,
 }
 
-/// A service which estimates load on it and also forces backoff if the service
-/// is not healthy.
-pub struct LoadService<S> {
+/// A service which estimates load on inner service and
+/// also forces backoff if the inner service is not healthy.
+pub struct HealthService<S> {
     inner: S,
     healthcheck: Box<dyn Fn() -> BoxFuture<'static, bool> + Send>,
     reactivate_delay: Duration,
@@ -31,13 +31,13 @@ pub struct LoadService<S> {
     state: ServiceState,
 }
 
-impl<S> LoadService<S> {
+impl<S> HealthService<S> {
     pub fn new(
         inner: S,
         healthcheck: impl Fn() -> BoxFuture<'static, bool> + Send + 'static,
         reactivate_delay: std::time::Duration,
     ) -> Self {
-        LoadService {
+        HealthService {
             inner,
             reactivate_delay: reactivate_delay.into(),
             request_handle: Arc::new(AtomicBool::new(false)),
@@ -47,7 +47,7 @@ impl<S> LoadService<S> {
     }
 }
 
-impl<S, Req> Service<Req> for LoadService<S>
+impl<S, Req> Service<Req> for HealthService<S>
 where
     S: Service<Req>,
 {
@@ -87,12 +87,12 @@ where
     fn call(&mut self, req: Req) -> Self::Future {
         LoadFuture {
             inner: self.inner.call(req),
-            request_handle: Some(Arc::clone(&self.request_handle)),
+            request_handle: Arc::clone(&self.request_handle),
         }
     }
 }
 
-impl<S> Load for LoadService<S> {
+impl<S> Load for HealthService<S> {
     type Metric = usize;
 
     fn load(&self) -> Self::Metric {
@@ -102,11 +102,12 @@ impl<S> Load for LoadService<S> {
     }
 }
 
-#[pin_project(PinnedDrop)]
+/// Future for LoadService.
+#[pin_project]
 pub struct LoadFuture<F> {
     #[pin]
     inner: F,
-    request_handle: Option<Arc<AtomicBool>>,
+    request_handle: Arc<AtomicBool>,
 }
 
 impl<F: TryFuture> Future for LoadFuture<F>
@@ -120,13 +121,9 @@ where
         let this = self.project();
         let output = ready!(this.inner.poll(cx));
 
-        let request_handle = this
-            .request_handle
-            .take()
-            .expect("Poll called after completion.");
         if output.is_err() {
             // Notify service of the error
-            request_handle.store(true, Ordering::Release);
+            this.request_handle.store(true, Ordering::Release);
         }
 
         // Note: If we could extract status code here then
@@ -134,15 +131,5 @@ where
         // for this specific service.
 
         Poll::Ready(output)
-    }
-}
-
-#[pinned_drop]
-impl<F> PinnedDrop for LoadFuture<F> {
-    fn drop(self: Pin<&mut Self>) {
-        if let Some(request_handle) = self.project().request_handle.take() {
-            // Future dropped without completion. Better check its health.
-            request_handle.store(true, Ordering::Release);
-        }
     }
 }

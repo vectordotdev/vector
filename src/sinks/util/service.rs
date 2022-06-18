@@ -1,19 +1,22 @@
-use std::{hash::Hash, marker::PhantomData, sync::Arc, time::Duration};
+use std::{hash::Hash, marker::PhantomData, pin::Pin, sync::Arc, time::Duration};
 
+use futures_util::{future::BoxFuture, Stream, TryStream, TryStreamExt};
 use serde::{Deserialize, Serialize};
 use tower::{
+    balance::p2c::Balance,
+    discover::Change,
     layer::{util::Stack, Layer},
     limit::RateLimit,
     retry::Retry,
-    timeout::Timeout,
+    timeout::{Timeout, TimeoutLayer},
     Service, ServiceBuilder,
 };
 use vector_buffers::Acker;
 
 pub use crate::sinks::util::service::{
-    clone::{CloneableService, PollReadyFuture},
+    clone::{CloneLayer, CloneService},
     concurrency::{concurrency_is_none, Concurrency},
-    load::{LoadFuture, LoadService},
+    health::HealthService,
     map::Map,
 };
 use crate::sinks::util::{
@@ -28,10 +31,11 @@ use crate::sinks::util::{
 
 mod clone;
 mod concurrency;
-mod load;
+mod health;
 mod map;
 
-pub type Svc<S, L> = RateLimit<AdaptiveConcurrencyLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>, L>>;
+pub type InnerSvc<S, L> = RateLimit<AdaptiveConcurrencyLimit<Retry<FixedRetryPolicy<L>, S>, L>>;
+pub type Svc<S, L> = InnerSvc<Timeout<S>, L>;
 pub type TowerBatchedSink<S, B, RL> = BatchSink<Svc<S, RL>, B>;
 pub type TowerPartitionSink<S, B, RL, K> = PartitionBatchSink<Svc<S, RL>, B, K>;
 
@@ -44,7 +48,7 @@ pub trait ServiceBuilderExt<L> {
         self,
         settings: TowerRequestSettings,
         retry_logic: RL,
-    ) -> ServiceBuilder<Stack<TowerRequestLayer<RL, Request>, L>>;
+    ) -> ServiceBuilder<Stack<TimeoutLayer, Stack<TowerRequestLayer<RL, Request>, L>>>;
 }
 
 impl<L> ServiceBuilderExt<L> for ServiceBuilder<L> {
@@ -59,12 +63,14 @@ impl<L> ServiceBuilderExt<L> for ServiceBuilder<L> {
         self,
         settings: TowerRequestSettings,
         retry_logic: RL,
-    ) -> ServiceBuilder<Stack<TowerRequestLayer<RL, Request>, L>> {
+    ) -> ServiceBuilder<Stack<TimeoutLayer, Stack<TowerRequestLayer<RL, Request>, L>>> {
+        let timeout = settings.timeout;
         self.layer(TowerRequestLayer {
             settings,
             retry_logic,
             _pd: std::marker::PhantomData,
         })
+        .timeout(timeout)
     }
 }
 
@@ -251,6 +257,61 @@ impl TowerRequestSettings {
             .service(service);
         BatchSink::new(service, batch, batch_timeout, acker)
     }
+
+    pub fn distributed_service<Req, RL, S, H, K, D>(
+        self,
+        retry_logic: RL,
+        services: D,
+        reactivate_delay: Duration,
+    ) -> InnerSvc<
+        CloneService<
+            Balance<
+                Pin<
+                    Box<
+                        dyn Stream<
+                                Item = Result<Change<K, HealthService<Timeout<S>>>, crate::Error>,
+                            > + Send,
+                    >,
+                >,
+                Req,
+            >,
+        >,
+        RL,
+    >
+    where
+        Req: Clone + Send + 'static,
+        RL: RetryLogic<Response = S::Response>,
+        S: Service<Req> + Clone + Send + 'static,
+        S::Error: Into<crate::Error> + Send + Sync + 'static,
+        S::Response: Send,
+        S::Future: Send + 'static,
+        H: Fn() -> BoxFuture<'static, bool> + Send + 'static,
+        K: Eq + Hash + Clone + Copy + Send + 'static,
+        D: TryStream<Ok = Change<K, (S, H)>, Error = crate::Error> + Send + 'static,
+    {
+        let service_layer = ServiceBuilder::new().timeout(self.timeout);
+
+        let services = services.map_ok(move |change| match change {
+            Change::Insert(key, (service, healthcheck)) => Change::Insert(
+                key,
+                HealthService::new(
+                    service_layer.service(service),
+                    healthcheck,
+                    reactivate_delay,
+                ),
+            ),
+            Change::Remove(key) => Change::Remove(key),
+        });
+
+        ServiceBuilder::new()
+            .layer(TowerRequestLayer {
+                settings: self,
+                retry_logic,
+                _pd: std::marker::PhantomData,
+            })
+            .layer(CloneLayer)
+            .service(Balance::new(Box::pin(services) as Pin<Box<_>>))
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -269,7 +330,7 @@ where
     RL: RetryLogic<Response = S::Response> + Send + 'static,
     Request: Clone + Send + 'static,
 {
-    type Service = Svc<S, RL>;
+    type Service = InnerSvc<S, RL>;
 
     fn layer(&self, inner: S) -> Self::Service {
         let policy = self.settings.retry_policy(self.retry_logic.clone());
@@ -284,7 +345,6 @@ where
                 self.retry_logic.clone(),
             ))
             .retry(policy)
-            .timeout(self.settings.timeout)
             .service(inner)
     }
 }

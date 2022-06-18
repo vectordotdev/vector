@@ -4,10 +4,10 @@ use std::{
     time::Duration,
 };
 
-use futures::FutureExt;
+use futures::{stream, FutureExt};
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
-use tower::{balance::p2c::Balance, discover::ServiceList, ServiceBuilder};
+use tower::{discover::Change, ServiceBuilder};
 
 use crate::{
     aws::RegionOrEndpoint,
@@ -15,10 +15,7 @@ use crate::{
     event::{EventRef, LogEvent, Value},
     http::HttpClient,
     internal_events::TemplateRenderingError,
-    sinks::util::{
-        encoding::Transformer,
-        service::{CloneableService, LoadService},
-    },
+    sinks::util::encoding::Transformer,
     sinks::{
         elasticsearch::{
             retry::ElasticsearchRetryLogic,
@@ -317,6 +314,12 @@ impl SinkConfig for ElasticsearchConfig {
         let stream = if let Some(distribution) = self.distribution.as_ref() {
             // Distributed services
 
+            let reactivate_delay = Duration::from_secs(
+                distribution
+                    .reactivate_delay_secs
+                    .unwrap_or(REACTIVATE_DELAY_SECONDS_DEFAULT),
+            );
+
             // Multiply configuration, one for each endpoint
             let mut commons = vec![common.clone()];
             for endpoint in distribution.endpoints.clone() {
@@ -344,21 +347,17 @@ impl SinkConfig for ElasticsearchConfig {
                             .boxed()
                     };
 
-                    let reactivate_delay = Duration::from_secs(
-                        distribution
-                            .reactivate_delay_secs
-                            .unwrap_or(REACTIVATE_DELAY_SECONDS_DEFAULT),
-                    );
-
-                    LoadService::new(service, healthcheck, reactivate_delay)
+                    (service, healthcheck)
                 })
+                .enumerate()
+                .map(|(i, service)| Ok(Change::Insert(i, service)))
                 .collect::<Vec<_>>();
 
-            let service = ServiceBuilder::new()
-                .settings(request_limits, ElasticsearchRetryLogic)
-                .service(CloneableService::new(Balance::new(ServiceList::new(
-                    services,
-                ))));
+            let service = request_limits.distributed_service(
+                ElasticsearchRetryLogic,
+                stream::iter(services),
+                reactivate_delay,
+            );
 
             let sink = ElasticsearchSink::new(&common, self, cx.acker(), service)?;
             VectorSink::from_event_streamsink(sink)
