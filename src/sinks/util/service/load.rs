@@ -23,7 +23,7 @@ enum ServiceState {
 /// A service which estimates load on it and also forces backoff if the service
 /// is not healthy.
 pub struct LoadService<S> {
-    service: S,
+    inner: S,
     healthcheck: Box<dyn Fn() -> BoxFuture<'static, bool> + Send>,
     reactivate_delay: Duration,
     /// Serves as an estimate of load and for notifying about errors.
@@ -33,12 +33,12 @@ pub struct LoadService<S> {
 
 impl<S> LoadService<S> {
     pub fn new(
-        service: S,
+        inner: S,
         healthcheck: impl Fn() -> BoxFuture<'static, bool> + Send + 'static,
         reactivate_delay: std::time::Duration,
     ) -> Self {
         LoadService {
-            service,
+            inner,
             reactivate_delay: reactivate_delay.into(),
             request_handle: Arc::new(AtomicBool::new(false)),
             state: ServiceState::Healthcheck(healthcheck()),
@@ -56,31 +56,29 @@ where
     type Future = LoadFuture<S::Future>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        match &mut self.state {
-            ServiceState::Healthcheck(healthcheck) => {
-                if ready!(healthcheck.as_mut().poll(cx)) {
-                    self.state = ServiceState::Ready;
-                    // Clear errors
-                    self.request_handle.store(false, Ordering::Release);
-                    Poll::Ready(Ok(()))
-                } else {
-                    self.state = ServiceState::Backoff(sleep(self.reactivate_delay).boxed());
-                    self.poll_ready(cx)
+        loop {
+            self.state = match self.state {
+                ServiceState::Healthcheck(ref mut healthcheck) => {
+                    if ready!(healthcheck.as_mut().poll(cx)) {
+                        // Clear errors
+                        self.request_handle.store(false, Ordering::Release);
+                        ServiceState::Ready
+                    } else {
+                        ServiceState::Backoff(sleep(self.reactivate_delay).boxed())
+                    }
                 }
-            }
-            ServiceState::Backoff(backoff) => {
-                ready!(backoff.as_mut().poll(cx));
-                self.state = ServiceState::Healthcheck((self.healthcheck)());
-                self.poll_ready(cx)
-            }
-            ServiceState::Ready => {
-                // Check for errors
-                if self.request_handle.load(Ordering::Acquire) {
-                    // Check if the service is healthy
-                    self.state = ServiceState::Healthcheck((self.healthcheck)());
-                    self.poll_ready(cx)
-                } else {
-                    Poll::Ready(Ok(()))
+                ServiceState::Backoff(ref mut backoff) => {
+                    ready!(backoff.as_mut().poll(cx));
+                    ServiceState::Healthcheck((self.healthcheck)())
+                }
+                ServiceState::Ready => {
+                    // Check for errors
+                    if self.request_handle.load(Ordering::Acquire) {
+                        // Check if the service is healthy
+                        ServiceState::Healthcheck((self.healthcheck)())
+                    } else {
+                        return self.inner.poll_ready(cx);
+                    }
                 }
             }
         }
@@ -88,7 +86,7 @@ where
 
     fn call(&mut self, req: Req) -> Self::Future {
         LoadFuture {
-            inner: self.service.call(req),
+            inner: self.inner.call(req),
             request_handle: Some(Arc::clone(&self.request_handle)),
         }
     }
