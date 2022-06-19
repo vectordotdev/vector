@@ -84,6 +84,10 @@ impl Expression for RandomBytesFn {
         random_bytes(length)
     }
 
+    fn resolve_batch(&self, ctx: &mut BatchContext) {
+        todo!("resolve_batch")
+    }
+
     fn type_def(&self, _state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         match self.length.as_value() {
             None => TypeDef::bytes().fallible(),

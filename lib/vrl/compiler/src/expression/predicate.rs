@@ -8,7 +8,7 @@ use crate::{
     parser::Node,
     state::{ExternalEnv, LocalEnv},
     value::Kind,
-    Context, Expression, Span, TypeDef,
+    BatchContext, Context, Expression, Span, TypeDef,
 };
 
 pub(crate) type Result = std::result::Result<Predicate, Error>;
@@ -60,6 +60,16 @@ impl Expression for Predicate {
             .map(|expr| expr.resolve(ctx))
             .collect::<std::result::Result<Vec<_>, _>>()
             .map(|mut v| v.pop().unwrap_or(Value::Boolean(false)))
+    }
+
+    fn resolve_batch(&self, ctx: &mut BatchContext) {
+        for (resolved, target, state, timezone) in ctx.iter_mut() {
+            let target = &mut *(*target).borrow_mut();
+            let state = &mut *(*state).borrow_mut();
+            let mut ctx = Context::new(target, state, &timezone);
+
+            *resolved = self.resolve(&mut ctx);
+        }
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {

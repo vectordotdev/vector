@@ -162,6 +162,10 @@ impl Expression for EncodeKeyValueFn {
         )
     }
 
+    fn resolve_batch(&self, ctx: &mut BatchContext) {
+        todo!("resolve_batch")
+    }
+
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().with_fallibility(self.fields.is_some())
     }

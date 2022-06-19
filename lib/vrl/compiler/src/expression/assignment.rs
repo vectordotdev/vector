@@ -13,7 +13,7 @@ use crate::{
     state::{ExternalEnv, LocalEnv},
     type_def::Details,
     value::kind::DefaultValue,
-    Context, Expression, Span, TypeDef,
+    BatchContext, Context, Expression, Span, TypeDef,
 };
 
 #[derive(Clone, PartialEq)]
@@ -183,6 +183,10 @@ impl Expression for Assignment {
         self.variant.resolve(ctx)
     }
 
+    fn resolve_batch(&self, ctx: &mut BatchContext) {
+        self.variant.resolve_batch(ctx)
+    }
+
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
         self.variant.type_def(state)
     }
@@ -277,16 +281,53 @@ impl Target {
 
                 // Update existing variable using the provided path, or create a
                 // new value in the store.
-                match ctx.state_mut().variable_mut(ident) {
+                let state = ctx.state_mut();
+                match state.variable_mut(ident) {
                     Some(stored) => stored.insert_by_path(path, value),
-                    None => ctx
-                        .state_mut()
-                        .insert_variable(ident.clone(), value.at_path(path)),
+                    None => state.insert_variable(ident.clone(), value.at_path(path)),
                 }
             }
 
             External(path) => {
                 let _ = ctx.target_mut().target_insert(path, value);
+            }
+        }
+    }
+
+    fn insert_batch(&self, values: impl IntoIterator<Item = Value>, ctx: &mut BatchContext) {
+        use Target::*;
+
+        let values = values.into_iter();
+
+        match self {
+            Noop => {}
+            Internal(ident, path) => {
+                // Get the provided path, or else insert into the variable
+                // without any path appended and return early.
+                let path = match path.is_root() {
+                    false => path,
+                    true => {
+                        return values.zip(ctx.states()).for_each(|(value, state)| {
+                            state.borrow_mut().insert_variable(ident.clone(), value)
+                        })
+                    }
+                };
+
+                // Update existing variable using the provided path, or create a
+                // new value in the store.
+                values.zip(ctx.states()).for_each(|(value, state)| {
+                    let mut state = state.borrow_mut();
+                    match state.variable_mut(ident) {
+                        Some(stored) => stored.insert_by_path(path, value),
+                        None => state.insert_variable(ident.clone(), value.at_path(path)),
+                    }
+                });
+            }
+
+            External(path) => {
+                values.zip(ctx.targets()).for_each(|(value, target)| {
+                    let _ = target.borrow_mut().target_insert(path, value);
+                });
             }
         }
     }
@@ -410,6 +451,53 @@ where
         };
 
         Ok(value)
+    }
+
+    fn resolve_batch(&self, ctx: &mut BatchContext) {
+        use Variant::*;
+
+        match self {
+            Single { target, expr } => {
+                expr.resolve_batch(ctx);
+                let mut ctx_ok = ctx.clone().filtered(|resolved| resolved.is_ok());
+                let values = ctx_ok
+                    .resolved_values_mut()
+                    .iter()
+                    .cloned()
+                    .map(|resolved| resolved.expect("resolved value must not be error"))
+                    .collect::<Vec<_>>();
+                target.insert_batch(values, &mut ctx_ok);
+            }
+            Infallible {
+                ok,
+                err,
+                expr,
+                default,
+            } => {
+                expr.resolve_batch(ctx);
+
+                let mut resolved_ok_values = Vec::with_capacity(ctx.len());
+                let mut resolved_err_values = Vec::with_capacity(ctx.len());
+                for resolved in ctx.resolved_values_mut().iter_mut() {
+                    match resolved {
+                        Ok(value) => {
+                            resolved_ok_values.push(value.clone());
+                            resolved_err_values.push(Value::Null);
+                            *resolved = Ok(value.clone());
+                        }
+                        Err(error) => {
+                            resolved_ok_values.push(default.clone());
+                            let value = Value::from(error.to_string());
+                            resolved_err_values.push(value.clone());
+                            *resolved = Ok(value);
+                        }
+                    }
+                }
+
+                err.insert_batch(resolved_err_values, ctx);
+                ok.insert_batch(resolved_ok_values, ctx);
+            }
+        }
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {

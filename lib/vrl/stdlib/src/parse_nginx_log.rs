@@ -161,6 +161,10 @@ impl Expression for ParseNginxLogFn {
         parse_nginx_log(bytes, timestamp_format, format, ctx)
     }
 
+    fn resolve_batch(&self, ctx: &mut BatchContext) {
+        todo!("resolve_batch")
+    }
+
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::object(match self.format.as_ref() {
             b"combined" => kind_combined(),

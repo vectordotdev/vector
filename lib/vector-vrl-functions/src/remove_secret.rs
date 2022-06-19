@@ -54,6 +54,10 @@ impl Expression for RemoveSecretFn {
         remove_secret(ctx, key)
     }
 
+    fn resolve_batch(&self, ctx: &mut BatchContext) {
+        todo!("resolve_batch")
+    }
+
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::null().infallible()
     }

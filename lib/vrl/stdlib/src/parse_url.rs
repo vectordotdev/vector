@@ -100,6 +100,10 @@ impl Expression for ParseUrlFn {
             .map(|url| url_to_value(url, default_known_ports))
     }
 
+    fn resolve_batch(&self, ctx: &mut BatchContext) {
+        todo!("resolve_batch")
+    }
+
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::object(inner_kind()).fallible()
     }

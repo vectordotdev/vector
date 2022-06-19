@@ -146,6 +146,10 @@ impl Expression for IsJsonFn {
         is_json(value)
     }
 
+    fn resolve_batch(&self, ctx: &mut BatchContext) {
+        todo!("resolve_batch")
+    }
+
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().infallible()
     }
@@ -163,6 +167,10 @@ impl Expression for IsJsonVariantsFn {
         let variant = &self.variant;
 
         is_json_with_variant(value, variant)
+    }
+
+    fn resolve_batch(&self, ctx: &mut BatchContext) {
+        todo!("resolve_batch")
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

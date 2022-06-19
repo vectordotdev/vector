@@ -2,13 +2,14 @@ use std::fmt;
 
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 use parser::ast::Node;
+use value::Value;
 
 use super::Expr;
 use crate::{
     expression::{ExpressionError, Resolved},
     state::{ExternalEnv, LocalEnv},
     value::{Kind, VrlValueConvert},
-    Context, Expression, Span, TypeDef,
+    BatchContext, Context, Expression, Span, TypeDef,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -66,6 +67,36 @@ impl Expression for Abort {
             span: self.span,
             message,
         })
+    }
+
+    fn resolve_batch(&self, ctx: &mut BatchContext) {
+        let messages: Vec<_> = if let Some(expr) = &self.message {
+            expr.resolve_batch(ctx);
+            ctx.resolved_values_mut()
+                .iter_mut()
+                .map(|resolved| {
+                    let resolved = {
+                        let mut moved = Ok(Value::Null);
+                        std::mem::swap(resolved, &mut moved);
+                        moved
+                    };
+                    (|| -> Result<_, ExpressionError> {
+                        Ok(Some(resolved?.try_bytes_utf8_lossy()?.to_string()))
+                    })()
+                })
+                .collect()
+        } else {
+            ctx.resolved_values_mut().iter().map(|_| Ok(None)).collect()
+        };
+
+        for (resolved, message) in ctx.resolved_values_mut().iter_mut().zip(messages) {
+            *resolved = message.and_then(|message| {
+                Err(ExpressionError::Abort {
+                    span: self.span,
+                    message,
+                })
+            });
+        }
     }
 
     fn type_def(&self, _: (&LocalEnv, &ExternalEnv)) -> TypeDef {

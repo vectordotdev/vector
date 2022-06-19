@@ -60,6 +60,10 @@ impl Expression for GetMetadataFieldFn {
         get_metadata_field(ctx, &self.key)
     }
 
+    fn resolve_batch(&self, ctx: &mut BatchContext) {
+        todo!("resolve_batch")
+    }
+
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         match &self.key {
             MetadataKey::Legacy(_) => TypeDef::bytes().add_null().infallible(),

@@ -121,6 +121,10 @@ impl Expression for SliceFn {
         slice(start, end, value)
     }
 
+    fn resolve_batch(&self, ctx: &mut BatchContext) {
+        todo!("resolve_batch")
+    }
+
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         let td = TypeDef::from(Kind::never()).fallible();
 

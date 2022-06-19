@@ -35,6 +35,10 @@ impl Expression for NowFn {
         Ok(Utc::now().into())
     }
 
+    fn resolve_batch(&self, ctx: &mut BatchContext) {
+        todo!("resolve_batch")
+    }
+
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::timestamp()
     }

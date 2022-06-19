@@ -10,7 +10,7 @@ use value::{Value, ValueRegex};
 use crate::{
     expression::Resolved,
     state::{ExternalEnv, LocalEnv},
-    Context, Expression, Span, TypeDef,
+    BatchContext, Context, Expression, Span, TypeDef,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -49,6 +49,13 @@ impl Literal {
 impl Expression for Literal {
     fn resolve(&self, _: &mut Context) -> Resolved {
         Ok(self.to_value())
+    }
+
+    fn resolve_batch(&self, ctx: &mut BatchContext) {
+        let value = self.to_value();
+        for resolved in ctx.resolved_values_mut() {
+            *resolved = Ok(value.clone());
+        }
     }
 
     fn as_value(&self) -> Option<Value> {

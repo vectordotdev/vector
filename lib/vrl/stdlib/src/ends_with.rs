@@ -105,6 +105,10 @@ impl Expression for EndsWithFn {
         ends_with(value, substring, case_sensitive)
     }
 
+    fn resolve_batch(&self, ctx: &mut BatchContext) {
+        todo!("resolve_batch")
+    }
+
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().infallible()
     }

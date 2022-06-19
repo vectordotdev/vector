@@ -1,13 +1,14 @@
 use std::fmt;
 
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
+use value::Value;
 
 use crate::{
     expression::{Expr, Resolved},
     parser::Node,
     state::{ExternalEnv, LocalEnv},
     value::{Kind, VrlValueConvert},
-    Context, Expression, Span, TypeDef,
+    BatchContext, Context, Expression, Span, TypeDef,
 };
 
 pub(crate) type Result = std::result::Result<Not, Error>;
@@ -39,6 +40,18 @@ impl Not {
 impl Expression for Not {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         Ok((!self.inner.resolve(ctx)?.try_boolean()?).into())
+    }
+
+    fn resolve_batch(&self, ctx: &mut BatchContext) {
+        self.inner.resolve_batch(ctx);
+        for resolved in ctx.resolved_values_mut() {
+            let temp = {
+                let mut moved = Ok(Value::Null);
+                std::mem::swap(resolved, &mut moved);
+                moved
+            };
+            *resolved = (|| Ok((!temp?.try_boolean()?).into()))();
+        }
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {

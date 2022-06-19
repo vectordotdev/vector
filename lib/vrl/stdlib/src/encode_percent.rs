@@ -163,6 +163,10 @@ impl Expression for EncodePercentFn {
         encode_percent(value, &self.ascii_set)
     }
 
+    fn resolve_batch(&self, ctx: &mut BatchContext) {
+        todo!("resolve_batch")
+    }
+
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes()
     }
