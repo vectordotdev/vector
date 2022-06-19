@@ -1,17 +1,32 @@
 use std::{convert::TryFrom, time::Duration};
 
 use regex::bytes::Regex;
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use vector_config::configurable_component;
 
 use crate::line_agg;
 
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+/// Configuration of multi-line aggregation.
+#[configurable_component]
+#[derive(Clone, Debug, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct MultilineConfig {
+    /// Regular expression pattern that is used to match the start of a new message.
     pub start_pattern: String,
+
+    /// Regular expression pattern that is used to determine whether or not more lines should be read.
+    ///
+    /// This setting must be configured in conjunction with `mode`.
     pub condition_pattern: String,
+
+    /// Aggregation mode.
+    ///
+    /// This setting must be configured in conjunction with `condition_pattern`.
     pub mode: line_agg::Mode,
+
+    /// The maximum amount of time to wait for the next additional line, in milliseconds.
+    ///
+    /// Once this timeout is reached, the buffered message is guaranteed to be flushed, even if incomplete.
     pub timeout_ms: u64,
 }
 

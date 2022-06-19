@@ -26,7 +26,10 @@ components: sinks: gcp_pubsub: {
 			compression: enabled: false
 			encoding: {
 				enabled: true
-				codec: enabled: false
+				codec: {
+					enabled: true
+					enum: ["json", "text"]
+				}
 			}
 			proxy: enabled: true
 			request: {

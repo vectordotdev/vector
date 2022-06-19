@@ -329,9 +329,10 @@ test-behavior: test-behavior-transforms test-behavior-formats test-behavior-conf
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
 test-integration: test-integration-aws test-integration-azure test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
+test-integration: test-integration-azure test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
 test-integration: test-integration-eventstoredb test-integration-fluent test-integration-gcp test-integration-humio test-integration-influxdb
-test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb_metrics test-integration-nats
-test-integration: test-integration-nginx test-integration-postgresql_metrics test-integration-prometheus test-integration-pulsar
+test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb test-integration-nats
+test-integration: test-integration-nginx test-integration-postgres test-integration-prometheus test-integration-pulsar
 test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent test-integration-datadog-logs
 test-integration: test-integration-datadog-traces test-integration-shutdown
 
@@ -350,18 +351,6 @@ test-integration-datadog-agent: ## Runs Datadog Agent integration tests
 	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml run --rm runner
 ifeq ($(AUTODESPAWN), true)
 	make test-integration-datadog-agent-cleanup
-endif
-
-.PHONY: test-integration-nats
-test-integration-nats: ## Runs NATS integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh nats stop
-	@scripts/setup_integration_env.sh nats start
-	sleep 10 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features nats-integration-tests --lib ::nats::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh nats stop
 endif
 
 test-integration-%-cleanup:
@@ -444,7 +433,7 @@ check-all: check-scripts
 
 .PHONY: check-component-features
 check-component-features: ## Check that all component features are setup properly
-	${MAYBE_ENVIRONMENT_EXEC} cargo hack check --workspace --keep-going --each-feature --exclude-features "sources-utils-http sources-utils-http-encoding sources-utils-http-prelude sources-utils-http-query sources-utils-tcp-keepalive sources-utils-tcp-socket sources-utils-tls sources-utils-udp sources-utils-unix sinks-utils-udp" --all-targets
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-component-features
 
 .PHONY: check-clippy
 check-clippy: ## Check code with Clippy
@@ -672,3 +661,7 @@ git-hooks: ## Add Vector-local git hooks for commit sign-off
 cargo-install-%: override TOOL = $(@:cargo-install-%=%)
 cargo-install-%:
 	$(if $(findstring true,$(AUTOINSTALL)),cargo install ${TOOL} --quiet; cargo clean,)
+
+.PHONY: ci-generate-publish-metadata
+ci-generate-publish-metadata: ## Generates the necessary metadata required for building/publishing Vector.
+	@scripts/ci-generate-publish-metadata.sh

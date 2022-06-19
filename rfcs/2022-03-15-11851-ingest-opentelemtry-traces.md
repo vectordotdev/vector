@@ -100,7 +100,7 @@ N/A
 
 ### User Experience
 
-- User would point OpenTelemetry tracing lib directly to a local Vector deployement
+- User would point OpenTelemetry tracing lib directly to a local Vector deployment
 - Vector would be configured with a minimal config looking like:
 
 ```yaml
@@ -284,7 +284,7 @@ This makes the opposite conversion a bit complicated if we want it to be complet
 closed unmerged this provide a valuable example. Anyways the [otlp-and-other-formats][OpenTelemetry] acknowledges that
 some of the OpenTelemetry contruct ends up being stored as tags or annotations in other formats.
 
-Anyway the OpenTelemtry to Datadog traces conversion is dictacted by existing implementations in both the `trace-agent`
+Anyway the OpenTelemetry to Datadog traces conversion is dictacted by existing implementations in both the `trace-agent`
 and the Datadog exporter as users will expect a consistent behaviour from one solution to another. The same
 consideration applies for APM stats computation, as [official implementations][apm-stats-computation] already provides a
 reference that defines what should be done to get the same result with Vector in the loop. The other way, from Datadog to
@@ -310,7 +310,7 @@ intake and the `trace agent`) do not signigicantly change the end-to-end behavio
 trace ID, trace-wide tags/metrics, the original format) are likely to be added to the internal trace representation for
 efficiency and convenience.
 Trace would not get native `VrlTarget` representation anymore, there is a bigger discussion there that should probably
-be adressed separately. As an interim measure few fields may be exposed (At least trace ID & trace-wide tags), the spans
+be addressed separately. As an interim measure few fields may be exposed (At least trace ID & trace-wide tags), the spans
 list will not be exposed initially.
 
 #### APM stats computation
@@ -329,7 +329,7 @@ points have been discussed:
   on the fact that first identified usecases revolve around routing and filtering the most convenient location to do APM
   Stats computation is directly in the `datadog_traces` sink. The major issue is around sampling, statistically speaking
   distribution metrics wont be impacted, but other metrics (like counter/gauge) will, note that if the sampling rate is
-  known it would still be possible to get an original value estimate for those metrics. Anywat this has to be
+  known it would still be possible to get an original value estimate for those metrics. Anyway this has to be
   documented.
 - Implement a similar logic that the one done in the Datadog OTLP exporter, this would allow user to use multiple
   Datadog products with Opentelemetry traces and get the same consistent behaviour in all circumstances. APM stats
@@ -377,7 +377,7 @@ N/A
 ## Future Improvements
 
 - Transforms / complete VRL coverage of traces, later helpers to manipulate traces or isolate outliers
-- OpenTelemtry traces sink
+- OpenTelemetry traces sink
 - Add metrics then log to the `opentelemetry` source.
 
 [otlp-dd-exporter]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/64a87c1/exporter/datadogexporter

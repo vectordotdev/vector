@@ -14,6 +14,7 @@ use codecs::{
 use futures::{Stream, StreamExt};
 use http::HeaderMap;
 use indoc::indoc;
+use ordered_float::NotNan;
 use pretty_assertions::assert_eq;
 use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
@@ -30,9 +31,8 @@ use crate::{
     schema,
     serde::{default_decoding, default_framing_message_based},
     sources::datadog::agent::{
-        logs::{decode_log_body, LogMsg},
-        metrics::DatadogSeriesRequest,
-        DatadogAgentConfig, DatadogAgentSource, LOGS, METRICS, TRACES,
+        logs::decode_log_body, metrics::DatadogSeriesRequest, DatadogAgentConfig,
+        DatadogAgentSource, LogMsg, LOGS, METRICS, TRACES,
     },
     test_util::{
         components::{assert_source_compliance, HTTP_PUSH_SOURCE_TAGS},
@@ -50,7 +50,7 @@ mod dd_traces_proto {
 }
 
 fn test_logs_schema_definition() -> schema::Definition {
-    schema::Definition::empty().required_field(
+    schema::Definition::empty().with_field(
         "a log field",
         Kind::integer().or_bytes(),
         Some("log field"),
@@ -58,11 +58,7 @@ fn test_logs_schema_definition() -> schema::Definition {
 }
 
 fn test_metrics_schema_definition() -> schema::Definition {
-    schema::Definition::empty().required_field(
-        "a schema tag",
-        Kind::boolean().or_null(),
-        Some("tag"),
-    )
+    schema::Definition::empty().with_field("a schema tag", Kind::boolean().or_null(), Some("tag"))
 }
 
 impl Arbitrary for LogMsg {
@@ -70,7 +66,7 @@ impl Arbitrary for LogMsg {
         LogMsg {
             message: Bytes::from(String::arbitrary(g)),
             status: Bytes::from(String::arbitrary(g)),
-            timestamp: i64::arbitrary(g),
+            timestamp: Utc.timestamp_millis(u32::arbitrary(g) as i64),
             hostname: Bytes::from(String::arbitrary(g)),
             service: Bytes::from(String::arbitrary(g)),
             ddsource: Bytes::from(String::arbitrary(g)),
@@ -164,6 +160,7 @@ async fn source(
             store_api_key = {}
             acknowledgements = {}
             multiple_outputs = {}
+            trace_proto = "v1v2"
         "#},
         address, store_api_key, acknowledgements, multiple_outputs
     ))
@@ -205,7 +202,7 @@ async fn full_payload_v1() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("foo"),
-                            timestamp: 123,
+                            timestamp: Utc.timestamp(123, 0),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -228,7 +225,7 @@ async fn full_payload_v1() {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["message"], "foo".into());
-            assert_eq!(log["timestamp"], 123.into());
+            assert_eq!(log["timestamp"], Utc.timestamp(123, 0).into());
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
@@ -258,7 +255,7 @@ async fn full_payload_v2() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("foo"),
-                            timestamp: 123,
+                            timestamp: Utc.timestamp(123, 0),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -281,7 +278,7 @@ async fn full_payload_v2() {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["message"], "foo".into());
-            assert_eq!(log["timestamp"], 123.into());
+            assert_eq!(log["timestamp"], Utc.timestamp(123, 0).into());
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
@@ -311,7 +308,7 @@ async fn no_api_key() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("foo"),
-                            timestamp: 123,
+                            timestamp: Utc.timestamp(123, 0),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -334,7 +331,7 @@ async fn no_api_key() {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["message"], "foo".into());
-            assert_eq!(log["timestamp"], 123.into());
+            assert_eq!(log["timestamp"], Utc.timestamp(123, 0).into());
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
@@ -364,7 +361,7 @@ async fn api_key_in_url() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("bar"),
-                            timestamp: 456,
+                            timestamp: Utc.timestamp(456, 0),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -387,7 +384,7 @@ async fn api_key_in_url() {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["message"], "bar".into());
-            assert_eq!(log["timestamp"], 456.into());
+            assert_eq!(log["timestamp"], Utc.timestamp(456, 0).into());
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
@@ -420,7 +417,7 @@ async fn api_key_in_query_params() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("bar"),
-                            timestamp: 456,
+                            timestamp: Utc.timestamp(456, 0),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -443,7 +440,7 @@ async fn api_key_in_query_params() {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["message"], "bar".into());
-            assert_eq!(log["timestamp"], 456.into());
+            assert_eq!(log["timestamp"], Utc.timestamp(456, 0).into());
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
@@ -482,7 +479,7 @@ async fn api_key_in_header() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("baz"),
-                            timestamp: 789,
+                            timestamp: Utc.timestamp(789, 0),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -505,7 +502,7 @@ async fn api_key_in_header() {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["message"], "baz".into());
-            assert_eq!(log["timestamp"], 789.into());
+            assert_eq!(log["timestamp"], Utc.timestamp(789, 0).into());
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
@@ -538,7 +535,7 @@ async fn delivery_failure() {
                     addr,
                     &serde_json::to_string(&[LogMsg {
                         message: Bytes::from("foo"),
-                        timestamp: 123,
+                        timestamp: Utc.timestamp(123, 0),
                         hostname: Bytes::from("festeburg"),
                         status: Bytes::from("notice"),
                         service: Bytes::from("vector"),
@@ -571,7 +568,7 @@ async fn ignores_disabled_acknowledgements() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("foo"),
-                            timestamp: 123,
+                            timestamp: Utc.timestamp(123, 0),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -614,7 +611,7 @@ async fn ignores_api_key() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("baz"),
-                            timestamp: 789,
+                            timestamp: Utc.timestamp(789, 0),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -637,7 +634,7 @@ async fn ignores_api_key() {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["message"], "baz".into());
-            assert_eq!(log["timestamp"], 789.into());
+            assert_eq!(log["timestamp"], Utc.timestamp(789, 0).into());
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
@@ -700,6 +697,26 @@ async fn decode_series_endpoints() {
                     source_type_name: None,
                     device: None,
                 },
+                DatadogSeriesMetric {
+                    metric: "system.disk.free".to_string(),
+                    r#type: DatadogMetricType::Count,
+                    interval: None,
+                    points: vec![DatadogPoint(1542182955, 16777216_f64)],
+                    tags: None,
+                    host: None,
+                    source_type_name: None,
+                    device: None,
+                },
+                DatadogSeriesMetric {
+                    metric: "system.disk".to_string(),
+                    r#type: DatadogMetricType::Count,
+                    interval: None,
+                    points: vec![DatadogPoint(1542182955, 16777216_f64)],
+                    tags: None,
+                    host: None,
+                    source_type_name: None,
+                    device: None,
+                },
             ],
         };
         let events = spawn_collect_n(
@@ -716,13 +733,14 @@ async fn decode_series_endpoints() {
                 );
             },
             rx,
-            4,
+            6,
         )
         .await;
 
         {
             let mut metric = events[0].as_metric();
             assert_eq!(metric.name(), "dd_gauge");
+            assert_eq!(metric.namespace(), None);
             assert_eq!(
                 metric.timestamp(),
                 Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 10))
@@ -739,6 +757,7 @@ async fn decode_series_endpoints() {
 
             metric = events[1].as_metric();
             assert_eq!(metric.name(), "dd_gauge");
+            assert_eq!(metric.namespace(), None);
             assert_eq!(
                 metric.timestamp(),
                 Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 11))
@@ -755,6 +774,7 @@ async fn decode_series_endpoints() {
 
             metric = events[2].as_metric();
             assert_eq!(metric.name(), "dd_rate");
+            assert_eq!(metric.namespace(), None);
             assert_eq!(
                 metric.timestamp(),
                 Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 10))
@@ -792,6 +812,14 @@ async fn decode_series_endpoints() {
             );
             assert_eq!(metric.tags().unwrap()["host"], "a_host".to_string());
             assert_eq!(metric.tags().unwrap()["foobar"], "".to_string());
+
+            metric = events[4].as_metric();
+            assert_eq!(metric.name(), "disk.free");
+            assert_eq!(metric.namespace(), Some("system"));
+
+            metric = events[5].as_metric();
+            assert_eq!(metric.name(), "disk");
+            assert_eq!(metric.namespace(), Some("system"));
 
             assert_eq!(
                 &events[3].metadata().datadog_api_key().as_ref().unwrap()[..],
@@ -917,7 +945,7 @@ async fn decode_traces() {
         );
         headers.insert("X-Datadog-Reported-Languages", "ada".parse().unwrap());
 
-        let mut buf = Vec::new();
+        let mut buf_v1 = Vec::new();
 
         let span = dd_traces_proto::Span {
             service: "a_service".to_string(),
@@ -932,6 +960,7 @@ async fn decode_traces() {
             meta: BTreeMap::from_iter([("foo".to_string(), "bar".to_string())].into_iter()),
             metrics: BTreeMap::from_iter([("a_metrics".to_string(), 0.577f64)].into_iter()),
             r#type: "a_type".to_string(),
+            meta_struct: BTreeMap::new(),
         };
 
         let trace = dd_traces_proto::ApiTrace {
@@ -941,14 +970,54 @@ async fn decode_traces() {
             end_time: 1_431_649_000_000_001i64,
         };
 
-        let payload = dd_traces_proto::TracePayload {
+        let payload_v1 = dd_traces_proto::TracePayload {
             host_name: "a_hostname".to_string(),
             env: "an_environment".to_string(),
             traces: vec![trace],
-            transactions: vec![span],
+            transactions: vec![span.clone()],
+            // Other filea
+            tracer_payloads: vec![],
+            tags: BTreeMap::new(),
+            agent_version: "".to_string(),
+            target_tps: 0f64,
+            error_tps: 0f64,
         };
 
-        payload.encode(&mut buf).unwrap();
+        payload_v1.encode(&mut buf_v1).unwrap();
+
+        let mut buf_v2 = Vec::new();
+
+        let chunk = dd_traces_proto::TraceChunk {
+            priority: 42i32,
+            origin: "an_origin".to_string(),
+            dropped_trace: false,
+            spans: vec![span],
+            tags: BTreeMap::from_iter([("a".to_string(), "tag".to_string())].into_iter()),
+        };
+
+        let tracer_payload = dd_traces_proto::TracerPayload {
+            container_id: "an_id".to_string(),
+            language_name: "plop".to_string(),
+            language_version: "v33".to_string(),
+            tracer_version: "v577".to_string(),
+            runtime_id: "123abc".to_string(),
+            chunks: vec![chunk],
+            app_version: "v314".to_string(),
+        };
+
+        let payload_v2 = dd_traces_proto::TracePayload {
+            host_name: "a_hostname".to_string(),
+            env: "env".to_string(),
+            traces: vec![],
+            transactions: vec![],
+            tracer_payloads: vec![tracer_payload],
+            tags: BTreeMap::new(),
+            agent_version: "v1.23456".to_string(),
+            target_tps: 10f64,
+            error_tps: 10f64,
+        };
+
+        payload_v2.encode(&mut buf_v2).unwrap();
 
         let events = spawn_collect_n(
             async move {
@@ -956,7 +1025,17 @@ async fn decode_traces() {
                     200,
                     send_with_path(
                         addr,
-                        unsafe { str::from_utf8_unchecked(&buf) },
+                        unsafe { str::from_utf8_unchecked(&buf_v1) },
+                        headers.clone(),
+                        "/api/v0.2/traces"
+                    )
+                    .await
+                );
+                assert_eq!(
+                    200,
+                    send_with_path(
+                        addr,
+                        unsafe { str::from_utf8_unchecked(&buf_v2) },
                         headers,
                         "/api/v0.2/traces"
                     )
@@ -964,40 +1043,43 @@ async fn decode_traces() {
                 );
             },
             rx,
-            2,
+            3,
         )
         .await;
 
         {
-            let trace = events[0].as_trace();
-            assert_eq!(trace.as_map()["host"], "a_hostname".into());
-            assert_eq!(trace.as_map()["env"], "an_environment".into());
-            assert_eq!(trace.as_map()["language"], "ada".into());
-            assert!(trace.contains("spans"));
-            assert_eq!(trace.as_map()["spans"].as_array().unwrap().len(), 1);
-            let span_from_trace = trace.as_map()["spans"].as_array().unwrap()[0]
+            let trace_v1 = events[0].as_trace();
+            assert_eq!(trace_v1.as_map()["host"], "a_hostname".into());
+            assert_eq!(trace_v1.as_map()["env"], "an_environment".into());
+            assert_eq!(trace_v1.as_map()["language_name"], "ada".into());
+            assert!(trace_v1.contains("spans"));
+            assert_eq!(trace_v1.as_map()["spans"].as_array().unwrap().len(), 1);
+            let span_from_trace_v1 = trace_v1.as_map()["spans"].as_array().unwrap()[0]
                 .as_object()
                 .unwrap();
-            assert_eq!(span_from_trace["service"], "a_service".into());
-            assert_eq!(span_from_trace["name"], "a_name".into());
-            assert_eq!(span_from_trace["resource"], "a_resource".into());
-            assert_eq!(span_from_trace["trace_id"], Value::Integer(123));
-            assert_eq!(span_from_trace["span_id"], Value::Integer(456));
-            assert_eq!(span_from_trace["parent_id"], Value::Integer(789));
+            assert_eq!(span_from_trace_v1["service"], "a_service".into());
+            assert_eq!(span_from_trace_v1["name"], "a_name".into());
+            assert_eq!(span_from_trace_v1["resource"], "a_resource".into());
+            assert_eq!(span_from_trace_v1["trace_id"], Value::Integer(123));
+            assert_eq!(span_from_trace_v1["span_id"], Value::Integer(456));
+            assert_eq!(span_from_trace_v1["parent_id"], Value::Integer(789));
             assert_eq!(
-                span_from_trace["start"],
+                span_from_trace_v1["start"],
                 Value::from(Utc.timestamp_nanos(1_431_648_000_000_001i64))
             );
-            assert_eq!(span_from_trace["duration"], Value::Integer(1_000_000_000));
-            assert_eq!(span_from_trace["error"], Value::Integer(404));
-            assert_eq!(span_from_trace["meta"].as_object().unwrap().len(), 1);
             assert_eq!(
-                span_from_trace["meta"].as_object().unwrap()["foo"],
+                span_from_trace_v1["duration"],
+                Value::Integer(1_000_000_000)
+            );
+            assert_eq!(span_from_trace_v1["error"], Value::Integer(404));
+            assert_eq!(span_from_trace_v1["meta"].as_object().unwrap().len(), 1);
+            assert_eq!(
+                span_from_trace_v1["meta"].as_object().unwrap()["foo"],
                 "bar".into()
             );
-            assert_eq!(span_from_trace["metrics"].as_object().unwrap().len(), 1);
+            assert_eq!(span_from_trace_v1["metrics"].as_object().unwrap().len(), 1);
             assert_eq!(
-                span_from_trace["metrics"].as_object().unwrap()["a_metrics"],
+                span_from_trace_v1["metrics"].as_object().unwrap()["a_metrics"],
                 0.577.into()
             );
             assert_eq!(
@@ -1006,16 +1088,74 @@ async fn decode_traces() {
             );
 
             let apm_event = events[1].as_trace();
-            assert!(!apm_event.contains("spans"));
-            assert_eq!(apm_event.as_map()["env"], "an_environment".into());
-            assert_eq!(apm_event.as_map()["language"], "ada".into());
+            assert!(apm_event.contains("spans"));
             assert_eq!(apm_event.as_map()["host"], "a_hostname".into());
-            assert_eq!(apm_event.as_map()["service"], "a_service".into());
-            assert_eq!(apm_event.as_map()["name"], "a_name".into());
-            assert_eq!(apm_event.as_map()["resource"], "a_resource".into());
+            assert_eq!(apm_event.as_map()["env"], "an_environment".into());
+            assert_eq!(apm_event.as_map()["language_name"], "ada".into());
+            let span_from_apm_event = apm_event.as_map()["spans"].as_array().unwrap()[0]
+                .as_object()
+                .unwrap();
+
+            assert_eq!(span_from_apm_event["service"], "a_service".into());
+            assert_eq!(span_from_apm_event["name"], "a_name".into());
+            assert_eq!(span_from_apm_event["resource"], "a_resource".into());
 
             assert_eq!(
                 &events[1].metadata().datadog_api_key().as_ref().unwrap()[..],
+                "12345678abcdefgh12345678abcdefgh"
+            );
+
+            let trace_v2 = events[2].as_trace();
+            assert_eq!(trace_v2.as_map()["host"], "a_hostname".into());
+            assert_eq!(trace_v2.as_map()["env"], "env".into());
+            assert_eq!(trace_v2.as_map()["language_name"], "plop".into());
+            assert_eq!(trace_v2.as_map()["language_version"], "v33".into());
+            assert_eq!(trace_v2.as_map()["container_id"], "an_id".into());
+            assert_eq!(trace_v2.as_map()["origin"], "an_origin".into());
+            assert_eq!(trace_v2.as_map()["tracer_version"], "v577".into());
+            assert_eq!(trace_v2.as_map()["runtime_id"], "123abc".into());
+            assert_eq!(trace_v2.as_map()["app_version"], "v314".into());
+            assert_eq!(trace_v2.as_map()["priority"], Value::Integer(42));
+            assert_eq!(
+                trace_v2.as_map()["target_tps"],
+                Value::Float(NotNan::new(10.0f64).unwrap())
+            );
+            assert_eq!(
+                trace_v2.as_map()["error_tps"],
+                Value::Float(NotNan::new(10.0f64).unwrap())
+            );
+            assert!(trace_v2.contains("spans"));
+            assert_eq!(trace_v2.as_map()["spans"].as_array().unwrap().len(), 1);
+            let span_from_trace_v2 = trace_v2.as_map()["spans"].as_array().unwrap()[0]
+                .as_object()
+                .unwrap();
+            assert_eq!(span_from_trace_v2["service"], "a_service".into());
+            assert_eq!(span_from_trace_v2["name"], "a_name".into());
+            assert_eq!(span_from_trace_v2["resource"], "a_resource".into());
+            assert_eq!(span_from_trace_v2["trace_id"], Value::Integer(123));
+            assert_eq!(span_from_trace_v2["span_id"], Value::Integer(456));
+            assert_eq!(span_from_trace_v2["parent_id"], Value::Integer(789));
+            assert_eq!(
+                span_from_trace_v2["start"],
+                Value::from(Utc.timestamp_nanos(1_431_648_000_000_001i64))
+            );
+            assert_eq!(
+                span_from_trace_v2["duration"],
+                Value::Integer(1_000_000_000)
+            );
+            assert_eq!(span_from_trace_v2["error"], Value::Integer(404));
+            assert_eq!(span_from_trace_v2["meta"].as_object().unwrap().len(), 1);
+            assert_eq!(
+                span_from_trace_v2["meta"].as_object().unwrap()["foo"],
+                "bar".into()
+            );
+            assert_eq!(span_from_trace_v2["metrics"].as_object().unwrap().len(), 1);
+            assert_eq!(
+                span_from_trace_v2["metrics"].as_object().unwrap()["a_metrics"],
+                0.577.into()
+            );
+            assert_eq!(
+                &events[2].metadata().datadog_api_key().as_ref().unwrap()[..],
                 "12345678abcdefgh12345678abcdefgh"
             );
         }
@@ -1042,7 +1182,7 @@ async fn split_outputs() {
                         addr,
                         &serde_json::to_string(&[LogMsg {
                             message: Bytes::from("baz"),
-                            timestamp: 789,
+                            timestamp: Utc.timestamp(789, 0),
                             hostname: Bytes::from("festeburg"),
                             status: Bytes::from("notice"),
                             service: Bytes::from("vector"),
@@ -1125,7 +1265,7 @@ async fn split_outputs() {
             let event = log_event.remove(0);
             let log = event.as_log();
             assert_eq!(log["message"], "baz".into());
-            assert_eq!(log["timestamp"], 789.into());
+            assert_eq!(log["timestamp"], Utc.timestamp(789, 0).into());
             assert_eq!(log["hostname"], "festeburg".into());
             assert_eq!(log["status"], "notice".into());
             assert_eq!(log["service"], "vector".into());
@@ -1171,13 +1311,13 @@ fn test_config_outputs() {
                     None,
                     Some(
                         schema::Definition::empty()
-                            .required_field("message", Kind::bytes(), Some("message"))
-                            .required_field("status", Kind::bytes(), Some("severity"))
-                            .required_field("timestamp", Kind::integer(), Some("timestamp"))
-                            .required_field("hostname", Kind::bytes(), Some("host"))
-                            .required_field("service", Kind::bytes(), None)
-                            .required_field("ddsource", Kind::bytes(), None)
-                            .required_field("ddtags", Kind::bytes(), None),
+                            .with_field("message", Kind::bytes(), Some("message"))
+                            .with_field("status", Kind::bytes(), Some("severity"))
+                            .with_field("timestamp", Kind::timestamp(), Some("timestamp"))
+                            .with_field("hostname", Kind::bytes(), Some("host"))
+                            .with_field("service", Kind::bytes(), Some("service"))
+                            .with_field("ddsource", Kind::bytes(), Some("source"))
+                            .with_field("ddtags", Kind::bytes(), Some("tags")),
                     ),
                 )]),
             },
@@ -1191,13 +1331,13 @@ fn test_config_outputs() {
                     None,
                     Some(
                         schema::Definition::empty()
-                            .required_field("message", Kind::bytes(), Some("message"))
-                            .required_field("status", Kind::bytes(), Some("severity"))
-                            .required_field("timestamp", Kind::integer(), Some("timestamp"))
-                            .required_field("hostname", Kind::bytes(), Some("host"))
-                            .required_field("service", Kind::bytes(), None)
-                            .required_field("ddsource", Kind::bytes(), None)
-                            .required_field("ddtags", Kind::bytes(), None),
+                            .with_field("message", Kind::bytes(), Some("message"))
+                            .with_field("status", Kind::bytes(), Some("severity"))
+                            .with_field("timestamp", Kind::timestamp(), Some("timestamp"))
+                            .with_field("hostname", Kind::bytes(), Some("host"))
+                            .with_field("service", Kind::bytes(), Some("service"))
+                            .with_field("ddsource", Kind::bytes(), Some("source"))
+                            .with_field("ddtags", Kind::bytes(), Some("tags")),
                     ),
                 )]),
             },
@@ -1212,13 +1352,13 @@ fn test_config_outputs() {
                         Some(LOGS),
                         Some(
                             schema::Definition::empty()
-                                .required_field("message", Kind::bytes(), Some("message"))
-                                .required_field("status", Kind::bytes(), Some("severity"))
-                                .required_field("timestamp", Kind::integer(), Some("timestamp"))
-                                .required_field("hostname", Kind::bytes(), Some("host"))
-                                .required_field("service", Kind::bytes(), None)
-                                .required_field("ddsource", Kind::bytes(), None)
-                                .required_field("ddtags", Kind::bytes(), None),
+                                .with_field("message", Kind::bytes(), Some("message"))
+                                .with_field("status", Kind::bytes(), Some("severity"))
+                                .with_field("timestamp", Kind::timestamp(), Some("timestamp"))
+                                .with_field("hostname", Kind::bytes(), Some("host"))
+                                .with_field("service", Kind::bytes(), Some("service"))
+                                .with_field("ddsource", Kind::bytes(), Some("source"))
+                                .with_field("ddtags", Kind::bytes(), Some("tags")),
                         ),
                     ),
                     (Some(METRICS), None),
@@ -1235,11 +1375,7 @@ fn test_config_outputs() {
                     None,
                     Some(
                         schema::Definition::empty()
-                            .required_field(
-                                "timestamp",
-                                Kind::json().or_timestamp(),
-                                Some("timestamp"),
-                            )
+                            .with_field("timestamp", Kind::json().or_timestamp(), Some("timestamp"))
                             .unknown_fields(Kind::json()),
                     ),
                 )]),
@@ -1255,7 +1391,7 @@ fn test_config_outputs() {
                         Some(LOGS),
                         Some(
                             schema::Definition::empty()
-                                .required_field(
+                                .with_field(
                                     "timestamp",
                                     Kind::json().or_timestamp(),
                                     Some("timestamp"),
@@ -1278,7 +1414,7 @@ fn test_config_outputs() {
                     None,
                     Some(
                         schema::Definition::empty()
-                            .required_field("message", Kind::bytes(), Some("message"))
+                            .with_field("message", Kind::bytes(), Some("message"))
                             .optional_field("timestamp", Kind::timestamp(), Some("timestamp"))
                             .optional_field("hostname", Kind::bytes(), None)
                             .optional_field("severity", Kind::bytes(), Some("severity"))
@@ -1303,7 +1439,7 @@ fn test_config_outputs() {
                         Some(LOGS),
                         Some(
                             schema::Definition::empty()
-                                .required_field("message", Kind::bytes(), Some("message"))
+                                .with_field("message", Kind::bytes(), Some("message"))
                                 .optional_field("timestamp", Kind::timestamp(), Some("timestamp"))
                                 .optional_field("hostname", Kind::bytes(), None)
                                 .optional_field("severity", Kind::bytes(), Some("severity"))

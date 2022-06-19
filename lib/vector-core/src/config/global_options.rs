@@ -39,8 +39,6 @@ pub struct GlobalOptions {
     pub timezone: TimeZone,
     #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
     pub proxy: ProxyConfig,
-    #[serde(skip)]
-    pub enterprise: bool,
     #[serde(
         default,
         deserialize_with = "bool_or_struct",
@@ -61,7 +59,7 @@ impl GlobalOptions {
         local_data_dir: Option<&PathBuf>,
     ) -> crate::Result<PathBuf> {
         let data_dir = local_data_dir
-            .or_else(|| self.data_dir.as_ref())
+            .or(self.data_dir.as_ref())
             .ok_or(DataDirError::MissingDataDir)
             .map_err(Box::new)?
             .clone();

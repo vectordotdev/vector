@@ -6,9 +6,10 @@ use codecs::StreamDecodingError;
 use flate2::read::MultiGzDecoder;
 use lookup::path;
 use rmp_serde::{decode, Deserializer};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use smallvec::{smallvec, SmallVec};
 use tokio_util::codec::Decoder;
+use vector_config::configurable_component;
 
 use super::util::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
@@ -20,21 +21,36 @@ use crate::{
     internal_events::{FluentMessageDecodeError, FluentMessageReceived},
     serde::bool_or_struct,
     tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
+    tls::{MaybeTlsSettings, TlsSourceConfig},
 };
 
 mod message;
 use self::message::{FluentEntry, FluentMessage, FluentRecord, FluentTag, FluentTimestamp};
 
-#[derive(Deserialize, Serialize, Debug)]
+/// Configuration for the `fluent` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
 pub struct FluentConfig {
+    /// The address to listen for connections on.
     address: SocketListenAddr,
-    tls: Option<TlsEnableableConfig>,
+
+    /// The maximum number of TCP connections that will be allowed at any given time.
+    connection_limit: Option<u32>,
+
+    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
+
+    /// The size, in bytes, of the receive buffer used for each connection.
+    ///
+    /// This should not typically needed to be changed.
     receive_buffer_bytes: Option<usize>,
+
+    #[configurable(derived)]
+    tls: Option<TlsSourceConfig>,
+
+    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
-    connection_limit: Option<u32>,
 }
 
 inventory::submit! {
@@ -61,12 +77,18 @@ impl SourceConfig for FluentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let source = FluentSource {};
         let shutdown_secs = 30;
-        let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
+        let tls_config = self.tls.as_ref().map(|tls| tls.tls_config.clone());
+        let tls_client_metadata_key = self
+            .tls
+            .as_ref()
+            .and_then(|tls| tls.client_metadata_key.clone());
+        let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
         source.run(
             self.address,
             self.keepalive,
             shutdown_secs,
             tls,
+            tls_client_metadata_key,
             self.receive_buffer_bytes,
             cx,
             self.acknowledgements,
@@ -454,6 +476,7 @@ mod tests {
     use bytes::BytesMut;
     use chrono::{DateTime, Utc};
     use rmp_serde::Serializer;
+    use serde::Serialize;
     use std::collections::BTreeMap;
     use tokio::{
         io::{AsyncReadExt, AsyncWriteExt},

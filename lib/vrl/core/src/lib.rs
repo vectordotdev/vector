@@ -1,3 +1,4 @@
+#![deny(warnings)]
 #![deny(clippy::all)]
 #![deny(unreachable_pub)]
 #![deny(unused_allocation)]
@@ -10,5 +11,5 @@ mod r#macro;
 mod target;
 
 pub use expression::{ExpressionError, Resolved};
-pub use target::Target;
+pub use target::{MetadataTarget, SecretTarget, Target, TargetValue, TargetValueRef};
 pub use value::Value;

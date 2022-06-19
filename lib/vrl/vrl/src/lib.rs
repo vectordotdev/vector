@@ -1,3 +1,4 @@
+#![deny(warnings)]
 #![deny(clippy::all)]
 #![deny(unreachable_pub)]
 #![deny(unused_allocation)]
@@ -10,8 +11,8 @@ pub mod prelude;
 mod runtime;
 
 pub use compiler::{
-    function, state, value, vm::Vm, Context, Expression, Function, Program, ProgramInfo, Target,
-    VrlRuntime,
+    function, state, value, Context, Expression, Function, MetadataTarget, Program, ProgramInfo,
+    SecretTarget, Target, TargetValue, TargetValueRef, VrlRuntime,
 };
 pub use diagnostic;
 pub use runtime::{Runtime, RuntimeResult, Terminate};

@@ -86,13 +86,6 @@ impl Function for ParseAwsVpcFlowLog {
             },
         ]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let format = args.optional("format");
-
-        parse_aws_vpc_flow_log(value, format)
-    }
 }
 
 #[derive(Debug, Clone)]

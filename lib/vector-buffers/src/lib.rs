@@ -3,6 +3,7 @@
 //! This library implements a channel like functionality, one variant which is
 //! solely in-memory and the other that is on-disk. Both variants are bounded.
 
+#![deny(warnings)]
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)]
@@ -82,6 +83,24 @@ impl<T> Bufferable for T where
 
 pub trait EventCount {
     fn event_count(&self) -> usize;
+}
+
+impl<T> EventCount for Vec<T>
+where
+    T: EventCount,
+{
+    fn event_count(&self) -> usize {
+        self.iter().map(EventCount::event_count).sum()
+    }
+}
+
+impl<'a, T> EventCount for &'a T
+where
+    T: EventCount,
+{
+    fn event_count(&self) -> usize {
+        (*self).event_count()
+    }
 }
 
 #[track_caller]

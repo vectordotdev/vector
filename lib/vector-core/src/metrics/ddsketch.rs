@@ -259,6 +259,14 @@ impl AgentDDSketch {
         })
     }
 
+    pub fn gamma(&self) -> f64 {
+        self.config.gamma_v
+    }
+
+    pub fn bin_index_offset(&self) -> i32 {
+        self.config.norm_bias
+    }
+
     #[allow(dead_code)]
     fn bin_count(&self) -> usize {
         self.bins.len()

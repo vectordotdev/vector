@@ -68,10 +68,21 @@ components: sinks: azure_blob: {
 
 	configuration: {
 		connection_string: {
-			description: "The Azure Blob Storage Account connection string. Only authentication with access key supported."
-			required:    true
+			description: "The Azure Blob Storage Account connection string. Only authentication with access key supported. This or storage_account has to be provided."
+			required:    false
+			common:      true
 			type: string: {
+				default: ""
 				examples: ["DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net"]
+			}
+		}
+		storage_account: {
+			description: "The Azure Blob Storage Account name. Credentials are read in this order: [EnvironmentCredential](https://docs.rs/azure_identity/latest/azure_identity/struct.DefaultAzureCredential.html), ManagedIdentityCredential, AzureCliCredential. This or connection_string has to be provided."
+			required:    false
+			common:      true
+			type: string: {
+				default: ""
+				examples: ["mylogstorage"]
 			}
 		}
 		container_name: {

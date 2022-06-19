@@ -1,4 +1,4 @@
-use std::{error::Error as _, pin::Pin, sync::Arc, time::Duration};
+use std::{error::Error as _, pin::Pin, time::Duration};
 
 use chrono::{DateTime, NaiveDateTime, Utc};
 use codecs::decoding::{DeserializerConfig, FramingConfig};
@@ -6,15 +6,18 @@ use derivative::Derivative;
 use futures::{stream, Stream, StreamExt, TryFutureExt};
 use http::uri::{InvalidUri, Scheme, Uri};
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use tokio::sync::Mutex;
+use tokio::sync::mpsc::{self, Receiver, Sender};
+use tokio_stream::wrappers::ReceiverStream;
 use tonic::{
     metadata::{errors::InvalidMetadataValue, MetadataValue},
     transport::{Certificate, Channel, ClientTlsConfig, Endpoint, Identity},
     Code, Request, Status,
 };
-use vector_core::ByteSizeOf;
+use vector_common::{
+    byte_size_of::ByteSizeOf, finalizer::EmptyStream, finalizer::UnorderedFinalizer,
+};
+use vector_config::configurable_component;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -28,13 +31,18 @@ use crate::{
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
     sources::util,
-    sources::util::finalizer::{EmptyStream, UnorderedFinalizer},
     tls::{TlsConfig, TlsSettings},
     SourceSender,
 };
 
 const MIN_ACK_DEADLINE_SECONDS: i32 = 10;
 const MAX_ACK_DEADLINE_SECONDS: i32 = 600;
+
+// We use a bounded channel for the acknowledgement ID communication
+// between the request stream and receiver. During benchmark runs,
+// this channel had only a single element over 80% of the time and
+// rarely went over 8 elements.
+const ACK_QUEUE_SIZE: usize = 128;
 
 type Finalizer = UnorderedFinalizer<Vec<String>>;
 
@@ -93,34 +101,54 @@ pub(crate) enum PubsubError {
 
 static CLIENT_ID: Lazy<String> = Lazy::new(|| uuid::Uuid::new_v4().to_string());
 
-#[derive(Deserialize, Serialize, Derivative, Debug, Clone)]
+/// Configuration for the `gcp_pubsub` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub struct PubsubConfig {
+    /// The project name from which to pull logs.
     pub project: String,
+
+    /// The subscription within the project which is configured to receive logs.
     pub subscription: String,
+
+    /// The endpoint from which to pull data.
     pub endpoint: Option<String>,
 
-    #[serde(default)]
+    /// Disables the loading of authentication credentials.
+    ///
+    /// Only used for tests.
+    #[serde(skip, default)]
     pub skip_authentication: bool,
+
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
 
+    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
+    /// The acknowledgement deadline, in seconds, to use for this stream.
+    ///
+    /// Messages that are not acknowledged when this deadline expires may be retransmitted.
     #[serde(default = "default_ack_deadline")]
     pub ack_deadline_seconds: i32,
 
+    /// The amount of time, in seconds, to wait between retry attempts after an error.
     #[serde(default = "default_retry_delay")]
     pub retry_delay_seconds: f64,
 
+    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     pub framing: FramingConfig,
+
+    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,
 
+    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub acknowledgements: AcknowledgementsConfig,
 }
@@ -165,7 +193,6 @@ impl SourceConfig for PubsubConfig {
             shutdown: cx.shutdown,
             out: cx.out,
             ack_deadline_seconds: self.ack_deadline_seconds,
-            ack_ids: Default::default(),
             retry_delay: Duration::from_secs_f64(self.retry_delay_seconds),
         }
         .run()
@@ -199,11 +226,6 @@ struct PubsubSource {
     ack_deadline_seconds: i32,
     shutdown: ShutdownSignal,
     out: SourceSender,
-    // The acknowledgement IDs are pulled out of the response message
-    // and then inserted into the request. However, the request is
-    // generated in a separate async task from the response handling,
-    // so the data needs to be shared this way.
-    ack_ids: Arc<Mutex<Vec<String>>>,
     retry_delay: Duration,
 }
 
@@ -274,9 +296,11 @@ impl PubsubSource {
             },
         );
 
+        let (ack_ids_sender, ack_ids_receiver) = mpsc::channel(ACK_QUEUE_SIZE);
+
         // Handle shutdown during startup, the streaming pull doesn't
         // start if there is no data in the subscription.
-        let request_stream = self.request_stream();
+        let request_stream = self.request_stream(ack_ids_receiver);
         debug!("Starting streaming pull.");
         let stream = tokio::select! {
             _ = &mut self.shutdown => return State::Shutdown,
@@ -302,11 +326,15 @@ impl PubsubSource {
                 },
                 receipts = ack_stream.next() => if let Some((status, receipts)) = receipts {
                     if status == BatchStatus::Delivered {
-                        self.ack_ids.lock().await.extend(receipts);
+                        ack_ids_sender
+                            .send(receipts)
+                            .await
+                            .unwrap_or_else(|_| unreachable!("request stream never closes"));
                     }
                 },
                 response = stream.next() => match response {
-                    Some(Ok(response)) => self.handle_response(response, &finalizer).await,
+                    Some(Ok(response)) =>
+                        self.handle_response(response, &finalizer, &ack_ids_sender).await,
                     Some(Err(error)) => break translate_error(error),
                     None => break State::RetryNow,
                 },
@@ -326,34 +354,43 @@ impl PubsubSource {
         config
     }
 
-    fn request_stream(&self) -> impl Stream<Item = proto::StreamingPullRequest> + 'static {
-        // This data is only allowed in the first request
-        let mut subscription = Some(self.subscription.clone());
-        let mut client_id = Some(CLIENT_ID.clone());
-
-        let ack_ids = Arc::clone(&self.ack_ids);
+    fn request_stream(
+        &self,
+        ack_ids: Receiver<Vec<String>>,
+    ) -> impl Stream<Item = proto::StreamingPullRequest> + 'static {
+        let subscription = self.subscription.clone();
+        let client_id = CLIENT_ID.clone();
         let stream_ack_deadline_seconds = self.ack_deadline_seconds;
-        stream::repeat(()).then(move |()| {
-            let ack_ids = Arc::clone(&ack_ids);
-            let subscription = subscription.take().unwrap_or_default();
-            let client_id = client_id.take().unwrap_or_default();
-            async move {
-                let mut ack_ids = ack_ids.lock().await;
-                proto::StreamingPullRequest {
-                    subscription,
-                    client_id,
-                    ack_ids: std::mem::take(ack_ids.as_mut()),
-                    stream_ack_deadline_seconds,
-                    ..Default::default()
-                }
+        let ack_ids = ReceiverStream::new(ack_ids);
+
+        stream::once(async move {
+            // These fields are only valid on the first request in the
+            // stream, and so must not be repeated below.
+            proto::StreamingPullRequest {
+                subscription,
+                client_id,
+                stream_ack_deadline_seconds,
+                ..Default::default()
             }
         })
+        .chain(ack_ids.ready_chunks(ACK_QUEUE_SIZE).map(|chunks| {
+            // These "requests" serve only to send updates about
+            // acknowledgements to the server. None of the above
+            // fields need to be repeated and, in fact, will cause
+            // an stream error and cancellation if they are
+            // present.
+            proto::StreamingPullRequest {
+                ack_ids: chunks.into_iter().flatten().collect(),
+                ..Default::default()
+            }
+        }))
     }
 
     async fn handle_response(
         &mut self,
         response: proto::StreamingPullResponse,
         finalizer: &Option<Finalizer>,
+        ack_ids: &Sender<Vec<String>>,
     ) {
         emit!(BytesReceived {
             byte_size: response.size_of(),
@@ -367,7 +404,10 @@ impl PubsubSource {
         match self.out.send_batch(events).await {
             Err(error) => emit!(StreamClosedError { error, count }),
             Ok(()) => match notifier {
-                None => self.ack_ids.lock().await.extend(ids),
+                None => ack_ids
+                    .send(ids)
+                    .await
+                    .unwrap_or_else(|_| unreachable!("request stream never closes")),
                 Some(notifier) => finalizer
                     .as_ref()
                     .expect("Finalizer must have been set up for acknowledgements")
@@ -379,7 +419,7 @@ impl PubsubSource {
     async fn parse_messages(
         &self,
         response: Vec<proto::ReceivedMessage>,
-        batch: Option<Arc<BatchNotifier>>,
+        batch: Option<BatchNotifier>,
     ) -> (Vec<Event>, Vec<String>) {
         let mut ack_ids = Vec::with_capacity(response.len());
         let events = response
@@ -398,7 +438,7 @@ impl PubsubSource {
     fn parse_message<'a>(
         &self,
         message: proto::PubsubMessage,
-        batch: &'a Option<Arc<BatchNotifier>>,
+        batch: &'a Option<BatchNotifier>,
     ) -> impl Iterator<Item = Event> + 'a {
         let attributes = Value::Object(
             message

@@ -4,6 +4,7 @@
 #![deny(unused_allocation)]
 #![deny(unused_assignments)]
 #![deny(unused_comparisons)]
+#![deny(warnings)]
 #![allow(clippy::approx_constant)]
 #![allow(clippy::float_cmp)]
 #![allow(clippy::match_wild_err_arm)]
@@ -12,7 +13,7 @@
 #![allow(clippy::unit_arg)]
 #![deny(clippy::clone_on_ref_ptr)]
 #![deny(clippy::trivially_copy_pass_by_ref)]
-#![deny(clippy::disallowed_method)] // [nursery] mark some functions as verboten
+#![deny(clippy::disallowed_methods)] // [nursery] mark some functions as verboten
 #![deny(clippy::missing_const_for_fn)] // [nursery] valuable to the optimizer,
                                        // but may produce false positives
 
@@ -45,6 +46,7 @@ pub mod app;
 pub mod async_read;
 #[cfg(feature = "aws-config")]
 pub mod aws;
+#[allow(unreachable_pub)]
 pub mod codecs;
 pub(crate) mod common;
 pub mod encoding_transcode;
@@ -68,7 +70,6 @@ pub mod providers;
 pub mod serde;
 #[cfg(windows)]
 pub mod service;
-pub mod shutdown;
 pub mod signal;
 pub(crate) mod sink;
 #[allow(unreachable_pub)]
@@ -77,7 +78,6 @@ pub mod source_sender;
 #[allow(unreachable_pub)]
 pub mod sources;
 pub mod stats;
-pub(crate) mod stream;
 #[cfg(feature = "api-client")]
 #[allow(unreachable_pub)]
 mod tap;
@@ -94,7 +94,6 @@ pub mod topology;
 pub mod trace;
 #[allow(unreachable_pub)]
 pub mod transforms;
-pub mod trigger;
 pub mod types;
 pub mod udp;
 pub mod unit_test;
@@ -104,6 +103,7 @@ pub mod validate;
 pub mod vector_windows;
 
 pub use source_sender::SourceSender;
+pub use vector_common::shutdown;
 pub use vector_core::{event, metrics, schema, Error, Result};
 
 pub fn vector_version() -> impl std::fmt::Display {
@@ -158,4 +158,15 @@ where
 
     #[cfg(not(tokio_unstable))]
     tokio::spawn(task)
+}
+
+pub fn num_threads() -> usize {
+    let count = match std::thread::available_parallelism() {
+        Ok(count) => count,
+        Err(error) => {
+            warn!(message = "Failed to determine available parallelism for thread count, defaulting to 1.", %error);
+            std::num::NonZeroUsize::new(1).unwrap()
+        }
+    };
+    usize::from(count)
 }

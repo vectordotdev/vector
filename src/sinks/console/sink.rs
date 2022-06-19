@@ -1,6 +1,9 @@
 use async_trait::async_trait;
+use bytes::BytesMut;
+use codecs::encoding::Framer;
 use futures::{stream::BoxStream, StreamExt};
 use tokio::{io, io::AsyncWriteExt};
+use tokio_util::codec::Encoder as _;
 use vector_core::{
     buffers::Acker,
     internal_event::{BytesSent, EventsSent},
@@ -8,17 +11,16 @@ use vector_core::{
 };
 
 use crate::{
-    event::Event,
-    sinks::util::{
-        encoding::{Encoder, EncodingConfig, StandardEncodings},
-        StreamSink,
-    },
+    codecs::Encoder,
+    event::{Event, EventStatus, Finalizable},
+    sinks::util::{encoding::Transformer, StreamSink},
 };
 
 pub struct WriterSink<T> {
     pub acker: Acker,
     pub output: T,
-    pub encoding: EncodingConfig<StandardEncodings>,
+    pub transformer: Transformer,
+    pub encoder: Encoder<Framer>,
 }
 
 #[async_trait]
@@ -27,41 +29,54 @@ where
     T: io::AsyncWrite + Send + Sync + Unpin,
 {
     async fn run(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        while let Some(event) = input.next().await {
+        while let Some(mut event) = input.next().await {
             let event_byte_size = event.size_of();
-            if let Some(mut buf) = encode_event(event, &self.encoding) {
-                buf.push('\n');
-                if let Err(error) = self.output.write_all(buf.as_bytes()).await {
+            self.transformer.transform(&mut event);
+
+            let finalizers = event.take_finalizers();
+            let mut bytes = BytesMut::new();
+            self.encoder.encode(event, &mut bytes).map_err(|_| {
+                // Error is handled by `Encoder`.
+                finalizers.update_status(EventStatus::Errored);
+            })?;
+
+            match self.output.write_all(&bytes).await {
+                Err(error) => {
                     // Error when writing to stdout/stderr is likely irrecoverable,
                     // so stop the sink.
                     error!(message = "Error writing to output. Stopping sink.", %error);
+                    finalizers.update_status(EventStatus::Errored);
                     return Err(());
                 }
-                self.acker.ack(1);
+                Ok(()) => {
+                    finalizers.update_status(EventStatus::Delivered);
+                    self.acker.ack(1);
 
-                emit!(EventsSent {
-                    byte_size: event_byte_size,
-                    count: 1,
-                    output: None,
-                });
-                emit!(BytesSent {
-                    byte_size: buf.len(),
-                    protocol: "console"
-                });
+                    emit!(EventsSent {
+                        byte_size: event_byte_size,
+                        count: 1,
+                        output: None,
+                    });
+                    emit!(BytesSent {
+                        byte_size: bytes.len(),
+                        protocol: "console"
+                    });
+                }
             }
         }
+
         Ok(())
     }
-}
-
-fn encode_event(event: Event, encoding: &EncodingConfig<StandardEncodings>) -> Option<String> {
-    encoding.encode_input_to_string(event).ok()
 }
 
 #[cfg(test)]
 mod test {
     use chrono::{offset::TimeZone, Utc};
+    use codecs::{BytesEncoder, NewlineDelimitedEncoder};
+    use futures::future::ready;
+    use futures_util::stream;
     use pretty_assertions::assert_eq;
+    use vector_core::sink::VectorSink;
 
     use super::*;
     use crate::{
@@ -69,15 +84,61 @@ mod test {
             metric::{Metric, MetricKind, MetricValue, StatisticKind},
             Event, Value,
         },
-        sinks::util::encoding::StandardEncodings,
+        sinks::util::encoding::{
+            EncodingConfig, EncodingConfigWithFramingAdapter, StandardEncodings,
+            StandardEncodingsWithFramingMigrator,
+        },
+        test_util::components::{run_and_assert_sink_compliance, SINK_TAGS},
     };
+
+    fn encode_event(
+        event: Event,
+        encoding: EncodingConfigWithFramingAdapter<
+            EncodingConfig<StandardEncodings>,
+            StandardEncodingsWithFramingMigrator,
+        >,
+    ) -> Result<String, codecs::encoding::Error> {
+        let (framer, serializer) = encoding.encoding();
+        let framer = framer.unwrap_or_else(|| BytesEncoder::new().into());
+        let mut encoder = Encoder::<Framer>::new(framer, serializer);
+        let mut bytes = BytesMut::new();
+        encoder.encode(event, &mut bytes)?;
+        Ok(String::from_utf8_lossy(&bytes).to_string())
+    }
+
+    #[tokio::test]
+    async fn component_spec_compliance() {
+        let event = Event::from("foo");
+
+        let encoding: EncodingConfigWithFramingAdapter<
+            EncodingConfig<StandardEncodings>,
+            StandardEncodingsWithFramingMigrator,
+        > = EncodingConfig::from(StandardEncodings::Json).into();
+        let transformer = encoding.transformer();
+        let (_, serializer) = encoding.encoding();
+        let encoder = Encoder::<Framer>::new(NewlineDelimitedEncoder::new().into(), serializer);
+
+        let sink = WriterSink {
+            acker: Acker::passthrough(),
+            output: Vec::new(),
+            transformer,
+            encoder,
+        };
+
+        run_and_assert_sink_compliance(
+            VectorSink::from_event_streamsink(sink),
+            stream::once(ready(event)),
+            &SINK_TAGS,
+        )
+        .await;
+    }
 
     #[test]
     fn encodes_raw_logs() {
         let event = Event::from("foo");
         assert_eq!(
             "foo",
-            encode_event(event, &EncodingConfig::from(StandardEncodings::Text)).unwrap()
+            encode_event(event, EncodingConfig::from(StandardEncodings::Text).into()).unwrap()
         );
     }
 
@@ -89,7 +150,7 @@ mod test {
         log.insert("z", Value::from(25));
         log.insert("a", Value::from("0"));
 
-        let encoded = encode_event(event, &EncodingConfig::from(StandardEncodings::Json));
+        let encoded = encode_event(event, EncodingConfig::from(StandardEncodings::Json).into());
         let expected = r#"{"a":"0","x":"23","z":25}"#;
         assert_eq!(encoded.unwrap(), expected);
     }
@@ -116,7 +177,7 @@ mod test {
         );
         assert_eq!(
             r#"{"name":"foos","namespace":"vector","tags":{"Key3":"Value3","key1":"value1","key2":"value2"},"timestamp":"2018-11-14T08:09:10.000000011Z","kind":"incremental","counter":{"value":100.0}}"#,
-            encode_event(event, &EncodingConfig::from(StandardEncodings::Json)).unwrap()
+            encode_event(event, EncodingConfig::from(StandardEncodings::Json).into()).unwrap()
         );
     }
 
@@ -131,7 +192,7 @@ mod test {
         ));
         assert_eq!(
             r#"{"name":"users","kind":"incremental","set":{"values":["bob"]}}"#,
-            encode_event(event, &EncodingConfig::from(StandardEncodings::Json)).unwrap()
+            encode_event(event, EncodingConfig::from(StandardEncodings::Json).into()).unwrap()
         );
     }
 
@@ -147,7 +208,7 @@ mod test {
         ));
         assert_eq!(
             r#"{"name":"glork","kind":"incremental","distribution":{"samples":[{"value":10.0,"rate":1}],"statistic":"histogram"}}"#,
-            encode_event(event, &EncodingConfig::from(StandardEncodings::Json)).unwrap()
+            encode_event(event, EncodingConfig::from(StandardEncodings::Json).into()).unwrap()
         );
     }
 
@@ -162,7 +223,7 @@ mod test {
         ));
         assert_eq!(
             "users{} + bob",
-            encode_event(event, &EncodingConfig::from(StandardEncodings::Text)).unwrap()
+            encode_event(event, EncodingConfig::from(StandardEncodings::Text).into()).unwrap()
         );
     }
 }

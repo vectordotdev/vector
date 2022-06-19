@@ -1,17 +1,10 @@
 #[cfg(any(feature = "sources-http"))]
 mod body_decoding;
 mod encoding_config;
-#[cfg(any(
-    feature = "sources-aws_sqs",
-    feature = "sources-file",
-    feature = "sources-gcp_pubsub",
-    feature = "sources-journald",
-    feature = "sources-kafka",
-    feature = "sources-splunk_hec"
-))]
-pub mod finalizer;
 #[cfg(all(unix, feature = "sources-dnstap"))]
 pub mod framestream;
+#[cfg(feature = "sources-vector")]
+pub mod grpc;
 #[cfg(any(
     feature = "sources-utils-http-auth",
     feature = "sources-utils-http-encoding",

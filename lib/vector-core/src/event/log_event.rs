@@ -185,13 +185,13 @@ impl LogEvent {
     }
 
     #[must_use]
-    pub fn with_batch_notifier(mut self, batch: &Arc<BatchNotifier>) -> Self {
+    pub fn with_batch_notifier(mut self, batch: &BatchNotifier) -> Self {
         self.metadata = self.metadata.with_batch_notifier(batch);
         self
     }
 
     #[must_use]
-    pub fn with_batch_notifier_option(mut self, batch: &Option<Arc<BatchNotifier>>) -> Self {
+    pub fn with_batch_notifier_option(mut self, batch: &Option<BatchNotifier>) -> Self {
         self.metadata = self.metadata.with_batch_notifier_option(batch);
         self
     }
@@ -217,6 +217,14 @@ impl LogEvent {
             .schema_definition()
             .meaning_path(meaning.as_ref())
             .and_then(|path| self.inner.fields.get_by_path(path))
+    }
+
+    // TODO(Jean): Once the event API uses `Lookup`, the allocation here can be removed.
+    pub fn find_key_by_meaning(&self, meaning: impl AsRef<str>) -> Option<String> {
+        self.metadata()
+            .schema_definition()
+            .meaning_path(meaning.as_ref())
+            .map(std::string::ToString::to_string)
     }
 
     pub fn get_mut<'a>(&mut self, path: impl Path<'a>) -> Option<&mut Value> {
@@ -447,10 +455,10 @@ impl Serialize for LogEvent {
 impl From<&tracing::Event<'_>> for LogEvent {
     fn from(event: &tracing::Event<'_>) -> Self {
         let now = chrono::Utc::now();
-        let mut maker = MakeLogEvent::default();
+        let mut maker = LogEvent::default();
         event.record(&mut maker);
 
-        let mut log = maker.0;
+        let mut log = maker;
         log.insert("timestamp", now);
 
         let meta = event.metadata();
@@ -476,33 +484,30 @@ impl From<&tracing::Event<'_>> for LogEvent {
     }
 }
 
-#[derive(Debug, Default)]
-struct MakeLogEvent(LogEvent);
-
-impl tracing::field::Visit for MakeLogEvent {
+impl tracing::field::Visit for LogEvent {
     fn record_str(&mut self, field: &tracing::field::Field, value: &str) {
-        self.0.insert(field.name(), value.to_string());
+        self.insert(field.name(), value.to_string());
     }
 
     fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn Debug) {
-        self.0.insert(field.name(), format!("{:?}", value));
+        self.insert(field.name(), format!("{:?}", value));
     }
 
     fn record_i64(&mut self, field: &tracing::field::Field, value: i64) {
-        self.0.insert(field.name(), value);
+        self.insert(field.name(), value);
     }
 
     fn record_u64(&mut self, field: &tracing::field::Field, value: u64) {
         let field = field.name();
         let converted: Result<i64, _> = value.try_into();
         match converted {
-            Ok(value) => self.0.insert(field, value),
-            Err(_) => self.0.insert(field, value.to_string()),
+            Ok(value) => self.insert(field, value),
+            Err(_) => self.insert(field, value.to_string()),
         };
     }
 
     fn record_bool(&mut self, field: &tracing::field::Field, value: bool) {
-        self.0.insert(field.name(), value);
+        self.insert(field.name(), value);
     }
 }
 

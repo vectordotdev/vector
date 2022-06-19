@@ -104,11 +104,6 @@ impl Function for ParseAwsCloudWatchLogSubscriptionMessage {
             required: true,
         }]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        parse_aws_cloudwatch_log_subscription_message(value)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -143,11 +138,11 @@ fn inner_kind() -> BTreeMap<Field, Kind> {
         ),
         (
             Field::from("log_events"),
-            Kind::object(BTreeMap::from([
+            Kind::array(Collection::from_unknown(Kind::object(BTreeMap::from([
                 (Field::from("id"), Kind::bytes()),
                 (Field::from("timestamp"), Kind::timestamp()),
                 (Field::from("message"), Kind::bytes()),
-            ])),
+            ])))),
         ),
     ])
 }

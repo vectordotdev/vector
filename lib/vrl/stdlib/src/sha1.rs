@@ -41,11 +41,6 @@ impl Function for Sha1 {
 
         Ok(Box::new(Sha1Fn { value }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        sha1(value)
-    }
 }
 
 #[derive(Debug, Clone)]

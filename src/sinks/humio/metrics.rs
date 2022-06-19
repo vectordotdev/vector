@@ -5,7 +5,7 @@ use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use vector_core::{sink::StreamSink, transform::Transform};
 
-use super::{host_key, logs::HumioLogsConfig, Encoding};
+use super::{host_key, logs::HumioLogsConfig};
 use crate::{
     config::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
@@ -13,8 +13,14 @@ use crate::{
     },
     event::{Event, EventArray, EventContainer},
     sinks::{
-        splunk_hec::common::SplunkHecDefaultBatchSettings,
-        util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
+        splunk_hec::{
+            common::SplunkHecDefaultBatchSettings,
+            logs::config::{HecEncoding, HecEncodingMigrator},
+        },
+        util::{
+            encoding::{EncodingConfig, EncodingConfigAdapter},
+            BatchConfig, Compression, TowerRequestConfig,
+        },
         Healthcheck, VectorSink,
     },
     template::Template,
@@ -23,6 +29,7 @@ use crate::{
 };
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 struct HumioMetricsConfig {
     #[serde(flatten)]
     transform: MetricToLogConfig,
@@ -31,7 +38,7 @@ struct HumioMetricsConfig {
     #[serde(alias = "host")]
     pub(in crate::sinks::humio) endpoint: Option<String>,
     source: Option<Template>,
-    encoding: EncodingConfig<Encoding>,
+    encoding: EncodingConfigAdapter<EncodingConfig<HecEncoding>, HecEncodingMigrator>,
     event_type: Option<Template>,
     #[serde(default = "host_key")]
     host_key: String,
@@ -102,6 +109,8 @@ impl SinkConfig for HumioMetricsConfig {
             tls: self.tls.clone(),
             timestamp_nanos_key: None,
             acknowledgements: Default::default(),
+            // hard coded as humio expects this format so no sense in making it configurable
+            timestamp_key: "timestamp".to_string(),
         };
 
         let (sink, healthcheck) = sink.clone().build(cx).await?;
@@ -164,7 +173,10 @@ mod tests {
             Event, Metric,
         },
         sinks::util::test::{build_test_server, load_sink},
-        test_util::{self, components, components::HTTP_SINK_TAGS},
+        test_util::{
+            self,
+            components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+        },
     };
 
     #[test]
@@ -248,7 +260,7 @@ mod tests {
         ];
 
         let len = metrics.len();
-        components::run_sink_events(sink, stream::iter(metrics), &HTTP_SINK_TAGS).await;
+        run_and_assert_sink_compliance(sink, stream::iter(metrics), &HTTP_SINK_TAGS).await;
 
         let output = rx.take(len).collect::<Vec<_>>().await;
         assert_eq!(

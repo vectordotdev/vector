@@ -1,16 +1,15 @@
 use std::{fmt, num::NonZeroUsize};
 
 use bitmask_enum::bitmask;
-use serde::{Deserialize, Serialize};
 
 mod global_options;
-mod id;
 mod log_schema;
 pub mod proxy;
 
 pub use global_options::GlobalOptions;
-pub use id::ComponentKey;
 pub use log_schema::{init_log_schema, log_schema, LogSchema};
+pub use vector_common::config::ComponentKey;
+use vector_config::configurable_component;
 
 use crate::schema;
 
@@ -85,6 +84,13 @@ impl Input {
             log_schema_requirement: schema::Requirement::empty(),
         }
     }
+
+    /// Set the schema requirement for this output.
+    #[must_use]
+    pub fn with_schema_requirement(mut self, schema_requirement: schema::Requirement) -> Self {
+        self.log_schema_requirement = schema_requirement;
+        self
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -134,8 +140,11 @@ impl Output {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+/// Configuration of acknowledgement behavior.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct AcknowledgementsConfig {
+    /// Enables end-to-end acknowledgements.
     enabled: Option<bool>,
 }
 

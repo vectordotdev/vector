@@ -1,4 +1,6 @@
-use std::{convert::TryFrom, iter, num::NonZeroU8, sync::Arc};
+use std::{convert::TryFrom, iter, num::NonZeroU8};
+
+use futures::{future::ready, stream};
 
 use serde_json::Value as JsonValue;
 use tokio::time::{sleep, Duration};
@@ -11,14 +13,15 @@ use crate::{
             common::{
                 acknowledgements::HecClientAcknowledgementsConfig,
                 integration_test_helpers::{get_token, splunk_api_address, splunk_hec_address},
+                EndpointTarget, SOURCE_FIELD,
             },
-            logs::{config::HecLogsSinkConfig, encoder::HecLogsEncoder},
+            logs::config::{HecEncoding, HecLogsSinkConfig},
         },
         util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
     },
     template::Template,
     test_util::{
-        components::{self, HTTP_SINK_TAGS},
+        components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
         random_lines_with_stream, random_string,
     },
 };
@@ -94,7 +97,7 @@ async fn find_entries(messages: &[String]) -> bool {
 }
 
 async fn config(
-    encoding: impl Into<EncodingConfig<HecLogsEncoder>>,
+    encoding: impl Into<EncodingConfig<HecEncoding>>,
     indexed_fields: Vec<String>,
 ) -> HecLogsSinkConfig {
     let mut batch = BatchConfig::default();
@@ -108,13 +111,15 @@ async fn config(
         index: None,
         sourcetype: None,
         source: None,
-        encoding: encoding.into(),
+        encoding: encoding.into().into(),
         compression: Compression::None,
         batch,
         request: TowerRequestConfig::default(),
         tls: None,
         acknowledgements: Default::default(),
         timestamp_nanos_key: None,
+        timestamp_key: Default::default(),
+        endpoint_target: EndpointTarget::Event,
     }
 }
 
@@ -122,16 +127,14 @@ async fn config(
 async fn splunk_insert_message() {
     let cx = SinkContext::new_test();
 
-    let config = config(HecLogsEncoder::Text, vec![]).await;
+    let config = config(HecEncoding::Text, vec![]).await;
     let (sink, _) = config.build(cx).await.unwrap();
 
     let message = random_string(100);
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-    let event = LogEvent::from(message.clone())
-        .with_batch_notifier(&batch)
-        .into();
+    let event = LogEvent::from(message.clone()).with_batch_notifier(&batch);
     drop(batch);
-    components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
+    run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
     let entry = find_entry(message.as_str()).await;
@@ -141,20 +144,43 @@ async fn splunk_insert_message() {
 }
 
 #[tokio::test]
+async fn splunk_insert_raw_message() {
+    let cx = SinkContext::new_test();
+
+    let config = HecLogsSinkConfig {
+        endpoint_target: EndpointTarget::Raw,
+        source: Some(Template::try_from("zork").unwrap()),
+        ..config(HecEncoding::Text, vec![]).await
+    };
+    let (sink, _) = config.build(cx).await.unwrap();
+
+    let message = random_string(100);
+    let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+    let event = LogEvent::from(message.clone()).with_batch_notifier(&batch);
+    drop(batch);
+    run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    let entry = find_entry(message.as_str()).await;
+
+    assert_eq!(message, entry["_raw"].as_str().unwrap());
+    assert_eq!("zork", entry[SOURCE_FIELD].as_str().unwrap());
+    assert!(entry.get("message").is_none());
+}
+
+#[tokio::test]
 async fn splunk_insert_broken_token() {
     let cx = SinkContext::new_test();
 
-    let mut config = config(HecLogsEncoder::Text, vec![]).await;
+    let mut config = config(HecEncoding::Text, vec![]).await;
     config.default_token = "BROKEN_TOKEN".into();
     let (sink, _) = config.build(cx).await.unwrap();
 
     let message = random_string(100);
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-    let event = LogEvent::from(message.clone())
-        .with_batch_notifier(&batch)
-        .into();
+    let event = LogEvent::from(message.clone()).with_batch_notifier(&batch);
     drop(batch);
-    sink.run_events(iter::once(event)).await.unwrap();
+    sink.run_events(iter::once(event.into())).await.unwrap();
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
 }
 
@@ -162,31 +188,31 @@ async fn splunk_insert_broken_token() {
 async fn splunk_insert_source() {
     let cx = SinkContext::new_test();
 
-    let mut config = config(HecLogsEncoder::Text, vec![]).await;
+    let mut config = config(HecEncoding::Text, vec![]).await;
     config.source = Template::try_from("/var/log/syslog".to_string()).ok();
 
     let (sink, _) = config.build(cx).await.unwrap();
 
     let message = random_string(100);
     let event = Event::from(message.clone());
-    components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
+    run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
     let entry = find_entry(message.as_str()).await;
 
-    assert_eq!(entry["source"].as_str(), Some("/var/log/syslog"));
+    assert_eq!(entry[SOURCE_FIELD].as_str(), Some("/var/log/syslog"));
 }
 
 #[tokio::test]
 async fn splunk_insert_index() {
     let cx = SinkContext::new_test();
 
-    let mut config = config(HecLogsEncoder::Text, vec![]).await;
+    let mut config = config(HecEncoding::Text, vec![]).await;
     config.index = Template::try_from("custom_index".to_string()).ok();
     let (sink, _) = config.build(cx).await.unwrap();
 
     let message = random_string(100);
-    let event = Event::from(message.clone());
-    components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
+    let event = LogEvent::from(message.clone());
+    run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
     let entry = find_entry(message.as_str()).await;
 
@@ -198,15 +224,15 @@ async fn splunk_index_is_interpolated() {
     let cx = SinkContext::new_test();
 
     let indexed_fields = vec!["asdf".to_string()];
-    let mut config = config(HecLogsEncoder::Json, indexed_fields).await;
+    let mut config = config(HecEncoding::Json, indexed_fields).await;
     config.index = Template::try_from("{{ index_name }}".to_string()).ok();
 
     let (sink, _) = config.build(cx).await.unwrap();
 
     let message = random_string(100);
-    let mut event = Event::from(message.clone());
-    event.as_mut_log().insert("index_name", "custom_index");
-    components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
+    let mut event = LogEvent::from(message.clone());
+    event.insert("index_name", "custom_index");
+    run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
     let entry = find_entry(message.as_str()).await;
 
@@ -218,11 +244,11 @@ async fn splunk_index_is_interpolated() {
 async fn splunk_insert_many() {
     let cx = SinkContext::new_test();
 
-    let config = config(HecLogsEncoder::Text, vec![]).await;
+    let config = config(HecEncoding::Text, vec![]).await;
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (messages, events) = random_lines_with_stream(100, 10, None);
-    components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
+    run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
 
     assert!(find_entries(messages.as_slice()).await);
 }
@@ -232,13 +258,13 @@ async fn splunk_custom_fields() {
     let cx = SinkContext::new_test();
 
     let indexed_fields = vec!["asdf".into()];
-    let config = config(HecLogsEncoder::Json, indexed_fields).await;
+    let config = config(HecEncoding::Json, indexed_fields).await;
     let (sink, _) = config.build(cx).await.unwrap();
 
     let message = random_string(100);
-    let mut event = Event::from(message.clone());
-    event.as_mut_log().insert("asdf", "hello");
-    components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
+    let mut event = LogEvent::from(message.clone());
+    event.insert("asdf", "hello");
+    run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
     let entry = find_entry(message.as_str()).await;
 
@@ -252,14 +278,14 @@ async fn splunk_hostname() {
     let cx = SinkContext::new_test();
 
     let indexed_fields = vec!["asdf".into()];
-    let config = config(HecLogsEncoder::Json, indexed_fields).await;
+    let config = config(HecEncoding::Json, indexed_fields).await;
     let (sink, _) = config.build(cx).await.unwrap();
 
     let message = random_string(100);
-    let mut event = Event::from(message.clone());
-    event.as_mut_log().insert("asdf", "hello");
-    event.as_mut_log().insert("host", "example.com:1234");
-    components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
+    let mut event = LogEvent::from(message.clone());
+    event.insert("asdf", "hello");
+    event.insert("host", "example.com:1234");
+    run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
     let entry = find_entry(message.as_str()).await;
 
@@ -275,15 +301,15 @@ async fn splunk_sourcetype() {
     let cx = SinkContext::new_test();
 
     let indexed_fields = vec!["asdf".to_string()];
-    let mut config = config(HecLogsEncoder::Json, indexed_fields).await;
+    let mut config = config(HecEncoding::Json, indexed_fields).await;
     config.sourcetype = Template::try_from("_json".to_string()).ok();
 
     let (sink, _) = config.build(cx).await.unwrap();
 
     let message = random_string(100);
-    let mut event = Event::from(message.clone());
-    event.as_mut_log().insert("asdf", "hello");
-    components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
+    let mut event = LogEvent::from(message.clone());
+    event.insert("asdf", "hello");
+    run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
     let entry = find_entry(message.as_str()).await;
 
@@ -300,17 +326,17 @@ async fn splunk_configure_hostname() {
 
     let config = HecLogsSinkConfig {
         host_key: "roast".into(),
-        ..config(HecLogsEncoder::Json, vec!["asdf".to_string()]).await
+        ..config(HecEncoding::Json, vec!["asdf".to_string()]).await
     };
 
     let (sink, _) = config.build(cx).await.unwrap();
 
     let message = random_string(100);
-    let mut event = Event::from(message.clone());
-    event.as_mut_log().insert("asdf", "hello");
-    event.as_mut_log().insert("host", "example.com:1234");
-    event.as_mut_log().insert("roast", "beef.example.com:1234");
-    components::run_sink_event(sink, event, &HTTP_SINK_TAGS).await;
+    let mut event = LogEvent::from(message.clone());
+    event.insert("asdf", "hello");
+    event.insert("host", "example.com:1234");
+    event.insert("roast", "beef.example.com:1234");
+    run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
     let entry = find_entry(message.as_str()).await;
 
@@ -334,14 +360,14 @@ async fn splunk_indexer_acknowledgements() {
     let config = HecLogsSinkConfig {
         default_token: String::from(ACK_TOKEN),
         acknowledgements: acknowledgements_config,
-        ..config(HecLogsEncoder::Json, vec!["asdf".to_string()]).await
+        ..config(HecEncoding::Json, vec!["asdf".to_string()]).await
     };
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (tx, mut rx) = BatchNotifier::new_with_receiver();
-    let (messages, events) = random_lines_with_stream(100, 10, Some(Arc::clone(&tx)));
+    let (messages, events) = random_lines_with_stream(100, 10, Some(tx.clone()));
     drop(tx);
-    components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
+    run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
 
     assert_eq!(rx.try_recv(), Ok(BatchStatus::Delivered));
     assert!(find_entries(messages.as_slice()).await);
@@ -351,13 +377,13 @@ async fn splunk_indexer_acknowledgements() {
 async fn splunk_indexer_acknowledgements_disabled_on_server() {
     let cx = SinkContext::new_test();
 
-    let config = config(HecLogsEncoder::Json, vec!["asdf".to_string()]).await;
+    let config = config(HecEncoding::Json, vec!["asdf".to_string()]).await;
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (tx, mut rx) = BatchNotifier::new_with_receiver();
-    let (messages, events) = random_lines_with_stream(100, 10, Some(Arc::clone(&tx)));
+    let (messages, events) = random_lines_with_stream(100, 10, Some(tx.clone()));
     drop(tx);
-    components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
+    run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
 
     // With indexer acknowledgements disabled on the server, events are still
     // acknowledged based on 200 OK

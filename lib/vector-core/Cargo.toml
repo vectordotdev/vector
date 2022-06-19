@@ -11,35 +11,34 @@ async-trait = { version = "0.1", default-features = false }
 bitmask-enum = { version = "2.0.0", default-features = false }
 bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
-crossbeam-utils = { version = "0.8.8", default-features = false }
+crossbeam-utils = { version = "0.8.9", default-features = false }
 db-key = { version = "0.0.5", default-features = false, optional = true }
-derivative = { version = "2.2.0", default-features = false }
 dyn-clone = { version = "1.0.5", default-features = false }
 enrichment = { path = "../enrichment", optional = true }
 enumflags2 = { version = "0.7.5", default-features = false }
-float_eq = { version = "0.7", default-features = false }
+float_eq = { version = "1.0", default-features = false }
 futures = { version = "0.3.21", default-features = false, features = ["std"] }
 futures-util = { version = "0.3.21", default-features = false, features = ["std"] }
 headers = { version = "0.3.7", default-features = false }
-http = { version = "0.2.7", default-features = false }
+http = { version = "0.2.8", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
-indexmap = { version = "~1.8.1", default-features = false, features = ["serde"] }
+indexmap = { version = "~1.8.2", default-features = false, features = ["serde"] }
 lookup = { path = "../lookup", features = ["arbitrary"] }
 metrics = { version = "0.17.1", default-features = false, features = ["std"]}
 metrics-tracing-context = { version = "0.9.0", default-features = false }
 metrics-util = { version = "0.10.2", default-features = false, features = ["std"] }
-mlua = { version = "0.7.4", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
-no-proxy = { version  = "0.3.1", default-features = false, features = ["serialize"] }
-once_cell = { version = "1.10", default-features = false }
+mlua = { version = "0.8.0", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
+no-proxy = { version  = "0.3.2", default-features = false, features = ["serialize"] }
+once_cell = { version = "1.12", default-features = false }
 ordered-float = { version = "3.0.0", default-features = false }
 pin-project = { version = "1.0.10", default-features = false }
-prost = { version = "0.10.3", default-features = false, features = ["std"] }
+prost = { version = "0.10.4", default-features = false, features = ["std"] }
 prost-types = { version = "0.10.1", default-features = false }
-regex = { version = "1.5.5", default-features = false, features = ["std", "perf"] }
+regex = { version = "1.5.6", default-features = false, features = ["std", "perf"] }
 serde = { version = "1.0.137", default-features = false, features = ["derive", "rc"] }
 serde_json = { version = "1.0.81", default-features = false }
 snafu = { version = "0.7.1", default-features = false }
-tokio = { version = "1.18.2", default-features = false }
+tokio = { version = "1.19.2", default-features = false }
 tokio-stream = { version = "0.1", default-features = false, features = ["time"], optional = true }
 tokio-util = { version = "0.7.0", default-features = false, features = ["time"] }
 toml = { version = "0.5.9", default-features = false }
@@ -54,12 +53,14 @@ url = { version = "2", default-features = false }
 value = { path = "../value", default-features = false, features = ["lua", "toml", "json", "api"] }
 vector_buffers = { path = "../vector-buffers", default-features = false }
 vector_common = { path = "../vector-common" }
+vector_config = { path = "../vector-config" }
+vector_config_macros = { path = "../vector-config-macros" }
 # Rename to "vrl" once we use a release with stable `-Z namespaced-features`:
 # https://doc.rust-lang.org/cargo/reference/unstable.html#namespaced-features
 vrl-lib = { package = "vrl", path = "../vrl/vrl", optional = true }
 
 [build-dependencies]
-prost-build = "0.10.3"
+prost-build = "0.10.4"
 
 [dev-dependencies]
 base64 = "0.13.0"
@@ -80,10 +81,10 @@ value = { path = "../value", default-features = false, features = ["lua", "toml"
 vrl-lib = { package = "vrl", path = "../vrl/vrl"}
 
 [features]
-api = ["async-graphql", "value/api"]
+api = ["dep:async-graphql", "value/api"]
 default = []
-lua = ["mlua", "tokio-stream"]
-vrl = ["vrl-lib", "enrichment"]
+lua = ["dep:mlua", "dep:tokio-stream"]
+vrl = ["dep:vrl-lib", "dep:enrichment"]
 test = ["vector_common/test"]
 
 [[bench]]

@@ -16,7 +16,7 @@ use crate::{
     sinks::{
         gcs_common::config::healthcheck_response,
         util::{
-            encoding::{EncodingConfigWithDefault, EncodingConfiguration},
+            encoding::Transformer,
             http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
             BatchConfig, BoxedRawValue, JsonArrayBuffer, RealtimeSizeBasedDefaultBatchSettings,
             TowerRequestConfig,
@@ -36,6 +36,9 @@ enum HealthcheckError {
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct StackdriverConfig {
+    #[serde(skip, default = "default_endpoint")]
+    endpoint: String,
+
     #[serde(flatten)]
     pub log_name: StackdriverLogName,
     pub log_id: Template,
@@ -46,10 +49,10 @@ pub struct StackdriverConfig {
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
     #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
+    pub encoding: Transformer,
 
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
@@ -66,6 +69,10 @@ pub struct StackdriverConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
+fn default_endpoint() -> String {
+    "https://logging.googleapis.com/v2/entries:write".to_string()
+}
+
 #[derive(Clone, Debug)]
 struct StackdriverSink {
     config: StackdriverConfig,
@@ -76,14 +83,6 @@ struct StackdriverSink {
 
 // 10MB limit for entries.write: https://cloud.google.com/logging/quotas#api-limits
 const MAX_BATCH_PAYLOAD_SIZE: usize = 10_000_000;
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-pub enum Encoding {
-    #[derivative(Default)]
-    Default,
-}
 
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
@@ -113,8 +112,6 @@ inventory::submit! {
 
 impl_generate_config_from_default!(StackdriverConfig);
 
-const ENDPOINT_URI: &str = "https://logging.googleapis.com/v2/entries:write";
-
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_stackdriver_logs")]
 impl SinkConfig for StackdriverConfig {
@@ -138,7 +135,7 @@ impl SinkConfig for StackdriverConfig {
             config: self.clone(),
             creds,
             severity_key: self.severity_key.clone(),
-            uri: ENDPOINT_URI.parse().unwrap(),
+            uri: self.endpoint.parse().unwrap(),
         };
 
         let healthcheck = healthcheck(client.clone(), sink.clone()).boxed();
@@ -211,7 +208,7 @@ impl HttpEventEncoder<serde_json::Value> for StackdriverEventEncoder {
             .unwrap_or_else(|| 0.into());
 
         let mut event = Event::Log(log);
-        self.config.encoding.apply_rules(&mut event);
+        self.config.encoding.transform(&mut event);
 
         let log = event.into_log();
 
@@ -336,15 +333,44 @@ impl StackdriverConfig {
 #[cfg(test)]
 mod tests {
     use chrono::{TimeZone, Utc};
+    use futures::{future::ready, stream};
     use indoc::indoc;
     use serde_json::value::RawValue;
 
     use super::*;
-    use crate::event::{LogEvent, Value};
+    use crate::{
+        config::{GenerateConfig, SinkConfig, SinkContext},
+        event::{LogEvent, Value},
+        test_util::{
+            components::{run_and_assert_sink_compliance, SINK_TAGS},
+            http::{always_200_response, spawn_blackhole_http_server},
+        },
+    };
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<StackdriverConfig>();
+    }
+
+    #[tokio::test]
+    async fn component_spec_compliance() {
+        let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
+
+        let config = StackdriverConfig::generate_config().to_string();
+        let mut config =
+            toml::from_str::<StackdriverConfig>(&config).expect("config should be valid");
+
+        // If we don't override the credentials path/API key, it tries to directly call out to the Google Instance
+        // Metadata API, which we clearly don't have in unit tests. :)
+        config.auth.credentials_path = None;
+        config.auth.api_key = Some("fake".to_string());
+        config.endpoint = mock_endpoint.to_string();
+
+        let context = SinkContext::new_test();
+        let (sink, _healthcheck) = config.build(context).await.unwrap();
+
+        let event = Event::from("simple message");
+        run_and_assert_sink_compliance(sink, stream::once(ready(event)), &SINK_TAGS).await;
     }
 
     #[test]
@@ -363,7 +389,7 @@ mod tests {
             config,
             creds: None,
             severity_key: Some("anumber".into()),
-            uri: ENDPOINT_URI.parse().unwrap(),
+            uri: default_endpoint().parse().unwrap(),
         };
         let mut encoder = sink.build_encoder();
 
@@ -405,7 +431,7 @@ mod tests {
             config,
             creds: None,
             severity_key: Some("anumber".into()),
-            uri: ENDPOINT_URI.parse().unwrap(),
+            uri: default_endpoint().parse().unwrap(),
         };
         let mut encoder = sink.build_encoder();
 
@@ -474,7 +500,7 @@ mod tests {
             config,
             creds: None,
             severity_key: None,
-            uri: ENDPOINT_URI.parse().unwrap(),
+            uri: default_endpoint().parse().unwrap(),
         };
         let mut encoder = sink.build_encoder();
 

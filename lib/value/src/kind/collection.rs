@@ -213,21 +213,40 @@ impl<T: Ord> Collection<T> {
     /// - If a field exists in both collections, their `Kind`s are merged, or the `other` fields
     ///   are used (depending on the configured [`Strategy`](merge::Strategy)).
     ///
-    /// - If a field exists in one but not the other, the field is used.
+    /// - If a field exists in one but not the other, the field is merged with the "unknown"
+    ///   of the other if it exists, or just the field is used otherwise.
     ///
     /// For *unknown fields or indices*:
     ///
     /// - Both `Unknown`s are merged, similar to merging two `Kind`s.
     pub fn merge(&mut self, mut other: Self, strategy: merge::Strategy) {
-        self.known
-            .iter_mut()
-            .for_each(|(key, self_kind)| match other.known.remove(key) {
-                Some(other_kind) if strategy.depth.is_shallow() => *self_kind = other_kind,
-                Some(other_kind) => self_kind.merge(other_kind, strategy),
-                _ => {}
-            });
+        for (key, self_kind) in &mut self.known {
+            if let Some(other_kind) = other.known.remove(key) {
+                if strategy.depth.is_shallow() {
+                    *self_kind = other_kind;
+                } else {
+                    self_kind.merge(other_kind, strategy);
+                }
+            } else if let Some(other_unknown) = other.unknown() {
+                if strategy.depth.is_shallow() {
+                    *self_kind = other_unknown.to_kind().into_owned();
+                } else {
+                    self_kind.merge(other_unknown.to_kind().into_owned(), strategy);
+                }
+            }
+        }
 
-        self.known.extend(other.known);
+        let self_unknown_kind = self.unknown().map(|unknown| unknown.to_kind().into_owned());
+        if let Some(self_unknown_kind) = self_unknown_kind {
+            for (key, mut other_kind) in other.known {
+                if !strategy.depth.is_shallow() {
+                    other_kind.merge(self_unknown_kind.clone(), strategy);
+                }
+                self.known_mut().insert(key, other_kind);
+            }
+        } else {
+            self.known.extend(other.known);
+        }
 
         match (self.unknown.as_mut(), other.unknown) {
             (None, Some(rhs)) => self.unknown = Some(rhs),
@@ -237,29 +256,28 @@ impl<T: Ord> Collection<T> {
     }
 
     /// Return the reduced `Kind` of the items within the collection.
+    /// This only returns the type of _existing_ values in the collection. Accessing
+    /// a non-existing value can return null which is not added to the type here.
     pub fn reduced_kind(&self) -> Kind {
         let strategy = merge::Strategy {
             depth: merge::Depth::Deep,
             indices: merge::Indices::Keep,
         };
 
-        self.known
+        let mut kind = self
+            .known
             .values()
             .cloned()
             .reduce(|mut lhs, rhs| {
                 lhs.merge(rhs, strategy);
                 lhs
             })
-            .map_or_else(Kind::any, |kind| {
-                self.unknown
-                    .as_ref()
-                    .map(|unknown| {
-                        let mut kind = kind.clone();
-                        kind.merge(unknown.to_kind().into_owned(), strategy);
-                        kind
-                    })
-                    .unwrap_or(kind)
-            })
+            .unwrap_or_else(Kind::never);
+
+        if let Some(unknown) = &self.unknown {
+            kind.merge(unknown.to_kind().into_owned(), strategy);
+        }
+        kind
     }
 }
 
