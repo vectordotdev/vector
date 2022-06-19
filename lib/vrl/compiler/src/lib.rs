@@ -24,7 +24,7 @@ pub use core::{
 use std::{fmt::Display, str::FromStr};
 
 use ::serde::{Deserialize, Serialize};
-pub use context::Context;
+pub use context::{BatchContext, BatchContextIterMut, Context};
 use diagnostic::DiagnosticList;
 pub(crate) use diagnostic::Span;
 pub use expression::Expression;

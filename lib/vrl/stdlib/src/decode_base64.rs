@@ -82,6 +82,10 @@ impl Expression for DecodeBase64Fn {
         decode_base64(charset, value)
     }
 
+    fn resolve_batch(&self, ctx: &mut BatchContext) {
+        todo!("resolve_batch")
+    }
+
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         // Always fallible due to the possibility of decoding errors that VRL can't detect in
         // advance: https://docs.rs/base64/0.13.0/base64/enum.DecodeError.html

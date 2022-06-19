@@ -64,6 +64,10 @@ impl Expression for TimestampFn {
         timestamp(value)
     }
 
+    fn resolve_batch(&self, ctx: &mut BatchContext) {
+        todo!("resolve_batch")
+    }
+
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         let non_timestamp = !self.value.type_def(state).is_timestamp();
 

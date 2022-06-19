@@ -5,6 +5,7 @@ use value::Value;
 
 use crate::state::{ExternalEnv, LocalEnv};
 use crate::value::VrlValueArithmetic;
+use crate::BatchContext;
 use crate::{
     expression::{self, Expr, Resolved},
     parser::{ast, Node},
@@ -98,7 +99,7 @@ impl Expression for Op {
                 };
             }
             _ => (),
-        };
+        }
 
         let lhs = self.lhs.resolve(ctx)?;
         let rhs = self.rhs.resolve(ctx)?;
@@ -119,6 +120,169 @@ impl Expression for Op {
             And | Or | Err => unreachable!(),
         }
         .map_err(Into::into)
+    }
+
+    fn resolve_batch(&self, ctx: &mut BatchContext) {
+        use ast::Opcode::*;
+        use value::Value::*;
+
+        match self.opcode {
+            Err => {
+                return for (resolved, target, state, timezone) in ctx.iter_mut() {
+                    let target = &mut *(*target).borrow_mut();
+                    let state = &mut *(*state).borrow_mut();
+                    let mut ctx = Context::new(target, state, &timezone);
+                    let ctx = &mut ctx;
+                    *resolved = self.lhs.resolve(ctx).or_else(|_| self.rhs.resolve(ctx));
+                }
+            }
+            Or => {
+                return for (resolved, target, state, timezone) in ctx.iter_mut() {
+                    let target = &mut *(*target).borrow_mut();
+                    let state = &mut *(*state).borrow_mut();
+                    let mut ctx = Context::new(target, state, &timezone);
+                    let ctx = &mut ctx;
+                    *resolved = (|| {
+                        self.lhs
+                            .resolve(ctx)?
+                            .try_or(|| self.rhs.resolve(ctx))
+                            .map_err(Into::into)
+                    })();
+                }
+            }
+            And => {
+                return for (resolved, target, state, timezone) in ctx.iter_mut() {
+                    let target = &mut *(*target).borrow_mut();
+                    let state = &mut *(*state).borrow_mut();
+                    let mut ctx = Context::new(target, state, &timezone);
+                    let ctx = &mut ctx;
+                    *resolved = (|| match self.lhs.resolve(ctx)? {
+                        Null | Boolean(false) => Ok(false.into()),
+                        v => v.try_and(self.rhs.resolve(ctx)?).map_err(Into::into),
+                    })();
+                }
+            }
+            _ => (),
+        }
+
+        self.lhs.resolve_batch(ctx);
+        let ctx_lhs_err = ctx.drain_filter(|resolved| resolved.is_err());
+        let lhs = {
+            let mut moved = vec![Ok(Value::Null); ctx.len()];
+            std::mem::swap(ctx.resolved_values_mut(), &mut moved);
+            moved
+        };
+        self.rhs.resolve_batch(ctx);
+        let mut ctx_rhs_ok_resolved_values = Vec::with_capacity(ctx.len());
+        let mut ctx_rhs_ok_targets = Vec::with_capacity(ctx.len());
+        let mut ctx_rhs_ok_states = Vec::with_capacity(ctx.len());
+        let mut ctx_rhs_err_resolved_values = Vec::new();
+        let mut ctx_rhs_err_targets = Vec::new();
+        let mut ctx_rhs_err_states = Vec::new();
+
+        for ((rhs, target, state, _), lhs) in ctx.iter_mut().zip(lhs) {
+            if rhs.is_err() {
+                let rhs = {
+                    let mut moved = Ok(Value::Null);
+                    std::mem::swap(rhs, &mut moved);
+                    moved
+                };
+
+                ctx_rhs_err_resolved_values.push(rhs);
+                ctx_rhs_err_targets.push(target);
+                ctx_rhs_err_states.push(state);
+            } else {
+                ctx_rhs_ok_resolved_values.push((lhs, rhs));
+                ctx_rhs_ok_targets.push(target);
+                ctx_rhs_ok_states.push(state);
+            }
+        }
+
+        let values = ctx_rhs_ok_resolved_values.into_iter().map(|(lhs, rhs)| {
+            let resolved = rhs;
+            let lhs = lhs.expect("is not an error");
+            let rhs = {
+                let mut moved = Ok(Value::Null);
+                std::mem::swap(resolved, &mut moved);
+                moved
+            }
+            .expect("is not an error");
+            (resolved, lhs, rhs)
+        });
+
+        match self.opcode {
+            Mul => {
+                values.for_each(|(resolved, lhs, rhs)| {
+                    *resolved = lhs.try_mul(rhs).map_err(Into::into);
+                });
+            }
+            Div => {
+                values.for_each(|(resolved, lhs, rhs)| {
+                    *resolved = lhs.try_div(rhs).map_err(Into::into);
+                });
+            }
+            Add => {
+                values.for_each(|(resolved, lhs, rhs)| {
+                    *resolved = lhs.try_add(rhs).map_err(Into::into);
+                });
+            }
+            Sub => {
+                values.for_each(|(resolved, lhs, rhs)| {
+                    *resolved = lhs.try_sub(rhs).map_err(Into::into);
+                });
+            }
+            Rem => {
+                values.for_each(|(resolved, lhs, rhs)| {
+                    *resolved = lhs.try_rem(rhs).map_err(Into::into);
+                });
+            }
+            Eq => {
+                values.for_each(|(resolved, lhs, rhs)| {
+                    *resolved = Ok(lhs.eq_lossy(&rhs).into());
+                });
+            }
+            Ne => {
+                values.for_each(|(resolved, lhs, rhs)| {
+                    *resolved = Ok((!lhs.eq_lossy(&rhs)).into());
+                });
+            }
+            Gt => {
+                values.for_each(|(resolved, lhs, rhs)| {
+                    *resolved = lhs.try_gt(rhs).map_err(Into::into);
+                });
+            }
+            Ge => {
+                values.for_each(|(resolved, lhs, rhs)| {
+                    *resolved = lhs.try_ge(rhs).map_err(Into::into);
+                });
+            }
+            Lt => {
+                values.for_each(|(resolved, lhs, rhs)| {
+                    *resolved = lhs.try_lt(rhs).map_err(Into::into);
+                });
+            }
+            Le => {
+                values.for_each(|(resolved, lhs, rhs)| {
+                    *resolved = lhs.try_le(rhs).map_err(Into::into);
+                });
+            }
+            Merge => {
+                values.for_each(|(resolved, lhs, rhs)| {
+                    *resolved = lhs.try_merge(rhs).map_err(Into::into);
+                });
+            }
+            And | Or | Err => unreachable!(),
+        }
+
+        let ctx_rhs_err = BatchContext::new(
+            ctx_rhs_err_resolved_values,
+            ctx_rhs_err_targets,
+            ctx_rhs_err_states,
+            ctx.timezone(),
+        );
+
+        ctx.extend(ctx_lhs_err);
+        ctx.extend(ctx_rhs_err);
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {

@@ -3,7 +3,7 @@ use lookup::LookupBuf;
 use crate::{
     expression::{Block, Resolved},
     state::LocalEnv,
-    Context, Expression,
+    BatchContext, Context, Expression,
 };
 
 #[derive(Debug, Clone)]
@@ -34,6 +34,11 @@ impl Program {
     /// Resolve the program to its final [`Value`].
     pub fn resolve(&self, ctx: &mut Context) -> Resolved {
         self.expressions.resolve(ctx)
+    }
+
+    /// Resolve the program to its final [`Value`]s.
+    pub fn resolve_batch(&self, ctx: &mut BatchContext) {
+        self.expressions.resolve_batch(ctx);
     }
 }
 

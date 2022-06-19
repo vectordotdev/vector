@@ -88,6 +88,10 @@ impl Expression for ParseCsvFn {
         parse_csv(csv_string, delimiter)
     }
 
+    fn resolve_batch(&self, ctx: &mut BatchContext) {
+        todo!("resolve_batch")
+    }
+
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::array(inner_kind()).fallible()
     }

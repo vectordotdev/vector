@@ -6,7 +6,7 @@ use crate::{
     expression::{levenstein, Resolved},
     parser::ast::Ident,
     state::{ExternalEnv, LocalEnv},
-    Context, Expression, Span, TypeDef,
+    BatchContext, Context, Expression, Span, TypeDef,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -48,6 +48,23 @@ impl Expression for Variable {
             .variable(&self.ident)
             .cloned()
             .unwrap_or(Value::Null))
+    }
+
+    fn resolve_batch(&self, ctx: &mut BatchContext) {
+        let variables = ctx
+            .states()
+            .map(|state| {
+                state
+                    .borrow_mut()
+                    .variable(&self.ident)
+                    .cloned()
+                    .unwrap_or(Value::Null)
+            })
+            .collect::<Vec<_>>();
+
+        for (resolved, variable) in ctx.resolved_values_mut().iter_mut().zip(variables) {
+            *resolved = Ok(variable);
+        }
     }
 
     fn type_def(&self, (local, _): (&LocalEnv, &ExternalEnv)) -> TypeDef {

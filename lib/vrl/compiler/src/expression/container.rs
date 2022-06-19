@@ -3,7 +3,7 @@ use std::fmt;
 use crate::{
     expression::{Array, Block, Group, Object, Resolved, Value},
     state::{ExternalEnv, LocalEnv},
-    Context, Expression, TypeDef,
+    BatchContext, Context, Expression, TypeDef,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -34,6 +34,17 @@ impl Expression for Container {
             Block(v) => v.resolve(ctx),
             Array(v) => v.resolve(ctx),
             Object(v) => v.resolve(ctx),
+        }
+    }
+
+    fn resolve_batch(&self, ctx: &mut BatchContext) {
+        use Variant::*;
+
+        match &self.variant {
+            Group(v) => v.resolve_batch(ctx),
+            Block(v) => v.resolve_batch(ctx),
+            Array(v) => v.resolve_batch(ctx),
+            Object(v) => v.resolve_batch(ctx),
         }
     }
 

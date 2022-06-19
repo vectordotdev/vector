@@ -8,7 +8,7 @@ use crate::{
     parser::ast::Ident,
     state::{ExternalEnv, LocalEnv},
     type_def::Details,
-    Context, Expression, TypeDef,
+    BatchContext, Context, Expression, TypeDef,
 };
 
 #[derive(Clone, PartialEq)]
@@ -103,6 +103,45 @@ impl Expression for Query {
             .get_by_path(&self.path)
             .cloned()
             .unwrap_or(Value::Null))
+    }
+
+    fn resolve_batch(&self, ctx: &mut BatchContext) {
+        use Target::*;
+
+        match &self.target {
+            External => {
+                let targets = ctx.targets().collect::<Vec<_>>();
+                return ctx.resolved_values_mut().iter_mut().zip(targets).for_each(
+                    |(resolved, target)| {
+                        let target = &mut *(*target).borrow_mut();
+                        *resolved = Ok(target
+                            .target_get(&self.path)
+                            .ok()
+                            .flatten()
+                            .cloned()
+                            .unwrap_or(Value::Null));
+                    },
+                );
+            }
+            Internal(variable) => variable.resolve_batch(ctx),
+            FunctionCall(call) => call.resolve_batch(ctx),
+            Container(container) => container.resolve_batch(ctx),
+        };
+
+        for resolved_value in ctx.resolved_values_mut() {
+            let resolved = {
+                let mut moved = Ok(Value::Null);
+                std::mem::swap(resolved_value, &mut moved);
+                moved
+            };
+
+            *resolved_value = resolved.map(|value| {
+                value
+                    .get_by_path(&self.path)
+                    .cloned()
+                    .unwrap_or(Value::Null)
+            });
+        }
     }
 
     fn as_value(&self) -> Option<Value> {

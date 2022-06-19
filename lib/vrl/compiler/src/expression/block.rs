@@ -1,7 +1,7 @@
 use crate::{
     expression::{Expr, Resolved},
     state::{ExternalEnv, LocalEnv},
-    Context, Expression, TypeDef,
+    BatchContext, Context, Expression, TypeDef,
 };
 use std::fmt;
 
@@ -32,7 +32,7 @@ impl Expression for Block {
         // NOTE:
         //
         // Technically, this invalidates the scoping invariant of variables
-        // defined in child scopes to not be accessible in parrent scopes.
+        // defined in child scopes to not be accessible in parent scopes.
         //
         // However, because we guard against this (using the "undefined
         // variable" check) at compile-time, we can omit any (costly) run-time
@@ -47,6 +47,19 @@ impl Expression for Block {
             .try_for_each(|expr| expr.resolve(ctx).map(|_| ()))?;
 
         last.resolve(ctx)
+    }
+
+    fn resolve_batch(&self, ctx: &mut BatchContext) {
+        let mut ctx_err = BatchContext::empty_with_timezone(ctx.timezone());
+
+        for block in &self.inner {
+            block.resolve_batch(ctx);
+
+            let ctx_err_new = ctx.drain_filter(|resolved| resolved.is_err());
+            ctx_err.extend(ctx_err_new);
+        }
+
+        ctx.extend(ctx_err);
     }
 
     /// If an expression has a "never" type, it is considered a "terminating" expression.

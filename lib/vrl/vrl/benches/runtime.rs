@@ -15,6 +15,13 @@ struct Source {
 
 static SOURCES: &[Source] = &[
     Source {
+        name: "literal",
+        target: "{}",
+        program: indoc! {r#"
+            "Hello, world!"
+        "#},
+    },
+    Source {
         name: "parse_json",
         target: r#"
             {

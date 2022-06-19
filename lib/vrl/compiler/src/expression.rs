@@ -6,7 +6,7 @@ use value::Value;
 
 use crate::{
     state::{ExternalEnv, LocalEnv},
-    Context, Span, TypeDef,
+    BatchContext, Context, Span, TypeDef,
 };
 
 #[cfg(feature = "expr-abort")]
@@ -78,6 +78,13 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     ///
     /// An expression is allowed to fail, which aborts the running program.
     fn resolve(&self, ctx: &mut Context) -> Resolved;
+
+    /// Resolve a batch of expression to a concrete [`Value`]s.
+    ///
+    /// This method is executed at runtime.
+    ///
+    /// An expression is allowed to fail, which aborts the running program.
+    fn resolve_batch(&self, ctx: &mut BatchContext);
 
     /// Resolve an expression to a value without any context, if possible.
     ///
@@ -250,6 +257,32 @@ impl Expression for Expr {
             Unary(v) => v.resolve(ctx),
             #[cfg(feature = "expr-abort")]
             Abort(v) => v.resolve(ctx),
+        }
+    }
+
+    fn resolve_batch(&self, ctx: &mut BatchContext) {
+        use Expr::*;
+
+        match self {
+            #[cfg(feature = "expr-literal")]
+            Literal(v) => v.resolve_batch(ctx),
+            Container(v) => v.resolve_batch(ctx),
+            #[cfg(feature = "expr-if_statement")]
+            IfStatement(v) => v.resolve_batch(ctx),
+            #[cfg(feature = "expr-op")]
+            Op(v) => v.resolve_batch(ctx),
+            #[cfg(feature = "expr-assignment")]
+            Assignment(v) => v.resolve_batch(ctx),
+            #[cfg(feature = "expr-query")]
+            Query(v) => v.resolve_batch(ctx),
+            #[cfg(feature = "expr-function_call")]
+            FunctionCall(v) => v.resolve_batch(ctx),
+            Variable(v) => v.resolve_batch(ctx),
+            Noop(v) => v.resolve_batch(ctx),
+            #[cfg(feature = "expr-unary")]
+            Unary(v) => v.resolve_batch(ctx),
+            #[cfg(feature = "expr-abort")]
+            Abort(v) => v.resolve_batch(ctx),
         }
     }
 

@@ -234,6 +234,10 @@ impl Expression for CompactFn {
         compact(recursive, null, string, object, array, nullish, value)
     }
 
+    fn resolve_batch(&self, ctx: &mut BatchContext) {
+        todo!("resolve_batch")
+    }
+
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         if self.value.type_def(state).is_array() {
             TypeDef::array(Collection::any())

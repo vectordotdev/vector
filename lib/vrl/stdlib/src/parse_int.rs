@@ -107,6 +107,10 @@ impl Expression for ParseIntFn {
         parse_int(value, base)
     }
 
+    fn resolve_batch(&self, ctx: &mut BatchContext) {
+        todo!("resolve_batch")
+    }
+
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::integer().fallible()
     }

@@ -3,7 +3,7 @@ use std::fmt;
 use crate::{
     expression::{Not, Resolved},
     state::{ExternalEnv, LocalEnv},
-    Context, Expression, TypeDef,
+    BatchContext, Context, Expression, TypeDef,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -28,6 +28,14 @@ impl Expression for Unary {
 
         match &self.variant {
             Not(v) => v.resolve(ctx),
+        }
+    }
+
+    fn resolve_batch(&self, ctx: &mut BatchContext) {
+        use Variant::*;
+
+        match &self.variant {
+            Not(v) => v.resolve_batch(ctx),
         }
     }
 

@@ -63,6 +63,10 @@ impl Expression for FloatFn {
         float(self.value.resolve(ctx)?)
     }
 
+    fn resolve_batch(&self, ctx: &mut BatchContext) {
+        todo!("resolve_batch")
+    }
+
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         let non_float = !self.value.type_def(state).is_float();
 
