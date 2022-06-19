@@ -442,3 +442,16 @@ impl MaybeAsLogMut for Event {
         }
     }
 }
+
+pub trait MaybeAsLog {
+    fn maybe_as_log(&self) -> Option<&LogEvent>;
+}
+
+impl MaybeAsLog for Event {
+    fn maybe_as_log(&self) -> Option<&LogEvent> {
+        match self {
+            Event::Log(log) => Some(log),
+            _ => None,
+        }
+    }
+}

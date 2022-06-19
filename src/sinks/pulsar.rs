@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use vector_buffers::Acker;
 use vector_common::internal_event::{BytesSent, EventsSent};
-use vector_core::event::MaybeAsLogMut;
+use vector_core::event::MaybeAsLog;
 
 use crate::{
     config::{
@@ -270,7 +270,7 @@ impl Sink<Event> for PulsarSink {
         Poll::Ready(Ok(()))
     }
 
-    fn start_send(mut self: Pin<&mut Self>, mut item: Event) -> Result<(), Self::Error> {
+    fn start_send(mut self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
         assert!(
             matches!(self.state, PulsarSinkState::Ready(_)),
             "Expected `poll_ready` to be called first."
@@ -278,7 +278,7 @@ impl Sink<Event> for PulsarSink {
 
         let metadata_builder = RequestMetadata::builder(&item);
         let event_time = item
-            .maybe_as_log_mut()
+            .maybe_as_log()
             .map(|log| log.get(log_schema().timestamp_key())
                 .map(|v| v.as_timestamp().map(|dt| dt.timestamp_millis()))
                 .unwrap_or(None))
