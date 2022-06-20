@@ -50,14 +50,14 @@ where
     }
 
     fn call(&mut self, req: Req) -> Self::Future {
-        PollReadyFuture::PollReady(self.inner.clone(), Some(req))
+        PollReadyFuture::PollReady(Arc::clone(&self.inner), Some(req))
     }
 }
 
 impl<S> Clone for CloneService<S> {
     fn clone(&self) -> Self {
         CloneService {
-            inner: self.inner.clone(),
+            inner: Arc::clone(&self.inner),
         }
     }
 }
@@ -89,7 +89,7 @@ where
                 self.as_mut().project_replace(PollReadyFuture::Called(fut));
                 self.poll(cx)
             }
-            PollReadyProj::Called(future) => return future.poll(cx),
+            PollReadyProj::Called(future) => future.poll(cx),
         }
     }
 }

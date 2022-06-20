@@ -45,11 +45,11 @@ impl<S, RL> HealthService<S, RL> {
         inner: S,
         healthcheck: impl Fn() -> BoxFuture<'static, bool> + Send + 'static,
         logic: RL,
-        reactivate_delay: std::time::Duration,
+        reactivate_delay: Duration,
     ) -> Self {
         HealthService {
             inner,
-            reactivate_delay: reactivate_delay.into(),
+            reactivate_delay,
             logic,
             request_handle: Arc::new(AtomicUsize::new(0)),
             state: ServiceState::Healthcheck(healthcheck()),
