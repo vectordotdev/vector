@@ -92,6 +92,8 @@ where
                     if healthcheck {
                         ServiceState::Healthcheck((self.healthcheck)())
                     } else {
+                        // Clear errors
+                        self.request_handle.store(0, Ordering::Release);
                         ServiceState::Ready
                     }
                 }
