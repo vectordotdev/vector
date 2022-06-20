@@ -50,7 +50,7 @@ const NAME: &str = "gcp_chronicle_unstructured";
 // https://cloud.google.com/chronicle/docs/reference/ingestion-api#ingestion_api_reference
 // We can send UDM (unified data model - https://cloud.google.com/chronicle/docs/reference/udm-field-list)
 // events or unstructured log entries.
-const CHRONICLE_URL: &str = "https://malachiteingestion-pa.googleapis.com";
+// const CHRONICLE_URL: &str = "https://malachiteingestion-pa.googleapis.com";
 
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
@@ -62,9 +62,30 @@ pub enum GcsHealthcheckError {
     NotFound,
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Region {
+    Eu,
+    Us,
+    Asia,
+}
+
+impl Region {
+    /// Each region has a it's own endpoint.
+    fn endpoint(&self) -> &'static str {
+        match self {
+            Region::Eu => "europe-malachiteingestion-pa.googleapis.com",
+            Region::Us => "malachiteingestion-pa.googleapis.com",
+            Region::Asia => "southeast1-malachiteingestion-pa.googleapis.com",
+        }
+    }
+}
+
 #[derive(Deserialize, Serialize, Debug)]
 pub struct GcsChronicleUnstructuredConfig {
     pub endpoint: Option<String>,
+    pub region: Option<Region>,
+    pub customer_id: String,
     #[serde(default = "default_skip_authentication")]
     pub skip_authentication: bool,
     #[serde(flatten)]
@@ -101,7 +122,6 @@ inventory::submit! {
 impl GenerateConfig for GcsChronicleUnstructuredConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(indoc! {r#"
-            log_type = "WINDOWS_DNS"
             credentials_path = "/path/to/credentials.json"
             encoding.codec = "ndjson"
         "#})
@@ -131,6 +151,12 @@ pub fn build_healthcheck(
     Ok(Box::pin(healthcheck))
 }
 
+#[derive(Debug, Snafu)]
+pub enum ChronicleError {
+    #[snafu(display("Region or endpoint not defined"))]
+    RegionOrEndpoint,
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_chronicle_unstructured")]
 impl SinkConfig for GcsChronicleUnstructuredConfig {
@@ -139,18 +165,24 @@ impl SinkConfig for GcsChronicleUnstructuredConfig {
             None
         } else {
             self.auth
-                // TODO This needs to be `https://www.googleapis.com/auth/malachite-ingestion`
-                .make_credentials(Scope::DevStorageReadWrite)
+                .make_credentials(Scope::MalachiteIngestion)
                 .await?
         };
 
         let tls = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls, cx.proxy())?;
 
-        let endpoint = self
-            .endpoint
-            .clone()
-            .unwrap_or_else(|| format!("{}/v2/unstructuredlogentries:batchCreate", CHRONICLE_URL));
+        let endpoint = self.endpoint.clone().unwrap_or_else(|| {
+            let s = format!(
+                "https://{}/v2/unstructuredlogentries:batchCreate",
+                self.region
+                    .unwrap()
+                    // .ok_or_else(|| ChronicleError::RegionOrEndpoint)
+                    .endpoint()
+            );
+
+            s
+        });
 
         let healthcheck = build_healthcheck(client.clone(), &endpoint, creds.clone())?;
         let sink = self.build_sink(client, endpoint, creds, cx)?;
@@ -225,7 +257,9 @@ impl Finalizable for ChronicleRequest {
 }
 
 #[derive(Clone, Debug)]
-struct ChronicleEncoder;
+struct ChronicleEncoder {
+    customer_id: String,
+}
 
 impl Encoder<(String, Vec<Event>)> for ChronicleEncoder {
     fn encode_input(
@@ -244,10 +278,12 @@ impl Encoder<(String, Vec<Event>)> for ChronicleEncoder {
             .collect::<Vec<_>>();
 
         let json = json!({
-            "customer_id": "zork",
+            "customer_id": self.customer_id,
             "log_type": partition_key,
             "entries": events,
         });
+
+        dbg!(&json);
 
         let body = crate::serde::json::to_bytes(&json)?.freeze();
         writer.write(&body)
@@ -322,7 +358,9 @@ impl RequestSettings {
 
         Ok(Self {
             compression: config.compression,
-            encoder: ChronicleEncoder,
+            encoder: ChronicleEncoder {
+                customer_id: config.customer_id.clone(),
+            },
         })
     }
 }
@@ -354,6 +392,7 @@ impl Service<ChronicleRequest> for ChronicleService {
     }
 
     fn call(&mut self, request: ChronicleRequest) -> Self::Future {
+        dbg!(&self.base_url);
         let mut builder = Request::put(&self.base_url);
         let headers = builder.headers_mut().unwrap();
         headers.insert(
