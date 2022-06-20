@@ -1091,6 +1091,10 @@ mod tests {
     fn test_get_socket_protocol_name() {
         assert_eq!("UDP", to_socket_protocol_name(1).unwrap());
         assert_eq!("TCP", to_socket_protocol_name(2).unwrap());
-        assert!(to_socket_protocol_name(3).is_err());
+        assert_eq!("DOT", to_socket_protocol_name(3).unwrap());
+        assert_eq!("DOH", to_socket_protocol_name(4).unwrap());
+        assert_eq!("DNSCryptUDP", to_socket_protocol_name(5).unwrap());
+        assert_eq!("DNSCryptTCP", to_socket_protocol_name(6).unwrap());
+        assert!(to_socket_protocol_name(7).is_err());
     }
 }
