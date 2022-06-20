@@ -195,25 +195,54 @@ impl SourceConfig for PubsubConfig {
 
         let endpoint = self.endpoint.as_deref().unwrap_or(PUBSUB_URL).to_string();
         let uri: Uri = endpoint.parse().context(UriSnafu)?;
+
+        let tls = TlsSettings::from_options(&self.tls)?;
+        let host = uri.host().unwrap_or("pubsub.googleapis.com");
+        let mut tls_config = ClientTlsConfig::new().domain_name(host);
+        if let Some((cert, key)) = tls.identity_pem() {
+            tls_config = tls_config.identity(Identity::from_pem(cert, key));
+        }
+        for authority in tls.authorities_pem() {
+            tls_config = tls_config.ca_certificate(Certificate::from_pem(authority));
+        }
+
+        let mut endpoint = Channel::from_shared(endpoint).context(EndpointSnafu)?;
+        if uri.scheme() != Some(&Scheme::HTTP) {
+            endpoint = endpoint.tls_config(tls_config).context(EndpointTlsSnafu)?;
+        }
+
+        let token_generator = match &credentials {
+            Some(credentials) => credentials.clone().spawn_regenerate_token(),
+            None => {
+                let (sender, receiver) = watch::channel(());
+                // Dropping the sender will cause the receiver to
+                // error, but there is no good way of hanging on to it
+                // and sending nothing. This `forget` will leak one
+                // sender per instance of this source and so never
+                // drop it.
+                std::mem::forget(sender);
+                receiver
+            }
+        };
+
         let source = PubsubSource {
             endpoint,
             uri,
             credentials,
+            token_generator,
             subscription: format!(
                 "projects/{}/subscriptions/{}",
                 self.project, self.subscription
             ),
             decoder: DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build(),
             acknowledgements: cx.do_acknowledgements(&self.acknowledgements),
-            tls: TlsSettings::from_options(&self.tls)?,
             shutdown: cx.shutdown,
             out: cx.out,
             ack_deadline_seconds: self.ack_deadline_seconds,
             retry_delay: Duration::from_secs_f64(self.retry_delay_seconds),
             keepalive: Duration::from_secs_f64(self.keepalive_secs),
-            concurrency: self.concurrency,
         }
-        .run()
+        .run_all(self.concurrency)
         .map_err(|error| error!(message = "Source failed.", %error));
         Ok(Box::pin(source))
     }
@@ -235,19 +264,18 @@ impl_generate_config_from_default!(PubsubConfig);
 
 #[derive(Clone)]
 struct PubsubSource {
-    endpoint: String,
+    endpoint: Endpoint,
     uri: Uri,
     credentials: Option<GcpCredentials>,
+    token_generator: watch::Receiver<()>,
     subscription: String,
     decoder: Decoder,
     acknowledgements: bool,
-    tls: TlsSettings,
     ack_deadline_seconds: i32,
     shutdown: ShutdownSignal,
     out: SourceSender,
     retry_delay: Duration,
     keepalive: Duration,
-    concurrency: usize,
 }
 
 enum State {
@@ -257,34 +285,11 @@ enum State {
 }
 
 impl PubsubSource {
-    async fn run(self) -> crate::Result<()> {
-        let mut endpoint = Channel::from_shared(self.endpoint.clone()).context(EndpointSnafu)?;
-        if self.uri.scheme() != Some(&Scheme::HTTP) {
-            endpoint = endpoint
-                .tls_config(self.make_tls_config())
-                .context(EndpointTlsSnafu)?;
-        }
-
-        let token_generator = match &self.credentials {
-            Some(credentials) => credentials.clone().spawn_regenerate_token(),
-            None => {
-                let (sender, receiver) = watch::channel(());
-                // Dropping the sender will cause the receiver to
-                // error, but there is no good way of hanging on to it
-                // and sending nothing. This `forget` will leak one
-                // sender per instance of this source and so never
-                // drop it.
-                std::mem::forget(sender);
-                receiver
-            }
-        };
-
-        let tasks: Vec<_> = (0..self.concurrency)
-            .map(|_| {
-                tokio::spawn(
-                    self.clone()
-                        .run_loop(endpoint.clone(), token_generator.clone()),
-                )
+    async fn run_all(self, concurrency: usize) -> crate::Result<()> {
+        let tasks: Vec<_> = (0..concurrency)
+            .map(|i| {
+                debug!("Starting stream #{}.", i);
+                tokio::spawn(self.clone().run())
             })
             .collect();
 
@@ -293,9 +298,9 @@ impl PubsubSource {
         Ok(())
     }
 
-    async fn run_loop(mut self, endpoint: Endpoint, mut token_generator: watch::Receiver<()>) {
+    async fn run(mut self) {
         loop {
-            match self.run_once(&endpoint, &mut token_generator).await {
+            match self.run_once().await {
                 State::RetryNow => debug!("Retrying immediately."),
                 State::RetryDelay => {
                     info!(
@@ -309,12 +314,8 @@ impl PubsubSource {
         }
     }
 
-    async fn run_once(
-        &mut self,
-        endpoint: &Endpoint,
-        token_generator: &mut watch::Receiver<()>,
-    ) -> State {
-        let connection = match endpoint.connect().await {
+    async fn run_once(&mut self) -> State {
+        let connection = match self.endpoint.connect().await {
             Ok(connection) => connection,
             Err(error) => {
                 emit!(GcpPubsubConnectError { error });
@@ -363,7 +364,7 @@ impl PubsubSource {
         loop {
             tokio::select! {
                 _ = &mut self.shutdown => return State::Shutdown,
-                _ = token_generator.changed() => {
+                _ = self.token_generator.changed() => {
                     debug!("New authentication token generated, restarting stream.");
                     break State::RetryNow;
                 },
@@ -383,18 +384,6 @@ impl PubsubSource {
                 },
             }
         }
-    }
-
-    fn make_tls_config(&self) -> ClientTlsConfig {
-        let host = self.uri.host().unwrap_or("pubsub.googleapis.com");
-        let mut config = ClientTlsConfig::new().domain_name(host);
-        if let Some((cert, key)) = self.tls.identity_pem() {
-            config = config.identity(Identity::from_pem(cert, key));
-        }
-        for authority in self.tls.authorities_pem() {
-            config = config.ca_certificate(Certificate::from_pem(authority));
-        }
-        config
     }
 
     fn request_stream(
