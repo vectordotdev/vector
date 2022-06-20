@@ -38,6 +38,21 @@ pub type InnerSvc<S, L> = RateLimit<AdaptiveConcurrencyLimit<Retry<FixedRetryPol
 pub type Svc<S, L> = InnerSvc<Timeout<S>, L>;
 pub type TowerBatchedSink<S, B, RL> = BatchSink<Svc<S, RL>, B>;
 pub type TowerPartitionSink<S, B, RL, K> = PartitionBatchSink<Svc<S, RL>, B, K>;
+pub type DistributedService<S, RL, K, Req> = InnerSvc<
+    CloneService<
+        Balance<
+            Pin<
+                Box<
+                    dyn Stream<
+                            Item = Result<Change<K, HealthService<Timeout<S>, RL>>, crate::Error>,
+                        > + Send,
+                >,
+            >,
+            Req,
+        >,
+    >,
+    RL,
+>;
 
 pub trait ServiceBuilderExt<L> {
     fn map<R1, R2, F>(self, f: F) -> ServiceBuilder<Stack<MapLayer<R1, R2>, L>>
@@ -263,24 +278,7 @@ impl TowerRequestSettings {
         retry_logic: RL,
         services: D,
         reactivate_delay: Duration,
-    ) -> InnerSvc<
-        CloneService<
-            Balance<
-                Pin<
-                    Box<
-                        dyn Stream<
-                                Item = Result<
-                                    Change<K, HealthService<Timeout<S>, RL>>,
-                                    crate::Error,
-                                >,
-                            > + Send,
-                    >,
-                >,
-                Req,
-            >,
-        >,
-        RL,
-    >
+    ) -> DistributedService<S, RL, K, Req>
     where
         Req: Clone + Send + 'static,
         RL: RetryLogic<Response = S::Response>,
