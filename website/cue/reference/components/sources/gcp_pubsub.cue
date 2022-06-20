@@ -68,7 +68,17 @@ components: sources: gcp_pubsub: {
 				unit: "seconds"
 			}
 		}
-		api_key:          configuration._gcp_api_key
+		api_key: configuration._gcp_api_key
+		concurrency: {
+			common:      false
+			description: "The number of concurrent stream connections to open at once."
+			required:    false
+			type: uint: {
+				default: 5
+				examples: [1, 9]
+				unit: "concurrency"
+			}
+		}
 		credentials_path: configuration._gcp_credentials_path
 		endpoint: {
 			common:      false

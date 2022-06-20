@@ -126,6 +126,10 @@ pub struct PubsubConfig {
     #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
+    /// The number of concurrent stream connections to open at once.
+    #[serde(default = "default_concurrency")]
+    pub concurrency: usize,
+
     /// The acknowledgement deadline, in seconds, to use for this stream.
     ///
     /// Messages that are not acknowledged when this deadline expires may be retransmitted.
@@ -169,6 +173,10 @@ const fn default_keepalive() -> f64 {
     60.0
 }
 
+const fn default_concurrency() -> usize {
+    5
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_pubsub")]
 impl SourceConfig for PubsubConfig {
@@ -203,6 +211,7 @@ impl SourceConfig for PubsubConfig {
             ack_deadline_seconds: self.ack_deadline_seconds,
             retry_delay: Duration::from_secs_f64(self.retry_delay_seconds),
             keepalive: Duration::from_secs_f64(self.keepalive_secs),
+            concurrency: self.concurrency,
         }
         .run()
         .map_err(|error| error!(message = "Source failed.", %error));
@@ -224,6 +233,7 @@ impl SourceConfig for PubsubConfig {
 
 impl_generate_config_from_default!(PubsubConfig);
 
+#[derive(Clone)]
 struct PubsubSource {
     endpoint: String,
     uri: Uri,
@@ -237,6 +247,7 @@ struct PubsubSource {
     out: SourceSender,
     retry_delay: Duration,
     keepalive: Duration,
+    concurrency: usize,
 }
 
 enum State {
@@ -246,7 +257,7 @@ enum State {
 }
 
 impl PubsubSource {
-    async fn run(mut self) -> crate::Result<()> {
+    async fn run(self) -> crate::Result<()> {
         let mut endpoint = Channel::from_shared(self.endpoint.clone()).context(EndpointSnafu)?;
         if self.uri.scheme() != Some(&Scheme::HTTP) {
             endpoint = endpoint
@@ -254,7 +265,7 @@ impl PubsubSource {
                 .context(EndpointTlsSnafu)?;
         }
 
-        let mut token_generator = match &self.credentials {
+        let token_generator = match &self.credentials {
             Some(credentials) => credentials.clone().spawn_regenerate_token(),
             None => {
                 let (sender, receiver) = watch::channel(());
@@ -268,6 +279,21 @@ impl PubsubSource {
             }
         };
 
+        let tasks: Vec<_> = (0..self.concurrency)
+            .map(|_| {
+                tokio::spawn(
+                    self.clone()
+                        .run_loop(endpoint.clone(), token_generator.clone()),
+                )
+            })
+            .collect();
+
+        futures::future::join_all(tasks).await;
+
+        Ok(())
+    }
+
+    async fn run_loop(mut self, endpoint: Endpoint, mut token_generator: watch::Receiver<()>) {
         loop {
             match self.run_once(&endpoint, &mut token_generator).await {
                 State::RetryNow => debug!("Retrying immediately."),
@@ -281,8 +307,6 @@ impl PubsubSource {
                 State::Shutdown => break,
             }
         }
-
-        Ok(())
     }
 
     async fn run_once(
