@@ -14,7 +14,11 @@ use pin_project::pin_project;
 use tokio::time::{sleep, Duration};
 use tower::{load::Load, Service};
 
-use crate::sinks::util::retries::RetryLogic;
+use crate::{
+    emit,
+    internal_events::{EndpointsActive, OpenGauge, OpenToken},
+    sinks::util::retries::RetryLogic,
+};
 
 enum ServiceState {
     Healthcheck(BoxFuture<'static, bool>),
@@ -22,7 +26,7 @@ enum ServiceState {
         timer: BoxFuture<'static, ()>,
         healthcheck: bool,
     },
-    Ready,
+    Ready(OpenToken<fn(usize)>),
 }
 
 /// A service which estimates load on inner service and
@@ -38,6 +42,7 @@ pub struct HealthService<S, RL> {
     /// 2 - backoff
     request_handle: Arc<AtomicUsize>,
     state: ServiceState,
+    open: OpenGauge,
 }
 
 impl<S, RL> HealthService<S, RL> {
@@ -46,6 +51,7 @@ impl<S, RL> HealthService<S, RL> {
         healthcheck: impl Fn() -> BoxFuture<'static, bool> + Send + 'static,
         logic: RL,
         reactivate_delay: Duration,
+        open: OpenGauge,
     ) -> Self {
         HealthService {
             inner,
@@ -54,6 +60,7 @@ impl<S, RL> HealthService<S, RL> {
             request_handle: Arc::new(AtomicUsize::new(0)),
             state: ServiceState::Healthcheck(healthcheck()),
             healthcheck: Box::new(healthcheck) as Box<_>,
+            open,
         }
     }
 }
@@ -76,7 +83,7 @@ where
                     if ready!(healthcheck.as_mut().poll(cx)) {
                         // Clear errors
                         self.request_handle.store(0, Ordering::Release);
-                        ServiceState::Ready
+                        ServiceState::Ready(self.open.clone().open(emit_active_endpoints))
                     } else {
                         ServiceState::Backoff {
                             timer: sleep(self.reactivate_delay).boxed(),
@@ -94,10 +101,10 @@ where
                     } else {
                         // Clear errors
                         self.request_handle.store(0, Ordering::Release);
-                        ServiceState::Ready
+                        ServiceState::Ready(self.open.clone().open(emit_active_endpoints))
                     }
                 }
-                ServiceState::Ready => {
+                ServiceState::Ready(_) => {
                     // Check for errors
                     match self.request_handle.load(Ordering::Acquire) {
                         // No errors
@@ -175,4 +182,8 @@ where
 
         Poll::Ready(output)
     }
+}
+
+fn emit_active_endpoints(count: usize) {
+    emit!(EndpointsActive { count });
 }

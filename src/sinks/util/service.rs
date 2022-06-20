@@ -19,14 +19,17 @@ pub use crate::sinks::util::service::{
     health::HealthService,
     map::Map,
 };
-use crate::sinks::util::{
-    adaptive_concurrency::{
-        AdaptiveConcurrencyLimit, AdaptiveConcurrencyLimitLayer, AdaptiveConcurrencySettings,
+use crate::{
+    internal_events::OpenGauge,
+    sinks::util::{
+        adaptive_concurrency::{
+            AdaptiveConcurrencyLimit, AdaptiveConcurrencyLimitLayer, AdaptiveConcurrencySettings,
+        },
+        retries::{FixedRetryPolicy, RetryLogic},
+        service::map::MapLayer,
+        sink::Response,
+        Batch, BatchSink, Partition, PartitionBatchSink,
     },
-    retries::{FixedRetryPolicy, RetryLogic},
-    service::map::MapLayer,
-    sink::Response,
-    Batch, BatchSink, Partition, PartitionBatchSink,
 };
 
 mod clone;
@@ -293,6 +296,7 @@ impl TowerRequestSettings {
         let service_layer = ServiceBuilder::new().timeout(self.timeout);
 
         let logic = retry_logic.clone();
+        let open = OpenGauge::new();
         let services = services.map_ok(move |change| match change {
             Change::Insert(key, (service, healthcheck)) => Change::Insert(
                 key,
@@ -301,6 +305,7 @@ impl TowerRequestSettings {
                     healthcheck,
                     logic.clone(),
                     reactivate_delay,
+                    open.clone(),
                 ),
             ),
             Change::Remove(key) => Change::Remove(key),

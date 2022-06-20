@@ -33,7 +33,7 @@ pub trait RetryLogic: Clone + Send + Sync + 'static {
         RetryAction::Successful
     }
 
-    /// None if request was successful, Some(is_back_pressure) if failed
+    /// None if request was successful, else Some(is_back_pressure)
     fn is_back_pressure(&self, response: &Result<Self::Response, crate::Error>) -> Option<bool> {
         // It would be better to avoid generating the string in Retry(_)
         // just to throw it away here, but it's probably not worth the
