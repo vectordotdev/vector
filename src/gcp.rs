@@ -1,7 +1,6 @@
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
-use futures::{Stream, StreamExt};
 pub use goauth::scopes::Scope;
 use goauth::{
     auth::{JwtClaims, Token, TokenErr},
@@ -12,8 +11,7 @@ use hyper::header::AUTHORIZATION;
 use once_cell::sync::Lazy;
 use smpl_jwt::Jwt;
 use snafu::{ResultExt, Snafu};
-use tokio::time::Instant;
-use tokio_stream::wrappers::IntervalStream;
+use tokio::{sync::watch, time::Instant};
 use vector_config::configurable_component;
 
 use crate::{config::ProxyConfig, http::HttpClient, http::HttpError};
@@ -145,28 +143,29 @@ impl GcpCredentials {
         Ok(())
     }
 
-    pub fn spawn_regenerate_token(&self) {
-        let this = self.clone();
-        tokio::spawn(async move { this.token_regenerator().for_each(|_| async {}).await });
+    pub fn spawn_regenerate_token(&self) -> watch::Receiver<()> {
+        let (sender, receiver) = watch::channel(());
+        tokio::spawn(self.clone().token_regenerator(sender));
+        receiver
     }
 
-    pub fn token_regenerator(&self) -> impl Stream<Item = ()> + 'static {
+    async fn token_regenerator(self, sender: watch::Sender<()>) {
         let period = Duration::from_secs(self.0.token.read().unwrap().expires_in() as u64 / 2);
         let this = self.clone();
-        IntervalStream::new(tokio::time::interval_at(Instant::now() + period, period)).then(
-            move |_| {
-                let this = this.clone();
-                async move {
-                    debug!("Renewing GCP authentication token.");
-                    if let Err(error) = this.regenerate_token().await {
-                        error!(
-                            message = "Failed to update GCP authentication token.",
-                            %error
-                        );
-                    }
+        let mut interval = tokio::time::interval_at(Instant::now() + period, period);
+        loop {
+            interval.tick().await;
+            debug!("Renewing GCP authentication token.");
+            match this.regenerate_token().await {
+                Ok(()) => sender.send_replace(()),
+                Err(error) => {
+                    error!(
+                        message = "Failed to update GCP authentication token.",
+                        %error
+                    );
                 }
-            },
-        )
+            }
+        }
     }
 }
 

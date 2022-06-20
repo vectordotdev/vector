@@ -1,4 +1,4 @@
-use std::{error::Error as _, pin::Pin, time::Duration};
+use std::{error::Error as _, time::Duration};
 
 use chrono::{DateTime, NaiveDateTime, Utc};
 use codecs::decoding::{DeserializerConfig, FramingConfig};
@@ -7,16 +7,14 @@ use futures::{stream, Stream, StreamExt, TryFutureExt};
 use http::uri::{InvalidUri, Scheme, Uri};
 use once_cell::sync::Lazy;
 use snafu::{ResultExt, Snafu};
-use tokio::sync::mpsc::{self, Receiver, Sender};
+use tokio::sync::{mpsc, watch};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{
     metadata::{errors::InvalidMetadataValue, MetadataValue},
     transport::{Certificate, Channel, ClientTlsConfig, Endpoint, Identity},
     Code, Request, Status,
 };
-use vector_common::{
-    byte_size_of::ByteSizeOf, finalizer::EmptyStream, finalizer::UnorderedFinalizer,
-};
+use vector_common::{byte_size_of::ByteSizeOf, finalizer::UnorderedFinalizer};
 use vector_config::configurable_component;
 
 use crate::{
@@ -257,8 +255,17 @@ impl PubsubSource {
         }
 
         let mut token_generator = match &self.credentials {
-            Some(credentials) => credentials.clone().token_regenerator().boxed(),
-            None => EmptyStream::default().boxed(),
+            Some(credentials) => credentials.clone().spawn_regenerate_token(),
+            None => {
+                let (sender, receiver) = watch::channel(());
+                // Dropping the sender will cause the receiver to
+                // error, but there is no good way of hanging on to it
+                // and sending nothing. This `forget` will leak one
+                // sender per instance of this source and so never
+                // drop it.
+                std::mem::forget(sender);
+                receiver
+            }
         };
 
         loop {
@@ -281,7 +288,7 @@ impl PubsubSource {
     async fn run_once(
         &mut self,
         endpoint: &Endpoint,
-        token_generator: &mut Pin<Box<dyn Stream<Item = ()> + Send>>,
+        token_generator: &mut watch::Receiver<()>,
     ) -> State {
         let connection = match endpoint.connect().await {
             Ok(connection) => connection,
@@ -332,7 +339,7 @@ impl PubsubSource {
         loop {
             tokio::select! {
                 _ = &mut self.shutdown => return State::Shutdown,
-                _ = &mut token_generator.next() => {
+                _ = token_generator.changed() => {
                     debug!("New authentication token generated, restarting stream.");
                     break State::RetryNow;
                 },
@@ -368,7 +375,7 @@ impl PubsubSource {
 
     fn request_stream(
         &self,
-        ack_ids: Receiver<Vec<String>>,
+        ack_ids: mpsc::Receiver<Vec<String>>,
     ) -> impl Stream<Item = proto::StreamingPullRequest> + 'static {
         let subscription = self.subscription.clone();
         let client_id = CLIENT_ID.clone();
@@ -416,7 +423,7 @@ impl PubsubSource {
         &mut self,
         response: proto::StreamingPullResponse,
         finalizer: &Option<Finalizer>,
-        ack_ids: &Sender<Vec<String>>,
+        ack_ids: &mpsc::Sender<Vec<String>>,
     ) {
         emit!(BytesReceived {
             byte_size: response.size_of(),
