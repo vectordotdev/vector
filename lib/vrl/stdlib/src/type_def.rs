@@ -61,10 +61,6 @@ impl Expression for TypeDefFn {
         type_def(&self.type_def.clone())
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        todo!("resolve_batch")
-    }
-
     fn type_def(&self, _state: (&state::LocalEnv, &state::ExternalEnv)) -> VrlTypeDef {
         VrlTypeDef::any().infallible()
     }

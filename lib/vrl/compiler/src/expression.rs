@@ -79,12 +79,20 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     /// An expression is allowed to fail, which aborts the running program.
     fn resolve(&self, ctx: &mut Context) -> Resolved;
 
-    /// Resolve a batch of expression to a concrete [`Value`]s.
+    /// Resolve a batch of expression to concrete [`Value`]s.
     ///
     /// This method is executed at runtime.
     ///
     /// An expression is allowed to fail, which aborts the running program.
-    fn resolve_batch(&self, ctx: &mut BatchContext);
+    fn resolve_batch(&self, ctx: &mut BatchContext) {
+        for (resolved, target, state, timezone) in ctx.iter_mut() {
+            let target = &mut *(*target).borrow_mut();
+            let state = &mut *(*state).borrow_mut();
+            let mut ctx = Context::new(target, state, &timezone);
+
+            *resolved = self.resolve(&mut ctx);
+        }
+    }
 
     /// Resolve an expression to a value without any context, if possible.
     ///

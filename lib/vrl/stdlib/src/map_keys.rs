@@ -124,10 +124,6 @@ impl Expression for MapKeysFn {
         map_keys(value, recursive, ctx, runner)
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        todo!("resolve_batch")
-    }
-
     fn type_def(&self, ctx: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         self.value
             .type_def(ctx)

@@ -172,10 +172,6 @@ impl Expression for ToBoolFn {
         to_bool(value)
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        todo!("resolve_batch")
-    }
-
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         let td = self.value.type_def(state);
 

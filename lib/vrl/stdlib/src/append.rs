@@ -66,10 +66,6 @@ impl Expression for AppendFn {
         append(value, items)
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        todo!("resolve_batch")
-    }
-
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         self.value
             .type_def(state)

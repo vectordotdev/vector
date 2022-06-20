@@ -133,10 +133,6 @@ impl Expression for ParseRegexAllFn {
         parse_regex_all(value, numeric_groups.try_boolean()?, pattern)
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        todo!("resolve_batch")
-    }
-
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::array(Collection::from_unknown(
             Kind::object(util::regex_kind(&self.pattern)).or_null(),
