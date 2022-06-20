@@ -38,6 +38,7 @@ use lookup::path;
 
 /// The field name for the timestamp required by data stream mode
 pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
+pub const REACTIVATE_DELAY_SECONDS_DEFAULT: u64 = 5; // 5 seconds
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -131,6 +132,12 @@ impl BulkConfig {
     fn default_index() -> String {
         "vector-%Y.%m.%d".into()
     }
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, Default)]
+pub struct DistributionConfig {
+    pub endpoints: Vec<String>,
+    pub reactivate_delay_secs: Option<u64>,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
@@ -290,14 +297,6 @@ impl DataStreamConfig {
         Some(format!("{}-{}-{}", dtype, dataset, namespace))
     }
 }
-
-#[derive(Deserialize, Serialize, Clone, Debug, Default)]
-pub struct DistributionConfig {
-    pub endpoints: Vec<String>,
-    pub reactivate_delay_secs: Option<u64>, // 5 seconds
-}
-
-pub const REACTIVATE_DELAY_SECONDS_DEFAULT: u64 = 5; // 5 seconds
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "elasticsearch")]
