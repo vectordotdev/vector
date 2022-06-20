@@ -74,10 +74,6 @@ impl Expression for ParseRubyHashFn {
         parse_ruby_hash(value)
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        todo!("resolve_batch")
-    }
-
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::object(Collection::from_unknown(inner_kinds())).fallible()
     }

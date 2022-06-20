@@ -117,10 +117,6 @@ impl Expression for Sha2Fn {
         sha2(value, variant)
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        todo!("resolve_batch")
-    }
-
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().infallible()
     }

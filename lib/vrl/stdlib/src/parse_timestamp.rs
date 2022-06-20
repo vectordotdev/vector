@@ -73,10 +73,6 @@ impl Expression for ParseTimestampFn {
         parse_timestamp(value, format, ctx)
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        todo!("resolve_batch")
-    }
-
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::timestamp().fallible(/* always fallible because the format needs to be parsed at runtime */)
     }

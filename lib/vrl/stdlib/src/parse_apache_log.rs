@@ -146,10 +146,6 @@ impl Expression for ParseApacheLogFn {
         parse_apache_log(bytes, timestamp_format, &self.format, ctx)
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        todo!("resolve_batch")
-    }
-
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::object(match self.format.as_ref() {
             b"common" => kind_common(),

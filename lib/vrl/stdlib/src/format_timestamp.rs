@@ -71,10 +71,6 @@ impl Expression for FormatTimestampFn {
         format_timestamp(bytes, ts)
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        todo!("resolve_batch")
-    }
-
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().fallible()
     }

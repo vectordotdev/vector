@@ -101,10 +101,6 @@ impl Expression for ForEachFn {
         for_each(value, ctx, runner)
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        todo!("resolve_batch")
-    }
-
     fn type_def(&self, ctx: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         let fallible = self.closure.block.type_def(ctx).is_fallible();
 

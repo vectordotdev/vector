@@ -160,10 +160,6 @@ impl Expression for UnnestFn {
         unnest(&self.path, &self.root, ctx)
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        todo!("resolve_batch")
-    }
-
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         use expression::Target;
 

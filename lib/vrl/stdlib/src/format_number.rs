@@ -172,10 +172,6 @@ impl Expression for FormatNumberFn {
         format_number(value, scale, grouping_separator, decimal_separator)
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        todo!("resolve_batch")
-    }
-
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().infallible()
     }

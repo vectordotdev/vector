@@ -5,7 +5,7 @@ use value::Value;
 use crate::{
     expression::{Expr, Resolved},
     state::{ExternalEnv, LocalEnv},
-    BatchContext, Context, Expression, TypeDef,
+    Context, Expression, TypeDef,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -34,16 +34,6 @@ impl Expression for Array {
             .map(|expr| expr.resolve(ctx))
             .collect::<Result<Vec<_>, _>>()
             .map(Value::Array)
-    }
-
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        for (resolved, target, state, timezone) in ctx.iter_mut() {
-            let target = &mut *(*target).borrow_mut();
-            let state = &mut *(*state).borrow_mut();
-            let mut ctx = Context::new(target, state, &timezone);
-
-            *resolved = self.resolve(&mut ctx);
-        }
     }
 
     fn as_value(&self) -> Option<Value> {

@@ -72,10 +72,6 @@ impl Expression for PushFn {
         push(list, item)
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        todo!("resolve_batch")
-    }
-
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         let item = TypeDef::array(BTreeMap::from([(
             0.into(),

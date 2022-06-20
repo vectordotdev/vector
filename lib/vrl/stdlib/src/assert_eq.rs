@@ -103,10 +103,6 @@ impl Expression for AssertEqFn {
         assert_eq(left, right, message)
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        todo!("resolve_batch")
-    }
-
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().fallible()
     }

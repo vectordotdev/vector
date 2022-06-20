@@ -171,10 +171,6 @@ impl Expression for DecryptFn {
         decrypt(ciphertext, algorithm, key, iv)
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        todo!("resolve_batch")
-    }
-
     fn type_def(&self, _state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().fallible()
     }

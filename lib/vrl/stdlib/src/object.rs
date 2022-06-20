@@ -63,10 +63,6 @@ impl Expression for ObjectFn {
         object(self.value.resolve(ctx)?)
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        todo!("resolve_batch")
-    }
-
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         self.value
             .type_def(state)

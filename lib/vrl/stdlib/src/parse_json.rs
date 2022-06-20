@@ -197,10 +197,6 @@ impl Expression for ParseJsonFn {
         parse_json(value)
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        todo!("resolve_batch")
-    }
-
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         type_def()
     }
@@ -217,10 +213,6 @@ impl Expression for ParseJsonMaxDepthFn {
         let value = self.value.resolve(ctx)?;
         let max_depth = self.max_depth.resolve(ctx)?;
         parse_json_with_depth(value, max_depth)
-    }
-
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        todo!("resolve_batch")
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

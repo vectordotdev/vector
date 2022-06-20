@@ -123,10 +123,6 @@ impl Expression for MapValuesFn {
         map_values(value, recursive, ctx, runner)
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        todo!("resolve_batch")
-    }
-
     fn type_def(&self, ctx: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         let mut value = self.value.type_def(ctx);
         let closure = self.closure.block.type_def(ctx);

@@ -10,7 +10,7 @@ use vrl::{
     },
     state,
     value::kind,
-    BatchContext, Context, Expression, Function,
+    Context, Expression, Function,
 };
 
 use crate::{
@@ -219,10 +219,6 @@ impl Expression for GetEnrichmentTableRecordFn {
             &condition,
             index,
         )
-    }
-
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        todo!("resolve_batch")
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

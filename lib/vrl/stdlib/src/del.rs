@@ -168,10 +168,6 @@ impl Expression for DelFn {
         del(&self.query, ctx)
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        todo!("resolve_batch")
-    }
-
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         // The return type can't be queried from the state since it was deleted in "update_state"
         self.return_type.clone()

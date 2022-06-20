@@ -94,10 +94,6 @@ impl Expression for AssertFn {
         assert(condition, message, format)
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        todo!("resolve_batch")
-    }
-
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::boolean().fallible()
     }

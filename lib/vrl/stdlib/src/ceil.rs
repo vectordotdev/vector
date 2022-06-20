@@ -85,10 +85,6 @@ impl Expression for CeilFn {
         ceil(value, precision)
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        todo!("resolve_batch")
-    }
-
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         match Kind::from(self.value.type_def(state)) {
             v if v.is_float() || v.is_integer() => v.into(),
