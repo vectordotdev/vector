@@ -916,6 +916,14 @@ fn to_socket_protocol_name(socket_protocol: i32) -> Result<&'static str> {
         Ok("UDP")
     } else if socket_protocol == SocketProtocol::Tcp as i32 {
         Ok("TCP")
+    } else if socket_protocol == SocketProtocol::Dot as i32 {
+        Ok("DOT")
+    } else if socket_protocol == SocketProtocol::Doh as i32 {
+        Ok("DOH")
+    } else if socket_protocol == SocketProtocol::DnsCryptUdp as i32 {
+        Ok("DNSCryptUDP")
+    } else if socket_protocol == SocketProtocol::DnsCryptTcp as i32 {
+        Ok("DNSCryptTCP")
     } else {
         Err(Error::from(format!(
             "Unknown socket protocol: {}",
