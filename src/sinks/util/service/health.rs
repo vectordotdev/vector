@@ -70,7 +70,6 @@ where
     RL: RetryLogic<Response = S::Response>,
     S: Service<Req>,
     S::Error: Into<crate::Error>,
-    // <S::Future as TryFuture>::Error: Into<crate::Error>,
 {
     type Response = S::Response;
     type Error = crate::Error;
