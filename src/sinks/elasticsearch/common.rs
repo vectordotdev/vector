@@ -140,6 +140,22 @@ impl ElasticsearchCommon {
         })
     }
 
+    /// Parses distribution endpoints to self.
+    pub async fn parse_endpoints(config: &ElasticsearchConfig) -> crate::Result<Vec<Self>> {
+        let mut commons = Vec::new();
+        if let Some(distribution) = config.distribution.as_ref() {
+            // Multiply configuration, one for each endpoint
+            for endpoint in distribution.endpoints.clone() {
+                let config = ElasticsearchConfig {
+                    endpoint,
+                    ..config.clone()
+                };
+                commons.push(Self::parse_config(&config).await?);
+            }
+        }
+        Ok(commons)
+    }
+
     pub async fn healthcheck(self, client: HttpClient) -> crate::Result<()> {
         let mut builder = Request::get(format!("{}/_cluster/health", self.base_url));
 

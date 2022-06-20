@@ -320,16 +320,9 @@ impl SinkConfig for ElasticsearchConfig {
             );
 
             // Multiply configuration, one for each endpoint
-            let mut commons = vec![common.clone()];
-            for endpoint in distribution.endpoints.clone() {
-                let config = Self {
-                    endpoint,
-                    ..self.clone()
-                };
-                let common = ElasticsearchCommon::parse_config(&config).await?;
-
-                commons.push(common);
-            }
+            let commons = Some(common.clone())
+                .into_iter()
+                .chain(ElasticsearchCommon::parse_endpoints(self).await?);
 
             let services = commons
                 .into_iter()
