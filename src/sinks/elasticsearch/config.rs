@@ -291,10 +291,10 @@ impl DataStreamConfig {
     }
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, Clone, Debug, Default)]
 pub struct DistributionConfig {
-    endpoints: Vec<String>,
-    reactivate_delay_secs: Option<u64>, // 5 seconds
+    pub endpoints: Vec<String>,
+    pub reactivate_delay_secs: Option<u64>, // 5 seconds
 }
 
 pub const REACTIVATE_DELAY_SECONDS_DEFAULT: u64 = 5; // 5 seconds
@@ -433,5 +433,17 @@ mod tests {
         .unwrap();
         assert!(matches!(config.mode, ElasticsearchMode::DataStream));
         assert!(config.data_stream.is_some());
+    }
+
+    #[test]
+    fn parse_distribution() {
+        toml::from_str::<ElasticsearchConfig>(
+            r#"
+            endpoint = ""
+            distribution.endpoints = []
+            distribution.reactivate_delay_secs = 10
+        "#,
+        )
+        .unwrap();
     }
 }

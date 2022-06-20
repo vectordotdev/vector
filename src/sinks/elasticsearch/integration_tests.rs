@@ -330,6 +330,58 @@ async fn insert_events_in_data_stream() {
     run_insert_tests_with_config(&cfg, false, BatchStatus::Delivered).await;
 }
 
+#[tokio::test]
+async fn distributed_insert_events() {
+    trace_init();
+
+    // Assumes that behind https_server and http_server addresses lies the same server
+    run_insert_tests(
+        ElasticsearchConfig {
+            auth: Some(ElasticsearchAuth::Basic {
+                user: "elastic".into(),
+                password: "vector".into(),
+            }),
+            endpoint: https_server(),
+            doc_type: Some("log_lines".into()),
+            compression: Compression::None,
+            tls: Some(TlsConfig {
+                ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
+                ..Default::default()
+            }),
+            distribution: Some(DistributionConfig {
+                endpoints: vec![http_server()],
+                ..Default::default()
+            }),
+            ..config()
+        },
+        false,
+        BatchStatus::Delivered,
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn distributed_insert_events_failover() {
+    trace_init();
+
+    run_insert_tests(
+        ElasticsearchConfig {
+            endpoint: http_server(),
+            doc_type: Some("log_lines".into()),
+            compression: Compression::None,
+            distribution: Some(DistributionConfig {
+                // Some random non elasticsearch endpoint
+                endpoints: vec!["http://localhost:2347".into()],
+                ..Default::default()
+            }),
+            ..config()
+        },
+        false,
+        BatchStatus::Delivered,
+    )
+    .await;
+}
+
 async fn run_insert_tests(
     mut config: ElasticsearchConfig,
     break_events: bool,
