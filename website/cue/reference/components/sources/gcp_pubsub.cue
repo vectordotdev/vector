@@ -79,7 +79,7 @@ components: sources: gcp_pubsub: {
 				examples: ["https://us-central1-pubsub.googleapis.com"]
 			}
 		}
-		inactivity_timeout_seconds: {
+		keepalive_secs: {
 			common:      false
 			description: "The amount of time, in seconds, with no received activity before sending a keepalive request. If this is set larger than `60`, you may see periodic errors sent from the server."
 			required:    false

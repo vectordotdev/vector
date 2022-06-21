@@ -141,8 +141,8 @@ pub struct PubsubConfig {
     /// The amount of time, in seconds, with no received activity
     /// before sending a keepalive request. If this is set larger than
     /// `60`, you may see periodic errors sent from the server.
-    #[serde(default = "default_inactivity_timeout")]
-    pub inactivity_timeout_seconds: f64,
+    #[serde(default = "default_keepalive")]
+    pub keepalive_secs: f64,
 
     #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
@@ -167,7 +167,7 @@ const fn default_retry_delay() -> f64 {
     1.0
 }
 
-const fn default_inactivity_timeout() -> f64 {
+const fn default_keepalive() -> f64 {
     60.0
 }
 
@@ -204,7 +204,7 @@ impl SourceConfig for PubsubConfig {
             out: cx.out,
             ack_deadline_seconds: self.ack_deadline_seconds,
             retry_delay: Duration::from_secs_f64(self.retry_delay_seconds),
-            inactivity_timeout: Duration::from_secs_f64(self.inactivity_timeout_seconds),
+            keepalive: Duration::from_secs_f64(self.keepalive_secs),
         }
         .run()
         .map_err(|error| error!(message = "Source failed.", %error));
@@ -238,7 +238,7 @@ struct PubsubSource {
     shutdown: ShutdownSignal,
     out: SourceSender,
     retry_delay: Duration,
-    inactivity_timeout: Duration,
+    keepalive: Duration,
 }
 
 enum State {
@@ -374,7 +374,7 @@ impl PubsubSource {
         let client_id = CLIENT_ID.clone();
         let stream_ack_deadline_seconds = self.ack_deadline_seconds;
         let mut ack_ids = ReceiverStream::new(ack_ids).ready_chunks(ACK_QUEUE_SIZE);
-        let timeout = self.inactivity_timeout;
+        let keepalive = self.keepalive;
 
         stream::once(async move {
             // These fields are only valid on the first request in the
@@ -397,7 +397,7 @@ impl PubsubSource {
                 // keepalive.
                 let ack_ids: Vec<String> = tokio::select! {
                     chunks = ack_ids.next() => chunks.into_iter().flatten().flatten().collect(),
-                    _ = tokio::time::sleep(timeout) => Vec::new(),
+                    _ = tokio::time::sleep(keepalive) => Vec::new(),
                 };
                 // These "requests" serve only to send updates about
                 // acknowledgements to the server. None of the above
