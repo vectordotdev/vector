@@ -13,7 +13,7 @@ use super::Deserializer;
 
 /// GELF Message fields. Definitions from https://docs.graylog.org/docs/gelf
 #[rustfmt::skip]
-pub mod fields {
+pub mod gelf_fields {
     /// (required) GELF spec version – “1.1”.
     pub const VERSION         : &str     = "version";
     /// (required) The name of the host, source or application that sent this message.
@@ -34,7 +34,7 @@ pub mod fields {
     /// (optional) (deprecated) The file (with path if you want) that caused the error. Send as additional field instead.
     pub const FILE            : &str     = "file";
 }
-pub use fields::*;
+pub use gelf_fields::*;
 
 /// Config used to build a `GelfDeserializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]

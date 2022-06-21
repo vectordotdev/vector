@@ -8,9 +8,10 @@ use std::fmt::Debug;
 
 use bytes::BytesMut;
 pub use format::{
-    JsonSerializer, JsonSerializerConfig, LogfmtSerializer, LogfmtSerializerConfig,
-    NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer, NativeSerializerConfig,
-    RawMessageSerializer, RawMessageSerializerConfig, TextSerializer, TextSerializerConfig,
+    GelfSerializer, GelfSerializerConfig, JsonSerializer, JsonSerializerConfig, LogfmtSerializer,
+    LogfmtSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer,
+    NativeSerializerConfig, RawMessageSerializer, RawMessageSerializerConfig, TextSerializer,
+    TextSerializerConfig,
 };
 pub use framing::{
     BoxedFramer, BoxedFramingError, BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder,
@@ -181,6 +182,8 @@ impl tokio_util::codec::Encoder<()> for Framer {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag = "codec", rename_all = "snake_case")]
 pub enum SerializerConfig {
+    /// Configures the `GelfSerializer`.
+    Gelf,
     /// Configures the `JsonSerializer`.
     Json,
     /// Configures the `LogfmtSerializer`.
@@ -193,6 +196,12 @@ pub enum SerializerConfig {
     RawMessage,
     /// Configures the `TextSerializer`.
     Text,
+}
+
+impl From<GelfSerializerConfig> for SerializerConfig {
+    fn from(_: GelfSerializerConfig) -> Self {
+        Self::Gelf
+    }
 }
 
 impl From<JsonSerializerConfig> for SerializerConfig {
@@ -233,8 +242,9 @@ impl From<TextSerializerConfig> for SerializerConfig {
 
 impl SerializerConfig {
     /// Build the `Serializer` from this configuration.
-    pub const fn build(&self) -> Serializer {
+    pub fn build(&self) -> Serializer {
         match self {
+            SerializerConfig::Gelf => Serializer::Gelf(GelfSerializerConfig::new().build()),
             SerializerConfig::Json => Serializer::Json(JsonSerializerConfig.build()),
             SerializerConfig::Logfmt => Serializer::Logfmt(LogfmtSerializerConfig.build()),
             SerializerConfig::Native => Serializer::Native(NativeSerializerConfig.build()),
@@ -251,6 +261,7 @@ impl SerializerConfig {
     /// The data type of events that are accepted by this `Serializer`.
     pub fn input_type(&self) -> DataType {
         match self {
+            SerializerConfig::Gelf => GelfSerializerConfig::input_type(),
             SerializerConfig::Json => JsonSerializerConfig.input_type(),
             SerializerConfig::Logfmt => LogfmtSerializerConfig.input_type(),
             SerializerConfig::Native => NativeSerializerConfig.input_type(),
@@ -263,6 +274,7 @@ impl SerializerConfig {
     /// The schema required by the serializer.
     pub fn schema_requirement(&self) -> schema::Requirement {
         match self {
+            SerializerConfig::Gelf => GelfSerializerConfig::schema_requirement(),
             SerializerConfig::Json => JsonSerializerConfig.schema_requirement(),
             SerializerConfig::Logfmt => LogfmtSerializerConfig.schema_requirement(),
             SerializerConfig::Native => NativeSerializerConfig.schema_requirement(),
@@ -276,6 +288,8 @@ impl SerializerConfig {
 /// Serialize structured events as bytes.
 #[derive(Debug, Clone)]
 pub enum Serializer {
+    /// Uses a `GelfSerializer` for serialization.
+    Gelf(GelfSerializer),
     /// Uses a `JsonSerializer` for serialization.
     Json(JsonSerializer),
     /// Uses a `LogfmtSerializer` for serialization.
@@ -294,7 +308,7 @@ impl Serializer {
     /// Check if the serializer supports encoding to JSON via `Serializer::to_json_value`.
     pub fn supports_json(&self) -> bool {
         match self {
-            Serializer::Json(_) | Serializer::NativeJson(_) => true,
+            Serializer::Gelf(_) | Serializer::Json(_) | Serializer::NativeJson(_) => true,
             Serializer::Logfmt(_)
             | Serializer::Text(_)
             | Serializer::Native(_)
@@ -310,6 +324,7 @@ impl Serializer {
     /// if you need to determine the capability to encode to JSON at runtime.
     pub fn to_json_value(&self, event: Event) -> Result<serde_json::Value, serde_json::Error> {
         match self {
+            Serializer::Gelf(serializer) => serializer.to_json_value(event),
             Serializer::Json(serializer) => serializer.to_json_value(event),
             Serializer::NativeJson(serializer) => serializer.to_json_value(event),
             Serializer::Logfmt(_)
@@ -319,6 +334,12 @@ impl Serializer {
                 panic!("Serializer does not support JSON")
             }
         }
+    }
+}
+
+impl From<GelfSerializer> for Serializer {
+    fn from(serializer: GelfSerializer) -> Self {
+        Self::Gelf(serializer)
     }
 }
 
@@ -363,6 +384,7 @@ impl tokio_util::codec::Encoder<Event> for Serializer {
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         match self {
+            Serializer::Gelf(serializer) => serializer.encode(event, buffer),
             Serializer::Json(serializer) => serializer.encode(event, buffer),
             Serializer::Logfmt(serializer) => serializer.encode(event, buffer),
             Serializer::Native(serializer) => serializer.encode(event, buffer),

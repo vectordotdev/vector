@@ -1,5 +1,7 @@
 use bytes::Bytes;
-use codecs::{decoding::format::fields::*, decoding::format::Deserializer, GelfDeserializerConfig};
+use codecs::{
+    decoding::format::gelf_fields::*, decoding::format::Deserializer, GelfDeserializerConfig,
+};
 use pretty_assertions::assert_eq;
 use serde_json::json;
 

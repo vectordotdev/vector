@@ -146,7 +146,7 @@ where
     }
 
     /// Build the serializer for this configuration.
-    pub const fn encoding(&self) -> Serializer {
+    pub fn encoding(&self) -> Serializer {
         self.0.encoding.build()
     }
 }

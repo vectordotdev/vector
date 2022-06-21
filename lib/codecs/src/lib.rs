@@ -7,7 +7,7 @@ pub mod decoding;
 pub mod encoding;
 
 pub use decoding::{
-    BytesDecoder, BytesDecoderConfig, BytesDeserializer, BytesDeserializerConfig,
+    gelf_fields, BytesDecoder, BytesDecoderConfig, BytesDeserializer, BytesDeserializerConfig,
     CharacterDelimitedDecoder, CharacterDelimitedDecoderConfig, GelfDeserializer,
     GelfDeserializerConfig, JsonDeserializer, JsonDeserializerConfig, LengthDelimitedDecoder,
     LengthDelimitedDecoderConfig, NativeDeserializer, NativeDeserializerConfig,
@@ -19,9 +19,9 @@ pub use decoding::{
 pub use decoding::{SyslogDeserializer, SyslogDeserializerConfig};
 pub use encoding::{
     BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig,
-    JsonSerializer, JsonSerializerConfig, LengthDelimitedEncoder, LengthDelimitedEncoderConfig,
-    LogfmtSerializer, LogfmtSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig,
-    NativeSerializer, NativeSerializerConfig, NewlineDelimitedEncoder,
-    NewlineDelimitedEncoderConfig, RawMessageSerializer, RawMessageSerializerConfig,
-    TextSerializer, TextSerializerConfig,
+    GelfSerializer, GelfSerializerConfig, JsonSerializer, JsonSerializerConfig,
+    LengthDelimitedEncoder, LengthDelimitedEncoderConfig, LogfmtSerializer, LogfmtSerializerConfig,
+    NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer, NativeSerializerConfig,
+    NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig, RawMessageSerializer,
+    RawMessageSerializerConfig, TextSerializer, TextSerializerConfig,
 };

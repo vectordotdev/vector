@@ -19,7 +19,7 @@ impl LogfmtSerializerConfig {
         LogfmtSerializer
     }
 
-    /// The data type of events that are accepted by `JsonSerializer`.
+    /// The data type of events that are accepted by `LogfmtSerializer`.
     pub fn input_type(&self) -> DataType {
         DataType::Log
     }
