@@ -219,6 +219,7 @@ components: sinks: elasticsearch: {
 			common:      false
 			description: "Options for distributing events to multiple endpoints."
 			required:    false
+			warnings: ["By default ARC is enabled which can cause [issues](#_distribution) when distribution is used."]
 			type: object: {
 				examples: []
 				options: {
@@ -228,9 +229,8 @@ components: sinks: elasticsearch: {
 						required:    false
 						type: array: {
 							default: []
-							items: type: string: {
-								examples: ["http://10.24.32.122:9000", "https://example.com", "https://user:password@example.com"]
-							}
+							examples: [["http://10.24.32.122:9000", "https://example.com", "https://user:password@example.com"]]
+							items: type: string: {}
 						}
 					}
 					reactivate_delay_secs: {
@@ -368,12 +368,17 @@ components: sinks: elasticsearch: {
 				"""
 		}
 
-		distribution: {
+		_distribution: {
 			title: "Distribution"
 			body: """
 				By default, Vector sends events to a single Elasticsearch endpoint.
 				If `distribution` is used, events will be distributed to multiple endpoints
 				according to their estimated load with failover.
+
+				[ARC](#adaptive-request-concurrency-arc) and Distribution will play nicely with each other up to a certain point:
+					* If all Elasticsearch instances are in the same data center, ARC should work.
+					* If all Elasticsearch instances are in the same region, ARC will probably work, but some tweaking of its parameters may be needed.
+					* Else, ARC probably won't work without heavy tweaking and even then may not work.
 				"""
 		}
 
