@@ -183,6 +183,7 @@ components: sources: syslog: {
 					unit: null
 				}
 			}
+			client_metadata: fields._client_metadata
 			"*": {
 				description: "In addition to the defined fields, any [Syslog 5424 structured fields](https://datatracker.ietf.org/doc/html/rfc5424#section-6.3) are parsed and inserted, namespaced under the name of each structured data section."
 				required:    true

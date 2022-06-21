@@ -41,6 +41,7 @@ pub fn merged_definition(
         return definition.clone();
     }
 
+    // TODO: special case when inputs is empty?
     let mut definition = Definition::empty_kind(Kind::never(), []);
 
     for input in inputs {

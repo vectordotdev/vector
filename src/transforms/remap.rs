@@ -151,6 +151,7 @@ impl TransformConfig for RemapConfig {
                     .cloned()
                     .expect("context exists")
                     .0;
+
                 let mut new_type_def = Definition::empty_kind(
                     state.target_kind().clone(),
                     input_definition.log_namespaces().clone(),
@@ -159,6 +160,20 @@ impl TransformConfig for RemapConfig {
                     new_type_def = new_type_def.with_known_meaning(path, &id);
                 }
                 new_type_def
+                // =======
+                //
+                //                 state
+                //                     .target_kind()
+                //                     .clone()
+                //                     .into_object()
+                //                     .map(schema::Definition::from)
+                //                     .map(|mut def| {
+                //                         for (id, path) in meaning {
+                //                             def = def.with_known_meaning(path, &id);
+                //                         }
+                //                         def
+                //                     })
+                // >>>>>>> master
             })
             .unwrap_or_else(|_| {
                 Definition::empty_kind(Kind::never(), input_definition.log_namespaces().clone())
@@ -1191,10 +1206,10 @@ mod tests {
         };
 
         let schema_definition = schema::Definition::legacy_empty()
-            .with_field("foo", Kind::bytes(), None)
+            .with_field("foo", Kind::bytes().or_null(), None)
             .with_field(
                 "tags",
-                Kind::object(BTreeMap::from([("foo".into(), Kind::bytes())])),
+                Kind::object(BTreeMap::from([("foo".into(), Kind::bytes())])).or_null(),
                 None,
             );
 

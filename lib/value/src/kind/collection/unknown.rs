@@ -1,7 +1,7 @@
 use std::{borrow::Cow, collections::BTreeMap};
 
 use super::Collection;
-use crate::{kind::merge, Kind};
+use crate::Kind;
 
 /// The type-state of "unknown" values in a collection.
 ///
@@ -113,9 +113,9 @@ impl Unknown {
     /// Merge `other` into `self`, using the provided `Strategy`.
     ///
     /// If any of the two `Unknown`s is marked as "infinite", it will overwrite the finite variant.
-    pub(crate) fn merge(&mut self, other: Self, strategy: merge::Strategy) {
+    pub(crate) fn merge(&mut self, other: Self, overwrite: bool) {
         match (&mut self.0, other.0) {
-            (Inner::Exact(lhs), Inner::Exact(rhs)) => lhs.merge(*rhs, strategy),
+            (Inner::Exact(lhs), Inner::Exact(rhs)) => lhs.merge_keep(*rhs, overwrite),
             (Inner::Infinite(lhs), Inner::Infinite(rhs)) => lhs.merge(rhs),
             (_, rhs @ Inner::Infinite(_)) => self.0 = rhs,
             (Inner::Infinite(_), _) => {}
