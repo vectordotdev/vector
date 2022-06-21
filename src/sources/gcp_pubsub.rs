@@ -35,8 +35,8 @@ use crate::{
     SourceSender,
 };
 
-const MIN_ACK_DEADLINE_SECONDS: i32 = 10;
-const MAX_ACK_DEADLINE_SECONDS: i32 = 600;
+const MIN_ACK_DEADLINE_SECS: i32 = 10;
+const MAX_ACK_DEADLINE_SECS: i32 = 600;
 
 // We use a bounded channel for the acknowledgement ID communication
 // between the request stream and receiver. During benchmark runs,
@@ -92,11 +92,15 @@ pub(crate) enum PubsubError {
     #[snafu(display("Could not pull data from remote: {}", source))]
     Pull { source: Status },
     #[snafu(display(
-        "`ack_deadline_seconds` is outside the valid range of {} to {}",
-        MIN_ACK_DEADLINE_SECONDS,
-        MAX_ACK_DEADLINE_SECONDS
+        "`ack_deadline_secs` is outside the valid range of {} to {}",
+        MIN_ACK_DEADLINE_SECS,
+        MAX_ACK_DEADLINE_SECS
     ))]
     InvalidAckDeadline,
+    #[snafu(display("Cannot set both `ack_deadline_secs` and `ack_deadline_seconds`"))]
+    BothAckDeadlineSecsAndSeconds,
+    #[snafu(display("Cannot set both `retry_delay_secs` and `retry_delay_seconds`"))]
+    BothRetryDelaySecsAndSeconds,
 }
 
 static CLIENT_ID: Lazy<String> = Lazy::new(|| uuid::Uuid::new_v4().to_string());
@@ -131,12 +135,16 @@ pub struct PubsubConfig {
     /// The acknowledgement deadline, in seconds, to use for this stream.
     ///
     /// Messages that are not acknowledged when this deadline expires may be retransmitted.
-    #[serde(default = "default_ack_deadline")]
-    pub ack_deadline_seconds: i32,
+    pub ack_deadline_secs: Option<i32>,
+
+    /// Deprecated, old name of `ack_deadline_secs`.
+    pub ack_deadline_seconds: Option<i32>,
 
     /// The amount of time, in seconds, to wait between retry attempts after an error.
-    #[serde(default = "default_retry_delay")]
-    pub retry_delay_seconds: f64,
+    pub retry_delay_secs: Option<f64>,
+
+    /// Deprecated, old name of `retry_delay_secs`.
+    pub retry_delay_seconds: Option<f64>,
 
     /// The amount of time, in seconds, with no received activity
     /// before sending a keepalive request. If this is set larger than
@@ -175,11 +183,28 @@ const fn default_keepalive() -> f64 {
 #[typetag::serde(name = "gcp_pubsub")]
 impl SourceConfig for PubsubConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<crate::sources::Source> {
-        if self.ack_deadline_seconds < MIN_ACK_DEADLINE_SECONDS
-            || self.ack_deadline_seconds > MAX_ACK_DEADLINE_SECONDS
-        {
+        let ack_deadline_secs = match (self.ack_deadline_secs, self.ack_deadline_seconds) {
+            (Some(ads), None) => ads,
+            (None, Some(ads)) => {
+                warn!("The `ack_deadline_seconds` setting is deprecated, use `ack_deadline_secs` instead.");
+                ads
+            }
+            (Some(_), Some(_)) => return Err(PubsubError::BothAckDeadlineSecsAndSeconds.into()),
+            (None, None) => default_ack_deadline(),
+        };
+        if !(MIN_ACK_DEADLINE_SECS..=MAX_ACK_DEADLINE_SECS).contains(&ack_deadline_secs) {
             return Err(PubsubError::InvalidAckDeadline.into());
         }
+
+        let retry_delay_secs = match (self.retry_delay_secs, self.retry_delay_seconds) {
+            (Some(rds), None) => rds,
+            (None, Some(rds)) => {
+                warn!("The `retry_delay_seconds` setting is deprecated, use `retry_delay_secs` instead.");
+                rds
+            }
+            (Some(_), Some(_)) => return Err(PubsubError::BothRetryDelaySecsAndSeconds.into()),
+            (None, None) => default_retry_delay(),
+        };
 
         let credentials = if self.skip_authentication {
             None
@@ -202,8 +227,8 @@ impl SourceConfig for PubsubConfig {
             tls: TlsSettings::from_options(&self.tls)?,
             shutdown: cx.shutdown,
             out: cx.out,
-            ack_deadline_seconds: self.ack_deadline_seconds,
-            retry_delay: Duration::from_secs_f64(self.retry_delay_seconds),
+            ack_deadline_secs,
+            retry_delay: Duration::from_secs_f64(retry_delay_secs),
             keepalive: Duration::from_secs_f64(self.keepalive_secs),
         }
         .run()
@@ -234,7 +259,7 @@ struct PubsubSource {
     decoder: Decoder,
     acknowledgements: bool,
     tls: TlsSettings,
-    ack_deadline_seconds: i32,
+    ack_deadline_secs: i32,
     shutdown: ShutdownSignal,
     out: SourceSender,
     retry_delay: Duration,
@@ -372,7 +397,7 @@ impl PubsubSource {
     ) -> impl Stream<Item = proto::StreamingPullRequest> + 'static {
         let subscription = self.subscription.clone();
         let client_id = CLIENT_ID.clone();
-        let stream_ack_deadline_seconds = self.ack_deadline_seconds;
+        let stream_ack_deadline_seconds = self.ack_deadline_secs;
         let mut ack_ids = ReceiverStream::new(ack_ids).ready_chunks(ACK_QUEUE_SIZE);
         let keepalive = self.keepalive;
 
@@ -746,7 +771,7 @@ mod integration_tests {
                 subscription: self.subscription.clone(),
                 endpoint: Some(gcp::PUBSUB_ADDRESS.clone()),
                 skip_authentication: true,
-                ack_deadline_seconds: ACK_DEADLINE as i32,
+                ack_deadline_secs: Some(ACK_DEADLINE as i32),
                 ..Default::default()
             };
             let (mut ctx, shutdown) = SourceContext::new_shutdown(&self.component, tx);
