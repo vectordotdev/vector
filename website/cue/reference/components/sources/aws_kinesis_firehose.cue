@@ -202,7 +202,14 @@ components: sources: aws_kinesis_firehose: {
 					inputs = ["firehose"]
 					drop_on_error = false
 					source = '''
-					. |= parse_aws_cloudwatch_log_subscription_message!(.message)
+					parsed = parse_aws_cloudwatch_log_subscription_message!(.message)
+					. = unnest(parsed.log_events)
+					. = map_values(.) -> |value| {
+						event = del(value.log_events)
+						value |= event
+						message = del(.message)
+						. |= object!(parse_json!(message))
+					}
 					'''
 
 					[sinks.console]

@@ -1,7 +1,7 @@
 ---
 title: Ingesting AWS CloudWatch Logs via AWS Kinesis Firehose
 description: Use CloudWatch Log subscriptions and Kinesis Firehose to robustly collect and route your CloudWatch logs.
-authors: ["jszwedko"]
+authors: ["jszwedko", "spencergilbert"]
 domains: ["sources", "transforms"]
 transforms: ["remap"]
 weight: 2
@@ -83,7 +83,7 @@ Let's take a look at the configuration we will be using:
 [sources.firehose]
   type = "aws_kinesis_firehose"
   address = "0.0.0.0:8080" # the public URL will be set when configuring Firehose
-  access_key = "${FIREHOSE_ACCESS_KEY}"my secret key" # this will also be set when configuring Firehose
+  access_key = "${FIREHOSE_ACCESS_KEY} # this will also be set when configuring Firehose
 
 [transforms.parse]
   type = "remap"
