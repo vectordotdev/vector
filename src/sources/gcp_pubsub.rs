@@ -138,6 +138,12 @@ pub struct PubsubConfig {
     #[serde(default = "default_retry_delay")]
     pub retry_delay_seconds: f64,
 
+    /// The amount of time, in seconds, with no received activity
+    /// before sending a keepalive request. If this is set larger than
+    /// `60`, you may see periodic errors sent from the server.
+    #[serde(default = "default_keepalive")]
+    pub keepalive_secs: f64,
+
     #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
@@ -159,6 +165,10 @@ const fn default_ack_deadline() -> i32 {
 
 const fn default_retry_delay() -> f64 {
     1.0
+}
+
+const fn default_keepalive() -> f64 {
+    60.0
 }
 
 #[async_trait::async_trait]
@@ -194,6 +204,7 @@ impl SourceConfig for PubsubConfig {
             out: cx.out,
             ack_deadline_seconds: self.ack_deadline_seconds,
             retry_delay: Duration::from_secs_f64(self.retry_delay_seconds),
+            keepalive: Duration::from_secs_f64(self.keepalive_secs),
         }
         .run()
         .map_err(|error| error!(message = "Source failed.", %error));
@@ -227,6 +238,7 @@ struct PubsubSource {
     shutdown: ShutdownSignal,
     out: SourceSender,
     retry_delay: Duration,
+    keepalive: Duration,
 }
 
 enum State {
@@ -361,7 +373,8 @@ impl PubsubSource {
         let subscription = self.subscription.clone();
         let client_id = CLIENT_ID.clone();
         let stream_ack_deadline_seconds = self.ack_deadline_seconds;
-        let ack_ids = ReceiverStream::new(ack_ids);
+        let mut ack_ids = ReceiverStream::new(ack_ids).ready_chunks(ACK_QUEUE_SIZE);
+        let keepalive = self.keepalive;
 
         stream::once(async move {
             // These fields are only valid on the first request in the
@@ -373,17 +386,30 @@ impl PubsubSource {
                 ..Default::default()
             }
         })
-        .chain(ack_ids.ready_chunks(ACK_QUEUE_SIZE).map(|chunks| {
-            // These "requests" serve only to send updates about
-            // acknowledgements to the server. None of the above
-            // fields need to be repeated and, in fact, will cause
-            // an stream error and cancellation if they are
-            // present.
-            proto::StreamingPullRequest {
-                ack_ids: chunks.into_iter().flatten().collect(),
-                ..Default::default()
+        .chain(async_stream::stream! {
+            loop {
+                // GCP Pub/Sub likes to time out connections after
+                // about 75 seconds of inactivity. To forestall the
+                // resulting error, send an empty array of
+                // acknowledgement IDs to the request stream if no
+                // other activity has happened. This will result in a
+                // new request with empty fields, effectively a
+                // keepalive.
+                let ack_ids: Vec<String> = tokio::select! {
+                    chunks = ack_ids.next() => chunks.into_iter().flatten().flatten().collect(),
+                    _ = tokio::time::sleep(keepalive) => Vec::new(),
+                };
+                // These "requests" serve only to send updates about
+                // acknowledgements to the server. None of the above
+                // fields need to be repeated and, in fact, will cause
+                // an stream error and cancellation if they are
+                // present.
+                yield proto::StreamingPullRequest {
+                    ack_ids,
+                    ..Default::default()
+                };
             }
-        }))
+        })
     }
 
     async fn handle_response(
