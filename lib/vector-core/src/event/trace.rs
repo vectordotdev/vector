@@ -12,7 +12,7 @@ use crate::ByteSizeOf;
 use lookup::path;
 
 /// Traces are a newtype of `LogEvent`
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct TraceEvent(LogEvent);
 
 impl TraceEvent {

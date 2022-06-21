@@ -29,7 +29,7 @@ pub use self::value::*;
 
 pub type MetricTags = BTreeMap<String, String>;
 
-#[derive(Clone, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Metric {
     #[serde(flatten)]
     pub(super) series: MetricSeries,
