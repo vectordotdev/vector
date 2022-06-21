@@ -204,6 +204,8 @@ impl LookupBuf {
 
         components
     }
+
+    pub fn can_start_with()
 }
 
 #[inherent]
