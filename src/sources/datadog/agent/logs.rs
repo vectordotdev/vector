@@ -89,12 +89,12 @@ pub(crate) fn decode_log_body(
 
     for LogMsg {
         message,
-        status,
         timestamp,
         hostname,
         service,
         ddsource,
         ddtags,
+        ..
     } in messages
     {
         let mut decoder = source.decoder.clone();
@@ -105,7 +105,6 @@ pub(crate) fn decode_log_body(
                 Ok(Some((events, _byte_size))) => {
                     for mut event in events {
                         if let Event::Log(ref mut log) = event {
-                            log.try_insert(path!("status"), status.clone());
                             log.try_insert(path!("timestamp"), timestamp);
                             log.try_insert(path!("hostname"), hostname.clone());
                             log.try_insert(path!("service"), service.clone());

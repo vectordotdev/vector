@@ -1,5 +1,9 @@
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
+use crate::{
+    config::{self, ConfigDiff, Format},
+    test_util, topology, Error,
+};
 use hyper::{
     service::{make_service_fn, service_fn},
     Body, Request, Response, Server, StatusCode,
@@ -7,12 +11,7 @@ use hyper::{
 use tokio::{
     sync::{mpsc, oneshot, Mutex},
     task::JoinHandle,
-	time::{timeout, Duration},
-};
-use crate::{
-	config::{self, ConfigDiff, Format},
-        topology,
-	test_util, Error,
+    time::{timeout, Duration},
 };
 
 type Lock = Arc<Mutex<()>>;

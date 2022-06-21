@@ -16,7 +16,7 @@ use crate::{
             acknowledgements::HecClientAcknowledgementsConfig,
             build_healthcheck, build_http_batch_service, create_client, host_key,
             service::{HecService, HttpRequestBuilder},
-            timestamp_key, SplunkHecDefaultBatchSettings,
+            timestamp_key, EndpointTarget, SplunkHecDefaultBatchSettings,
         },
         util::{
             encoding::{EncodingConfig, EncodingConfigAdapter, EncodingConfigMigrator},
@@ -78,6 +78,12 @@ pub struct HecLogsSinkConfig {
     pub timestamp_nanos_key: Option<String>,
     #[serde(default = "crate::sinks::splunk_hec::common::timestamp_key")]
     pub timestamp_key: String,
+    #[serde(default = "default_endpoint_target")]
+    pub endpoint_target: EndpointTarget,
+}
+
+const fn default_endpoint_target() -> EndpointTarget {
+    EndpointTarget::Event
 }
 
 impl GenerateConfig for HecLogsSinkConfig {
@@ -98,6 +104,7 @@ impl GenerateConfig for HecLogsSinkConfig {
             acknowledgements: Default::default(),
             timestamp_nanos_key: None,
             timestamp_key: timestamp_key(),
+            endpoint_target: EndpointTarget::Event,
         })
         .unwrap()
     }
@@ -159,6 +166,7 @@ impl HecLogsSinkConfig {
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
         let http_request_builder = Arc::new(HttpRequestBuilder::new(
             self.endpoint.clone(),
+            self.endpoint_target,
             self.default_token.clone(),
             self.compression,
         ));
@@ -167,6 +175,7 @@ impl HecLogsSinkConfig {
             .service(build_http_batch_service(
                 client,
                 Arc::clone(&http_request_builder),
+                self.endpoint_target,
             ));
 
         let service = HecService::new(
@@ -190,6 +199,7 @@ impl HecLogsSinkConfig {
             host: self.host_key.clone(),
             timestamp_nanos_key: self.timestamp_nanos_key.clone(),
             timestamp_key: self.timestamp_key.clone(),
+            endpoint_target: self.endpoint_target,
         };
 
         Ok(VectorSink::from_event_streamsink(sink))
