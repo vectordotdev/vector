@@ -372,7 +372,7 @@ components: sinks: elasticsearch: {
 			title: "Distribution"
 			body:  """
 				By default, Vector sends events to a single Elasticsearch endpoint.
-				If `distribution` is used, events will be distributed to multiple endpoints 
+				If `distribution` is used, events will be distributed to multiple endpoints
 				according to their estimated load with failover.
 				"""
 		}
