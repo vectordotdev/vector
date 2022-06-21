@@ -68,7 +68,7 @@ impl Arbitrary for FieldBuf {
         FieldBuf::from(name)
     }
 
-    fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
+    fn shrink(&self) -> Box<dyn Iterator<Item=Self>> {
         Box::new(
             self.name
                 .shrink()
@@ -89,9 +89,34 @@ impl Arbitrary for FieldBuf {
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub enum SegmentBuf {
     Field(FieldBuf),
-    Index(isize), // Indexes can be negative.
+    Index(isize),
+    // Indexes can be negative.
     // Coalesces hold multiple possible fields.
     Coalesce(Vec<FieldBuf>),
+}
+
+impl SegmentBuf {
+    /// Returns true if the segments could possibly be equal. This is different than
+    /// the `Eq` implementation for coalesced segments in that it returns true if they intersect
+    /// in any way
+    pub fn can_equal(&self, other: &Self) -> bool {
+        match (self, other) {
+            (a @ Self::Index(_), b) | (a, b @ Self::Index(_)) => a == b,
+            (Self::Field(a), Self::Field(b)) => a == b,
+            (Self::Field(field), Self::Coalesce(coalesce)) |
+            (Self::Coalesce(coalesce), Self::Field(field)) => {
+                coalesce.contains(field)
+            },
+            (Self::Coalesce(a), Self::Coalesce(b)) => {
+                for field in a {
+                    if b.contains(field) {
+                        return true;
+                    }
+                }
+                false
+            }
+        }
+    }
 }
 
 #[cfg(any(test, feature = "arbitrary"))]
@@ -110,7 +135,7 @@ impl Arbitrary for SegmentBuf {
         }
     }
 
-    fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
+    fn shrink(&self) -> Box<dyn Iterator<Item=Self>> {
         match self {
             SegmentBuf::Field(field) => Box::new(field.shrink().map(SegmentBuf::Field)),
             SegmentBuf::Index(index) => Box::new(index.shrink().map(SegmentBuf::Index)),
