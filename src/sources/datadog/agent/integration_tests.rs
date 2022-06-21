@@ -70,8 +70,11 @@ async fn wait_for_message() {
 
     let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
     let schema_definitions = HashMap::from([
-        (Some(LOGS.to_owned()), schema::Definition::empty_kind(Kind::)),
-        (Some(METRICS.to_owned()), schexma::Definition::empty()),
+        (Some(LOGS.to_owned()), schema::Definition::legacy_empty()),
+        (
+            Some(METRICS.to_owned()),
+            schexma::Definition::legacy_empty(),
+        ),
     ]);
     let context = SourceContext::new_test(sender, Some(schema_definitions));
     tokio::spawn(async move {
