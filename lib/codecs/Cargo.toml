@@ -15,7 +15,7 @@ prost = { version = "0.10.4", default-features = false, features = ["std"] }
 serde = { version = "1", default-features = false, features = ["derive"] }
 serde_json = { version = "1", default-features = false }
 smallvec = { version = "1", default-features = false, features = ["union"] }
-syslog_loose = { version = "0.16", default-features = false, optional = true }
+syslog_loose = { version = "0.17", default-features = false, optional = true }
 tokio-util = { version = "0.7", default-features = false, features = ["codec"] }
 tracing = { version = "0.1", default-features = false }
 value = { path = "../value", default-features = false }
