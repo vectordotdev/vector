@@ -139,9 +139,8 @@ impl SourceConfig for DatadogAgentConfig {
             .expect("registered metrics schema required")
             .clone();
 
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone())
-            .with_log_namespace(log_namespace)
-            .build();
+        let decoder =
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
 
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         let source = DatadogAgentSource::new(

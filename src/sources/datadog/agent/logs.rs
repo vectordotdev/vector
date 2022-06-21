@@ -138,15 +138,16 @@ pub(crate) fn decode_log_body(
                                 ddtags.clone(),
                             );
 
-                            // TODO: don't use log schema keys for Vector namespace
                             namespace.insert_vector_metadata(
                                 log,
                                 path!(source.log_schema_source_type_key),
+                                path!("source_type"),
                                 Bytes::from("datadog_agent"),
                             );
                             namespace.insert_vector_metadata(
                                 log,
                                 path!(source.log_schema_timestamp_key),
+                                path!("ingest_timestamp"),
                                 now,
                             );
 

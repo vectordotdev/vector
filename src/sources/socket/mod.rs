@@ -127,7 +127,7 @@ impl SourceConfig for SocketConfig {
                     }
                 };
 
-                let decoder = DecodingConfig::new(framing, decoding).build();
+                let decoder = DecodingConfig::new(framing, decoding, LogNamespace::Legacy).build();
 
                 let tcp = tcp::RawTcpSource::new(config.clone(), decoder);
                 let tls_config = config.tls().as_ref().map(|tls| tls.tls_config.clone());
@@ -153,9 +153,12 @@ impl SourceConfig for SocketConfig {
                     .host_key()
                     .clone()
                     .unwrap_or_else(|| log_schema().host_key().to_string());
-                let decoder =
-                    DecodingConfig::new(config.framing().clone(), config.decoding().clone())
-                        .build();
+                let decoder = DecodingConfig::new(
+                    config.framing().clone(),
+                    config.decoding().clone(),
+                    LogNamespace::Legacy,
+                )
+                .build();
                 Ok(udp::udp(config, host_key, decoder, cx.shutdown, cx.out))
             }
             #[cfg(unix)]
@@ -166,6 +169,7 @@ impl SourceConfig for SocketConfig {
                 let decoder = DecodingConfig::new(
                     config.framing.unwrap_or_else(default_framing_message_based),
                     config.decoding.clone(),
+                    LogNamespace::Legacy,
                 )
                 .build();
                 unix::unix_datagram(
@@ -203,7 +207,7 @@ impl SourceConfig for SocketConfig {
                     }
                 };
 
-                let decoder = DecodingConfig::new(framing, decoding).build();
+                let decoder = DecodingConfig::new(framing, decoding, LogNamespace::Legacy).build();
 
                 let host_key = config
                     .host_key

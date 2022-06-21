@@ -18,12 +18,15 @@ pub struct DecodingConfig {
 impl DecodingConfig {
     /// Creates a new `DecodingConfig` with the provided `FramingConfig` and
     /// `DeserializerConfig`.
-    pub const fn new(framing: FramingConfig, decoding: DeserializerConfig) -> Self {
-        //TODO: make log namespace a mandatory param
+    pub const fn new(
+        framing: FramingConfig,
+        decoding: DeserializerConfig,
+        log_namespace: LogNamespace,
+    ) -> Self {
         Self {
             framing,
             decoding,
-            log_namespace: LogNamespace::Legacy,
+            log_namespace,
         }
     }
 
@@ -36,11 +39,5 @@ impl DecodingConfig {
         let deserializer = self.decoding.build();
 
         Decoder::new(framer, deserializer).with_log_namespace(self.log_namespace)
-    }
-
-    /// Sets the path prefix where all deserialized data will be placed
-    pub fn with_log_namespace(mut self, log_namespace: LogNamespace) -> Self {
-        self.log_namespace = log_namespace;
-        self
     }
 }

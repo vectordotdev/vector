@@ -98,7 +98,12 @@ impl fmt::Display for Compression {
 #[typetag::serde(name = "aws_kinesis_firehose")]
 impl SourceConfig for AwsKinesisFirehoseConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
+        let decoder = DecodingConfig::new(
+            self.framing.clone(),
+            self.decoding.clone(),
+            LogNamespace::Legacy,
+        )
+        .build();
         let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
 
         let svc = filters::firehose(

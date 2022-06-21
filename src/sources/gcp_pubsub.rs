@@ -188,7 +188,12 @@ impl SourceConfig for PubsubConfig {
                 "projects/{}/subscriptions/{}",
                 self.project, self.subscription
             ),
-            decoder: DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build(),
+            decoder: DecodingConfig::new(
+                self.framing.clone(),
+                self.decoding.clone(),
+                LogNamespace::Legacy,
+            )
+            .build(),
             acknowledgements: cx.do_acknowledgements(&self.acknowledgements),
             tls: TlsSettings::from_options(&self.tls)?,
             shutdown: cx.shutdown,

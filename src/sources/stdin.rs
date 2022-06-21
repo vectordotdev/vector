@@ -110,7 +110,7 @@ where
     let framing = config
         .framing
         .unwrap_or_else(|| config.decoding.default_stream_framing());
-    let decoder = DecodingConfig::new(framing, config.decoding).build();
+    let decoder = DecodingConfig::new(framing, config.decoding, LogNamespace::Legacy).build();
 
     let (mut sender, receiver) = mpsc::channel(1024);
 

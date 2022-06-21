@@ -155,7 +155,12 @@ impl SourceConfig for RedisSourceConfig {
 
         let client = redis::Client::open(self.url.as_str()).context(ClientSnafu {})?;
         let connection_info = client.get_connection_info().into();
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
+        let decoder = DecodingConfig::new(
+            self.framing.clone(),
+            self.decoding.clone(),
+            LogNamespace::Legacy,
+        )
+        .build();
 
         match self.data_type {
             DataTypeConfig::List => {

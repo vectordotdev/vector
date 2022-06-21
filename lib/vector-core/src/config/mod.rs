@@ -238,16 +238,17 @@ impl LogNamespace {
     pub fn insert_vector_metadata<'a>(
         &self,
         log: &mut LogEvent,
-        key: impl Path<'a>,
+        legacy_key: impl Path<'a>,
+        metadata_key: impl Path<'a>,
         value: impl Into<Value>,
     ) {
         match self {
             LogNamespace::Vector => {
                 log.metadata_mut()
                     .value_mut()
-                    .insert(path!("vector").concat(key), value);
+                    .insert(path!("vector").concat(metadata_key), value);
             }
-            LogNamespace::Legacy => log.try_insert(key, value),
+            LogNamespace::Legacy => log.try_insert(legacy_key, value),
         }
     }
 

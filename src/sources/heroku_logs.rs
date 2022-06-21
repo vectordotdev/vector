@@ -111,7 +111,12 @@ impl HttpSource for LogplexSource {
 #[typetag::serde(name = "heroku_logs")]
 impl SourceConfig for LogplexConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
+        let decoder = DecodingConfig::new(
+            self.framing.clone(),
+            self.decoding.clone(),
+            LogNamespace::Legacy,
+        )
+        .build();
         let source = LogplexSource {
             query_parameters: self.query_parameters.clone(),
             decoder,
