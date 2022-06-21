@@ -567,7 +567,7 @@ async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) 
     let client = create_http_client();
     let mut total = 0;
     for base_url in base_urls {
-        let mut response = client
+        let response = client
             .get(&format!("{}/{}/_search", base_url, index))
             .basic_auth("elastic", Some("vector"))
             .json(&json!({
