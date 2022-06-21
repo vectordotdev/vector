@@ -215,6 +215,36 @@ components: sinks: elasticsearch: {
 				}
 			}
 		}
+		distribution: {
+			common:      false
+			description: "Options for distributing events to multiple endpoints."
+			required:    false
+			type: object: {
+				examples: []
+				options: {
+					endpoints: {
+						common: false
+						description: "Additional Elasticsearch endpoints to send logs to. They should be a full URL as shown in the example."
+						required: false
+						type: array: {
+							default: []
+							items: type: string: {
+								examples: ["http://10.24.32.122:9000", "https://example.com", "https://user:password@example.com"]
+							}
+						}
+					}
+					reactivate_delay_secs: {
+						common:      false
+						description: "Delay between trying to reactivate inactive endpoints."
+						required:    false
+						type: uint: {
+							default: 5
+							unit: "seconds"
+						}
+					}
+				}
+			}
+		}
 		doc_type: {
 			common:      false
 			description: "The `doc_type` for your index data. This is only relevant for Elasticsearch <= 6.X. If you are using >= 7.0 you do not need to set this option since Elasticsearch has removed it."
@@ -335,6 +365,15 @@ components: sinks: elasticsearch: {
 				To use [Data streams](\(urls.elasticsearch_data_streams)), set the `mode` to
 				`data_stream`. Use the combination of `data_stream.type`, `data_stream.dataset` and
 				`data_stream.namespace` instead of `index`.
+				"""
+		}
+
+		distribution: {
+			title: "Distribution"
+			body:  """
+				By default, Vector sends events to a single Elasticsearch endpoint.
+				If `distribution` is used, events will be distributed to multiple endpoints 
+				according to their estimated load with failover.
 				"""
 		}
 
