@@ -60,6 +60,16 @@ components: sources: gcp_pubsub: {
 		acknowledgements: configuration._source_acknowledgements
 		ack_deadline_seconds: {
 			common:      false
+			description: "The acknowledgement deadline to use for this stream. Messages that are not acknowledged when this deadline expires may be retransmitted. This setting is deprecated and will be removed in a future version."
+			required:    false
+			type: uint: {
+				default: 600
+				examples: [10, 600]
+				unit: "seconds"
+			}
+		}
+		ack_deadline_secs: {
+			common:      false
 			description: "The acknowledgement deadline to use for this stream. Messages that are not acknowledged when this deadline expires may be retransmitted."
 			required:    false
 			type: uint: {
@@ -96,6 +106,16 @@ components: sources: gcp_pubsub: {
 			}
 		}
 		retry_delay_seconds: {
+			common:      false
+			description: "The amount of time to wait between retry attempts after an error. This setting is deprecated and will be removed in a future version."
+			required:    false
+			type: float: {
+				default: 1.0
+				examples: [0.5]
+				unit: "seconds"
+			}
+		}
+		retry_delay_secs: {
 			common:      false
 			description: "The amount of time to wait between retry attempts after an error."
 			required:    false
