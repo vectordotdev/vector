@@ -221,7 +221,7 @@ pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &LookupBuf) -> TypeD
                 unknown.clone().into(),
                 insert::Strategy {
                     inner_conflict: insert::InnerConflict::Merge(merge::Strategy {
-                        depth: merge::Depth::Deep,
+                        collisions: merge::CollisionStrategy::Union,
                         indices: merge::Indices::Keep,
                     }),
                     leaf_conflict: insert::LeafConflict::Replace,

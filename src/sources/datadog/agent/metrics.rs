@@ -242,18 +242,21 @@ fn into_vector_metric(
         .device
         .and_then(|dev| tags.insert("device".into(), dev));
 
+    let (namespace, name) = namespace_name_from_dd_metric(&dd_metric.metric);
+
     match dd_metric.r#type {
         DatadogMetricType::Count => dd_metric
             .points
             .iter()
             .map(|dd_point| {
                 Metric::new(
-                    dd_metric.metric.clone(),
+                    name.to_string(),
                     MetricKind::Incremental,
                     MetricValue::Counter { value: dd_point.1 },
                 )
                 .with_timestamp(Some(Utc.timestamp(dd_point.0, 0)))
                 .with_tags(Some(tags.clone()))
+                .with_namespace(namespace)
             })
             .collect::<Vec<_>>(),
         DatadogMetricType::Gauge => dd_metric
@@ -261,12 +264,13 @@ fn into_vector_metric(
             .iter()
             .map(|dd_point| {
                 Metric::new(
-                    dd_metric.metric.clone(),
+                    name.to_string(),
                     MetricKind::Absolute,
                     MetricValue::Gauge { value: dd_point.1 },
                 )
                 .with_timestamp(Some(Utc.timestamp(dd_point.0, 0)))
                 .with_tags(Some(tags.clone()))
+                .with_namespace(namespace)
             })
             .collect::<Vec<_>>(),
         // Agent sends rate only for dogstatsd counter https://github.com/DataDog/datadog-agent/blob/f4a13c6dca5e2da4bb722f861a8ac4c2f715531d/pkg/metrics/counter.go#L8-L10
@@ -277,7 +281,7 @@ fn into_vector_metric(
             .map(|dd_point| {
                 let i = dd_metric.interval.filter(|v| *v != 0).unwrap_or(1) as f64;
                 Metric::new(
-                    dd_metric.metric.clone(),
+                    name.to_string(),
                     MetricKind::Incremental,
                     MetricValue::Counter {
                         value: dd_point.1 * i,
@@ -285,6 +289,7 @@ fn into_vector_metric(
                 )
                 .with_timestamp(Some(Utc.timestamp(dd_point.0, 0)))
                 .with_tags(Some(tags.clone()))
+                .with_namespace(namespace)
             })
             .collect::<Vec<_>>(),
     }
@@ -301,6 +306,16 @@ fn into_vector_metric(
         metric.into()
     })
     .collect()
+}
+
+/// Parses up to the first '.' of the input metric name into a namespace.
+/// If no delimiter, the namespace is None type.
+fn namespace_name_from_dd_metric(dd_metric_name: &str) -> (Option<&str>, &str) {
+    // ex: "system.fs.util" -> ("system", "fs.util")
+    match dd_metric_name.split_once('.') {
+        Some((namespace, name)) => (Some(namespace), name),
+        None => (None, dd_metric_name),
+    }
 }
 
 mod dd_proto {
@@ -349,10 +364,11 @@ pub(crate) fn decode_ddsketch(
                     )
                     .unwrap_or_else(AgentDDSketch::with_agent_defaults),
                 );
-                let mut metric =
-                    Metric::new(sketch_series.metric.clone(), MetricKind::Incremental, val)
-                        .with_tags(Some(tags.clone()))
-                        .with_timestamp(Some(Utc.timestamp(sketch.ts, 0)));
+                let (namespace, name) = namespace_name_from_dd_metric(&sketch_series.metric);
+                let mut metric = Metric::new(name.to_string(), MetricKind::Incremental, val)
+                    .with_tags(Some(tags.clone()))
+                    .with_timestamp(Some(Utc.timestamp(sketch.ts, 0)))
+                    .with_namespace(namespace);
                 if let Some(k) = &api_key {
                     metric.metadata_mut().set_datadog_api_key(Arc::clone(k));
                 }

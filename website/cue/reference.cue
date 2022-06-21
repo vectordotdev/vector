@@ -7,6 +7,9 @@ _values: {
 	local_host:        "my-host.local"
 	remote_host:       "34.33.222.212"
 	instance:          "vector:9598"
+	client_metadata: {
+		subject: "CN=localhost,OU=Vector,O=Datadog,L=New York,ST=New York,C=US"
+	}
 }
 
 // `#Any` allows for any value.

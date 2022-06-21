@@ -4,6 +4,7 @@
 #![deny(unused_allocation)]
 #![deny(unused_assignments)]
 #![deny(unused_comparisons)]
+#![deny(warnings)]
 #![allow(clippy::approx_constant)]
 #![allow(clippy::float_cmp)]
 #![allow(clippy::match_wild_err_arm)]
@@ -157,4 +158,15 @@ where
 
     #[cfg(not(tokio_unstable))]
     tokio::spawn(task)
+}
+
+pub fn num_threads() -> usize {
+    let count = match std::thread::available_parallelism() {
+        Ok(count) => count,
+        Err(error) => {
+            warn!(message = "Failed to determine available parallelism for thread count, defaulting to 1.", %error);
+            std::num::NonZeroUsize::new(1).unwrap()
+        }
+    };
+    usize::from(count)
 }
