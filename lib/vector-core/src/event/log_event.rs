@@ -436,19 +436,6 @@ impl TryFrom<serde_json::Value> for LogEvent {
     }
 }
 
-// impl TryFrom<Value> for LogEvent {
-//     type Error = crate::Error;
-//
-//     fn try_from(value: Value) -> Result<Self, Self::Error> {
-//         match value {
-//             Value::Object(map) => Ok(LogEvent::from(map)),
-//             _ => Err(crate::Error::from(
-//                 "Attempted to convert non-Object Value into a LogEvent.",
-//             )),
-//         }
-//     }
-// }
-
 impl TryInto<serde_json::Value> for LogEvent {
     type Error = crate::Error;
 

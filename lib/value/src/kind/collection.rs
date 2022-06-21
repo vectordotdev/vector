@@ -295,7 +295,7 @@ impl Collection<Field> {
     /// # Errors
     ///
     /// See `Kind::find_at_path`.
-    // This functions can currently return an "unknown" value
+    // This function can currently return an "unknown" value
     // https://github.com/vectordotdev/vector/issues/13045
     pub fn find_known_at_path<'a>(
         &'a self,

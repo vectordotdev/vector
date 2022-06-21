@@ -18,7 +18,7 @@ pub enum Error {
 impl Kind {
     /// Find the `Kind` within the known set of fields.
     ///
-    /// This is currently broken due to https://github.com/vectordotdev/vector/issues/13045
+    /// This is currently broken due to <a>https://github.com/vectordotdev/vector/issues/13045</a>
     ///
     /// In all of the above cases, this method returns `Ok(None)`.
     ///
@@ -29,7 +29,7 @@ impl Kind {
     pub fn find_known_at_path<'a>(
         &'a self,
         path: &'a mut Lookup<'a>,
-    ) -> Result<Option<Cow<'a, Kind>>, super::find::Error> {
+    ) -> Result<Option<Cow<'a, Self>>, super::find::Error> {
         match path.pop_front() {
             None => Ok(Some(Cow::Borrowed(self))),
             Some(Segment::Field(field)) => {

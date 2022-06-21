@@ -55,7 +55,7 @@ pub fn merged_definition(
                 ))
                 .log_schema_definition
                 .clone()
-                .unwrap_or_else(Definition::legacy_default2);
+                .unwrap_or_else(Definition::legacy_default);
 
             if config.schema_enabled() {
                 definition = definition.merge(source_definition);
@@ -146,7 +146,7 @@ pub(super) fn expanded_definitions(
                         output
                             .log_schema_definition
                             .clone()
-                            .unwrap_or_else(Definition::legacy_default2),
+                            .unwrap_or_else(Definition::legacy_default),
                     )
                 } else {
                     None
@@ -508,7 +508,7 @@ mod tests {
                     inputs: vec![("foo", None)],
                     sources: IndexMap::from([("foo", vec![Output::default(DataType::all())])]),
                     transforms: IndexMap::default(),
-                    want: vec![Definition::legacy_default2()],
+                    want: vec![Definition::legacy_default()],
                 },
             ),
             (

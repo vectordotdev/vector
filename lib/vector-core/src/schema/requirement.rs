@@ -80,6 +80,11 @@ impl Requirement {
     ///
     /// Returns a list of errors if validation fails.
     pub fn validate(&self, definition: &Definition) -> Result<(), ValidationErrors> {
+        println!(
+            "Validating definition: {:?}",
+            definition.kind().debug_info()
+        );
+
         let mut errors = vec![];
 
         for (identifier, req_meaning) in &self.meaning {
@@ -105,10 +110,12 @@ impl Requirement {
                     // lack any further information.
                     let definition_kind = definition
                         .kind()
-                        .find_known_at_path(&mut path.to_lookup())
+                        .find_at_path(&mut path.to_lookup())
                         .ok()
                         .flatten()
                         .map_or_else(Kind::any, Cow::into_owned);
+
+                    println!("Meaning at {:?} = {:?}", path, definition_kind.debug_info());
 
                     if !req_meaning.kind.is_superset(&definition_kind) {
                         // We found a field matching the defined semantic
@@ -354,7 +361,11 @@ mod tests {
                 },
             ),
         ]) {
+            println!("Requirement: {:?}", requirement);
             let got = requirement.validate(&definition);
+
+            // println!("GOT:\n{:#?}", got);
+
             let want = if errors.is_empty() {
                 Ok(())
             } else {
