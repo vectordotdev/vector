@@ -1,5 +1,8 @@
-#[cfg(all(feature = "sinks-socket", feature = "sources-socket",))]
+#[cfg(all(feature = "sinks-socket", feature = "sources-socket"))]
 mod crash;
+
+#[cfg(all(feature = "sources-http", feature = "sinks-http"))]
+mod end_to_end;
 
 #[cfg(all(
     feature = "sinks-blackhole",

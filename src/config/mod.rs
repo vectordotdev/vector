@@ -666,6 +666,7 @@ mod tests {
 
             [sinks.out]
             type = "mock_sink"
+            inputs = ["sample1"]
             "#,
             Format::Toml,
         )
@@ -714,6 +715,7 @@ mod tests {
 
             [sinks.out]
             type = "mock_sink"
+            inputs = ["four"]
             "#,
             Format::Toml,
         )

@@ -762,6 +762,7 @@ pub fn transform(suffix: &str, increase: f64) -> MockTransformConfig {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(default)]
 pub struct MockSourceConfig {
     #[serde(skip)]
     receiver: Arc<Mutex<Option<LimitedReceiver<EventArray>>>>,
