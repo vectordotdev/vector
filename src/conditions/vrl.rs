@@ -61,7 +61,12 @@ impl ConditionConfig for VrlConfig {
         }
 
         match self.runtime {
-            VrlRuntime::Ast => Ok(Condition::Vrl(Vrl {
+            // TODO: Support condition transform that can evaluate a batch of VRL conditions.
+            // This is not trivially possible at the moment since the output events are not
+            // guaranteed to be in the same order as the input. However, `if` expressions are the
+            // only ones which may reorder the event output. We can add a flag to the compilation of
+            // a VRL program where these are disallowed.
+            VrlRuntime::Ast | VrlRuntime::AstBatch => Ok(Condition::Vrl(Vrl {
                 program,
                 source: self.source.clone(),
             })),

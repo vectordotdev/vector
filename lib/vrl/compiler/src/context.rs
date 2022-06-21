@@ -47,18 +47,18 @@ impl<'a> Context<'a> {
 }
 
 #[derive(Clone)]
-pub struct BatchContext {
+pub struct BatchContext<'a> {
     resolved_values: Vec<Resolved>,
-    targets: Vec<Rc<RefCell<dyn Target>>>,
+    targets: Vec<Rc<RefCell<dyn Target + 'a>>>,
     states: Vec<Rc<RefCell<Runtime>>>,
     timezone: TimeZone,
 }
 
-impl BatchContext {
+impl<'a> BatchContext<'a> {
     /// Create a new [`BatchContext`].
     pub fn new(
         resolved_values: Vec<Resolved>,
-        targets: Vec<Rc<RefCell<dyn Target>>>,
+        targets: Vec<Rc<RefCell<dyn Target + 'a>>>,
         states: Vec<Rc<RefCell<Runtime>>>,
         timezone: TimeZone,
     ) -> Self {
@@ -91,7 +91,7 @@ impl BatchContext {
         &mut self.resolved_values
     }
 
-    pub fn targets(&self) -> impl Iterator<Item = Rc<RefCell<dyn Target>>> + '_ {
+    pub fn targets(&self) -> impl Iterator<Item = Rc<RefCell<dyn Target + 'a>>> + '_ {
         self.targets.iter().cloned()
     }
 
@@ -158,7 +158,7 @@ impl BatchContext {
         }
     }
 
-    pub fn extend(&mut self, other: BatchContext) {
+    pub fn extend(&mut self, other: BatchContext<'a>) {
         assert_eq!(self.timezone, other.timezone);
         self.resolved_values.extend(other.resolved_values);
         self.targets.extend(other.targets);
@@ -169,12 +169,12 @@ impl BatchContext {
         self.timezone
     }
 
-    pub fn iter_mut(
-        &mut self,
+    pub fn iter_mut<'b>(
+        &'b mut self,
     ) -> impl Iterator<
         Item = (
-            &'_ mut Resolved,
-            Rc<RefCell<dyn Target>>,
+            &'b mut Resolved,
+            Rc<RefCell<dyn Target + 'a>>,
             Rc<RefCell<Runtime>>,
             TimeZone,
         ),
@@ -197,7 +197,7 @@ impl BatchContext {
         self,
     ) -> (
         Vec<Resolved>,
-        Vec<Rc<RefCell<dyn Target>>>,
+        Vec<Rc<RefCell<dyn Target + 'a>>>,
         Vec<Rc<RefCell<Runtime>>>,
         TimeZone,
     ) {
@@ -210,17 +210,17 @@ impl BatchContext {
     }
 }
 
-pub struct BatchContextIterMut<'a> {
-    resolved_values: std::slice::IterMut<'a, Resolved>,
-    targets: std::slice::Iter<'a, Rc<RefCell<dyn Target>>>,
-    states: std::slice::Iter<'a, Rc<RefCell<Runtime>>>,
+pub struct BatchContextIterMut<'a, 'b> {
+    resolved_values: std::slice::IterMut<'b, Resolved>,
+    targets: std::slice::Iter<'b, Rc<RefCell<dyn Target + 'a>>>,
+    states: std::slice::Iter<'b, Rc<RefCell<Runtime>>>,
     timezone: TimeZone,
 }
 
-impl<'a> Iterator for BatchContextIterMut<'a> {
+impl<'a, 'b> Iterator for BatchContextIterMut<'a, 'b> {
     type Item = (
-        &'a mut Resolved,
-        Rc<RefCell<dyn Target>>,
+        &'b mut Resolved,
+        Rc<RefCell<dyn Target + 'a>>,
         Rc<RefCell<Runtime>>,
         TimeZone,
     );

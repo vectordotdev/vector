@@ -183,7 +183,7 @@ fn execute(
     vrl_runtime: VrlRuntime,
 ) -> Result<Value, String> {
     match vrl_runtime {
-        VrlRuntime::Ast => runtime
+        VrlRuntime::Ast | VrlRuntime::AstBatch => runtime
             .resolve(object, &program, timezone)
             .map_err(|err| err.to_string()),
     }

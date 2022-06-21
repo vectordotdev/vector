@@ -116,12 +116,12 @@ impl BatchRuntime {
 
     /// Given the provided [`Target`], resolve the provided [`Program`] to
     /// completion.
-    pub fn resolve_batch(
+    pub fn resolve_batch<'a>(
         &self,
-        targets: Vec<Rc<RefCell<dyn Target>>>,
+        targets: Vec<Rc<RefCell<dyn Target + 'a>>>,
         program: &Program,
         timezone: TimeZone,
-    ) -> Vec<(Rc<RefCell<dyn Target>>, RuntimeResult)> {
+    ) -> Vec<(Rc<RefCell<dyn Target + 'a>>, RuntimeResult)> {
         let mut invalid_targets = Vec::new();
         let targets = targets
             .into_iter()

@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::ops::DerefMut;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::{
@@ -119,6 +118,10 @@ impl TransformConfig for RemapConfig {
         let (transform, warnings) = match self.runtime {
             VrlRuntime::Ast => {
                 let (remap, warnings) = Remap::new_ast(self.clone(), context)?;
+                (Transform::synchronous(remap), warnings)
+            }
+            VrlRuntime::AstBatch => {
+                let (remap, warnings) = Remap::new_ast_batch(self.clone(), context)?;
                 (Transform::synchronous(remap), warnings)
             }
         };
@@ -582,7 +585,7 @@ where
                 let target = {
                     let mut moved = VrlTarget::new(Event::new_empty_log(), program_info);
                     std::mem::swap(&mut moved, unsafe {
-                        &mut *(target.borrow_mut().deref_mut() as *mut _ as *mut VrlTarget)
+                        &mut *(&mut *target.borrow_mut() as *mut _ as *mut VrlTarget)
                     });
                     moved
                 };

@@ -1,17 +1,19 @@
 use core::TargetValueRef;
 use std::{
+    cell::RefCell,
     collections::BTreeMap,
     fs::File,
     io::{self, Read},
     iter::IntoIterator,
     path::PathBuf,
+    rc::Rc,
 };
 
 use ::value::Value;
 use clap::Parser;
 use value::Secrets;
 use vector_common::TimeZone;
-use vrl::{diagnostic::Formatter, state, Program, Runtime, Target, VrlRuntime};
+use vrl::{diagnostic::Formatter, state, BatchRuntime, Runtime, Target, VrlRuntime};
 
 #[cfg(feature = "repl")]
 use super::repl;
@@ -118,7 +120,7 @@ fn run(opts: &Opts) -> Result<(), Error> {
 
         repl(repl_objects, &tz, opts.runtime)
     } else {
-        let objects = opts.read_into_objects()?;
+        let mut objects = opts.read_into_objects()?;
         let source = opts.read_program()?;
         let (program, warnings) = vrl::compile(&source, &stdlib::all()).map_err(|diagnostics| {
             Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
@@ -130,30 +132,76 @@ fn run(opts: &Opts) -> Result<(), Error> {
             eprintln!("{warnings}")
         }
 
-        for mut object in objects {
-            let mut metadata = Value::Object(BTreeMap::new());
-            let mut secrets = Secrets::new();
-            let mut target = TargetValueRef {
-                value: &mut object,
-                metadata: &mut metadata,
-                secrets: &mut secrets,
-            };
-            let state = state::Runtime::default();
-            let runtime = Runtime::new(state);
+        let mut metadata = objects
+            .iter()
+            .map(|_| Value::Object(BTreeMap::new()))
+            .collect::<Vec<_>>();
+        let mut secrets = objects.iter().map(|_| Secrets::new()).collect::<Vec<_>>();
 
-            let result = execute(&mut target, &program, &tz, runtime, opts.runtime).map(|v| {
-                if opts.print_object {
-                    object.to_string()
-                } else {
-                    v.to_string()
-                }
+        let targets = objects
+            .iter_mut()
+            .zip(metadata.iter_mut())
+            .zip(secrets.iter_mut())
+            .map(|((value, metadata), secrets)| TargetValueRef {
+                value,
+                metadata,
+                secrets,
             });
 
-            #[allow(clippy::print_stdout)]
-            #[allow(clippy::print_stderr)]
-            match result {
-                Ok(ok) => println!("{}", ok),
-                Err(err) => eprintln!("{}", err),
+        match opts.runtime {
+            VrlRuntime::Ast => {
+                for mut target in targets {
+                    let state = state::Runtime::default();
+                    let mut runtime = Runtime::new(state);
+                    let result = runtime
+                        .resolve(&mut target, &program, &tz)
+                        .map(|v| {
+                            if opts.print_object {
+                                target.value.to_string()
+                            } else {
+                                v.to_string()
+                            }
+                        })
+                        .map_err(Error::Runtime);
+
+                    #[allow(clippy::print_stdout)]
+                    #[allow(clippy::print_stderr)]
+                    match result {
+                        Ok(ok) => println!("{}", ok),
+                        Err(err) => eprintln!("{}", err),
+                    }
+                }
+            }
+            VrlRuntime::AstBatch => {
+                let runtime = BatchRuntime::new();
+                let targets = targets
+                    .into_iter()
+                    .map(|target| Rc::new(RefCell::new(target)) as Rc<RefCell<dyn Target>>)
+                    .collect();
+                let results = runtime.resolve_batch(targets, &program, tz);
+
+                for (target, result) in results {
+                    let target = unsafe {
+                        &mut *(&mut *target.borrow_mut() as *mut _ as *mut TargetValueRef)
+                    };
+
+                    let result = result
+                        .map(|value| {
+                            if opts.print_object {
+                                target.value.to_string()
+                            } else {
+                                value.to_string()
+                            }
+                        })
+                        .map_err(Error::Runtime);
+
+                    #[allow(clippy::print_stdout)]
+                    #[allow(clippy::print_stderr)]
+                    match result {
+                        Ok(ok) => println!("{}", ok),
+                        Err(err) => eprintln!("{}", err),
+                    }
+                }
             }
         }
 
@@ -181,20 +229,6 @@ fn repl(objects: Vec<Value>, timezone: &TimeZone, vrl_runtime: VrlRuntime) -> Re
 #[cfg(not(feature = "repl"))]
 fn repl(_objects: Vec<Value>, _timezone: &TimeZone, _vrl_runtime: VrlRuntime) -> Result<(), Error> {
     Err(Error::ReplFeature)
-}
-
-fn execute(
-    object: &mut impl Target,
-    program: &Program,
-    timezone: &TimeZone,
-    mut runtime: Runtime,
-    vrl_runtime: VrlRuntime,
-) -> Result<Value, Error> {
-    match vrl_runtime {
-        VrlRuntime::Ast => runtime
-            .resolve(object, program, timezone)
-            .map_err(Error::Runtime),
-    }
 }
 
 fn serde_to_vrl(value: serde_json::Value) -> Value {
