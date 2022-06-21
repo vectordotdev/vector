@@ -671,11 +671,11 @@ mod tests {
                     kind: Kind::timestamp(),
                     strategy: Strategy {
                         inner_conflict: InnerConflict::Merge(merge::Strategy {
-                            depth: merge::Depth::Shallow,
+                            collisions: merge::CollisionStrategy::Overwrite,
                             indices: merge::Indices::Keep,
                         }),
                         leaf_conflict: LeafConflict::Merge(merge::Strategy {
-                            depth: merge::Depth::Shallow,
+                            collisions: merge::CollisionStrategy::Overwrite,
                             indices: merge::Indices::Keep,
                         }),
                         coalesced_path: CoalescedPath::InsertValid,
@@ -693,11 +693,11 @@ mod tests {
                     kind: Kind::timestamp(),
                     strategy: Strategy {
                         inner_conflict: InnerConflict::Merge(merge::Strategy {
-                            depth: merge::Depth::Shallow,
+                            collisions: merge::CollisionStrategy::Overwrite,
                             indices: merge::Indices::Keep,
                         }),
                         leaf_conflict: LeafConflict::Merge(merge::Strategy {
-                            depth: merge::Depth::Shallow,
+                            collisions: merge::CollisionStrategy::Overwrite,
                             indices: merge::Indices::Keep,
                         }),
                         coalesced_path: CoalescedPath::InsertValid,
@@ -717,11 +717,11 @@ mod tests {
                     kind: Kind::timestamp(),
                     strategy: Strategy {
                         inner_conflict: InnerConflict::Merge(merge::Strategy {
-                            depth: merge::Depth::Shallow,
+                            collisions: merge::CollisionStrategy::Overwrite,
                             indices: merge::Indices::Keep,
                         }),
                         leaf_conflict: LeafConflict::Merge(merge::Strategy {
-                            depth: merge::Depth::Shallow,
+                            collisions: merge::CollisionStrategy::Overwrite,
                             indices: merge::Indices::Keep,
                         }),
                         coalesced_path: CoalescedPath::InsertValid,
@@ -803,7 +803,7 @@ mod tests {
                     strategy: Strategy {
                         inner_conflict: InnerConflict::Reject,
                         leaf_conflict: LeafConflict::Merge(merge::Strategy {
-                            depth: merge::Depth::Shallow,
+                            collisions: merge::CollisionStrategy::Overwrite,
                             indices: merge::Indices::Keep,
                         }),
                         coalesced_path: CoalescedPath::Reject,
@@ -988,11 +988,11 @@ mod tests {
                     kind: Kind::timestamp(),
                     strategy: Strategy {
                         inner_conflict: InnerConflict::Merge(merge::Strategy {
-                            depth: merge::Depth::Deep,
+                            collisions: merge::CollisionStrategy::Union,
                             indices: merge::Indices::Append,
                         }),
                         leaf_conflict: LeafConflict::Merge(merge::Strategy {
-                            depth: merge::Depth::Deep,
+                            collisions: merge::CollisionStrategy::Union,
                             indices: merge::Indices::Append,
                         }),
                         coalesced_path: CoalescedPath::InsertAll,
@@ -1019,7 +1019,7 @@ mod tests {
                     strategy: Strategy {
                         inner_conflict: InnerConflict::Replace,
                         leaf_conflict: LeafConflict::Merge(merge::Strategy {
-                            depth: merge::Depth::Shallow,
+                            collisions: merge::CollisionStrategy::Overwrite,
                             indices: merge::Indices::Keep,
                         }),
                         coalesced_path: CoalescedPath::InsertAll,

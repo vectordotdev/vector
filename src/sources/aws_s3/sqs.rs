@@ -1,4 +1,4 @@
-use std::{cmp, future::ready, panic, sync::Arc};
+use std::{future::ready, panic, sync::Arc};
 
 use aws_sdk_s3::error::GetObjectError;
 use aws_sdk_s3::Client as S3Client;
@@ -110,7 +110,7 @@ const fn default_true() -> bool {
 }
 
 fn default_client_concurrency() -> u32 {
-    cmp::max(1, crate::num_threads() as u32)
+    crate::num_threads() as u32
 }
 
 #[derive(Debug, Snafu)]

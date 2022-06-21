@@ -1,5 +1,3 @@
-use std::cmp;
-
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use vector_config::configurable_component;
 
@@ -143,7 +141,7 @@ const fn default_poll_secs() -> u32 {
 }
 
 fn default_client_concurrency() -> u32 {
-    cmp::max(1, crate::num_threads() as u32)
+    crate::num_threads() as u32
 }
 
 const fn default_visibility_timeout_secs() -> u32 {

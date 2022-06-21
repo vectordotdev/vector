@@ -171,15 +171,16 @@ impl SourceConfig for DatadogAgentConfig {
     fn outputs(&self) -> Vec<Output> {
         let definition = match self.decoding {
             // See: `LogMsg` struct.
-            DeserializerConfig::Bytes => schema::Definition::empty()
+            DeserializerConfig::Bytes => self
+                .decoding
+                .schema_definition()
                 .with_field("message", Kind::bytes(), Some("message"))
                 .with_field("status", Kind::bytes(), Some("severity"))
                 .with_field("timestamp", Kind::timestamp(), Some("timestamp"))
                 .with_field("hostname", Kind::bytes(), Some("host"))
                 .with_field("service", Kind::bytes(), Some("service"))
                 .with_field("ddsource", Kind::bytes(), Some("source"))
-                .with_field("ddtags", Kind::bytes(), Some("tags"))
-                .merge(self.decoding.schema_definition()),
+                .with_field("ddtags", Kind::bytes(), Some("tags")),
 
             // JSON deserializer can overwrite existing fields at runtime, so we have to treat
             // those events as if there is no known type details we can provide, other than the
