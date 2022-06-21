@@ -143,7 +143,7 @@ impl Kind {
                                 merged_kind.merge(
                                     kind.into_owned(),
                                     merge::Strategy {
-                                        depth: merge::Depth::Deep,
+                                        collisions: merge::CollisionStrategy::Union,
                                         indices: merge::Indices::Keep,
                                     },
                                 );
@@ -415,17 +415,16 @@ mod tests {
                         ),
                     ])),
                     path: LookupBuf::from_str(".(foo | bar)").unwrap(),
-                    // TODO(Jean):
-                    //
-                    // This isn't as accurate as it can be, but it is accurate enough to pass all
-                    // existing tests. In reality, we should track two different `object` states
-                    // for the kind, one for each potential coalesced arm. For this to work, the
-                    // internal API of `Kind` has to be updated to store `BTreeSet<Collection<T>>`,
-                    // instead of the existing `Option<Collection<T>>`.
+                    // TODO: This is returning a type more general than it could be, but it is "correct"
+                    //       otherwise
+                    // The type system currently doesn't distinguish between "null" and "undefined",
+                    // but the runtime behavior of coalescing _does_, so in general types
+                    // for coalesced paths won't be as accurate as possible.
+                    // (This specific example could be fixed though)
                     want: Ok(Some(Kind::object(BTreeMap::from([
-                        ("one".into(), Kind::integer()),
+                        ("one".into(), Kind::integer().or_null()),
                         ("two".into(), Kind::integer().or_boolean()),
-                        ("three".into(), Kind::boolean()),
+                        ("three".into(), Kind::boolean().or_null()),
                     ])))),
                 },
             ),
