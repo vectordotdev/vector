@@ -43,8 +43,10 @@ const MAX_ACK_DEADLINE_SECS: i32 = 600;
 // We use a bounded channel for the acknowledgement ID communication
 // between the request stream and receiver. During benchmark runs,
 // this channel had only a single element over 80% of the time and
-// rarely went over 8 elements.
-const ACK_QUEUE_SIZE: usize = 128;
+// rarely went over 8 elements. Having it too small does not introduce
+// deadlocks, as the worst case is slightly less efficient ack
+// processing.
+const ACK_QUEUE_SIZE: usize = 8;
 
 type Finalizer = UnorderedFinalizer<Vec<String>>;
 
