@@ -5582,9 +5582,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.39"
+version = "1.0.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c54b25569025b7fc9651de43004ae593a75ad88543b17178aa5e1b9c4f15f56f"
+checksum = "dd96a1e8ed2596c337f8eae5f24924ec83f5ad5ab21ea8e455d3566c69fbcaf7"
 dependencies = [
  "unicode-ident",
 ]
@@ -7229,9 +7229,9 @@ dependencies = [
 
 [[package]]
 name = "syslog_loose"
-version = "0.16.0"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8417c2dcaef3d8016608956f3a5b70ad9cf4efe44b5546c93ca4934903c16749"
+checksum = "1c4eae4d024d7912b5bea75e54319445d0ffe7f423bb4b68a46129cdcebecaef"
 dependencies = [
  "chrono",
  "nom",
