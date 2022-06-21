@@ -6,7 +6,6 @@ use lookup::{Field, Lookup, Segment};
 
 use super::Kind;
 use crate::kind::merge;
-use crate::kind::merge::{Depth, Indices};
 
 /// The list of errors that can occur when `remove_at_path` fails.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -16,67 +15,6 @@ pub enum Error {
 }
 
 impl Kind {
-    /// Find the `Kind` within the known set of fields.
-    ///
-    /// This is currently broken due to <a>https://github.com/vectordotdev/vector/issues/13045</a>
-    ///
-    /// In all of the above cases, this method returns `Ok(None)`.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the path contains negative indexing segments (e.g. `.foo[-2]`). This
-    /// is currently not supported.
-    pub fn find_known_at_path<'a>(
-        &'a self,
-        path: &'a mut Lookup<'a>,
-    ) -> Result<Option<Cow<'a, Self>>, super::find::Error> {
-        match path.pop_front() {
-            None => Ok(Some(Cow::Borrowed(self))),
-            Some(Segment::Field(field)) => {
-                if let Some(object) = &self.object {
-                    object.find_known_at_path(path)
-                } else {
-                    Ok(None)
-                }
-            }
-            Some(Segment::Index(index)) => {
-                if let Some(array) = &self.array {
-                    // This function is missing. (https://github.com/vectordotdev/vector/issues/13045)
-                    // using "find_at_path" instead since that is the current behavior anyway
-                    // array.find_known_at_path(path)
-
-                    path.push_front(Segment::Index(index));
-                    self.find_at_path(path)
-                } else {
-                    Ok(None)
-                }
-            }
-            Some(Segment::Coalesce(fields)) => {
-                let mut merged: Option<Kind> = None;
-
-                for field in fields {
-                    let mut child_path = path.clone();
-                    child_path.push_front(Segment::Field(field));
-                    if let Some(child_kind) = self.find_known_at_path(&mut child_path)? {
-                        if let Some(merged) = &mut merged {
-                            merged.merge(
-                                child_kind.into_owned(),
-                                merge::Strategy {
-                                    depth: Depth::Deep,
-                                    indices: Indices::Keep,
-                                },
-                            );
-                        } else {
-                            merged = Some(child_kind.into_owned());
-                        }
-                    }
-                }
-
-                Ok(merged.map(Cow::Owned))
-            }
-        }
-    }
-
     /// Find the [`Kind`] at the given path.
     ///
     /// If the path points to root, then `self` is returned, otherwise `None` is returned if `Kind`
