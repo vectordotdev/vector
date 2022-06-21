@@ -19,7 +19,7 @@ use flate2::read::MultiGzDecoder;
 use futures::{
     ready, stream, task::noop_waker_ref, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt,
 };
-use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
+use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode};
 use portpicker::pick_unused_port;
 use rand::{thread_rng, Rng};
 use rand_distr::Alphanumeric;
@@ -158,6 +158,8 @@ pub async fn send_lines_tls(
     host: String,
     lines: impl Iterator<Item = String>,
     ca: impl Into<Option<&Path>>,
+    client_cert: impl Into<Option<&Path>>,
+    client_key: impl Into<Option<&Path>>,
 ) -> Result<SocketAddr, Infallible> {
     let stream = TcpStream::connect(&addr).await.unwrap();
 
@@ -168,6 +170,16 @@ pub async fn send_lines_tls(
         connector.set_ca_file(ca).unwrap();
     } else {
         connector.set_verify(SslVerifyMode::NONE);
+    }
+
+    if let Some(cert_file) = client_cert.into() {
+        connector.set_certificate_chain_file(cert_file).unwrap();
+    }
+
+    if let Some(key_file) = client_key.into() {
+        connector
+            .set_private_key_file(key_file, SslFiletype::PEM)
+            .unwrap();
     }
 
     let ssl = connector

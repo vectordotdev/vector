@@ -3,18 +3,18 @@ use vector_common::internal_event::InternalEvent;
 
 pub struct BufferCreated {
     pub idx: usize,
-    pub max_size_events: Option<usize>,
-    pub max_size_bytes: Option<u64>,
+    pub max_size_events: usize,
+    pub max_size_bytes: u64,
 }
 
 impl InternalEvent for BufferCreated {
     #[allow(clippy::cast_precision_loss)]
     fn emit(self) {
-        if let Some(max_size) = self.max_size_events {
-            gauge!("buffer_max_event_size", max_size as f64, "stage" => self.idx.to_string());
+        if self.max_size_events != 0 {
+            gauge!("buffer_max_event_size", self.max_size_events as f64, "stage" => self.idx.to_string());
         }
-        if let Some(max_size) = self.max_size_bytes {
-            gauge!("buffer_max_byte_size", max_size as f64, "stage" => self.idx.to_string());
+        if self.max_size_bytes != 0 {
+            gauge!("buffer_max_byte_size", self.max_size_bytes as f64, "stage" => self.idx.to_string());
         }
     }
 }

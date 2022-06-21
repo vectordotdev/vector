@@ -23,7 +23,7 @@ use crate::{
     event::{Event, Value},
     serde::bool_or_struct,
     tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
+    tls::{MaybeTlsSettings, TlsSourceConfig},
     types,
 };
 
@@ -38,7 +38,7 @@ pub struct LogstashConfig {
     keepalive: Option<TcpKeepaliveConfig>,
 
     #[configurable(derived)]
-    tls: Option<TlsEnableableConfig>,
+    tls: Option<TlsSourceConfig>,
 
     /// The size, in bytes, of the receive buffer used for each connection.
     ///
@@ -79,12 +79,18 @@ impl SourceConfig for LogstashConfig {
             timestamp_converter: types::Conversion::Timestamp(cx.globals.timezone),
         };
         let shutdown_secs = 30;
-        let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
+        let tls_config = self.tls.as_ref().map(|tls| tls.tls_config.clone());
+        let tls_client_metadata_key = self
+            .tls
+            .as_ref()
+            .and_then(|tls| tls.client_metadata_key.clone());
+        let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
         source.run(
             self.address,
             self.keepalive,
             shutdown_secs,
             tls,
+            tls_client_metadata_key,
             self.receive_buffer_bytes,
             cx,
             self.acknowledgements,
@@ -701,7 +707,7 @@ mod integration_tests {
             components::{assert_source_compliance, SOCKET_PUSH_SOURCE_TAGS},
             wait_for_tcp,
         },
-        tls::TlsConfig,
+        tls::{TlsConfig, TlsEnableableConfig},
         SourceSender,
     };
 
@@ -777,10 +783,18 @@ mod integration_tests {
     ) -> impl Stream<Item = Event> {
         let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
         let address: std::net::SocketAddr = address.parse().unwrap();
+        let tls_options = match tls {
+            Some(options) => options,
+            None => TlsEnableableConfig::default(),
+        };
+        let tls_config = TlsSourceConfig {
+            client_metadata_key: None,
+            tls_config: tls_options,
+        };
         tokio::spawn(async move {
             LogstashConfig {
                 address: address.into(),
-                tls,
+                tls: Some(tls_config),
                 keepalive: None,
                 receive_buffer_bytes: None,
                 acknowledgements: false.into(),

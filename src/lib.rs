@@ -161,7 +161,12 @@ where
 }
 
 pub fn num_threads() -> usize {
-    std::thread::available_parallelism()
-        .expect("Could not determine available parallelism")
-        .into()
+    let count = match std::thread::available_parallelism() {
+        Ok(count) => count,
+        Err(error) => {
+            warn!(message = "Failed to determine available parallelism for thread count, defaulting to 1.", %error);
+            std::num::NonZeroUsize::new(1).unwrap()
+        }
+    };
+    usize::from(count)
 }
