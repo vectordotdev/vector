@@ -1,0 +1,20 @@
+data_dir = "/var/lib/vector"
+
+##
+## Sources
+##
+
+[sources.logs]
+type = "http"
+address = "0.0.0.0:8282"
+encoding = "text"
+
+##
+## Sinks
+##
+
+[sinks.http_sink]
+type = "http"
+uri = "http://localhost:8080"
+inputs = ["logs"]
+encoding.codec = "json"
