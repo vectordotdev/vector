@@ -223,9 +223,9 @@ components: sinks: elasticsearch: {
 				examples: []
 				options: {
 					endpoints: {
-						common: false
+						common:      false
 						description: "Additional Elasticsearch endpoints to send logs to. They should be a full URL as shown in the example."
-						required: false
+						required:    false
 						type: array: {
 							default: []
 							items: type: string: {
@@ -239,7 +239,7 @@ components: sinks: elasticsearch: {
 						required:    false
 						type: uint: {
 							default: 5
-							unit: "seconds"
+							unit:    "seconds"
 						}
 					}
 				}
@@ -370,7 +370,7 @@ components: sinks: elasticsearch: {
 
 		distribution: {
 			title: "Distribution"
-			body:  """
+			body: """
 				By default, Vector sends events to a single Elasticsearch endpoint.
 				If `distribution` is used, events will be distributed to multiple endpoints
 				according to their estimated load with failover.
