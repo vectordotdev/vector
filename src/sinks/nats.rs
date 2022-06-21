@@ -203,7 +203,7 @@ impl StreamSink<Event> for NatsSink {
                 finalizers.update_status(EventStatus::Errored);
                 self.acker.ack(1);
                 continue;
-            };
+            }
 
             match self.connection.publish(&subject, &bytes).await {
                 Err(error) => {
