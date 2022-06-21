@@ -82,7 +82,7 @@ impl RemapConfig {
         functions.append(&mut vector_vrl_functions::vrl_functions());
 
         let mut state =
-            vrl::state::ExternalEnv::new_with_kind(merged_schema_definition.kind().clone().into());
+            vrl::state::ExternalEnv::new_with_kind(merged_schema_definition.kind().clone());
         state.set_external_context(enrichment_tables);
         state.set_external_context(MeaningList::default());
 
@@ -205,7 +205,7 @@ impl TransformConfig for RemapConfig {
         let default_output =
             Output::default(DataType::all()).with_schema_definition(default_definition);
 
-        let output = if self.reroute_dropped {
+        if self.reroute_dropped {
             vec![
                 default_output,
                 Output::default(DataType::all())
@@ -214,8 +214,7 @@ impl TransformConfig for RemapConfig {
             ]
         } else {
             vec![default_output]
-        };
-        output
+        }
     }
 
     fn transform_type(&self) -> &'static str {

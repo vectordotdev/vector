@@ -87,7 +87,7 @@ impl Definition {
 
     /// Creates an empty definition that is of the kind specified.
     /// There are no meanings or optional fields.
-    /// The log_namespaces are used to list the possible namespaces the schema is for.
+    /// The `log_namespaces` are used to list the possible namespaces the schema is for.
     pub fn empty_kind(kind: Kind, log_namespaces: impl Into<BTreeSet<LogNamespace>>) -> Self {
         Self {
             kind,
@@ -147,9 +147,10 @@ impl Definition {
         if !path.is_root() {
             if kind.contains_null() {
                 // field is optional, so don't coerce to an object, but still make sure it _can_ be an object
-                if self.kind.as_object().is_none() {
-                    panic!("Setting a field on a value that cannot be an object");
-                }
+                assert!(
+                    self.kind.as_object().is_some(),
+                    "Setting a field on a value that cannot be an object"
+                );
             } else {
                 self.kind = self
                     .kind

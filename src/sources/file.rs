@@ -625,7 +625,7 @@ fn create_event(
         byte_size: line.len(),
     });
 
-    let mut event = LogEvent::from_bytes_legacy(line);
+    let mut event = LogEvent::from_bytes_legacy(&line);
 
     // Add source type
     event.insert(log_schema().source_type_key(), Bytes::from("file"));

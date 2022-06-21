@@ -1,4 +1,3 @@
-use bytes::Bytes;
 use std::{
     collections::{BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
@@ -85,15 +84,9 @@ impl Event {
     }
 
     /// This used to be the implementation for `Event::from(&'str)`, but this is now only
-    /// valid for LogNamespace::Legacy
+    /// valid for `LogNamespace::Legacy`
     pub fn from_str_legacy(msg: impl Into<String>) -> Self {
         LogEvent::from_str_legacy(msg).into()
-    }
-
-    /// This used to be the implementation for `LogEvent::from(Bytes)`, but this is now only
-    /// valid for LogNamespace::Legacy
-    pub fn from_bytes_legacy(msg: Bytes) -> Self {
-        LogEvent::from_bytes_legacy(msg).into()
     }
 
     /// Return self as a `LogEvent`
@@ -408,6 +401,7 @@ impl From<proto::SummaryQuantile> for metric::Quantile {
 #[cfg(any(test, feature = "test"))]
 mod test_utils {
     use super::*;
+    use bytes::Bytes;
 
     // these rely on the global log schema, which is no longer supported when using the
     // "LogNamespace::Vector" namespace.

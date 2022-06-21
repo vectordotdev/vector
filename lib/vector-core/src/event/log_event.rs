@@ -121,7 +121,7 @@ pub struct LogEvent {
 
 impl LogEvent {
     /// This used to be the implementation for `LogEvent::from(&'str)`, but this is now only
-    /// valid for LogNamespace::Legacy
+    /// valid for `LogNamespace::Legacy`
     pub fn from_str_legacy(msg: impl Into<String>) -> Self {
         let mut log = LogEvent::default();
         log.insert(log_schema().message_key(), msg.into());
@@ -130,8 +130,8 @@ impl LogEvent {
     }
 
     /// This used to be the implementation for `LogEvent::from(Bytes)`, but this is now only
-    /// valid for LogNamespace::Legacy
-    pub fn from_bytes_legacy(msg: Bytes) -> Self {
+    /// valid for `LogNamespace::Legacy`
+    pub fn from_bytes_legacy(msg: &Bytes) -> Self {
         Self::from_str_legacy(String::from_utf8_lossy(msg.as_ref()).to_string())
     }
 

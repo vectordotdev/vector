@@ -6,7 +6,6 @@ use std::{
 use chrono::Utc;
 use indoc::indoc;
 use tokio::{io::AsyncWriteExt, net::TcpStream};
-use value::Kind;
 
 use super::{DatadogAgentConfig, LOGS, METRICS};
 use crate::{
@@ -71,10 +70,7 @@ async fn wait_for_message() {
     let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
     let schema_definitions = HashMap::from([
         (Some(LOGS.to_owned()), schema::Definition::legacy_empty()),
-        (
-            Some(METRICS.to_owned()),
-            schexma::Definition::legacy_empty(),
-        ),
+        (Some(METRICS.to_owned()), schema::Definition::legacy_empty()),
     ]);
     let context = SourceContext::new_test(sender, Some(schema_definitions));
     tokio::spawn(async move {

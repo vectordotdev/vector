@@ -50,10 +50,12 @@ pub fn merged_definition(
         // Merge the schema if it's a source
         if let Ok(maybe_output) = config.source_output_for_port(key, &input.port) {
             let source_definition = maybe_output
-                .expect(&format!(
-                    "source output mis-configured - output for port {:?} missing",
-                    &input.port
-                ))
+                .unwrap_or_else(|| {
+                    panic!(
+                        "source output mis-configured - output for port {:?} missing",
+                        &input.port
+                    )
+                })
                 .log_schema_definition
                 .clone()
                 .unwrap_or_else(Definition::legacy_default);
@@ -74,10 +76,12 @@ pub fn merged_definition(
             let maybe_transform_definition = config
                 .transform_output_for_port(key, &input.port, &merged_definition)
                 .expect("transform must exist - already found inputs")
-                .expect(&format!(
-                    "transform output mis-configured - output for port {:?} missing",
-                    &input.port
-                ))
+                .unwrap_or_else(|| {
+                    panic!(
+                        "transform output mis-configured - output for port {:?} missing",
+                        &input.port
+                    )
+                })
                 .log_schema_definition
                 .clone();
 
@@ -266,6 +270,7 @@ pub trait ComponentContainer {
     ///
     /// Returns Err(()) if there is no transform with the given key
     /// Returns Some(None) if the source does not have an output for the port given
+    #[allow(clippy::result_unit_err)]
     fn transform_output_for_port(
         &self,
         key: &ComponentKey,
@@ -283,6 +288,7 @@ pub trait ComponentContainer {
     ///
     /// Returns Err(()) if there is no source with the given key
     /// Returns Some(None) if the source does not have an output for the port given
+    #[allow(clippy::result_unit_err)]
     fn source_output_for_port(
         &self,
         key: &ComponentKey,

@@ -80,13 +80,6 @@ impl SyslogDeserializerConfig {
 #[derive(Debug, Clone)]
 pub struct SyslogDeserializer;
 
-impl SyslogDeserializer {
-    /// Creates a new syslog deserializer
-    pub fn new() -> Self {
-        Self
-    }
-}
-
 impl Deserializer for SyslogDeserializer {
     fn parse(
         &self,
@@ -202,7 +195,7 @@ mod tests {
 
         let input =
             Bytes::from("<34>1 2003-10-11T22:14:15.003Z mymachine.example.com su - ID47 - MSG");
-        let deserializer = SyslogDeserializer::new();
+        let deserializer = SyslogDeserializer;
 
         let events = deserializer.parse(input, LogNamespace::Legacy).unwrap();
         assert_eq!(events.len(), 1);
@@ -225,7 +218,7 @@ mod tests {
 
         let input =
             Bytes::from("<34>1 2003-10-11T22:14:15.003Z mymachine.example.com su - ID47 - MSG");
-        let deserializer = SyslogDeserializer::new();
+        let deserializer = SyslogDeserializer;
 
         let events = deserializer.parse(input, LogNamespace::Vector).unwrap();
         assert_eq!(events.len(), 1);

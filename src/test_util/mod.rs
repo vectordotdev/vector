@@ -236,7 +236,7 @@ pub fn generate_lines_with_stream<Gen: FnMut(usize) -> String>(
 ) -> (Vec<String>, impl Stream<Item = EventArray>) {
     let lines = (0..count).map(generator).collect::<Vec<_>>();
     let stream = map_batch_stream(
-        stream::iter(lines.clone()).map(|x| LogEvent::from_str_legacy(x)),
+        stream::iter(lines.clone()).map(LogEvent::from_str_legacy),
         batch,
     );
     (lines, stream)

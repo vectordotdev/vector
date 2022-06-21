@@ -54,8 +54,9 @@ impl GlobalOptions {
     /// Gets the value of the globally configured log namespace, or the default if it wasn't set
     pub fn log_namespace(&self) -> LogNamespace {
         self.log_namespace
-            .map(|use_vector_namespace| use_vector_namespace.into())
-            .unwrap_or(LogNamespace::Legacy)
+            .map_or(LogNamespace::Legacy, |use_vector_namespace| {
+                use_vector_namespace.into()
+            })
     }
 
     /// Resolve the `data_dir` option in either the global or local config, and

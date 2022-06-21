@@ -578,7 +578,7 @@ impl Source {
 }
 
 fn create_event(line: Bytes, file: &str, ingestion_timestamp_field: Option<&str>) -> Event {
-    let mut event = LogEvent::from_bytes_legacy(line);
+    let mut event = LogEvent::from_bytes_legacy(&line);
 
     // Add source type.
     event.insert(log_schema().source_type_key(), COMPONENT_ID.to_owned());
