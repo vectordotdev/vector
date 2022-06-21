@@ -86,30 +86,30 @@ components: sinks: axiom: {
 			description: "Your Axiom URL (only required if not Axiom Cloud)"
 			common:      false
 			required:    false
-			warnings:    []
+			warnings: []
 			type: string: {
 				examples: ["https://cloud.axiom.co", "${AXIOM_URL}"]
-				syntax: "literal"
-			  default:     ""
+				syntax:  "literal"
+				default: ""
 			}
 		}
 		org_id: {
 			description: "Your Axiom Org ID (only required for personal tokens)"
 			common:      false
 			required:    false
-			warnings:    []
+			warnings: []
 			type: string: {
 				examples: ["xxxx", "${AXIOM_ORG_ID}"]
-				syntax: "literal"
-			  default:     ""
+				syntax:  "literal"
+				default: ""
 			}
 		}
 	}
 
 	input: {
-		logs: true
+		logs:    true
 		metrics: null
-		traces: true
+		traces:  true
 	}
 
 	how_it_works: {
