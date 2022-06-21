@@ -166,7 +166,7 @@ async fn multiple_inputs_backpressure() {
     // `expected_sourced_events`, as that value is intended to be representative of how many events should be sendable
     // before all of the interstitial buffers have been filled, etc.
     //
-    // As-is, it seems like `expected_sourced_events` is muchn larger after a change to how we calculate available
+    // As-is, it seems like `expected_sourced_events` is much larger after a change to how we calculate available
     // parallelism, which leads to this test failing to complete within the timeout, hence the `#[ignore]`.
     let mut config = Config::builder();
 
