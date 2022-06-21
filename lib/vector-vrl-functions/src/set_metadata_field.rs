@@ -14,7 +14,7 @@ fn set_metadata_field(
             Value::Null
         }
         MetadataKey::Query(query) => {
-            ctx.target_mut().remove_metadata(query.path())?;
+            ctx.target_mut().set_metadata(query.path(), value)?;
             Value::Null
         }
     })

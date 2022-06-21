@@ -290,6 +290,25 @@ components: sources: [Name=string]: {
 						examples: ["2019-02-13T19:48:34+00:00 [info] Started GET \"/\" for 127.0.0.1"]
 					}
 				}
+
+				_client_metadata: {
+					common:      false
+					description: "Client TLS metadata."
+					required:    false
+					type: object: {
+						options: {
+							subject: {
+								common:      true
+								description: "The subject from the client TLS certificate. Only added if `tls.client_metadata_key` is set. Key name depends on configured `client_metadata_key`"
+								required:    false
+								type: string: {
+									default: null
+									examples: [ "CN=localhost,OU=Vector,O=Datadog,L=New York,ST=New York,C=US"]
+								}
+							}
+						}
+					}
+				}
 			}
 		}
 	}

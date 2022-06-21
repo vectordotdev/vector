@@ -199,7 +199,7 @@ async fn test_buffer_metrics_normal() {
     let snapshot = handle.snapshot();
     assert_eq!(3, snapshot.received_event_count);
     assert_eq!(0, snapshot.sent_event_count);
-    assert_eq!(None, snapshot.dropped_event_count);
+    assert_eq!(0, snapshot.dropped_event_count_intentional);
 
     // Then, when we collect all of the messages from the receiver, the metrics should also reflect that.
     let mut results = drain_receiver(tx, rx).await;
@@ -209,7 +209,7 @@ async fn test_buffer_metrics_normal() {
     let snapshot = handle.snapshot();
     assert_eq!(3, snapshot.received_event_count);
     assert_eq!(3, snapshot.sent_event_count);
-    assert_eq!(None, snapshot.dropped_event_count);
+    assert_eq!(0, snapshot.dropped_event_count_intentional);
 }
 
 #[tokio::test]
@@ -226,7 +226,7 @@ async fn test_buffer_metrics_drop_newest() {
     let snapshot = handle.snapshot();
     assert_eq!(3, snapshot.received_event_count);
     assert_eq!(0, snapshot.sent_event_count);
-    assert_eq!(Some(1), snapshot.dropped_event_count);
+    assert_eq!(1, snapshot.dropped_event_count_intentional);
 
     // Then, when we collect all of the messages from the receiver, the metrics should also reflect that.
     let mut results = drain_receiver(tx, rx).await;
@@ -236,5 +236,5 @@ async fn test_buffer_metrics_drop_newest() {
     let snapshot = handle.snapshot();
     assert_eq!(3, snapshot.received_event_count);
     assert_eq!(2, snapshot.sent_event_count);
-    assert_eq!(Some(1), snapshot.dropped_event_count);
+    assert_eq!(1, snapshot.dropped_event_count_intentional);
 }

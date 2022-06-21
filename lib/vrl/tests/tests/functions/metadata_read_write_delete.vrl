@@ -1,0 +1,14 @@
+# result:
+# {
+#    "a": {"foo": {"a": 1, "b": 2}},
+#    "b": {"foo": {"b": 2}},
+#    "c": {"foo": {}}
+# }
+
+set_metadata_field(.foo, {"a": 1, "b": 2})
+.a = get_metadata_field(.)
+remove_metadata_field(.foo.a)
+.b = get_metadata_field(.)
+remove_metadata_field(.foo.b)
+.c = get_metadata_field(.)
+.

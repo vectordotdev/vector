@@ -26,7 +26,7 @@ use crate::{
     },
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
+    tls::{MaybeTlsSettings, TlsSourceConfig},
     udp, SourceSender,
 };
 
@@ -88,7 +88,7 @@ pub struct TcpConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    tls: Option<TlsEnableableConfig>,
+    tls: Option<TlsSourceConfig>,
 
     /// The timeout before a connection is forcefully closed during shutdown.
     #[serde(default = "default_shutdown_timeout_secs")]
@@ -144,12 +144,18 @@ impl SourceConfig for StatsdConfig {
                 Ok(Box::pin(statsd_udp(config.clone(), cx.shutdown, cx.out)))
             }
             StatsdConfig::Tcp(config) => {
-                let tls = MaybeTlsSettings::from_config(&config.tls, true)?;
+                let tls_config = config.tls.as_ref().map(|tls| tls.tls_config.clone());
+                let tls_client_metadata_key = config
+                    .tls
+                    .as_ref()
+                    .and_then(|tls| tls.client_metadata_key.clone());
+                let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
                 StatsdTcpSource.run(
                     config.address,
                     config.keepalive,
                     config.shutdown_timeout_secs,
                     tls,
+                    tls_client_metadata_key,
                     config.receive_buffer_bytes,
                     cx,
                     false.into(),
