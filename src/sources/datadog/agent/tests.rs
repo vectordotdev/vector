@@ -102,7 +102,6 @@ fn test_decode_log_body() {
         for (msg, event) in msgs.into_iter().zip(events.into_iter()) {
             let log = event.as_log();
             assert_eq!(log["message"], msg.message.into());
-            assert_eq!(log["status"], msg.status.into());
             assert_eq!(log["timestamp"], msg.timestamp.into());
             assert_eq!(log["hostname"], msg.hostname.into());
             assert_eq!(log["service"], msg.service.into());
@@ -227,7 +226,7 @@ async fn full_payload_v1() {
             assert_eq!(log["message"], "foo".into());
             assert_eq!(log["timestamp"], Utc.timestamp(123, 0).into());
             assert_eq!(log["hostname"], "festeburg".into());
-            assert_eq!(log["status"], "notice".into());
+            assert_eq!(log.contains("status"), false);
             assert_eq!(log["service"], "vector".into());
             assert_eq!(log["ddsource"], "curl".into());
             assert_eq!(log["ddtags"], "one,two,three".into());
@@ -280,7 +279,7 @@ async fn full_payload_v2() {
             assert_eq!(log["message"], "foo".into());
             assert_eq!(log["timestamp"], Utc.timestamp(123, 0).into());
             assert_eq!(log["hostname"], "festeburg".into());
-            assert_eq!(log["status"], "notice".into());
+            assert_eq!(log.contains("status"), false);
             assert_eq!(log["service"], "vector".into());
             assert_eq!(log["ddsource"], "curl".into());
             assert_eq!(log["ddtags"], "one,two,three".into());
@@ -333,7 +332,7 @@ async fn no_api_key() {
             assert_eq!(log["message"], "foo".into());
             assert_eq!(log["timestamp"], Utc.timestamp(123, 0).into());
             assert_eq!(log["hostname"], "festeburg".into());
-            assert_eq!(log["status"], "notice".into());
+            assert_eq!(log.contains("status"), false);
             assert_eq!(log["service"], "vector".into());
             assert_eq!(log["ddsource"], "curl".into());
             assert_eq!(log["ddtags"], "one,two,three".into());
@@ -386,7 +385,7 @@ async fn api_key_in_url() {
             assert_eq!(log["message"], "bar".into());
             assert_eq!(log["timestamp"], Utc.timestamp(456, 0).into());
             assert_eq!(log["hostname"], "festeburg".into());
-            assert_eq!(log["status"], "notice".into());
+            assert_eq!(log.contains("status"), false);
             assert_eq!(log["service"], "vector".into());
             assert_eq!(log["ddsource"], "curl".into());
             assert_eq!(log["ddtags"], "one,two,three".into());
@@ -442,7 +441,7 @@ async fn api_key_in_query_params() {
             assert_eq!(log["message"], "bar".into());
             assert_eq!(log["timestamp"], Utc.timestamp(456, 0).into());
             assert_eq!(log["hostname"], "festeburg".into());
-            assert_eq!(log["status"], "notice".into());
+            assert_eq!(log.contains("status"), false);
             assert_eq!(log["service"], "vector".into());
             assert_eq!(log["ddsource"], "curl".into());
             assert_eq!(log["ddtags"], "one,two,three".into());
@@ -504,7 +503,7 @@ async fn api_key_in_header() {
             assert_eq!(log["message"], "baz".into());
             assert_eq!(log["timestamp"], Utc.timestamp(789, 0).into());
             assert_eq!(log["hostname"], "festeburg".into());
-            assert_eq!(log["status"], "notice".into());
+            assert_eq!(log.contains("status"), false);
             assert_eq!(log["service"], "vector".into());
             assert_eq!(log["ddsource"], "curl".into());
             assert_eq!(log["ddtags"], "one,two,three".into());
@@ -636,7 +635,7 @@ async fn ignores_api_key() {
             assert_eq!(log["message"], "baz".into());
             assert_eq!(log["timestamp"], Utc.timestamp(789, 0).into());
             assert_eq!(log["hostname"], "festeburg".into());
-            assert_eq!(log["status"], "notice".into());
+            assert_eq!(log.contains("status"), false);
             assert_eq!(log["service"], "vector".into());
             assert_eq!(log["ddsource"], "curl".into());
             assert_eq!(log["ddtags"], "one,two,three".into());
@@ -1267,7 +1266,7 @@ async fn split_outputs() {
             assert_eq!(log["message"], "baz".into());
             assert_eq!(log["timestamp"], Utc.timestamp(789, 0).into());
             assert_eq!(log["hostname"], "festeburg".into());
-            assert_eq!(log["status"], "notice".into());
+            assert_eq!(log.contains("status"), false);
             assert_eq!(log["service"], "vector".into());
             assert_eq!(log["ddsource"], "curl".into());
             assert_eq!(log["ddtags"], "one,two,three".into());
