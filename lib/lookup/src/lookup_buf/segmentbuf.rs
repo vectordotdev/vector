@@ -68,7 +68,7 @@ impl Arbitrary for FieldBuf {
         FieldBuf::from(name)
     }
 
-    fn shrink(&self) -> Box<dyn Iterator<Item=Self>> {
+    fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
         Box::new(
             self.name
                 .shrink()
@@ -103,10 +103,8 @@ impl SegmentBuf {
         match (self, other) {
             (a @ Self::Index(_), b) | (a, b @ Self::Index(_)) => a == b,
             (Self::Field(a), Self::Field(b)) => a == b,
-            (Self::Field(field), Self::Coalesce(coalesce)) |
-            (Self::Coalesce(coalesce), Self::Field(field)) => {
-                coalesce.contains(field)
-            },
+            (Self::Field(field), Self::Coalesce(coalesce))
+            | (Self::Coalesce(coalesce), Self::Field(field)) => coalesce.contains(field),
             (Self::Coalesce(a), Self::Coalesce(b)) => {
                 for field in a {
                     if b.contains(field) {
@@ -135,7 +133,7 @@ impl Arbitrary for SegmentBuf {
         }
     }
 
-    fn shrink(&self) -> Box<dyn Iterator<Item=Self>> {
+    fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
         match self {
             SegmentBuf::Field(field) => Box::new(field.shrink().map(SegmentBuf::Field)),
             SegmentBuf::Index(index) => Box::new(index.shrink().map(SegmentBuf::Index)),

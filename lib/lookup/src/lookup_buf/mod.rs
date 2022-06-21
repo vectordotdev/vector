@@ -205,7 +205,6 @@ impl LookupBuf {
         components
     }
 
-
     pub fn can_start_with(&self, prefix: &LookupBuf) -> bool {
         let mut self_iter = self.iter();
         for prefix_segment in prefix.iter() {
