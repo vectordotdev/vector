@@ -107,7 +107,7 @@ impl GcpCredentials {
     pub fn apply<T>(&self, request: &mut http::Request<T>) {
         request
             .headers_mut()
-            .insert(AUTHORIZATION, self.make_token().parse().unwrap());
+            .insert(AUTHORIZATION, dbg!(self.make_token().parse().unwrap()));
     }
 
     async fn regenerate_token(&self) -> crate::Result<()> {

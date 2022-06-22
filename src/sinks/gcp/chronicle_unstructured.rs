@@ -72,11 +72,11 @@ pub enum Region {
 
 impl Region {
     /// Each region has a it's own endpoint.
-    fn endpoint(&self) -> &'static str {
+    fn endpoint(self) -> &'static str {
         match self {
             Region::Eu => "europe-malachiteingestion-pa.googleapis.com",
             Region::Us => "malachiteingestion-pa.googleapis.com",
-            Region::Asia => "southeast1-malachiteingestion-pa.googleapis.com",
+            Region::Asia => "asia-southeast1-malachiteingestion-pa.googleapis.com",
         }
     }
 }
@@ -168,6 +168,8 @@ impl SinkConfig for GcsChronicleUnstructuredConfig {
                 .make_credentials(Scope::MalachiteIngestion)
                 .await?
         };
+
+        dbg!(&creds);
 
         let tls = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls, cx.proxy())?;
