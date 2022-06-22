@@ -265,12 +265,10 @@ impl SourceConfig for PubsubConfig {
             Some(credentials) => credentials.clone().spawn_regenerate_token(),
             None => {
                 let (sender, receiver) = watch::channel(());
-                // Dropping the sender will cause the receiver to
-                // error, but there is no good way of hanging on to it
-                // and sending nothing. This `forget` will leak one
-                // sender per instance of this source and so never
-                // drop it.
-                std::mem::forget(sender);
+                // This keeps the sender end of the watch open without
+                // actually sending anything, effectively creating an
+                // empty watch stream.
+                tokio::spawn(async move { sender.closed().await });
                 receiver
             }
         };
