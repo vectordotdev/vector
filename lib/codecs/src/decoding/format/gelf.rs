@@ -53,7 +53,7 @@ pub struct GelfDeserializerConfig;
 impl GelfDeserializerConfig {
     /// Build the `GelfDeserializer` from this configuration.
     pub fn build(&self) -> GelfDeserializer {
-        GelfDeserializer::new()
+        GelfDeserializer::default()
     }
 
     /// Return the type of event built by this deserializer.
@@ -86,6 +86,12 @@ impl GelfDeserializerConfig {
 #[derive(Debug, Clone)]
 pub struct GelfDeserializer {
     regex: Regex,
+}
+
+impl Default for GelfDeserializer {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl GelfDeserializer {
@@ -152,8 +158,8 @@ impl GelfDeserializer {
                 // TODO Vector seems to not accept "." or "-" for log field names...
                 // not sure if this is the best approach but seems either we will need to modify the
                 // field names we received, or alter vector to allow "." or "-" in the field names.
-                let key = key.replace(".", "_");
-                let key = key.replace("-", "_");
+                let key = key.replace('.', "_");
+                let key = key.replace('-', "_");
 
                 // per GELF spec, values to additional fields can be strings or numbers
                 if val.is_string() {

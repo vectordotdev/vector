@@ -36,7 +36,7 @@ fn gelf_deserializing_all() {
     let buffer = Bytes::from(serde_json::to_vec(&input).unwrap());
 
     // Ensure that we can parse the gelf json successfully
-    let events = deserializer.parse(buffer.clone()).unwrap();
+    let events = deserializer.parse(buffer).unwrap();
     assert_eq!(events.len(), 1);
 
     let log = events[0].as_log();
@@ -91,7 +91,7 @@ fn gelf_deserializing_err() {
         let config = GelfDeserializerConfig;
         let deserializer = config.build();
         let buffer = Bytes::from(serde_json::to_vec(&input).unwrap());
-        deserializer.parse(buffer.clone()).unwrap_err();
+        deserializer.parse(buffer).unwrap_err();
     }
 
     // missing SHORT_MESSAGE
