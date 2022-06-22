@@ -213,3 +213,31 @@ macro_rules! update_counter {
         }
     }};
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn prepare_metrics(cardinality: usize) -> &'static Controller {
+        let _ = init_test();
+        let controller = Controller::get().unwrap();
+        controller.reset();
+
+        for idx in 0..cardinality {
+            metrics::counter!("test", 1, "idx" => idx.to_string());
+        }
+
+        assert_eq!(controller.capture_metrics().len(), cardinality + 1);
+
+        controller
+    }
+
+    #[test]
+    fn cardinality_matches() {
+        for cardinality in &[0, 1, 10, 100, 1000, 10000] {
+            let controller = prepare_metrics(*cardinality);
+            let list = controller.capture_metrics();
+            assert_eq!(list.len(), cardinality + 1);
+        }
+    }
+}
