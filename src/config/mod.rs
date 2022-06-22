@@ -577,22 +577,22 @@ mod tests {
         let err = load(
             r#"
             [sources.in]
-            type = "mock_source"
+            type = "basic_source"
 
             [transforms.sample]
-            type = "mock_transform"
+            type = "basic_transform"
             inputs = []
             suffix = "foo"
             increase = 1.25
 
             [transforms.sample2]
-            type = "mock_transform"
+            type = "basic_transform"
             inputs = ["qwerty"]
             suffix = "foo"
             increase = 1.25
 
             [sinks.out]
-            type = "mock_sink"
+            type = "basic_sink"
             inputs = ["asdf", "in", "in"]
             "#,
             Format::Toml,
@@ -616,19 +616,19 @@ mod tests {
         let err = load(
             r#"
             [sources.foo]
-            type = "mock_source"
+            type = "basic_source"
 
             [sources.bar]
-            type = "mock_source"
+            type = "basic_source"
 
             [transforms.foo]
-            type = "mock_transform"
+            type = "basic_transform"
             inputs = ["bar"]
             suffix = "foo"
             increase = 1.25
 
             [sinks.out]
-            type = "mock_sink"
+            type = "basic_sink"
             inputs = ["foo"]
             "#,
             Format::Toml,
@@ -647,25 +647,25 @@ mod tests {
         let warnings = load(
             r#"
             [sources.in1]
-            type = "mock_source"
+            type = "basic_source"
 
             [sources.in2]
-            type = "mock_source"
+            type = "basic_source"
 
             [transforms.sample1]
-            type = "mock_transform"
+            type = "basic_transform"
             inputs = ["in1"]
             suffix = "foo"
             increase = 1.25
 
             [transforms.sample2]
-            type = "mock_transform"
+            type = "basic_transform"
             inputs = ["in1"]
             suffix = "foo"
             increase = 1.25
 
             [sinks.out]
-            type = "mock_sink"
+            type = "basic_sink"
             inputs = ["sample1"]
             "#,
             Format::Toml,
@@ -687,34 +687,34 @@ mod tests {
         let errors = load(
             r#"
             [sources.in]
-            type = "mock_source"
+            type = "basic_source"
 
             [transforms.one]
-            type = "mock_transform"
+            type = "basic_transform"
             inputs = ["in"]
             suffix = "foo"
             increase = 1.25
 
             [transforms.two]
-            type = "mock_transform"
+            type = "basic_transform"
             inputs = ["one", "four"]
             suffix = "foo"
             increase = 1.25
 
             [transforms.three]
-            type = "mock_transform"
+            type = "basic_transform"
             inputs = ["two"]
             suffix = "foo"
             increase = 1.25
 
             [transforms.four]
-            type = "mock_transform"
+            type = "basic_transform"
             inputs = ["three"]
             suffix = "foo"
             increase = 1.25
 
             [sinks.out]
-            type = "mock_sink"
+            type = "basic_sink"
             inputs = ["four"]
             "#,
             Format::Toml,
@@ -733,10 +733,10 @@ mod tests {
         let config = load_from_str(
             indoc! {r#"
                 [sources.in]
-                type = "mock_source"
+                type = "basic_source"
 
                 [sinks.out]
-                type = "mock_sink"
+                type = "basic_sink"
                 inputs = ["in"]
             "#},
             Format::Toml,
@@ -754,10 +754,10 @@ mod tests {
         let config = load_from_str(
             indoc! {r#"
             [sources.in]
-            type = "mock_source"
+            type = "basic_source"
 
             [sinks.out]
-            type = "mock_sink"
+            type = "basic_sink"
             inputs = ["in"]
             "#},
             Format::Toml,
@@ -785,10 +785,10 @@ mod tests {
                   timestamp_key = "then"
 
                 [sources.in]
-                  type = "mock_source"
+                  type = "basic_source"
 
                 [sinks.out]
-                  type = "mock_sink"
+                  type = "basic_sink"
                   inputs = ["in"]
             "#},
             Format::Toml,
@@ -805,10 +805,10 @@ mod tests {
         let mut config: ConfigBuilder = format::deserialize(
             indoc! {r#"
                 [sources.in]
-                  type = "mock_source"
+                  type = "basic_source"
 
                 [sinks.out]
-                  type = "mock_sink"
+                  type = "basic_sink"
                   inputs = ["in"]
             "#},
             Format::Toml,
@@ -825,7 +825,7 @@ mod tests {
                           http = "http://proxy.inc:3128"
 
                         [transforms.foo]
-                          type = "mock_transform"
+                          type = "basic_transform"
                           inputs = [ "in" ]
                           suffix = "foo"
                           increase = 1.25
@@ -863,10 +863,10 @@ mod tests {
         let mut config: ConfigBuilder = format::deserialize(
             indoc! {r#"
                 [sources.in]
-                  type = "mock_source"
+                  type = "basic_source"
 
                 [sinks.out]
-                  type = "mock_sink"
+                  type = "basic_sink"
                   inputs = ["in"]
             "#},
             Format::Toml,
@@ -878,16 +878,16 @@ mod tests {
                 format::deserialize(
                     indoc! {r#"
                         [sources.in]
-                          type = "mock_source"
+                          type = "basic_source"
 
                         [transforms.foo]
-                          type = "mock_transform"
+                          type = "basic_transform"
                           inputs = [ "in" ]
                           suffix = "foo"
                           increase = 1.25
 
                         [sinks.out]
-                          type = "mock_sink"
+                          type = "basic_sink"
                           inputs = ["in"]
                     "#},
                     Format::Toml,
