@@ -21,7 +21,6 @@ use super::{
     SourceOuter, TransformOuter,
 };
 use crate::{
-    built_info,
     common::datadog::{get_api_base_endpoint, Region},
     conditions::AnyCondition,
     http::{HttpClient, HttpError},
@@ -417,9 +416,6 @@ fn setup_logs_reporting(
 
     let configuration_key = &datadog.configuration_key;
     let vector_version = crate::vector_version();
-    let build_arch = built_info::TARGET_ARCH;
-    let build_os = built_info::TARGET_OS;
-    let build_vendor = built_info::TARGET_VENDOR;
     let tag_logs = RemapConfig {
         source: Some(format!(
             r#"
@@ -427,9 +423,6 @@ fn setup_logs_reporting(
             .vector.configuration_key = "{configuration_key}"
             .vector.configuration_version_hash = "{configuration_version_hash}"
             .vector.version = "{vector_version}"
-            .vector.arch = "{build_arch}"
-            .vector.os = "{build_os}"
-            .vector.vendor = "{build_vendor}"
             {}
         "#,
             custom_logs_tags_vrl,

@@ -91,6 +91,7 @@ components: sources: vector: {
 		logs: event: {
 			description: "A Vector event"
 			fields: {
+				client_metadata: fields._client_metadata
 				"*": {
 					description: "Vector transparently forwards data from another upstream Vector instance. The `vector` source will not modify or add fields."
 					required:    true

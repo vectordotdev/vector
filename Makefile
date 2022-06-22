@@ -8,12 +8,12 @@ mkfile_dir := $(dir $(mkfile_path))
 ifeq ($(OS),Windows_NT) # is Windows_NT on XP, 2000, 7, Vista, 10...
     export OPERATING_SYSTEM := Windows
 	export RUST_TARGET ?= "x86_64-unknown-windows-msvc"
-    export DEFAULT_FEATURES = default-msvc
+    export FEATURES ?= default-msvc
 	undefine DNSTAP_BENCHES
 else
     export OPERATING_SYSTEM := $(shell uname)  # same as "uname -s"
 	export RUST_TARGET ?= "x86_64-unknown-linux-gnu"
-    export DEFAULT_FEATURES = default
+    export FEATURES ?= default
 	export DNSTAP_BENCHES := dnstap-benches
 endif
 
@@ -169,12 +169,12 @@ environment-push: environment-prepare ## Publish a new version of the container 
 build: check-build-tools
 build: export CFLAGS += -g0 -O3
 build: ## Build the project in release mode (Supports `ENVIRONMENT=true`)
-	${MAYBE_ENVIRONMENT_EXEC} cargo build --release --no-default-features --features ${DEFAULT_FEATURES}
+	${MAYBE_ENVIRONMENT_EXEC} cargo build --release --no-default-features --features ${FEATURES}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
 .PHONY: build-dev
 build-dev: ## Build the project in development mode (Supports `ENVIRONMENT=true`)
-	${MAYBE_ENVIRONMENT_EXEC} cargo build --no-default-features --features ${DEFAULT_FEATURES}
+	${MAYBE_ENVIRONMENT_EXEC} cargo build --no-default-features --features ${FEATURES}
 
 .PHONY: build-x86_64-unknown-linux-gnu
 build-x86_64-unknown-linux-gnu: target/x86_64-unknown-linux-gnu/release/vector ## Build a release binary for the x86_64-unknown-linux-gnu triple.
@@ -296,11 +296,11 @@ target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 # https://github.com/rust-lang/cargo/issues/6454
 .PHONY: test
 test: ## Run the unit test suite
-	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --workspace --no-fail-fast --no-default-features --features "${DEFAULT_FEATURES}" ${SCOPE}
+	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --workspace --no-fail-fast --no-default-features --features "${FEATURES}" ${SCOPE}
 
 .PHONY: test-docs
 test-docs: ## Run the docs test suite
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --doc --workspace --no-fail-fast --no-default-features --features "${DEFAULT_FEATURES}" ${SCOPE}
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --doc --workspace --no-fail-fast --no-default-features --features "${FEATURES}" ${SCOPE}
 
 .PHONY: test-all
 test-all: test test-docs test-behavior test-integration ## Runs all tests: unit, docs, behaviorial, and integration.
@@ -423,7 +423,7 @@ bench-all: bench-remap-functions
 
 .PHONY: check
 check: ## Run prerequisite code checks
-	${MAYBE_ENVIRONMENT_EXEC} cargo check --all --no-default-features --features ${DEFAULT_FEATURES}
+	${MAYBE_ENVIRONMENT_EXEC} cargo check --all --no-default-features --features ${FEATURES}
 
 .PHONY: check-all
 check-all: ## Check everything

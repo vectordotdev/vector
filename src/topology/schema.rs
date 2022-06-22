@@ -40,7 +40,8 @@ pub(super) fn merged_definition(
         return definition.clone();
     }
 
-    let mut definition = Definition::empty();
+    // This should be "never", but that isn't supported yet (coming soon!)
+    let mut definition: Option<Definition> = None;
 
     for input in inputs {
         let key = &input.component;
@@ -74,7 +75,11 @@ pub(super) fn merged_definition(
                 None => unreachable!("source output misconfigured"),
             };
 
-            definition = definition.merge(source_definition);
+            definition = Some(if let Some(prev_definition) = definition {
+                prev_definition.merge(source_definition)
+            } else {
+                source_definition
+            });
 
         // If the input is a transform, it _might_ define its own output schema, or it might not
         // change anything in the schema from its inputs, in which case we need to recursively get
@@ -109,9 +114,15 @@ pub(super) fn merged_definition(
                 None => merged_definition,
             };
 
-            definition = definition.merge(transform_definition);
+            definition = Some(if let Some(prev_definition) = definition {
+                prev_definition.merge(transform_definition)
+            } else {
+                transform_definition
+            });
         }
     }
+
+    let definition = definition.unwrap_or_else(Definition::empty);
 
     cache.insert(inputs.to_vec(), definition.clone());
 
@@ -398,8 +409,12 @@ mod tests {
                     ]),
                     transforms: IndexMap::default(),
                     want: Definition::empty()
-                        .with_field("foo", Kind::integer().or_bytes(), Some("foo bar"))
-                        .with_field("foo", Kind::timestamp(), Some("baz qux")),
+                        .with_field(
+                            "foo",
+                            Kind::integer().or_bytes().or_timestamp(),
+                            Some("foo bar"),
+                        )
+                        .with_known_meaning("foo", "baz qux"),
                 },
             ),
         ]) {

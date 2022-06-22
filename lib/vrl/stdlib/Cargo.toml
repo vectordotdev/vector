@@ -25,7 +25,7 @@ dns-lookup = { version = "1.0.8", optional = true }
 grok = { version = "2", optional = true }
 hex = { version = "0.4", optional = true }
 hostname = { version = "0.3", optional = true }
-indexmap = { version = "~1.8.2", default-features = false, optional = true}
+indexmap = { version = "~1.9.1", default-features = false, optional = true}
 md-5 = { version = "0.10", optional = true }
 nom = { version = "7", optional = true }
 percent-encoding = { version = "2.1", optional = true }
@@ -39,7 +39,7 @@ sha-1 = { version = "0.10", optional = true }
 sha-2 = { package = "sha2", version = "0.10", optional = true }
 sha-3 = { package = "sha3", version = "0.10", optional = true }
 strip-ansi-escapes = { version = "0.1", optional = true }
-syslog_loose = { version = "0.16", optional = true }
+syslog_loose = { version = "0.17", optional = true }
 tracing = { version = "0.1", optional = true }
 url = { version = "2", optional = true }
 uuid = { version = "1", features = ["v4"], optional = true }

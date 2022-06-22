@@ -21,7 +21,7 @@ use crate::{
     internal_events::{FluentMessageDecodeError, FluentMessageReceived},
     serde::bool_or_struct,
     tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
+    tls::{MaybeTlsSettings, TlsSourceConfig},
 };
 
 mod message;
@@ -46,7 +46,7 @@ pub struct FluentConfig {
     receive_buffer_bytes: Option<usize>,
 
     #[configurable(derived)]
-    tls: Option<TlsEnableableConfig>,
+    tls: Option<TlsSourceConfig>,
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
@@ -77,12 +77,18 @@ impl SourceConfig for FluentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let source = FluentSource {};
         let shutdown_secs = 30;
-        let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
+        let tls_config = self.tls.as_ref().map(|tls| tls.tls_config.clone());
+        let tls_client_metadata_key = self
+            .tls
+            .as_ref()
+            .and_then(|tls| tls.client_metadata_key.clone());
+        let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
         source.run(
             self.address,
             self.keepalive,
             shutdown_secs,
             tls,
+            tls_client_metadata_key,
             self.receive_buffer_bytes,
             cx,
             self.acknowledgements,
