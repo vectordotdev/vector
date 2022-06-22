@@ -7,7 +7,7 @@ publish = false
 
 [dependencies]
 encoding_rs = { version = "0.8", default-features = false, features = ["alloc", "serde"] }
-indexmap = { version = "1.8", default-features = false }
+indexmap = { version = "1.9", default-features = false }
 num-traits = { version = "0.2.15", default-features = false }
 schemars = { version = "0.8.10", default-features = true, features = ["preserve_order"] }
 serde = { version = "1.0", default-features = false }

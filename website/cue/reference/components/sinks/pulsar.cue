@@ -21,7 +21,7 @@ components: sinks: pulsar: {
 				enabled: true
 				codec: {
 					enabled: true
-					enum: ["text", "json"]
+					enum: ["text", "json", "avro"]
 				}
 			}
 			request: enabled: false

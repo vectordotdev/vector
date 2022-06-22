@@ -82,19 +82,22 @@ impl Expression for Op {
         use ast::Opcode::*;
         use value::Value::*;
 
-        if let Err = self.opcode {
-            return self.lhs.resolve(ctx).or_else(|_| self.rhs.resolve(ctx));
-        } else if let Or = self.opcode {
-            return self
-                .lhs
-                .resolve(ctx)?
-                .try_or(|| self.rhs.resolve(ctx))
-                .map_err(Into::into);
-        } else if let And = self.opcode {
-            return match self.lhs.resolve(ctx)? {
-                Null | Boolean(false) => Ok(false.into()),
-                v => v.try_and(self.rhs.resolve(ctx)?).map_err(Into::into),
-            };
+        match self.opcode {
+            Err => return self.lhs.resolve(ctx).or_else(|_| self.rhs.resolve(ctx)),
+            Or => {
+                return self
+                    .lhs
+                    .resolve(ctx)?
+                    .try_or(|| self.rhs.resolve(ctx))
+                    .map_err(Into::into);
+            }
+            And => {
+                return match self.lhs.resolve(ctx)? {
+                    Null | Boolean(false) => Ok(false.into()),
+                    v => v.try_and(self.rhs.resolve(ctx)?).map_err(Into::into),
+                };
+            }
+            _ => (),
         };
 
         let lhs = self.lhs.resolve(ctx)?;
