@@ -37,7 +37,7 @@ use vector_core::{
 use crate::{
     codecs::Encoder,
     dns, emit,
-    event::Event,
+    event::{Event, Finalizable},
     internal_events::{
         ConnectionOpen, OpenGauge, WsConnectionError, WsConnectionEstablished,
         WsConnectionFailedError, WsConnectionShutdown,
@@ -277,6 +277,8 @@ impl WebSocketSink {
                     } else {
                         break;
                     };
+
+                    let finalizers = event.take_finalizers();
                     let mut bytes = BytesMut::new();
                     self.transformer.transform(&mut event);
                     let res = match self.encoder.encode(event, &mut bytes) {
@@ -300,6 +302,8 @@ impl WebSocketSink {
                             Ok(())
                         }
                     };
+
+                    drop(finalizers);
                     self.acker.ack(1);
                     res
                 },
