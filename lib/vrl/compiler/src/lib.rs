@@ -60,7 +60,7 @@ pub type Result<T = (Program, DiagnosticList)> = std::result::Result<T, Diagnost
 
 /// The choice of available runtimes.
 #[derive(Deserialize, Serialize, Debug, Copy, Clone, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 pub enum VrlRuntime {
     Ast,
     AstBatch,

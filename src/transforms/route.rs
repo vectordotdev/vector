@@ -209,7 +209,7 @@ mod test {
 
         assert_eq!(
             serde_json::to_string(&config).unwrap(),
-            r#"{"route":{"first":{"type":"vrl","source":".message == \"hello world\"","runtime":"ast"}}}"#
+            r#"{"route":{"first":{"type":"vrl","source":".message == \"hello world\"","runtime":"ast_batch"}}}"#
         );
     }
 
