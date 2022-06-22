@@ -319,7 +319,7 @@ impl TypeDef {
         self.merge(
             other,
             merge::Strategy {
-                depth: merge::Depth::Deep,
+                collisions: merge::CollisionStrategy::Union,
                 indices: merge::Indices::Keep,
             },
         );
@@ -335,7 +335,7 @@ impl TypeDef {
         self.merge(
             other,
             merge::Strategy {
-                depth: merge::Depth::Shallow,
+                collisions: merge::CollisionStrategy::Overwrite,
                 indices: merge::Indices::Append,
             },
         );
@@ -359,7 +359,7 @@ impl TypeDef {
         self.merge(
             other,
             merge::Strategy {
-                depth: merge::Depth::Shallow,
+                collisions: merge::CollisionStrategy::Overwrite,
                 indices: merge::Indices::Keep,
             },
         );

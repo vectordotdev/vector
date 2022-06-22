@@ -1,6 +1,7 @@
 //! The `value` crate contains types shared across Vector libraries to support it's use of `Value`
 //! and the closely linked `Kind` in support of progressive type checking.
 
+#![deny(warnings)]
 #![deny(
     clippy::all,
     clippy::cargo,

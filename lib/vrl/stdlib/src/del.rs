@@ -83,7 +83,7 @@ impl Function for Del {
 
     fn compile(
         &self,
-        (_, external): (&mut state::LocalEnv, &mut state::ExternalEnv),
+        (local, external): (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -96,7 +96,9 @@ impl Function for Del {
             .into());
         }
 
-        Ok(Box::new(DelFn { query }))
+        let return_type = query.type_def((local, external));
+
+        Ok(Box::new(DelFn { query, return_type }))
     }
 
     fn compile_argument(
@@ -129,11 +131,12 @@ impl Function for Del {
 #[derive(Debug, Clone)]
 pub(crate) struct DelFn {
     query: expression::Query,
+    return_type: TypeDef,
 }
 
 impl DelFn {
     #[cfg(test)]
-    fn new(path: &str) -> Self {
+    fn new(path: &str, return_type: TypeDef) -> Self {
         use std::str::FromStr;
 
         Self {
@@ -141,6 +144,7 @@ impl DelFn {
                 expression::Target::External,
                 FromStr::from_str(path).unwrap(),
             ),
+            return_type,
         }
     }
 }
@@ -165,7 +169,8 @@ impl Expression for DelFn {
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
-        TypeDef::any()
+        // The return type can't be queried from the state since it was deleted in "update_state"
+        self.return_type.clone()
     }
 
     fn update_state(
@@ -210,43 +215,43 @@ mod tests {
                 // String field exists
                 btreemap! { "exists" => "value" },
                 Ok(value!("value")),
-                DelFn::new("exists"),
+                DelFn::new("exists", TypeDef::bytes()),
             ),
             (
                 // String field doesn't exist
                 btreemap! { "exists" => "value" },
                 Ok(value!(null)),
-                DelFn::new("does_not_exist"),
+                DelFn::new("does_not_exist", TypeDef::null()),
             ),
             (
                 // Array field exists
                 btreemap! { "exists" => value!([1, 2, 3]) },
                 Ok(value!([1, 2, 3])),
-                DelFn::new("exists"),
+                DelFn::new("exists", value!([1, 2, 3]).kind().into()),
             ),
             (
                 // Null field exists
                 btreemap! { "exists" => value!(null) },
                 Ok(value!(null)),
-                DelFn::new("exists"),
+                DelFn::new("exists", TypeDef::null()),
             ),
             (
                 // Map field exists
                 btreemap! {"exists" => btreemap! { "foo" => "bar" }},
                 Ok(value!(btreemap! {"foo" => "bar" })),
-                DelFn::new("exists"),
+                DelFn::new("exists", value!(btreemap! {"foo" => "bar" }).kind().into()),
             ),
             (
                 // Integer field exists
                 btreemap! { "exists" => 127 },
                 Ok(value!(127)),
-                DelFn::new("exists"),
+                DelFn::new("exists", TypeDef::integer()),
             ),
             (
                 // Array field exists
                 btreemap! {"exists" => value!([1, 2, 3]) },
                 Ok(value!(2)),
-                DelFn::new(".exists[1]"),
+                DelFn::new(".exists[1]", TypeDef::integer()),
             ),
         ];
         let tz = TimeZone::default();
