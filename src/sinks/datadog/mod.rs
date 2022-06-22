@@ -94,8 +94,8 @@ impl DatadogApiError {
         }
     }
 
-    pub const fn is_retriable_error(error: &DatadogApiError) -> bool {
-        match &*error {
+    pub const fn is_retriable(&self) -> bool {
+        match self {
             // This retry logic will be expanded further, but specifically retrying unauthorized
             // requests and lower level HttpErrorsfor now.
             // I verified using `curl` that `403` is the respose code for this.

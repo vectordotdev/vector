@@ -34,7 +34,7 @@ impl RetryLogic for LogApiRetry {
     type Response = LogApiResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        DatadogApiError::is_retriable_error(error)
+        error.is_retriable()
     }
 }
 
@@ -154,16 +154,15 @@ impl Service<LogApiRequest> for LogApiService {
             .expect("building HTTP request failed unexpectedly");
 
         Box::pin(async move {
-            let result = client.call(http_request).in_current_span().await;
-            DatadogApiError::from_result(result)?;
-
-            Ok(LogApiResponse {
-                event_status: EventStatus::Delivered,
-                count,
-                events_byte_size,
-                raw_byte_size,
-                protocol,
-            })
+            DatadogApiError::from_result(client.call(http_request).in_current_span().await).map(
+                |_| LogApiResponse {
+                    event_status: EventStatus::Delivered,
+                    count,
+                    events_byte_size,
+                    raw_byte_size,
+                    protocol,
+                },
+            )
         })
     }
 }

@@ -32,7 +32,7 @@ impl RetryLogic for DatadogMetricsRetryLogic {
     type Response = DatadogMetricsResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        DatadogApiError::is_retriable_error(error)
+        error.is_retriable()
     }
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
@@ -170,11 +170,9 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
-        match self.client.poll_ready(cx) {
-            Poll::Ready(Ok(())) => Poll::Ready(Ok(())),
-            Poll::Ready(Err(error)) => Poll::Ready(Err(DatadogApiError::HttpError { error })),
-            Poll::Pending => Poll::Pending,
-        }
+        self.client
+            .poll_ready(cx)
+            .map_err(|error| DatadogApiError::HttpError { error })
     }
 
     fn call(&mut self, request: DatadogMetricsRequest) -> Self::Future {
