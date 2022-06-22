@@ -456,6 +456,29 @@ impl PubsubSource {
 
         loop {
             tokio::select! {
+                biased;
+                receipts = ack_stream.next() => if let Some((status, receipts)) = receipts {
+                    pending_acks -= 1;
+                    if status == BatchStatus::Delivered {
+                        ack_ids_sender
+                            .send(receipts)
+                            .await
+                            .unwrap_or_else(|_| unreachable!("request stream never closes"));
+                    }
+                },
+                response = stream.next() => match response {
+                    Some(Ok(response)) => {
+                        self.handle_response(
+                            response,
+                            &finalizer,
+                            &ack_ids_sender,
+                            &mut pending_acks,
+                            busy_flag,
+                        ).await;
+                    }
+                    Some(Err(error)) => break translate_error(error),
+                    None => break State::RetryNow,
+                },
                 _ = &mut self.shutdown, if pending_acks == 0 => return State::Shutdown,
                 _ = self.token_generator.changed() => {
                     debug!("New authentication token generated, restarting stream.");
@@ -485,28 +508,6 @@ impl PubsubSource {
                         .await
                         .unwrap_or_else(|_| unreachable!("request stream never closes"));
                 }
-                receipts = ack_stream.next() => if let Some((status, receipts)) = receipts {
-                    pending_acks -= 1;
-                    if status == BatchStatus::Delivered {
-                        ack_ids_sender
-                            .send(receipts)
-                            .await
-                            .unwrap_or_else(|_| unreachable!("request stream never closes"));
-                    }
-                },
-                response = stream.next() => match response {
-                    Some(Ok(response)) => {
-                        self.handle_response(
-                            response,
-                            &finalizer,
-                            &ack_ids_sender,
-                            &mut pending_acks,
-                            busy_flag,
-                        ).await;
-                    }
-                    Some(Err(error)) => break translate_error(error),
-                    None => break State::RetryNow,
-                },
             }
         }
     }
