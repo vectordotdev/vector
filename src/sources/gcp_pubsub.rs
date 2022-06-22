@@ -387,7 +387,7 @@ impl PubsubSource {
         // receives "full" batches, it will mark itself as busy, and
         // when it has an idle interval it will mark itself as not
         // busy.
-        let busy_flag = Arc::new(AtomicBool::new(true));
+        let busy_flag = Arc::new(AtomicBool::new(false));
         let task = tokio::spawn(self.clone().run(Arc::clone(&busy_flag)));
         tasks.push(Task { task, busy_flag });
     }
