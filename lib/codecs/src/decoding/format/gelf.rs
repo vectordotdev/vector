@@ -52,8 +52,8 @@ pub struct GelfDeserializerConfig;
 
 impl GelfDeserializerConfig {
     /// Build the `GelfDeserializer` from this configuration.
-    pub const fn build(&self) -> GelfDeserializer {
-        GelfDeserializer
+    pub fn build(&self) -> GelfDeserializer {
+        GelfDeserializer::new()
     }
 
     /// Return the type of event built by this deserializer.
@@ -84,7 +84,89 @@ impl GelfDeserializerConfig {
 /// Deserializer that builds an `Event` from a byte frame containing a GELF log
 /// message.
 #[derive(Debug, Clone)]
-pub struct GelfDeserializer;
+pub struct GelfDeserializer {
+    regex: Regex,
+}
+
+impl GelfDeserializer {
+    /// Create a new GelfDeserializer
+    pub fn new() -> GelfDeserializer {
+        GelfDeserializer {
+            regex: Regex::new(r"^[\w\.\-]*$").unwrap(),
+        }
+    }
+
+    // Adds fields from parsed GelfMessage to the event, adhering to GELF spec
+    fn insert_fields_from_gelf(
+        &self,
+        event: &mut Event,
+        parsed: &GelfMessage,
+    ) -> vector_core::Result<()> {
+        let log = event.as_mut_log();
+
+        log.insert(VERSION, parsed.version.to_string());
+        log.insert(HOST, parsed.host.to_string());
+
+        if let Some(full_message) = &parsed.full_message {
+            log.insert(FULL_MESSAGE, full_message.to_string());
+        }
+
+        if let Some(timestamp) = parsed.timestamp {
+            let naive = NaiveDateTime::from_timestamp(
+                f64::trunc(timestamp) as i64,
+                f64::fract(timestamp) as u32,
+            );
+            log.insert(
+                log_schema().timestamp_key(),
+                DateTime::<Utc>::from_utc(naive, Utc),
+            );
+        } else {
+            log.insert(log_schema().timestamp_key(), Utc::now());
+        }
+
+        if let Some(level) = parsed.level {
+            log.insert(LEVEL, level);
+        }
+        if let Some(facility) = &parsed.facility {
+            log.insert(FACILITY, facility.to_string());
+        }
+        if let Some(line) = &parsed.line {
+            log.insert(LINE, *line);
+        }
+        if let Some(file) = &parsed.file {
+            log.insert(FILE, file.to_string());
+        }
+
+        if let Some(add) = &parsed.additional_fields {
+            for (key, val) in add.iter() {
+                // per GELF spec, filter out _id
+                if key == "_id" {
+                    continue;
+                }
+                // per GELF spec, Additional field names must be characters dashes or dots
+
+                // TODO currently dropping fields that don't match the GELF spec... should we error instead?
+                if !self.regex.is_match(key) {
+                    continue;
+                }
+                // TODO Vector seems to not accept "." or "-" for log field names...
+                // not sure if this is the best approach but seems either we will need to modify the
+                // field names we received, or alter vector to allow "." or "-" in the field names.
+                let key = key.replace(".", "_");
+                let key = key.replace("-", "_");
+
+                // per GELF spec, values to additional fields can be strings or numbers
+                if val.is_string() {
+                    log.insert(key.as_str(), val.as_str());
+                } else if val.is_number() {
+                    log.insert(key.as_str(), val.as_i64());
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
 
 #[derive(Serialize, Deserialize)]
 struct GelfMessage {
@@ -108,71 +190,8 @@ impl Deserializer for GelfDeserializer {
 
         let parsed: GelfMessage = serde_json::from_str(line)?;
         let mut event = Event::from(parsed.short_message.to_string());
-        insert_fields_from_gelf(&mut event, &parsed)?;
+        self.insert_fields_from_gelf(&mut event, &parsed)?;
 
         Ok(smallvec![event])
     }
-}
-
-fn insert_fields_from_gelf(event: &mut Event, parsed: &GelfMessage) -> vector_core::Result<()> {
-    let log = event.as_mut_log();
-
-    log.insert(VERSION, parsed.version.to_string());
-    log.insert(HOST, parsed.host.to_string());
-
-    if let Some(full_message) = &parsed.full_message {
-        log.insert(FULL_MESSAGE, full_message.to_string());
-    }
-
-    if let Some(timestamp) = parsed.timestamp {
-        let naive = NaiveDateTime::from_timestamp(
-            f64::trunc(timestamp) as i64,
-            f64::fract(timestamp) as u32,
-        );
-        log.insert(
-            log_schema().timestamp_key(),
-            DateTime::<Utc>::from_utc(naive, Utc),
-        );
-    } else {
-        log.insert(log_schema().timestamp_key(), Utc::now());
-    }
-
-    if let Some(level) = parsed.level {
-        log.insert(LEVEL, level);
-    }
-    if let Some(facility) = &parsed.facility {
-        log.insert(FACILITY, facility.to_string());
-    }
-    if let Some(line) = &parsed.line {
-        log.insert(LINE, *line);
-    }
-    if let Some(file) = &parsed.file {
-        log.insert(FILE, file.to_string());
-    }
-
-    if let Some(add) = &parsed.additional_fields {
-        for (key, val) in add.iter() {
-            // per GELF spec, filter out _id
-            if key == "_id" {
-                continue;
-            }
-            // per GELF spec, Additional field names must be characters dashes or dots
-            let re = Regex::new(r"^[\w\.\-]*$")?;
-            if !re.is_match(key) {
-                continue;
-            }
-            // TODO Vector seems to not accept "." or "-" for log field names...
-            // not sure if this is the best approach...
-            let key = key.replace(".", "_");
-            let key = key.replace("-", "_");
-            // per GELF spec, values to additional fields can be strings or numbers
-            if val.is_string() {
-                log.insert(key.as_str(), val.as_str());
-            } else if val.is_number() {
-                log.insert(key.as_str(), val.as_i64());
-            }
-        }
-    }
-
-    Ok(())
 }
