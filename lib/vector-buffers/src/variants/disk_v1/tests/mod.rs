@@ -6,7 +6,7 @@ use tracing::{Metadata, Span};
 use super::{open, Reader, Writer};
 use crate::{
     buffer_usage_data::BufferUsageHandle, test::common::install_tracing_helpers,
-    variants::disk_v1::reader::FLUSH_INTERVAL, Acker, Bufferable, WhenFull,
+    variants::disk_v1::reader::FLUSH_INTERVAL, Acker, Bufferable,
 };
 
 mod acknowledgements;
@@ -24,7 +24,7 @@ where
     P: AsRef<Path>,
     R: Bufferable + Clone,
 {
-    let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
+    let usage_handle = BufferUsageHandle::noop();
     open(
         data_dir.as_ref(),
         "disk_buffer_v1",
@@ -42,7 +42,7 @@ where
     P: AsRef<Path>,
     R: Bufferable + Clone,
 {
-    let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
+    let usage_handle = BufferUsageHandle::noop();
     let (writer, reader, acker) = open(
         data_dir.as_ref(),
         "disk_buffer_v1",
@@ -65,7 +65,7 @@ where
 {
     let max_buffer_size =
         NonZeroU64::new(max_buffer_size).expect("max buffer size must be non-zero");
-    let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
+    let usage_handle = BufferUsageHandle::noop();
     let (writer, reader, acker) = open(
         data_dir.as_ref(),
         "disk_buffer_v1",

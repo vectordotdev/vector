@@ -450,6 +450,7 @@ urls: {
 	splunk_hec_protocol:                                      "https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/HECRESTendpoints"
 	splunk_hec_raw_endpoint:                                  "https://docs.splunk.com/Documentation/Splunk/8.0.0/RESTREF/RESTinput#services.2Fcollector.2Fraw"
 	splunk_hec_setup:                                         "https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector"
+	splunk_hec_metadata:                                      "https://docs.splunk.com/Documentation/Splunk/latest/Data/FormateventsforHTTPEventCollector#Event_metadata"
 	specs_instrumentation:                                    "\(vector_repo)/blob/master/docs/specs/instrumentation.md)"
 	standard_streams:                                         "\(wikipedia)/wiki/Standard_streams"
 	statsd:                                                   "\(github)/statsd/statsd"

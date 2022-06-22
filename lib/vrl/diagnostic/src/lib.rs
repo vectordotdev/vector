@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 mod diagnostic;
 mod formatter;
 mod label;
