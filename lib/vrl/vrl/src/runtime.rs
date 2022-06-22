@@ -123,14 +123,16 @@ impl BatchRuntime {
         timezone: TimeZone,
     ) -> Vec<(Rc<RefCell<dyn Target + 'a>>, RuntimeResult)> {
         let mut invalid_targets = Vec::new();
-        let targets = targets
+        let (indices, targets) = (0..targets.len())
             .into_iter()
-            .filter_map(|target| {
+            .zip(targets)
+            .filter_map(|(index, target)| {
                 // Validate that the path is a value.
                 match target.clone().borrow().target_get(&self.root_lookup) {
-                    Ok(Some(_)) => Some(target),
+                    Ok(Some(_)) => Some((index, target)),
                     Ok(None) => {
                         invalid_targets.push((
+                            index,
                             target,
                             Err(Terminate::Error(
                                 "expected target object, got nothing".to_owned().into(),
@@ -140,6 +142,7 @@ impl BatchRuntime {
                     }
                     Err(err) => {
                         invalid_targets.push((
+                            index,
                             target,
                             Err(Terminate::Error(
                                 format!("error querying target object: {}", err).into(),
@@ -149,16 +152,16 @@ impl BatchRuntime {
                     }
                 }
             })
-            .collect::<Vec<_>>();
+            .unzip::<_, _, Vec<usize>, Vec<Rc<RefCell<dyn Target + 'a>>>>();
 
-        let values = vec![Ok(Value::Null); targets.len()];
-        let states = (0..targets.len())
+        let values = vec![Ok(Value::Null); indices.len()];
+        let states = (0..indices.len())
             .map(|_| Rc::new(RefCell::new(state::Runtime::default())))
             .collect::<Vec<_>>();
-        let mut ctx = BatchContext::new(values, targets, states, timezone);
+        let mut ctx = BatchContext::new(indices, values, targets, states, timezone);
         program.resolve_batch(&mut ctx);
 
-        let (resolved_values, targets, _, _) = ctx.into_parts();
+        let (indices, resolved_values, targets, _, _) = ctx.into_parts();
         let resolved_values = resolved_values.into_iter().map(|resolved| {
             resolved.map_err(|err| match err {
                 #[cfg(feature = "expr-abort")]
@@ -167,10 +170,19 @@ impl BatchRuntime {
             })
         });
 
-        targets
+        let mut result = indices
             .into_iter()
+            .zip(targets)
             .zip(resolved_values)
+            .map(|((index, target), resolved)| (index, target, resolved))
             .chain(invalid_targets)
+            .collect::<Vec<_>>();
+
+        result.sort_unstable_by(|(a, ..), (b, ..)| b.cmp(a));
+
+        result
+            .into_iter()
+            .map(|(_, target, resolved)| (target, resolved))
             .collect()
     }
 }

@@ -85,7 +85,7 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     ///
     /// An expression is allowed to fail, which aborts the running program.
     fn resolve_batch(&self, ctx: &mut BatchContext) {
-        for (resolved, target, state, timezone) in ctx.iter_mut() {
+        for (_, resolved, target, state, timezone) in ctx.iter_mut() {
             let target = &mut *(*target).borrow_mut();
             let state = &mut *(*state).borrow_mut();
             let mut ctx = Context::new(target, state, &timezone);
