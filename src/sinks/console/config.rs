@@ -67,8 +67,7 @@ impl SinkConfig for ConsoleSinkConfig {
             (Some(framer), _) => framer,
             (
                 None,
-                Serializer::Gelf(_)
-                | Serializer::Text(_)
+                Serializer::Text(_)
                 | Serializer::Json(_)
                 | Serializer::Logfmt(_)
                 | Serializer::NativeJson(_)

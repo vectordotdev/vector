@@ -289,8 +289,7 @@ impl RequestSettings {
             (None, Serializer::Native(_)) => LengthDelimitedEncoder::new().into(),
             (
                 None,
-                Serializer::Gelf(_)
-                | Serializer::Logfmt(_)
+                Serializer::Logfmt(_)
                 | Serializer::NativeJson(_)
                 | Serializer::RawMessage(_)
                 | Serializer::Text(_),

@@ -160,8 +160,7 @@ impl S3SinkConfig {
             }
             (
                 None,
-                Serializer::Gelf(_)
-                | Serializer::Logfmt(_)
+                Serializer::Logfmt(_)
                 | Serializer::NativeJson(_)
                 | Serializer::RawMessage(_)
                 | Serializer::Text(_),
