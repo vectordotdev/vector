@@ -1,5 +1,6 @@
 use bytes::Bytes;
 use chrono::{DateTime, NaiveDateTime, Utc};
+use lookup::path;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
@@ -14,35 +15,38 @@ use vector_core::{
 use super::Deserializer;
 
 /// GELF Message fields. Definitions from https://docs.graylog.org/docs/gelf
-#[rustfmt::skip]
 pub mod gelf_fields {
+
+    /// <not a field> The latest version of the GELF specificaiton.
+    pub const GELF_VERSION: &str = "1.1";
+
     /// (required) GELF spec version – “1.1”.
-    pub const VERSION         : &str     = "version";
+    pub const VERSION: &str = "version";
 
     /// (required) The name of the host, source or application that sent this message.
-    pub const HOST            : &str     = "host";
+    pub const HOST: &str = "host";
 
     /// (required) A short descriptive message.
-    pub const SHORT_MESSAGE   : &str     = "short_message";
+    pub const SHORT_MESSAGE: &str = "short_message";
 
     /// (optional) A long message that can i.e. contain a backtrace
-    pub const FULL_MESSAGE    : &str     = "full_message";
+    pub const FULL_MESSAGE: &str = "full_message";
 
     /// (optional) Seconds since UNIX epoch with optional decimal places for milliseconds.
     ///  SHOULD be set by client library. Will be set to the current timestamp (now) by the server if absent.
-    pub const TIMESTAMP       : &str     = "timestamp";
+    pub const TIMESTAMP: &str = "timestamp";
 
     /// (optional) The level equal to the standard syslog levels. default is 1 (ALERT).
-    pub const LEVEL           : &str     = "level";
+    pub const LEVEL: &str = "level";
 
     /// (optional) (deprecated) Send as additional field instead.
-    pub const FACILITY        : &str     = "facility";
+    pub const FACILITY: &str = "facility";
 
     /// (optional) (deprecated) The line in a file that caused the error (decimal). Send as additional field instead.
-    pub const LINE            : &str     = "line";
+    pub const LINE: &str = "line";
 
     /// (optional) (deprecated) The file (with path if you want) that caused the error. Send as additional field instead.
-    pub const FILE            : &str     = "file";
+    pub const FILE: &str = "file";
 }
 pub use gelf_fields::*;
 
@@ -102,13 +106,19 @@ impl GelfDeserializer {
         }
     }
 
-    // Adds fields from parsed GelfMessage to the event, adhering to GELF spec
-    fn insert_fields_from_gelf(
-        &self,
-        event: &mut Event,
-        parsed: &GelfMessage,
-    ) -> vector_core::Result<()> {
+    // Builds a LogEvent from the parsed GelfMessage, adhering to GELF spec
+    fn insert_fields_from_gelf(&self, parsed: &GelfMessage) -> vector_core::Result<Event> {
+        let mut event = Event::from(parsed.short_message.to_string());
         let log = event.as_mut_log();
+
+        // GELF spec defines the version as 1.1 which has not changed since 2013
+        if parsed.version != GELF_VERSION {
+            return Err(format!(
+                "{} does not match GELF spec version ({})",
+                VERSION, GELF_VERSION
+            )
+            .into());
+        }
 
         log.insert(VERSION, parsed.version.to_string());
         log.insert(HOST, parsed.host.to_string());
@@ -151,26 +161,30 @@ impl GelfDeserializer {
                 }
                 // per GELF spec, Additional field names must be characters dashes or dots
 
-                // TODO currently dropping fields that don't match the GELF spec... should we error instead?
+                // drop fields names that don't match the GELF spec
                 if !self.regex.is_match(key) {
                     continue;
                 }
-                // TODO Vector seems to not accept "." or "-" for log field names...
-                // not sure if this is the best approach but seems either we will need to modify the
-                // field names we received, or alter vector to allow "." or "-" in the field names.
-                let key = key.replace('.', "_");
-                let key = key.replace('-', "_");
 
                 // per GELF spec, values to additional fields can be strings or numbers
                 if val.is_string() {
-                    log.insert(key.as_str(), val.as_str());
-                } else if val.is_number() {
-                    log.insert(key.as_str(), val.as_i64());
+                    log.insert(path!(key.as_str()), val.as_str());
+                } else if val.is_u64() {
+                    log.insert(path!(key.as_str()), val.as_u64());
+                } else if val.is_i64() {
+                    log.insert(path!(key.as_str()), val.as_i64());
+                } else if val.is_f64() {
+                    match ordered_float::NotNan::new(val.as_f64().unwrap()) {
+                        Ok(float) => {
+                            log.insert(path!(key.as_str()), float);
+                        }
+                        Err(e) => return Err(e.to_string().into()),
+                    }
                 }
             }
         }
 
-        Ok(())
+        Ok(event)
     }
 }
 
@@ -195,8 +209,7 @@ impl Deserializer for GelfDeserializer {
         let line = line.trim();
 
         let parsed: GelfMessage = serde_json::from_str(line)?;
-        let mut event = Event::from(parsed.short_message.to_string());
-        self.insert_fields_from_gelf(&mut event, &parsed)?;
+        let event = self.insert_fields_from_gelf(&parsed)?;
 
         Ok(smallvec![event])
     }

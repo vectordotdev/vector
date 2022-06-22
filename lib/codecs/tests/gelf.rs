@@ -3,6 +3,7 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use codecs::{
     decoding::format::gelf_fields::*, decoding::format::Deserializer, GelfDeserializerConfig,
 };
+use lookup::path;
 use pretty_assertions::assert_eq;
 use serde_json::json;
 use value::Value;
@@ -16,8 +17,6 @@ fn gelf_deserializing_all() {
 
     let add_on_int_in = "_an.add-field_int";
     let add_on_str_in = "_an.add-field_str";
-    let add_on_int_out = "_an_add_field_int";
-    let add_on_str_out = "_an_add_field_str";
 
     let input = json!({
         VERSION: "1.1",
@@ -29,7 +28,7 @@ fn gelf_deserializing_all() {
         FACILITY: "foo",
         LINE: 42,
         FILE: "/tmp/bar",
-        add_on_int_in: 2001,
+        add_on_int_in: 2001.1002,
         add_on_str_in: "A Space Odyssey",
     });
 
@@ -77,9 +76,14 @@ fn gelf_deserializing_all() {
         log.get(FILE),
         Some(&Value::Bytes(Bytes::from_static(b"/tmp/bar")))
     );
-    assert_eq!(log.get(add_on_int_out), Some(&Value::Integer(2001)));
     assert_eq!(
-        log.get(add_on_str_out),
+        log.get(path!(add_on_int_in)),
+        Some(&Value::Float(
+            ordered_float::NotNan::new(2001.1002).unwrap()
+        ))
+    );
+    assert_eq!(
+        log.get(path!(add_on_str_in)),
         Some(&Value::Bytes(Bytes::from_static(b"A Space Odyssey")))
     );
 }
@@ -106,6 +110,12 @@ fn gelf_deserializing_err() {
     }));
     // missing VERSION
     validate_err(&json!({
+        HOST: "example.org",
+        SHORT_MESSAGE: "A short message that helps you identify what is going on",
+    }));
+    // incorrect version
+    validate_err(&json!({
+        VERSION: "1.7",
         HOST: "example.org",
         SHORT_MESSAGE: "A short message that helps you identify what is going on",
     }));
