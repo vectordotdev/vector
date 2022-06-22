@@ -506,7 +506,7 @@ fn build_predicates(
 /// A condition that checks the fields of an event against certain predicates.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
-pub(crate) struct CheckFieldsConfig {
+pub struct CheckFieldsConfig {
     /// A map of fields, the predicate to use, and the value to match with the predicate.
     ///
     /// The key is a compound of the field and the predicate, such as `host.eq`, where `host` is the field to look for

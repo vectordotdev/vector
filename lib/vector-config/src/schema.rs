@@ -61,12 +61,6 @@ pub fn apply_metadata<'de, T>(schema: &mut SchemaObject, metadata: Metadata<'de,
 where
     T: Configurable<'de>,
 {
-    // Figure out if we're applying metadata to a schema reference or the actual schema itself.
-    // Some things only makes sense to add to the reference (like a default value to use), while
-    // some things only make sense to add to the schema itself (like custom metadata, validation,
-    // etc), and some things make sense being added to both. (like the description)
-    let is_schema_ref = schema.reference.is_some();
-
     // Set the title/description of this schema.
     //
     // By default, we want to populate `description` because most things don't need a title: their property name or type
@@ -103,7 +97,7 @@ where
         }
     }
 
-    if !custom_map.is_empty() && !is_schema_ref {
+    if !custom_map.is_empty() {
         schema
             .extensions
             .insert("_metadata".to_string(), Value::Object(custom_map));

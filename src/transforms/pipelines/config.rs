@@ -1,6 +1,5 @@
 use std::collections::HashSet;
 
-use serde::{Deserialize, Serialize};
 use vector_config::configurable_component;
 use vector_core::{
     config::Input,
@@ -15,6 +14,7 @@ use vector_core::{
 use crate::{
     conditions::{AnyCondition, Condition},
     config::{ComponentKey, DataType, Output, TransformConfig},
+    transforms::Transforms,
 };
 
 // 64 is a lowish number and arbitrarily chosen: there is no magic to this magic
@@ -23,7 +23,7 @@ const INTERIOR_BUFFER_SIZE: usize = 64;
 
 /// A single pipeline.
 #[configurable_component]
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct PipelineConfig {
     /// The name of the pipeline.
     name: String,
@@ -33,26 +33,14 @@ pub(crate) struct PipelineConfig {
 
     /// A list of sequential transforms that will process any event that is passed to the pipeline.
     #[serde(default)]
-    transforms: Vec<Box<dyn TransformConfig>>,
+    transforms: Vec<Transforms>,
 }
 
 #[cfg(test)]
 impl PipelineConfig {
     #[allow(dead_code)] // for some small subset of feature flags this code is dead
-    pub(crate) fn transforms(&self) -> &Vec<Box<dyn TransformConfig>> {
-        &self.transforms
-    }
-}
-
-impl Clone for PipelineConfig {
-    fn clone(&self) -> Self {
-        // This is a hack around the issue of cloning
-        // trait objects. So instead to clone the config
-        // we first serialize it into JSON, then back from
-        // JSON. Originally we used TOML here but TOML does not
-        // support serializing `None`.
-        let json = serde_json::to_value(self).unwrap();
-        serde_json::from_value(json).unwrap()
+    pub(crate) fn transforms(&self) -> &[Transforms] {
+        &self.transforms[..]
     }
 }
 
@@ -235,7 +223,7 @@ impl SyncTransform for Pipeline {
 /// An ordered list of transformations.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
-pub(crate) struct EventTypeConfig(#[configuration(transparent)] Vec<PipelineConfig>);
+pub(crate) struct EventTypeConfig(#[configurable(transparent)] Vec<PipelineConfig>);
 
 impl AsRef<Vec<PipelineConfig>> for EventTypeConfig {
     fn as_ref(&self) -> &Vec<PipelineConfig> {

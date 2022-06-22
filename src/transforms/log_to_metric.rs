@@ -62,18 +62,18 @@ pub struct CounterConfig {
 #[derive(Clone, Debug)]
 pub struct GaugeConfig {
     /// Name of the field in the event to generate the gauge from.
-    field: String,
+    pub field: String,
 
     /// Overrides the name of the gauge.
     ///
     /// If not specified, `field` is used as the name of the gauge.
-    name: Option<String>,
+    pub name: Option<String>,
 
     /// Sets the namespace for the gauge.
-    namespace: Option<String>,
+    pub namespace: Option<String>,
 
     /// Tags to apply to the gauge.
-    tags: Option<IndexMap<String, String>>,
+    pub tags: Option<IndexMap<String, String>>,
 }
 
 /// Specification of a set derived from a log event.

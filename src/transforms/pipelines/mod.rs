@@ -118,9 +118,8 @@ use vector_core::{
 };
 
 use crate::{
-    conditions::is_log::IsLogConfig,
-    conditions::is_metric::IsMetricConfig,
     conditions::AnyCondition,
+    conditions::ConditionConfig,
     config::{GenerateConfig, TransformDescription},
     schema,
     transforms::route::{RouteConfig, UNMATCHED_ROUTE},
@@ -133,7 +132,7 @@ inventory::submit! {
 /// Configuration for the `pipelines` transform.
 #[configurable_component(transform)]
 #[derive(Clone, Debug, Default)]
-pub(crate) struct PipelinesConfig {
+pub struct PipelinesConfig {
     /// Configuration for the logs-specific side of the pipeline.
     #[serde(default)]
     logs: EventTypeConfig,
@@ -192,7 +191,7 @@ impl TransformConfig for PipelinesConfig {
             let logs_route = name.join("logs");
             conditions.insert(
                 "logs".to_string(),
-                AnyCondition::Map(Box::new(IsLogConfig {})),
+                AnyCondition::Map(ConditionConfig::IsLog),
             );
             let logs_inputs = vec![router_name.port("logs")];
             let inner_topology = self
@@ -206,7 +205,7 @@ impl TransformConfig for PipelinesConfig {
             let metrics_route = name.join("metrics");
             conditions.insert(
                 "metrics".to_string(),
-                AnyCondition::Map(Box::new(IsMetricConfig {})),
+                AnyCondition::Map(ConditionConfig::IsMetric),
             );
             let metrics_inputs = vec![router_name.port("metrics")];
             let inner_topology = self

@@ -111,7 +111,7 @@ impl FunctionTransform for Filter {
 mod test {
     use super::*;
     use crate::{
-        conditions::{is_log::IsLogConfig, ConditionConfig},
+        conditions::{is_log::IsLog, Condition},
         event::Event,
         transforms::test::transform_one,
     };
@@ -123,7 +123,7 @@ mod test {
 
     #[test]
     fn passes_metadata() {
-        let mut filter = Filter::new(IsLogConfig {}.build(&Default::default()).unwrap());
+        let mut filter = Filter::new(Condition::IsLog(IsLog::default()));
         let event = Event::from("message");
         let metadata = event.metadata().clone();
         let result = transform_one(&mut filter, event).unwrap();

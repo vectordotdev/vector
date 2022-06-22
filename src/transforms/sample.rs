@@ -170,7 +170,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        conditions::{ConditionConfig, VrlConfig},
+        conditions::{Condition, ConditionalConfig, VrlConfig},
         config::log_schema,
         event::Event,
         test_util::random_lines,
@@ -178,12 +178,14 @@ mod tests {
     };
 
     fn condition_contains(key: &str, needle: &str) -> Condition {
-        VrlConfig {
+        let vrl_config = VrlConfig {
             source: format!(r#"contains!(."{}", "{}")"#, key, needle),
             runtime: Default::default(),
-        }
-        .build(&Default::default())
-        .unwrap()
+        };
+
+        vrl_config
+            .build(&Default::default())
+            .expect("should not fail to build VRL condition")
     }
 
     #[test]

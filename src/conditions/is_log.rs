@@ -1,25 +1,7 @@
-use vector_config::configurable_component;
+use crate::{conditions::Conditional, event::Event};
 
-use crate::{
-    conditions::{Condition, Conditional, ConditionalConfig},
-    event::Event,
-};
-
-/// A condition that asserts whether or not an event is a log.
-#[configurable_component]
 #[derive(Clone, Debug, Default)]
-pub(crate) struct IsLogConfig {}
-
-impl_generate_config_from_default!(IsLogConfig);
-
-impl ConditionalConfig for IsLogConfig {
-    fn build(&self, _enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition> {
-        Ok(Condition::is_log())
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct IsLog {}
+pub struct IsLog;
 
 impl Conditional for IsLog {
     fn check(&self, e: Event) -> (bool, Event) {
@@ -38,20 +20,18 @@ impl Conditional for IsLog {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::event::{
-        metric::{Metric, MetricKind, MetricValue},
-        Event,
+    use super::IsLog;
+    use crate::{
+        conditions::Conditional,
+        event::{
+            metric::{Metric, MetricKind, MetricValue},
+            Event,
+        },
     };
 
     #[test]
-    fn generate_config() {
-        crate::test_util::test_generate_config::<IsLogConfig>();
-    }
-
-    #[test]
     fn is_log_basic() {
-        let cond = IsLogConfig {}.build(&Default::default()).unwrap();
+        let cond = IsLog::default();
 
         assert!(cond.check(Event::from("just a log")).0);
         assert!(

@@ -6,11 +6,11 @@ use crate::event::Event;
 /// A condition that uses the negated version of another condition.
 #[configurable_component]
 #[derive(Clone, Debug)]
-pub(crate) struct NotConfig(#[configurable(derived)] Box<AnyCondition>);
+pub struct NotConfig(#[configurable(derived)] Box<AnyCondition>);
 
 impl From<AnyCondition> for NotConfig {
     fn from(value: AnyCondition) -> Self {
-        Self(value)
+        Self(Box::new(value))
     }
 }
 

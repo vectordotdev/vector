@@ -1,5 +1,3 @@
-use vector_common::TimeZone;
-
 use super::{cri::Cri, docker::Docker};
 use crate::{
     event::{Event, Value},
@@ -9,28 +7,33 @@ use crate::{
 
 #[derive(Clone, Debug)]
 enum PickerState {
-    Init,
+    /// Runtime has not yet been detected.
+    Uninitialized,
+
+    /// Docker runtime is being used.
     Docker(Docker),
+
+    /// CRI is being used.
     Cri(Cri),
 }
 
 #[derive(Clone, Debug)]
 pub struct Picker {
-    timezone: TimeZone,
     state: PickerState,
 }
 
 impl Picker {
-    pub(crate) const fn new(timezone: TimeZone) -> Self {
-        let state = PickerState::Init;
-        Self { timezone, state }
+    pub(crate) const fn new() -> Self {
+        Self {
+            state: PickerState::Uninitialized,
+        }
     }
 }
 
 impl FunctionTransform for Picker {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
         match &mut self.state {
-            PickerState::Init => {
+            PickerState::Uninitialized => {
                 let message = match event
                     .as_log()
                     .get(crate::config::log_schema().message_key())
@@ -57,7 +60,7 @@ impl FunctionTransform for Picker {
                 self.state = if bytes.len() > 1 && bytes[0] == b'{' {
                     PickerState::Docker(Docker)
                 } else {
-                    PickerState::Cri(Cri::new(self.timezone))
+                    PickerState::Cri(Cri::default())
                 };
                 self.transform(output, event)
             }
@@ -90,11 +93,7 @@ mod tests {
     #[test]
     fn test_parsing() {
         trace_init();
-        test_util::test_parser(
-            || Transform::function(Picker::new(TimeZone::Local)),
-            Event::from,
-            cases(),
-        );
+        test_util::test_parser(|| Transform::function(Picker::new()), Event::from, cases());
     }
 
     #[test]
@@ -105,7 +104,7 @@ mod tests {
 
         for message in cases {
             let input = Event::from(message);
-            let mut picker = Picker::new(TimeZone::Local);
+            let mut picker = Picker::new();
             let mut output = OutputBuffer::default();
             picker.transform(&mut output, input);
             assert!(output.is_empty(), "Expected no events: {:?}", output);
@@ -128,7 +127,7 @@ mod tests {
         ];
 
         for input in cases {
-            let mut picker = Picker::new(TimeZone::Local);
+            let mut picker = Picker::new();
             let mut output = OutputBuffer::default();
             picker.transform(&mut output, input);
             assert!(output.is_empty(), "Expected no events: {:?}", output);

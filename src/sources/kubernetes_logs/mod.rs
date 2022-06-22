@@ -24,9 +24,8 @@ use kube::{
     },
     Client, Config as ClientConfig,
 };
-use vector_common::TimeZone;
 use vector_config::configurable_component;
-use vector_core::ByteSizeOf;
+use vector_core::{transform::TaskTransform, ByteSizeOf};
 
 use crate::{
     config::{
@@ -43,7 +42,7 @@ use crate::{
     kubernetes::custom_reflector,
     shutdown::ShutdownSignal,
     sources,
-    transforms::{FunctionTransform, OutputBuffer, TaskTransform},
+    transforms::{FunctionTransform, OutputBuffer},
     SourceSender,
 };
 
@@ -138,9 +137,6 @@ pub struct Config {
     /// processed by the `kubernetes_logs` source.
     ingestion_timestamp_field: Option<String>,
 
-    /// The default time zone for timestamps without an explicit zone.
-    timezone: Option<TimeZone>,
-
     /// Optional path to a kubeconfig file readable by Vector. If not set,
     /// Vector will try to connect to Kubernetes using in-cluster configuration.
     kube_config_file: Option<PathBuf>,
@@ -183,7 +179,6 @@ impl Default for Config {
             fingerprint_lines: default_fingerprint_lines(),
             glob_minimum_cooldown_ms: default_glob_minimum_cooldown_ms(),
             ingestion_timestamp_field: None,
-            timezone: None,
             kube_config_file: None,
             delay_deletion_ms: default_delay_deletion_ms(),
         }
@@ -236,7 +231,6 @@ struct Source {
     fingerprint_lines: usize,
     glob_minimum_cooldown: Duration,
     ingestion_timestamp_field: Option<String>,
-    timezone: TimeZone,
     delay_deletion: Duration,
 }
 
@@ -281,7 +275,6 @@ impl Source {
         let client = Client::try_from(client_config)?;
 
         let data_dir = globals.resolve_and_make_data_subdir(config.data_dir.as_ref(), key.id())?;
-        let timezone = config.timezone.unwrap_or(globals.timezone);
 
         let exclude_paths = prepare_exclude_paths(config)?;
 
@@ -315,7 +308,6 @@ impl Source {
             fingerprint_lines: config.fingerprint_lines,
             glob_minimum_cooldown,
             ingestion_timestamp_field: config.ingestion_timestamp_field.clone(),
-            timezone,
             delay_deletion,
         })
     }
@@ -343,7 +335,6 @@ impl Source {
             fingerprint_lines,
             glob_minimum_cooldown,
             ingestion_timestamp_field,
-            timezone,
             delay_deletion,
         } = self;
 
@@ -469,7 +460,7 @@ impl Source {
 
         let (file_source_tx, file_source_rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
 
-        let mut parser = parser::build(timezone);
+        let mut parser = parser::build();
         let partial_events_merger = Box::new(partial_events_merger::build(auto_partial_merge));
 
         let checkpoints = checkpointer.view();

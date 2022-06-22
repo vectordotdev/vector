@@ -1,7 +1,9 @@
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput, ExprPath, GenericParam, Ident, Lifetime, LifetimeDef};
+use syn::{
+    parse_macro_input, DeriveInput, ExprPath, GenericParam, Ident, Lifetime, LifetimeDef, Type,
+};
 use vector_config_common::{attributes::CustomAttribute, validation::Validation};
 
 use crate::ast::{Container, Data, Field, Style, Tagging, Variant};
@@ -45,9 +47,14 @@ pub fn derive_configurable_impl(input: TokenStream) -> TokenStream {
     // Now we can go ahead and actually generate the method bodies for our `Configurable` impl,
     // which are varied based on whether we have a struct or enum container.
     let metadata_fn = build_metadata_fn(&container);
-    let generate_schema_fn = match container.data() {
-        Data::Struct(style, fields) => build_struct_generate_schema_fn(&container, style, fields),
-        Data::Enum(variants) => build_enum_generate_schema_fn(variants),
+    let generate_schema_fn = match container.virtual_newtype() {
+        Some(virtual_ty) => build_virtual_newtype_schema_fn(virtual_ty),
+        None => match container.data() {
+            Data::Struct(style, fields) => {
+                build_struct_generate_schema_fn(&container, style, fields)
+            }
+            Data::Enum(variants) => build_enum_generate_schema_fn(variants),
+        },
     };
 
     let name = container.ident();
@@ -80,6 +87,22 @@ fn build_metadata_fn(container: &Container<'_>) -> proc_macro2::TokenStream {
         fn metadata() -> ::vector_config::Metadata<#clt, Self> {
             #container_metadata
             #meta_ident
+        }
+    }
+}
+
+fn build_virtual_newtype_schema_fn(virtual_ty: Type) -> proc_macro2::TokenStream {
+    let (clt, _) = get_configurable_lifetime();
+
+    quote! {
+        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator, overrides: ::vector_config::Metadata<#clt, Self>) -> ::vector_config::schemars::schema::SchemaObject {
+            // Virtual newtypes always shuttle their schema's metadata/overridden metadata when generating the schema
+            // for the wrapped type, otherwise we wouldn't be able to effectively document them. This does mean we end
+            // up dropping any default value for _this_ schema's metadata, including overridden metadata, so the wrapped
+            // type must have a default value for itself if having a default value is required.
+            let overrides = Self::metadata().merge(overrides).convert();
+
+            <#virtual_ty as ::vector_config::Configurable<#clt>>::generate_schema(schema_gen, overrides)
         }
     }
 }
@@ -129,7 +152,7 @@ fn generate_struct_field(field: &Field<'_>) -> proc_macro2::TokenStream {
 
     quote! {
         #field_metadata
-        let mut subschema = #field_as_configurable::generate_schema(schema_gen, #field_metadata_ref.clone());
+        let mut subschema = #field_as_configurable::generate_schema(schema_gen, #field_metadata_ref.as_subschema());
         ::vector_config::schema::finalize_schema(schema_gen, &mut subschema, #field_metadata_ref);
     }
 }

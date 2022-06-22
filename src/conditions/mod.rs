@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use vector_config::configurable_component;
 
 use crate::event::Event;
@@ -13,8 +15,8 @@ pub use self::vrl::VrlConfig;
 use self::{
     check_fields::{CheckFields, CheckFieldsConfig},
     datadog_search::{DatadogSearchConfig, DatadogSearchRunner},
-    is_log::{IsLog, IsLogConfig},
-    is_metric::{IsMetric, IsMetricConfig},
+    is_log::IsLog,
+    is_metric::IsMetric,
     not::{Not, NotConfig},
     vrl::Vrl,
 };
@@ -39,6 +41,9 @@ pub enum Condition {
     /// Matches an event with a [Datadog Search](https://docs.datadoghq.com/logs/explorer/search_syntax/) query.
     DatadogSearch(DatadogSearchRunner),
 
+    /// Matches an event based on an arbitrary implementation of `Condition`.
+    Arbitrary(Arc<dyn Conditional + Send + Sync>),
+
     /// Matches any event.
     AlwaysPass,
 
@@ -47,16 +52,13 @@ pub enum Condition {
 }
 
 impl Condition {
-    pub(crate) const fn is_log() -> Self {
-        Self::IsLog(is_log::IsLog {})
+    pub fn arbitrary<A>(arb: A) -> Self
+    where
+        A: Conditional + Send + Sync + 'static,
+    {
+        Self::Arbitrary(Arc::new(arb))
     }
 
-    pub(crate) const fn is_metric() -> Self {
-        Self::IsMetric(is_metric::IsMetric {})
-    }
-}
-
-impl Condition {
     /// Checks if a condition is true.
     ///
     /// The event should not be modified, it is only mutable so it can be passed into VRL, but VRL type checking prevents mutation.
@@ -68,6 +70,7 @@ impl Condition {
             Condition::Vrl(x) => x.check(e),
             Condition::CheckFields(x) => x.check(e),
             Condition::DatadogSearch(x) => x.check(e),
+            Condition::Arbitrary(x) => x.check(e),
             Condition::AlwaysPass => (true, e),
             Condition::AlwaysFail => (false, e),
         }
@@ -85,6 +88,7 @@ impl Condition {
             Condition::Vrl(x) => x.check_with_context(e),
             Condition::CheckFields(x) => x.check_with_context(e),
             Condition::DatadogSearch(x) => x.check_with_context(e),
+            Condition::Arbitrary(x) => x.check_with_context(e),
             Condition::AlwaysPass => (Ok(()), e),
             Condition::AlwaysFail => (Ok(()), e),
         }
@@ -110,10 +114,10 @@ pub enum ConditionConfig {
     Not(#[configurable(derived)] NotConfig),
 
     /// Matches an event if it is a log.
-    IsLog(#[configurable(derived)] IsLogConfig),
+    IsLog,
 
     /// Matches an event if it is a metric.
-    IsMetric(#[configurable(derived)] IsMetricConfig),
+    IsMetric,
 
     /// Matches an event with a [Vector Remap Language](https://vector.dev/docs/reference/vrl) (VRL) [boolean expression](https://vector.dev/docs/reference/vrl#boolean-expressions).
     Vrl(#[configurable(derived)] VrlConfig),
@@ -123,22 +127,38 @@ pub enum ConditionConfig {
 
     /// Matches an event with a [Datadog Search](https://docs.datadoghq.com/logs/explorer/search_syntax/) query.
     DatadogSearch(#[configurable(derived)] DatadogSearchConfig),
+
+    /// Matches an event based on an arbitrary implementation of `Condition`.
+    ///
+    /// This is not usable from normal user-based configurations, and only exists as a way to use arbitrary
+    /// implementations of `Condition` in components that take `AnyCondition` but are initialized directly, such as the
+    /// `kubernetes_logs` source using the `reduce` transform directly.
+    #[serde(skip)]
+    Arbitrary(#[configurable(derived)] Box<dyn ConditionalConfig>),
 }
 
 impl ConditionConfig {
+    pub fn arbitrary<A>(arb: A) -> Self
+    where
+        A: ConditionalConfig + 'static,
+    {
+        Self::Arbitrary(Box::new(arb))
+    }
+
     pub fn build(&self, enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition> {
         match self {
             ConditionConfig::Not(x) => x.build(enrichment_tables),
-            ConditionConfig::IsLog(x) => x.build(enrichment_tables),
-            ConditionConfig::IsMetric(x) => x.build(enrichment_tables),
+            ConditionConfig::IsLog => Ok(Condition::IsLog(IsLog::default())),
+            ConditionConfig::IsMetric => Ok(Condition::IsMetric(IsMetric::default())),
             ConditionConfig::Vrl(x) => x.build(enrichment_tables),
             ConditionConfig::CheckFields(x) => x.build(enrichment_tables),
             ConditionConfig::DatadogSearch(x) => x.build(enrichment_tables),
+            ConditionConfig::Arbitrary(x) => x.build(enrichment_tables),
         }
     }
 }
 
-pub trait Conditional {
+pub trait Conditional: std::fmt::Debug {
     /// Checks if a condition is true.
     ///
     /// The event should not be modified, it is only mutable so it can be passed into VRL, but VRL type checking prevents mutation.

@@ -14,6 +14,43 @@ use std::{
 use serde::{de, Deserialize, Deserializer};
 use vector_config::{configurable_component, schema::generate_root_schema};
 
+/// A templated string.
+#[configurable_component]
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+#[serde(try_from = "String", into = "String")]
+pub struct Template {
+    /// The template string.
+    src: String,
+
+    #[serde(skip)]
+    has_ts: bool,
+
+    #[serde(skip)]
+    has_fields: bool,
+}
+
+impl TryFrom<String> for Template {
+    type Error = String;
+
+    fn try_from(src: String) -> Result<Self, Self::Error> {
+        if src.len() == 0 {
+            Err("wahhh".to_string())
+        } else {
+            Ok(Self {
+                src,
+                has_ts: false,
+                has_fields: false,
+            })
+        }
+    }
+}
+
+impl Into<String> for Template {
+    fn into(self) -> String {
+        self.src
+    }
+}
+
 /// A period of time.
 #[derive(Clone)]
 #[configurable_component]
@@ -146,6 +183,9 @@ pub struct SimpleSinkConfig {
     #[configurable(derived)]
     #[serde(default = "default_simple_sink_encoding")]
     encoding: Encoding,
+    /// The filepath to write the events to.
+    #[configurable(metadata(templateable))]
+    output_path: Template,
     /// The tags to apply to each event.
     #[configurable(validation(length(max = 32)))]
     tags: HashMap<String, String>,

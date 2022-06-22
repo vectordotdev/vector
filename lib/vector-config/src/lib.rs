@@ -281,6 +281,17 @@ impl<'de, T: Configurable<'de>> Metadata<'de, T> {
             _de: PhantomData,
         }
     }
+
+    pub fn as_subschema(&self) -> Self {
+        Self {
+            title: self.title.clone(),
+            description: self.description.clone(),
+            default_value: self.default_value.clone(),
+            custom_attributes: Vec::new(),
+            transparent: self.transparent,
+            ..Default::default()
+        }
+    }
 }
 
 impl<'de, T: Configurable<'de>> Metadata<'de, Option<T>> {
