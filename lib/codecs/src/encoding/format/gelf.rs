@@ -11,22 +11,29 @@ use vector_core::{
     schema,
 };
 
-/// Config used to build a `GelfSerializer`.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct GelfSerializerConfig {
+/// Options for building a `GelfSerializer`.
+#[derive(Debug, Clone, Default, Copy, Deserialize, Serialize)]
+pub struct GelfSerializerOptions {
     #[serde(default)]
     sanitize: bool,
 }
 
+/// Config used to build a `GelfSerializer`.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct GelfSerializerConfig {
+    /// Configuration pptions for the GelfSerializer
+    pub options: GelfSerializerOptions,
+}
+
 impl GelfSerializerConfig {
     /// Creates a new `GelfSerializerConfig`.
-    pub const fn new() -> Self {
-        Self { sanitize: false }
+    pub const fn new(options: GelfSerializerOptions) -> Self {
+        Self { options }
     }
 
     /// Build the `GelfSerializer` from this configuration.
     pub fn build(&self) -> GelfSerializer {
-        GelfSerializer::new(self.sanitize)
+        GelfSerializer::new(self.options)
     }
 
     /// The data type of events that are accepted by `GelfSerializer`.
@@ -59,11 +66,11 @@ enum EventGelfConformity {
 
 impl GelfSerializer {
     /// Creates a new `GelfSerializer`.
-    pub fn new(sanitize: bool) -> Self {
+    pub fn new(options: GelfSerializerOptions) -> Self {
         GelfSerializer {
             valid_regex: Regex::new(r"^_[\w\.\-]*$").unwrap(),
             invalid_regex: Regex::new(r"[^\w\.\-]+").unwrap(),
-            sanitize,
+            sanitize: options.sanitize,
         }
     }
 
@@ -442,14 +449,14 @@ impl GelfSerializer {
                     self.expect_number_value(&key, value, &mut conformed_log, &mut conformed)?;
                 } else {
                     // additional fields must be prefixed with underscores
+                    // NOTE: electing to conform on this rule even if the sanitize flag is not set
+                    // because otherwise vector-added fields (such as "source_type: will throw errors
                     if key.len() > 0 && key.chars().nth(0).unwrap() != '_' {
-                        if let Some(clog) = &mut conformed_log {
+                        if conformed_log.is_none() {
+                            let mut clog = log.clone();
                             clog.rename_key(key.as_str(), &*format!("_{}", &key));
+                            conformed_log = Some(clog);
                             conformed = true;
-                        } else {
-                            return Err(EventGelfConformity::Conformable(
-                                format!("LogEvent field {} is not underscore prefixed", key).into(),
-                            ));
                         }
                     }
 
@@ -480,7 +487,7 @@ impl GelfSerializer {
 
 impl Default for GelfSerializer {
     fn default() -> Self {
-        Self::new(false)
+        Self::new(GelfSerializerOptions { sanitize: false })
     }
 }
 
@@ -511,40 +518,3 @@ impl Encoder<Event> for GelfSerializer {
         }
     }
 }
-
-// #[cfg(test)]
-// mod tests {
-//     use bytes::BytesMut;
-//     use vector_common::btreemap;
-//     use vector_core::event::Value;
-//
-//     use super::*;
-//
-//     #[test]
-//     fn serialize_json() {
-//         let event = Event::from(btreemap! {
-//             "foo" => Value::from("bar")
-//         });
-//         let mut serializer = GelfSerializer::new();
-//         let mut bytes = BytesMut::new();
-//
-//         serializer.encode(event, &mut bytes).unwrap();
-//
-//         assert_eq!(bytes.freeze(), r#"{"foo":"bar"}"#);
-//     }
-//
-//     #[test]
-//     fn serialize_equals_to_json_value() {
-//         let event = Event::from(btreemap! {
-//             "foo" => Value::from("bar")
-//         });
-//         let mut serializer = GelfSerializer::new();
-//         let mut bytes = BytesMut::new();
-//
-//         serializer.encode(event.clone(), &mut bytes).unwrap();
-//
-//         let json = serializer.to_json_value(event).unwrap();
-//
-//         assert_eq!(bytes.freeze(), serde_json::to_string(&json).unwrap());
-//     }
-// }

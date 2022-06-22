@@ -1,13 +1,17 @@
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use codecs::{
     decoding::format::gelf_fields::*, decoding::format::Deserializer, GelfDeserializerConfig,
+    GelfSerializerConfig,
 };
 use lookup::path;
 use pretty_assertions::assert_eq;
 use serde_json::json;
+use tokio_util::codec::Encoder;
 use value::Value;
+use vector_common::btreemap;
 use vector_core::config::log_schema;
+use vector_core::event::{Event, EventMetadata, LogEvent};
 
 /// Validates all the spec'd fields of GELF are deserialized.
 #[test]
@@ -88,7 +92,7 @@ fn gelf_deserializing_all() {
     );
 }
 
-/// Validates the error conditions in deserialization
+/// Validates the error conditions of GELF deserialization
 #[test]
 fn gelf_deserializing_err() {
     fn validate_err(input: &serde_json::Value) {
@@ -119,4 +123,22 @@ fn gelf_deserializing_err() {
         HOST: "example.org",
         SHORT_MESSAGE: "A short message that helps you identify what is going on",
     }));
+}
+
+/// TODO
+#[test]
+fn gelf_serializing_() {
+    let config = GelfSerializerConfig::default();
+    let mut serializer = config.build();
+
+    let event_fields = btreemap! {
+        VERSION => "1.1",
+        HOST => "example.org",
+        log_schema().message_key() => "Some message",
+    };
+    let event: Event = LogEvent::from_map(event_fields, EventMetadata::default()).into();
+
+    let mut buffer = BytesMut::new();
+
+    serializer.encode(event, &mut buffer).unwrap();
 }
