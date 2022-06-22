@@ -235,7 +235,7 @@ fn main() {
                             .map(|target| Rc::new(RefCell::new(target)) as Rc<RefCell<dyn Target>>)
                             .collect();
                         let mut results = runtime.resolve_batch(targets, &program, timezone);
-                        results.pop().expect("one element").1
+                        results.pop().expect("one element")
                     }
                 };
 
