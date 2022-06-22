@@ -13,3 +13,7 @@ quote = { version = "1.0", default-features = false }
 serde_derive_internals = "0.26"
 syn = { version = "1.0", default-features = false, features = ["full", "extra-traits", "visit-mut", "visit"] }
 vector_config_common = { path = "../vector-config-common" }
+
+[dev-dependencies]
+serde = { version = "1.0.137", default-features = false }
+vector_config = { path = "../vector-config" }

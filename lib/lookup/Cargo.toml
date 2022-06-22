@@ -24,7 +24,7 @@ quickcheck = { version = "1.0.3" }
 lalrpop = "0.19.8"
 
 [features]
-arbitrary = ["quickcheck"]
+arbitrary = ["dep:quickcheck"]
 
 [[bench]]
 name = "lookup"

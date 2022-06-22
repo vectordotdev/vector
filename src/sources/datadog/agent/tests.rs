@@ -697,6 +697,26 @@ async fn decode_series_endpoints() {
                     source_type_name: None,
                     device: None,
                 },
+                DatadogSeriesMetric {
+                    metric: "system.disk.free".to_string(),
+                    r#type: DatadogMetricType::Count,
+                    interval: None,
+                    points: vec![DatadogPoint(1542182955, 16777216_f64)],
+                    tags: None,
+                    host: None,
+                    source_type_name: None,
+                    device: None,
+                },
+                DatadogSeriesMetric {
+                    metric: "system.disk".to_string(),
+                    r#type: DatadogMetricType::Count,
+                    interval: None,
+                    points: vec![DatadogPoint(1542182955, 16777216_f64)],
+                    tags: None,
+                    host: None,
+                    source_type_name: None,
+                    device: None,
+                },
             ],
         };
         let events = spawn_collect_n(
@@ -713,13 +733,14 @@ async fn decode_series_endpoints() {
                 );
             },
             rx,
-            4,
+            6,
         )
         .await;
 
         {
             let mut metric = events[0].as_metric();
             assert_eq!(metric.name(), "dd_gauge");
+            assert_eq!(metric.namespace(), None);
             assert_eq!(
                 metric.timestamp(),
                 Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 10))
@@ -736,6 +757,7 @@ async fn decode_series_endpoints() {
 
             metric = events[1].as_metric();
             assert_eq!(metric.name(), "dd_gauge");
+            assert_eq!(metric.namespace(), None);
             assert_eq!(
                 metric.timestamp(),
                 Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 11))
@@ -752,6 +774,7 @@ async fn decode_series_endpoints() {
 
             metric = events[2].as_metric();
             assert_eq!(metric.name(), "dd_rate");
+            assert_eq!(metric.namespace(), None);
             assert_eq!(
                 metric.timestamp(),
                 Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 10))
@@ -789,6 +812,14 @@ async fn decode_series_endpoints() {
             );
             assert_eq!(metric.tags().unwrap()["host"], "a_host".to_string());
             assert_eq!(metric.tags().unwrap()["foobar"], "".to_string());
+
+            metric = events[4].as_metric();
+            assert_eq!(metric.name(), "disk.free");
+            assert_eq!(metric.namespace(), Some("system"));
+
+            metric = events[5].as_metric();
+            assert_eq!(metric.name(), "disk");
+            assert_eq!(metric.namespace(), Some("system"));
 
             assert_eq!(
                 &events[3].metadata().datadog_api_key().as_ref().unwrap()[..],

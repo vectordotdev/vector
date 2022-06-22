@@ -27,7 +27,7 @@ use crate::{
     shutdown::ShutdownSignal,
     sources::util::{SocketListenAddr, TcpNullAcker, TcpSource},
     tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
+    tls::{MaybeTlsSettings, TlsSourceConfig},
     udp, SourceSender,
 };
 
@@ -67,7 +67,7 @@ pub enum Mode {
         keepalive: Option<TcpKeepaliveConfig>,
 
         #[configurable(derived)]
-        tls: Option<TlsEnableableConfig>,
+        tls: Option<TlsSourceConfig>,
 
         /// The size, in bytes, of the receive buffer used for each connection.
         ///
@@ -158,12 +158,16 @@ impl SourceConfig for SyslogConfig {
                     host_key,
                 };
                 let shutdown_secs = 30;
-                let tls = MaybeTlsSettings::from_config(&tls, true)?;
+                let tls_config = tls.as_ref().map(|tls| tls.tls_config.clone());
+                let tls_client_metadata_key =
+                    tls.as_ref().and_then(|tls| tls.client_metadata_key.clone());
+                let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
                 source.run(
                     address,
                     keepalive,
                     shutdown_secs,
                     tls,
+                    tls_client_metadata_key,
                     receive_buffer_bytes,
                     cx,
                     false.into(),
@@ -1144,6 +1148,7 @@ mod test {
                 "notice" => Some(Self::LOG_NOTICE),
                 "info" => Some(Self::LOG_INFO),
                 "debug" => Some(Self::LOG_DEBUG),
+
                 x => {
                     #[allow(clippy::print_stdout)]
                     {

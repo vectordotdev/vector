@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 use std::fmt;
 
 use dashmap::DashMap;

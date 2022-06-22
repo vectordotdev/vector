@@ -253,6 +253,23 @@ mod tests {
             tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
+        empty_sd_value {
+            args: func_args![value: r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - [non_empty x=""][empty] qwerty"#],
+            want: Ok(btreemap!{
+                "message" => "qwerty",
+                "appname" => "root",
+                "facility" => "user",
+                "hostname" => "74794bfb6795",
+                "message" => "qwerty",
+                "procid" => 8449,
+                "severity" => "notice",
+                "timestamp" => chrono::Utc.ymd(2019, 2, 13).and_hms_milli(19, 48, 34, 0),
+                "version" => 1,
+                "non_empty.x" => "",
+            }),
+            tdef: TypeDef::object(inner_kind()).fallible(),
+        }
+
         non_structured_data_in_message {
             args: func_args![value: "<131>Jun 8 11:54:08 master apache_error [Tue Jun 08 11:54:08.929301 2021] [php7:emerg] [pid 1374899] [client 95.223.77.60:41888] rest of message"],
             want: Ok(btreemap!{

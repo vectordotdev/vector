@@ -1,3 +1,4 @@
+#![deny(warnings)]
 #![deny(clippy::all)]
 
 #[macro_use]
