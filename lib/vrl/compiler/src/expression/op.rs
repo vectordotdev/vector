@@ -127,7 +127,7 @@ impl Expression for Op {
 
         match self.opcode {
             Err => {
-                return for (resolved, target, state, timezone) in ctx.iter_mut() {
+                return for (_, resolved, target, state, timezone) in ctx.iter_mut() {
                     let target = &mut *(*target).borrow_mut();
                     let state = &mut *(*state).borrow_mut();
                     let mut ctx = Context::new(target, state, &timezone);
@@ -136,7 +136,7 @@ impl Expression for Op {
                 }
             }
             Or => {
-                return for (resolved, target, state, timezone) in ctx.iter_mut() {
+                return for (_, resolved, target, state, timezone) in ctx.iter_mut() {
                     let target = &mut *(*target).borrow_mut();
                     let state = &mut *(*state).borrow_mut();
                     let mut ctx = Context::new(target, state, &timezone);
@@ -150,7 +150,7 @@ impl Expression for Op {
                 }
             }
             And => {
-                return for (resolved, target, state, timezone) in ctx.iter_mut() {
+                return for (_, resolved, target, state, timezone) in ctx.iter_mut() {
                     let target = &mut *(*target).borrow_mut();
                     let state = &mut *(*state).borrow_mut();
                     let mut ctx = Context::new(target, state, &timezone);
@@ -175,11 +175,12 @@ impl Expression for Op {
         let mut ctx_rhs_ok_resolved_values = Vec::with_capacity(ctx.len());
         let mut ctx_rhs_ok_targets = Vec::with_capacity(ctx.len());
         let mut ctx_rhs_ok_states = Vec::with_capacity(ctx.len());
+        let mut ctx_rhs_err_indices = Vec::new();
         let mut ctx_rhs_err_resolved_values = Vec::new();
         let mut ctx_rhs_err_targets = Vec::new();
         let mut ctx_rhs_err_states = Vec::new();
 
-        for ((rhs, target, state, _), lhs) in ctx.iter_mut().zip(lhs) {
+        for ((rhs_index, rhs, target, state, _), lhs) in ctx.iter_mut().zip(lhs) {
             if rhs.is_err() {
                 let rhs = {
                     let mut moved = Ok(Value::Null);
@@ -187,6 +188,7 @@ impl Expression for Op {
                     moved
                 };
 
+                ctx_rhs_err_indices.push(rhs_index);
                 ctx_rhs_err_resolved_values.push(rhs);
                 ctx_rhs_err_targets.push(target);
                 ctx_rhs_err_states.push(state);
@@ -274,6 +276,7 @@ impl Expression for Op {
         }
 
         let ctx_rhs_err = BatchContext::new(
+            ctx_rhs_err_indices,
             ctx_rhs_err_resolved_values,
             ctx_rhs_err_targets,
             ctx_rhs_err_states,
