@@ -1,5 +1,9 @@
-use std::{net::SocketAddr, sync::Arc};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
+use crate::{
+    config::{self, ConfigDiff, Format},
+    test_util, topology, Error,
+};
 use hyper::{
     service::{make_service_fn, service_fn},
     Body, Request, Response, Server, StatusCode,
@@ -7,8 +11,8 @@ use hyper::{
 use tokio::{
     sync::{mpsc, oneshot, Mutex},
     task::JoinHandle,
+    time::{timeout, Duration},
 };
-use vector::{test_util, Error};
 
 type Lock = Arc<Mutex<()>>;
 
@@ -71,14 +75,7 @@ pub fn http_client(
     (rx, sender)
 }
 
-#[cfg(all(feature = "sources-http", feature = "sinks-http"))]
 async fn http_to_http(status: StatusCode, response: StatusCode) {
-    use tokio::time::{timeout, Duration};
-    use vector::{
-        config::{self, ConfigDiff, Format},
-        topology,
-    };
-
     let address1 = test_util::next_addr();
     let address2 = test_util::next_addr();
     let config = config::load_from_str(
@@ -102,7 +99,7 @@ uri = "http://{address2}/"
     )
     .unwrap();
     let diff = ConfigDiff::initial(&config);
-    let pieces = topology::build_or_log_errors(&config, &diff, std::collections::HashMap::new())
+    let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
         .await
         .unwrap();
     let (_topology, _shutdown) = topology::start_validated(config, diff, pieces)
@@ -118,34 +115,36 @@ uri = "http://{address2}/"
     // The expected flow is this:
     // 0. Nothing is ready to continue.
     assert!(matches!(rx_server.try_recv(), Err(_)));
+
     // 1. We send an event to the HTTP source server.
     let (mut rx_client, sender) = http_client(address1, "test");
+
     // 2. It sends to the HTTP sink sender. `rx` is activated, but no response yet.
     timeout(Duration::from_secs(4), rx_server.recv())
         .await
         .expect("Timed out waiting to receive event from HTTP sink")
         .expect("Error receiving event from HTTP sink");
     assert!(matches!(rx_client.try_recv(), Err(_)));
+
     // 3. Our test HTTP server waits for the mutex lock.
     drop(pause);
     assert!(matches!(rx_server.try_recv(), Err(_)));
+
     // 4. Our test HTTP server responds.
     // 5. The acknowledgement is returned to the source.
     // 6. The source responds to our initial send.
     let result = timeout(Duration::from_secs(1), sender)
         .await
-        .expect("Timed out waiting to receive result fro HTTP source")
+        .expect("Timed out waiting to receive result from HTTP source")
         .expect("Error receiving result from tokio task");
     assert_eq!(result.status(), response);
 }
 
-#[cfg(all(feature = "sources-http", feature = "sinks-http"))]
 #[tokio::test]
 async fn http_to_http_delivered() {
     http_to_http(StatusCode::OK, StatusCode::OK).await;
 }
 
-#[cfg(all(feature = "sources-http", feature = "sinks-http"))]
 #[tokio::test]
 async fn http_to_http_failed() {
     http_to_http(StatusCode::FORBIDDEN, StatusCode::BAD_REQUEST).await;
