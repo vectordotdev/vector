@@ -605,7 +605,10 @@ impl AgentDDSketch {
             // generally enforced at the source level by converting from cumulative buckets, or
             // enforced by the internal structures that hold bucketed data i.e. Vector's internal
             // `Histogram` data structure used for collecting histograms from `metrics`.
-            self.insert_interpolate_bucket(lower, upper, bucket.count);
+
+            // TODO: What should we do here if bucket.count > u32::MAX?
+            // Can we change ddsketch to handle u64?
+            self.insert_interpolate_bucket(lower, upper, bucket.count as u32);
             lower = bucket.upper_limit;
         }
     }

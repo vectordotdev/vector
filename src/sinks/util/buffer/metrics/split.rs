@@ -144,7 +144,7 @@ impl MetricSplit for AggregatedSummarySplitter {
                     ts,
                     kind,
                     MetricValue::Counter {
-                        value: f64::from(count),
+                        value: count as f64,
                     },
                 );
                 let count_metadata = metadata.clone();

@@ -560,6 +560,14 @@ mod test {
         assert_eq!(left, tail);
         assert!(r.is_nan());
 
+        // TODO this doesn't pass because we are parsing as f64 so we lose
+        // accuracy.
+        //
+        // let input = wrap(&(u64::MAX - 1).to_string());
+        // let (left, r) = Metric::parse_value(&input).unwrap();
+        // assert_eq!(left, tail);
+        // assert_eq!(r as u64, u64::MAX - 1);
+
         let tests = [
             ("0", 0.0f64),
             ("0.25", 0.25f64),

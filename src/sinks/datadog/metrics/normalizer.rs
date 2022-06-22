@@ -51,7 +51,7 @@ mod tests {
     use super::DatadogMetricsNormalizer;
     use crate::sinks::util::buffer::metrics::{MetricNormalize, MetricSet};
 
-    fn buckets_from_samples(values: &[f64]) -> (Vec<Bucket>, f64, u32) {
+    fn buckets_from_samples(values: &[f64]) -> (Vec<Bucket>, f64, u64) {
         // Generate buckets, and general statistics, for an input set of data.  We only use this in
         // tests, and so we have some semi-realistic buckets here, but mainly we use them for testing,
         // not for most accurately/efficiently representing the input samples.
