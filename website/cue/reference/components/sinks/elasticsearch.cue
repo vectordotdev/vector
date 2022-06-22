@@ -224,9 +224,12 @@ components: sinks: elasticsearch: {
 				examples: []
 				options: {
 					endpoints: {
-						common:      false
-						description: "Additional Elasticsearch endpoints to send logs to. They should be a full URL as shown in the example."
-						required:    false
+						common: false
+						description: """
+							Additional Elasticsearch endpoints to send logs to. They should be a full URL as shown in the example.
+							All options that apply to regular [endpoint](#endpoint), like [auth](#auth), also apply to these endpoints.
+							"""
+						required: false
 						type: array: {
 							default: []
 							examples: [["http://10.24.32.122:9000", "https://example.com", "https://user:password@example.com"]]
@@ -375,10 +378,11 @@ components: sinks: elasticsearch: {
 				If `distribution` is used, events will be distributed to multiple endpoints
 				according to their estimated load with failover.
 
-				[ARC](#adaptive-request-concurrency-arc) and Distribution will play nicely with each other up to a certain point:
+				Rate limit and concurrency are applied to the sink as a whole. As such [ARC](#adaptive-request-concurrency-arc)
+				will manage aggregated concurrency for all endpoints, but only to a certain point:
 					* If all Elasticsearch instances are in the same data center, ARC should work.
 					* If all Elasticsearch instances are in the same region, ARC will probably work, but some tweaking of its parameters may be needed.
-					* Else, ARC probably won't work without heavy tweaking and even then may not work.
+					* Else, ARC probably won't work without heavy tweaking and even then may not work. So it may be better to turn it off.
 				"""
 		}
 
