@@ -239,10 +239,7 @@ pub trait VrlRunner {
         targets: Vec<Rc<RefCell<dyn Target>>>,
         program: &Program,
         timezone: TimeZone,
-    ) -> Vec<(
-        Rc<RefCell<dyn Target>>,
-        std::result::Result<value::Value, Terminate>,
-    )>;
+    ) -> Vec<std::result::Result<value::Value, Terminate>>;
 }
 
 #[derive(Debug)]
@@ -275,18 +272,15 @@ impl VrlRunner for AstRunner {
         targets: Vec<Rc<RefCell<dyn Target>>>,
         program: &Program,
         timezone: TimeZone,
-    ) -> Vec<(
-        Rc<RefCell<dyn Target>>,
-        std::result::Result<value::Value, Terminate>,
-    )> {
+    ) -> Vec<std::result::Result<value::Value, Terminate>> {
         targets
             .into_iter()
             .map(|target| {
-                self.runtime.clear();
-                let resolved = self
+                let result = self
                     .runtime
                     .resolve(&mut *target.borrow_mut(), program, &timezone);
-                (target, resolved)
+                self.runtime.clear();
+                result
             })
             .collect()
     }
@@ -338,10 +332,7 @@ impl VrlRunner for AstBatchRunner {
         targets: Vec<Rc<RefCell<dyn Target>>>,
         program: &Program,
         timezone: TimeZone,
-    ) -> Vec<(
-        Rc<RefCell<dyn Target>>,
-        std::result::Result<value::Value, Terminate>,
-    )> {
+    ) -> Vec<std::result::Result<value::Value, Terminate>> {
         self.runtime.resolve_batch(targets, program, timezone)
     }
 }
@@ -461,10 +452,7 @@ where
     fn run_vrl_batch(
         &mut self,
         targets: Vec<Rc<RefCell<dyn Target>>>,
-    ) -> Vec<(
-        Rc<RefCell<dyn Target>>,
-        std::result::Result<value::Value, Terminate>,
-    )> {
+    ) -> Vec<std::result::Result<value::Value, Terminate>> {
         self.runner.run_batch(targets, &self.program, self.timezone)
     }
 }
@@ -570,28 +558,21 @@ where
         let program_info = self.program.info();
         let targets = events
             .into_events()
-            .map(|event| {
-                Rc::new(RefCell::new(VrlTarget::new(event, program_info)))
-                    as Rc<RefCell<dyn Target>>
-            })
+            .map(|event| Rc::new(RefCell::new(VrlTarget::new(event, program_info))))
             .collect::<Vec<_>>();
-        let results = self.run_vrl_batch(targets);
-
-        let program_info = self.program.info();
-        let results = results
+        let batch_targets = targets
+            .clone()
             .into_iter()
-            .enumerate()
-            .map(|(i, (target, result))| {
-                let target = {
-                    let mut moved = VrlTarget::new(Event::new_empty_log(), program_info);
-                    std::mem::swap(&mut moved, unsafe {
-                        &mut *(&mut *target.borrow_mut() as *mut _ as *mut VrlTarget)
-                    });
-                    moved
-                };
-                (i, target, result)
-            });
-        for (i, target, result) in results {
+            .map(|target| target as Rc<RefCell<dyn Target>>)
+            .collect();
+
+        let results = self.run_vrl_batch(batch_targets);
+
+        for (i, (target, result)) in targets.into_iter().zip(results).enumerate() {
+            let target = Rc::try_unwrap(target)
+                .expect("unique ownership of target")
+                .into_inner();
+
             match result {
                 Ok(_) => match target.into_events() {
                     TargetEvents::One(event) => {

@@ -176,14 +176,19 @@ fn run(opts: &Opts) -> Result<(), Error> {
                 let runtime = BatchRuntime::new();
                 let targets = targets
                     .into_iter()
-                    .map(|target| Rc::new(RefCell::new(target)) as Rc<RefCell<dyn Target>>)
+                    .map(|target| Rc::new(RefCell::new(target)))
+                    .collect::<Vec<_>>();
+                let batch_targets = targets
+                    .clone()
+                    .into_iter()
+                    .map(|target| target as Rc<RefCell<dyn Target>>)
                     .collect();
-                let results = runtime.resolve_batch(targets, &program, tz);
+                let results = runtime.resolve_batch(batch_targets, &program, tz);
 
-                for (target, result) in results {
-                    let target = unsafe {
-                        &mut *(&mut *target.borrow_mut() as *mut _ as *mut TargetValueRef)
-                    };
+                for (target, result) in targets.into_iter().zip(results) {
+                    let target = Rc::try_unwrap(target)
+                        .expect("unique ownership of target")
+                        .into_inner();
 
                     let result = result
                         .map(|value| {

@@ -120,8 +120,8 @@ impl BatchRuntime {
         targets: Vec<Rc<RefCell<dyn Target + 'a>>>,
         program: &Program,
         timezone: TimeZone,
-    ) -> Vec<(Rc<RefCell<dyn Target + 'a>>, RuntimeResult)> {
-        let mut invalid_targets = Vec::new();
+    ) -> Vec<RuntimeResult> {
+        let mut invalid_values = Vec::new();
         let (indices, targets) = (0..targets.len())
             .into_iter()
             .zip(targets)
@@ -130,9 +130,8 @@ impl BatchRuntime {
                 match target.clone().borrow().target_get(&self.root_lookup) {
                     Ok(Some(_)) => Some((index, target)),
                     Ok(None) => {
-                        invalid_targets.push((
+                        invalid_values.push((
                             index,
-                            target,
                             Err(Terminate::Error(
                                 "expected target object, got nothing".to_owned().into(),
                             )),
@@ -140,9 +139,8 @@ impl BatchRuntime {
                         None
                     }
                     Err(err) => {
-                        invalid_targets.push((
+                        invalid_values.push((
                             index,
-                            target,
                             Err(Terminate::Error(
                                 format!("error querying target object: {}", err).into(),
                             )),
@@ -160,7 +158,7 @@ impl BatchRuntime {
         let mut ctx = BatchContext::new(indices, values, targets, states, timezone);
         program.resolve_batch(&mut ctx);
 
-        let (indices, resolved_values, targets, _, _) = ctx.into_parts();
+        let (indices, resolved_values, _, _, _) = ctx.into_parts();
         let resolved_values = resolved_values.into_iter().map(|resolved| {
             resolved.map_err(|err| match err {
                 #[cfg(feature = "expr-abort")]
@@ -171,17 +169,12 @@ impl BatchRuntime {
 
         let mut result = indices
             .into_iter()
-            .zip(targets)
             .zip(resolved_values)
-            .map(|((index, target), resolved)| (index, target, resolved))
-            .chain(invalid_targets)
+            .chain(invalid_values)
             .collect::<Vec<_>>();
 
         result.sort_unstable_by(|(a, ..), (b, ..)| b.cmp(a));
 
-        result
-            .into_iter()
-            .map(|(_, target, resolved)| (target, resolved))
-            .collect()
+        result.into_iter().map(|(_, resolved)| resolved).collect()
     }
 }
