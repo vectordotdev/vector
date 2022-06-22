@@ -1,0 +1,17 @@
+# result:
+# error[E316]: cannot overwrite object value
+#   ┌─ :3:1
+#   │
+# 3 │ foo = true
+#   │ ^^^ this object cannot be overwritten implicitly
+#   │
+#   = try: clear the target before assignment
+#   =
+#   =     del(foo)
+#   =     foo = true
+#   =
+#   = see documentation about error handling at https://errors.vrl.dev/#handling
+#   = see language documentation at https://vrl.dev
+
+foo = {}
+foo = true

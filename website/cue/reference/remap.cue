@@ -173,7 +173,7 @@ remap: #Remap & {
 			title: "Emitting multiple logs from JSON"
 			input: log: message: #"[{"message": "first_log"}, {"message": "second_log"}]"#
 			source: """
-				. = parse_json!(.message) # sets `.` to an array of objects
+				. = array!(parse_json!(.message)) # sets `.` to an array of objects
 				"""
 			output: [
 				{log: {message: "first_log"}},

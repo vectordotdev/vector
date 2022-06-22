@@ -1,8 +1,8 @@
-use std::{convert::TryFrom, fmt};
+use std::{borrow::Cow, convert::TryFrom, fmt};
 
 use diagnostic::{DiagnosticMessage, Label, Note};
 use lookup::LookupBuf;
-use value::Value;
+use value::{Kind, Value};
 
 use crate::{
     expression::{Expr, Resolved},
@@ -61,6 +61,16 @@ impl Assignment {
                 let expr = expr.into_inner();
                 let target = Target::try_from(target.into_inner())?;
                 verify_mutable(&target, external, target_span, assignment_span)?;
+                verify_overwriteable(
+                    &target,
+                    expr.clone(),
+                    local,
+                    external,
+                    target_span,
+                    expr_span,
+                    assignment_span,
+                )?;
+
                 let value = expr.as_value();
 
                 target.insert_type_def(local, external, type_def, value);
@@ -111,6 +121,16 @@ impl Assignment {
                 // "err" target.
                 let ok = Target::try_from(ok.into_inner())?;
                 verify_mutable(&ok, external, expr_span, ok_span)?;
+                verify_overwriteable(
+                    &ok,
+                    expr.clone(),
+                    local,
+                    external,
+                    ok_span,
+                    expr_span,
+                    assignment_span,
+                )?;
+
                 let type_def = type_def.infallible();
                 let default_value = type_def.default_value();
                 let value = expr.as_value();
@@ -121,6 +141,16 @@ impl Assignment {
                 // error message.
                 let err = Target::try_from(err.into_inner())?;
                 verify_mutable(&err, external, expr_span, err_span)?;
+                verify_overwriteable(
+                    &err,
+                    expr.clone(),
+                    local,
+                    external,
+                    err_span,
+                    expr_span,
+                    assignment_span,
+                )?;
+
                 let type_def = TypeDef::bytes().add_null().infallible();
 
                 err.insert_type_def(local, external, type_def, None);
@@ -176,6 +206,59 @@ fn verify_mutable(
         }
         Target::Internal(_, _) | Target::Noop => Ok(()),
     }
+}
+
+/// Ensure the provided target can be written to.
+fn verify_overwriteable(
+    target: &Target,
+    rhs: Expr,
+    local: &LocalEnv,
+    external: &ExternalEnv,
+    target_span: Span,
+    expr_span: Span,
+    assignment_span: Span,
+) -> Result<(), Error> {
+    let lhs_kind = target.kind(local, external);
+    let rhs_kind = rhs.type_def((local, external));
+
+    // Allow overwriting noop-targets.
+    if target.is_noop() {
+        return Ok(());
+    }
+
+    // Accept assigning to an "any" target, to avoid erroring on assignments to
+    // fields for which we have no type information available.
+    if lhs_kind.is_any() {
+        return Ok(());
+    }
+
+    // If the target is not known to maybe be an object, allow overwriting its
+    // value.
+    if !lhs_kind.contains_object() {
+        return Ok(());
+    }
+
+    // Allow overwriting an existing object with a new object, as that is
+    // a common pattern to apply (e.g. `. = { "foo": true }`).
+    if lhs_kind.is_object() && rhs_kind.is_object() {
+        return Ok(());
+    }
+
+    // Allow overwriting a _root_ target with arrays, as it's used to explode
+    // one event into multiple events.
+    if target.is_root() && rhs_kind.is_array() {
+        return Ok(());
+    }
+
+    Err(Error {
+        variant: ErrorVariant::InvalidOverwriteKind {
+            target_span,
+            target: target.clone(),
+            rhs,
+        },
+        expr_span,
+        assignment_span,
+    })
 }
 
 impl Expression for Assignment {
@@ -288,6 +371,39 @@ impl Target {
             External(path) => {
                 let _ = ctx.target_mut().target_insert(path, value);
             }
+        }
+    }
+
+    /// Get the [`Kind`] of the target.
+    fn kind(&self, local: &LocalEnv, external: &ExternalEnv) -> Kind {
+        let (target, path) = match self {
+            Target::Noop => return Kind::null(),
+            Target::Internal(ident, path) => (local.variable(ident), path),
+            Target::External(path) => (Some(external.target()), path),
+        };
+
+        target
+            .and_then(|details| {
+                details
+                    .type_def
+                    .kind()
+                    .find_at_path(&path.to_lookup())
+                    .ok()
+                    .flatten()
+                    .map(Cow::into_owned)
+            })
+            .unwrap_or_else(Kind::any)
+    }
+
+    fn is_noop(&self) -> bool {
+        matches!(self, Target::Noop)
+    }
+
+    fn is_root(&self) -> bool {
+        match self {
+            Target::Noop => true,
+            Target::Internal(_, path) => path.is_root(),
+            Target::External(path) => path.is_root(),
         }
     }
 }
@@ -462,6 +578,13 @@ pub(crate) enum ErrorVariant {
 
     #[error("mutation of read-only value")]
     ReadOnly,
+
+    #[error("cannot overwrite object value")]
+    InvalidOverwriteKind {
+        target: Target,
+        target_span: Span,
+        rhs: Expr,
+    },
 }
 
 impl fmt::Display for Error {
@@ -486,6 +609,7 @@ impl DiagnosticMessage for Error {
             InfallibleAssignment(..) => 104,
             InvalidTarget(..) => 641,
             ReadOnly => 315,
+            InvalidOverwriteKind { .. } => 316,
         }
     }
 
@@ -520,6 +644,10 @@ impl DiagnosticMessage for Error {
                 "mutation of read-only value",
                 self.assignment_span,
             )],
+            InvalidOverwriteKind { target_span, .. } => vec![Label::primary(
+                format!("this object cannot be overwritten implicitly"),
+                target_span,
+            )],
         }
     }
 
@@ -528,6 +656,17 @@ impl DiagnosticMessage for Error {
 
         match &self.variant {
             FallibleAssignment(..) | InfallibleAssignment(..) => vec![Note::SeeErrorDocs],
+            InvalidOverwriteKind { target, rhs, .. } => {
+                let mut notes = vec![];
+
+                notes.append(&mut Note::solution(
+                    "clear the target before assignment",
+                    vec![format!("del({target})"), format!("{target} = {rhs}")],
+                ));
+
+                notes.push(Note::SeeErrorDocs);
+                notes
+            }
             _ => vec![],
         }
     }
