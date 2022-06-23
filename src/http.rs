@@ -39,6 +39,17 @@ pub enum HttpError {
     BuildRequest { source: http::Error },
 }
 
+impl HttpError {
+    pub const fn is_retriable(&self) -> bool {
+        match self {
+            HttpError::BuildRequest { .. } | HttpError::MakeProxyConnector { .. } => false,
+            HttpError::CallRequest { .. }
+            | HttpError::BuildTlsConnector { .. }
+            | HttpError::MakeHttpsConnector { .. } => true,
+        }
+    }
+}
+
 pub type HttpClientFuture = <HttpClient as Service<http::Request<Body>>>::Future;
 
 pub struct HttpClient<B = Body> {
