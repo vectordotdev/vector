@@ -6,7 +6,6 @@ mod check_fields;
 pub(self) mod datadog_search;
 pub(crate) mod is_log;
 pub(crate) mod is_metric;
-//pub mod not;
 mod vrl;
 
 pub use self::vrl::VrlConfig;
@@ -15,15 +14,11 @@ use self::{
     datadog_search::{DatadogSearchConfig, DatadogSearchRunner},
     is_log::{check_is_log, check_is_log_with_context},
     is_metric::{check_is_metric, check_is_metric_with_context},
-    //not::{Not, NotConfig},
     vrl::Vrl,
 };
 
 #[derive(Debug, Clone)]
 pub enum Condition {
-    /// Negates the result of a nested condition.
-    //Not(Not),
-
     /// Matches an event if it is a log.
     IsLog,
 
@@ -52,7 +47,6 @@ impl Condition {
     /// The event should not be modified, it is only mutable so it can be passed into VRL, but VRL type checking prevents mutation.
     pub(crate) fn check(&self, e: Event) -> (bool, Event) {
         match self {
-            //Condition::Not(x) => x.check(e),
             Condition::IsLog => check_is_log(e),
             Condition::IsMetric => check_is_metric(e),
             Condition::Vrl(x) => x.check(e),
@@ -69,7 +63,6 @@ impl Condition {
     /// case. As such, it should typically be avoided in hot paths.
     pub(crate) fn check_with_context(&self, e: Event) -> (Result<(), String>, Event) {
         match self {
-            //Condition::Not(x) => x.check_with_context(e),
             Condition::IsLog => check_is_log_with_context(e),
             Condition::IsMetric => check_is_metric_with_context(e),
             Condition::Vrl(x) => x.check_with_context(e),
@@ -96,8 +89,6 @@ impl Condition {
 #[derive(Clone, Debug)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ConditionConfig {
-    // /// Negates the result of a nested condition.
-    //Not(#[configurable(derived)] NotConfig),
     /// Matches an event if it is a log.
     IsLog,
 
@@ -117,7 +108,6 @@ pub enum ConditionConfig {
 impl ConditionConfig {
     pub fn build(&self, enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition> {
         match self {
-            //ConditionConfig::Not(x) => x.build(enrichment_tables),
             ConditionConfig::IsLog => Ok(Condition::IsLog),
             ConditionConfig::IsMetric => Ok(Condition::IsMetric),
             ConditionConfig::Vrl(x) => x.build(enrichment_tables),

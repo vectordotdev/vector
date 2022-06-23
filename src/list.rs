@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use clap::Parser;
 use serde::Serialize;
 

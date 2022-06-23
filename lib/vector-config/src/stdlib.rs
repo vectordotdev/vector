@@ -27,36 +27,6 @@ impl<'de> Configurable<'de> for () {
     }
 }
 
-impl<'de, T> Configurable<'de> for Box<T>
-where
-    T: Configurable<'de>,
-{
-    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
-        // Forward to `T`, but convert our metadata as necessary.
-        T::generate_schema(gen, overrides.convert())
-    }
-
-    fn referencable_name() -> Option<&'static str> {
-        // Forward to `T`.
-        T::referencable_name()
-    }
-
-    fn description() -> Option<&'static str> {
-        // Forward to `T`.
-        T::description()
-    }
-
-    fn is_optional() -> bool {
-        // Forward to `T`.
-        T::is_optional()
-    }
-
-    fn metadata() -> Metadata<'de, Self> {
-        // Forward to `T`, but wrap the default value as necessary.
-        T::metadata().map_default_value(|v| Box::new(v))
-    }
-}
-
 // Null and boolean.
 impl<'de, T> Configurable<'de> for Option<T>
 where
