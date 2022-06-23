@@ -13,17 +13,23 @@ use pulsar::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use tokio_util::codec::Encoder as _;
 use vector_buffers::Acker;
 use vector_common::internal_event::{BytesSent, EventsSent};
 
 use crate::{
-    codecs::{Encoder, EncodingConfig},
+    codecs::Encoder,
     config::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
     },
     event::Event,
-    internal_events::PulsarEncodeEventError,
-    sinks::util::{encoding::Transformer, metadata::RequestMetadata},
+    sinks::util::{
+        encoding::{
+            EncodingConfig, EncodingConfigAdapter, StandardEncodings, StandardEncodingsMigrator,
+            Transformer,
+        },
+        metadata::RequestMetadata,
+    },
 };
 
 #[derive(Debug, Snafu)]
@@ -38,7 +44,9 @@ pub struct PulsarSinkConfig {
     #[serde(alias = "address")]
     endpoint: String,
     topic: String,
-    encoding: EncodingConfig,
+    #[serde(flatten)]
+    pub encoding:
+        EncodingConfigAdapter<EncodingConfig<StandardEncodings>, StandardEncodingsMigrator>,
     auth: Option<AuthConfig>,
 }
 
@@ -104,7 +112,7 @@ impl GenerateConfig for PulsarSinkConfig {
         toml::Value::try_from(Self {
             endpoint: "pulsar://127.0.0.1:6650".to_string(),
             topic: "topic-1234".to_string(),
-            encoding: Encoding::Text.into(),
+            encoding: EncodingConfig::from(StandardEncodings::Text).into(),
             auth: None,
         })
         .unwrap()
@@ -122,7 +130,12 @@ impl SinkConfig for PulsarSinkConfig {
             .create_pulsar_producer()
             .await
             .context(CreatePulsarSinkSnafu)?;
-        let sink = PulsarSink::new(producer, self.encoding.clone(), cx.acker())?;
+
+        let transformer = self.encoding.transformer();
+        let serializer = self.encoding.encoding()?;
+        let encoder = Encoder::<()>::new(serializer);
+
+        let sink = PulsarSink::new(producer, transformer, encoder, cx.acker())?;
 
         let producer = self
             .create_pulsar_producer()
@@ -257,7 +270,7 @@ impl Sink<Event> for PulsarSink {
         let _ = std::mem::replace(
             &mut self.state,
             PulsarSinkState::Sending(Box::pin(async move {
-                let result = producer.send(message).await;
+                let result = producer.send(bytes.as_ref()).await;
                 (producer, result, metadata)
             })),
         );
