@@ -82,7 +82,7 @@ components: sources: vector: {
 					"1": "Vector source API version 1"
 					"2": "Vector source API version 2"
 				}
-				default: "1"
+				default: "2"
 			}
 		}
 	}
