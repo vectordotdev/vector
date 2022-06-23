@@ -380,9 +380,11 @@ components: sinks: elasticsearch: {
 
 				Rate limit and concurrency are applied to the sink as a whole. As such [ARC](#adaptive-request-concurrency-arc)
 				will manage aggregated concurrency for all endpoints, but only to a certain point:
-					* If all Elasticsearch instances are in the same data center, ARC should work.
-					* If all Elasticsearch instances are in the same region, ARC will probably work, but some tweaking of its parameters may be needed.
-					* Else, ARC probably won't work without heavy tweaking and even then may not work. So it may be better to turn it off.
+
+				* If all Elasticsearch instances are in the same data center, ARC should work.
+				* If all Elasticsearch instances are in the same region, ARC will probably work, but some tweaking of its parameters may be needed.
+				* Else, ARC probably won't work without heavy tweaking and even then may not work. So it may be better to turn it off.
+
 				"""
 		}
 
