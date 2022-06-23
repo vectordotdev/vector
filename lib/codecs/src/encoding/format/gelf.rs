@@ -58,7 +58,8 @@ pub struct GelfSerializer {
     sanitize: bool,
 }
 
-/// TODO
+/// Whether the non-conforming event is capable of being conformed to GELF
+/// standard by vector or not.
 enum EventGelfConformity {
     Conformable(String),
     Unconformable(String),
@@ -280,7 +281,8 @@ impl GelfSerializer {
     //     }
     // }
 
-    /// TODO
+    /// Return Ok if value is a string. Otherwise, determine if it is possible to conform
+    /// the value to a string, and do the conformation if configured to do so.
     fn expect_bytes_value(
         &self,
         key: &str,
@@ -309,8 +311,9 @@ impl GelfSerializer {
         Ok(())
     }
 
-    /// TODO
-    fn expect_number_value(
+    /// Return Ok if value is an integer. Otherwise, determine if it is possible to conform
+    /// the value to an integer, and do the conformation if configured to do so.
+    fn expect_integer_value(
         &self,
         key: &str,
         value: &Value,
@@ -378,15 +381,25 @@ impl GelfSerializer {
                 }
             } else {
                 return Err(EventGelfConformity::Unconformable(
-                    format!("LogEvent field {} should be a UTF-8 string", key).into(),
+                    format!("LogEvent field {} should be an integer", key).into(),
                 ));
             }
         }
         Ok(())
     }
 
-    /// TODO
+    /// Determine if input log event is in valid GELF format. Possible return values:
+    ///    - Ok(None)           => The log event is valid GELF
+    ///    - Ok(Some(LogEvent)) => The the log event isn't valid GELF, but was conformed to
+    ///                            valid GELF due to the sanitize configuration flag being set.
+    ///
+    ///    - Err(EventGelfConformity::Conformable)
+    ///         => The log event isn't valid GELF, but could be conformed to be valid if the
+    ///            user were to set the sanitize configuration option to true.
+    ///    - Err(EventGelfConformity::UnConformable)
+    ///         => The log event isn't valid GELF and vector is unable to conform it.
     fn is_event_valid_gelf(&self, log: &LogEvent) -> Result<Option<LogEvent>, EventGelfConformity> {
+        // VERSION, HOST and <MESSAGE> are all required fields
         if !log.contains(VERSION) {
             return Err(EventGelfConformity::Unconformable(
                 format!("LogEvent does not contain field {}", VERSION).into(),
@@ -408,9 +421,6 @@ impl GelfSerializer {
                 .into(),
             ));
         }
-
-        // TODO this is not being set in the config file :(
-        dbg!(self.sanitize);
 
         let mut conformed_log = if self.sanitize {
             Some(log.clone())
@@ -446,7 +456,7 @@ impl GelfSerializer {
                 }
                 // validate integer values
                 else if key == LEVEL || key == FILE {
-                    self.expect_number_value(&key, value, &mut conformed_log, &mut conformed)?;
+                    self.expect_integer_value(&key, value, &mut conformed_log, &mut conformed)?;
                 } else {
                     // additional fields must be prefixed with underscores
                     // NOTE: electing to conform on this rule even if the sanitize flag is not set
@@ -509,10 +519,14 @@ impl Encoder<Event> for GelfSerializer {
             }
             Err(conformity) => match conformity {
                 EventGelfConformity::Conformable(s) => {
-                    Err(format!("Event does not conform to GELF specification but is sanitizable, try setting the sanitize configuration option for the encoder: {}", s).into())
+                    Err(format!("Event does not conform to GELF specification but is sanitizable, try setting the sanitize configuration option to 'true' for the encoder: {}", s).into())
                 },
                 EventGelfConformity::Unconformable(s) => {
-                    Err(format!("Event does not conform to GELF specification: {}", s).into())
+                    if self.sanitize {
+                        Err(format!("Event does not conform to GELF specification. Vector was not able to sanitize the event: {}", s).into())
+                    } else {
+                        Err(format!("Event does not conform to GELF specification: {}", s).into())
+                    }
                 },
             },
         }
