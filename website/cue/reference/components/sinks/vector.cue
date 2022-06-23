@@ -100,7 +100,7 @@ components: sinks: vector: {
 					"1": "Vector sink API version 1"
 					"2": "Vector sink API version 2"
 				}
-				default: "1"
+				default: "2"
 			}
 		}
 	}
