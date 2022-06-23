@@ -219,7 +219,7 @@ components: sinks: elasticsearch: {
 			common:      false
 			description: "Options for distributing events to multiple endpoints."
 			required:    false
-			warnings: ["By default ARC is enabled which can cause [issues](#_distribution) when distribution is used."]
+			warnings: ["By default ARC is enabled which can cause [issues](#distribution_how) when distribution is used."]
 			type: object: {
 				examples: []
 				options: {
@@ -371,7 +371,7 @@ components: sinks: elasticsearch: {
 				"""
 		}
 
-		_distribution: {
+		distribution_how: {
 			title: "Distribution"
 			body: """
 				By default, Vector sends events to a single Elasticsearch endpoint.
