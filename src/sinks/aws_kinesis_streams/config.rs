@@ -156,7 +156,7 @@ impl SinkConfig for KinesisSinkConfig {
             });
 
         let transformer = self.encoding.transformer();
-        let serializer = self.encoding.encoding()?;
+        let serializer = self.encoding.encoding();
         let encoder = Encoder::<()>::new(serializer);
 
         let request_builder = KinesisRequestBuilder {

@@ -60,7 +60,7 @@ impl KafkaSink {
         let producer_config = config.to_rdkafka(KafkaRole::Producer)?;
         let producer = create_producer(producer_config)?;
         let transformer = config.encoding.transformer();
-        let serializer = config.encoding.encoding()?;
+        let serializer = config.encoding.encoding();
         let encoder = Encoder::<()>::new(serializer);
 
         Ok(KafkaSink {
