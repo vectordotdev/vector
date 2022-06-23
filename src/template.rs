@@ -97,9 +97,9 @@ impl TryFrom<Cow<'_, str>> for Template {
     }
 }
 
-impl Into<String> for Template {
-    fn into(self) -> String {
-        self.src
+impl From<Template> for String {
+    fn from(template: Template) -> String {
+        template.src
     }
 }
 

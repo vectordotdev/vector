@@ -133,30 +133,20 @@ impl FunctionTransform for Cri {
         // Detect if this is a partial event by examining the multiline tag field, and if it is, convert it to the more
         // generic `_partial` field that partial event merger will be looking for.
         match log.remove(MULTILINE_TAG) {
-            None => {
-                // The multiline tag always needs to exist in the message, so if we didn't find it, this is an invalid
-                // event overall so we don't emit the event.
+            Some(Value::Bytes(val)) => {
+                let is_partial = val[0] == b'P';
+                if is_partial {
+                    log.insert(event::PARTIAL, true);
+                }
+            }
+            _ => {
+                // The multiline tag always needs to exist in the message, and it needs to be a string, so if we didn't
+                // find it, or it's not a string, this is an invalid event overall so we don't emit the event.
 
                 // TODO: Should we actually emit an internal event/error here? It would definitely be weird if a
-                // mandated field in the log format wasn't present.
+                // mandated field in the log format wasn't present/the right type.
                 return;
             }
-            Some(tag) => match tag {
-                Value::Bytes(val) => {
-                    let is_partial = val[0] == b'P';
-                    if is_partial {
-                        log.insert(event::PARTIAL, true);
-                    }
-                }
-                _ => {
-                    // If the multiline tag isn't a string, then there's no way it could possibly represent the valid
-                    // values for the multiline tag, so we don't emit the event.
-
-                    // TODO: Should we actually emit an internal event/error here? It would definitely be weird if a
-                    // field that was supposed to be a string ... wasn't a string.
-                    return;
-                }
-            },
         };
 
         // Since we successfully parsed the message, send it onward.

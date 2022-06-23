@@ -33,7 +33,7 @@ impl TryFrom<String> for Template {
     type Error = String;
 
     fn try_from(src: String) -> Result<Self, Self::Error> {
-        if src.len() == 0 {
+        if src.is_empty() {
             Err("wahhh".to_string())
         } else {
             Ok(Self {
@@ -45,9 +45,9 @@ impl TryFrom<String> for Template {
     }
 }
 
-impl Into<String> for Template {
-    fn into(self) -> String {
-        self.src
+impl From<Template> for String {
+    fn from(template: Template) -> String {
+        template.src
     }
 }
 

@@ -284,8 +284,8 @@ impl<'de, T: Configurable<'de>> Metadata<'de, T> {
 
     pub fn as_subschema(&self) -> Self {
         Self {
-            title: self.title.clone(),
-            description: self.description.clone(),
+            title: self.title,
+            description: self.description,
             default_value: self.default_value.clone(),
             custom_attributes: Vec::new(),
             transparent: self.transparent,

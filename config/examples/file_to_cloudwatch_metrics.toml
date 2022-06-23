@@ -16,7 +16,7 @@ inputs = ["file"]
 type = "remap"
 drop_on_error = false
 source = '''
-. |= parse_regex!(.message, [#"^(?P<host>[\w\.]+) - (?P<user>[\w-]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$"#]
+. |= parse_apache_log!(string!(.message), "common")
 '''
 
 # Transform into metrics

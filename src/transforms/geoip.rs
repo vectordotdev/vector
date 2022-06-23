@@ -483,7 +483,6 @@ mod tests {
             "en".to_string(),
         )
         .unwrap();
-        let result = transform_one(&mut augment, event).unwrap();
-        result
+        transform_one(&mut augment, event).unwrap()
     }
 }
