@@ -16,7 +16,6 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use vector_buffers::Acker;
 use vector_common::internal_event::{BytesSent, EventsSent};
-use vector_core::event::MaybeAsLog;
 
 use crate::{
     config::{
@@ -164,22 +163,28 @@ impl PulsarSinkConfig {
     async fn create_pulsar_producer(&self) -> Result<PulsarProducer, PulsarError> {
         let mut builder = Pulsar::builder(&self.endpoint, TokioExecutor);
         if let Some(auth) = &self.auth {
-            builder = match (auth.name.as_ref(), auth.token.as_ref(), auth.oauth2.as_ref()) {
+            builder = match (
+                auth.name.as_ref(),
+                auth.token.as_ref(),
+                auth.oauth2.as_ref(),
+            ) {
                 (Some(name), Some(token), None) => builder.with_auth(Authentication {
                     name: name.clone(),
                     data: token.as_bytes().to_vec(),
                 }),
-                (None, None, Some(oauth2)) => builder.with_auth_provider(OAuth2Authentication::client_credentials(
-                    OAuth2Params {
+                (None, None, Some(oauth2)) => builder.with_auth_provider(
+                    OAuth2Authentication::client_credentials(OAuth2Params {
                         issuer_url: oauth2.issuer_url.clone(),
                         credentials_url: oauth2.credentials_url.clone(),
                         audience: oauth2.audience.clone(),
                         scope: oauth2.scope.clone(),
-                    },
-                )),
-                _ => return Err(PulsarError::Authentication(AuthenticationError::Custom(
-                    "Invalid auth config".to_string(),
-                ))),
+                    }),
+                ),
+                _ => {
+                    return Err(PulsarError::Authentication(AuthenticationError::Custom(
+                        "Invalid auth config".to_string(),
+                    )))
+                }
             };
         }
 
@@ -277,10 +282,10 @@ impl Sink<Event> for PulsarSink {
         );
 
         let metadata_builder = RequestMetadata::builder(&item);
-        let event_time = item
-            .maybe_as_log()
-            .map_or(None, |log| log.get(log_schema().timestamp_key())
-                .map_or(None, |v| v.as_timestamp().map(|dt| dt.timestamp_millis())));
+        let event_time = item.maybe_as_log().map_or(None, |log| {
+            log.get(log_schema().timestamp_key())
+                .map_or(None, |v| v.as_timestamp().map(|dt| dt.timestamp_millis()))
+        });
 
         let message = encode_event(item, &self.encoding, &self.avro_schema)
             .map_err(|error| emit!(PulsarEncodeEventError { error }))?;

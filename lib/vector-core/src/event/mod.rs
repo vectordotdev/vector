@@ -131,6 +131,16 @@ impl Event {
         }
     }
 
+    /// Return self as a `LogEvent` if possible
+    ///
+    /// If the event is a `LogEvent`, then `Some(&log_event)` is returned, otherwise `None`.
+    pub fn maybe_as_log(&self) -> Option<&LogEvent> {
+        match self {
+            Event::Log(log) => Some(log),
+            _ => None,
+        }
+    }
+
     /// Return self as a `Metric`
     ///
     /// # Panics
@@ -436,19 +446,6 @@ pub trait MaybeAsLogMut {
 
 impl MaybeAsLogMut for Event {
     fn maybe_as_log_mut(&mut self) -> Option<&mut LogEvent> {
-        match self {
-            Event::Log(log) => Some(log),
-            _ => None,
-        }
-    }
-}
-
-pub trait MaybeAsLog {
-    fn maybe_as_log(&self) -> Option<&LogEvent>;
-}
-
-impl MaybeAsLog for Event {
-    fn maybe_as_log(&self) -> Option<&LogEvent> {
         match self {
             Event::Log(log) => Some(log),
             _ => None,
