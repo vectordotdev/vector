@@ -44,15 +44,9 @@ pub struct EncodedList {
 }
 
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
-    let mut sources = SourceDescription::types();
-    let mut transforms = TransformDescription::types();
-    let mut sinks = SinkDescription::types();
-
-    // Remove deprecated components from list
-    let deprecated = deprecated_components();
-    sources.retain(|name| !deprecated.contains(name));
-    transforms.retain(|name| !deprecated.contains(name));
-    sinks.retain(|name| !deprecated.contains(name));
+    let sources = SourceDescription::types();
+    let transforms = TransformDescription::types();
+    let sinks = SinkDescription::types();
 
     #[allow(clippy::print_stdout)]
     match opts.format {
@@ -91,9 +85,4 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     }
 
     exitcode::OK
-}
-
-/// Returns names of all deprecated components.
-fn deprecated_components() -> HashSet<&'static str> {
-    vec!["field_filter"].into_iter().collect()
 }

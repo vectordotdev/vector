@@ -528,6 +528,7 @@ transforms-logs = [
   "transforms-field_filter",
   "transforms-filter",
   "transforms-geoip",
+  "transforms-log_to_metric",
   "transforms-lua",
   "transforms-metric_to_log",
   "transforms-pipelines",
