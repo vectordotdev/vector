@@ -29,6 +29,10 @@ use crate::{
 
 #[derive(Debug, Snafu)]
 enum BuildError {
+    #[snafu(display("invalid encoding: {}", source))]
+    Encoding {
+        source: codecs::encoding::BuildError,
+    },
     #[snafu(display("invalid subject template: {}", source))]
     SubjectTemplate { source: TemplateParseError },
     #[snafu(display("NATS Config Error: {}", source))]
@@ -160,7 +164,7 @@ impl NatsSink {
     async fn new(config: NatsSinkConfig, acker: Acker) -> Result<Self, BuildError> {
         let connection = config.connect().await?;
         let transformer = config.encoding.transformer();
-        let serializer = config.encoding.encoding();
+        let serializer = config.encoding.encoding().context(EncodingSnafu)?;
         let encoder = Encoder::<()>::new(serializer);
 
         Ok(NatsSink {

@@ -191,19 +191,23 @@ pub struct WebSocketSink {
 }
 
 impl WebSocketSink {
-    pub fn new(config: &WebSocketSinkConfig, connector: WebSocketConnector, acker: Acker) -> Self {
+    pub fn new(
+        config: &WebSocketSinkConfig,
+        connector: WebSocketConnector,
+        acker: Acker,
+    ) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
-        let serializer = config.encoding.encoding();
+        let serializer = config.encoding.encoding()?;
         let encoder = Encoder::<()>::new(serializer);
 
-        Self {
+        Ok(Self {
             transformer,
             encoder,
             connector,
             acker,
             ping_interval: config.ping_interval.filter(|v| *v > 0),
             ping_timeout: config.ping_timeout.filter(|v| *v > 0),
-        }
+        })
     }
 
     async fn create_sink_and_stream(
@@ -390,9 +394,9 @@ mod tests {
             EncodingConfig<StandardEncodings>,
             StandardEncodingsMigrator,
         >,
-    ) -> Result<Message, codecs::encoding::Error> {
+    ) -> crate::Result<Message> {
         let transformer = encoding.transformer();
-        let serializer = encoding.encoding();
+        let serializer = encoding.encoding()?;
         let mut encoder = Encoder::<()>::new(serializer);
 
         let mut bytes = BytesMut::new();
