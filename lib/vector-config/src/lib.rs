@@ -269,6 +269,9 @@ impl<'de, T: Configurable<'de>> Metadata<'de, T> {
         }
     }
 
+    /// Converts this metadata from holding a default value of `T` to `U`.
+    ///
+    /// If a default value was present before, it is dropped.
     pub fn convert<U: Configurable<'de>>(self) -> Metadata<'de, U> {
         Metadata {
             title: self.title,
@@ -282,6 +285,10 @@ impl<'de, T: Configurable<'de>> Metadata<'de, T> {
         }
     }
 
+    /// Gets a version of this metadata subtle for subschema use.
+    ///
+    /// This strips all custom attributes and validations, as well as some flags, which makes this exclusively useful
+    /// for shuttling metadata from a type that (de)serializes to an entirely different type.
     pub fn as_subschema(&self) -> Self {
         Self {
             title: self.title,
