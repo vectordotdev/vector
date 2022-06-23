@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 
 use crate::{
-    gcp::{GcpCredentials, GcpError},
+    gcp::{GcpAuthenticator, GcpError},
     http::HttpClient,
     sinks::{
         gcs_common::service::GcsResponse,
@@ -50,7 +50,7 @@ pub fn build_healthcheck(
     bucket: String,
     client: HttpClient,
     base_url: String,
-    creds: Option<GcpCredentials>,
+    creds: Option<GcpAuthenticator>,
 ) -> crate::Result<Healthcheck> {
     let healthcheck = async move {
         let uri = base_url.parse::<Uri>()?;
@@ -72,7 +72,7 @@ pub fn build_healthcheck(
 // Use this to map a healthcheck response, as it handles setting up the renewal task.
 pub fn healthcheck_response(
     response: http::Response<hyper::Body>,
-    creds: Option<GcpCredentials>,
+    creds: Option<GcpAuthenticator>,
     not_found_error: crate::Error,
 ) -> crate::Result<()> {
     // If there are credentials configured, the generated OAuth

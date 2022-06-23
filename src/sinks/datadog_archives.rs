@@ -35,7 +35,7 @@ use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
     codecs::Encoder,
     config::{GenerateConfig, Input, SinkConfig, SinkContext},
-    gcp::{GcpAuthConfig, GcpCredentials},
+    gcp::{GcpAuthConfig, GcpAuthenticator},
     http::HttpClient,
     serde::json::to_string,
     sinks::{
@@ -301,7 +301,7 @@ impl DatadogArchivesSinkConfig {
         &self,
         client: HttpClient,
         base_url: String,
-        creds: Option<GcpCredentials>,
+        creds: Option<GcpAuthenticator>,
         cx: SinkContext,
     ) -> crate::Result<VectorSink> {
         let request = self.request.unwrap_with(&Default::default());

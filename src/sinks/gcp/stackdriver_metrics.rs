@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Metric, MetricValue},
-    gcp::{GcpAuthConfig, GcpCredentials},
+    gcp::{GcpAuthConfig, GcpAuthenticator},
     http::HttpClient,
     sinks::{
         gcp,
@@ -120,7 +120,7 @@ impl SinkConfig for StackdriverConfig {
 struct HttpEventSink {
     config: StackdriverConfig,
     started: DateTime<Utc>,
-    creds: Option<GcpCredentials>,
+    creds: Option<GcpAuthenticator>,
 }
 
 struct StackdriverMetricsEncoder;

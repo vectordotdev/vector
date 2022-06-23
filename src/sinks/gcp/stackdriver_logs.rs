@@ -11,7 +11,7 @@ use snafu::Snafu;
 use crate::{
     config::{log_schema, AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
-    gcp::{GcpAuthConfig, GcpCredentials, Scope},
+    gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
     http::HttpClient,
     sinks::{
         gcs_common::config::healthcheck_response,
@@ -76,7 +76,7 @@ fn default_endpoint() -> String {
 #[derive(Clone, Debug)]
 struct StackdriverSink {
     config: StackdriverConfig,
-    creds: Option<GcpCredentials>,
+    creds: Option<GcpAuthenticator>,
     severity_key: Option<String>,
     uri: Uri,
 }

@@ -13,7 +13,7 @@ use vector_core::{buffers::Ackable, internal_event::EventsSent, stream::DriverRe
 
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
-    gcp::GcpCredentials,
+    gcp::GcpAuthenticator,
     http::{get_http_scheme_from_uri, HttpClient, HttpError},
     sinks::util::metadata::RequestMetadata,
 };
@@ -22,14 +22,14 @@ use crate::{
 pub struct GcsService {
     client: HttpClient,
     base_url: String,
-    creds: Option<GcpCredentials>,
+    creds: Option<GcpAuthenticator>,
 }
 
 impl GcsService {
     pub const fn new(
         client: HttpClient,
         base_url: String,
-        creds: Option<GcpCredentials>,
+        creds: Option<GcpAuthenticator>,
     ) -> GcsService {
         GcsService {
             client,

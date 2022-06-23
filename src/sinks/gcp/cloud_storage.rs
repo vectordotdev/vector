@@ -21,7 +21,7 @@ use crate::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
     },
     event::Event,
-    gcp::{GcpAuthConfig, GcpCredentials, Scope},
+    gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
     http::HttpClient,
     serde::json::to_string,
     sinks::{
@@ -168,7 +168,7 @@ impl GcsSinkConfig {
         &self,
         client: HttpClient,
         base_url: String,
-        creds: Option<GcpCredentials>,
+        creds: Option<GcpAuthenticator>,
         cx: SinkContext,
     ) -> crate::Result<VectorSink> {
         let request = self.request.unwrap_with(&TowerRequestConfig {

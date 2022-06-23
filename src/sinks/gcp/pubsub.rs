@@ -14,7 +14,7 @@ use crate::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
     },
     event::Event,
-    gcp::{GcpAuthConfig, GcpCredentials, Scope, PUBSUB_URL},
+    gcp::{GcpAuthConfig, GcpAuthenticator, Scope, PUBSUB_URL},
     http::HttpClient,
     sinks::{
         gcs_common::config::healthcheck_response,
@@ -140,7 +140,7 @@ impl SinkConfig for PubsubConfig {
 
 struct PubsubSink {
     api_key: Option<String>,
-    creds: Option<GcpCredentials>,
+    creds: Option<GcpAuthenticator>,
     uri_base: String,
     transformer: Transformer,
     encoder: Encoder<()>,
@@ -237,7 +237,7 @@ impl HttpSink for PubsubSink {
 async fn healthcheck(
     client: HttpClient,
     uri: Uri,
-    creds: Option<GcpCredentials>,
+    creds: Option<GcpAuthenticator>,
 ) -> crate::Result<()> {
     let mut request = Request::get(uri).body(Body::empty()).unwrap();
     if let Some(creds) = creds.as_ref() {

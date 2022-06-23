@@ -25,7 +25,7 @@ use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, Event, MaybeAsLogMut, Value},
-    gcp::{GcpAuthConfig, GcpCredentials, Scope, PUBSUB_URL},
+    gcp::{GcpAuthConfig, GcpAuthenticator, Scope, PUBSUB_URL},
     internal_events::{
         BytesReceived, GcpPubsubConnectError, GcpPubsubReceiveError, GcpPubsubStreamingPullError,
         StreamClosedError,
@@ -319,7 +319,7 @@ impl_generate_config_from_default!(PubsubConfig);
 struct PubsubSource {
     endpoint: Endpoint,
     uri: Uri,
-    credentials: Option<GcpCredentials>,
+    credentials: Option<GcpAuthenticator>,
     token_generator: watch::Receiver<()>,
     subscription: String,
     decoder: Decoder,

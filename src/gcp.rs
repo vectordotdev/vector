@@ -82,32 +82,32 @@ pub struct GcpAuthConfig {
 }
 
 impl GcpAuthConfig {
-    pub async fn make_credentials(&self, scope: Scope) -> crate::Result<Option<GcpCredentials>> {
+    pub async fn make_credentials(&self, scope: Scope) -> crate::Result<Option<GcpAuthenticator>> {
         let gap = std::env::var("GOOGLE_APPLICATION_CREDENTIALS").ok();
         let creds_path = self.credentials_path.as_ref().or(gap.as_ref());
         Ok(match (&creds_path, &self.api_key) {
-            (Some(path), _) => Some(GcpCredentials::from_file(path, scope).await?),
+            (Some(path), _) => Some(GcpAuthenticator::from_file(path, scope).await?),
             (None, Some(_)) => None,
-            (None, None) => Some(GcpCredentials::new_implicit(scope).await?),
+            (None, None) => Some(GcpAuthenticator::new_implicit(scope).await?),
         })
     }
 }
 
 #[derive(Clone, Debug)]
-pub struct GcpCredentials(Arc<Inner>);
+pub struct GcpAuthenticator(Arc<InnerCreds>);
 
 #[derive(Debug)]
-struct Inner {
+struct InnerCreds {
     creds: Option<Credentials>,
     scope: Scope,
     token: RwLock<Token>,
 }
 
-impl GcpCredentials {
+impl GcpAuthenticator {
     async fn from_file(path: &str, scope: Scope) -> crate::Result<Self> {
         let creds = Credentials::from_file(path).context(InvalidCredentialsSnafu)?;
         let token = fetch_token(&creds, &scope).await?;
-        Ok(Self(Arc::new(Inner {
+        Ok(Self(Arc::new(InnerCreds {
             creds: Some(creds),
             scope,
             token: RwLock::new(token),
@@ -116,7 +116,7 @@ impl GcpCredentials {
 
     async fn new_implicit(scope: Scope) -> crate::Result<Self> {
         let token = get_token_implicit().await?;
-        Ok(Self(Arc::new(Inner {
+        Ok(Self(Arc::new(InnerCreds {
             creds: None,
             scope,
             token: RwLock::new(token),
