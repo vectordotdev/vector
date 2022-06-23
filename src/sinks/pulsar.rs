@@ -180,11 +180,10 @@ impl PulsarSinkConfig {
                         scope: oauth2.scope.clone(),
                     }),
                 ),
-                _ => {
-                    return Err(PulsarError::Authentication(AuthenticationError::Custom(
-                        "Invalid auth config".to_string(),
-                    )))
-                }
+                _ => return Err(PulsarError::Authentication(AuthenticationError::Custom(
+                    "Invalid auth config: can only specify name and token or oauth2 configuration"
+                        .to_string(),
+                ))),
             };
         }
 
