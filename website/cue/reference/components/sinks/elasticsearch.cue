@@ -219,7 +219,7 @@ components: sinks: elasticsearch: {
 			common:      false
 			description: "Options for distributing events to multiple endpoints."
 			required:    false
-			warnings: ["By default ARC is enabled which can cause [issues](#distribution-how) when distribution is used."]
+			warnings: ["By default ARC is enabled which can cause [issues](#how_it_works.distribution) in some cases when distribution is used."]
 			type: object: {
 				examples: []
 				options: {
@@ -227,7 +227,7 @@ components: sinks: elasticsearch: {
 						common: false
 						description: """
 							Additional Elasticsearch endpoints to send logs to. They should be a full URL as shown in the example.
-							All options that apply to regular [endpoint](#endpoint), like [auth](#auth), also apply to these endpoints.
+							All options that apply to regular [`endpoint`](#endpoint), like [`auth`](#auth), also apply to these endpoints.
 							"""
 						required: false
 						type: array: {
@@ -371,7 +371,7 @@ components: sinks: elasticsearch: {
 				"""
 		}
 
-		distribution_how: {
+		distribution: {
 			title: "Distribution"
 			body: """
 				By default, Vector sends events to a single Elasticsearch endpoint.
