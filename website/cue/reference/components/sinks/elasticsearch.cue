@@ -219,7 +219,7 @@ components: sinks: elasticsearch: {
 			common:      false
 			description: "Options for distributing events to multiple endpoints."
 			required:    false
-			warnings: ["By default ARC is enabled which can cause [issues](#how_it_works.distribution) in some cases when distribution is used."]
+			warnings: ["By default, ARC is enabled which can cause issues when Elasticsearch hosts are spread over larger distances."]
 			type: object: {
 				examples: []
 				options: {
