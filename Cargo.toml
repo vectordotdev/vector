@@ -151,21 +151,21 @@ metrics = { version = "0.17.1", default-features = false, features = ["std"] }
 metrics-tracing-context = { version = "0.9.0", default-features = false }
 
 # AWS - Official SDK
-aws-config = { version = "0.13.0", default-features = false, features = ["rustls"], optional = true }
-aws-types = { version = "0.13.0", default-features = false, features = ["hardcoded-credentials"], optional = true }
-aws-sdk-s3 = { version = "0.13.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-sqs = { version = "0.13.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-cloudwatch = { version = "0.13.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-cloudwatchlogs = { version = "0.13.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-elasticsearch = {version = "0.13.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-firehose = { version = "0.13.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-kinesis = { version = "0.13.0", default-features = false, features = ["rustls"], optional = true }
-aws-sigv4 = { version = "0.13.0", default-features = false, optional = true }
-aws-smithy-async = { version = "0.43.0", default-features = false, optional = true }
-aws-smithy-client = { version = "0.43.0", default-features = false, features = ["client-hyper"], optional = true}
-aws-smithy-http = { version = "0.43.0", default-features = false, features = ["event-stream"], optional = true }
-aws-smithy-http-tower = { version = "0.43.0", default-features = false, optional = true }
-aws-smithy-types = { version = "0.43.0", default-features = false, optional = true }
+aws-config = { version = "0.14.0", default-features = false, features = ["rustls"], optional = true }
+aws-types = { version = "0.14.0", default-features = false, features = ["hardcoded-credentials"], optional = true }
+aws-sdk-s3 = { version = "0.14.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-sqs = { version = "0.14.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-cloudwatch = { version = "0.14.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-cloudwatchlogs = { version = "0.14.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-elasticsearch = {version = "0.14.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-firehose = { version = "0.14.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-kinesis = { version = "0.14.0", default-features = false, features = ["rustls"], optional = true }
+aws-sigv4 = { version = "0.14.0", default-features = false, optional = true }
+aws-smithy-async = { version = "0.44.0", default-features = false, optional = true }
+aws-smithy-client = { version = "0.44.0", default-features = false, features = ["client-hyper"], optional = true}
+aws-smithy-http = { version = "0.44.0", default-features = false, features = ["event-stream"], optional = true }
+aws-smithy-http-tower = { version = "0.44.0", default-features = false, optional = true }
+aws-smithy-types = { version = "0.44.0", default-features = false, optional = true }
 
 # Azure
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b7171eb40909f7f2805f4622e076f8a6dbbe2d98", default-features = false, features = ["enable_reqwest"], optional = true }
@@ -273,7 +273,7 @@ ordered-float = { version = "3.0.0", default-features = false }
 percent-encoding = { version = "2.1.0", default-features = false }
 pin-project = { version = "1.0.10", default-features = false }
 postgres-openssl = { version = "0.5.0", default-features = false, features = ["runtime"], optional = true }
-pulsar = { version = "4.1", default-features = false, features = ["tokio-runtime"], optional = true }
+pulsar = { version = "4.1.2", default-features = false, features = ["tokio-runtime", "auth-oauth2"], optional = true }
 rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.3", default-features = false }
 rdkafka = { version = "0.27.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
