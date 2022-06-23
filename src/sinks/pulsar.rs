@@ -281,9 +281,9 @@ impl Sink<Event> for PulsarSink {
         );
 
         let metadata_builder = RequestMetadata::builder(&item);
-        let event_time = item.maybe_as_log().map_or(None, |log| {
+        let event_time = item.maybe_as_log().and_then(|log| {
             log.get(log_schema().timestamp_key())
-                .map_or(None, |v| v.as_timestamp().map(|dt| dt.timestamp_millis()))
+                .and_then(|v| v.as_timestamp().map(|dt| dt.timestamp_millis()))
         });
 
         let message = encode_event(item, &self.encoding, &self.avro_schema)
