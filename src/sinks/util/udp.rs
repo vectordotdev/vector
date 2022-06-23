@@ -20,7 +20,7 @@ use super::SinkBuildError;
 use crate::{
     config::SinkContext,
     dns,
-    event::Event,
+    event::{Event, Finalizable},
     internal_events::{
         SocketEventsSent, SocketMode, UdpSendIncompleteError, UdpSocketConnectionError,
         UdpSocketConnectionEstablished, UdpSocketError,
@@ -287,10 +287,9 @@ where
             while let Some(mut event) = input.next().await {
                 let byte_size = event.size_of();
 
-                self.acker.ack(1);
-
                 self.transformer.transform(&mut event);
 
+                let finalizers = event.take_finalizers();
                 let mut bytes = BytesMut::new();
                 if encoder.encode(event, &mut bytes).is_err() {
                     continue;
@@ -314,6 +313,9 @@ where
                         break;
                     }
                 };
+
+                drop(finalizers);
+                self.acker.ack(1);
             }
         }
 
