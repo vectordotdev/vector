@@ -209,7 +209,9 @@ impl ConfigBuilder {
 
         #[cfg(feature = "enterprise")]
         {
-            self.enterprise = with.enterprise;
+            if let Some(enterprise) = with.enterprise {
+                self.enterprise = Some(enterprise);
+            }
         }
 
         self.provider = with.provider;
@@ -329,6 +331,7 @@ impl ConfigBuilder {
 
 #[cfg(all(test, feature = "enterprise", feature = "api"))]
 mod tests {
+    use crate::config::enterprise;
     use crate::config::ConfigBuilder;
 
     #[test]
@@ -395,5 +398,45 @@ mod tests {
             "2bc405edda02d6a32f2a93332d5e73840670cce4731a78cf6f73e2f7df8e7229",
             ConfigBuilder::default().sha256_hash()
         );
+    }
+
+    #[test]
+    fn append_keeps_enterprise() {
+        let mut base = ConfigBuilder {
+            enterprise: Some(enterprise::Options::default()),
+            ..Default::default()
+        };
+        let other = ConfigBuilder::default();
+        base.append(other).unwrap();
+        assert!(base.enterprise.is_some());
+    }
+
+    #[test]
+    fn append_sets_enterprise() {
+        let mut base = ConfigBuilder::default();
+        let other = ConfigBuilder {
+            enterprise: Some(enterprise::Options::default()),
+            ..Default::default()
+        };
+        base.append(other).unwrap();
+        assert!(base.enterprise.is_some());
+    }
+
+    #[test]
+    fn append_overwrites_enterprise() {
+        let mut base_ent = enterprise::Options::default();
+        base_ent.application_key = "base".to_string();
+        let mut base = ConfigBuilder {
+            enterprise: Some(base_ent),
+            ..Default::default()
+        };
+        let mut other_ent = enterprise::Options::default();
+        other_ent.application_key = "other".to_string();
+        let other = ConfigBuilder {
+            enterprise: Some(other_ent),
+            ..Default::default()
+        };
+        base.append(other).unwrap();
+        assert_eq!(base.enterprise.unwrap().application_key, "other");
     }
 }
