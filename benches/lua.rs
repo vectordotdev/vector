@@ -22,11 +22,6 @@ fn bench_add_fields(c: &mut Criterion) {
     group.throughput(Throughput::Elements(1));
 
     let benchmarks: Vec<(&str, Transform)> = vec![
-        ("native", {
-            let mut map = IndexMap::new();
-            map.insert(String::from(key), value.to_owned().into());
-            Transform::function(transforms::add_fields::AddFields::new(map, true).unwrap())
-        }),
         ("v1", {
             let source = format!("event['{}'] = '{}'", key, value);
 
@@ -103,18 +98,6 @@ fn bench_field_filter(c: &mut Criterion) {
     group.throughput(Throughput::Elements(num_events));
 
     let benchmarks: Vec<(&str, Transform)> = vec![
-        ("native", {
-            let rt = runtime();
-            rt.block_on(async move {
-                transforms::field_filter::FieldFilterConfig {
-                    field: "the_field".to_string(),
-                    value: "0".to_string(),
-                }
-                .build(&TransformContext::default())
-                .await
-                .unwrap()
-            })
-        }),
         ("v1", {
             let source = String::from(indoc! {r#"
                 if event["the_field"] ~= "0" then

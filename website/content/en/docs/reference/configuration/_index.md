@@ -324,7 +324,7 @@ source = '''
 ```toml
 # Sample the data to save on cost
 inputs = ["apache_parser"]
-type   = "sampler"
+type   = "sample"
 rate   = 50                   # only keep 50%
 . = parse_apache_log(.message)
 ```

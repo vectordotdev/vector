@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use vector_config::configurable_component;
 
 use crate::event::Event;
@@ -8,29 +6,29 @@ mod check_fields;
 pub(self) mod datadog_search;
 pub(crate) mod is_log;
 pub(crate) mod is_metric;
-pub mod not;
+//pub mod not;
 mod vrl;
 
 pub use self::vrl::VrlConfig;
 use self::{
     check_fields::{CheckFields, CheckFieldsConfig},
     datadog_search::{DatadogSearchConfig, DatadogSearchRunner},
-    is_log::IsLog,
-    is_metric::IsMetric,
-    not::{Not, NotConfig},
+    is_log::{check_is_log, check_is_log_with_context},
+    is_metric::{check_is_metric, check_is_metric_with_context},
+    //not::{Not, NotConfig},
     vrl::Vrl,
 };
 
 #[derive(Debug, Clone)]
 pub enum Condition {
     /// Negates the result of a nested condition.
-    Not(Not),
+    //Not(Not),
 
     /// Matches an event if it is a log.
-    IsLog(IsLog),
+    IsLog,
 
     /// Matches an event if it is a metric.
-    IsMetric(IsMetric),
+    IsMetric,
 
     /// Matches an event with a [Vector Remap Language](https://vector.dev/docs/reference/vrl) (VRL) [boolean expression](https://vector.dev/docs/reference/vrl#boolean-expressions).
     Vrl(Vrl),
@@ -41,9 +39,6 @@ pub enum Condition {
     /// Matches an event with a [Datadog Search](https://docs.datadoghq.com/logs/explorer/search_syntax/) query.
     DatadogSearch(DatadogSearchRunner),
 
-    /// Matches an event based on an arbitrary implementation of `Condition`.
-    Arbitrary(Arc<dyn Conditional + Send + Sync>),
-
     /// Matches any event.
     AlwaysPass,
 
@@ -52,25 +47,17 @@ pub enum Condition {
 }
 
 impl Condition {
-    pub fn arbitrary<A>(arb: A) -> Self
-    where
-        A: Conditional + Send + Sync + 'static,
-    {
-        Self::Arbitrary(Arc::new(arb))
-    }
-
     /// Checks if a condition is true.
     ///
     /// The event should not be modified, it is only mutable so it can be passed into VRL, but VRL type checking prevents mutation.
     pub(crate) fn check(&self, e: Event) -> (bool, Event) {
         match self {
-            Condition::Not(x) => x.check(e),
-            Condition::IsLog(x) => x.check(e),
-            Condition::IsMetric(x) => x.check(e),
+            //Condition::Not(x) => x.check(e),
+            Condition::IsLog => check_is_log(e),
+            Condition::IsMetric => check_is_metric(e),
             Condition::Vrl(x) => x.check(e),
             Condition::CheckFields(x) => x.check(e),
             Condition::DatadogSearch(x) => x.check(e),
-            Condition::Arbitrary(x) => x.check(e),
             Condition::AlwaysPass => (true, e),
             Condition::AlwaysFail => (false, e),
         }
@@ -82,13 +69,12 @@ impl Condition {
     /// case. As such, it should typically be avoided in hot paths.
     pub(crate) fn check_with_context(&self, e: Event) -> (Result<(), String>, Event) {
         match self {
-            Condition::Not(x) => x.check_with_context(e),
-            Condition::IsLog(x) => x.check_with_context(e),
-            Condition::IsMetric(x) => x.check_with_context(e),
+            //Condition::Not(x) => x.check_with_context(e),
+            Condition::IsLog => check_is_log_with_context(e),
+            Condition::IsMetric => check_is_metric_with_context(e),
             Condition::Vrl(x) => x.check_with_context(e),
             Condition::CheckFields(x) => x.check_with_context(e),
             Condition::DatadogSearch(x) => x.check_with_context(e),
-            Condition::Arbitrary(x) => x.check_with_context(e),
             Condition::AlwaysPass => (Ok(()), e),
             Condition::AlwaysFail => (Ok(()), e),
         }
@@ -107,12 +93,11 @@ impl Condition {
 /// condition."message.equals" = 'hooray'
 /// ```
 #[configurable_component]
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ConditionConfig {
-    /// Negates the result of a nested condition.
-    Not(#[configurable(derived)] NotConfig),
-
+    // /// Negates the result of a nested condition.
+    //Not(#[configurable(derived)] NotConfig),
     /// Matches an event if it is a log.
     IsLog,
 
@@ -127,33 +112,17 @@ pub enum ConditionConfig {
 
     /// Matches an event with a [Datadog Search](https://docs.datadoghq.com/logs/explorer/search_syntax/) query.
     DatadogSearch(#[configurable(derived)] DatadogSearchConfig),
-
-    /// Matches an event based on an arbitrary implementation of `Condition`.
-    ///
-    /// This is not usable from normal user-based configurations, and only exists as a way to use arbitrary
-    /// implementations of `Condition` in components that take `AnyCondition` but are initialized directly, such as the
-    /// `kubernetes_logs` source using the `reduce` transform directly.
-    #[serde(skip)]
-    Arbitrary(#[configurable(derived)] Box<dyn ConditionalConfig>),
 }
 
 impl ConditionConfig {
-    pub fn arbitrary<A>(arb: A) -> Self
-    where
-        A: ConditionalConfig + 'static,
-    {
-        Self::Arbitrary(Box::new(arb))
-    }
-
     pub fn build(&self, enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition> {
         match self {
-            ConditionConfig::Not(x) => x.build(enrichment_tables),
-            ConditionConfig::IsLog => Ok(Condition::IsLog(IsLog::default())),
-            ConditionConfig::IsMetric => Ok(Condition::IsMetric(IsMetric::default())),
+            //ConditionConfig::Not(x) => x.build(enrichment_tables),
+            ConditionConfig::IsLog => Ok(Condition::IsLog),
+            ConditionConfig::IsMetric => Ok(Condition::IsMetric),
             ConditionConfig::Vrl(x) => x.build(enrichment_tables),
             ConditionConfig::CheckFields(x) => x.build(enrichment_tables),
             ConditionConfig::DatadogSearch(x) => x.build(enrichment_tables),
-            ConditionConfig::Arbitrary(x) => x.build(enrichment_tables),
         }
     }
 }
@@ -228,6 +197,12 @@ impl AnyCondition {
     }
 }
 
+impl From<ConditionConfig> for AnyCondition {
+    fn from(config: ConditionConfig) -> Self {
+        Self::Map(config)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
@@ -258,7 +233,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            r#"Map(CheckFieldsConfig { predicates: {"norg.equals": "nork"} })"#,
+            r#"Map(CheckFields(CheckFieldsConfig { predicates: {"norg.equals": "nork"} }))"#,
             format!("{:?}", conf.condition)
         )
     }
@@ -272,7 +247,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            r#"Map(VrlConfig { source: ".nork == true", runtime: Ast })"#,
+            r#"Map(Vrl(VrlConfig { source: ".nork == true", runtime: Ast }))"#,
             format!("{:?}", conf.condition)
         )
     }

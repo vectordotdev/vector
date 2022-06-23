@@ -9,10 +9,7 @@ mod apache_metrics;
 mod api;
 #[cfg(feature = "aws-core")]
 mod aws;
-#[cfg(any(
-    feature = "sinks-aws_cloudwatch_logs",
-    feature = "transforms-aws_cloudwatch_logs_subscription_parser",
-))]
+#[cfg(feature = "sinks-aws_cloudwatch_logs")]
 mod aws_cloudwatch_logs_subscription_parser;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
 mod aws_ec2_metadata;
@@ -138,10 +135,7 @@ pub(crate) use self::apache_metrics::*;
 pub(crate) use self::api::*;
 #[cfg(feature = "aws-core")]
 pub(crate) use self::aws::*;
-#[cfg(any(
-    feature = "sinks-aws_cloudwatch_logs",
-    feature = "transforms-aws_cloudwatch_logs_subscription_parser",
-))]
+#[cfg(feature = "sinks-aws_cloudwatch_logs")]
 pub(crate) use self::aws_cloudwatch_logs_subscription_parser::*;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
 pub(crate) use self::aws_ec2_metadata::*;

@@ -1,5 +1,6 @@
 use std::{
     net::{SocketAddr, TcpListener},
+    num::NonZeroU64,
     time::Duration,
 };
 
@@ -11,9 +12,12 @@ use vector_core::config::ComponentKey;
 
 use crate::{
     config::Config,
-    sinks::{blackhole::BlackholeConfig, prometheus::exporter::PrometheusExporterConfig},
-    sources::{internal_metrics::InternalMetricsConfig, prometheus::PrometheusRemoteWriteConfig},
-    test_util::{next_addr, start_topology, temp_dir, wait_for_tcp},
+    sinks::prometheus::exporter::PrometheusExporterConfig,
+    sources::{
+        internal_metrics::InternalMetricsConfig, prometheus::PrometheusRemoteWriteConfig,
+        splunk_hec::SplunkConfig,
+    },
+    test_util::{mock::basic_sink, next_addr, start_topology, temp_dir, wait_for_tcp},
 };
 
 fn internal_metrics_source() -> InternalMetricsConfig {
@@ -24,10 +28,6 @@ fn prom_remote_write_source(addr: SocketAddr) -> PrometheusRemoteWriteConfig {
     PrometheusRemoteWriteConfig::from_address(addr)
 }
 
-fn blackhole_sink() -> BlackholeConfig {
-    BlackholeConfig::default()
-}
-
 fn prom_exporter_sink(addr: SocketAddr, flush_period_secs: u64) -> PrometheusExporterConfig {
     PrometheusExporterConfig {
         address: addr,
@@ -36,17 +36,23 @@ fn prom_exporter_sink(addr: SocketAddr, flush_period_secs: u64) -> PrometheusExp
     }
 }
 
+fn splunk_source_config(addr: SocketAddr) -> SplunkConfig {
+    let mut config = SplunkConfig::default();
+    config.address = addr;
+    config
+}
+
 #[tokio::test]
 async fn topology_reuse_old_port() {
     let address = next_addr();
 
     let mut old_config = Config::builder();
     old_config.add_source("in1", prom_remote_write_source(address));
-    old_config.add_sink("out", &["in1"], blackhole_sink());
+    old_config.add_sink("out", &["in1"], basic_sink(1).1);
 
     let mut new_config = Config::builder();
     new_config.add_source("in2", prom_remote_write_source(address));
-    new_config.add_sink("out", &["in2"], blackhole_sink());
+    new_config.add_sink("out", &["in2"], basic_sink(1).1);
 
     let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
     assert!(topology
@@ -61,12 +67,12 @@ async fn topology_rebuild_old() {
     let address_1 = next_addr();
 
     let mut old_config = Config::builder();
-    old_config.add_source("in", prom_remote_write_source(address_0));
-    old_config.add_sink("out", &["in"], blackhole_sink());
+    old_config.add_source("in", splunk_source_config(address_0));
+    old_config.add_sink("out", &["in"], basic_sink(1).1);
 
     let mut new_config = Config::builder();
-    new_config.add_source("in", prom_remote_write_source(address_1));
-    new_config.add_sink("out", &["in"], blackhole_sink());
+    new_config.add_source("in", splunk_source_config(address_1));
+    new_config.add_sink("out", &["in"], basic_sink(1).1);
 
     // Will cause the new_config to fail on build
     let _bind = TcpListener::bind(address_1).unwrap();
@@ -84,7 +90,7 @@ async fn topology_old() {
 
     let mut old_config = Config::builder();
     old_config.add_source("in", prom_remote_write_source(address));
-    old_config.add_sink("out", &["in"], blackhole_sink());
+    old_config.add_sink("out", &["in"], basic_sink(1).1);
 
     let (mut topology, _crash) = start_topology(old_config.clone().build().unwrap(), false).await;
     assert!(topology
@@ -95,6 +101,11 @@ async fn topology_old() {
 
 #[tokio::test]
 async fn topology_reuse_old_port_sink() {
+    // TODO: Write a test source that emits only metrics, and a test sink that can bind a TCP listener, so we can
+    // replace `internal_metrics` and `prometheus_exporter` here. We additionally need to ensure the metrics/ subsystem
+    // is enabled to use `internal_metrics`, otherwise it throws an error when trying to build the component.
+    let _ = crate::metrics::init_test();
+
     let address = next_addr();
 
     let mut old_config = Config::builder();
@@ -116,6 +127,11 @@ async fn topology_reuse_old_port_sink() {
 
 #[tokio::test]
 async fn topology_reuse_old_port_cross_dependency() {
+    // TODO: Write a test source that emits only metrics, and a test sink that can bind a TCP listener, so we can
+    // replace `internal_metrics` and `prometheus_exporter` here. We additionally need to ensure the metrics/ subsystem
+    // is enabled to use `internal_metrics`, otherwise it throws an error when trying to build the component.
+    let _ = crate::metrics::init_test();
+
     // Reload with source that uses address of changed sink.
     let address_0 = next_addr();
     let address_1 = next_addr();
@@ -139,6 +155,11 @@ async fn topology_reuse_old_port_cross_dependency() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn topology_disk_buffer_conflict() {
+    // TODO: Write a test source that emits only metrics, and a test sink that can bind a TCP listener, so we can
+    // replace `internal_metrics` and `prometheus_exporter` here. We additionally need to ensure the metrics/ subsystem
+    // is enabled to use `internal_metrics`, otherwise it throws an error when trying to build the component.
+    let _ = crate::metrics::init_test();
+
     let address_0 = next_addr();
     let address_1 = next_addr();
 
@@ -153,7 +174,7 @@ async fn topology_disk_buffer_conflict() {
     let sink_key = ComponentKey::from("out");
     old_config.sinks[&sink_key].buffer = BufferConfig {
         stages: vec![BufferType::DiskV1 {
-            max_size: std::num::NonZeroU64::new(1024).unwrap(),
+            max_size: NonZeroU64::new(1024).unwrap(),
             when_full: WhenFull::Block,
         }],
     };
@@ -162,7 +183,7 @@ async fn topology_disk_buffer_conflict() {
     new_config.sinks[&sink_key].inner = Box::new(prom_exporter_sink(address_1, 1));
     new_config.sinks[&sink_key].buffer = BufferConfig {
         stages: vec![BufferType::DiskV1 {
-            max_size: std::num::NonZeroU64::new(1024).unwrap(),
+            max_size: NonZeroU64::new(1024).unwrap(),
             when_full: WhenFull::Block,
         }],
     };
@@ -178,6 +199,11 @@ async fn topology_disk_buffer_conflict() {
 
 #[tokio::test]
 async fn topology_reload_with_new_components() {
+    // TODO: Write a test source that emits only metrics, and a test sink that can bind a TCP listener, so we can
+    // replace `internal_metrics` and `prometheus_exporter` here. We additionally need to ensure the metrics/ subsystem
+    // is enabled to use `internal_metrics`, otherwise it throws an error when trying to build the component.
+    let _ = crate::metrics::init_test();
+
     // This specifically exercises that we can add new components -- no changed or removed
     // components -- via the reload mechanism and without any issues.
     let address_0 = next_addr();

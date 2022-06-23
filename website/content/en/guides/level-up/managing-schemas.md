@@ -253,14 +253,6 @@ and a `last_name` field coming from a source, and we'd like to output a `name` f
   '''
 ```
 
-{{< info >}}
-What if you had to do this in reverse? Try using the [`regex_parser`][docs.transforms.regex_parser] or
-[`split`][docs.transforms.split] transforms.
-
-[docs.transforms.regex_parser]: /docs/reference/vrl/functions/#parse_regex
-[docs.transforms.split]: /docs/reference/vrl/functions/#split
-{{< /info >}}
-
 ## Coercing Data Types
 
 Occasionally services will provide you with data that is in the right shape, but the types are wrong. Perhaps a string

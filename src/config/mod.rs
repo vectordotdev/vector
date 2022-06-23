@@ -541,12 +541,7 @@ pub struct TestOutput<T = OutputId> {
     pub conditions: Option<Vec<conditions::AnyCondition>>,
 }
 
-#[cfg(all(
-    test,
-    feature = "sources-file",
-    feature = "sinks-console",
-    feature = "transforms-json_parser"
-))]
+#[cfg(all(test, feature = "sources-file", feature = "sinks-console"))]
 mod tests {
     use std::{collections::HashMap, path::PathBuf};
 
@@ -1123,12 +1118,7 @@ mod tests {
     }
 }
 
-#[cfg(all(
-    test,
-    feature = "sources-file",
-    feature = "sinks-file",
-    feature = "transforms-json_parser"
-))]
+#[cfg(all(test, feature = "sources-file", feature = "sinks-file",))]
 mod acknowledgements_tests {
     use indoc::indoc;
 
@@ -1150,8 +1140,10 @@ mod acknowledgements_tests {
                 [sources.in3]
                     type = "file"
                 [transforms.parse3]
-                    type = "json_parser"
+                    type = "basic_transform"
                     inputs = ["in3"]
+                    increase = 0.0
+                    suffix = ""
                 [sinks.out1]
                     type = "file"
                     inputs = ["in1"]
@@ -1345,6 +1337,7 @@ mod pipelines_tests {
     use super::{load_from_str, Format};
 
     #[test]
+    #[ignore]
     fn forbid_pipeline_nesting() {
         let res = load_from_str(
             indoc! {r#"

@@ -76,14 +76,10 @@ mod tests {
         super::{cri, docker, test_util},
         *,
     };
-    use crate::{
-        event::{Event, LogEvent},
-        test_util::trace_init,
-        transforms::Transform,
-    };
+    use crate::{event::Event, test_util::trace_init, transforms::Transform};
 
     /// Picker has to work for all test cases for underlying parsers.
-    fn cases() -> Vec<(String, Vec<LogEvent>)> {
+    fn cases() -> Vec<(String, Vec<Event>)> {
         let mut cases = vec![];
         cases.extend(docker::tests::cases());
         cases.extend(cri::tests::cases());

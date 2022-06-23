@@ -147,7 +147,7 @@ pub mod tests {
     }
 
     /// Shared test cases.
-    pub fn cases() -> Vec<(String, Vec<LogEvent>)> {
+    pub fn cases() -> Vec<(String, Vec<Event>)> {
         vec![
             (
                 r#"{"log": "The actual log line\n", "stream": "stderr", "time": "2016-10-05T00:00:30.082640485Z"}"#.into(),

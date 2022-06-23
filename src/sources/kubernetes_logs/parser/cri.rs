@@ -31,7 +31,7 @@ pub(super) struct Cri {
     #[derivative(Debug = "ignore")]
     pattern: Regex,
     capture_locations: CaptureLocations,
-    capture_names: Vec<String>,
+    capture_names: Vec<(usize, String)>,
     field: &'static str,
 }
 
@@ -42,8 +42,8 @@ impl Default for Cri {
 
         let capture_names = pattern
             .capture_names()
-            .flatten()
-            .map(|s| s.to_string())
+            .enumerate()
+            .filter_map(|(i, s)| s.map(|s| (i, s.to_string())))
             .collect::<Vec<_>>();
         let capture_locations = pattern.capture_locations();
 
@@ -77,48 +77,50 @@ impl FunctionTransform for Cri {
                 }
                 Some(_) => {
                     let locations = &self.capture_locations;
-                    let captures =
-                        self.capture_names
-                            .iter()
-                            .enumerate()
-                            .filter_map(|(idx, name)| {
-                                locations.get(idx).and_then(|(start, end)| {
-                                    let raw = &s[start..end];
+                    let captures = self.capture_names.iter().filter_map(|(idx, name)| {
+                        locations.get(*idx).and_then(|(start, end)| {
+                            let raw = &s[start..end];
 
-                                    // For all fields except `timestamp`, simply treat them as `Value::Bytes`. For
-                                    // `timestamp`, however, we actually make sure we can convert it correctly and feed it
-                                    // in as `Value::Timestamp`.
-                                    let value = if name == TIMESTAMP_TAG {
-                                        let ds = String::from_utf8_lossy(raw);
-                                        match DateTime::parse_from_rfc3339(&ds) {
-                                            Ok(dt) => {
-                                                Some(Value::Timestamp(dt.with_timezone(&Utc)))
-                                            }
-                                            Err(e) => {
-                                                emit!(ParserConversionError {
-                                                    name,
-                                                    error: conversion::Error::TimestampParse {
-                                                        s: ds.to_string(),
-                                                        source: e,
-                                                    },
-                                                });
-                                                None
-                                            }
-                                        }
-                                    } else {
-                                        Some(Value::Bytes(Bytes::copy_from_slice(raw)))
-                                    };
+                            // For all fields except `timestamp`, simply treat them as `Value::Bytes`. For
+                            // `timestamp`, however, we actually make sure we can convert it correctly and feed it
+                            // in as `Value::Timestamp`.
+                            let value = if name == TIMESTAMP_TAG {
+                                let ds = String::from_utf8_lossy(raw);
+                                match DateTime::parse_from_str(&ds, "%+") {
+                                    Ok(dt) => Some(Value::Timestamp(dt.with_timezone(&Utc))),
+                                    Err(e) => {
+                                        emit!(ParserConversionError {
+                                            name,
+                                            error: conversion::Error::TimestampParse {
+                                                s: ds.to_string(),
+                                                source: e,
+                                            },
+                                        });
+                                        None
+                                    }
+                                }
+                            } else {
+                                Some(Value::Bytes(Bytes::copy_from_slice(raw)))
+                            };
 
-                                    value.map(|v| (name, v))
-                                })
-                            });
+                            value.map(|v| (name, v))
+                        })
+                    });
 
+                    let mut drop_original = true;
                     for (name, value) in captures {
+                        // If we're already overriding the original field, don't remove it after.
+                        if name == self.field {
+                            drop_original = false;
+                        }
+
                         let _ = log.insert(name.as_str(), value);
                     }
 
-                    // Drop the original field from the event now that we've parsed it.
-                    log.remove(self.field);
+                    // If we didn't overwrite the original field, remove it now.
+                    if drop_original {
+                        let _ = log.remove(self.field);
+                    }
                 }
             },
         }
@@ -167,14 +169,14 @@ pub mod tests {
     use bytes::Bytes;
 
     use super::{super::test_util, *};
-    use crate::{event::LogEvent, test_util::trace_init, transforms::Transform};
+    use crate::{test_util::trace_init, transforms::Transform};
 
     fn make_long_string(base: &str, len: usize) -> String {
         base.chars().cycle().take(len).collect()
     }
 
     /// Shared test cases.
-    pub fn cases() -> Vec<(String, Vec<LogEvent>)> {
+    pub fn cases() -> Vec<(String, Vec<Event>)> {
         vec![
             (
                 "2016-10-06T00:17:09.669794202Z stdout F The content of the log entry 1".into(),
@@ -229,7 +231,7 @@ pub mod tests {
         ]
     }
 
-    pub fn byte_cases() -> Vec<(Bytes, Vec<LogEvent>)> {
+    pub fn byte_cases() -> Vec<(Bytes, Vec<Event>)> {
         vec![(
             // This is not valid UTF-8 string, ends with \n
             // 2021-08-05T17:35:26.640507539Z stdout P Hello World Привет Ми\xd1\n

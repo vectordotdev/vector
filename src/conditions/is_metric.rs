@@ -1,41 +1,31 @@
-use crate::{conditions::Conditional, event::Event};
+use crate::event::Event;
 
-#[derive(Clone, Debug, Default)]
-pub struct IsMetric;
+pub(crate) const fn check_is_metric(e: Event) -> (bool, Event) {
+    (matches!(e, Event::Metric(_)), e)
+}
 
-impl Conditional for IsMetric {
-    fn check(&self, e: Event) -> (bool, Event) {
-        (matches!(e, Event::Metric(_)), e)
-    }
-
-    fn check_with_context(&self, e: Event) -> (Result<(), String>, Event) {
-        let (result, event) = self.check(e);
-        if result {
-            (Ok(()), event)
-        } else {
-            (Err("event is not a metric type".to_string()), event)
-        }
+pub(crate) fn check_is_metric_with_context(e: Event) -> (Result<(), String>, Event) {
+    let (result, event) = check_is_metric(e);
+    if result {
+        (Ok(()), event)
+    } else {
+        (Err("event is not a metric type".to_string()), event)
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::IsMetric;
-    use crate::{
-        conditions::Conditional,
-        event::{
-            metric::{Metric, MetricKind, MetricValue},
-            Event,
-        },
+    use super::check_is_metric;
+    use crate::event::{
+        metric::{Metric, MetricKind, MetricValue},
+        Event,
     };
 
     #[test]
     fn is_metric_basic() {
-        let cond = IsMetric::default();
-
-        assert!(!cond.check(Event::from("just a log")).0);
+        assert!(!check_is_metric(Event::from("just a log")).0);
         assert!(
-            cond.check(Event::from(Metric::new(
+            check_is_metric(Event::from(Metric::new(
                 "test metric",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },

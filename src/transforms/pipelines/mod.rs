@@ -191,7 +191,7 @@ impl TransformConfig for PipelinesConfig {
             let logs_route = name.join("logs");
             conditions.insert(
                 "logs".to_string(),
-                AnyCondition::Map(ConditionConfig::IsLog),
+                AnyCondition::from(ConditionConfig::IsLog),
             );
             let logs_inputs = vec![router_name.port("logs")];
             let inner_topology = self
@@ -205,7 +205,7 @@ impl TransformConfig for PipelinesConfig {
             let metrics_route = name.join("metrics");
             conditions.insert(
                 "metrics".to_string(),
-                AnyCondition::Map(ConditionConfig::IsMetric),
+                AnyCondition::from(ConditionConfig::IsMetric),
             );
             let metrics_inputs = vec![router_name.port("metrics")];
             let inner_topology = self
