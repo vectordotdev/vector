@@ -7,6 +7,7 @@ use goauth::{
     credentials::Credentials,
     GoErr,
 };
+use http::{uri::InvalidUri, uri::PathAndQuery, Uri};
 use hyper::header::AUTHORIZATION;
 use once_cell::sync::Lazy;
 use smpl_jwt::Jwt;
@@ -32,6 +33,8 @@ pub enum GcpError {
     MissingAuth,
     #[snafu(display("Invalid GCP credentials: {}", source))]
     InvalidCredentials { source: GoErr },
+    #[snafu(display("Invalid GCP API key: {}", source))]
+    InvalidApiKey { source: InvalidUri },
     #[snafu(display("Healthcheck endpoint forbidden"))]
     HealthcheckForbidden,
     #[snafu(display("Invalid RSA key in GCP credentials: {}", source))]
@@ -87,7 +90,7 @@ impl GcpAuthConfig {
         let creds_path = self.credentials_path.as_ref().or(gap.as_ref());
         Ok(match (&creds_path, &self.api_key) {
             (Some(path), _) => GcpAuthenticator::from_file(path, scope).await?,
-            (None, Some(api_key)) => GcpAuthenticator::from_api_key(api_key),
+            (None, Some(api_key)) => GcpAuthenticator::from_api_key(api_key)?,
             (None, None) => GcpAuthenticator::new_implicit().await?,
         })
     }
@@ -119,16 +122,16 @@ impl GcpAuthenticator {
         Ok(Self::Credentials(Arc::new(InnerCreds { creds, token })))
     }
 
-    pub fn from_api_key(api_key: &str) -> Self {
-        Self::ApiKey(api_key.into())
+    pub fn from_api_key(api_key: &str) -> crate::Result<Self> {
+        format!("/?key={api_key}")
+            .parse::<PathAndQuery>()
+            .context(InvalidApiKeySnafu)?;
+        Ok(Self::ApiKey(api_key.into()))
     }
 
     pub fn make_token(&self) -> Option<String> {
         match self {
-            Self::Credentials(inner) => {
-                let token = inner.token.read().unwrap();
-                Some(format!("{} {}", token.token_type(), token.access_token()))
-            }
+            Self::Credentials(inner) => Some(inner.make_token()),
             Self::ApiKey(_) => None,
         }
     }
@@ -138,6 +141,23 @@ impl GcpAuthenticator {
             request
                 .headers_mut()
                 .insert(AUTHORIZATION, token.parse().unwrap());
+        }
+        self.apply_uri(request.uri_mut());
+    }
+
+    pub fn apply_uri(&self, uri: &mut Uri) {
+        match self {
+            Self::Credentials(_) => (),
+            Self::ApiKey(api_key) => {
+                let mut parts = uri.clone().into_parts();
+                let path = parts
+                    .path_and_query
+                    .as_ref()
+                    .map_or("/", PathAndQuery::path);
+                let paq = format!("{path}?key={api_key}");
+                parts.path_and_query = Some(paq.parse().expect("FIXME"));
+                *uri = Uri::from_parts(parts).expect("FIXME");
+            }
         }
     }
 
@@ -180,6 +200,11 @@ impl InnerCreds {
         };
         *self.token.write().unwrap() = token;
         Ok(())
+    }
+
+    fn make_token(&self) -> String {
+        let token = self.token.read().unwrap();
+        format!("{} {}", token.token_type(), token.access_token())
     }
 }
 

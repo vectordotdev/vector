@@ -377,7 +377,7 @@ mod tests {
             .build_sink(
                 client,
                 mock_endpoint.to_string(),
-                GcpAuthenticator::from_api_key("FAKE"),
+                GcpAuthenticator::from_api_key("FAKE").unwrap(),
                 context,
             )
             .expect("failed to build sink");

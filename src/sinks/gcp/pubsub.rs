@@ -139,7 +139,6 @@ impl SinkConfig for PubsubConfig {
 }
 
 struct PubsubSink {
-    api_key: Option<String>,
     auth: Option<GcpAuthenticator>,
     uri_base: String,
     transformer: Transformer,
@@ -169,7 +168,6 @@ impl PubsubSink {
         let encoder = Encoder::<()>::new(serializer);
 
         Ok(Self {
-            api_key: config.auth.api_key.clone(),
             auth,
             uri_base,
             transformer,
@@ -178,13 +176,12 @@ impl PubsubSink {
     }
 
     fn uri(&self, suffix: &str) -> crate::Result<Uri> {
-        let mut uri = format!("{}{}", self.uri_base, suffix);
-        if let Some(key) = &self.api_key {
-            uri = format!("{}?key={}", uri, key);
+        let uri = format!("{}{}", self.uri_base, suffix);
+        let mut uri = uri.parse::<Uri>().context(UriParseSnafu)?;
+        if let Some(auth) = &self.auth {
+            auth.apply_uri(&mut uri);
         }
-        uri.parse::<Uri>()
-            .context(UriParseSnafu)
-            .map_err(Into::into)
+        Ok(uri)
     }
 }
 
