@@ -76,7 +76,7 @@ fn default_endpoint() -> String {
 #[derive(Clone, Debug)]
 struct StackdriverSink {
     config: StackdriverConfig,
-    creds: Option<GcpAuthenticator>,
+    auth: GcpAuthenticator,
     severity_key: Option<String>,
     uri: Uri,
 }
@@ -116,7 +116,7 @@ impl_generate_config_from_default!(StackdriverConfig);
 #[typetag::serde(name = "gcp_stackdriver_logs")]
 impl SinkConfig for StackdriverConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let creds = self.auth.make_credentials(Scope::LoggingWrite).await?;
+        let auth = self.auth.build(Scope::LoggingWrite).await?;
 
         let batch = self
             .batch
@@ -133,7 +133,7 @@ impl SinkConfig for StackdriverConfig {
 
         let sink = StackdriverSink {
             config: self.clone(),
-            creds,
+            auth,
             severity_key: self.severity_key.clone(),
             uri: self.endpoint.parse().unwrap(),
         };
@@ -255,10 +255,7 @@ impl HttpSink for StackdriverSink {
             .header("Content-Type", "application/json")
             .body(body)
             .unwrap();
-
-        if let Some(creds) = &self.creds {
-            creds.apply(&mut request);
-        }
+        self.auth.apply(&mut request);
 
         Ok(request)
     }
@@ -310,7 +307,7 @@ async fn healthcheck(client: HttpClient, sink: StackdriverSink) -> crate::Result
     let response = client.send(request).await?;
     healthcheck_response(
         response,
-        sink.creds.clone(),
+        Some(sink.auth.clone()),
         HealthcheckError::NotFound.into(),
     )
 }
@@ -387,7 +384,7 @@ mod tests {
 
         let sink = StackdriverSink {
             config,
-            creds: None,
+            auth: GcpAuthenticator::from_api_key("FAKE"),
             severity_key: Some("anumber".into()),
             uri: default_endpoint().parse().unwrap(),
         };
@@ -429,7 +426,7 @@ mod tests {
 
         let sink = StackdriverSink {
             config,
-            creds: None,
+            auth: GcpAuthenticator::from_api_key("FAKE"),
             severity_key: Some("anumber".into()),
             uri: default_endpoint().parse().unwrap(),
         };
@@ -498,7 +495,7 @@ mod tests {
 
         let sink = StackdriverSink {
             config,
-            creds: None,
+            auth: GcpAuthenticator::from_api_key("FAKE"),
             severity_key: None,
             uri: default_endpoint().parse().unwrap(),
         };

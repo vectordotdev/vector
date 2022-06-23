@@ -237,10 +237,10 @@ impl SourceConfig for PubsubConfig {
             (None, None) => default_retry_delay(),
         };
 
-        let credentials = if self.skip_authentication {
+        let auth = if self.skip_authentication {
             None
         } else {
-            self.auth.make_credentials(Scope::PubSub).await?
+            Some(self.auth.build(Scope::PubSub).await?)
         };
 
         let endpoint = self.endpoint.as_deref().unwrap_or(PUBSUB_URL).to_string();
@@ -261,7 +261,7 @@ impl SourceConfig for PubsubConfig {
             endpoint = endpoint.tls_config(tls_config).context(EndpointTlsSnafu)?;
         }
 
-        let token_generator = match &credentials {
+        let token_generator = match &auth {
             Some(credentials) => credentials.clone().spawn_regenerate_token(),
             None => {
                 let (sender, receiver) = watch::channel(());
@@ -276,7 +276,7 @@ impl SourceConfig for PubsubConfig {
         let source = PubsubSource {
             endpoint,
             uri,
-            credentials,
+            auth,
             token_generator,
             subscription: format!(
                 "projects/{}/subscriptions/{}",
@@ -319,7 +319,7 @@ impl_generate_config_from_default!(PubsubConfig);
 struct PubsubSource {
     endpoint: Endpoint,
     uri: Uri,
-    credentials: Option<GcpAuthenticator>,
+    auth: Option<GcpAuthenticator>,
     token_generator: watch::Receiver<()>,
     subscription: String,
     decoder: Decoder,
@@ -418,15 +418,16 @@ impl PubsubSource {
         let mut client = proto::subscriber_client::SubscriberClient::with_interceptor(
             connection,
             |mut req: Request<()>| {
-                if let Some(credentials) = &self.credentials {
-                    let authorization = MetadataValue::try_from(&credentials.make_token())
-                        .map_err(|_| {
+                if let Some(auth) = &self.auth {
+                    if let Some(token) = auth.make_token() {
+                        let authorization = MetadataValue::try_from(&token).map_err(|_| {
                             Status::new(
                                 Code::FailedPrecondition,
                                 "Invalid token text returned by GCP",
                             )
                         })?;
-                    req.metadata_mut().insert("authorization", authorization);
+                        req.metadata_mut().insert("authorization", authorization);
+                    }
                 }
                 Ok(req)
             },

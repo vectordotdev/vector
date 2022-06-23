@@ -110,7 +110,7 @@ impl SinkConfig for PubsubConfig {
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
 
-        let healthcheck = healthcheck(client.clone(), sink.uri("")?, sink.creds.clone()).boxed();
+        let healthcheck = healthcheck(client.clone(), sink.uri("")?, sink.auth.clone()).boxed();
 
         let sink = BatchedHttpSink::new(
             sink,
@@ -140,7 +140,7 @@ impl SinkConfig for PubsubConfig {
 
 struct PubsubSink {
     api_key: Option<String>,
-    creds: Option<GcpAuthenticator>,
+    auth: Option<GcpAuthenticator>,
     uri_base: String,
     transformer: Transformer,
     encoder: Encoder<()>,
@@ -149,10 +149,10 @@ struct PubsubSink {
 impl PubsubSink {
     async fn from_config(config: &PubsubConfig) -> crate::Result<Self> {
         // We only need to load the credentials if we are not targeting an emulator.
-        let creds = if config.skip_authentication {
+        let auth = if config.skip_authentication {
             None
         } else {
-            config.auth.make_credentials(Scope::PubSub).await?
+            Some(config.auth.build(Scope::PubSub).await?)
         };
 
         let uri_base = match config.endpoint.as_ref() {
@@ -170,7 +170,7 @@ impl PubsubSink {
 
         Ok(Self {
             api_key: config.auth.api_key.clone(),
-            creds,
+            auth,
             uri_base,
             transformer,
             encoder,
@@ -226,8 +226,8 @@ impl HttpSink for PubsubSink {
         let builder = Request::post(uri).header("Content-Type", "application/json");
 
         let mut request = builder.body(body).unwrap();
-        if let Some(creds) = &self.creds {
-            creds.apply(&mut request);
+        if let Some(auth) = &self.auth {
+            auth.apply(&mut request);
         }
 
         Ok(request)
@@ -237,15 +237,15 @@ impl HttpSink for PubsubSink {
 async fn healthcheck(
     client: HttpClient,
     uri: Uri,
-    creds: Option<GcpAuthenticator>,
+    auth: Option<GcpAuthenticator>,
 ) -> crate::Result<()> {
     let mut request = Request::get(uri).body(Body::empty()).unwrap();
-    if let Some(creds) = creds.as_ref() {
-        creds.apply(&mut request);
+    if let Some(auth) = auth.as_ref() {
+        auth.apply(&mut request);
     }
 
     let response = client.send(request).await?;
-    healthcheck_response(response, creds, HealthcheckError::TopicNotFound.into())
+    healthcheck_response(response, auth, HealthcheckError::TopicNotFound.into())
 }
 
 #[cfg(test)]

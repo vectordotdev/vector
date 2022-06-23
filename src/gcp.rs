@@ -82,22 +82,25 @@ pub struct GcpAuthConfig {
 }
 
 impl GcpAuthConfig {
-    pub async fn make_credentials(&self, scope: Scope) -> crate::Result<Option<GcpAuthenticator>> {
+    pub async fn build(&self, scope: Scope) -> crate::Result<GcpAuthenticator> {
         let gap = std::env::var("GOOGLE_APPLICATION_CREDENTIALS").ok();
         let creds_path = self.credentials_path.as_ref().or(gap.as_ref());
         Ok(match (&creds_path, &self.api_key) {
-            (Some(path), _) => Some(GcpAuthenticator::from_file(path, scope).await?),
-            (None, Some(_)) => None,
-            (None, None) => Some(GcpAuthenticator::new_implicit().await?),
+            (Some(path), _) => GcpAuthenticator::from_file(path, scope).await?,
+            (None, Some(api_key)) => GcpAuthenticator::from_api_key(api_key),
+            (None, None) => GcpAuthenticator::new_implicit().await?,
         })
     }
 }
 
 #[derive(Clone, Debug)]
-pub struct GcpAuthenticator(Arc<InnerCreds>);
+pub enum GcpAuthenticator {
+    Credentials(Arc<InnerCreds>),
+    ApiKey(Box<str>),
+}
 
 #[derive(Debug)]
-struct InnerCreds {
+pub struct InnerCreds {
     creds: Option<(Credentials, Scope)>,
     token: RwLock<Token>,
 }
@@ -105,39 +108,37 @@ struct InnerCreds {
 impl GcpAuthenticator {
     async fn from_file(path: &str, scope: Scope) -> crate::Result<Self> {
         let creds = Credentials::from_file(path).context(InvalidCredentialsSnafu)?;
-        let token = fetch_token(&creds, &scope).await?;
-        Ok(Self(Arc::new(InnerCreds {
-            creds: Some((creds, scope)),
-            token: RwLock::new(token),
-        })))
+        let token = RwLock::new(fetch_token(&creds, &scope).await?);
+        let creds = Some((creds, scope));
+        Ok(Self::Credentials(Arc::new(InnerCreds { creds, token })))
     }
 
     async fn new_implicit() -> crate::Result<Self> {
-        let token = get_token_implicit().await?;
-        Ok(Self(Arc::new(InnerCreds {
-            creds: None,
-            token: RwLock::new(token),
-        })))
+        let token = RwLock::new(get_token_implicit().await?);
+        let creds = None;
+        Ok(Self::Credentials(Arc::new(InnerCreds { creds, token })))
     }
 
-    pub fn make_token(&self) -> String {
-        let token = self.0.token.read().unwrap();
-        format!("{} {}", token.token_type(), token.access_token())
+    pub fn from_api_key(api_key: &str) -> Self {
+        Self::ApiKey(api_key.into())
+    }
+
+    pub fn make_token(&self) -> Option<String> {
+        match self {
+            Self::Credentials(inner) => {
+                let token = inner.token.read().unwrap();
+                Some(format!("{} {}", token.token_type(), token.access_token()))
+            }
+            Self::ApiKey(_) => None,
+        }
     }
 
     pub fn apply<T>(&self, request: &mut http::Request<T>) {
-        request
-            .headers_mut()
-            .insert(AUTHORIZATION, self.make_token().parse().unwrap());
-    }
-
-    async fn regenerate_token(&self) -> crate::Result<()> {
-        let token = match &self.0.creds {
-            Some((creds, scope)) => fetch_token(creds, scope).await?,
-            None => get_token_implicit().await?,
-        };
-        *self.0.token.write().unwrap() = token;
-        Ok(())
+        if let Some(token) = self.make_token() {
+            request
+                .headers_mut()
+                .insert(AUTHORIZATION, token.parse().unwrap());
+        }
     }
 
     pub fn spawn_regenerate_token(&self) -> watch::Receiver<()> {
@@ -147,22 +148,38 @@ impl GcpAuthenticator {
     }
 
     async fn token_regenerator(self, sender: watch::Sender<()>) {
-        let period = Duration::from_secs(self.0.token.read().unwrap().expires_in() as u64 / 2);
-        let this = self.clone();
-        let mut interval = tokio::time::interval_at(Instant::now() + period, period);
-        loop {
-            interval.tick().await;
-            debug!("Renewing GCP authentication token.");
-            match this.regenerate_token().await {
-                Ok(()) => sender.send_replace(()),
-                Err(error) => {
-                    error!(
-                        message = "Failed to update GCP authentication token.",
-                        %error
-                    );
+        match self {
+            Self::Credentials(inner) => {
+                let period =
+                    Duration::from_secs(inner.token.read().unwrap().expires_in() as u64 / 2);
+                let mut interval = tokio::time::interval_at(Instant::now() + period, period);
+                loop {
+                    interval.tick().await;
+                    debug!("Renewing GCP authentication token.");
+                    match inner.regenerate_token().await {
+                        Ok(()) => sender.send_replace(()),
+                        Err(error) => {
+                            error!(
+                                message = "Failed to update GCP authentication token.",
+                                %error
+                            );
+                        }
+                    }
                 }
             }
+            Self::ApiKey(_) => todo!(),
         }
+    }
+}
+
+impl InnerCreds {
+    async fn regenerate_token(&self) -> crate::Result<()> {
+        let token = match &self.creds {
+            Some((creds, scope)) => fetch_token(creds, scope).await?,
+            None => get_token_implicit().await?,
+        };
+        *self.token.write().unwrap() = token;
+        Ok(())
     }
 }
 
@@ -221,7 +238,7 @@ mod tests {
     #[ignore]
     async fn fails_missing_creds() {
         let config: GcpAuthConfig = toml::from_str("").unwrap();
-        match config.make_credentials(Scope::Compute).await {
+        match config.build(Scope::Compute).await {
             Ok(_) => panic!("make_credentials failed to error"),
             Err(err) => assert_downcast_matches!(err, GcpError, GcpError::GetImplicitToken { .. }), // This should be a more relevant error
         }
