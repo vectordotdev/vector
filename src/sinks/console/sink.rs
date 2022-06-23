@@ -98,7 +98,7 @@ mod test {
             StandardEncodingsWithFramingMigrator,
         >,
     ) -> Result<String, codecs::encoding::Error> {
-        let (framer, serializer) = encoding.encoding().unwrap();
+        let (framer, serializer) = encoding.encoding();
         let framer = framer.unwrap_or_else(|| BytesEncoder::new().into());
         let mut encoder = Encoder::<Framer>::new(framer, serializer);
         let mut bytes = BytesMut::new();
@@ -115,7 +115,7 @@ mod test {
             StandardEncodingsWithFramingMigrator,
         > = EncodingConfig::from(StandardEncodings::Json).into();
         let transformer = encoding.transformer();
-        let (_, serializer) = encoding.encoding().unwrap();
+        let (_, serializer) = encoding.encoding();
         let encoder = Encoder::<Framer>::new(NewlineDelimitedEncoder::new().into(), serializer);
 
         let sink = WriterSink {

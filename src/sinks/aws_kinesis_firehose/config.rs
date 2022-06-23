@@ -147,7 +147,7 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
             });
 
         let transformer = self.encoding.transformer();
-        let serializer = self.encoding.encoding()?;
+        let serializer = self.encoding.encoding();
         let encoder = Encoder::<()>::new(serializer);
 
         let request_builder = KinesisRequestBuilder {

@@ -3,7 +3,7 @@ use std::{convert::TryInto, sync::Arc};
 use azure_storage_blobs::prelude::*;
 use codecs::{
     encoding::{Framer, Serializer},
-    CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder,
+    CharacterDelimitedEncoder, NewlineDelimitedEncoder,
 };
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
@@ -139,12 +139,13 @@ impl AzureBlobSinkConfig {
             .unwrap_or(DEFAULT_FILENAME_APPEND_UUID);
 
         let transformer = self.encoding.transformer();
-        let (framer, serializer) = self.encoding.clone().encoding()?;
+        let (framer, serializer) = self.encoding.clone().encoding();
         let framer = match (framer, &serializer) {
             (Some(framer), _) => framer,
             (None, Serializer::Json(_)) => CharacterDelimitedEncoder::new(b',').into(),
-            (None, Serializer::Avro(_) | Serializer::Native(_)) => {
-                LengthDelimitedEncoder::new().into()
+            (None, Serializer::Native(_)) => {
+                // TODO: We probably want to use something like octet framing here.
+                return Err("Native encoding is not implemented for this sink yet".into());
             }
             (
                 None,

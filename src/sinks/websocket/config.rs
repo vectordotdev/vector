@@ -49,7 +49,7 @@ impl GenerateConfig for WebSocketSinkConfig {
 impl SinkConfig for WebSocketSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let connector = self.build_connector()?;
-        let ws_sink = WebSocketSink::new(self, connector.clone(), cx.acker())?;
+        let ws_sink = WebSocketSink::new(self, connector.clone(), cx.acker());
 
         Ok((
             VectorSink::from_event_streamsink(ws_sink),

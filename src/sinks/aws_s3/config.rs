@@ -2,7 +2,7 @@ use std::convert::TryInto;
 
 use aws_sdk_s3::Client as S3Client;
 use codecs::encoding::{Framer, Serializer};
-use codecs::{CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder};
+use codecs::{CharacterDelimitedEncoder, NewlineDelimitedEncoder};
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
 use vector_core::sink::VectorSink;
@@ -150,12 +150,13 @@ impl S3SinkConfig {
             .unwrap_or(DEFAULT_FILENAME_APPEND_UUID);
 
         let transformer = self.encoding.transformer();
-        let (framer, serializer) = self.encoding.encoding()?;
+        let (framer, serializer) = self.encoding.encoding();
         let framer = match (framer, &serializer) {
             (Some(framer), _) => framer,
             (None, Serializer::Json(_)) => CharacterDelimitedEncoder::new(b',').into(),
-            (None, Serializer::Avro(_) | Serializer::Native(_)) => {
-                LengthDelimitedEncoder::new().into()
+            (None, Serializer::Native(_)) => {
+                // TODO: We probably want to use something like octet framing here.
+                return Err("Native encoding is not implemented for this sink yet".into());
             }
             (
                 None,
