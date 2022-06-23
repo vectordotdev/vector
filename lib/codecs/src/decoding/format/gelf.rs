@@ -3,6 +3,7 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use lookup::path;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use smallvec::{smallvec, SmallVec};
 use std::collections::HashMap;
 use value::Kind;
@@ -106,99 +107,125 @@ impl GelfDeserializer {
         }
     }
 
-    // Builds a LogEvent from the parsed GelfMessage, adhering to GELF spec
-    fn insert_fields_from_gelf(&self, parsed: &GelfMessage) -> vector_core::Result<Event> {
-        let mut event = Event::from(parsed.short_message.to_string());
-        let log = event.as_mut_log();
+    /// Returns a UTC DateTime from a numeric Value.
+    fn parse_timestamp(&self, val: &Value) -> DateTime<Utc> {
+        let mut secs = 0;
+        let mut nsecs = 0;
+        if val.is_f64() {
+            secs = f64::trunc(val.as_f64().unwrap()) as i64;
+            nsecs = f64::fract(val.as_f64().unwrap()) as u32;
+        } else if val.is_i64() {
+            secs = val.as_i64().unwrap();
+        } else if val.is_u64() {
+            secs = val.as_u64().unwrap() as i64;
+        }
+        let naive = NaiveDateTime::from_timestamp(secs, nsecs);
+        DateTime::<Utc>::from_utc(naive, Utc)
+    }
 
-        // GELF spec defines the version as 1.1 which has not changed since 2013
-        if parsed.version != GELF_VERSION {
-            return Err(format!(
-                "{} does not match GELF spec version ({})",
+    /// Attemps to parse an integer from a Value.
+    fn parse_number(&self, val: &Value) -> Result<i64, vector_core::Error> {
+        if val.is_number() {
+            let mut number = 0;
+            if val.is_f64() {
+                number = f64::round(val.as_f64().unwrap()) as i64;
+            } else if val.is_u64() {
+                number = val.as_u64().unwrap() as i64;
+            } else if val.is_i64() {
+                number = val.as_i64().unwrap();
+            }
+            Ok(number)
+        } else if val.is_string() {
+            match val.as_str().unwrap().parse::<i64>() {
+                Ok(number) => Ok(number),
+                Err(_) => match val.as_str().unwrap().parse::<f64>() {
+                    Ok(number) => Ok(f64::round(number) as i64),
+                    Err(_) => Err(format!(
+                        "Event field {} does not match GELF spec version {}: must be a number",
+                        VERSION, GELF_VERSION
+                    )
+                    .into()),
+                },
+            }
+        } else {
+            Err(format!(
+                "Event field {} does not match GELF spec version {}: must be a number",
                 VERSION, GELF_VERSION
             )
-            .into());
+            .into())
+        }
+    }
+
+    /// Builds a LogEvent from the parsed GelfMessage.
+    /// The logic does not follow strictly the documented GELF standard, it more closely
+    /// follows the behavior of graylog itself, which is more relaxed.
+    fn message_to_event(&self, parsed: &GelfMessage) -> vector_core::Result<Event> {
+        if parsed.message.is_none() && parsed.short_message.is_none() {
+            return Err("Event must contain the field 'short_message'".into());
         }
 
-        log.insert(VERSION, parsed.version.to_string());
-        log.insert(HOST, parsed.host.to_string());
-
-        if let Some(full_message) = &parsed.full_message {
-            log.insert(FULL_MESSAGE, full_message.to_string());
-        }
-
-        if let Some(timestamp) = parsed.timestamp {
-            let naive = NaiveDateTime::from_timestamp(
-                f64::trunc(timestamp) as i64,
-                f64::fract(timestamp) as u32,
-            );
-            log.insert(
-                log_schema().timestamp_key(),
-                DateTime::<Utc>::from_utc(naive, Utc),
-            );
+        let message = if let Some(msg) = &parsed.short_message {
+            msg
         } else {
-            log.insert(log_schema().timestamp_key(), Utc::now());
-        }
+            parsed.message.as_ref().unwrap()
+        };
+        let mut event = Event::from(message.to_string());
+        let log = event.as_mut_log();
 
-        if let Some(level) = parsed.level {
-            log.insert(LEVEL, level);
+        let timestamp_key = log_schema().timestamp_key();
+
+        // GELF spec defines the version as 1.1 which has not changed since 2013
+        // but graylog server does not reject any event which does not specify a version
+
+        if let Some(host) = &parsed.host {
+            log.insert(HOST, host.to_string());
         }
-        if let Some(facility) = &parsed.facility {
-            log.insert(FACILITY, facility.to_string());
-        }
-        if let Some(line) = &parsed.line {
-            log.insert(LINE, *line);
-        }
-        if let Some(file) = &parsed.file {
-            log.insert(FILE, file.to_string());
-        }
+        // TODO graylog sets field 'host' to IP address if not specified. I'm not seeing a clear way to get the IP...
+
+        // FACILITY, FILE, FULL_MESSAGE can be any type and are optional
 
         if let Some(add) = &parsed.additional_fields {
             for (key, val) in add.iter() {
-                // per GELF spec, filter out _id
-                if key == "_id" {
-                    continue;
-                }
-                // per GELF spec, Additional field names must be characters dashes or dots
-
-                // drop fields names that don't match the GELF spec
+                // Additional field names must be characters dashes or dots.
+                // Drop fields names that contain offending characters.
                 if !self.regex.is_match(key) {
                     continue;
                 }
 
-                // per GELF spec, values to additional fields can be strings or numbers
-                if val.is_string() {
-                    log.insert(path!(key.as_str()), val.as_str());
-                } else if val.is_u64() {
-                    log.insert(path!(key.as_str()), val.as_u64());
-                } else if val.is_i64() {
-                    log.insert(path!(key.as_str()), val.as_i64());
-                } else if val.is_f64() {
-                    match ordered_float::NotNan::new(val.as_f64().unwrap()) {
-                        Ok(float) => {
-                            log.insert(path!(key.as_str()), float);
-                        }
-                        Err(e) => return Err(e.to_string().into()),
+                // if the timestamp is not numeric, we set it to current UTC later
+                if key == TIMESTAMP && val.is_number() {
+                    log.insert(timestamp_key, self.parse_timestamp(val));
+                }
+                // level and line are both numbers
+                else if key == LEVEL || key == LINE {
+                    log.insert(path!(key), self.parse_number(val)?);
+                } else {
+                    let vector_val: value::Value = val.into();
+
+                    // trim the leading underscore prefix if present
+                    if let Some(stripped) = key.strip_prefix('_') {
+                        log.insert(path!(stripped), vector_val);
+                    } else {
+                        log.insert(path!(key.as_str()), vector_val);
                     }
                 }
             }
+        }
+
+        // add a timestamp if not present
+        if !log.contains(timestamp_key) {
+            log.insert(timestamp_key, Utc::now());
         }
 
         Ok(event)
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct GelfMessage {
-    version: String,
-    host: String,
-    short_message: String,
-    full_message: Option<String>,
-    timestamp: Option<f64>,
-    level: Option<u8>,
-    facility: Option<String>,
-    line: Option<usize>,
-    file: Option<String>,
+    host: Option<String>,
+    short_message: Option<String>,
+    message: Option<String>,
     #[serde(flatten)]
     additional_fields: Option<HashMap<String, serde_json::Value>>,
 }
@@ -209,7 +236,7 @@ impl Deserializer for GelfDeserializer {
         let line = line.trim();
 
         let parsed: GelfMessage = serde_json::from_str(line)?;
-        let event = self.insert_fields_from_gelf(&parsed)?;
+        let event = self.message_to_event(&parsed)?;
 
         Ok(smallvec![event])
     }
