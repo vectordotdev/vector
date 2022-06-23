@@ -78,7 +78,7 @@ sources:
       - /var/log/apache2/*.log
     ignore_older: 86400
 transforms:
-  remap:
+  apache_parser:
     inputs:
       - apache_logs
     type: remap
@@ -125,7 +125,7 @@ sinks:
     }
   },
   "transforms": {
-    "remap": {
+    "apache_parser": {
       "inputs": [
         "apache_logs"
       ],
