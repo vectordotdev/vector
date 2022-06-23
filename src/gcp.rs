@@ -88,7 +88,7 @@ impl GcpAuthConfig {
         Ok(match (&creds_path, &self.api_key) {
             (Some(path), _) => Some(GcpAuthenticator::from_file(path, scope).await?),
             (None, Some(_)) => None,
-            (None, None) => Some(GcpAuthenticator::new_implicit(scope).await?),
+            (None, None) => Some(GcpAuthenticator::new_implicit().await?),
         })
     }
 }
@@ -98,8 +98,7 @@ pub struct GcpAuthenticator(Arc<InnerCreds>);
 
 #[derive(Debug)]
 struct InnerCreds {
-    creds: Option<Credentials>,
-    scope: Scope,
+    creds: Option<(Credentials, Scope)>,
     token: RwLock<Token>,
 }
 
@@ -108,17 +107,15 @@ impl GcpAuthenticator {
         let creds = Credentials::from_file(path).context(InvalidCredentialsSnafu)?;
         let token = fetch_token(&creds, &scope).await?;
         Ok(Self(Arc::new(InnerCreds {
-            creds: Some(creds),
-            scope,
+            creds: Some((creds, scope)),
             token: RwLock::new(token),
         })))
     }
 
-    async fn new_implicit(scope: Scope) -> crate::Result<Self> {
+    async fn new_implicit() -> crate::Result<Self> {
         let token = get_token_implicit().await?;
         Ok(Self(Arc::new(InnerCreds {
             creds: None,
-            scope,
             token: RwLock::new(token),
         })))
     }
@@ -136,7 +133,7 @@ impl GcpAuthenticator {
 
     async fn regenerate_token(&self) -> crate::Result<()> {
         let token = match &self.0.creds {
-            Some(creds) => fetch_token(creds, &self.0.scope).await?,
+            Some((creds, scope)) => fetch_token(creds, scope).await?,
             None => get_token_implicit().await?,
         };
         *self.0.token.write().unwrap() = token;
