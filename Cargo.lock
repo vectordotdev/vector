@@ -1573,7 +1573,7 @@ dependencies = [
  "indoc",
  "memchr",
  "pretty_assertions",
- "prost 0.10.4",
+ "prost",
  "serde",
  "serde_json",
  "smallvec",
@@ -1651,8 +1651,8 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06c5fd425783d81668ed68ec98408a80498fb4ae2fd607797539e1a9dfa3618f"
 dependencies = [
- "prost 0.10.4",
- "prost-types 0.10.1",
+ "prost",
+ "prost-types",
  "tonic",
  "tracing-core 0.1.26",
 ]
@@ -1669,7 +1669,7 @@ dependencies = [
  "futures 0.3.21",
  "hdrhistogram",
  "humantime",
- "prost-types 0.10.1",
+ "prost-types",
  "serde",
  "serde_json",
  "thread_local",
@@ -1726,27 +1726,12 @@ dependencies = [
 
 [[package]]
 name = "crc"
-version = "2.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49fc9a695bca7f35f5f4c15cddc84415f66a74ea78eef08e90c5024f2b540e23"
-dependencies = [
- "crc-catalog 1.1.1",
-]
-
-[[package]]
-name = "crc"
 version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "53757d12b596c16c78b83458d732a5d1a17ab3f53f2f7412f6fb57cc8a140ab3"
 dependencies = [
- "crc-catalog 2.1.0",
+ "crc-catalog",
 ]
-
-[[package]]
-name = "crc-catalog"
-version = "1.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ccaeedb56da03b09f598226e25e80088cb4cd25f316e6e4df7d695f0feeb1403"
 
 [[package]]
 name = "crc-catalog"
@@ -1775,7 +1760,7 @@ dependencies = [
  "criterion-plot",
  "csv",
  "futures 0.3.21",
- "itertools",
+ "itertools 0.10.3",
  "lazy_static",
  "num-traits",
  "oorandom",
@@ -1798,7 +1783,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d00996de9f2f7559f7f4dc286073197f83e92256a59ed395f9aac01fe717da57"
 dependencies = [
  "cast",
- "itertools",
+ "itertools 0.10.3",
 ]
 
 [[package]]
@@ -2024,6 +2009,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ee2393c4a91429dffb4bedf19f4d6abf27d8a732c8ce4980305d782e5426d57"
 
 [[package]]
+name = "data-url"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a30bfce702bcfa94e906ef82421f2c0e61c076ad76030c16ee5d2e9a32fe193"
+dependencies = [
+ "matches",
+]
+
+[[package]]
 name = "datadog-filter"
 version = "0.1.0"
 dependencies = [
@@ -2062,7 +2056,7 @@ dependencies = [
 name = "datadog-search-syntax"
 version = "0.1.0"
 dependencies = [
- "itertools",
+ "itertools 0.10.3",
  "once_cell",
  "pest",
  "pest_derive",
@@ -2549,7 +2543,7 @@ dependencies = [
  "bstr",
  "bytes 1.1.0",
  "chrono",
- "crc 3.0.0",
+ "crc",
  "criterion",
  "dashmap 5.2.0",
  "flate2",
@@ -2579,12 +2573,6 @@ dependencies = [
  "redox_syscall 0.2.13",
  "winapi 0.3.9",
 ]
-
-[[package]]
-name = "fixedbitset"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37ab347416e802de484e4d03c7316c48f1ecb56574dfd4a46a80f173ce1de04d"
 
 [[package]]
 name = "fixedbitset"
@@ -3600,6 +3588,15 @@ dependencies = [
 
 [[package]]
 name = "itertools"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "284f18f85651fe11e8a991b2adb42cb078325c996ed026d994719efcfca1d54b"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
 version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a9a9d19fa1e79b6215ff29b9d6880b706147f16e9b1dbb1e4e5947b5b02bc5e3"
@@ -3714,7 +3711,7 @@ dependencies = [
  "http",
  "percent-encoding",
  "serde",
- "serde-value",
+ "serde-value 0.7.0",
  "serde_json",
  "url",
 ]
@@ -3789,7 +3786,7 @@ dependencies = [
  "k8s-openapi",
  "kube-core",
  "openssl",
- "pem 1.0.2",
+ "pem",
  "pin-project",
  "secrecy",
  "serde",
@@ -3856,9 +3853,9 @@ dependencies = [
  "bit-set",
  "diff",
  "ena",
- "itertools",
+ "itertools 0.10.3",
  "lalrpop-util",
- "petgraph 0.6.0",
+ "petgraph",
  "pico-args",
  "regex",
  "regex-syntax",
@@ -4509,7 +4506,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "22877ad014bafa2f7dcfa5d556b0c7a52b0546cc98061a1ebef6d1834957b069"
 dependencies = [
  "indexmap",
- "itertools",
+ "itertools 0.10.3",
  "ndarray",
  "noisy_float",
  "num-integer",
@@ -4918,6 +4915,31 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
+name = "openidconnect"
+version = "2.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "691c1ba89b0a112f3062b946ef160711c3aea33e1476b6877a904f2f83856781"
+dependencies = [
+ "base64",
+ "chrono",
+ "http",
+ "itertools 0.9.0",
+ "log",
+ "num-bigint 0.4.3",
+ "oauth2",
+ "rand 0.8.5",
+ "ring",
+ "serde",
+ "serde-value 0.6.0",
+ "serde_derive",
+ "serde_json",
+ "serde_path_to_error",
+ "thiserror",
+ "untrusted",
+ "url",
+]
+
+[[package]]
 name = "openssl"
 version = "0.10.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4970,6 +4992,15 @@ dependencies = [
  "openssl-src",
  "pkg-config",
  "vcpkg",
+]
+
+[[package]]
+name = "ordered-float"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3305af35278dd29f46fcdd139e0b1fbfae2153f0e5928b39b035542dd31e37b7"
+dependencies = [
+ "num-traits",
 ]
 
 [[package]]
@@ -5111,17 +5142,6 @@ checksum = "9e9ed2178b0575fff8e1b83b58ba6f75e727aafac2e1b6c795169ad3b17eb518"
 
 [[package]]
 name = "pem"
-version = "0.8.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd56cbd21fea48d0c440b41cd69c589faacade08c992d9a54e471b79d0fd13eb"
-dependencies = [
- "base64",
- "once_cell",
- "regex",
-]
-
-[[package]]
-name = "pem"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e9a3b09a20e374558580a4914d3b7d89bd61b954a5a5e1dcbea98753addb1947"
@@ -5189,21 +5209,11 @@ dependencies = [
 
 [[package]]
 name = "petgraph"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "467d164a6de56270bd7c4d070df81d07beace25012d5103ced4e9ff08d6afdb7"
-dependencies = [
- "fixedbitset 0.2.0",
- "indexmap",
-]
-
-[[package]]
-name = "petgraph"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4a13a2fa9d0b63e5f22328828741e523766fff0ee9e779316902290dff3f824f"
 dependencies = [
- "fixedbitset 0.4.1",
+ "fixedbitset",
  "indexmap",
 ]
 
@@ -5418,7 +5428,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a5aab5be6e4732b473071984b3164dbbfb7a3674d30ea5ff44410b6bcd960c3c"
 dependencies = [
  "difflib",
- "itertools",
+ "itertools 0.10.3",
  "predicates-core",
 ]
 
@@ -5535,9 +5545,9 @@ dependencies = [
  "indexmap",
  "nom",
  "num_enum",
- "prost 0.10.4",
- "prost-build 0.10.4",
- "prost-types 0.10.1",
+ "prost",
+ "prost-build",
+ "prost-types",
  "snafu",
  "value",
  "vector_common",
@@ -5577,40 +5587,12 @@ dependencies = [
 
 [[package]]
 name = "prost"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de5e2533f59d08fcf364fd374ebda0692a70bd6d7e66ef97f306f45c6c5d8020"
-dependencies = [
- "bytes 1.1.0",
- "prost-derive 0.8.0",
-]
-
-[[package]]
-name = "prost"
 version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "71adf41db68aa0daaefc69bb30bcd68ded9b9abaad5d1fbb6304c4fb390e083e"
 dependencies = [
  "bytes 1.1.0",
- "prost-derive 0.10.1",
-]
-
-[[package]]
-name = "prost-build"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "355f634b43cdd80724ee7848f95770e7e70eefa6dcf14fea676216573b8fd603"
-dependencies = [
- "bytes 1.1.0",
- "heck 0.3.3",
- "itertools",
- "log",
- "multimap",
- "petgraph 0.5.1",
- "prost 0.8.0",
- "prost-types 0.8.0",
- "tempfile",
- "which",
+ "prost-derive",
 ]
 
 [[package]]
@@ -5623,29 +5605,16 @@ dependencies = [
  "cfg-if 1.0.0",
  "cmake",
  "heck 0.4.0",
- "itertools",
+ "itertools 0.10.3",
  "lazy_static",
  "log",
  "multimap",
- "petgraph 0.6.0",
- "prost 0.10.4",
- "prost-types 0.10.1",
+ "petgraph",
+ "prost",
+ "prost-types",
  "regex",
  "tempfile",
  "which",
-]
-
-[[package]]
-name = "prost-derive"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "600d2f334aa05acb02a755e217ef1ab6dea4d51b58b7846588b747edec04efba"
-dependencies = [
- "anyhow",
- "itertools",
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
@@ -5655,20 +5624,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b670f45da57fb8542ebdbb6105a925fe571b67f9e7ed9f47a06a84e72b4e7cc"
 dependencies = [
  "anyhow",
- "itertools",
+ "itertools 0.10.3",
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "prost-types"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "603bbd6394701d13f3f25aada59c7de9d35a6a5887cfc156181234a44002771b"
-dependencies = [
- "bytes 1.1.0",
- "prost 0.8.0",
 ]
 
 [[package]]
@@ -5678,7 +5637,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2d0a014229361011dc8e69c8a1ec6c2e8d0f2af7c91e3ea3f5b2170298461e68"
 dependencies = [
  "bytes 1.1.0",
- "prost 0.10.4",
+ "prost",
 ]
 
 [[package]]
@@ -5703,29 +5662,35 @@ dependencies = [
 
 [[package]]
 name = "pulsar"
-version = "4.1.1"
+version = "4.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08be3034f3401142c05385eeb7099bf6b3e36b9491b45ee8e619124e60377409"
+checksum = "31a5a4fbe9363c113b7e25ae76dd2d6455411c815d688977be6f0b68ae5e73b8"
 dependencies = [
+ "async-trait",
  "bit-vec 0.6.3",
  "bytes 1.1.0",
  "chrono",
- "crc 2.1.0",
+ "crc",
+ "data-url",
  "futures 0.3.21",
  "futures-io",
  "futures-timer",
  "log",
  "native-tls",
  "nom",
- "pem 0.8.3",
- "prost 0.8.0",
- "prost-build 0.8.0",
- "prost-derive 0.8.0",
+ "oauth2",
+ "openidconnect",
+ "pem",
+ "prost",
+ "prost-build",
+ "prost-derive",
  "rand 0.8.5",
  "regex",
+ "serde",
+ "serde_json",
  "tokio",
  "tokio-native-tls",
- "tokio-util 0.6.9",
+ "tokio-util 0.7.1",
  "url",
 ]
 
@@ -6068,6 +6033,7 @@ dependencies = [
  "http",
  "http-body",
  "hyper",
+ "hyper-rustls 0.23.0",
  "hyper-tls",
  "ipnet",
  "js-sys",
@@ -6077,17 +6043,21 @@ dependencies = [
  "native-tls",
  "percent-encoding",
  "pin-project-lite",
+ "rustls 0.20.4",
+ "rustls-pemfile 1.0.0",
  "serde",
  "serde_json",
  "serde_urlencoded",
  "tokio",
  "tokio-native-tls",
+ "tokio-rustls 0.23.3",
  "tokio-util 0.7.1",
  "tower-service",
  "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
+ "webpki-roots",
  "winreg 0.10.1",
 ]
 
@@ -6578,6 +6548,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d842a22544da00889e963dd7d8a22abbe6393ff992a3a83dafcb0bad776c82a5"
 dependencies = [
  "toml",
+]
+
+[[package]]
+name = "serde-value"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a65a7291a8a568adcae4c10a677ebcedbc6c9cec91c054dee2ce40b0e3290eb"
+dependencies = [
+ "ordered-float 1.1.1",
+ "serde",
 ]
 
 [[package]]
@@ -7596,8 +7576,8 @@ dependencies = [
  "hyper-timeout",
  "percent-encoding",
  "pin-project",
- "prost 0.10.4",
- "prost-derive 0.10.1",
+ "prost",
+ "prost-derive",
  "rustls-native-certs 0.6.2",
  "rustls-pemfile 1.0.0",
  "tokio",
@@ -7619,7 +7599,7 @@ checksum = "d9263bf4c9bfaae7317c1c2faf7f18491d2fe476f70c414b73bf5d445b00ffa1"
 dependencies = [
  "prettyplease",
  "proc-macro2",
- "prost-build 0.10.4",
+ "prost-build",
  "quote",
  "syn",
 ]
@@ -8360,7 +8340,7 @@ dependencies = [
  "indoc",
  "infer 0.8.1",
  "inventory 0.1.11",
- "itertools",
+ "itertools 0.10.3",
  "k8s-openapi",
  "kube",
  "libc",
@@ -8392,9 +8372,9 @@ dependencies = [
  "pretty_assertions",
  "prometheus-parser",
  "proptest",
- "prost 0.10.4",
- "prost-build 0.10.4",
- "prost-types 0.10.1",
+ "prost",
+ "prost-build",
+ "prost-types",
  "pulsar",
  "quickcheck",
  "rand 0.8.5",
@@ -8641,9 +8621,9 @@ dependencies = [
  "pin-project",
  "pretty_assertions",
  "proptest",
- "prost 0.10.4",
- "prost-build 0.10.4",
- "prost-types 0.10.1",
+ "prost",
+ "prost-build",
+ "prost-types",
  "quickcheck",
  "rand 0.8.5",
  "rand_distr",
