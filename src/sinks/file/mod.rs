@@ -166,7 +166,7 @@ impl SinkConfig for FileSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let sink = FileSink::new(self, cx.acker())?;
+        let sink = FileSink::new(self, cx.acker());
         Ok((
             super::VectorSink::from_event_streamsink(sink),
             future::ok(()).boxed(),
@@ -198,13 +198,13 @@ pub struct FileSink {
 }
 
 impl FileSink {
-    pub fn new(config: &FileSinkConfig, acker: Acker) -> crate::Result<Self> {
+    pub fn new(config: &FileSinkConfig, acker: Acker) -> Self {
         let transformer = config.encoding.transformer();
-        let (framer, serializer) = config.encoding.encoding()?;
+        let (framer, serializer) = config.encoding.encoding();
         let framer = framer.unwrap_or_else(|| NewlineDelimitedEncoder::new().into());
         let encoder = Encoder::<Framer>::new(framer, serializer);
 
-        Ok(Self {
+        Self {
             acker,
             path: config.path.clone(),
             transformer,
@@ -212,7 +212,7 @@ impl FileSink {
             idle_timeout: Duration::from_secs(config.idle_timeout_secs.unwrap_or(30)),
             files: ExpiringHashMap::default(),
             compression: config.compression,
-        })
+        }
     }
 
     /// Uses pass the `event` to `self.path` template to obtain the file path
@@ -452,7 +452,7 @@ mod tests {
             acknowledgements: Default::default(),
         };
 
-        let sink = FileSink::new(&config, Acker::passthrough()).unwrap();
+        let sink = FileSink::new(&config, Acker::passthrough());
         let (input, _events) = random_lines_with_stream(100, 64, None);
 
         let events = Box::pin(stream::iter(input.clone().into_iter().map(Event::from)));
@@ -483,7 +483,7 @@ mod tests {
             acknowledgements: Default::default(),
         };
 
-        let sink = FileSink::new(&config, Acker::passthrough()).unwrap();
+        let sink = FileSink::new(&config, Acker::passthrough());
         let (input, _) = random_lines_with_stream(100, 64, None);
 
         let events = Box::pin(stream::iter(input.clone().into_iter().map(Event::from)));
@@ -519,7 +519,7 @@ mod tests {
             acknowledgements: Default::default(),
         };
 
-        let sink = FileSink::new(&config, Acker::passthrough()).unwrap();
+        let sink = FileSink::new(&config, Acker::passthrough());
 
         let (mut input, _events) = random_events_with_stream(32, 8, None);
         input[0].as_mut_log().insert("date", "2019-26-07");
@@ -604,7 +604,7 @@ mod tests {
             acknowledgements: Default::default(),
         };
 
-        let sink = FileSink::new(&config, Acker::passthrough()).unwrap();
+        let sink = FileSink::new(&config, Acker::passthrough());
         let (mut input, _events) = random_lines_with_stream(10, 64, None);
 
         let (mut tx, rx) = futures::channel::mpsc::channel(0);
