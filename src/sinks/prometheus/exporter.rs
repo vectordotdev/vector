@@ -35,7 +35,7 @@ use crate::{
     },
     event::{
         metric::{Metric, MetricData, MetricKind, MetricValue},
-        Event,
+        {Event, Finalizable},
     },
     internal_events::PrometheusServerRequestComplete,
     sinks::{
@@ -464,7 +464,7 @@ impl StreamSink<Event> for PrometheusExporter {
             buckets: self.config.buckets.clone(),
         });
 
-        while let Some(event) = input.next().await {
+        while let Some(mut event) = input.next().await {
             // If we've exceed our flush interval, go through all of the metrics we're currently
             // tracking and remove any which have exceeded the flush interval in terms of not
             // having been updated within that long of a time.
@@ -490,6 +490,7 @@ impl StreamSink<Event> for PrometheusExporter {
                 }
             }
 
+            let finalizers = event.take_finalizers();
             // Now process the metric we got.
             let metric = event.into_metric();
             if let Some(normalized) = normalizer.normalize(metric) {
@@ -509,6 +510,7 @@ impl StreamSink<Event> for PrometheusExporter {
                 }
             }
 
+            drop(finalizers);
             self.acker.ack(1);
         }
 
