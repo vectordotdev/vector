@@ -340,7 +340,7 @@ impl PartialEq for MetricValue {
         match (self, other) {
             (Self::Counter { value: l_value }, Self::Counter { value: r_value })
             | (Self::Gauge { value: l_value }, Self::Gauge { value: r_value }) => {
-                l_value.eq_ulps(r_value, &1)
+                float_eq(l_value, r_value)
             }
             (Self::Set { values: l_values }, Self::Set { values: r_values }) => {
                 l_values == r_values
@@ -366,7 +366,7 @@ impl PartialEq for MetricValue {
                     count: r_count,
                     sum: r_sum,
                 },
-            ) => l_buckets == r_buckets && l_count == r_count && l_sum.eq_ulps(r_sum, &1),
+            ) => l_buckets == r_buckets && l_count == r_count && float_eq(l_sum, r_sum),
             (
                 Self::AggregatedSummary {
                     quantiles: l_quantiles,
@@ -378,12 +378,20 @@ impl PartialEq for MetricValue {
                     count: r_count,
                     sum: r_sum,
                 },
-            ) => l_quantiles == r_quantiles && l_count == r_count && l_sum.eq_ulps(r_sum, &1),
+            ) => l_quantiles == r_quantiles && l_count == r_count && float_eq(l_sum, r_sum),
             (Self::Sketch { sketch: l_sketch }, Self::Sketch { sketch: r_sketch }) => {
                 l_sketch == r_sketch
             }
             _ => false,
         }
+    }
+}
+
+fn float_eq(l_value: &f64, r_value: &f64) -> bool {
+    if l_value.is_nan() && r_value.is_nan() {
+        true
+    } else {
+        l_value.eq_ulps(r_value, &1)
     }
 }
 
@@ -535,10 +543,16 @@ impl From<MetricSketch> for ::value::Value {
 
 /// A single sample from a `MetricValue::Distribution`, containing the
 /// sampled value paired with the rate at which it was observed.
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialOrd, Serialize)]
 pub struct Sample {
     pub value: f64,
     pub rate: u32,
+}
+
+impl PartialEq for Sample {
+    fn eq(&self, other: &Self) -> bool {
+        self.rate == other.rate && float_eq(&self.value, &other.value)
+    }
 }
 
 impl ByteSizeOf for Sample {
@@ -551,7 +565,7 @@ impl ByteSizeOf for Sample {
 /// of the bucket is the upper bound on the range of values within the
 /// bucket. The lower bound on the range is just higher than the
 /// previous bucket, or zero for the first bucket.
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialOrd, Serialize)]
 pub struct Bucket {
     pub upper_limit: f64,
     pub count: u32,
@@ -563,11 +577,23 @@ impl ByteSizeOf for Bucket {
     }
 }
 
+impl PartialEq for Bucket {
+    fn eq(&self, other: &Self) -> bool {
+        self.count == other.count && float_eq(&self.upper_limit, &other.upper_limit)
+    }
+}
+
 /// A single value from a `MetricValue::AggregatedSummary`.
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialOrd, Serialize)]
 pub struct Quantile {
     pub quantile: f64,
     pub value: f64,
+}
+
+impl PartialEq for Quantile {
+    fn eq(&self, other: &Self) -> bool {
+        float_eq(&self.quantile, &other.quantile) && float_eq(&self.value, &other.value)
+    }
 }
 
 impl Quantile {
