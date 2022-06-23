@@ -525,7 +525,6 @@ transforms = ["transforms-logs", "transforms-metrics"]
 transforms-logs = [
   "transforms-aws_ec2_metadata",
   "transforms-dedupe",
-  "transforms-field_filter",
   "transforms-filter",
   "transforms-geoip",
   "transforms-log_to_metric",
@@ -553,7 +552,6 @@ transforms-metrics = [
 transforms-aggregate = []
 transforms-aws_ec2_metadata = ["dep:arc-swap"]
 transforms-dedupe = ["dep:lru"]
-transforms-field_filter = []
 transforms-filter = []
 transforms-geoip = ["dep:maxminddb"]
 transforms-log_to_metric = []
@@ -793,7 +791,6 @@ benches = [
   "sources-file",
   "sources-socket",
   "sources-syslog",
-  "transforms-field_filter",
   "transforms-lua",
   "transforms-sample",
 ]
