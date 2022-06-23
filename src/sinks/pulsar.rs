@@ -6,6 +6,8 @@ use std::{
 };
 
 use futures::{future::BoxFuture, ready, stream::FuturesUnordered, FutureExt, Sink, Stream};
+use pulsar::authentication::oauth2::{OAuth2Authentication, OAuth2Params};
+use pulsar::error::AuthenticationError;
 use pulsar::{
     message::proto, producer::SendFuture, proto::CommandSendReceipt, Authentication,
     Error as PulsarError, Producer, Pulsar, TokioExecutor,
@@ -46,8 +48,17 @@ pub struct PulsarSinkConfig {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 struct AuthConfig {
-    name: String,  // "token"
-    token: String, // <jwt token>
+    name: Option<String>,  // "token"
+    token: Option<String>, // <jwt token>
+    oauth2: Option<OAuth2Config>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct OAuth2Config {
+    issuer_url: String,
+    credentials_url: String,
+    audience: Option<String>,
+    scope: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
@@ -152,10 +163,28 @@ impl PulsarSinkConfig {
     async fn create_pulsar_producer(&self) -> Result<PulsarProducer, PulsarError> {
         let mut builder = Pulsar::builder(&self.endpoint, TokioExecutor);
         if let Some(auth) = &self.auth {
-            builder = builder.with_auth(Authentication {
-                name: auth.name.clone(),
-                data: auth.token.as_bytes().to_vec(),
-            });
+            builder = match (
+                auth.name.as_ref(),
+                auth.token.as_ref(),
+                auth.oauth2.as_ref(),
+            ) {
+                (Some(name), Some(token), None) => builder.with_auth(Authentication {
+                    name: name.clone(),
+                    data: token.as_bytes().to_vec(),
+                }),
+                (None, None, Some(oauth2)) => builder.with_auth_provider(
+                    OAuth2Authentication::client_credentials(OAuth2Params {
+                        issuer_url: oauth2.issuer_url.clone(),
+                        credentials_url: oauth2.credentials_url.clone(),
+                        audience: oauth2.audience.clone(),
+                        scope: oauth2.scope.clone(),
+                    }),
+                ),
+                _ => return Err(PulsarError::Authentication(AuthenticationError::Custom(
+                    "Invalid auth config: can only specify name and token or oauth2 configuration"
+                        .to_string(),
+                ))),
+            };
         }
 
         if let Some(avro_schema) = &self.encoding.schema() {
@@ -251,6 +280,11 @@ impl Sink<Event> for PulsarSink {
             "Expected `poll_ready` to be called first."
         );
 
+        let event_time = item.maybe_as_log().and_then(|log| {
+            log.get(log_schema().timestamp_key())
+                .and_then(|v| v.as_timestamp().map(|dt| dt.timestamp_millis()))
+        });
+
         let metadata_builder = RequestMetadata::builder(&item);
         let message = encode_event(item, &self.encoding, &self.avro_schema)
             .map_err(|error| emit!(PulsarEncodeEventError { error }))?;
@@ -267,7 +301,11 @@ impl Sink<Event> for PulsarSink {
         let _ = std::mem::replace(
             &mut self.state,
             PulsarSinkState::Sending(Box::pin(async move {
-                let result = producer.send(message).await;
+                let mut builder = producer.create_message().with_content(message);
+                if let Some(et) = event_time {
+                    builder = builder.event_time(et as u64);
+                }
+                let result = builder.send().await;
                 (producer, result, metadata)
             })),
         );

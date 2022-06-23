@@ -131,6 +131,16 @@ impl Event {
         }
     }
 
+    /// Return self as a `LogEvent` if possible
+    ///
+    /// If the event is a `LogEvent`, then `Some(&log_event)` is returned, otherwise `None`.
+    pub fn maybe_as_log(&self) -> Option<&LogEvent> {
+        match self {
+            Event::Log(log) => Some(log),
+            _ => None,
+        }
+    }
+
     /// Return self as a `Metric`
     ///
     /// # Panics

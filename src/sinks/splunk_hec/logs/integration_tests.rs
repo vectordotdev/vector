@@ -4,7 +4,7 @@ use futures::{future::ready, stream};
 
 use serde_json::Value as JsonValue;
 use tokio::time::{sleep, Duration};
-use vector_core::event::{BatchNotifier, BatchStatus, LogEvent};
+use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
 use crate::{
     config::{SinkConfig, SinkContext},
@@ -13,6 +13,7 @@ use crate::{
             common::{
                 acknowledgements::HecClientAcknowledgementsConfig,
                 integration_test_helpers::{get_token, splunk_api_address, splunk_hec_address},
+                EndpointTarget, SOURCE_FIELD,
             },
             logs::config::{HecEncoding, HecLogsSinkConfig},
         },
@@ -118,6 +119,7 @@ async fn config(
         acknowledgements: Default::default(),
         timestamp_nanos_key: None,
         timestamp_key: Default::default(),
+        endpoint_target: EndpointTarget::Event,
     }
 }
 
@@ -138,6 +140,31 @@ async fn splunk_insert_message() {
     let entry = find_entry(message.as_str()).await;
 
     assert_eq!(message, entry["_raw"].as_str().unwrap());
+    assert!(entry.get("message").is_none());
+}
+
+#[tokio::test]
+async fn splunk_insert_raw_message() {
+    let cx = SinkContext::new_test();
+
+    let config = HecLogsSinkConfig {
+        endpoint_target: EndpointTarget::Raw,
+        source: Some(Template::try_from("zork").unwrap()),
+        ..config(HecEncoding::Text, vec![]).await
+    };
+    let (sink, _) = config.build(cx).await.unwrap();
+
+    let message = random_string(100);
+    let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+    let event = LogEvent::from(message.clone()).with_batch_notifier(&batch);
+    drop(batch);
+    run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    let entry = find_entry(message.as_str()).await;
+
+    assert_eq!(message, entry["_raw"].as_str().unwrap());
+    assert_eq!("zork", entry[SOURCE_FIELD].as_str().unwrap());
     assert!(entry.get("message").is_none());
 }
 
@@ -167,12 +194,12 @@ async fn splunk_insert_source() {
     let (sink, _) = config.build(cx).await.unwrap();
 
     let message = random_string(100);
-    let event = LogEvent::from(message.clone());
+    let event = Event::from(message.clone());
     run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
 
     let entry = find_entry(message.as_str()).await;
 
-    assert_eq!(entry["source"].as_str(), Some("/var/log/syslog"));
+    assert_eq!(entry[SOURCE_FIELD].as_str(), Some("/var/log/syslog"));
 }
 
 #[tokio::test]

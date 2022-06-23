@@ -59,7 +59,7 @@ components: sinks: prometheus_exporter: {
 
 	configuration: {
 		address: {
-			description: "The address to expose for scraping."
+			description: "The address to expose for scraping. The metrics are exposed at the typical Prometheus exporter path, `/metrics`"
 			required:    true
 			warnings: []
 			type: string: {

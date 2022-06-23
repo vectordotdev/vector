@@ -10,10 +10,10 @@ services:
     environment:
       - INFLUXDB_REPORTING_DISABLED=true
       - INFLUXDB_HTTP_HTTPS_ENABLED=true
-      - INFLUXDB_HTTP_HTTPS_CERTIFICATE=/etc/ssl/influxdb.crt
-      - INFLUXDB_HTTP_HTTPS_PRIVATE_KEY=/etc/ssl/influxdb.key
+      - INFLUXDB_HTTP_HTTPS_CERTIFICATE=/etc/ssl/intermediate_server/certs/influxdb-v1-tls-chain.cert.pem
+      - INFLUXDB_HTTP_HTTPS_PRIVATE_KEY=/etc/ssl/intermediate_server/private/influxdb-v1-tls.key.pem
     volumes:
-      - ${PWD}/tests/data:/etc/ssl:ro
+      - ${PWD}/tests/data/ca:/etc/ssl:ro
   influxdb-v2:
     image: docker.io/influxdb:2.0
     command: influxd --reporting-disabled

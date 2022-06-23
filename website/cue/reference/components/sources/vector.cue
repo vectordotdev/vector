@@ -82,7 +82,7 @@ components: sources: vector: {
 					"1": "Vector source API version 1"
 					"2": "Vector source API version 2"
 				}
-				default: "1"
+				default: "2"
 			}
 		}
 	}
@@ -91,6 +91,7 @@ components: sources: vector: {
 		logs: event: {
 			description: "A Vector event"
 			fields: {
+				client_metadata: fields._client_metadata
 				"*": {
 					description: "Vector transparently forwards data from another upstream Vector instance. The `vector` source will not modify or add fields."
 					required:    true
