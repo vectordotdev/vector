@@ -5048,6 +5048,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8e22443d1643a904602595ba1cd8f7d896afe56d26712531c5ff73a15b2fbf64"
 
 [[package]]
+name = "otel_proto"
+version = "0.1.0"
+dependencies = [
+ "bytes 1.1.0",
+ "hex",
+ "ordered-float 3.0.0",
+ "prost",
+ "prost-build",
+ "tonic",
+ "tonic-build",
+ "value",
+ "vector_core",
+]
+
+[[package]]
 name = "output_vt100"
 version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8365,6 +8380,7 @@ dependencies = [
  "openssl",
  "openssl-probe",
  "ordered-float 3.0.0",
+ "otel_proto",
  "percent-encoding",
  "pin-project",
  "portpicker",
