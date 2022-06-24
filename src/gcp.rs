@@ -162,8 +162,13 @@ impl GcpAuthenticator {
                     .as_ref()
                     .map_or("/", PathAndQuery::path);
                 let paq = format!("{path}?key={api_key}");
-                parts.path_and_query = Some(paq.parse().expect("FIXME"));
-                *uri = Uri::from_parts(parts).expect("FIXME");
+                // The API key is verified above to only contain
+                // URL-safe characters. That key is added to a path
+                // that came from a successfully parsed URI. As such,
+                // re-parsing the string cannot fail.
+                parts.path_and_query =
+                    Some(paq.parse().expect("Could not re-parse path and query"));
+                *uri = Uri::from_parts(parts).expect("Could not re-parse URL");
             }
         }
     }
