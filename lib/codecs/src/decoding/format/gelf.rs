@@ -136,17 +136,16 @@ impl GelfDeserializer {
             }
             Ok(number)
         } else if val.is_string() {
-            match val.as_str().unwrap().parse::<i64>() {
-                Ok(number) => Ok(number),
-                Err(_) => match val.as_str().unwrap().parse::<f64>() {
-                    Ok(number) => Ok(f64::round(number) as i64),
-                    Err(_) => Err(format!(
+            let val = val.as_str().unwrap();
+            val.parse::<i64>()
+                .or_else(|_| val.parse::<f64>().map(|number| number.round() as i64))
+                .map_err(|_| {
+                    Err(format!(
                         "Event field {} does not match GELF spec version {}: must be a number",
                         VERSION, GELF_VERSION
-                    )
-                    .into()),
-                },
-            }
+                    ))
+                })
+                .into();
         } else {
             Err(format!(
                 "Event field {} does not match GELF spec version {}: must be a number",
