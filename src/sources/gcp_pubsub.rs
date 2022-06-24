@@ -883,7 +883,10 @@ mod integration_tests {
                 project: PROJECT.into(),
                 subscription: self.subscription.clone(),
                 endpoint: Some(gcp::PUBSUB_ADDRESS.clone()),
-                skip_authentication: true,
+                auth: GcpAuthConfig {
+                    skip_authentication: true,
+                    ..Default::default()
+                },
                 ack_deadline_secs: Some(ACK_DEADLINE as i32),
                 ..Default::default()
             };
