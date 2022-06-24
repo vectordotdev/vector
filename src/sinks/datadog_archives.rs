@@ -227,10 +227,7 @@ impl DatadogArchivesSinkConfig {
                     .gcp_cloud_storage
                     .as_ref()
                     .expect("gcs config wasn't provided");
-                let creds = gcs_config
-                    .auth
-                    .make_credentials(Scope::DevStorageReadWrite)
-                    .await?;
+                let auth = gcs_config.auth.build(Scope::DevStorageReadWrite).await?;
                 let base_url = format!("{}{}/", BASE_URL, self.bucket);
                 let tls = TlsSettings::from_options(&self.tls)?;
                 let client = HttpClient::new(tls, cx.proxy())?;
@@ -238,10 +235,10 @@ impl DatadogArchivesSinkConfig {
                     self.bucket.clone(),
                     client.clone(),
                     base_url.clone(),
-                    creds.clone(),
+                    Some(auth.clone()),
                 )?;
                 let sink = self
-                    .build_gcs_sink(client, base_url, creds, cx)
+                    .build_gcs_sink(client, base_url, auth, cx)
                     .map_err(|error| error.to_string())?;
                 Ok((sink, healthcheck))
             }
@@ -301,7 +298,7 @@ impl DatadogArchivesSinkConfig {
         &self,
         client: HttpClient,
         base_url: String,
-        creds: Option<GcpAuthenticator>,
+        auth: GcpAuthenticator,
         cx: SinkContext,
     ) -> crate::Result<VectorSink> {
         let request = self.request.unwrap_with(&Default::default());
@@ -312,7 +309,7 @@ impl DatadogArchivesSinkConfig {
 
         let svc = ServiceBuilder::new()
             .settings(request, GcsRetryLogic)
-            .service(GcsService::new(client, base_url, creds));
+            .service(GcsService::new(client, base_url, auth));
 
         let gcs_config = self
             .gcp_cloud_storage
