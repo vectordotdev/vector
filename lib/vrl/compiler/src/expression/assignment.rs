@@ -273,13 +273,13 @@ fn verify_overwriteable(
         }
 
         let parent_str = match target {
-            Target::Internal(ident, _) => format!("{ident}{}", path.to_string()),
+            Target::Internal(ident, _) => format!("{ident}{}", path),
             Target::External(_) => {
                 if path.is_root() && remainder_str.starts_with('.') {
                     remainder_str = remainder_str[1..].to_owned();
                 }
 
-                format!(".{}", path.to_string())
+                format!(".{}", path)
             }
             Target::Noop => unreachable!(),
         };
@@ -579,6 +579,7 @@ pub(crate) struct Error {
 }
 
 #[derive(thiserror::Error, Debug)]
+#[allow(clippy::large_enum_variant)]
 pub(crate) enum ErrorVariant {
     #[error("unnecessary no-op assignment")]
     UnnecessaryNoop(Span),
