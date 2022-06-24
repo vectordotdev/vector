@@ -60,6 +60,7 @@ pub struct GelfSerializer {
 
 /// Whether the non-conforming event is capable of being conformed to GELF
 /// standard by vector or not.
+#[derive(Clone)]
 enum EventGelfConformity {
     Conformable(String),
     Unconformable(String),
@@ -79,207 +80,33 @@ impl GelfSerializer {
     pub fn to_json_value(&self, event: Event) -> Result<serde_json::Value, serde_json::Error> {
         match event {
             Event::Log(log) => serde_json::to_value(&log),
+            // TODO Metric and Trace shouldn't be valid but I was not finding a way to construct a
+            // custom serde_json::Error on the fly
             Event::Metric(metric) => serde_json::to_value(&metric),
             Event::Trace(trace) => serde_json::to_value(&trace),
         }
     }
 
-    // fn massage_gelf_format(&self, log: &mut LogEvent) -> Result<(), EventGelfConformity> {
-    //     fn expect_bytes_value(
-    //         key: &str,
-    //         value: &Value,
-    //         log: &mut LogEvent,
-    //     ) -> Result<(), EventGelfConformity> {
-    //         if !value.is_bytes() {
-    //             if value.is_float() || value.is_integer() || value.is_boolean() {
-    //                 // TODO modify value
-    //             } else {
-    //                 return Err(EventGelfConformity::Unconformable(
-    //                     format!("LogEvent field {} should be a UTF-8 string", key).into(),
-    //                 ));
-    //             }
-    //         }
-    //         Ok(())
-    //     }
-
-    //     fn expect_number_value(
-    //         key: &str,
-    //         value: &Value,
-    //         log: &mut LogEvent,
-    //     ) -> Result<(), EventGelfConformity> {
-    //         if !value.is_integer() {
-    //             if value.is_bytes() {
-    //                 let v = value.as_bytes().unwrap();
-    //                 match std::str::from_utf8(&v) {
-    //                     Ok(_) => {
-    //                         // TODO modify value
-    //                     }
-    //                     Err(_) => {
-    //                         return Err(EventGelfConformity::Unconformable(
-    //                             format!("LogEvent field {} should be an integer", key).into(),
-    //                         ))
-    //                     }
-    //                 }
-    //             } else if value.is_float() || value.is_boolean() {
-    //                 // TODO modify value
-    //             } else {
-    //                 return Err(EventGelfConformity::Unconformable(
-    //                     format!("LogEvent field {} should be a UTF-8 string", key).into(),
-    //                 ));
-    //             }
-    //         }
-    //         Ok(())
-    //     }
-
-    //     if let Some(event_data) = log.as_map() {
-    //         for (key, value) in event_data {
-    //             if key == VERSION {
-    //                 expect_bytes_value(&key, value, log)?;
-    //             } else if key == HOST {
-    //                 expect_bytes_value(&key, value, log)?;
-    //             } else if key == log_schema().message_key() {
-    //                 expect_bytes_value(&key, value, log)?;
-    //             } else if key == FULL_MESSAGE || key == FACILITY || key == FILE {
-    //                 expect_bytes_value(&key, value, log)?;
-    //             } else if key == TIMESTAMP {
-    //                 if !value.is_timestamp() || value.is_integer() {
-    //                     return Err(EventGelfConformity::Unconformable(
-    //                         format!(
-    //                             "LogEvent field {} should be a timestamp type or integer",
-    //                             log_schema().timestamp_key()
-    //                         )
-    //                         .into(),
-    //                     ));
-    //                 }
-    //             } else if key == LEVEL || key == FILE {
-    //                 expect_number_value(&key, value, log)?;
-    //             } else {
-    //                 if key.len() > 0 && key.chars().nth(0).unwrap() != '_' {
-    //                     return Err(EventGelfConformity::Conformable(
-    //                         format!("LogEvent field {} is not underscore prefixed", key).into(),
-    //                     ));
-    //                 }
-    //                 if !self.regex.is_match(key) {
-    //                     return Err(EventGelfConformity::Conformable(
-    //                         format!("LogEvent field {} contains an invalid character", key).into(),
-    //                     ));
-    //                 }
-    //             }
-    //         }
-    //     }
-
-    //     Ok(())
-    // }
-
-    // fn is_event_valid_gelf(&self, log: &LogEvent) -> Result<(), EventGelfConformity> {
-    //     let mut has_version = false;
-    //     let mut has_host = false;
-    //     let mut has_message = false;
-
-    //     fn expect_bytes_value(key: &str, value: &Value) -> Result<(), EventGelfConformity> {
-    //         if !value.is_bytes() {
-    //             if value.is_float() || value.is_integer() || value.is_boolean() {
-    //                 return Err(EventGelfConformity::Conformable(
-    //                     format!("LogEvent field {} should be a UTF-8 string", key).into(),
-    //                 ));
-    //             } else {
-    //                 return Err(EventGelfConformity::Unconformable(
-    //                     format!("LogEvent field {} should be a UTF-8 string", key).into(),
-    //                 ));
-    //             }
-    //         }
-    //         Ok(())
-    //     }
-
-    //     fn expect_number_value(key: &str, value: &Value) -> Result<(), EventGelfConformity> {
-    //         if !value.is_integer() {
-    //             if value.is_bytes() {
-    //                 let v = value.as_bytes().unwrap();
-    //                 match std::str::from_utf8(&v) {
-    //                     Ok(_) => {
-    //                         return Err(EventGelfConformity::Conformable(
-    //                             format!("LogEvent field {} should be an integer", key).into(),
-    //                         ))
-    //                     }
-    //                     Err(_) => {
-    //                         return Err(EventGelfConformity::Unconformable(
-    //                             format!("LogEvent field {} should be an integer", key).into(),
-    //                         ))
-    //                     }
-    //                 }
-    //             } else if value.is_float() || value.is_boolean() {
-    //                 return Err(EventGelfConformity::Conformable(
-    //                     format!("LogEvent field {} should be an integer", key).into(),
-    //                 ));
-    //             } else {
-    //                 return Err(EventGelfConformity::Unconformable(
-    //                     format!("LogEvent field {} should be a UTF-8 string", key).into(),
-    //                 ));
-    //             }
-    //         }
-    //         Ok(())
-    //     }
-
-    //     if let Some(event_data) = log.as_map() {
-    //         for (key, value) in event_data {
-    //             if key == VERSION {
-    //                 has_version = true;
-    //                 expect_bytes_value(&key, value)?;
-    //             } else if key == HOST {
-    //                 has_host = true;
-    //                 expect_bytes_value(&key, value)?;
-    //             } else if key == log_schema().message_key() {
-    //                 has_message = true;
-    //                 expect_bytes_value(&key, value)?;
-    //             } else if key == FULL_MESSAGE || key == FACILITY || key == FILE {
-    //                 expect_bytes_value(&key, value)?;
-    //             } else if key == TIMESTAMP {
-    //                 if !value.is_timestamp() || value.is_integer() {
-    //                     return Err(EventGelfConformity::Unconformable(
-    //                         format!(
-    //                             "LogEvent field {} should be a timestamp type or integer",
-    //                             log_schema().timestamp_key()
-    //                         )
-    //                         .into(),
-    //                     ));
-    //                 }
-    //             } else if key == LEVEL || key == FILE {
-    //                 expect_number_value(&key, value)?;
-    //             } else {
-    //                 if key.len() > 0 && key.chars().nth(0).unwrap() != '_' {
-    //                     return Err(EventGelfConformity::Conformable(
-    //                         format!("LogEvent field {} is not underscore prefixed", key).into(),
-    //                     ));
-    //                 }
-    //                 if !self.regex.is_match(key) {
-    //                     return Err(EventGelfConformity::Conformable(
-    //                         format!("LogEvent field {} contains an invalid character", key).into(),
-    //                     ));
-    //                 }
-    //             }
-    //         }
-    //     }
-
-    //     if !has_version {
-    //         Err(EventGelfConformity::Unconformable(
-    //             format!("LogEvent does not contain field {}", VERSION).into(),
-    //         ))
-    //     } else if !has_host {
-    //         Err(EventGelfConformity::Unconformable(
-    //             format!("LogEvent does not contain field {}", HOST).into(),
-    //         ))
-    //     } else if !has_message {
-    //         Err(EventGelfConformity::Unconformable(
-    //             format!(
-    //                 "LogEvent does not contain field {}",
-    //                 log_schema().message_key()
-    //             )
-    //             .into(),
-    //         ))
-    //     } else {
-    //         Ok(())
-    //     }
-    // }
+    /// Helper function to either conform the value at 'key' within the conformed log event,
+    /// or return the provided error.
+    fn conform<F: Fn(&mut Value)>(
+        &self,
+        clog: &mut Option<LogEvent>,
+        conformed: &mut bool,
+        key: &str,
+        err: Result<(), EventGelfConformity>,
+        f: F,
+    ) -> Result<(), EventGelfConformity> {
+        if let Some(clog) = clog {
+            // key is present per caller logic
+            let c_val = clog.get_mut(key).unwrap();
+            f(c_val);
+            *conformed = true;
+            Ok(())
+        } else {
+            err
+        }
+    }
 
     /// Return Ok if value is a string. Otherwise, determine if it is possible to conform
     /// the value to a string, and do the conformation if configured to do so.
@@ -292,16 +119,17 @@ impl GelfSerializer {
     ) -> Result<(), EventGelfConformity> {
         if !value.is_bytes() {
             if value.is_float() || value.is_integer() || value.is_boolean() {
-                if let Some(clog) = clog {
-                    // key is present per caller logic
-                    let c_val = clog.get_mut(key).unwrap();
-                    *c_val = Value::Bytes(value.coerce_to_bytes());
-                    *conformed = true;
-                } else {
-                    return Err(EventGelfConformity::Conformable(
+                self.conform(
+                    clog,
+                    conformed,
+                    key,
+                    Err(EventGelfConformity::Conformable(
                         format!("LogEvent field {} should be a UTF-8 string", key).into(),
-                    ));
-                }
+                    )),
+                    |c_val| {
+                        *c_val = Value::Bytes(value.coerce_to_bytes());
+                    },
+                )?;
             } else {
                 return Err(EventGelfConformity::Unconformable(
                     format!("LogEvent field {} should be a UTF-8 string", key).into(),
@@ -320,65 +148,45 @@ impl GelfSerializer {
         clog: &mut Option<LogEvent>,
         conformed: &mut bool,
     ) -> Result<(), EventGelfConformity> {
+        let conformable = EventGelfConformity::Conformable(
+            format!("LogEvent field {} should be an integer", key).into(),
+        );
+        let unconformable = EventGelfConformity::Unconformable(
+            format!("LogEvent field {} should be an integer", key).into(),
+        );
         if !value.is_integer() {
             // if the value is a string and that string can be parse into an integer
             if value.is_bytes() {
-                let v = value.as_bytes().unwrap();
-                match std::str::from_utf8(&v) {
-                    Ok(int_str) => {
-                        match int_str.parse::<i64>() {
-                            Ok(integer) => {
-                                if let Some(clog) = clog {
-                                    // key is present per caller logic
-                                    let c_val = clog.get_mut(key).unwrap();
-                                    *c_val = Value::Integer(integer);
-                                    *conformed = true;
-                                } else {
-                                    return Err(EventGelfConformity::Conformable(
-                                        format!("LogEvent field {} should be an integer", key)
-                                            .into(),
-                                    ));
-                                }
-                            }
-                            Err(_) => {
-                                return Err(EventGelfConformity::Unconformable(
-                                    format!("LogEvent field {} should be an integer", key).into(),
-                                ))
-                            }
-                        }
-                    }
-                    Err(_) => {
-                        return Err(EventGelfConformity::Unconformable(
-                            format!("LogEvent field {} should be an integer", key).into(),
-                        ))
-                    }
-                }
+                std::str::from_utf8(&value.as_bytes().unwrap())
+                    .map(|int_str| {
+                        int_str
+                            .parse::<i64>()
+                            .map(|integer| {
+                                Ok(self.conform(
+                                    clog,
+                                    conformed,
+                                    key,
+                                    Err(conformable),
+                                    |c_val| {
+                                        *c_val = Value::Integer(integer);
+                                    },
+                                )?)
+                            })
+                            .map_err(|_| unconformable.clone())?
+                    })
+                    .map_err(|_| unconformable)??;
             }
             // round off floats
             else if value.is_float() {
-                if let Some(clog) = clog {
-                    // key is present per caller logic
-                    let c_val = clog.get_mut(key).unwrap();
+                self.conform(clog, conformed, key, Err(conformable), |c_val| {
                     *c_val = Value::Integer(value.as_float().unwrap().round() as i64);
-                    *conformed = true;
-                } else {
-                    return Err(EventGelfConformity::Conformable(
-                        format!("LogEvent field {} should be an integer", key).into(),
-                    ));
-                }
+                })?;
             }
             // false -> 0 , true -> 1
             else if value.is_boolean() {
-                if let Some(clog) = clog {
-                    // key is present per caller logic
-                    let c_val = clog.get_mut(key).unwrap();
+                self.conform(clog, conformed, key, Err(conformable), |c_val| {
                     *c_val = Value::Integer(value.as_boolean().unwrap() as i64);
-                    *conformed = true;
-                } else {
-                    return Err(EventGelfConformity::Conformable(
-                        format!("LogEvent field {} should be an integer", key).into(),
-                    ));
-                }
+                })?;
             } else {
                 return Err(EventGelfConformity::Unconformable(
                     format!("LogEvent field {} should be an integer", key).into(),
@@ -399,6 +207,11 @@ impl GelfSerializer {
     ///    - Err(EventGelfConformity::UnConformable)
     ///         => The log event isn't valid GELF and vector is unable to conform it.
     fn is_event_valid_gelf(&self, log: &LogEvent) -> Result<Option<LogEvent>, EventGelfConformity> {
+        // TODO the GELF decoder is more relaxed than this, more closely mirroring the behavior of
+        // the graylog node. Which means as is, a user could pass in a GELF message to the decoder
+        // and it might be missing HOST and VERSION and that would succeed, but encoding it would
+        // fail
+
         // VERSION, HOST and <MESSAGE> are all required fields
         if !log.contains(VERSION) {
             return Err(EventGelfConformity::Unconformable(
@@ -510,6 +323,7 @@ impl Encoder<Event> for GelfSerializer {
 
         match self.is_event_valid_gelf(&log) {
             Ok(conformed) => {
+                // use conformed log event if it exists, otherwise the original
                 if let Some(conformed) = conformed {
                     serde_json::to_writer(writer, &conformed)?;
                 } else {
@@ -539,17 +353,10 @@ mod tests {
     use super::*;
     use vector_common::btreemap;
     use vector_core::event::{Event, EventMetadata};
-    //use bytes::Bytes;
-    //use chrono::{DateTime, NaiveDateTime, Utc};
-    //use lookup::path;
-    //use pretty_assertions::assert_eq;
-    //use serde_json::json;
-    //use smallvec::SmallVec;
-    //use value::Value;
 
-    /// TODO
+    /// TODO expand unit tests once confirmed encoding behavior
     #[test]
-    fn gelf_serializing_() {
+    fn gelf_serializing_valid() {
         let config = GelfSerializerConfig::default();
         let mut serializer = config.build();
 
@@ -562,6 +369,44 @@ mod tests {
 
         let mut buffer = BytesMut::new();
 
-        serializer.encode(event, &mut buffer).unwrap();
+        assert!(serializer.encode(event, &mut buffer).is_ok());
+    }
+
+    #[test]
+    fn gelf_serializing_invalid_sanitize() {
+        let config = GelfSerializerConfig {
+            options: GelfSerializerOptions { sanitize: true },
+        };
+        let mut serializer = config.build();
+
+        let event_fields = btreemap! {
+            VERSION => "1.1",
+            HOST => "example.org",
+            LINE => "1",
+            log_schema().message_key() => "Some message",
+        };
+        let event: Event = LogEvent::from_map(event_fields, EventMetadata::default()).into();
+
+        let mut buffer = BytesMut::new();
+
+        assert!(serializer.encode(event, &mut buffer).is_ok());
+    }
+
+    #[test]
+    fn gelf_serializing_invalid_no_sanitize() {
+        let config = GelfSerializerConfig::default();
+        let mut serializer = config.build();
+
+        let event_fields = btreemap! {
+            VERSION => "1.1",
+            HOST => "example.org",
+            LINE => "1",
+            log_schema().message_key() => "Some message",
+        };
+        let event: Event = LogEvent::from_map(event_fields, EventMetadata::default()).into();
+
+        let mut buffer = BytesMut::new();
+
+        assert!(serializer.encode(event, &mut buffer).is_err());
     }
 }
