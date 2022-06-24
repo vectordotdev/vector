@@ -9,9 +9,10 @@ use tokio::io::DuplexStream;
 
 use super::{
     io::{AsyncFile, Metadata, ProductionFilesystem, ReadableMemoryMap, WritableMemoryMap},
+    record::RECORD_HEADER_LEN,
     Buffer, DiskBufferConfigBuilder, Ledger, Reader, Writer,
 };
-use crate::{buffer_usage_data::BufferUsageHandle, Acker, Bufferable};
+use crate::{buffer_usage_data::BufferUsageHandle, encoding::FixedEncodable, Acker, Bufferable};
 
 type FilesystemUnderTest = ProductionFilesystem;
 
@@ -213,6 +214,8 @@ where
 pub(crate) async fn create_buffer_v2_with_max_buffer_size<P, R>(
     data_dir: P,
     max_buffer_size: u64,
+    max_data_file_size: u64,
+    max_record_size: u64,
 ) -> (
     Writer<R, FilesystemUnderTest>,
     Reader<R, FilesystemUnderTest>,
@@ -223,12 +226,15 @@ where
     P: AsRef<Path>,
     R: Bufferable,
 {
-    // We override `max_buffer_size` directly because otherwise `build` has built-in logic that
-    // ensures it is a minimum size related to the data file size limit, etc.
-    let mut config = DiskBufferConfigBuilder::from_path(data_dir)
+    let config = DiskBufferConfigBuilder::from_path(data_dir)
+        .max_record_size(
+            usize::try_from(max_record_size)
+                .expect("Vector only supports 64-bit architectures when testing."),
+        )
+        .max_data_file_size(max_data_file_size)
+        .max_buffer_size(max_buffer_size)
         .build()
         .expect("creating buffer should not fail");
-    config.max_buffer_size = max_buffer_size;
     let usage_handle = BufferUsageHandle::noop();
 
     Buffer::from_config_inner(config, usage_handle)
@@ -273,8 +279,12 @@ where
     P: AsRef<Path>,
     R: Bufferable,
 {
+    let max_record_size =
+        usize::try_from(max_data_file_size).expect("Vector only supports 64-bit architectures.");
+
     let config = DiskBufferConfigBuilder::from_path(data_dir)
         .max_data_file_size(max_data_file_size)
+        .max_record_size(max_record_size)
         .build()
         .expect("creating buffer should not fail");
     let usage_handle = BufferUsageHandle::noop();
@@ -306,4 +316,47 @@ where
     Buffer::from_config_inner(config, usage_handle)
         .await
         .expect("should not fail to create buffer")
+}
+
+const fn align16(amount: usize) -> usize {
+    const SERIALIZER_ALIGNMENT: usize = 16;
+
+    if amount % SERIALIZER_ALIGNMENT == 0 {
+        amount
+    } else {
+        // Pad ourselves to meet the alignment requirements.
+        (amount & !(SERIALIZER_ALIGNMENT - 1)) + SERIALIZER_ALIGNMENT
+    }
+}
+
+const fn align16_u32(amount: u32) -> u32 {
+    const SERIALIZER_ALIGNMENT: u32 = 16;
+
+    if amount % SERIALIZER_ALIGNMENT == 0 {
+        amount
+    } else {
+        // Pad ourselves to meet the alignment requirements.
+        (amount & !(SERIALIZER_ALIGNMENT - 1)) + SERIALIZER_ALIGNMENT
+    }
+}
+
+pub(crate) fn get_corrected_max_record_size<T>(payload: &T) -> usize
+where
+    T: FixedEncodable,
+{
+    let payload_len = payload
+        .encoded_size()
+        .expect("All test record types must return a valid encoded size.");
+    let total = RECORD_HEADER_LEN + payload_len;
+
+    align16(total)
+}
+
+pub(crate) fn get_minimum_data_file_size_for_record_payload<T>(payload: &T) -> u64
+where
+    T: FixedEncodable,
+{
+    // This is just the maximum record size, compensating for the record header length.
+    let max_record_size = get_corrected_max_record_size(payload);
+    u64::try_from(max_record_size).expect("Vector does not support 128-bit architectures.")
 }
