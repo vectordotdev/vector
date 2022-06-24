@@ -10,7 +10,7 @@ use crate::{
     Context, Expression, Span, TypeDef,
 };
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Variable {
     ident: Ident,
     value: Option<Value>,
@@ -23,7 +23,7 @@ impl Variable {
             None => {
                 let idents = local
                     .variable_idents()
-                    .map(|s| s.to_owned())
+                    .map(std::clone::Clone::clone)
                     .collect::<Vec<_>>();
 
                 return Err(Error::undefined(ident, span, idents));
@@ -55,8 +55,7 @@ impl Expression for Variable {
         local
             .variable(&self.ident)
             .cloned()
-            .map(|d| d.type_def)
-            .unwrap_or_else(|| TypeDef::null().infallible())
+            .map_or_else(|| TypeDef::null().infallible(), |d| d.type_def)
     }
 }
 
@@ -103,7 +102,7 @@ impl std::error::Error for Error {
 
 impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
-        use ErrorVariant::*;
+        use ErrorVariant::Undefined;
 
         match &self.variant {
             Undefined { .. } => 701,
@@ -111,7 +110,7 @@ impl DiagnosticMessage for Error {
     }
 
     fn labels(&self) -> Vec<Label> {
-        use ErrorVariant::*;
+        use ErrorVariant::Undefined;
 
         match &self.variant {
             Undefined { idents } => {
