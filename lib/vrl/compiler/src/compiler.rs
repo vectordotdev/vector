@@ -2,9 +2,9 @@ use diagnostic::{DiagnosticList, DiagnosticMessage, Severity, Span};
 use lookup::LookupBuf;
 use parser::ast::{self, Node, QueryTarget};
 
-use crate::parser::ast::RootExpr;
 use crate::{
     expression::*,
+    parser::ast::RootExpr,
     program::ProgramInfo,
     state::{ExternalEnv, LocalEnv},
     Function, Program,

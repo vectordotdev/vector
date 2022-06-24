@@ -4,8 +4,7 @@ use anymap::AnyMap;
 use lookup::LookupBuf;
 use value::{Kind, Value};
 
-use crate::value::Collection;
-use crate::{parser::ast::Ident, type_def::Details};
+use crate::{parser::ast::Ident, type_def::Details, value::Collection};
 
 /// Local environment, limited to a given scope.
 #[derive(Debug, Default, Clone, PartialEq)]

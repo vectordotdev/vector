@@ -1,6 +1,4 @@
-use vrl::prelude::*;
-
-use vrl::prelude::TypeDef as VrlTypeDef;
+use vrl::prelude::{TypeDef as VrlTypeDef, *};
 
 fn type_def(type_def: &VrlTypeDef) -> Resolved {
     let mut tree = type_def.kind().debug_info();

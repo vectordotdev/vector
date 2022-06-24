@@ -1,22 +1,24 @@
-use std::{error::Error as _, pin::Pin, time::Duration};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::{
+    error::Error as _, future::Future, pin::Pin, sync::Arc, task::Context, task::Poll,
+    time::Duration,
+};
 
 use chrono::{DateTime, NaiveDateTime, Utc};
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use derivative::Derivative;
-use futures::{stream, Stream, StreamExt, TryFutureExt};
+use futures::{stream, stream::FuturesUnordered, FutureExt, Stream, StreamExt, TryFutureExt};
 use http::uri::{InvalidUri, Scheme, Uri};
 use once_cell::sync::Lazy;
 use snafu::{ResultExt, Snafu};
-use tokio::sync::mpsc::{self, Receiver, Sender};
+use tokio::sync::{mpsc, watch};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{
     metadata::{errors::InvalidMetadataValue, MetadataValue},
     transport::{Certificate, Channel, ClientTlsConfig, Endpoint, Identity},
     Code, Request, Status,
 };
-use vector_common::{
-    byte_size_of::ByteSizeOf, finalizer::EmptyStream, finalizer::UnorderedFinalizer,
-};
+use vector_common::{byte_size_of::ByteSizeOf, finalizer::UnorderedFinalizer};
 use vector_config::configurable_component;
 
 use crate::{
@@ -41,8 +43,10 @@ const MAX_ACK_DEADLINE_SECS: i32 = 600;
 // We use a bounded channel for the acknowledgement ID communication
 // between the request stream and receiver. During benchmark runs,
 // this channel had only a single element over 80% of the time and
-// rarely went over 8 elements.
-const ACK_QUEUE_SIZE: usize = 128;
+// rarely went over 8 elements. Having it too small does not introduce
+// deadlocks, as the worst case is slightly less efficient ack
+// processing.
+const ACK_QUEUE_SIZE: usize = 8;
 
 type Finalizer = UnorderedFinalizer<Vec<String>>;
 
@@ -132,6 +136,21 @@ pub struct PubsubConfig {
     #[configurable(derived)]
     pub tls: Option<TlsConfig>,
 
+    /// The maximum number of concurrent stream connections to open at once.
+    #[serde(default = "default_max_concurrency")]
+    pub max_concurrency: usize,
+
+    /// The number of messages in a response to mark a stream as
+    /// "busy". This is used to determine if more streams should be
+    /// started.
+    #[serde(default = "default_full_response")]
+    pub full_response_size: usize,
+
+    /// How often to poll the currently active streams to see if they
+    /// are all busy and so open a new stream.
+    #[serde(default = "default_poll_time")]
+    pub poll_time_seconds: f64,
+
     /// The acknowledgement deadline, in seconds, to use for this stream.
     ///
     /// Messages that are not acknowledged when this deadline expires may be retransmitted.
@@ -179,6 +198,18 @@ const fn default_keepalive() -> f64 {
     60.0
 }
 
+const fn default_max_concurrency() -> usize {
+    10
+}
+
+const fn default_full_response() -> usize {
+    100
+}
+
+const fn default_poll_time() -> f64 {
+    2.0
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_pubsub")]
 impl SourceConfig for PubsubConfig {
@@ -214,24 +245,57 @@ impl SourceConfig for PubsubConfig {
 
         let endpoint = self.endpoint.as_deref().unwrap_or(PUBSUB_URL).to_string();
         let uri: Uri = endpoint.parse().context(UriSnafu)?;
+
+        let tls = TlsSettings::from_options(&self.tls)?;
+        let host = uri.host().unwrap_or("pubsub.googleapis.com");
+        let mut tls_config = ClientTlsConfig::new().domain_name(host);
+        if let Some((cert, key)) = tls.identity_pem() {
+            tls_config = tls_config.identity(Identity::from_pem(cert, key));
+        }
+        for authority in tls.authorities_pem() {
+            tls_config = tls_config.ca_certificate(Certificate::from_pem(authority));
+        }
+
+        let mut endpoint = Channel::from_shared(endpoint).context(EndpointSnafu)?;
+        if uri.scheme() != Some(&Scheme::HTTP) {
+            endpoint = endpoint.tls_config(tls_config).context(EndpointTlsSnafu)?;
+        }
+
+        let token_generator = match &credentials {
+            Some(credentials) => credentials.clone().spawn_regenerate_token(),
+            None => {
+                let (sender, receiver) = watch::channel(());
+                // This keeps the sender end of the watch open without
+                // actually sending anything, effectively creating an
+                // empty watch stream.
+                tokio::spawn(async move { sender.closed().await });
+                receiver
+            }
+        };
+
         let source = PubsubSource {
             endpoint,
             uri,
             credentials,
+            token_generator,
             subscription: format!(
                 "projects/{}/subscriptions/{}",
                 self.project, self.subscription
             ),
             decoder: DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build(),
             acknowledgements: cx.do_acknowledgements(&self.acknowledgements),
-            tls: TlsSettings::from_options(&self.tls)?,
             shutdown: cx.shutdown,
             out: cx.out,
             ack_deadline_secs,
             retry_delay: Duration::from_secs_f64(retry_delay_secs),
             keepalive: Duration::from_secs_f64(self.keepalive_secs),
+            concurrency: Default::default(),
+            full_response_size: self.full_response_size,
         }
-        .run()
+        .run_all(
+            self.max_concurrency,
+            Duration::from_secs_f64(self.poll_time_seconds),
+        )
         .map_err(|error| error!(message = "Source failed.", %error));
         Ok(Box::pin(source))
     }
@@ -251,19 +315,25 @@ impl SourceConfig for PubsubConfig {
 
 impl_generate_config_from_default!(PubsubConfig);
 
+#[derive(Clone)]
 struct PubsubSource {
-    endpoint: String,
+    endpoint: Endpoint,
     uri: Uri,
     credentials: Option<GcpCredentials>,
+    token_generator: watch::Receiver<()>,
     subscription: String,
     decoder: Decoder,
     acknowledgements: bool,
-    tls: TlsSettings,
     ack_deadline_secs: i32,
     shutdown: ShutdownSignal,
     out: SourceSender,
     retry_delay: Duration,
     keepalive: Duration,
+    // The current concurrency is shared across all tasks. It is used
+    // by the streams to avoid shutting down the last stream, which
+    // would result in repeatedly re-opening the stream on idle.
+    concurrency: Arc<AtomicUsize>,
+    full_response_size: usize,
 }
 
 enum State {
@@ -273,21 +343,56 @@ enum State {
 }
 
 impl PubsubSource {
-    async fn run(mut self) -> crate::Result<()> {
-        let mut endpoint = Channel::from_shared(self.endpoint.clone()).context(EndpointSnafu)?;
-        if self.uri.scheme() != Some(&Scheme::HTTP) {
-            endpoint = endpoint
-                .tls_config(self.make_tls_config())
-                .context(EndpointTlsSnafu)?;
-        }
-
-        let mut token_generator = match &self.credentials {
-            Some(credentials) => credentials.clone().token_regenerator().boxed(),
-            None => EmptyStream::default().boxed(),
-        };
+    async fn run_all(mut self, max_concurrency: usize, poll_time: Duration) -> crate::Result<()> {
+        let mut tasks = FuturesUnordered::new();
 
         loop {
-            match self.run_once(&endpoint, &mut token_generator).await {
+            self.concurrency.store(tasks.len(), Ordering::Relaxed);
+            tokio::select! {
+                _ = &mut self.shutdown => break,
+                _ = tasks.next() => {
+                    if tasks.is_empty() {
+                        // Either no tasks were started or a race
+                        // condition resulted in the last task
+                        // exiting. Start up a new stream immediately.
+                        self.start_one(&tasks);
+                    }
+
+                },
+                _ = tokio::time::sleep(poll_time) => {
+                    // If all of the tasks are marked as busy, start
+                    // up a new one.
+                    if tasks.len() < max_concurrency
+                        && tasks.iter().all(|task| task.busy_flag.load(Ordering::Relaxed))
+                    {
+                        self.start_one(&tasks);
+                    }
+                }
+            }
+        }
+
+        // Wait for all active streams to exit on shutdown
+        while tasks.next().await.is_some() {}
+
+        Ok(())
+    }
+
+    fn start_one(&self, tasks: &FuturesUnordered<Task>) {
+        info!(message = "Starting stream.", concurrency = tasks.len() + 1);
+        // The `busy_flag` is used to monitor the status of a
+        // stream. It will start marked as idle to prevent the above
+        // scan from spinning up too many at once. When a stream
+        // receives "full" batches, it will mark itself as busy, and
+        // when it has an idle interval it will mark itself as not
+        // busy.
+        let busy_flag = Arc::new(AtomicBool::new(false));
+        let task = tokio::spawn(self.clone().run(Arc::clone(&busy_flag)));
+        tasks.push(Task { task, busy_flag });
+    }
+
+    async fn run(mut self, busy_flag: Arc<AtomicBool>) {
+        loop {
+            match self.run_once(&busy_flag).await {
                 State::RetryNow => debug!("Retrying immediately."),
                 State::RetryDelay => {
                     info!(
@@ -299,16 +404,10 @@ impl PubsubSource {
                 State::Shutdown => break,
             }
         }
-
-        Ok(())
     }
 
-    async fn run_once(
-        &mut self,
-        endpoint: &Endpoint,
-        token_generator: &mut Pin<Box<dyn Stream<Item = ()> + Send>>,
-    ) -> State {
-        let connection = match endpoint.connect().await {
+    async fn run_once(&mut self, busy_flag: &Arc<AtomicBool>) -> State {
+        let connection = match self.endpoint.connect().await {
             Ok(connection) => connection,
             Err(error) => {
                 emit!(GcpPubsubConnectError { error });
@@ -353,15 +452,13 @@ impl PubsubSource {
 
         let (finalizer, mut ack_stream) =
             Finalizer::maybe_new(self.acknowledgements, self.shutdown.clone());
+        let mut pending_acks = 0;
 
         loop {
             tokio::select! {
-                _ = &mut self.shutdown => return State::Shutdown,
-                _ = &mut token_generator.next() => {
-                    debug!("New authentication token generated, restarting stream.");
-                    break State::RetryNow;
-                },
+                biased;
                 receipts = ack_stream.next() => if let Some((status, receipts)) = receipts {
+                    pending_acks -= 1;
                     if status == BatchStatus::Delivered {
                         ack_ids_sender
                             .send(receipts)
@@ -370,36 +467,59 @@ impl PubsubSource {
                     }
                 },
                 response = stream.next() => match response {
-                    Some(Ok(response)) =>
-                        self.handle_response(response, &finalizer, &ack_ids_sender).await,
+                    Some(Ok(response)) => {
+                        self.handle_response(
+                            response,
+                            &finalizer,
+                            &ack_ids_sender,
+                            &mut pending_acks,
+                            busy_flag,
+                        ).await;
+                    }
                     Some(Err(error)) => break translate_error(error),
                     None => break State::RetryNow,
                 },
+                _ = &mut self.shutdown, if pending_acks == 0 => return State::Shutdown,
+                _ = self.token_generator.changed() => {
+                    debug!("New authentication token generated, restarting stream.");
+                    break State::RetryNow;
+                },
+                _ = tokio::time::sleep(self.keepalive) => {
+                    if pending_acks == 0 {
+                        // No pending acks, and no new data, so drop
+                        // this stream if we aren't the only active
+                        // one.
+                        if self.concurrency.load(Ordering::Relaxed) > 1 {
+                            info!("Shutting down inactive stream.");
+                            break State::Shutdown;
+                        }
+                        // Otherwise, mark this stream as idle.
+                        busy_flag.store(false, Ordering::Relaxed);
+                    }
+                    // GCP Pub/Sub likes to time out connections after
+                    // about 75 seconds of inactivity. To forestall
+                    // the resulting error, send an empty array of
+                    // acknowledgement IDs to the request stream if no
+                    // other activity has happened. This will result
+                    // in a new request with empty fields, effectively
+                    // a keepalive.
+                    ack_ids_sender
+                        .send(Vec::new())
+                        .await
+                        .unwrap_or_else(|_| unreachable!("request stream never closes"));
+                }
             }
         }
     }
 
-    fn make_tls_config(&self) -> ClientTlsConfig {
-        let host = self.uri.host().unwrap_or("pubsub.googleapis.com");
-        let mut config = ClientTlsConfig::new().domain_name(host);
-        if let Some((cert, key)) = self.tls.identity_pem() {
-            config = config.identity(Identity::from_pem(cert, key));
-        }
-        for authority in self.tls.authorities_pem() {
-            config = config.ca_certificate(Certificate::from_pem(authority));
-        }
-        config
-    }
-
     fn request_stream(
         &self,
-        ack_ids: Receiver<Vec<String>>,
+        ack_ids: mpsc::Receiver<Vec<String>>,
     ) -> impl Stream<Item = proto::StreamingPullRequest> + 'static {
         let subscription = self.subscription.clone();
         let client_id = CLIENT_ID.clone();
         let stream_ack_deadline_seconds = self.ack_deadline_secs;
-        let mut ack_ids = ReceiverStream::new(ack_ids).ready_chunks(ACK_QUEUE_SIZE);
-        let keepalive = self.keepalive;
+        let ack_ids = ReceiverStream::new(ack_ids).ready_chunks(ACK_QUEUE_SIZE);
 
         stream::once(async move {
             // These fields are only valid on the first request in the
@@ -411,38 +531,30 @@ impl PubsubSource {
                 ..Default::default()
             }
         })
-        .chain(async_stream::stream! {
-            loop {
-                // GCP Pub/Sub likes to time out connections after
-                // about 75 seconds of inactivity. To forestall the
-                // resulting error, send an empty array of
-                // acknowledgement IDs to the request stream if no
-                // other activity has happened. This will result in a
-                // new request with empty fields, effectively a
-                // keepalive.
-                let ack_ids: Vec<String> = tokio::select! {
-                    chunks = ack_ids.next() => chunks.into_iter().flatten().flatten().collect(),
-                    _ = tokio::time::sleep(keepalive) => Vec::new(),
-                };
-                // These "requests" serve only to send updates about
-                // acknowledgements to the server. None of the above
-                // fields need to be repeated and, in fact, will cause
-                // an stream error and cancellation if they are
-                // present.
-                yield proto::StreamingPullRequest {
-                    ack_ids,
-                    ..Default::default()
-                };
+        .chain(ack_ids.map(|chunks| {
+            // These "requests" serve only to send updates about
+            // acknowledgements to the server. None of the above
+            // fields need to be repeated and, in fact, will cause
+            // an stream error and cancellation if they are
+            // present.
+            proto::StreamingPullRequest {
+                ack_ids: chunks.into_iter().flatten().collect(),
+                ..Default::default()
             }
-        })
+        }))
     }
 
     async fn handle_response(
         &mut self,
         response: proto::StreamingPullResponse,
         finalizer: &Option<Finalizer>,
-        ack_ids: &Sender<Vec<String>>,
+        ack_ids: &mpsc::Sender<Vec<String>>,
+        pending_acks: &mut usize,
+        busy_flag: &Arc<AtomicBool>,
     ) {
+        if response.received_messages.len() >= self.full_response_size {
+            busy_flag.store(true, Ordering::Relaxed);
+        }
         emit!(BytesReceived {
             byte_size: response.size_of(),
             protocol: self.uri.scheme().map(Scheme::as_str).unwrap_or("http"),
@@ -459,10 +571,13 @@ impl PubsubSource {
                     .send(ids)
                     .await
                     .unwrap_or_else(|_| unreachable!("request stream never closes")),
-                Some(notifier) => finalizer
-                    .as_ref()
-                    .expect("Finalizer must have been set up for acknowledgements")
-                    .add(ids, notifier),
+                Some(notifier) => {
+                    finalizer
+                        .as_ref()
+                        .expect("Finalizer must have been set up for acknowledgements")
+                        .add(ids, notifier);
+                    *pending_acks += 1;
+                }
             },
         }
     }
@@ -543,6 +658,20 @@ fn is_reset(error: &Status) -> bool {
         .and_then(|error| error.source())
         .and_then(|source| source.downcast_ref::<h2::Error>())
         .map_or(false, |error| error.is_remote() && error.is_reset())
+}
+
+#[pin_project::pin_project]
+struct Task {
+    task: tokio::task::JoinHandle<()>,
+    busy_flag: Arc<AtomicBool>,
+}
+
+impl Future for Task {
+    type Output = Result<(), tokio::task::JoinError>;
+
+    fn poll(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
+        self.task.poll_unpin(ctx)
+    }
 }
 
 #[cfg(test)]

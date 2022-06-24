@@ -1,9 +1,10 @@
+use std::fmt;
+
 use crate::{
     expression::{Expr, Resolved},
     state::{ExternalEnv, LocalEnv},
     Context, Expression, TypeDef,
 };
-use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Block {
