@@ -44,7 +44,7 @@ components: sinks: new_relic_logs: {
 				interface: {
 					socket: {
 						api: {
-							title: "New Relic  Log API"
+							title: "New Relic Log API"
 							url:   urls.new_relic_log_api
 						}
 						direction: "outgoing"

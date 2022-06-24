@@ -361,7 +361,7 @@ components: {
 					enabled: bool
 
 					if enabled {
-						batched: bool | *false
+						framing: bool | *false
 						enum:    [#EncodingCodec, ...#EncodingCodec] | null
 					}
 				}
