@@ -376,7 +376,6 @@ impl From<metric::Bucket> for proto::HistogramBucket3 {
     }
 }
 
-
 impl From<proto::HistogramBucket3> for metric::Bucket {
     fn from(bucket: proto::HistogramBucket3) -> Self {
         Self {
