@@ -243,8 +243,15 @@ impl SourceConfig for PubsubConfig {
             Some(self.auth.build(Scope::PubSub).await?)
         };
 
-        let endpoint = self.endpoint.as_deref().unwrap_or(PUBSUB_URL).to_string();
-        let uri: Uri = endpoint.parse().context(UriSnafu)?;
+        let mut uri: Uri = self
+            .endpoint
+            .as_deref()
+            .unwrap_or(PUBSUB_URL)
+            .parse()
+            .context(UriSnafu)?;
+        if let Some(auth) = &auth {
+            auth.apply_uri(&mut uri);
+        }
 
         let tls = TlsSettings::from_options(&self.tls)?;
         let host = uri.host().unwrap_or("pubsub.googleapis.com");
@@ -256,7 +263,7 @@ impl SourceConfig for PubsubConfig {
             tls_config = tls_config.ca_certificate(Certificate::from_pem(authority));
         }
 
-        let mut endpoint = Channel::from_shared(endpoint).context(EndpointSnafu)?;
+        let mut endpoint = Channel::from_shared(uri.to_string()).context(EndpointSnafu)?;
         if uri.scheme() != Some(&Scheme::HTTP) {
             endpoint = endpoint.tls_config(tls_config).context(EndpointTlsSnafu)?;
         }
