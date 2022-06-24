@@ -6,6 +6,7 @@ use std::{
 };
 
 use bytes::BytesMut;
+use codecs::encoding::SerializerConfig;
 use futures::{future::BoxFuture, ready, stream::FuturesUnordered, FutureExt, Sink, Stream};
 use pulsar::{
     message::proto, producer::SendFuture, proto::CommandSendReceipt, Authentication,
@@ -54,14 +55,6 @@ pub struct PulsarSinkConfig {
 struct AuthConfig {
     name: String,  // "token"
     token: String, // <jwt token>
-}
-
-#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
-#[serde(rename_all = "snake_case")]
-pub(self) enum Encoding {
-    Text,
-    Json,
-    Avro,
 }
 
 type PulsarProducer = Producer<TokioExecutor>;
@@ -169,13 +162,13 @@ impl PulsarSinkConfig {
             });
         }
 
-        if let Some(avro_schema) = &self.encoding.schema() {
-            let pulsar = builder.build().await?;
+        let pulsar = builder.build().await?;
+        if let SerializerConfig::Avro { avro } = self.encoding.config() {
             pulsar
                 .producer()
                 .with_options(pulsar::producer::ProducerOptions {
                     schema: Some(proto::Schema {
-                        schema_data: avro_schema.to_string().into_bytes(),
+                        schema_data: avro.schema.as_bytes().into(),
                         r#type: proto::schema::Type::Avro as i32,
                         ..Default::default()
                     }),
@@ -185,7 +178,6 @@ impl PulsarSinkConfig {
                 .build()
                 .await
         } else {
-            let pulsar = builder.build().await?;
             pulsar.producer().with_topic(&self.topic).build().await
         }
     }
@@ -255,7 +247,6 @@ impl Sink<Event> for PulsarSink {
         let mut bytes = BytesMut::new();
         self.encoder.encode(event, &mut bytes).map_err(|_| {
             // Error is handled by `Encoder`.
-            ()
         })?;
 
         let bytes_len =
@@ -330,8 +321,6 @@ impl Sink<Event> for PulsarSink {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
     use super::*;
 
     #[test]
@@ -368,7 +357,7 @@ mod integration_tests {
         let cnf = PulsarSinkConfig {
             endpoint: pulsar_address(),
             topic: topic.clone(),
-            encoding: Encoding::Text.into(),
+            encoding: EncodingConfig::from(StandardEncodings::Text).into(),
             auth: None,
         };
 
@@ -392,7 +381,10 @@ mod integration_tests {
 
         let (acker, ack_counter) = Acker::basic();
         let producer = cnf.create_pulsar_producer().await.unwrap();
-        let sink = PulsarSink::new(producer, cnf.encoding, acker).unwrap();
+        let transformer = cnf.encoding.transformer();
+        let serializer = cnf.encoding.encoding().unwrap();
+        let encoder = Encoder::<()>::new(serializer);
+        let sink = PulsarSink::new(producer, transformer, encoder, acker).unwrap();
         let sink = VectorSink::from_event_sink(sink);
         run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
 
