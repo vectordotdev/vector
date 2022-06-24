@@ -140,7 +140,7 @@ impl SinkConfig for GcsSinkConfig {
             self.bucket.clone(),
             client.clone(),
             base_url.clone(),
-            Some(auth.clone()),
+            auth.clone(),
         )?;
         let sink = self.build_sink(client, base_url, auth, cx)?;
 

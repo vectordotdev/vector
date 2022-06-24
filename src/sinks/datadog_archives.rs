@@ -235,7 +235,7 @@ impl DatadogArchivesSinkConfig {
                     self.bucket.clone(),
                     client.clone(),
                     base_url.clone(),
-                    Some(auth.clone()),
+                    auth.clone(),
                 )?;
                 let sink = self
                     .build_gcs_sink(client, base_url, auth, cx)

@@ -104,8 +104,7 @@ impl SinkConfig for PubsubConfig {
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
 
-        let healthcheck =
-            healthcheck(client.clone(), sink.uri("")?, Some(sink.auth.clone())).boxed();
+        let healthcheck = healthcheck(client.clone(), sink.uri("")?, sink.auth.clone()).boxed();
 
         let sink = BatchedHttpSink::new(
             sink,
@@ -218,15 +217,9 @@ impl HttpSink for PubsubSink {
     }
 }
 
-async fn healthcheck(
-    client: HttpClient,
-    uri: Uri,
-    auth: Option<GcpAuthenticator>,
-) -> crate::Result<()> {
+async fn healthcheck(client: HttpClient, uri: Uri, auth: GcpAuthenticator) -> crate::Result<()> {
     let mut request = Request::get(uri).body(Body::empty()).unwrap();
-    if let Some(auth) = auth.as_ref() {
-        auth.apply(&mut request);
-    }
+    auth.apply(&mut request);
 
     let response = client.send(request).await?;
     healthcheck_response(response, auth, HealthcheckError::TopicNotFound.into())

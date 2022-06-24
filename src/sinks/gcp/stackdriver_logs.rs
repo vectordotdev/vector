@@ -307,7 +307,7 @@ async fn healthcheck(client: HttpClient, sink: StackdriverSink) -> crate::Result
     let response = client.send(request).await?;
     healthcheck_response(
         response,
-        Some(sink.auth.clone()),
+        sink.auth.clone(),
         HealthcheckError::NotFound.into(),
     )
 }
