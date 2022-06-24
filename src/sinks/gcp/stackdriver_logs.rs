@@ -384,7 +384,7 @@ mod tests {
 
         let sink = StackdriverSink {
             config,
-            auth: GcpAuthenticator::from_api_key("FAKE").unwrap(),
+            auth: GcpAuthenticator::None,
             severity_key: Some("anumber".into()),
             uri: default_endpoint().parse().unwrap(),
         };
@@ -426,7 +426,7 @@ mod tests {
 
         let sink = StackdriverSink {
             config,
-            auth: GcpAuthenticator::from_api_key("FAKE").unwrap(),
+            auth: GcpAuthenticator::None,
             severity_key: Some("anumber".into()),
             uri: default_endpoint().parse().unwrap(),
         };
@@ -495,7 +495,7 @@ mod tests {
 
         let sink = StackdriverSink {
             config,
-            auth: GcpAuthenticator::from_api_key("FAKE").unwrap(),
+            auth: GcpAuthenticator::None,
             severity_key: None,
             uri: default_endpoint().parse().unwrap(),
         };

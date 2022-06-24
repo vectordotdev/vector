@@ -55,8 +55,6 @@ pub struct PubsubConfig {
     pub topic: String,
     #[serde(default)]
     pub endpoint: Option<String>,
-    #[serde(default = "default_skip_authentication")]
-    pub skip_authentication: bool,
     #[serde(default, flatten)]
     pub auth: GcpAuthConfig,
 
@@ -75,10 +73,6 @@ pub struct PubsubConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     acknowledgements: AcknowledgementsConfig,
-}
-
-const fn default_skip_authentication() -> bool {
-    false
 }
 
 inventory::submit! {
@@ -110,7 +104,8 @@ impl SinkConfig for PubsubConfig {
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
 
-        let healthcheck = healthcheck(client.clone(), sink.uri("")?, sink.auth.clone()).boxed();
+        let healthcheck =
+            healthcheck(client.clone(), sink.uri("")?, Some(sink.auth.clone())).boxed();
 
         let sink = BatchedHttpSink::new(
             sink,
@@ -139,7 +134,7 @@ impl SinkConfig for PubsubConfig {
 }
 
 struct PubsubSink {
-    auth: Option<GcpAuthenticator>,
+    auth: GcpAuthenticator,
     uri_base: String,
     transformer: Transformer,
     encoder: Encoder<()>,
@@ -148,11 +143,7 @@ struct PubsubSink {
 impl PubsubSink {
     async fn from_config(config: &PubsubConfig) -> crate::Result<Self> {
         // We only need to load the credentials if we are not targeting an emulator.
-        let auth = if config.skip_authentication {
-            None
-        } else {
-            Some(config.auth.build(Scope::PubSub).await?)
-        };
+        let auth = config.auth.build(Scope::PubSub).await?;
 
         let uri_base = match config.endpoint.as_ref() {
             Some(host) => host.to_string(),
@@ -178,9 +169,7 @@ impl PubsubSink {
     fn uri(&self, suffix: &str) -> crate::Result<Uri> {
         let uri = format!("{}{}", self.uri_base, suffix);
         let mut uri = uri.parse::<Uri>().context(UriParseSnafu)?;
-        if let Some(auth) = &self.auth {
-            auth.apply_uri(&mut uri);
-        }
+        self.auth.apply_uri(&mut uri);
         Ok(uri)
     }
 }
@@ -223,9 +212,7 @@ impl HttpSink for PubsubSink {
         let builder = Request::post(uri).header("Content-Type", "application/json");
 
         let mut request = builder.body(body).unwrap();
-        if let Some(auth) = &self.auth {
-            auth.apply(&mut request);
-        }
+        self.auth.apply(&mut request);
 
         Ok(request)
     }
@@ -290,8 +277,10 @@ mod integration_tests {
             project: PROJECT.into(),
             topic: topic.into(),
             endpoint: Some(gcp::PUBSUB_ADDRESS.clone()),
-            skip_authentication: true,
-            auth: Default::default(),
+            auth: GcpAuthConfig {
+                skip_authentication: true,
+                ..Default::default()
+            },
             batch: Default::default(),
             request: Default::default(),
             encoding: EncodingConfig::from(StandardEncodings::Json).into(),

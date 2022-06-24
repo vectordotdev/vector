@@ -82,16 +82,24 @@ pub struct GcpAuthConfig {
     /// running on. If Vector is not running on a GCE instance, then you must define eith an API key or service account
     /// credentials JSON file.
     pub credentials_path: Option<String>,
+
+    /// Skip all authentication handling. For use with integration tests only.
+    #[serde(default, skip_serializing)]
+    pub skip_authentication: bool,
 }
 
 impl GcpAuthConfig {
     pub async fn build(&self, scope: Scope) -> crate::Result<GcpAuthenticator> {
-        let gap = std::env::var("GOOGLE_APPLICATION_CREDENTIALS").ok();
-        let creds_path = self.credentials_path.as_ref().or(gap.as_ref());
-        Ok(match (&creds_path, &self.api_key) {
-            (Some(path), _) => GcpAuthenticator::from_file(path, scope).await?,
-            (None, Some(api_key)) => GcpAuthenticator::from_api_key(api_key)?,
-            (None, None) => GcpAuthenticator::new_implicit().await?,
+        Ok(if self.skip_authentication {
+            GcpAuthenticator::None
+        } else {
+            let gap = std::env::var("GOOGLE_APPLICATION_CREDENTIALS").ok();
+            let creds_path = self.credentials_path.as_ref().or(gap.as_ref());
+            match (&creds_path, &self.api_key) {
+                (Some(path), _) => GcpAuthenticator::from_file(path, scope).await?,
+                (None, Some(api_key)) => GcpAuthenticator::from_api_key(api_key)?,
+                (None, None) => GcpAuthenticator::new_implicit().await?,
+            }
         })
     }
 }
@@ -100,6 +108,7 @@ impl GcpAuthConfig {
 pub enum GcpAuthenticator {
     Credentials(Arc<InnerCreds>),
     ApiKey(Box<str>),
+    None,
 }
 
 #[derive(Debug)]
@@ -122,7 +131,7 @@ impl GcpAuthenticator {
         Ok(Self::Credentials(Arc::new(InnerCreds { creds, token })))
     }
 
-    pub fn from_api_key(api_key: &str) -> crate::Result<Self> {
+    fn from_api_key(api_key: &str) -> crate::Result<Self> {
         format!("/?key={api_key}")
             .parse::<PathAndQuery>()
             .context(InvalidApiKeySnafu)?;
@@ -132,7 +141,7 @@ impl GcpAuthenticator {
     pub fn make_token(&self) -> Option<String> {
         match self {
             Self::Credentials(inner) => Some(inner.make_token()),
-            Self::ApiKey(_) => None,
+            Self::ApiKey(_) | Self::None => None,
         }
     }
 
@@ -147,7 +156,7 @@ impl GcpAuthenticator {
 
     pub fn apply_uri(&self, uri: &mut Uri) {
         match self {
-            Self::Credentials(_) => (),
+            Self::Credentials(_) | Self::None => (),
             Self::ApiKey(api_key) => {
                 let mut parts = uri.clone().into_parts();
                 let path = parts
@@ -187,7 +196,12 @@ impl GcpAuthenticator {
                     }
                 }
             }
-            Self::ApiKey(_) => todo!(),
+            Self::ApiKey(_) | Self::None => {
+                // This keeps the sender end of the watch open without
+                // actually sending anything, effectively creating an
+                // empty watch stream.
+                sender.closed().await
+            }
         }
     }
 }
