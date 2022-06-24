@@ -32,11 +32,7 @@ mod crash;
 #[cfg(all(feature = "sources-http", feature = "sinks-http"))]
 mod end_to_end;
 
-#[cfg(all(
-    feature = "sinks-blackhole",
-    feature = "sources-stdin",
-    feature = "transforms-json_parser"
-))]
+#[cfg(all(feature = "sinks-blackhole", feature = "sources-stdin"))]
 mod transient_state;
 
 #[cfg(all(feature = "sinks-console", feature = "sources-demo_logs"))]

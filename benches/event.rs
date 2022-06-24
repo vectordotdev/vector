@@ -4,10 +4,7 @@ use serde_json::{json, Value};
 use vector::{
     config::log_schema,
     event::{Event, LogEvent},
-    transforms::{
-        json_parser::{JsonParser, JsonParserConfig},
-        FunctionTransform, OutputBuffer,
-    },
+    transforms::{FunctionTransform, OutputBuffer},
 };
 
 fn benchmark_event_iterate(c: &mut Criterion) {
@@ -16,11 +13,11 @@ fn benchmark_event_iterate(c: &mut Criterion) {
     group.bench_function("single-level", |b| {
         b.iter_batched_ref(
             || {
-                create_event(json!({
-                    "key1": "value1",
-                    "key2": "value2",
-                    "key3": "value3"
-                }))
+                let mut log = Event::new_empty_log().into_log();
+                log.insert("key1", Bytes::from("value1"));
+                log.insert("key2", Bytes::from("value2"));
+                log.insert("key3", Bytes::from("value3"));
+                log
             },
             |e| e.all_fields().unwrap().count(),
             BatchSize::SmallInput,
@@ -30,15 +27,11 @@ fn benchmark_event_iterate(c: &mut Criterion) {
     group.bench_function("nested-keys", |b| {
         b.iter_batched_ref(
             || {
-                create_event(json!({
-                    "key1": {
-                        "nested1": {
-                            "nested2": "value1",
-                            "nested3": "value4"
-                        }
-                    },
-                    "key3": "value3"
-                }))
+                let mut log = Event::new_empty_log().into_log();
+                log.insert("key1.nested1.nested2", Bytes::from("value1"));
+                log.insert("key1.nested1.nested3", Bytes::from("value4"));
+                log.insert("key3", Bytes::from("value3"));
+                log
             },
             |e| e.all_fields().unwrap().count(),
             BatchSize::SmallInput,
@@ -48,14 +41,10 @@ fn benchmark_event_iterate(c: &mut Criterion) {
     group.bench_function("array", |b| {
         b.iter_batched_ref(
             || {
-                create_event(json!({
-                    "key1": {
-                        "nested1": [
-                            "value1",
-                            "value2"
-                        ]
-                    },
-                }))
+                let mut log = Event::new_empty_log().into_log();
+                log.insert("key1.nested1[0]", Bytes::from("value1"));
+                log.insert("key1.nested1[1]", Bytes::from("value2"));
+                log
             },
             |e| e.all_fields().unwrap().count(),
             BatchSize::SmallInput,
@@ -90,17 +79,6 @@ fn benchmark_event_create(c: &mut Criterion) {
             log.insert("key1.nested1[1]", Bytes::from("value2"));
         })
     });
-}
-
-fn create_event(json: Value) -> LogEvent {
-    let s = serde_json::to_string(&json).unwrap();
-    let mut event = Event::new_empty_log();
-    event.as_mut_log().insert(log_schema().message_key(), s);
-
-    let mut parser = JsonParser::from(JsonParserConfig::default());
-    let mut output = OutputBuffer::with_capacity(1);
-    parser.transform(&mut output, event);
-    output.into_events().next().unwrap().into_log()
 }
 
 criterion_group!(

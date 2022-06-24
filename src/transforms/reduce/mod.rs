@@ -22,7 +22,7 @@ use crate::{
 mod merge_strategy;
 
 use crate::event::Value;
-use merge_strategy::*;
+pub use merge_strategy::*;
 
 //------------------------------------------------------------------------------
 
