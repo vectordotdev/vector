@@ -424,7 +424,7 @@ aws-core = [
 # Anything that requires Protocol Buffers.
 protobuf-build = ["dep:tonic-build", "dep:prost-build"]
 
-gcp = ["dep:goauth", "dep:smpl_jwt"]
+gcp = ["dep:base64", "dep:goauth", "dep:smpl_jwt"]
 
 # Enrichment Tables
 enrichment-tables = ["enrichment-tables-file"]
