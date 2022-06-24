@@ -7,7 +7,7 @@ use goauth::{
     credentials::Credentials,
     GoErr,
 };
-use http::{uri::InvalidUri, uri::PathAndQuery, Uri};
+use http::{uri::PathAndQuery, Uri};
 use hyper::header::AUTHORIZATION;
 use once_cell::sync::Lazy;
 use smpl_jwt::Jwt;
@@ -34,7 +34,7 @@ pub enum GcpError {
     #[snafu(display("Invalid GCP credentials: {}", source))]
     InvalidCredentials { source: GoErr },
     #[snafu(display("Invalid GCP API key: {}", source))]
-    InvalidApiKey { source: InvalidUri },
+    InvalidApiKey { source: base64::DecodeError },
     #[snafu(display("Healthcheck endpoint forbidden"))]
     HealthcheckForbidden,
     #[snafu(display("Invalid RSA key in GCP credentials: {}", source))]
@@ -132,9 +132,7 @@ impl GcpAuthenticator {
     }
 
     fn from_api_key(api_key: &str) -> crate::Result<Self> {
-        format!("/?key={api_key}")
-            .parse::<PathAndQuery>()
-            .context(InvalidApiKeySnafu)?;
+        base64::decode_config(api_key, base64::URL_SAFE).context(InvalidApiKeySnafu)?;
         Ok(Self::ApiKey(api_key.into()))
     }
 
@@ -274,12 +272,68 @@ mod tests {
     use crate::assert_downcast_matches;
 
     #[tokio::test]
-    #[ignore]
     async fn fails_missing_creds() {
-        let config: GcpAuthConfig = toml::from_str("").unwrap();
-        match config.build(Scope::Compute).await {
-            Ok(_) => panic!("make_credentials failed to error"),
-            Err(err) => assert_downcast_matches!(err, GcpError, GcpError::GetImplicitToken { .. }), // This should be a more relevant error
-        }
+        let error = build_auth("").await.expect_err("build failed to error");
+        assert_downcast_matches!(error, GcpError, GcpError::GetImplicitToken { .. });
+        // This should be a more relevant error
+    }
+
+    #[tokio::test]
+    async fn skip_authentication() {
+        let auth = build_auth(
+            r#"
+                skip_authentication = true
+                api_key = "testing"
+            "#,
+        )
+        .await
+        .expect("build_auth failed");
+        assert!(matches!(auth, GcpAuthenticator::None));
+    }
+
+    #[tokio::test]
+    async fn uses_api_key() {
+        let key = crate::test_util::random_string(16);
+
+        let auth = build_auth(&format!(r#"api_key = "{key}""#))
+            .await
+            .expect("build_auth failed");
+        assert!(matches!(auth, GcpAuthenticator::ApiKey(..)));
+
+        assert_eq!(
+            apply_uri(&auth, "http://example.com"),
+            format!("http://example.com/?key={key}")
+        );
+        assert_eq!(
+            apply_uri(&auth, "http://example.com/"),
+            format!("http://example.com/?key={key}")
+        );
+        assert_eq!(
+            apply_uri(&auth, "http://example.com/path"),
+            format!("http://example.com/path?key={key}")
+        );
+        assert_eq!(
+            apply_uri(&auth, "http://example.com/path1/"),
+            format!("http://example.com/path1/?key={key}")
+        );
+    }
+
+    #[tokio::test]
+    async fn fails_bad_api_key() {
+        let error = build_auth(r#"api_key = "abc%xyz""#)
+            .await
+            .expect_err("build failed to error");
+        assert_downcast_matches!(error, GcpError, GcpError::InvalidApiKey { .. });
+    }
+
+    fn apply_uri(auth: &GcpAuthenticator, uri: &str) -> String {
+        let mut uri: Uri = uri.parse().unwrap();
+        auth.apply_uri(&mut uri);
+        uri.to_string()
+    }
+
+    async fn build_auth(toml: &str) -> crate::Result<GcpAuthenticator> {
+        let config: GcpAuthConfig = toml::from_str(toml).expect("Invalid TOML");
+        config.build(Scope::Compute).await
     }
 }
