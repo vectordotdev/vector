@@ -200,7 +200,6 @@ impl From<&serde_json::Value> for Value {
                 NotNan::new(n.as_f64().unwrap()).unwrap().into()
             }
             serde_json::Value::Number(n) => n.to_string().into(),
-            //serde_json::Value::String(s) => Self::Bytes(Bytes::from(s)),
             serde_json::Value::String(s) => Self::Bytes(Bytes::from(s.clone())),
             serde_json::Value::Object(obj) => Self::Object(
                 obj.into_iter()

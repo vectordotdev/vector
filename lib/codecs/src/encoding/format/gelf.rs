@@ -533,3 +533,35 @@ impl Encoder<Event> for GelfSerializer {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use vector_common::btreemap;
+    use vector_core::event::{Event, EventMetadata};
+    //use bytes::Bytes;
+    //use chrono::{DateTime, NaiveDateTime, Utc};
+    //use lookup::path;
+    //use pretty_assertions::assert_eq;
+    //use serde_json::json;
+    //use smallvec::SmallVec;
+    //use value::Value;
+
+    /// TODO
+    #[test]
+    fn gelf_serializing_() {
+        let config = GelfSerializerConfig::default();
+        let mut serializer = config.build();
+
+        let event_fields = btreemap! {
+            VERSION => "1.1",
+            HOST => "example.org",
+            log_schema().message_key() => "Some message",
+        };
+        let event: Event = LogEvent::from_map(event_fields, EventMetadata::default()).into();
+
+        let mut buffer = BytesMut::new();
+
+        serializer.encode(event, &mut buffer).unwrap();
+    }
+}

@@ -112,8 +112,9 @@ impl GelfDeserializer {
         let mut secs = 0;
         let mut nsecs = 0;
         if val.is_f64() {
-            secs = f64::trunc(val.as_f64().unwrap()) as i64;
-            nsecs = f64::fract(val.as_f64().unwrap()) as u32;
+            let val = val.as_f64().unwrap();
+            secs = f64::trunc(val) as i64;
+            nsecs = f64::fract(val) as u32;
         } else if val.is_i64() {
             secs = val.as_i64().unwrap();
         } else if val.is_u64() {
@@ -124,7 +125,7 @@ impl GelfDeserializer {
     }
 
     /// Attemps to parse an integer from a Value.
-    fn parse_number(&self, val: &Value) -> Result<i64, vector_core::Error> {
+    fn parse_number(&self, val: &Value) -> vector_core::Result<i64> {
         if val.is_number() {
             let mut number = 0;
             if val.is_f64() {
@@ -136,17 +137,16 @@ impl GelfDeserializer {
             }
             Ok(number)
         } else if val.is_string() {
-            match val.as_str().unwrap().parse::<i64>() {
-                Ok(number) => Ok(number),
-                Err(_) => match val.as_str().unwrap().parse::<f64>() {
-                    Ok(number) => Ok(f64::round(number) as i64),
-                    Err(_) => Err(format!(
+            let val = val.as_str().unwrap();
+            val.parse::<i64>()
+                .or_else(|_| val.parse::<f64>().map(|number| number.round() as i64))
+                .map_err(|_| {
+                    format!(
                         "Event field {} does not match GELF spec version {}: must be a number",
                         VERSION, GELF_VERSION
                     )
-                    .into()),
-                },
-            }
+                    .into()
+                })
         } else {
             Err(format!(
                 "Event field {} does not match GELF spec version {}: must be a number",
@@ -160,27 +160,40 @@ impl GelfDeserializer {
     /// The logic does not follow strictly the documented GELF standard, it more closely
     /// follows the behavior of graylog itself, which is more relaxed.
     fn message_to_event(&self, parsed: &GelfMessage) -> vector_core::Result<Event> {
-        if parsed.message.is_none() && parsed.short_message.is_none() {
-            return Err("Event must contain the field 'short_message'".into());
-        }
-
-        let message = if let Some(msg) = &parsed.short_message {
-            msg
-        } else {
-            parsed.message.as_ref().unwrap()
+        let message = match (&parsed.short_message, &parsed.message) {
+            (Some(message), _) | (_, Some(message)) => message,
+            _ => {
+                return Err("Event must contain the field 'short_message'".into());
+            }
         };
         let mut event = Event::from(message.to_string());
         let log = event.as_mut_log();
 
-        let timestamp_key = log_schema().timestamp_key();
-
         // GELF spec defines the version as 1.1 which has not changed since 2013
-        // but graylog server does not reject any event which does not specify a version
+        // But graylog server does not reject any event which does not specify a version,
+        // has a mismatched version, or the version is not the expected type. Thus ignoring.
 
         if let Some(host) = &parsed.host {
             log.insert(HOST, host.to_string());
         }
-        // TODO graylog sets field 'host' to IP address if not specified. I'm not seeing a clear way to get the IP...
+        // TODO graylog sets field 'host' to client IP address if not specified in input.
+        // https://github.com/vectordotdev/vector/issues/13323
+
+        let timestamp_key = log_schema().timestamp_key();
+
+        // if the timestamp is not numeric, we set it to current UTC later
+        if let Some(timestamp) = &parsed.timestamp {
+            if timestamp.is_number() {
+                log.insert(timestamp_key, self.parse_timestamp(timestamp));
+            }
+        }
+
+        if let Some(line) = &parsed.line {
+            log.insert(LINE, self.parse_number(line)?);
+        }
+        if let Some(level) = &parsed.level {
+            log.insert(LEVEL, self.parse_number(level)?);
+        }
 
         // FACILITY, FILE, FULL_MESSAGE can be any type and are optional
 
@@ -192,22 +205,13 @@ impl GelfDeserializer {
                     continue;
                 }
 
-                // if the timestamp is not numeric, we set it to current UTC later
-                if key == TIMESTAMP && val.is_number() {
-                    log.insert(timestamp_key, self.parse_timestamp(val));
-                }
-                // level and line are both numbers
-                else if key == LEVEL || key == LINE {
-                    log.insert(path!(key), self.parse_number(val)?);
-                } else {
-                    let vector_val: value::Value = val.into();
+                let vector_val: value::Value = val.into();
 
-                    // trim the leading underscore prefix if present
-                    if let Some(stripped) = key.strip_prefix('_') {
-                        log.insert(path!(stripped), vector_val);
-                    } else {
-                        log.insert(path!(key.as_str()), vector_val);
-                    }
+                // trim the leading underscore prefix if present
+                if let Some(stripped) = key.strip_prefix('_') {
+                    log.insert(path!(stripped), vector_val);
+                } else {
+                    log.insert(path!(key.as_str()), vector_val);
                 }
             }
         }
@@ -226,6 +230,9 @@ struct GelfMessage {
     host: Option<String>,
     short_message: Option<String>,
     message: Option<String>,
+    timestamp: Option<serde_json::Value>,
+    line: Option<serde_json::Value>,
+    level: Option<serde_json::Value>,
     #[serde(flatten)]
     additional_fields: Option<HashMap<String, serde_json::Value>>,
 }
@@ -239,5 +246,191 @@ impl Deserializer for GelfDeserializer {
         let event = self.message_to_event(&parsed)?;
 
         Ok(smallvec![event])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bytes::Bytes;
+    use chrono::{DateTime, NaiveDateTime, Utc};
+    use lookup::path;
+    use pretty_assertions::assert_eq;
+    use serde_json::json;
+    use smallvec::SmallVec;
+    use value::Value;
+    use vector_core::{config::log_schema, event::Event};
+
+    fn deserialize_gelf_input(
+        input: &serde_json::Value,
+    ) -> vector_core::Result<SmallVec<[Event; 1]>> {
+        let config = GelfDeserializerConfig;
+        let deserializer = config.build();
+        let buffer = Bytes::from(serde_json::to_vec(&input).unwrap());
+        deserializer.parse(buffer)
+    }
+
+    /// Validates all the spec'd fields of GELF are deserialized correctly.
+    #[test]
+    fn gelf_deserialize_correctness() {
+        let add_on_int_in = "_an.add-field_int";
+        let add_on_str_in = "_an.add-field_str";
+
+        let input = json!({
+            VERSION: "1.1",
+            HOST: "example.org",
+            SHORT_MESSAGE: "A short message that helps you identify what is going on",
+            FULL_MESSAGE: "Backtrace here\n\nmore stuff",
+            TIMESTAMP: 1385053862.3072,
+            LEVEL: 1,
+            FACILITY: "foo",
+            LINE: 42,
+            FILE: "/tmp/bar",
+            add_on_int_in: 2001.1002,
+            add_on_str_in: "A Space Odyssey",
+        });
+
+        // Ensure that we can parse the gelf json successfully
+        let events = deserialize_gelf_input(&input).unwrap();
+        assert_eq!(events.len(), 1);
+
+        let log = events[0].as_log();
+
+        assert_eq!(
+            log.get(VERSION),
+            Some(&Value::Bytes(Bytes::from_static(b"1.1")))
+        );
+        assert_eq!(
+            log.get(HOST),
+            Some(&Value::Bytes(Bytes::from_static(b"example.org")))
+        );
+        assert_eq!(
+            log.get(log_schema().message_key()),
+            Some(&Value::Bytes(Bytes::from_static(
+                b"A short message that helps you identify what is going on"
+            )))
+        );
+        assert_eq!(
+            log.get(FULL_MESSAGE),
+            Some(&Value::Bytes(Bytes::from_static(
+                b"Backtrace here\n\nmore stuff"
+            )))
+        );
+        // Vector does not use the nanos
+        let naive = NaiveDateTime::from_timestamp(1385053862, 0);
+        assert_eq!(
+            log.get(TIMESTAMP),
+            Some(&Value::Timestamp(DateTime::<Utc>::from_utc(naive, Utc)))
+        );
+        assert_eq!(log.get(LEVEL), Some(&Value::Integer(1)));
+        assert_eq!(
+            log.get(FACILITY),
+            Some(&Value::Bytes(Bytes::from_static(b"foo")))
+        );
+        assert_eq!(log.get(LINE), Some(&Value::Integer(42)));
+        assert_eq!(
+            log.get(FILE),
+            Some(&Value::Bytes(Bytes::from_static(b"/tmp/bar")))
+        );
+        assert_eq!(
+            log.get(path!(&add_on_int_in[1..])),
+            Some(&Value::Float(
+                ordered_float::NotNan::new(2001.1002).unwrap()
+            ))
+        );
+        assert_eq!(
+            log.get(path!(&add_on_str_in[1..])),
+            Some(&Value::Bytes(Bytes::from_static(b"A Space Odyssey")))
+        );
+    }
+
+    /// Validates deserializiation succeeds for edge case inputs.
+    #[test]
+    fn gelf_deserializing_edge_cases() {
+        // host is not specified
+        {
+            let input = json!({
+                SHORT_MESSAGE: "foobar",
+            });
+            assert!(deserialize_gelf_input(&input).is_ok());
+        }
+
+        //  message set instead of short_message
+        {
+            let input = json!({
+                "message": "foobar",
+            });
+            assert!(deserialize_gelf_input(&input).is_ok());
+        }
+
+        //  timestamp is wrong type
+        {
+            let input = json!({
+                "message": "foobar",
+                TIMESTAMP: "hammer time",
+            });
+            assert!(deserialize_gelf_input(&input).is_ok());
+        }
+
+        //  level / line
+        {
+            let input = json!({
+                "message": "foobar",
+                LINE: "-1",
+            });
+            assert!(deserialize_gelf_input(&input).is_ok());
+        }
+        {
+            let input = json!({
+                "message": "foobar",
+                LEVEL: "4.2",
+            });
+            assert!(deserialize_gelf_input(&input).is_ok());
+        }
+        {
+            let input = json!({
+                "message": "foobar",
+                LEVEL: 4.2,
+            });
+            assert!(deserialize_gelf_input(&input).is_ok());
+        }
+
+        //  invalid character in field name - field is dropped
+        {
+            let bad_key = "_invalid$field%name";
+            let input = json!({
+                "message": "foobar",
+                bad_key: "drop_me",
+            });
+            let events = deserialize_gelf_input(&input).unwrap();
+            assert_eq!(events.len(), 1);
+            let log = events[0].as_log();
+            assert!(!log.contains(bad_key));
+        }
+    }
+
+    /// Validates the error conditions in deserialization
+    #[test]
+    fn gelf_deserializing_err() {
+        fn validate_err(input: &serde_json::Value) {
+            assert!(deserialize_gelf_input(input).is_err());
+        }
+
+        // host is not a string
+        validate_err(&json!({
+            HOST: 42,
+            SHORT_MESSAGE: "foobar",
+        }));
+
+        // missing message and short_message
+        validate_err(&json!({
+            HOST: "example.org",
+        }));
+
+        //  level / line is string and not numeric
+        validate_err(&json!({
+            SHORT_MESSAGE: "foobar",
+            LEVEL: "baz",
+        }));
     }
 }
