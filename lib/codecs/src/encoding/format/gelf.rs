@@ -519,7 +519,8 @@ impl Encoder<Event> for GelfSerializer {
             }
             Err(conformity) => match conformity {
                 EventGelfConformity::Conformable(s) => {
-                    Err(format!("Event does not conform to GELF specification but is sanitizable, try setting the sanitize configuration option to 'true' for the encoder: {}", s).into())
+                    Err(format!("Event does not conform to GELF specification but is sanitizable, \
+                                try setting the sanitize configuration option to 'true' for the encoder: {}", s).into())
                 },
                 EventGelfConformity::Unconformable(s) => {
                     if self.sanitize {
