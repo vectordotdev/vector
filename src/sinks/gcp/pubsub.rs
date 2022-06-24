@@ -165,7 +165,7 @@ impl PubsubSink {
         );
 
         let transformer = config.encoding.transformer();
-        let serializer = config.encoding.encoding();
+        let serializer = config.encoding.encoding()?;
         let encoder = Encoder::<()>::new(serializer);
 
         Ok(Self {

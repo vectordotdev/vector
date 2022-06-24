@@ -62,7 +62,7 @@ impl GenerateConfig for ConsoleSinkConfig {
 impl SinkConfig for ConsoleSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let transformer = self.encoding.transformer();
-        let (framer, serializer) = self.encoding.encoding();
+        let (framer, serializer) = self.encoding.encoding()?;
         let framer = match (framer, &serializer) {
             (Some(framer), _) => framer,
             (
@@ -73,7 +73,9 @@ impl SinkConfig for ConsoleSinkConfig {
                 | Serializer::NativeJson(_)
                 | Serializer::RawMessage(_),
             ) => NewlineDelimitedEncoder::new().into(),
-            (None, Serializer::Native(_)) => LengthDelimitedEncoder::new().into(),
+            (None, Serializer::Avro(_) | Serializer::Native(_)) => {
+                LengthDelimitedEncoder::new().into()
+            }
         };
         let encoder = Encoder::<Framer>::new(framer, serializer);
 

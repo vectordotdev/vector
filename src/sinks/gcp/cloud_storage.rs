@@ -282,11 +282,13 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
 impl RequestSettings {
     fn new(config: &GcsSinkConfig) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
-        let (framer, serializer) = config.encoding.encoding();
+        let (framer, serializer) = config.encoding.encoding()?;
         let framer = match (framer, &serializer) {
             (Some(framer), _) => framer,
             (None, Serializer::Json(_)) => CharacterDelimitedEncoder::new(b',').into(),
-            (None, Serializer::Native(_)) => LengthDelimitedEncoder::new().into(),
+            (None, Serializer::Avro(_) | Serializer::Native(_)) => {
+                LengthDelimitedEncoder::new().into()
+            }
             (
                 None,
                 Serializer::Logfmt(_)
