@@ -581,7 +581,10 @@ impl AgentDDSketch {
         self.insert_key_counts(key_counts);
     }
 
-    pub fn insert_interpolate_buckets(&mut self, mut buckets: Vec<Bucket>) {
+    /// # Errors
+    /// Returns an error if a bucket size is greater that u32::MAX.
+    #[must_use]
+    pub fn insert_interpolate_buckets(&mut self, mut buckets: Vec<Bucket>) -> Result<(), &'static str> {
         // Buckets need to be sorted from lowest to highest so that we can properly calculate the
         // rolling lower/upper bounds.
         buckets.sort_by(|a, b| {
@@ -606,11 +609,15 @@ impl AgentDDSketch {
             // enforced by the internal structures that hold bucketed data i.e. Vector's internal
             // `Histogram` data structure used for collecting histograms from `metrics`.
 
-            // TODO: What should we do here if bucket.count > u32::MAX?
-            // Can we change ddsketch to handle u64?
+            if bucket.count > u32::MAX as u64 {
+                return Err("bucket size greater than u32::MAX");
+            }
+
             self.insert_interpolate_bucket(lower, upper, bucket.count as u32);
             lower = bucket.upper_limit;
         }
+
+        Ok(())
     }
 
     /// Adds a bin directly into the sketch.
@@ -737,7 +744,7 @@ impl AgentDDSketch {
     /// a distribution or aggregated histogram -- then the metric is passed back unmodified.  All
     /// existing metadata -- series name, tags, timestamp, etc -- is left unmodified, even if the
     /// metric is converted to a sketch internally.
-    pub fn transform_to_sketch(mut metric: Metric) -> Metric {
+    pub fn transform_to_sketch(mut metric: Metric) -> Result<Metric, &'static str> {
         let sketch = match metric.data_mut().value_mut() {
             MetricValue::Distribution { samples, .. } => {
                 let mut sketch = AgentDDSketch::with_agent_defaults();
@@ -749,7 +756,7 @@ impl AgentDDSketch {
             MetricValue::AggregatedHistogram { buckets, .. } => {
                 let delta_buckets = mem::take(buckets);
                 let mut sketch = AgentDDSketch::with_agent_defaults();
-                sketch.insert_interpolate_buckets(delta_buckets);
+                sketch.insert_interpolate_buckets(delta_buckets)?;
                 Some(sketch)
             }
             // We can't convert from any other metric value.
@@ -758,9 +765,9 @@ impl AgentDDSketch {
 
         match sketch {
             // Metric was not able to be converted to a sketch, so pass it back.
-            None => metric,
+            None => Ok(metric),
             // Metric was able to be converted to a sketch, so adjust the value.
-            Some(sketch) => metric.with_value(sketch.into()),
+            Some(sketch) => Ok(metric.with_value(sketch.into())),
         }
     }
 }
