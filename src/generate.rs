@@ -409,9 +409,6 @@ fn write_config(filepath: &Path, body: &str) -> Result<(), crate::Error> {
 
 #[cfg(test)]
 mod tests {
-    #[cfg(all(feature = "sinks-console"))]
-    use indoc::indoc;
-
     use super::*;
 
     #[test]
@@ -484,7 +481,7 @@ mod tests {
                 &None,
                 TransformInputsStrategy::Auto
             ),
-            Ok(indoc! {r#"data_dir = "/var/lib/vector/"
+            Ok(indoc::indoc! {r#"data_dir = "/var/lib/vector/"
 
                 [sources.source0]
                 max_length = 102400
@@ -525,7 +522,7 @@ mod tests {
                 &None,
                 TransformInputsStrategy::Auto
             ),
-            Ok(indoc! {r#"data_dir = "/var/lib/vector/"
+            Ok(indoc::indoc! {r#"data_dir = "/var/lib/vector/"
 
                 [sources.source0]
                 max_length = 102400
@@ -561,7 +558,7 @@ mod tests {
 
         assert_eq!(
             generate_example(true, "stdin//console", &None, TransformInputsStrategy::Auto),
-            Ok(indoc! {r#"data_dir = "/var/lib/vector/"
+            Ok(indoc::indoc! {r#"data_dir = "/var/lib/vector/"
 
                 [sources.source0]
                 max_length = 102400
@@ -591,7 +588,7 @@ mod tests {
 
         assert_eq!(
             generate_example(true, "//console", &None, TransformInputsStrategy::Auto),
-            Ok(indoc! {r#"data_dir = "/var/lib/vector/"
+            Ok(indoc::indoc! {r#"data_dir = "/var/lib/vector/"
 
                 [sinks.sink0]
                 inputs = ["component-id"]
@@ -619,7 +616,7 @@ mod tests {
                 &None,
                 TransformInputsStrategy::Auto
             ),
-            Ok(indoc! {r#"data_dir = "/var/lib/vector/"
+            Ok(indoc::indoc! {r#"data_dir = "/var/lib/vector/"
 
                 [transforms.transform0]
                 inputs = []
@@ -649,7 +646,7 @@ mod tests {
                 &None,
                 TransformInputsStrategy::Auto
             ),
-            Ok(indoc! {r#"
+            Ok(indoc::indoc! {r#"
 
                 [transforms.transform0]
                 inputs = []

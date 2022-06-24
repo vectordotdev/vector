@@ -9,7 +9,7 @@ mod api;
 #[cfg(feature = "aws-core")]
 mod aws;
 #[cfg(feature = "sinks-aws_cloudwatch_logs")]
-mod aws_cloudwatch_logs_subscription_parser;
+mod aws_cloudwatch_logs;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
 mod aws_ec2_metadata;
 #[cfg(feature = "sources-aws_ecs_metrics")]
@@ -138,7 +138,7 @@ pub(crate) use self::api::*;
 #[cfg(feature = "aws-core")]
 pub(crate) use self::aws::*;
 #[cfg(feature = "sinks-aws_cloudwatch_logs")]
-pub(crate) use self::aws_cloudwatch_logs_subscription_parser::*;
+pub(crate) use self::aws_cloudwatch_logs::*;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
 pub(crate) use self::aws_ec2_metadata::*;
 #[cfg(feature = "sources-aws_ecs_metrics")]
