@@ -581,10 +581,13 @@ impl AgentDDSketch {
         self.insert_key_counts(key_counts);
     }
 
-    /// # Errors
-    /// Returns an error if a bucket size is greater that u32::MAX.
-    #[must_use]
-    pub fn insert_interpolate_buckets(&mut self, mut buckets: Vec<Bucket>) -> Result<(), &'static str> {
+    /// ## Errors
+    ///
+    /// Returns an error if a bucket size is greater that `u32::MAX`.
+    pub fn insert_interpolate_buckets(
+        &mut self,
+        mut buckets: Vec<Bucket>,
+    ) -> Result<(), &'static str> {
         // Buckets need to be sorted from lowest to highest so that we can properly calculate the
         // rolling lower/upper bounds.
         buckets.sort_by(|a, b| {
@@ -608,12 +611,10 @@ impl AgentDDSketch {
             // generally enforced at the source level by converting from cumulative buckets, or
             // enforced by the internal structures that hold bucketed data i.e. Vector's internal
             // `Histogram` data structure used for collecting histograms from `metrics`.
+            let count =
+                u32::try_from(bucket.count).map_err(|_| "bucket size greater than u32::MAX")?;
 
-            if bucket.count > u32::MAX as u64 {
-                return Err("bucket size greater than u32::MAX");
-            }
-
-            self.insert_interpolate_bucket(lower, upper, bucket.count as u32);
+            self.insert_interpolate_bucket(lower, upper, count);
             lower = bucket.upper_limit;
         }
 
@@ -744,6 +745,10 @@ impl AgentDDSketch {
     /// a distribution or aggregated histogram -- then the metric is passed back unmodified.  All
     /// existing metadata -- series name, tags, timestamp, etc -- is left unmodified, even if the
     /// metric is converted to a sketch internally.
+    ///
+    /// ## Errors
+    ///
+    /// Returns an error if a bucket size is greater that `u32::MAX`.
     pub fn transform_to_sketch(mut metric: Metric) -> Result<Metric, &'static str> {
         let sketch = match metric.data_mut().value_mut() {
             MetricValue::Distribution { samples, .. } => {
