@@ -176,7 +176,8 @@ impl GelfDeserializer {
         if let Some(host) = &parsed.host {
             log.insert(HOST, host.to_string());
         }
-        // TODO graylog sets field 'host' to IP address if not specified. I'm not seeing a clear way to get the IP...
+        // TODO graylog sets field 'host' to client IP address if not specified in input.
+        // https://github.com/vectordotdev/vector/issues/13323
 
         let timestamp_key = log_schema().timestamp_key();
 
