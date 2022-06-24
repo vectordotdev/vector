@@ -112,8 +112,9 @@ impl GelfDeserializer {
         let mut secs = 0;
         let mut nsecs = 0;
         if val.is_f64() {
-            secs = f64::trunc(val.as_f64().unwrap()) as i64;
-            nsecs = f64::fract(val.as_f64().unwrap()) as u32;
+            let val = val.as_f64().unwrap();
+            secs = f64::trunc(val) as i64;
+            nsecs = f64::fract(val) as u32;
         } else if val.is_i64() {
             secs = val.as_i64().unwrap();
         } else if val.is_u64() {
