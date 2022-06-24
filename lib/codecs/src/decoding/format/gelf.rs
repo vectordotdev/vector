@@ -160,15 +160,12 @@ impl GelfDeserializer {
     /// The logic does not follow strictly the documented GELF standard, it more closely
     /// follows the behavior of graylog itself, which is more relaxed.
     fn message_to_event(&self, parsed: &GelfMessage) -> vector_core::Result<Event> {
-        if parsed.message.is_none() && parsed.short_message.is_none() {
-            return Err("Event must contain the field 'short_message'".into());
+        match (&parsed.short_message, &parsed.message) {
+            (Some(message), _) | (_, Some(message)) => message,
+            _ => {
+                return Err("Event must contain the field 'short_message'".into());
+            }
         }
-
-        let message = if let Some(msg) = &parsed.short_message {
-            msg
-        } else {
-            parsed.message.as_ref().unwrap()
-        };
         let mut event = Event::from(message.to_string());
         let log = event.as_mut_log();
 
