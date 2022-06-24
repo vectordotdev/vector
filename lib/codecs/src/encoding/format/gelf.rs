@@ -123,17 +123,19 @@ impl GelfSerializer {
                     clog,
                     conformed,
                     key,
-                    Err(EventGelfConformity::Conformable(
-                        format!("LogEvent field {} should be a UTF-8 string", key).into(),
-                    )),
+                    Err(EventGelfConformity::Conformable(format!(
+                        "LogEvent field {} should be a UTF-8 string",
+                        key
+                    ))),
                     |c_val| {
                         *c_val = Value::Bytes(value.coerce_to_bytes());
                     },
                 )?;
             } else {
-                return Err(EventGelfConformity::Unconformable(
-                    format!("LogEvent field {} should be a UTF-8 string", key).into(),
-                ));
+                return Err(EventGelfConformity::Unconformable(format!(
+                    "LogEvent field {} should be a UTF-8 string",
+                    key
+                )));
             }
         }
         Ok(())
@@ -148,29 +150,25 @@ impl GelfSerializer {
         clog: &mut Option<LogEvent>,
         conformed: &mut bool,
     ) -> Result<(), EventGelfConformity> {
-        let conformable = EventGelfConformity::Conformable(
-            format!("LogEvent field {} should be an integer", key).into(),
-        );
-        let unconformable = EventGelfConformity::Unconformable(
-            format!("LogEvent field {} should be an integer", key).into(),
-        );
+        let conformable = EventGelfConformity::Conformable(format!(
+            "LogEvent field {} should be an integer",
+            key
+        ));
+        let unconformable = EventGelfConformity::Unconformable(format!(
+            "LogEvent field {} should be an integer",
+            key
+        ));
         if !value.is_integer() {
             // if the value is a string and that string can be parse into an integer
             if value.is_bytes() {
-                std::str::from_utf8(&value.as_bytes().unwrap())
+                std::str::from_utf8(value.as_bytes().unwrap())
                     .map(|int_str| {
                         int_str
                             .parse::<i64>()
                             .map(|integer| {
-                                Ok(self.conform(
-                                    clog,
-                                    conformed,
-                                    key,
-                                    Err(conformable),
-                                    |c_val| {
-                                        *c_val = Value::Integer(integer);
-                                    },
-                                )?)
+                                self.conform(clog, conformed, key, Err(conformable), |c_val| {
+                                    *c_val = Value::Integer(integer);
+                                })
                             })
                             .map_err(|_| unconformable.clone())?
                     })
@@ -188,9 +186,10 @@ impl GelfSerializer {
                     *c_val = Value::Integer(value.as_boolean().unwrap() as i64);
                 })?;
             } else {
-                return Err(EventGelfConformity::Unconformable(
-                    format!("LogEvent field {} should be an integer", key).into(),
-                ));
+                return Err(EventGelfConformity::Unconformable(format!(
+                    "LogEvent field {} should be an integer",
+                    key
+                )));
             }
         }
         Ok(())
@@ -207,6 +206,7 @@ impl GelfSerializer {
     ///    - Err(EventGelfConformity::UnConformable)
     ///         => The log event isn't valid GELF and vector is unable to conform it.
     fn is_event_valid_gelf(&self, log: &LogEvent) -> Result<Option<LogEvent>, EventGelfConformity> {
+        //
         // TODO the GELF decoder is more relaxed than this, more closely mirroring the behavior of
         // the graylog node. Which means as is, a user could pass in a GELF message to the decoder
         // and it might be missing HOST and VERSION and that would succeed, but encoding it would
@@ -214,25 +214,24 @@ impl GelfSerializer {
 
         // VERSION, HOST and <MESSAGE> are all required fields
         if !log.contains(VERSION) {
-            return Err(EventGelfConformity::Unconformable(
-                format!("LogEvent does not contain field {}", VERSION).into(),
-            ));
+            return Err(EventGelfConformity::Unconformable(format!(
+                "LogEvent does not contain field {}",
+                VERSION
+            )));
         }
         if !log.contains(HOST) {
-            return Err(EventGelfConformity::Unconformable(
-                format!("LogEvent does not contain field {}", HOST).into(),
-            ));
+            return Err(EventGelfConformity::Unconformable(format!(
+                "LogEvent does not contain field {}",
+                HOST
+            )));
         }
 
         let message_key = log_schema().message_key();
         if !log.contains(message_key) {
-            return Err(EventGelfConformity::Unconformable(
-                format!(
-                    "LogEvent does not contain field {}",
-                    log_schema().message_key()
-                )
-                .into(),
-            ));
+            return Err(EventGelfConformity::Unconformable(format!(
+                "LogEvent does not contain field {}",
+                log_schema().message_key()
+            )));
         }
 
         let mut conformed_log = if self.sanitize {
@@ -253,48 +252,43 @@ impl GelfSerializer {
                     || key == FACILITY
                     || key == FILE
                 {
-                    self.expect_bytes_value(&key, value, &mut conformed_log, &mut conformed)?;
+                    self.expect_bytes_value(key, value, &mut conformed_log, &mut conformed)?;
                 }
                 // validate timestamp value
                 else if key == TIMESTAMP {
                     if !value.is_timestamp() || value.is_integer() {
-                        return Err(EventGelfConformity::Unconformable(
-                            format!(
-                                "LogEvent field {} should be a timestamp type or integer",
-                                log_schema().timestamp_key()
-                            )
-                            .into(),
-                        ));
+                        return Err(EventGelfConformity::Unconformable(format!(
+                            "LogEvent field {} should be a timestamp type or integer",
+                            log_schema().timestamp_key()
+                        )));
                     }
                 }
                 // validate integer values
-                else if key == LEVEL || key == FILE {
-                    self.expect_integer_value(&key, value, &mut conformed_log, &mut conformed)?;
+                else if key == LEVEL || key == LINE {
+                    self.expect_integer_value(key, value, &mut conformed_log, &mut conformed)?;
                 } else {
                     // additional fields must be prefixed with underscores
                     // NOTE: electing to conform on this rule even if the sanitize flag is not set
                     // because otherwise vector-added fields (such as "source_type: will throw errors
-                    if key.len() > 0 && key.chars().nth(0).unwrap() != '_' {
-                        if conformed_log.is_none() {
-                            let mut clog = log.clone();
-                            clog.rename_key(key.as_str(), &*format!("_{}", &key));
-                            conformed_log = Some(clog);
-                            conformed = true;
-                        }
+                    if !key.is_empty() && !key.starts_with('_') && conformed_log.is_none() {
+                        let mut clog = log.clone();
+                        clog.rename_key(key.as_str(), &*format!("_{}", &key));
+                        conformed_log = Some(clog);
+                        conformed = true;
                     }
 
                     // additional fields must be only word chars, dashes and periods.
                     if !self.valid_regex.is_match(key) {
                         // replace offending characters with dashes
                         if let Some(clog) = &mut conformed_log {
-                            let new_key = self.invalid_regex.replace_all(&key, "-");
+                            let new_key = self.invalid_regex.replace_all(key, "-");
                             clog.rename_key(key.as_str(), &*new_key);
                             conformed = true;
                         } else {
-                            return Err(EventGelfConformity::Conformable(
-                                format!("LogEvent field {} contains an invalid character", key)
-                                    .into(),
-                            ));
+                            return Err(EventGelfConformity::Conformable(format!(
+                                "LogEvent field {} contains an invalid character",
+                                key
+                            )));
                         }
                     }
                 }
@@ -321,7 +315,7 @@ impl Encoder<Event> for GelfSerializer {
         let log = event.as_log();
         let writer = buffer.writer();
 
-        match self.is_event_valid_gelf(&log) {
+        match self.is_event_valid_gelf(log) {
             Ok(conformed) => {
                 // use conformed log event if it exists, otherwise the original
                 if let Some(conformed) = conformed {

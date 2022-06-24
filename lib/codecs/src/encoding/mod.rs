@@ -251,7 +251,7 @@ impl SerializerConfig {
     pub fn build(&self) -> Serializer {
         match self {
             SerializerConfig::Gelf { options } => {
-                Serializer::Gelf(GelfSerializerConfig::new(options.clone()).build())
+                Serializer::Gelf(GelfSerializerConfig::new(*options).build())
             }
             SerializerConfig::Json => Serializer::Json(JsonSerializerConfig.build()),
             SerializerConfig::Logfmt => Serializer::Logfmt(LogfmtSerializerConfig.build()),
