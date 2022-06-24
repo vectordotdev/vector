@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 
 use ::value::Value;
-use serde_json::value::{RawValue, Value as JsonValue};
-use serde_json::{Error, Map};
+use serde_json::{
+    value::{RawValue, Value as JsonValue},
+    Error, Map,
+};
 use vrl::prelude::*;
 
 fn parse_json(value: Value) -> Resolved {
