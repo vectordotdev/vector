@@ -4,8 +4,10 @@ use bytes::{BufMut, Bytes, BytesMut};
 use value::Value;
 
 use super::Error;
-use crate::value::{Kind, VrlValueConvert};
-use crate::ExpressionError;
+use crate::{
+    value::{Kind, VrlValueConvert},
+    ExpressionError,
+};
 
 pub trait VrlValueArithmetic: Sized {
     /// Similar to [`std::ops::Mul`], but fallible (e.g. `TryMul`).

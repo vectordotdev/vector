@@ -3,11 +3,11 @@ use std::fmt;
 use diagnostic::{DiagnosticMessage, Label, Note, Span, Urls};
 use value::Value;
 
-use crate::state::{ExternalEnv, LocalEnv};
-use crate::value::VrlValueArithmetic;
 use crate::{
     expression::{self, Expr, Resolved},
     parser::{ast, Node},
+    state::{ExternalEnv, LocalEnv},
+    value::VrlValueArithmetic,
     Context, Expression, TypeDef,
 };
 
@@ -385,8 +385,7 @@ impl DiagnosticMessage for Error {
 mod tests {
     use std::convert::TryInto;
 
-    use ast::Ident;
-    use ast::Opcode::*;
+    use ast::{Ident, Opcode::*};
     use ordered_float::NotNan;
 
     use super::*;
