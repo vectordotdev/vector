@@ -12,7 +12,7 @@ ignore_older = 86400                         # 1 day
 inputs       = ["apache_logs"]
 type         = "remap"
 source       = '''
-. = parse_apache_log(.message)
+. = parse_apache_log!(.message)
 '''
 
 # Sample the data to save on cost
