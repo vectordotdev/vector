@@ -134,15 +134,28 @@ pub fn build_healthcheck(
     base_url: &str,
     creds: Option<GcpCredentials>,
 ) -> crate::Result<Healthcheck> {
-    let uri = base_url.parse::<Uri>()?;
+    //let uri = base_url.parse::<Uri>()?;
+    let uri = "https://europe-malachiteingestion-pa.googleapis.com/v2/logtypes".parse::<Uri>()?;
+
     let healthcheck = async move {
-        let mut request = http::Request::head(uri).body(Body::empty())?;
+        //let mut request = http::Request::head(uri).body(Body::empty())?;
+        let mut request = http::Request::get(&uri).body(Body::empty())?;
 
         if let Some(creds) = creds.as_ref() {
             creds.apply(&mut request);
         }
 
         let not_found_error = GcsHealthcheckError::NotFound.into();
+
+        let response = client.send(request).await?;
+        let res = hyper::body::to_bytes(response.into_body()).await?;
+        dbg!(&res);
+
+        let mut request = http::Request::get(&uri).body(Body::empty())?;
+
+        if let Some(creds) = creds.as_ref() {
+            creds.apply(&mut request);
+        }
 
         let response = client.send(request).await?;
         healthcheck_response(response, creds, not_found_error)
@@ -395,7 +408,7 @@ impl Service<ChronicleRequest> for ChronicleService {
 
     fn call(&mut self, request: ChronicleRequest) -> Self::Future {
         dbg!(&self.base_url);
-        let mut builder = Request::put(&self.base_url);
+        let mut builder = Request::post(&self.base_url);
         let headers = builder.headers_mut().unwrap();
         headers.insert(
             "content-length",
