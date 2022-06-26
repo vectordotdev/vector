@@ -78,7 +78,7 @@ remap: {
 		   data set is very small.
 
 		For `geoip` enrichment tables this condition needs to be a VRL object with a single key-value pair
-		whose value needs to be a valid IP address. Example: `{"ip": .ip }`. If a return field is expected 
+		whose value needs to be a valid IP address. Example: `{"ip": .ip }`. If a return field is expected
 		and without a value, `null` will be used. This table can return following fields:
 
 		* `autonomous_system_number`

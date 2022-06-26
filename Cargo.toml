@@ -429,7 +429,7 @@ gcp = ["dep:goauth", "dep:smpl_jwt"]
 # Enrichment Tables
 enrichment-tables = ["enrichment-tables-file","enrichment-tables-geoip"]
 enrichment-tables-file = [ "dep:csv", "dep:seahash", "dep:hash_hasher" ]
-enrichment-tables-geoip = []
+enrichment-tables-geoip = ["dep:maxminddb"]
 
 # Sources
 sources = ["sources-logs", "sources-metrics"]
