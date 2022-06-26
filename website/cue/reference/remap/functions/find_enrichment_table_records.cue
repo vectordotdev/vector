@@ -75,15 +75,5 @@ remap: functions: find_enrichment_table_records: {
 					{"id":          2, "firstname":   "Fred", "surname": "Smith"},
 			]
 		},
-		{
-			title: "Geoip table"
-			source: #"""
-				find_enrichment_table_records!("test",
-				  {
-					"ip": .ip,
-				  })
-				"""#
-			return: [{"autonomous_system_number": 701, "autonomous_system_organization": "DoD Network Information Center", "isp": "Verizon Business", "organization": null}]
-		},
 	]
 }

@@ -76,15 +76,5 @@ remap: functions: get_enrichment_table_record: {
 				"""#
 			return: {"id": 1, "firstname": "Bob", "surname": "Smith"}
 		},
-		{
-			title: "Geoip table"
-			source: #"""
-				get_enrichment_table_record!("test",
-				  {
-					"ip": .ip,
-				  })
-				"""#
-			return: {"city_name": "New York", "continent_code": "NA", "country_code": "US", "country_name": "United States", "region_code": null, "region_name": null, "metro_code": 501, "latitude": 40.76241, "longitude": -73.97436020807207, "postal_code": null, "timezone": null}
-		},
 	]
 }
