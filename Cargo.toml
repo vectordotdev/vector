@@ -849,7 +849,7 @@ remap-benches = ["transforms-add_fields", "transforms-coercer", "transforms-json
 transform-benches = ["transforms-filter", "transforms-dedupe", "transforms-reduce", "transforms-route"]
 codecs-benches = []
 loki-benches = ["sinks-loki"]
-enrichment-tables-benches = ["enrichment-tables-file","enrichment-tables-geoip"]
+enrichment-tables-benches = ["enrichment-tables-file"]
 
 [[bench]]
 name = "default"
