@@ -13,7 +13,7 @@ fn benchmark_event_iterate(c: &mut Criterion) {
     group.bench_function("single-level", |b| {
         b.iter_batched_ref(
             || {
-                let mut log = Event::new_empty_log().into_log();
+                let mut log = LogEvent::new();
                 log.insert("key1", Bytes::from("value1"));
                 log.insert("key2", Bytes::from("value2"));
                 log.insert("key3", Bytes::from("value3"));
