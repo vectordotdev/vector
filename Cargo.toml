@@ -427,8 +427,9 @@ protobuf-build = ["dep:tonic-build", "dep:prost-build"]
 gcp = ["dep:goauth", "dep:smpl_jwt"]
 
 # Enrichment Tables
-enrichment-tables = ["enrichment-tables-file"]
+enrichment-tables = ["enrichment-tables-file","enrichment-tables-geoip"]
 enrichment-tables-file = [ "dep:csv", "dep:seahash", "dep:hash_hasher" ]
+enrichment-tables-geoip = []
 
 # Sources
 sources = ["sources-logs", "sources-metrics"]
@@ -848,7 +849,7 @@ remap-benches = ["transforms-add_fields", "transforms-coercer", "transforms-json
 transform-benches = ["transforms-filter", "transforms-dedupe", "transforms-reduce", "transforms-route"]
 codecs-benches = []
 loki-benches = ["sinks-loki"]
-enrichment-tables-benches = ["enrichment-tables-file"]
+enrichment-tables-benches = ["enrichment-tables-file","enrichment-tables-geoip"]
 
 [[bench]]
 name = "default"
