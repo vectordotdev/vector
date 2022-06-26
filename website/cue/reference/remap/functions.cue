@@ -58,10 +58,10 @@ remap: {
 
 	// Reusable text
 	_enrichment_table_explainer: """
-		This condition needs to be a VRL object in which the key-value pairs indicate a field to
-		search mapped to a value to search in that field. This function returns the rows that match
-		the provided condition(s). _All_ fields need to match for rows to be returned; if any fields
-		don't match, no rows are returned.
+		For `file` enrichment tables this condition needs to be a VRL object in which
+		the key-value pairs indicate a field to	search mapped to a value to search in that field.
+		This function returns the rows that match the provided condition(s). _All_ fields need to
+		match for rows to be returned; if any fields don't match, no rows are returned.
 
 		There are currently two forms of search criteria:
 
@@ -76,6 +76,9 @@ remap: {
 		   criteria. This can be an expensive operation if there are many rows returned by any exact
 		   match criteria. We recommend using date ranges as the _only_ criteria when the enrichment
 		   data set is very small.
+
+		For `geoip` enrichment tables this condition needs to be a VRL object with a single key-value pair
+		whose value needs to be a valid IP address.
 
 		To use this function, you need to update your Vector configuration to
 		include an
