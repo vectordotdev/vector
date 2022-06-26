@@ -14,7 +14,7 @@ const ISP_DATABASE_TYPE: &str = "GeoIP2-ISP";
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct GeoipConfig {
-    pub database: String,
+    pub path: String,
     #[serde(default = "default_locale")]
     pub locale: String,
 }
@@ -31,7 +31,7 @@ fn default_locale() -> String {
 impl GenerateConfig for GeoipConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            database: "/path/to/GeoLite2-City.mmdb".to_string(),
+            path: "/path/to/GeoLite2-City.mmdb".to_string(),
             locale: default_locale(),
         })
         .unwrap()
@@ -64,8 +64,8 @@ pub struct Geoip {
 impl Geoip {
     pub fn new(config: GeoipConfig) -> crate::Result<Self> {
         Ok(Geoip {
-            last_modified: fs::metadata(&config.database)?.modified()?,
-            dbreader: Arc::new(maxminddb::Reader::open_readfile(config.database.clone())?),
+            last_modified: fs::metadata(&config.path)?.modified()?,
+            dbreader: Arc::new(maxminddb::Reader::open_readfile(config.path.clone())?),
             config,
             indexes: Vec::new(),
         })
@@ -262,7 +262,7 @@ impl Table for Geoip {
 
     /// Returns true if the underlying data has changed and the table needs reloading.
     fn needs_reload(&self) -> bool {
-        matches!(fs::metadata(&self.config.database)
+        matches!(fs::metadata(&self.config.path)
             .and_then(|metadata| metadata.modified()),
             Ok(modified) if modified > self.last_modified)
     }
@@ -273,7 +273,7 @@ impl std::fmt::Debug for Geoip {
         write!(
             f,
             "Geoip {} database {})",
-            self.config.locale, self.config.database
+            self.config.locale, self.config.path
         )
     }
 }
@@ -394,7 +394,7 @@ mod tests {
         select: Option<&[String]>,
     ) -> Option<BTreeMap<String, Value>> {
         Geoip::new(GeoipConfig {
-            database: database.to_string(),
+            path: database.to_string(),
             locale: default_locale(),
         })
         .unwrap()

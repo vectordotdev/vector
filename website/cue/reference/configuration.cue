@@ -161,7 +161,7 @@ configuration: {
 						This enrichment table only supports lookup with IP address.
 						"""
 					type: object: options: {
-						database: {
+						path: {
 							description: """
 								Path to the [MaxMind GeoIP2](\(urls.maxmind_geoip2)) or [GeoLite2 binary city
 								database](\(urls.maxmind_geolite2_city)) file (`GeoLite2-City.mmdb`). Other
