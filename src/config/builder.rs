@@ -74,23 +74,25 @@ impl ConfigBuilderHash<'_> {
         let mut value = serde_json::to_value(self)
             .expect("Should serialize configuration hash builder to JSON. Please report.");
         Self::sort_json_values(&mut value);
-        todo!()
+
+        serde_json::to_string(&value).expect("Should serialize Value to JSON. Please report.")
     }
 
     fn sort_json_values(value: &mut Value) {
         match value {
             Value::Object(map) => {
-                let ordered_map: BTreeMap<String, Value> =
+                let mut ordered_map: BTreeMap<String, Value> =
                     serde_json::from_value(map.to_owned().into())
                         .expect("Converting Value to BTreeMap failed.");
+                for v in ordered_map.values_mut() {
+                    Self::sort_json_values(v)
+                }
                 *value = serde_json::to_value(ordered_map)
                     .expect("Converting BTreeMap back to Value failed.");
-                // iterate through key, values and continue sorting
-                todo!()
             }
             Value::Array(arr) => {
-                for value in arr.iter_mut() {
-                    Self::sort_json_values(value);
+                for v in arr.iter_mut() {
+                    Self::sort_json_values(v);
                 }
             }
             _ => {}
@@ -378,7 +380,7 @@ impl ConfigBuilder {
     }
 }
 
-#[cfg(all(test, feature = "enterprise", feature = "api"))]
+#[cfg(all(test, feature = "enterprise-tests"))]
 mod tests {
     use crate::config::ConfigBuilder;
 
@@ -446,5 +448,38 @@ mod tests {
             "2bc405edda02d6a32f2a93332d5e73840670cce4731a78cf6f73e2f7df8e7229",
             ConfigBuilder::default().sha256_hash()
         );
+    }
+
+    #[test]
+    fn version_hash_sorted() {
+        let _config = toml::from_str::<ConfigBuilder>(
+            r#"
+        [enterprise]
+        api_key = "apikey"
+        application_key = "appkey"
+        configuration_key = "configkey"
+
+        [sources.foo]
+        type = "internal_logs"
+
+        [sinks.loki]
+        type = "loki"
+        endpoint = "https://localhost:1111"
+        inputs = ["foo"]
+
+        [sinks.loki.labels]
+        foo = '{{ foo }}'
+        bar = '{{ bar }}'
+        baz = '{{ baz }}'
+        ingest = "hello-world"
+        level = '{{ level }}'
+        module = '{{ module }}'
+        service = '{{ service }}'
+
+        [sinks.loki.encoding]
+        codec = "json"
+        "#,
+        )
+        .unwrap();
     }
 }
