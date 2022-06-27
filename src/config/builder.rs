@@ -355,11 +355,8 @@ impl ConfigBuilder {
     }
 }
 
-#[allow(warnings)]
 #[cfg(all(test, feature = "enterprise-tests"))]
 mod tests {
-    use std::collections::HashMap;
-
     use crate::config::ConfigBuilder;
 
     use super::ConfigBuilderHash;
