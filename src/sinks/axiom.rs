@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     config::{
-        log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
-        SinkDescription,
+        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig,
+        SinkContext, SinkDescription,
     },
     sinks::{
         elasticsearch::{ElasticsearchAuth, ElasticsearchConfig},
@@ -90,7 +90,7 @@ impl SinkConfig for AxiomConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(DataType::Metric | DataType::Log)
     }
 
     fn sink_type(&self) -> &'static str {

@@ -108,8 +108,8 @@ components: sinks: axiom: {
 
 	input: {
 		logs:    true
-		metrics: null
-		traces:  true
+		metrics: true
+		traces:  null
 	}
 
 	how_it_works: {
