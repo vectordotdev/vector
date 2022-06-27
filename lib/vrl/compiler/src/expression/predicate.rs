@@ -1,15 +1,17 @@
 use std::fmt;
 
-use diagnostic::{DiagnosticError, Label, Note, Urls};
+use diagnostic::{DiagnosticMessage, Label, Note, Urls};
+use value::Value;
 
 use crate::{
-    expression::{Block, Expr, Resolved},
+    expression::{Expr, Resolved},
     parser::Node,
+    state::{ExternalEnv, LocalEnv},
     value::Kind,
-    Context, Expression, Span, State, TypeDef, Value,
+    Context, Expression, Span, TypeDef,
 };
 
-pub type Result = std::result::Result<Predicate, Error>;
+pub(crate) type Result = std::result::Result<Predicate, Error>;
 
 #[derive(Clone, PartialEq)]
 pub struct Predicate {
@@ -17,22 +19,35 @@ pub struct Predicate {
 }
 
 impl Predicate {
-    pub fn new(node: Node<Block>, state: &State) -> Result {
-        let (span, block) = node.take();
-        let type_def = block.type_def(state);
+    pub(crate) fn new(
+        node: Node<Vec<Expr>>,
+        state: (&LocalEnv, &ExternalEnv),
+        fallible_predicate: Option<&dyn DiagnosticMessage>,
+    ) -> Result {
+        let (span, exprs) = node.take();
+        let type_def = exprs
+            .last()
+            .map_or_else(TypeDef::null, |expr| expr.type_def(state));
+
+        if let Some(error) = fallible_predicate {
+            return Err(Error::Fallible {
+                code: error.code(),
+                labels: error.labels(),
+                notes: error.notes(),
+            });
+        }
 
         if !type_def.is_boolean() {
-            return Err(Error {
-                variant: ErrorVariant::NonBoolean(type_def.kind()),
+            return Err(Error::NonBoolean {
+                kind: type_def.into(),
                 span,
             });
         }
 
-        Ok(Self {
-            inner: block.into_inner(),
-        })
+        Ok(Self { inner: exprs })
     }
 
+    #[must_use]
     pub fn new_unchecked(inner: Vec<Expr>) -> Self {
         Self { inner }
     }
@@ -44,10 +59,10 @@ impl Expression for Predicate {
             .iter()
             .map(|expr| expr.resolve(ctx))
             .collect::<std::result::Result<Vec<_>, _>>()
-            .map(|mut v| v.pop().unwrap_or(Value::Null))
+            .map(|mut v| v.pop().unwrap_or(Value::Boolean(false)))
     }
 
-    fn type_def(&self, state: &State) -> TypeDef {
+    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
         let mut type_defs = self
             .inner
             .iter()
@@ -59,7 +74,7 @@ impl Expression for Predicate {
         let fallible = type_defs.iter().any(TypeDef::is_fallible);
 
         // The last expression determines the resulting value of the predicate.
-        let type_def = type_defs.pop().unwrap_or_else(|| TypeDef::new().null());
+        let type_def = type_defs.pop().unwrap_or_else(TypeDef::boolean);
 
         type_def.with_fallibility(fallible)
     }
@@ -107,62 +122,53 @@ impl fmt::Debug for Predicate {
 
 // -----------------------------------------------------------------------------
 
-#[derive(Debug)]
-pub struct Error {
-    pub(crate) variant: ErrorVariant,
-
-    span: Span,
-}
-
 #[derive(thiserror::Error, Debug)]
-pub enum ErrorVariant {
+pub(crate) enum Error {
     #[error("non-boolean predicate")]
-    NonBoolean(Kind),
+    NonBoolean { kind: Kind, span: Span },
+
+    #[error("fallible predicate")]
+    Fallible {
+        code: usize,
+        labels: Vec<Label>,
+        notes: Vec<Note>,
+    },
 }
 
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:#}", self.variant)
-    }
-}
-
-impl std::error::Error for Error {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        Some(&self.variant)
-    }
-}
-
-impl DiagnosticError for Error {
+impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
-        use ErrorVariant::*;
+        use Error::{Fallible, NonBoolean};
 
-        match &self.variant {
-            NonBoolean(..) => 102,
+        match self {
+            NonBoolean { .. } => 102,
+            Fallible { code, .. } => *code,
         }
     }
 
     fn labels(&self) -> Vec<Label> {
-        use ErrorVariant::*;
+        use Error::{Fallible, NonBoolean};
 
-        match &self.variant {
-            NonBoolean(kind) => vec![
-                Label::primary("this predicate must resolve to a boolean", self.span),
-                Label::context(format!("instead it resolves to {}", kind), self.span),
+        match self {
+            NonBoolean { kind, span } => vec![
+                Label::primary("this predicate must resolve to a boolean", span),
+                Label::context(format!("instead it resolves to {}", kind), span),
             ],
+            Fallible { labels, .. } => labels.clone(),
         }
     }
 
     fn notes(&self) -> Vec<Note> {
-        use ErrorVariant::*;
+        use Error::{Fallible, NonBoolean};
 
-        match &self.variant {
-            NonBoolean(..) => vec![
+        match self {
+            NonBoolean { .. } => vec![
                 Note::CoerceValue,
                 Note::SeeDocs(
                     "if expressions".to_owned(),
                     Urls::expression_docs_url("#if"),
                 ),
             ],
+            Fallible { notes, .. } => notes.clone(),
         }
     }
 }

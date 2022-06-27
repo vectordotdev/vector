@@ -30,7 +30,8 @@ pub mod console;
 #[cfg(any(
     feature = "sinks-datadog_events",
     feature = "sinks-datadog_logs",
-    feature = "sinks-datadog_metrics"
+    feature = "sinks-datadog_metrics",
+    feature = "sinks-datadog_traces"
 ))]
 pub mod datadog;
 #[cfg(feature = "sinks-datadog_archives")]
@@ -51,7 +52,7 @@ pub mod http;
 pub mod humio;
 #[cfg(any(feature = "sinks-influxdb", feature = "prometheus-integration-tests"))]
 pub mod influxdb;
-#[cfg(all(feature = "sinks-kafka", feature = "rdkafka"))]
+#[cfg(feature = "sinks-kafka")]
 pub mod kafka;
 #[cfg(feature = "sinks-logdna")]
 pub mod logdna;
@@ -59,6 +60,8 @@ pub mod logdna;
 pub mod loki;
 #[cfg(feature = "sinks-nats")]
 pub mod nats;
+#[cfg(feature = "sinks-new_relic")]
+pub mod new_relic;
 #[cfg(feature = "sinks-new_relic_logs")]
 pub mod new_relic_logs;
 #[cfg(feature = "sinks-papertrail")]
@@ -69,7 +72,10 @@ pub mod prometheus;
 pub mod pulsar;
 #[cfg(feature = "sinks-redis")]
 pub mod redis;
-#[cfg(any(feature = "sinks-aws_s3", feature = "sinks-datadog_archives"))]
+#[cfg(all(
+    any(feature = "sinks-aws_s3", feature = "sinks-datadog_archives"),
+    feature = "aws-core"
+))]
 pub mod s3_common;
 #[cfg(feature = "sinks-sematext")]
 pub mod sematext;
@@ -81,6 +87,8 @@ pub mod splunk_hec;
 pub mod statsd;
 #[cfg(feature = "sinks-vector")]
 pub mod vector;
+#[cfg(feature = "sinks-websocket")]
+pub mod websocket;
 
 pub use vector_core::sink::VectorSink;
 

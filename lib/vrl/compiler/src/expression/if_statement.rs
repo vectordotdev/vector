@@ -1,8 +1,12 @@
 use std::fmt;
 
+use value::Value;
+
 use crate::{
-    expression::{Block, Expr, Literal, Predicate, Resolved},
-    Context, Expression, State, TypeDef, Value,
+    expression::{Block, Predicate, Resolved},
+    state::{ExternalEnv, LocalEnv},
+    value::VrlValueConvert,
+    Context, Expression, TypeDef,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -10,22 +14,6 @@ pub struct IfStatement {
     pub predicate: Predicate,
     pub consequent: Block,
     pub alternative: Option<Block>,
-}
-
-impl IfStatement {
-    pub(crate) fn noop() -> Self {
-        let literal = Literal::Boolean(false);
-        let predicate = Predicate::new_unchecked(vec![Expr::Literal(literal)]);
-
-        let literal = Literal::Null;
-        let consequent = Block::new(vec![Expr::Literal(literal)]);
-
-        Self {
-            predicate,
-            consequent,
-            alternative: None,
-        }
-    }
 }
 
 impl Expression for IfStatement {
@@ -37,17 +25,16 @@ impl Expression for IfStatement {
             false => self
                 .alternative
                 .as_ref()
-                .map(|block| block.resolve(ctx))
-                .unwrap_or(Ok(Value::Null)),
+                .map_or(Ok(Value::Null), |block| block.resolve(ctx)),
         }
     }
 
-    fn type_def(&self, state: &State) -> TypeDef {
+    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
         let type_def = self.consequent.type_def(state);
 
         match &self.alternative {
-            None => type_def,
-            Some(alternative) => type_def.merge(alternative.type_def(state)),
+            None => type_def.add_null(),
+            Some(alternative) => type_def.merge_deep(alternative.type_def(state)),
         }
     }
 }

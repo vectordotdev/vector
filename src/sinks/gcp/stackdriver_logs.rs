@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use bytes::Bytes;
 use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
 use hyper::Body;
@@ -7,24 +8,23 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, map};
 use snafu::Snafu;
 
-use super::{GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
+    gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
     http::HttpClient,
-    internal_events::TemplateRenderingFailed,
     sinks::{
         gcs_common::config::healthcheck_response,
         util::{
-            encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpSink},
+            encoding::Transformer,
+            http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
             BatchConfig, BoxedRawValue, JsonArrayBuffer, RealtimeSizeBasedDefaultBatchSettings,
             TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
     template::{Template, TemplateRenderingError},
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 #[derive(Debug, Snafu)]
@@ -36,6 +36,9 @@ enum HealthcheckError {
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct StackdriverConfig {
+    #[serde(skip, default = "default_endpoint")]
+    endpoint: String,
+
     #[serde(flatten)]
     pub log_name: StackdriverLogName,
     pub log_id: Template,
@@ -46,37 +49,40 @@ pub struct StackdriverConfig {
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
     #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
+    pub encoding: Transformer,
 
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
 
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
+
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
+}
+
+fn default_endpoint() -> String {
+    "https://logging.googleapis.com/v2/entries:write".to_string()
 }
 
 #[derive(Clone, Debug)]
 struct StackdriverSink {
     config: StackdriverConfig,
-    creds: Option<GcpCredentials>,
+    auth: GcpAuthenticator,
     severity_key: Option<String>,
     uri: Uri,
 }
 
 // 10MB limit for entries.write: https://cloud.google.com/logging/quotas#api-limits
 const MAX_BATCH_PAYLOAD_SIZE: usize = 10_000_000;
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-pub enum Encoding {
-    #[derivative(Default)]
-    Default,
-}
 
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
@@ -106,13 +112,11 @@ inventory::submit! {
 
 impl_generate_config_from_default!(StackdriverConfig);
 
-const ENDPOINT_URI: &str = "https://logging.googleapis.com/v2/entries:write";
-
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_stackdriver_logs")]
 impl SinkConfig for StackdriverConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let creds = self.auth.make_credentials(Scope::LoggingWrite).await?;
+        let auth = self.auth.build(Scope::LoggingWrite).await?;
 
         let batch = self
             .batch
@@ -129,9 +133,9 @@ impl SinkConfig for StackdriverConfig {
 
         let sink = StackdriverSink {
             config: self.clone(),
-            creds,
+            auth,
             severity_key: self.severity_key.clone(),
-            uri: ENDPOINT_URI.parse().unwrap(),
+            uri: self.endpoint.parse().unwrap(),
         };
 
         let healthcheck = healthcheck(client.clone(), sink.clone()).boxed();
@@ -146,30 +150,35 @@ impl SinkConfig for StackdriverConfig {
         )
         .sink_map_err(|error| error!(message = "Fatal gcp_stackdriver_logs sink error.", %error));
 
-        Ok((VectorSink::Sink(Box::new(sink)), healthcheck))
+        Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "gcp_stackdriver_logs"
     }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
+    }
 }
 
-#[async_trait::async_trait]
-impl HttpSink for StackdriverSink {
-    type Input = serde_json::Value;
-    type Output = Vec<BoxedRawValue>;
+struct StackdriverEventEncoder {
+    config: StackdriverConfig,
+    severity_key: Option<String>,
+}
 
-    fn encode_event(&self, event: Event) -> Option<Self::Input> {
+impl HttpEventEncoder<serde_json::Value> for StackdriverEventEncoder {
+    fn encode_event(&mut self, event: Event) -> Option<serde_json::Value> {
         let mut labels = HashMap::with_capacity(self.config.resource.labels.len());
         for (key, template) in &self.config.resource.labels {
             let value = template
                 .render_string(&event)
                 .map_err(|error| {
-                    emit!(&TemplateRenderingFailed {
+                    emit!(crate::internal_events::TemplateRenderingError {
                         error,
                         field: Some("resource.labels"),
                         drop_event: true,
@@ -182,7 +191,7 @@ impl HttpSink for StackdriverSink {
             .config
             .log_name(&event)
             .map_err(|error| {
-                emit!(&TemplateRenderingFailed {
+                emit!(crate::internal_events::TemplateRenderingError {
                     error,
                     field: Some("log_id"),
                     drop_event: true,
@@ -194,12 +203,12 @@ impl HttpSink for StackdriverSink {
         let severity = self
             .severity_key
             .as_ref()
-            .and_then(|key| log.remove(key))
+            .and_then(|key| log.remove(key.as_str()))
             .map(remap_severity)
             .unwrap_or_else(|| 0.into());
 
         let mut event = Event::Log(log);
-        self.config.encoding.apply_rules(&mut event);
+        self.config.encoding.transform(&mut event);
 
         let log = event.into_log();
 
@@ -222,20 +231,31 @@ impl HttpSink for StackdriverSink {
 
         Some(json!(entry))
     }
+}
 
-    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
+#[async_trait::async_trait]
+impl HttpSink for StackdriverSink {
+    type Input = serde_json::Value;
+    type Output = Vec<BoxedRawValue>;
+    type Encoder = StackdriverEventEncoder;
+
+    fn build_encoder(&self) -> Self::Encoder {
+        StackdriverEventEncoder {
+            config: self.config.clone(),
+            severity_key: self.severity_key.clone(),
+        }
+    }
+
+    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Bytes>> {
         let events = serde_json::json!({ "entries": events });
 
-        let body = serde_json::to_vec(&events).unwrap();
+        let body = crate::serde::json::to_bytes(&events).unwrap().freeze();
 
         let mut request = Request::post(self.uri.clone())
             .header("Content-Type", "application/json")
             .body(body)
             .unwrap();
-
-        if let Some(creds) = &self.creds {
-            creds.apply(&mut request);
-        }
+        self.auth.apply(&mut request);
 
         Ok(request)
     }
@@ -252,7 +272,7 @@ fn remap_severity(severity: Value) -> Value {
                     s if s.starts_with("EMERG") || s.starts_with("FATAL") => 800,
                     s if s.starts_with("ALERT") => 700,
                     s if s.starts_with("CRIT") => 600,
-                    s if s.starts_with("ERR") => 500,
+                    s if s.starts_with("ERR") || s == "ER" => 500,
                     s if s.starts_with("WARN") => 400,
                     s if s.starts_with("NOTICE") => 300,
                     s if s.starts_with("INFO") => 200,
@@ -285,7 +305,11 @@ async fn healthcheck(client: HttpClient, sink: StackdriverSink) -> crate::Result
     let request = sink.build_request(vec![]).await?.map(Body::from);
 
     let response = client.send(request).await?;
-    healthcheck_response(sink.creds.clone(), HealthcheckError::NotFound.into())(response)
+    healthcheck_response(
+        response,
+        sink.auth.clone(),
+        HealthcheckError::NotFound.into(),
+    )
 }
 
 impl StackdriverConfig {
@@ -306,15 +330,44 @@ impl StackdriverConfig {
 #[cfg(test)]
 mod tests {
     use chrono::{TimeZone, Utc};
+    use futures::{future::ready, stream};
     use indoc::indoc;
     use serde_json::value::RawValue;
 
     use super::*;
-    use crate::event::{LogEvent, Value};
+    use crate::{
+        config::{GenerateConfig, SinkConfig, SinkContext},
+        event::{LogEvent, Value},
+        test_util::{
+            components::{run_and_assert_sink_compliance, SINK_TAGS},
+            http::{always_200_response, spawn_blackhole_http_server},
+        },
+    };
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<StackdriverConfig>();
+    }
+
+    #[tokio::test]
+    async fn component_spec_compliance() {
+        let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
+
+        let config = StackdriverConfig::generate_config().to_string();
+        let mut config =
+            toml::from_str::<StackdriverConfig>(&config).expect("config should be valid");
+
+        // If we don't override the credentials path/API key, it tries to directly call out to the Google Instance
+        // Metadata API, which we clearly don't have in unit tests. :)
+        config.auth.credentials_path = None;
+        config.auth.api_key = Some("fake".to_string());
+        config.endpoint = mock_endpoint.to_string();
+
+        let context = SinkContext::new_test();
+        let (sink, _healthcheck) = config.build(context).await.unwrap();
+
+        let event = Event::from("simple message");
+        run_and_assert_sink_compliance(sink, stream::once(ready(event)), &SINK_TAGS).await;
     }
 
     #[test]
@@ -331,10 +384,11 @@ mod tests {
 
         let sink = StackdriverSink {
             config,
-            creds: None,
+            auth: GcpAuthenticator::None,
             severity_key: Some("anumber".into()),
-            uri: ENDPOINT_URI.parse().unwrap(),
+            uri: default_endpoint().parse().unwrap(),
         };
+        let mut encoder = sink.build_encoder();
 
         let log = [
             ("message", "hello world"),
@@ -345,7 +399,7 @@ mod tests {
         .iter()
         .copied()
         .collect::<LogEvent>();
-        let json = sink.encode_event(Event::from(log)).unwrap();
+        let json = encoder.encode_event(Event::from(log)).unwrap();
         assert_eq!(
             json,
             serde_json::json!({
@@ -372,10 +426,11 @@ mod tests {
 
         let sink = StackdriverSink {
             config,
-            creds: None,
+            auth: GcpAuthenticator::None,
             severity_key: Some("anumber".into()),
-            uri: ENDPOINT_URI.parse().unwrap(),
+            uri: default_endpoint().parse().unwrap(),
         };
+        let mut encoder = sink.build_encoder();
 
         let mut log = LogEvent::default();
         log.insert("message", Value::Bytes("hello world".into()));
@@ -385,7 +440,7 @@ mod tests {
             Value::Timestamp(Utc.ymd(2020, 1, 1).and_hms(12, 30, 0)),
         );
 
-        let json = sink.encode_event(Event::from(log)).unwrap();
+        let json = encoder.encode_event(Event::from(log)).unwrap();
         assert_eq!(
             json,
             serde_json::json!({
@@ -440,15 +495,16 @@ mod tests {
 
         let sink = StackdriverSink {
             config,
-            creds: None,
+            auth: GcpAuthenticator::None,
             severity_key: None,
-            uri: ENDPOINT_URI.parse().unwrap(),
+            uri: default_endpoint().parse().unwrap(),
         };
+        let mut encoder = sink.build_encoder();
 
         let log1 = [("message", "hello")].iter().copied().collect::<LogEvent>();
         let log2 = [("message", "world")].iter().copied().collect::<LogEvent>();
-        let event1 = sink.encode_event(Event::from(log1)).unwrap();
-        let event2 = sink.encode_event(Event::from(log2)).unwrap();
+        let event1 = encoder.encode_event(Event::from(log1)).unwrap();
+        let event2 = encoder.encode_event(Event::from(log2)).unwrap();
 
         let json1 = serde_json::to_string(&event1).unwrap();
         let json2 = serde_json::to_string(&event2).unwrap();

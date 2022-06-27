@@ -34,18 +34,24 @@ pub enum RequestBuilderError {
 impl RequestBuilderError {
     /// Converts this error into its constituent parts: the error reason, and how many events were
     /// dropped as a result.
-    pub const fn into_parts(self) -> (&'static str, u64) {
+    pub const fn into_parts(self) -> (&'static str, &'static str, u64) {
         match self {
-            Self::FailedToBuild { error_type } => (error_type, 0),
+            Self::FailedToBuild { error_type } => {
+                ("Failed to build the request builder.", error_type, 0)
+            }
             Self::FailedToEncode {
                 reason,
                 dropped_events,
-            } => (reason, dropped_events),
-            Self::FailedToSplit { dropped_events } => ("split_failed", dropped_events),
+            } => ("Encoding of a metric failed.", reason, dropped_events),
+            Self::FailedToSplit { dropped_events } => (
+                "A split payload was still too big to encode/compress withing size limits.",
+                "split_failed",
+                dropped_events,
+            ),
             Self::Unexpected {
                 error_type,
                 dropped_events,
-            } => (error_type, dropped_events),
+            } => ("An unexpected error occurred.", error_type, dropped_events),
         }
     }
 }
@@ -102,6 +108,14 @@ impl From<EncoderError> for RequestBuilderError {
     }
 }
 
+/// Metadata that the `DatadogMetricsRequestBuilder` sends with each request.
+pub struct RequestMetadata {
+    endpoint: DatadogMetricsEndpoint,
+    batch_size: usize,
+    finalizers: EventFinalizers,
+    raw_bytes: usize,
+}
+
 /// Incremental request builder specific to Datadog metrics.
 pub struct DatadogMetricsRequestBuilder {
     endpoint_configuration: DatadogMetricsEndpointConfiguration,
@@ -138,7 +152,7 @@ impl DatadogMetricsRequestBuilder {
 impl IncrementalRequestBuilder<(DatadogMetricsEndpoint, Vec<Metric>)>
     for DatadogMetricsRequestBuilder
 {
-    type Metadata = (DatadogMetricsEndpoint, usize, EventFinalizers);
+    type Metadata = RequestMetadata;
     type Payload = Bytes;
     type Request = DatadogMetricsRequest;
     type Error = RequestBuilderError;
@@ -190,9 +204,15 @@ impl IncrementalRequestBuilder<(DatadogMetricsEndpoint, Vec<Metric>)>
             // If we encoded one or more metrics this pass, finalize the payload.
             if n > 0 {
                 match encoder.finish() {
-                    Ok((payload, mut metrics)) => {
+                    Ok((payload, mut metrics, raw_bytes_written)) => {
                         let finalizers = metrics.take_finalizers();
-                        results.push(Ok(((endpoint, n, finalizers), payload.into())));
+                        let metadata = RequestMetadata {
+                            endpoint,
+                            batch_size: n,
+                            finalizers,
+                            raw_bytes: raw_bytes_written,
+                        };
+                        results.push(Ok((metadata, payload)));
                     }
                     Err(err) => match err {
                         // The encoder informed us that the resulting payload was too big, so we're
@@ -242,15 +262,17 @@ impl IncrementalRequestBuilder<(DatadogMetricsEndpoint, Vec<Metric>)>
     }
 
     fn build_request(&mut self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
-        let (endpoint, batch_size, finalizers) = metadata;
-        let uri = self.endpoint_configuration.get_uri_for_endpoint(endpoint);
+        let uri = self
+            .endpoint_configuration
+            .get_uri_for_endpoint(metadata.endpoint);
 
         DatadogMetricsRequest {
             payload,
             uri,
-            content_type: endpoint.content_type(),
-            finalizers,
-            batch_size,
+            content_type: metadata.endpoint.content_type(),
+            finalizers: metadata.finalizers,
+            batch_size: metadata.batch_size,
+            raw_bytes: metadata.raw_bytes,
         }
     }
 }
@@ -267,7 +289,7 @@ fn encode_now_or_never(
     encoder: &mut DatadogMetricsEncoder,
     endpoint: DatadogMetricsEndpoint,
     metrics: Vec<Metric>,
-) -> Result<((DatadogMetricsEndpoint, usize, EventFinalizers), Bytes), RequestBuilderError> {
+) -> Result<(RequestMetadata, Bytes), RequestBuilderError> {
     let metrics_len = metrics.len() as u64;
 
     let n = metrics
@@ -281,9 +303,15 @@ fn encode_now_or_never(
 
     encoder
         .finish()
-        .map(|(payload, mut processed)| {
+        .map(|(payload, mut processed, raw_bytes_written)| {
             let finalizers = processed.take_finalizers();
-            ((endpoint, n, finalizers), payload.into())
+            let metadata = RequestMetadata {
+                endpoint,
+                batch_size: n,
+                finalizers,
+                raw_bytes: raw_bytes_written,
+            };
+            (metadata, payload)
         })
         .map_err(|_| RequestBuilderError::FailedToSplit {
             dropped_events: metrics_len,

@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, fmt::Write as _};
 use chrono::Utc;
 use indexmap::map::IndexMap;
 use prometheus_parser::{proto, METRIC_NAME_LABEL};
-use vector_core::event::metric::{MetricSketch, Quantile};
+use vector_core::event::metric::{samples_to_buckets, MetricSketch, Quantile};
 
 use crate::{
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
@@ -34,7 +34,6 @@ pub(super) trait MetricCollector {
         default_namespace: Option<&str>,
         buckets: &[f64],
         quantiles: &[f64],
-        expired: bool,
         metric: &Metric,
     ) {
         let name = encode_namespace(metric.namespace().or(default_namespace), '_', metric.name());
@@ -53,39 +52,24 @@ pub(super) trait MetricCollector {
                     self.emit_value(timestamp, name, "", *value, tags, None);
                 }
                 MetricValue::Set { values } => {
-                    // sets could expire
-                    let value = if expired { 0 } else { values.len() };
-                    self.emit_value(timestamp, name, "", value as f64, tags, None);
+                    self.emit_value(timestamp, name, "", values.len() as f64, tags, None);
                 }
                 MetricValue::Distribution {
                     samples,
                     statistic: StatisticKind::Histogram,
                 } => {
                     // convert distributions into aggregated histograms
-                    let mut counts = vec![0; buckets.len()];
-                    let mut sum = 0.0;
-                    let mut count = 0;
-                    for sample in samples {
-                        buckets
-                            .iter()
-                            .enumerate()
-                            .skip_while(|&(_, b)| *b < sample.value)
-                            .for_each(|(i, _)| {
-                                counts[i] += sample.rate;
-                            });
-
-                        sum += sample.value * (sample.rate as f64);
-                        count += sample.rate;
-                    }
-
-                    for (b, c) in buckets.iter().zip(counts.iter()) {
+                    let (buckets, count, sum) = samples_to_buckets(samples, buckets);
+                    let mut bucket_count = 0.0;
+                    for bucket in buckets {
+                        bucket_count += bucket.count as f64;
                         self.emit_value(
                             timestamp,
                             name,
                             "_bucket",
-                            *c as f64,
+                            bucket_count as f64,
                             tags,
-                            Some(("le", b.to_string())),
+                            Some(("le", bucket.upper_limit.to_string())),
                         );
                     }
                     self.emit_value(
@@ -197,10 +181,10 @@ pub(super) trait MetricCollector {
                 }
                 MetricValue::Sketch { sketch } => match sketch {
                     MetricSketch::AgentDDSketch(ddsketch) => {
-                        for q in [0.5, 0.75, 0.9, 0.99] {
+                        for q in quantiles {
                             let quantile = Quantile {
-                                quantile: q,
-                                value: ddsketch.quantile(q).unwrap_or(0.0),
+                                quantile: *q,
+                                value: ddsketch.quantile(*q).unwrap_or(0.0),
                             };
                             self.emit_value(
                                 timestamp,
@@ -290,15 +274,15 @@ impl StringCollector {
     ) {
         match (tags, extra) {
             (None, None) => Ok(()),
-            (None, Some(tag)) => write!(result, "{{{}=\"{}\"}}", tag.0, tag.1),
+            (None, Some(tag)) => write!(result, "{{{}}}", Self::format_tag(tag.0, &tag.1)),
             (Some(tags), ref tag) => {
                 let mut parts = tags
                     .iter()
-                    .map(|(name, value)| format!("{}=\"{}\"", name, value))
+                    .map(|(key, value)| Self::format_tag(key, value))
                     .collect::<Vec<_>>();
 
-                if let Some(tag) = tag {
-                    parts.push(format!("{}=\"{}\"", tag.0, tag.1));
+                if let Some((key, value)) = tag {
+                    parts.push(Self::format_tag(key, value))
                 }
 
                 parts.sort();
@@ -314,6 +298,23 @@ impl StringCollector {
             "# HELP {} {}\n# TYPE {} {}\n",
             fullname, name, fullname, r#type
         )
+    }
+
+    fn format_tag(key: &str, mut value: &str) -> String {
+        // For most tags, this is just `{KEY}="{VALUE}"` so allocate optimistically
+        let mut result = String::with_capacity(key.len() + value.len() + 3);
+        result.push_str(key);
+        result.push_str("=\"");
+        while let Some(i) = value.find(|ch| ch == '\\' || ch == '"') {
+            result.push_str(&value[..i]);
+            result.push('\\');
+            // Ugly but works because we know the character at `i` is ASCII
+            result.push(value.as_bytes()[i] as char);
+            value = &value[i + 1..];
+        }
+        result.push_str(value);
+        result.push('"');
+        result
     }
 }
 
@@ -438,6 +439,8 @@ const fn prometheus_metric_type(metric_value: &MetricValue) -> proto::MetricType
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
     use chrono::{DateTime, TimeZone};
     use indoc::indoc;
     use pretty_assertions::assert_eq;
@@ -452,11 +455,10 @@ mod tests {
         default_namespace: Option<&str>,
         buckets: &[f64],
         quantiles: &[f64],
-        expired: bool,
         metric: &Metric,
     ) -> T::Output {
         let mut s = T::new();
-        s.encode_metric(default_namespace, buckets, quantiles, expired, metric);
+        s.encode_metric(default_namespace, buckets, quantiles, metric);
         s.finish()
     }
 
@@ -534,7 +536,7 @@ mod tests {
         )
         .with_tags(Some(tags()))
         .with_timestamp(Some(timestamp()));
-        encode_one::<T>(Some("vector"), &[], &[], false, &metric)
+        encode_one::<T>(Some("vector"), &[], &[], &metric)
     }
 
     #[test]
@@ -565,7 +567,7 @@ mod tests {
         )
         .with_tags(Some(tags()))
         .with_timestamp(Some(timestamp()));
-        encode_one::<T>(Some("vector"), &[], &[], false, &metric)
+        encode_one::<T>(Some("vector"), &[], &[], &metric)
     }
 
     #[test]
@@ -597,7 +599,7 @@ mod tests {
             },
         )
         .with_timestamp(Some(timestamp()));
-        encode_one::<T>(Some("vector"), &[], &[], false, &metric)
+        encode_one::<T>(Some("vector"), &[], &[], &metric)
     }
 
     #[test]
@@ -625,11 +627,11 @@ mod tests {
             "users".to_owned(),
             MetricKind::Absolute,
             MetricValue::Set {
-                values: vec!["foo".into()].into_iter().collect(),
+                values: BTreeSet::new(),
             },
         )
         .with_timestamp(Some(timestamp()));
-        encode_one::<T>(Some("vector"), &[], &[], true, &metric)
+        encode_one::<T>(Some("vector"), &[], &[], &metric)
     }
 
     #[test]
@@ -676,7 +678,7 @@ mod tests {
             },
         )
         .with_timestamp(Some(timestamp()));
-        encode_one::<T>(Some("vector"), &[0.0, 2.5, 5.0], &[], false, &metric)
+        encode_one::<T>(Some("vector"), &[0.0, 2.5, 5.0], &[], &metric)
     }
 
     #[test]
@@ -767,7 +769,7 @@ mod tests {
             },
         )
         .with_timestamp(Some(timestamp()));
-        encode_one::<T>(Some("vector"), &[], &[], false, &metric)
+        encode_one::<T>(Some("vector"), &[], &[], &metric)
     }
 
     #[test]
@@ -813,7 +815,7 @@ mod tests {
         )
         .with_tags(Some(tags()))
         .with_timestamp(Some(timestamp()));
-        encode_one::<T>(Some("ns"), &[], &[], false, &metric)
+        encode_one::<T>(Some("ns"), &[], &[], &metric)
     }
 
     #[test]
@@ -869,13 +871,7 @@ mod tests {
         )
         .with_tags(Some(tags()))
         .with_timestamp(Some(timestamp()));
-        encode_one::<T>(
-            Some("ns"),
-            &[],
-            &default_summary_quantiles(),
-            false,
-            &metric,
-        )
+        encode_one::<T>(Some("ns"), &[], &default_summary_quantiles(), &metric)
     }
 
     #[test]
@@ -905,7 +901,7 @@ mod tests {
             MetricValue::Counter { value: 2.0 },
         )
         .with_timestamp(Some(timestamp()));
-        encode_one::<T>(None, &[], &[], false, &metric)
+        encode_one::<T>(None, &[], &[], &metric)
     }
 
     #[test]
@@ -916,11 +912,38 @@ mod tests {
             MetricKind::Absolute,
             MetricValue::Gauge { value: 1.0 },
         );
-        let encoded = encode_one::<TimeSeries>(None, &[], &[], false, &metric);
+        let encoded = encode_one::<TimeSeries>(None, &[], &[], &metric);
         assert!(encoded.timeseries[0].samples[0].timestamp >= now);
     }
 
     fn timestamp() -> DateTime<Utc> {
         Utc.ymd(2021, 2, 3).and_hms_milli(4, 5, 6, 789)
+    }
+
+    #[test]
+    fn escapes_tags_text() {
+        let tags: BTreeMap<String, String> = [
+            ("code", "200"),
+            ("quoted", r#"host"1""#),
+            ("path", r#"c:\Windows"#),
+        ]
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
+        let metric = Metric::new(
+            "something".to_owned(),
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_tags(Some(tags));
+        let encoded = encode_one::<StringCollector>(None, &[], &[], &metric);
+        assert_eq!(
+            encoded,
+            indoc! {r#"
+                # HELP something something
+                # TYPE something counter
+                something{code="200",path="c:\\Windows",quoted="host\"1\""} 1
+            "#}
+        );
     }
 }

@@ -13,30 +13,44 @@ use file_source::{
     Checkpointer, FileServer, FileServerShutdown, FingerprintStrategy, Fingerprinter, Line,
     ReadFrom,
 };
-use k8s_openapi::api::core::v1::{Namespace, Pod};
-use serde::{Deserialize, Serialize};
-use shared::TimeZone;
+use futures_util::Stream;
+use k8s_openapi::api::core::v1::{Namespace, Node, Pod};
+use kube::{
+    api::{Api, ListParams},
+    config::{self, KubeConfigOptions},
+    runtime::{
+        reflector::{self},
+        watcher,
+    },
+    Client, Config as ClientConfig,
+};
+use vector_common::TimeZone;
+use vector_config::configurable_component;
+use vector_core::ByteSizeOf;
 
 use crate::{
     config::{
-        log_schema, ComponentKey, DataType, GenerateConfig, GlobalOptions, ProxyConfig,
-        SourceConfig, SourceContext, SourceDescription,
+        log_schema, ComponentKey, DataType, GenerateConfig, GlobalOptions, Output, SourceConfig,
+        SourceContext, SourceDescription,
     },
     event::{Event, LogEvent},
     internal_events::{
-        FileSourceInternalEventsEmitter, KubernetesLogsEventAnnotationFailed,
-        KubernetesLogsEventNamespaceAnnotationFailed, KubernetesLogsEventReceived,
+        BytesReceived, FileSourceInternalEventsEmitter, KubernetesLifecycleError,
+        KubernetesLogsEventAnnotationError, KubernetesLogsEventNamespaceAnnotationError,
+        KubernetesLogsEventNodeAnnotationError, KubernetesLogsEventsReceived,
+        KubernetesLogsPodInfo, StreamClosedError,
     },
-    kubernetes as k8s,
-    kubernetes::hash_value::HashKey,
+    kubernetes::custom_reflector,
     shutdown::ShutdownSignal,
     sources,
-    transforms::{FunctionTransform, TaskTransform},
+    transforms::{FunctionTransform, OutputBuffer, TaskTransform},
+    SourceSender,
 };
 
 mod k8s_paths_provider;
 mod lifecycle;
 mod namespace_metadata_annotator;
+mod node_metadata_annotator;
 mod parser;
 mod partial_events_merger;
 mod path_helpers;
@@ -44,11 +58,12 @@ mod pod_metadata_annotator;
 mod transform_utils;
 mod util;
 
-use futures::{future::FutureExt, sink::Sink, stream::StreamExt};
+use self::namespace_metadata_annotator::NamespaceMetadataAnnotator;
+use self::node_metadata_annotator::NodeMetadataAnnotator;
+use self::pod_metadata_annotator::PodMetadataAnnotator;
+use futures::{future::FutureExt, stream::StreamExt};
 use k8s_paths_provider::K8sPathsProvider;
 use lifecycle::Lifecycle;
-use namespace_metadata_annotator::NamespaceMetadataAnnotator;
-use pod_metadata_annotator::PodMetadataAnnotator;
 
 /// The key we use for `file` field.
 const FILE_KEY: &str = "file";
@@ -57,34 +72,41 @@ const FILE_KEY: &str = "file";
 const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
 
 /// Configuration for the `kubernetes_logs` source.
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct Config {
-    /// Specifies the label selector to filter `Pod`s with, to be used in
-    /// addition to the built-in `vector.dev/exclude` filter.
+    /// Specifies the label selector to filter `Pod`s with, to be used in addition to the built-in `vector.dev/exclude` filter.
     extra_label_selector: String,
 
+    /// Specifies the label selector to filter `Namespace`s with, to be used in  addition to the built-in `vector.dev/exclude` filter.
+    extra_namespace_label_selector: String,
+
     /// The `name` of the Kubernetes `Node` that Vector runs at.
-    /// Required to filter the `Pod`s to only include the ones with the log
-    /// files accessible locally.
+    ///
+    /// Configured to use an environment var by default, to be evaluated to a value provided by Kubernetes at `Pod` deploy time.
     self_node_name: String,
 
-    /// Specifies the field selector to filter `Pod`s with, to be used in
-    /// addition to the built-in `Node` filter.
+    /// Specifies the field selector to filter `Pod`s with, to be used in addition to the built-in `Node` filter.
     extra_field_selector: String,
 
-    /// Automatically merge partial events.
+    /// Whether or not to automatically merge partial events.
     auto_partial_merge: bool,
 
-    /// Override global data_dir
+    /// The directory used to persist file checkpoint positions.
+    ///
+    /// By default, the global `data_dir` option is used. Please make sure the user Vector is running as has write permissions to this directory.
     data_dir: Option<PathBuf>,
 
-    /// Specifies the field names for Pod metadata annotation.
+    #[configurable(derived)]
     #[serde(alias = "annotation_fields")]
     pod_annotation_fields: pod_metadata_annotator::FieldsSpec,
 
-    /// Specifies the field names for Namespace metadata annotation.
+    #[configurable(derived)]
     namespace_annotation_fields: namespace_metadata_annotator::FieldsSpec,
+
+    #[configurable(derived)]
+    node_annotation_fields: node_metadata_annotator::FieldsSpec,
 
     /// A list of glob patterns to exclude from reading the files.
     exclude_paths_glob_patterns: Vec<PathBuf>,
@@ -147,12 +169,14 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             extra_label_selector: "".to_string(),
+            extra_namespace_label_selector: "".to_string(),
             self_node_name: default_self_node_name_env_template(),
             extra_field_selector: "".to_string(),
             auto_partial_merge: true,
             data_dir: None,
             pod_annotation_fields: pod_metadata_annotator::FieldsSpec::default(),
             namespace_annotation_fields: namespace_metadata_annotator::FieldsSpec::default(),
+            node_annotation_fields: node_metadata_annotator::FieldsSpec::default(),
             exclude_paths_glob_patterns: default_path_exclusion(),
             max_read_bytes: default_max_read_bytes(),
             max_line_bytes: default_max_line_bytes(),
@@ -172,7 +196,7 @@ const COMPONENT_ID: &str = "kubernetes_logs";
 #[typetag::serde(name = "kubernetes_logs")]
 impl SourceConfig for Config {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        let source = Source::new(self, &cx.globals, &cx.key, &cx.proxy)?;
+        let source = Source::new(self, &cx.globals, &cx.key).await?;
         Ok(Box::pin(source.run(cx.out, cx.shutdown).map(|result| {
             result.map_err(|error| {
                 error!(message = "Source future failed.", %error);
@@ -180,24 +204,32 @@ impl SourceConfig for Config {
         })))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
         COMPONENT_ID
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Clone)]
 struct Source {
-    client: k8s::client::Client,
+    client: Client,
     data_dir: PathBuf,
     auto_partial_merge: bool,
     pod_fields_spec: pod_metadata_annotator::FieldsSpec,
     namespace_fields_spec: namespace_metadata_annotator::FieldsSpec,
+    node_field_spec: node_metadata_annotator::FieldsSpec,
     field_selector: String,
     label_selector: String,
+    namespace_label_selector: String,
+    node_selector: String,
+    self_node_name: String,
     exclude_paths: Vec<glob::Pattern>,
     max_read_bytes: usize,
     max_line_bytes: usize,
@@ -209,20 +241,44 @@ struct Source {
 }
 
 impl Source {
-    fn new(
+    async fn new(
         config: &Config,
         globals: &GlobalOptions,
         key: &ComponentKey,
-        proxy: &ProxyConfig,
     ) -> crate::Result<Self> {
-        let field_selector = prepare_field_selector(config)?;
-        let label_selector = prepare_label_selector(config);
-
-        let k8s_config = match &config.kube_config_file {
-            Some(kc) => k8s::client::config::Config::kubeconfig(kc)?,
-            None => k8s::client::config::Config::in_cluster()?,
+        let self_node_name = if config.self_node_name.is_empty()
+            || config.self_node_name == default_self_node_name_env_template()
+        {
+            std::env::var(SELF_NODE_NAME_ENV_KEY).map_err(|_| {
+                format!(
+                    "self_node_name config value or {} env var is not set",
+                    SELF_NODE_NAME_ENV_KEY
+                )
+            })?
+        } else {
+            config.self_node_name.clone()
         };
-        let client = k8s::client::Client::new(k8s_config, proxy)?;
+
+        let field_selector = prepare_field_selector(config, self_node_name.as_str())?;
+        let label_selector = prepare_label_selector(config.extra_label_selector.as_ref());
+        let namespace_label_selector =
+            prepare_label_selector(config.extra_namespace_label_selector.as_ref());
+        let node_selector = prepare_node_selector(self_node_name.as_str())?;
+
+        // If the user passed a custom Kubeconfig use it, otherwise
+        // we attempt to load the local kubec-config, followed by the
+        // in-cluster environment variables
+        let client_config = match &config.kube_config_file {
+            Some(kc) => {
+                ClientConfig::from_custom_kubeconfig(
+                    config::Kubeconfig::read_from(kc)?,
+                    &KubeConfigOptions::default(),
+                )
+                .await?
+            }
+            None => ClientConfig::infer().await?,
+        };
+        let client = Client::try_from(client_config)?;
 
         let data_dir = globals.resolve_and_make_data_subdir(config.data_dir.as_ref(), key.id())?;
         let timezone = config.timezone.unwrap_or(globals.timezone);
@@ -247,8 +303,12 @@ impl Source {
             auto_partial_merge: config.auto_partial_merge,
             pod_fields_spec: config.pod_annotation_fields.clone(),
             namespace_fields_spec: config.namespace_annotation_fields.clone(),
+            node_field_spec: config.node_annotation_fields.clone(),
             field_selector,
             label_selector,
+            namespace_label_selector,
+            node_selector,
+            self_node_name,
             exclude_paths,
             max_read_bytes: config.max_read_bytes,
             max_line_bytes: config.max_line_bytes,
@@ -260,19 +320,23 @@ impl Source {
         })
     }
 
-    async fn run<O>(self, out: O, global_shutdown: ShutdownSignal) -> crate::Result<()>
-    where
-        O: Sink<Event> + Send + 'static + Unpin,
-        <O as Sink<Event>>::Error: std::error::Error,
-    {
+    async fn run(
+        self,
+        mut out: SourceSender,
+        global_shutdown: ShutdownSignal,
+    ) -> crate::Result<()> {
         let Self {
             client,
             data_dir,
             auto_partial_merge,
             pod_fields_spec,
             namespace_fields_spec,
+            node_field_spec,
             field_selector,
             label_selector,
+            namespace_label_selector,
+            node_selector,
+            self_node_name,
             exclude_paths,
             max_read_bytes,
             max_line_bytes,
@@ -283,55 +347,69 @@ impl Source {
             delay_deletion,
         } = self;
 
-        let watcher =
-            k8s::api_watcher::ApiWatcher::new(client.clone(), Pod::watch_pod_for_all_namespaces);
-        let watcher = k8s::instrumenting_watcher::InstrumentingWatcher::new(watcher);
-        let (state_reader, state_writer) = evmap::new();
-        let state_writer = k8s::state::evmap::Writer::new(
-            state_writer,
-            Some(Duration::from_millis(10)),
-            HashKey::Uid,
-        );
-        let state_writer = k8s::state::instrumenting::Writer::new(state_writer);
-        let state_writer = k8s::state::delayed_delete::Writer::new(state_writer, delay_deletion);
+        let mut reflectors = Vec::new();
 
-        let mut reflector = k8s::reflector::Reflector::new(
-            watcher,
-            state_writer,
-            Some(field_selector),
-            Some(label_selector),
-            Duration::from_secs(1),
+        let pods = Api::<Pod>::all(client.clone());
+        let pod_watcher = watcher(
+            pods,
+            ListParams {
+                field_selector: Some(field_selector),
+                label_selector: Some(label_selector),
+                ..Default::default()
+            },
         );
-        let reflector_process = reflector.run();
+        let pod_store_w = reflector::store::Writer::default();
+        let pod_state = pod_store_w.as_reader();
+
+        reflectors.push(tokio::spawn(custom_reflector(
+            pod_store_w,
+            pod_watcher,
+            delay_deletion,
+        )));
 
         // -----------------------------------------------------------------
 
-        let ns_watcher =
-            k8s::api_watcher::ApiWatcher::new(client.clone(), Namespace::watch_namespace);
-        let ns_watcher = k8s::instrumenting_watcher::InstrumentingWatcher::new(ns_watcher);
-        let (ns_state_reader, ns_state_writer) = evmap::new();
-        let ns_state_writer = k8s::state::evmap::Writer::new(
-            ns_state_writer,
-            Some(Duration::from_millis(10)),
-            HashKey::Name,
+        let namespaces = Api::<Namespace>::all(client.clone());
+        let ns_watcher = watcher(
+            namespaces,
+            ListParams {
+                label_selector: Some(namespace_label_selector),
+                ..Default::default()
+            },
         );
-        let ns_state_writer = k8s::state::instrumenting::Writer::new(ns_state_writer);
-        let ns_state_writer =
-            k8s::state::delayed_delete::Writer::new(ns_state_writer, delay_deletion);
+        let ns_store_w = reflector::store::Writer::default();
+        let ns_state = ns_store_w.as_reader();
 
-        let mut ns_reflector = k8s::reflector::Reflector::new(
+        reflectors.push(tokio::spawn(custom_reflector(
+            ns_store_w,
             ns_watcher,
-            ns_state_writer,
-            None,
-            None,
-            Duration::from_secs(1),
+            delay_deletion,
+        )));
+
+        // -----------------------------------------------------------------
+
+        let nodes = Api::<Node>::all(client);
+        let node_watcher = watcher(
+            nodes,
+            ListParams {
+                field_selector: Some(node_selector),
+                ..Default::default()
+            },
         );
-        let ns_reflector_process = ns_reflector.run();
+        let node_store_w = reflector::store::Writer::default();
+        let node_state = node_store_w.as_reader();
+
+        reflectors.push(tokio::spawn(custom_reflector(
+            node_store_w,
+            node_watcher,
+            delay_deletion,
+        )));
 
         let paths_provider =
-            K8sPathsProvider::new(state_reader.clone(), ns_state_reader.clone(), exclude_paths);
-        let annotator = PodMetadataAnnotator::new(state_reader, pod_fields_spec);
-        let ns_annotator = NamespaceMetadataAnnotator::new(ns_state_reader, namespace_fields_spec);
+            K8sPathsProvider::new(pod_state.clone(), ns_state.clone(), exclude_paths);
+        let annotator = PodMetadataAnnotator::new(pod_state, pod_fields_spec);
+        let ns_annotator = NamespaceMetadataAnnotator::new(ns_state, namespace_fields_spec);
+        let node_annotator = NodeMetadataAnnotator::new(node_state, node_field_spec);
 
         // TODO: maybe more of the parameters have to be configurable.
 
@@ -395,10 +473,14 @@ impl Source {
         let partial_events_merger = Box::new(partial_events_merger::build(auto_partial_merge));
 
         let checkpoints = checkpointer.view();
-        let events = file_source_rx.map(futures::stream::iter);
-        let events = events.flatten();
+        let events = file_source_rx.flat_map(futures::stream::iter);
         let events = events.map(move |line| {
             let byte_size = line.text.len();
+            emit!(BytesReceived {
+                byte_size,
+                protocol: "http",
+            });
+
             let mut event = create_event(
                 line.text,
                 &line.filename,
@@ -406,14 +488,17 @@ impl Source {
             );
             let file_info = annotator.annotate(&mut event, &line.filename);
 
-            emit!(&KubernetesLogsEventReceived {
+            emit!(KubernetesLogsEventsReceived {
                 file: &line.filename,
-                byte_size,
-                pod_name: file_info.as_ref().map(|info| info.pod_name),
+                byte_size: event.size_of(),
+                pod_info: file_info.as_ref().map(|info| KubernetesLogsPodInfo {
+                    name: info.pod_name.to_owned(),
+                    namespace: info.pod_namespace.to_owned(),
+                }),
             });
 
             if file_info.is_none() {
-                emit!(&KubernetesLogsEventAnnotationFailed { event: &event });
+                emit!(KubernetesLogsEventAnnotationError { event: &event });
             } else {
                 let namespace = file_info.as_ref().map(|info| info.pod_namespace);
 
@@ -421,8 +506,14 @@ impl Source {
                     let ns_info = ns_annotator.annotate(&mut event, name);
 
                     if ns_info.is_none() {
-                        emit!(&KubernetesLogsEventNamespaceAnnotationFailed { event: &event });
+                        emit!(KubernetesLogsEventNamespaceAnnotationError { event: &event });
                     }
+                }
+
+                let node_info = node_annotator.annotate(&mut event, self_node_name.as_str());
+
+                if node_info.is_none() {
+                    emit!(KubernetesLogsEventNodeAnnotationError { event: &event });
                 }
             }
 
@@ -430,45 +521,25 @@ impl Source {
             event
         });
         let events = events.flat_map(move |event| {
-            let mut buf = Vec::with_capacity(1);
+            let mut buf = OutputBuffer::with_capacity(1);
             parser.transform(&mut buf, event);
-            futures::stream::iter(buf)
+            futures::stream::iter(buf.into_events())
         });
+        let (events_count, _) = events.size_hint();
 
-        let event_processing_loop = partial_events_merger
-            .transform(Box::pin(events))
-            .map(Ok)
-            .forward(out);
+        let mut stream = partial_events_merger.transform(Box::pin(events));
+        let event_processing_loop = out.send_event_stream(&mut stream);
 
         let mut lifecycle = Lifecycle::new();
-        {
-            let (slot, shutdown) = lifecycle.add();
-            let fut =
-                util::cancel_on_signal(reflector_process, shutdown).map(|result| match result {
-                    Ok(()) => info!(message = "Reflector process completed gracefully."),
-                    Err(error) => {
-                        error!(message = "Reflector process exited with an error.", %error)
-                    }
-                });
-            slot.bind(Box::pin(fut));
-        }
-        {
-            let (slot, shutdown) = lifecycle.add();
-            let fut =
-                util::cancel_on_signal(ns_reflector_process, shutdown).map(|result| match result {
-                    Ok(()) => info!(message = "Namespace reflector process completed gracefully."),
-                    Err(error) => {
-                        error!(message = "Namespace reflector process exited with an error.", %error)
-                    }
-                });
-            slot.bind(Box::pin(fut));
-        }
         {
             let (slot, shutdown) = lifecycle.add();
             let fut = util::run_file_server(file_server, file_source_tx, shutdown, checkpointer)
                 .map(|result| match result {
                     Ok(FileServerShutdown) => info!(message = "File server completed gracefully."),
-                    Err(error) => error!(message = "File server exited with an error.", %error),
+                    Err(error) => emit!(KubernetesLifecycleError {
+                        message: "File server exited with an error.",
+                        error,
+                    }),
                 });
             slot.bind(Box::pin(fut));
         }
@@ -482,20 +553,24 @@ impl Source {
             .map(|result| {
                 match result {
                     Ok(Ok(())) => info!(message = "Event processing loop completed gracefully."),
-                    Ok(Err(error)) => error!(
-                        message = "Event processing loop exited with an error.",
-                        %error
-                    ),
-                    Err(error) => error!(
-                        message = "Event processing loop timed out during the shutdown.",
-                        %error
-                    ),
+                    Ok(Err(error)) => emit!(StreamClosedError {
+                        error,
+                        count: events_count
+                    }),
+                    Err(error) => emit!(KubernetesLifecycleError {
+                        error,
+                        message: "Event processing loop timed out during the shutdown.",
+                    }),
                 };
             });
             slot.bind(Box::pin(fut));
         }
 
         lifecycle.run(global_shutdown).await;
+        // Stop Kubernetes object reflectors to avoid their leak on vector reload.
+        for reflector in reflectors {
+            reflector.abort();
+        }
         info!(message = "Done.");
         Ok(())
     }
@@ -536,7 +611,7 @@ const fn default_max_read_bytes() -> usize {
 
 const fn default_max_line_bytes() -> usize {
     // NOTE: The below comment documents an incorrect assumption, see
-    // https://github.com/timberio/vector/issues/6967
+    // https://github.com/vectordotdev/vector/issues/6967
     //
     // The 16KB is the maximum size of the payload at single line for both
     // docker and CRI log formats.
@@ -586,19 +661,7 @@ fn prepare_exclude_paths(config: &Config) -> crate::Result<Vec<glob::Pattern>> {
 
 // This function constructs the effective field selector to use, based on
 // the specified configuration.
-fn prepare_field_selector(config: &Config) -> crate::Result<String> {
-    let self_node_name = if config.self_node_name.is_empty()
-        || config.self_node_name == default_self_node_name_env_template()
-    {
-        std::env::var(SELF_NODE_NAME_ENV_KEY).map_err(|_| {
-            format!(
-                "self_node_name config value or {} env var is not set",
-                SELF_NODE_NAME_ENV_KEY
-            )
-        })?
-    } else {
-        config.self_node_name.clone()
-    };
+fn prepare_field_selector(config: &Config, self_node_name: &str) -> crate::Result<String> {
     info!(
         message = "Obtained Kubernetes Node name to collect logs for (self).",
         ?self_node_name
@@ -616,16 +679,21 @@ fn prepare_field_selector(config: &Config) -> crate::Result<String> {
     ))
 }
 
+// This function constructs the selector for a node to annotate entries with a node metadata.
+fn prepare_node_selector(self_node_name: &str) -> crate::Result<String> {
+    Ok(format!("metadata.name={}", self_node_name))
+}
+
 // This function constructs the effective label selector to use, based on
 // the specified configuration.
-fn prepare_label_selector(config: &Config) -> String {
+fn prepare_label_selector(selector: &str) -> String {
     const BUILT_IN: &str = "vector.dev/exclude!=true";
 
-    if config.extra_label_selector.is_empty() {
+    if selector.is_empty() {
         return BUILT_IN.to_string();
     }
 
-    format!("{},{}", BUILT_IN, config.extra_label_selector)
+    format!("{},{}", BUILT_IN, selector)
 }
 
 #[cfg(test)]
@@ -710,7 +778,7 @@ mod tests {
         ];
 
         for (input, expected) in cases {
-            let output = super::prepare_field_selector(&input).unwrap();
+            let output = super::prepare_field_selector(&input, "qwe").unwrap();
             assert_eq!(expected, output, "expected left, actual right");
         }
     }
@@ -718,19 +786,44 @@ mod tests {
     #[test]
     fn prepare_label_selector() {
         let cases = vec![
-            (Config::default(), "vector.dev/exclude!=true"),
+            (
+                Config::default().extra_label_selector,
+                "vector.dev/exclude!=true",
+            ),
+            (
+                Config::default().extra_namespace_label_selector,
+                "vector.dev/exclude!=true",
+            ),
             (
                 Config {
                     extra_label_selector: "".to_owned(),
                     ..Default::default()
-                },
+                }
+                .extra_label_selector,
+                "vector.dev/exclude!=true",
+            ),
+            (
+                Config {
+                    extra_namespace_label_selector: "".to_owned(),
+                    ..Default::default()
+                }
+                .extra_namespace_label_selector,
                 "vector.dev/exclude!=true",
             ),
             (
                 Config {
                     extra_label_selector: "qwe".to_owned(),
                     ..Default::default()
-                },
+                }
+                .extra_label_selector,
+                "vector.dev/exclude!=true,qwe",
+            ),
+            (
+                Config {
+                    extra_namespace_label_selector: "qwe".to_owned(),
+                    ..Default::default()
+                }
+                .extra_namespace_label_selector,
                 "vector.dev/exclude!=true,qwe",
             ),
         ];

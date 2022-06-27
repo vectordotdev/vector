@@ -1,3 +1,11 @@
+#![deny(warnings)]
+#![deny(clippy::all)]
+#![deny(unreachable_pub)]
+#![deny(unused_allocation)]
+#![deny(unused_extern_crates)]
+#![deny(unused_assignments)]
+#![deny(unused_comparisons)]
+
 pub mod cmd;
 #[cfg(feature = "repl")]
 mod repl;

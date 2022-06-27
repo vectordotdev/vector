@@ -1,4 +1,20 @@
+use ::value::Value;
 use vrl::prelude::*;
+
+fn to_string(value: Value) -> Resolved {
+    use chrono::SecondsFormat;
+    use Value::*;
+    let value = match value {
+        v @ Bytes(_) => v,
+        Integer(v) => v.to_string().into(),
+        Float(v) => v.to_string().into(),
+        Boolean(v) => v.to_string().into(),
+        Timestamp(v) => v.to_rfc3339_opts(SecondsFormat::AutoSi, true).into(),
+        Null => "".into(),
+        v => return Err(format!("unable to coerce {} into string", v.kind()).into()),
+    };
+    Ok(value)
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct ToString;
@@ -57,21 +73,21 @@ impl Function for ToString {
                 title: "array",
                 source: "to_string!([])",
                 result: Err(
-                    r#"function call error for "to_string" at (0:14): unable to coerce "array" into "string""#,
+                    r#"function call error for "to_string" at (0:14): unable to coerce array into string"#,
                 ),
             },
             Example {
                 title: "object",
                 source: "to_string!({})",
                 result: Err(
-                    r#"function call error for "to_string" at (0:14): unable to coerce "object" into "string""#,
+                    r#"function call error for "to_string" at (0:14): unable to coerce object into string"#,
                 ),
             },
             Example {
                 title: "regex",
                 source: "to_string!(r'foo')",
                 result: Err(
-                    r#"function call error for "to_string" at (0:18): unable to coerce "regex" into "string""#,
+                    r#"function call error for "to_string" at (0:18): unable to coerce regex into string"#,
                 ),
             },
         ]
@@ -79,8 +95,8 @@ impl Function for ToString {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -96,34 +112,16 @@ struct ToStringFn {
 
 impl Expression for ToStringFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        use chrono::SecondsFormat;
-        use Value::*;
+        let value = self.value.resolve(ctx)?;
 
-        let value = match self.value.resolve(ctx)? {
-            v @ Bytes(_) => v,
-            Integer(v) => v.to_string().into(),
-            Float(v) => v.to_string().into(),
-            Boolean(v) => v.to_string().into(),
-            Timestamp(v) => v.to_rfc3339_opts(SecondsFormat::AutoSi, true).into(),
-            Null => "".into(),
-            v => return Err(format!(r#"unable to coerce {} into "string""#, v.kind()).into()),
-        };
-
-        Ok(value)
+        to_string(value)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.value
-            .type_def(state)
-            .fallible_unless(
-                Kind::Bytes
-                    | Kind::Integer
-                    | Kind::Float
-                    | Kind::Boolean
-                    | Kind::Null
-                    | Kind::Timestamp,
-            )
-            .bytes()
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        let td = self.value.type_def(state);
+
+        TypeDef::bytes()
+            .with_fallibility(td.contains_array() || td.contains_object() || td.contains_regex())
     }
 }
 
@@ -137,13 +135,13 @@ mod tests {
         integer {
             args: func_args![value: 20],
             want: Ok("20"),
-            tdef: TypeDef::new().bytes(),
+            tdef: TypeDef::bytes(),
         }
 
         float {
             args: func_args![value: 20.5],
             want: Ok("20.5"),
-            tdef: TypeDef::new().bytes(),
+            tdef: TypeDef::bytes(),
         }
     ];
 }

@@ -7,8 +7,8 @@ monitoring around the performance such that we can maintain healthy performance 
 
 - Build performance from the developer perspective and CI perspective
 - Utilization of our CI infrastructure
-- [RFC 7027: Vector core extraction](https://github.com/timberio/vector/issues/7027)
-- [RFC 6531: Performance testing](https://github.com/timberio/vector/issues/6531)
+- [RFC 7027: Vector core extraction](https://github.com/vectordotdev/vector/issues/7027)
+- [RFC 6531: Performance testing](https://github.com/vectordotdev/vector/issues/6531)
 
 ## Motivation
 
@@ -26,7 +26,7 @@ the groundwork for understanding the performance over time in the future.
 ### More granular compilation units
 
 @blt is already tackling this through his continued work on [RFC
-7027](https://github.com/timberio/vector/issues/7027).  This RFC seeks to break up the project
+7027](https://github.com/vectordotdev/vector/issues/7027).  This RFC seeks to break up the project
 structure of Vector such that changes in a far-off part of the codebase don’t force recompilation of
 unrelated parts where possible.
 

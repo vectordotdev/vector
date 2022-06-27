@@ -7,6 +7,21 @@ configuration: {
 
 configuration: {
 	configuration: {
+		acknowledgements: {
+			common:      true
+			description: "Controls how acknowledgements are handled by all sources. These settings may be overridden in individual sources."
+			required:    false
+			type: object: options: {
+				enabled: {
+					common:      true
+					description: "Controls if sources will wait for destination sinks to deliver the events, or persist them to a disk buffer, before acknowledging receipt. If set to `true`, all capable sources will have acknowledgements enabled."
+					warnings: ["Disabling this option may lead to loss of data, as destination sinks may reject events after the source acknowledges their successful receipt."]
+					required: false
+					type: bool: default: false
+				}
+			}
+		}
+
 		data_dir: {
 			common: false
 			description: """
@@ -234,6 +249,45 @@ configuration: {
 			}
 		}
 
+		secret: {
+			common: false
+			description: """
+				Configuration options to retrieve secrets from external backend in order to avoid storing secrets in plaintext
+				in Vector config. Currently, only the exec backend is supported. Multiple backends can be configured. To signify
+				Vector that it should look for a secret to retrieve use the `SECRET[<backend_name>.<secret_key>]`. This placeholder
+				will then be replaced by the secret retrieved from the relevant backend.
+				"""
+			required: false
+			type: object: options: {
+				exec: {
+					required:    true
+					description: "Run a local command to retrieve secrets."
+					type: object: options: {
+						command: {
+							description: """
+								The command to be run, plus any arguments required. It shall comply with the
+								[Datadog Agent executable API](\(urls.datadog_agent_exec_api)).
+								"""
+							required:    true
+							type: array: {
+								examples: [["/path/to/get-secret", "-s"], ["/path/to/vault-wrappper"]]
+								items: type: string: {}
+							}
+						}
+						timeout: {
+							description: "The amount of time Vector will wait for the command to complete."
+							required:    false
+							common:      false
+							type: uint: {
+								default: 5
+								unit:    "seconds"
+							}
+						}
+					}
+				}
+			}
+		}
+
 		timezone: {
 			common:      false
 			description: """
@@ -307,7 +361,7 @@ configuration: {
 		environment_variables: {
 			title: "Environment variables"
 			body: """
-				Vector will interpolate environment variables within your configuration file
+				Vector interpolates environment variables within your configuration file
 				with the following syntax:
 
 				```toml title="vector.toml"
@@ -315,8 +369,9 @@ configuration: {
 				  type = "add_fields"
 
 				  [transforms.add_host.fields]
-				    host = "${HOSTNAME}"
+				    host = "${HOSTNAME}" # or "$HOSTNAME"
 				    environment = "${ENV:-development}" # default value when not present
+				    tenant = "${TENANT:?tenant must be supplied}" # required environment variable
 				```
 				"""
 
@@ -324,10 +379,22 @@ configuration: {
 				{
 					title: "Default values"
 					body: """
-						Default values can be supplied via the `:-` syntax:
+						Default values can be supplied using `:-` or `-` syntax:
 
 						```toml
-						option = "${ENV_VAR:-default}"
+						option = "${ENV_VAR:-default}" # default value if variable is unset or empty
+						option = "${ENV_VAR-default}" # default value only if variable is unset
+						```
+						"""
+				},
+				{
+					title: "Required variables"
+					body: """
+						Environment variables that are required can be specified using `:?` or `?` syntax:
+
+						```toml
+						option = "${ENV_VAR:?err}" # Vector exits with 'err' message if variable is unset or empty
+						option = "${ENV_VAR?err}" # Vector exits with 'err' message only if variable is unset
 						```
 						"""
 				},
@@ -335,8 +402,80 @@ configuration: {
 					title: "Escaping"
 					body: """
 						You can escape environment variable by preceding them with a `$` character. For
-						example `$${HOSTNAME}` will be treated _literally_ in the above environment
+						example `$${HOSTNAME}` or `$$HOSTNAME` is treated literally in the above environment
 						variable example.
+						"""
+				},
+			]
+		}
+		secrets_management: {
+			title: "Secrets management"
+			body: """
+				Vector can retrieve secrets like a password or token by querying an external system in order to
+				avoid storing sensitive information in Vector configuration files. Secret backends used to retrieve
+				sensitive token are configured in a dedicated section (`secret`). In the rest of the configuration you should use
+				the `SECRET[<backend_name>.<secret_key>]` notation to interpolate the secret. Interpolation will happen immediately after
+				environment variables interpolation. While Vector supports multiple commands to retrieve secrets, a
+				secret backend cannot use the secret interpolation feature for its own configuration. Currently the only supported
+				kind of secret backend is the the `exec` one that runs an external command to retrieve secrets.
+
+				The following example shows a simple configuration with two backends defined:
+
+				```toml title="vector.toml"
+				[secret.backend_1]
+				type = "exec"
+				command = ["/path/to/cmd1", "--some-option"]
+				[secret.backend_2]
+				type = "exec"
+				command = ["/path/to/cmd2"]
+
+				[sinks.dd_logs]
+				type = "datadog_logs"
+				default_api_key = "SECRET[backend_1.dd_api_key]"
+
+				[sinks.splunk]
+				type = "splunk_hec"
+				default_token = "SECRET[backend_2.splunk_token]"
+				```
+
+				In that example Vector will retrieve the `dd_api_key` from `backen_1` and `splunk_token` from `backend_2`.
+				"""
+
+			sub_sections: [
+				{
+					title: "The `exec` backend"
+					body:  """
+						When using the `exec` type for a secret backend Vector and the external command are communicating using
+						the standard input and output. The communication is using plain text JSON. Vector spawns the specified
+						command, writes the secret retrieval query using JSON on the standard input of the child process and
+						reads its standard output expecting a JSON object. Standard error from the child process is read and
+						logged by Vector and can be used for troubleshooting.
+
+						The JSON object used for communication between an `exec` backend and Vector shall comply with the
+						[Datadog Agent executable API](\(urls.datadog_agent_exec_api)).
+
+						For example a query would look like:
+
+						```json
+						{
+							"version": "1.0",
+							"secrets": ["dd_api_key", "another_dd_api_key"]
+						}
+						```
+
+						A possible reply from a backend could then be:
+
+						```json
+						{
+							"dd_api_key": {"value": "A_DATADOG_API_KEY", "error": null},
+							"another_dd_api_key": {"value": null, "error": "unable to retrieve secret"}
+						}
+						```
+
+						If a backend writes a JSON that does not follow the expected structure or reports an error for a
+						given secret Vector will refuse to load the configuration.
+
+						Currently Vector will always query backend with `"version": "1.0"`.
 						"""
 				},
 			]
@@ -345,8 +484,8 @@ configuration: {
 			title: "Formats"
 			body:  """
 				Vector supports [TOML](\(urls.toml)), [YAML](\(urls.yaml)), and [JSON](\(urls.json)) to
-				ensure Vector fits into your workflow. A side benefit of supporting JSON is the
-				enablement of data templating languages like [Jsonnet](\(urls.jsonnet)) and
+				ensure Vector fits into your workflow. A side benefit of supporting YAML and JSON is that they
+				enable you to use data templating languages such as [ytt](\(urls.ytt)), [Jsonnet](\(urls.jsonnet)) and
 				[Cue](\(urls.cue)).
 				"""
 		}

@@ -1,20 +1,31 @@
 use std::{collections::BTreeMap, sync::Arc};
 
 use chrono::{TimeZone, Utc};
-use futures_util::{stream, StreamExt};
+use futures_util::StreamExt;
 use serde::Deserialize;
 use vector_core::{
     config::log_schema,
     event::{Event, Value},
-    ByteSizeOf,
 };
 
-use super::sink::HecProcessedEvent;
+use super::{config::HecEncodingMigrator, sink::HecProcessedEvent};
 use crate::{
+    codecs::Encoder,
     config::{SinkConfig, SinkContext},
     sinks::{
-        splunk_hec::logs::{config::HecLogsSinkConfig, encoder::HecLogsEncoder, sink::process_log},
-        util::{test::build_test_server, Compression},
+        splunk_hec::{
+            common::{timestamp_key, EndpointTarget},
+            logs::{
+                config::{HecEncoding, HecLogsSinkConfig},
+                encoder::HecLogsEncoder,
+                sink::process_log,
+            },
+        },
+        util::{
+            encoding::{Encoder as _, EncodingConfig, EncodingConfigAdapter},
+            test::build_test_server,
+            Compression,
+        },
     },
     template::Template,
     test_util::next_addr,
@@ -22,7 +33,7 @@ use crate::{
 
 #[derive(Deserialize, Debug)]
 struct HecEventJson {
-    time: f64,
+    time: Option<f64>,
     event: BTreeMap<String, serde_json::Value>,
     fields: BTreeMap<String, String>,
     source: Option<String>,
@@ -42,7 +53,10 @@ struct HecEventText {
     host: Option<String>,
 }
 
-fn get_processed_event() -> HecProcessedEvent {
+fn get_processed_event_timestamp(
+    timestamp: Option<Value>,
+    timestamp_key: &str,
+) -> HecProcessedEvent {
     let mut event = Event::from("hello world");
     event
         .as_mut_log()
@@ -54,11 +68,12 @@ fn get_processed_event() -> HecProcessedEvent {
     event.as_mut_log().insert("event_field2", "test_value2");
     event.as_mut_log().insert("key", "value");
     event.as_mut_log().insert("int_val", 123);
-    event.as_mut_log().insert(
-        log_schema().timestamp_key(),
-        Utc.timestamp_nanos(1638366107111456123),
-    );
-    let event_byte_size = event.size_of();
+
+    if timestamp.is_some() {
+        event.as_mut_log().insert(timestamp_key, timestamp);
+    } else {
+        event.as_mut_log().remove(timestamp_key);
+    }
 
     let sourcetype = Template::try_from("{{ event_sourcetype }}".to_string()).ok();
     let source = Template::try_from("{{ event_source }}".to_string()).ok();
@@ -67,23 +82,32 @@ fn get_processed_event() -> HecProcessedEvent {
     let timestamp_nanos_key = Some(String::from("ts_nanos_key"));
 
     process_log(
-        event.into_log(),
-        event_byte_size,
-        sourcetype.as_ref(),
-        source.as_ref(),
-        index.as_ref(),
-        "host_key",
-        indexed_fields.as_slice(),
-        timestamp_nanos_key.as_deref(),
+        event,
+        &super::sink::HecLogData {
+            sourcetype: sourcetype.as_ref(),
+            source: source.as_ref(),
+            index: index.as_ref(),
+            host_key: "host_key",
+            indexed_fields: indexed_fields.as_slice(),
+            timestamp_nanos_key: timestamp_nanos_key.as_ref(),
+            timestamp_key,
+            endpoint_target: EndpointTarget::Event,
+        },
     )
-    .unwrap()
+}
+
+fn get_processed_event() -> HecProcessedEvent {
+    get_processed_event_timestamp(
+        Some(value::Value::Timestamp(
+            Utc.timestamp_nanos(1638366107111456123),
+        )),
+        &timestamp_key(),
+    )
 }
 
 fn get_event_with_token(msg: &str, token: &str) -> Event {
     let mut event = Event::from(msg);
-    event
-        .metadata_mut()
-        .set_splunk_hec_token(Some(Arc::from(token)));
+    event.metadata_mut().set_splunk_hec_token(Arc::from(token));
     event
 }
 
@@ -100,12 +124,27 @@ fn splunk_process_log_event() {
     assert!(metadata.fields.contains("event_field2"));
 }
 
+fn hec_encoder(encoding: HecEncoding) -> HecLogsEncoder {
+    let encoding: EncodingConfigAdapter<EncodingConfig<HecEncoding>, HecEncodingMigrator> =
+        EncodingConfig::from(encoding).into();
+    let transformer = encoding.transformer();
+    let serializer = encoding.encoding().unwrap();
+    let encoder = Encoder::<()>::new(serializer);
+    HecLogsEncoder {
+        transformer,
+        encoder,
+    }
+}
+
 #[test]
 fn splunk_encode_log_event_json() {
     let processed_event = get_processed_event();
-    let encoder = HecLogsEncoder::Json;
-    let bytes = encoder.encode_event(processed_event).unwrap();
-    let hec_data = serde_json::from_slice::<HecEventJson>(&bytes[..]).unwrap();
+    let encoder = hec_encoder(HecEncoding::Json);
+    let mut bytes = Vec::new();
+    encoder
+        .encode_input(vec![processed_event], &mut bytes)
+        .unwrap();
+    let hec_data = serde_json::from_slice::<HecEventJson>(&bytes).unwrap();
     let event = hec_data.event;
 
     assert_eq!(event.get("key").unwrap(), &serde_json::Value::from("value"));
@@ -125,7 +164,7 @@ fn splunk_encode_log_event_json() {
 
     assert_eq!(hec_data.fields.get("event_field1").unwrap(), "test_value1");
 
-    assert_eq!(hec_data.time, 1638366107.111);
+    assert_eq!(hec_data.time, Some(1638366107.111));
     assert_eq!(
         event.get("ts_nanos_key").unwrap(),
         &serde_json::Value::from(456123)
@@ -135,9 +174,12 @@ fn splunk_encode_log_event_json() {
 #[test]
 fn splunk_encode_log_event_text() {
     let processed_event = get_processed_event();
-    let encoder = HecLogsEncoder::Text;
-    let bytes = encoder.encode_event(processed_event).unwrap();
-    let hec_data = serde_json::from_slice::<HecEventText>(&bytes[..]).unwrap();
+    let encoder = hec_encoder(HecEncoding::Text);
+    let mut bytes = Vec::new();
+    encoder
+        .encode_input(vec![processed_event], &mut bytes)
+        .unwrap();
+    let hec_data = serde_json::from_slice::<HecEventText>(&bytes).unwrap();
 
     assert_eq!(hec_data.event.as_str(), "hello world");
 
@@ -162,13 +204,15 @@ async fn splunk_passthrough_token() {
         index: None,
         sourcetype: None,
         source: None,
-        encoding: HecLogsEncoder::Json.into(),
+        encoding: EncodingConfig::from(HecEncoding::Json).into(),
         compression: Compression::None,
         batch: Default::default(),
         request: Default::default(),
         tls: None,
         acknowledgements: Default::default(),
         timestamp_nanos_key: None,
+        timestamp_key: log_schema().timestamp_key().into(),
+        endpoint_target: EndpointTarget::Event,
     };
     let cx = SinkContext::new_test();
 
@@ -183,7 +227,7 @@ async fn splunk_passthrough_token() {
         Event::from("default token will be used"),
     ];
 
-    let _ = sink.run(stream::iter(events)).await.unwrap();
+    let _ = sink.run_events(events).await.unwrap();
 
     let mut tokens = rx
         .take(3)
@@ -200,4 +244,34 @@ async fn splunk_passthrough_token() {
             "Splunk token"
         ]
     )
+}
+
+#[test]
+fn splunk_encode_log_event_json_timestamps() {
+    crate::test_util::trace_init();
+
+    fn get_hec_data_for_timestamp_test(
+        timestamp: Option<Value>,
+        timestamp_key: &str,
+    ) -> HecEventJson {
+        let processed_event = get_processed_event_timestamp(timestamp, timestamp_key);
+        let encoder = hec_encoder(HecEncoding::Json);
+        let mut bytes = Vec::new();
+        encoder
+            .encode_input(vec![processed_event], &mut bytes)
+            .unwrap();
+        serde_json::from_slice::<HecEventJson>(&bytes).unwrap()
+    }
+
+    // no timestamp_key is provided
+    let mut hec_data = get_hec_data_for_timestamp_test(None, "");
+    assert_eq!(hec_data.time, None);
+
+    // timestamp_key is provided but timestamp is not valid type
+    hec_data = get_hec_data_for_timestamp_test(Some(value::Value::Integer(0)), &timestamp_key());
+    assert_eq!(hec_data.time, None);
+
+    // timestamp_key is provided but no timestamp in the event
+    let hec_data = get_hec_data_for_timestamp_test(None, &timestamp_key());
+    assert_eq!(hec_data.time, None);
 }

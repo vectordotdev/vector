@@ -1,21 +1,23 @@
+use std::collections::BTreeMap;
 use std::fmt::Formatter;
 
 use bytes::Bytes;
+use lookup::{Lookup, LookupBuf};
 use nom::{
     self,
     branch::alt,
     bytes::complete::{tag, take_until, take_while1},
-    character::complete::{char, digit1, space0, space1},
+    character::complete::{char, space0, space1},
     combinator::{eof, map, opt, peek, rest, value},
     multi::{many_m_n, separated_list1},
     number::complete::double,
     sequence::{delimited, preceded, terminated, tuple},
-    IResult,
+    IResult, Slice,
 };
-use nom_regex::str::re_find;
+use once_cell::sync::Lazy;
 use ordered_float::NotNan;
 use regex::Regex;
-use vrl_compiler::Value;
+use value::Value;
 
 use crate::{
     ast::{Function, FunctionArgument},
@@ -23,6 +25,8 @@ use crate::{
     parse_grok::Error as GrokRuntimeError,
     parse_grok_rules::Error as GrokStaticError,
 };
+
+static DEFAULT_FILTER_RE: Lazy<regex::Regex> = Lazy::new(|| Regex::new(r"^[\w.\-_@]*").unwrap());
 
 pub fn filter_from_function(f: &Function) -> Result<GrokFilter, GrokStaticError> {
     {
@@ -53,7 +57,7 @@ pub fn filter_from_function(f: &Function) -> Result<GrokFilter, GrokStaticError>
             }
         } else {
             // default allowed unescaped symbols
-            Regex::new(r"^[\w.\-_@]*").unwrap()
+            DEFAULT_FILTER_RE.clone()
         };
 
         let quotes = if args_len > 2 {
@@ -120,7 +124,8 @@ impl std::fmt::Display for KeyValueFilter {
 
 pub fn apply_filter(value: &Value, filter: &KeyValueFilter) -> Result<Value, GrokRuntimeError> {
     match value {
-        Value::Bytes(bytes) => Ok(Value::from_iter::<Vec<(String, Value)>>(
+        Value::Bytes(bytes) => {
+            let mut result = Value::Object(BTreeMap::default());
             parse(
                 String::from_utf8_lossy(bytes).as_ref(),
                 &filter.key_value_delimiter,
@@ -132,18 +137,20 @@ pub fn apply_filter(value: &Value, filter: &KeyValueFilter) -> Result<Value, Gro
                 &filter.quotes,
                 &filter.value_re,
             )
-            .map_err(|_e| {
-                GrokRuntimeError::FailedToApplyFilter(filter.to_string(), value.to_string())
-            })?
-            .iter()
-            .filter(|(k, v)| {
-                !(v.is_null()
-                    || matches!(v, Value::Bytes(b) if b.is_empty())
+            .unwrap_or_default()
+            .into_iter()
+            .for_each(|(k, v)| {
+                if !(v.is_null()
+                    || matches!(&v, Value::Bytes(b) if b.is_empty())
                     || k.trim().is_empty())
-            })
-            .map(|(k, v)| (k.to_owned(), v.to_owned()))
-            .collect(),
-        )),
+                {
+                    let lookup: LookupBuf = Lookup::from(&k).into();
+
+                    result.insert_by_path(&lookup, v);
+                }
+            });
+            Ok(result)
+        }
         _ => Err(GrokRuntimeError::FailedToApplyFilter(
             filter.to_string(),
             value.to_string(),
@@ -153,6 +160,7 @@ pub fn apply_filter(value: &Value, filter: &KeyValueFilter) -> Result<Value, Gro
 
 type SResult<'a, O> = IResult<&'a str, O, (&'a str, nom::error::ErrorKind)>;
 
+#[inline]
 fn parse<'a>(
     input: &'a str,
     key_value_delimiter: &'a str,
@@ -177,6 +185,7 @@ fn parse<'a>(
 }
 
 /// Parse the line as a separated list of key value pairs.
+#[inline]
 fn parse_line<'a>(
     input: &'a str,
     key_value_delimiter: &'a str,
@@ -235,7 +244,7 @@ fn parse_key_value<'a>(
                         ),
                         preceded(space0, parse_key(field_delimiter, quotes, non_quoted_re)),
                     )),
-                    many_m_n(1, 1, tag(key_value_delimiter)),
+                    many_m_n(0, 1, tag(key_value_delimiter)),
                     parse_value(field_delimiter, quotes, non_quoted_re),
                 ))(input)
             },
@@ -251,6 +260,7 @@ fn parse_key_value<'a>(
 }
 
 /// Parses quoted strings.
+#[inline]
 fn parse_quoted<'a>(
     quotes: &'a (char, char),
     field_terminator: &'a str,
@@ -273,10 +283,12 @@ fn parse_quoted<'a>(
 }
 
 /// A delimited value is all the text until our field_delimiter, or the rest of the string if it is the last value in the line,
+#[inline]
 fn parse_delimited<'a>(field_delimiter: &'a str) -> impl Fn(&'a str) -> SResult<&'a str> {
     move |input| map(alt((take_until(field_delimiter), rest)), |s: &str| s.trim())(input)
 }
 
+#[inline]
 fn quoted<'a>(
     quotes: &'a [(char, char)],
     delimiter: &'a str,
@@ -293,13 +305,30 @@ fn quoted<'a>(
     }
 }
 
+fn re_find<'a, E>(re: &'a Regex) -> impl Fn(&'a str) -> IResult<&'a str, &'a str, E>
+where
+    E: nom::error::ParseError<&'a str>,
+{
+    move |i| {
+        if let Some(m) = re.find(i) {
+            Ok((i.slice(m.end()..), i.slice(m.start()..m.end())))
+        } else {
+            Err(nom::Err::Error(E::from_error_kind(
+                i,
+                nom::error::ErrorKind::RegexpFind,
+            )))
+        }
+    }
+}
+
 /// Parses an input while it matches a given regex, otherwise skips an input until the next field delimiter
+#[inline]
 fn match_re_or_empty<'a>(
     value_re: &'a Regex,
     field_delimiter: &'a str,
 ) -> impl Fn(&'a str) -> SResult<&'a str> {
     move |input| {
-        re_find::<'a, (&'a str, nom::error::ErrorKind)>(value_re.clone())(input)
+        re_find::<'a, (&'a str, nom::error::ErrorKind)>(value_re)(input)
             .or_else(|_| parse_delimited(field_delimiter)(input).map(|(rest, _v)| (rest, "")))
     }
 }
@@ -309,6 +338,7 @@ fn match_re_or_empty<'a>(
 ///
 /// 1. The value is quoted - parse until the end quote
 /// 2. Otherwise we parse until regex matches
+#[inline]
 fn parse_value<'a>(
     field_delimiter: &'a str,
     quotes: &'a [(char, char)],
@@ -321,23 +351,38 @@ fn parse_value<'a>(
             }),
             parse_null,
             parse_boolean,
-            map(
-                terminated(
-                    digit1,
-                    peek(alt((
-                        parse_field_delimiter(field_delimiter),
-                        parse_end_of_input(),
-                    ))),
-                ),
-                |v: &'a str| Value::Integer(v.parse().expect("not an integer")),
-            ),
-            map(double, |value| {
-                Value::Float(NotNan::new(value).expect("not a float"))
-            }),
+            parse_number(field_delimiter),
             map(match_re_or_empty(re, field_delimiter), |value| {
                 Value::Bytes(Bytes::copy_from_slice(value.as_bytes()))
             }),
         ))(input)
+    }
+}
+
+fn parse_number<'a>(field_delimiter: &'a str) -> impl Fn(&'a str) -> SResult<Value> {
+    move |input| {
+        map(
+            terminated(
+                double,
+                peek(alt((
+                    parse_field_delimiter(field_delimiter),
+                    parse_end_of_input(),
+                ))),
+            ),
+            |v| {
+                if ((v as i64) as f64 - v).abs() == 0.0 {
+                    // can be safely converted to Integer without precision loss
+                    Value::Integer(v as i64)
+                } else {
+                    Value::Float(NotNan::new(v).expect("not a float"))
+                }
+            },
+        )(input)
+        .map_err(|e| match e {
+            // double might return Failure(an unrecoverable error) - make it recoverable
+            nom::Err::Failure(_) => nom::Err::Error((input, nom::error::ErrorKind::Float)),
+            e => e,
+        })
     }
 }
 
@@ -359,7 +404,7 @@ fn parse_key<'a>(
     quotes: &'a [(char, char)],
     re: &'a Regex,
 ) -> impl Fn(&'a str) -> SResult<&'a str> {
-    move |input| alt((quoted(quotes, key_value_delimiter), re_find(re.to_owned())))(input)
+    move |input| alt((quoted(quotes, key_value_delimiter), re_find(re)))(input)
 }
 
 #[cfg(test)]

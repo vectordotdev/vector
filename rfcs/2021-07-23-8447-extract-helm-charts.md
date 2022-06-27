@@ -1,4 +1,4 @@
-# RFC 8447 - 2021-07-23 - Extract Helm charts out of `timberio/vector` repository
+# RFC 8447 - 2021-07-23 - Extract Helm charts out of `vectordotdev/vector` repository
 
 Our Helm charts should be extracted from our application repository and housed in a standalone git repository to better
 enables standardized tooling and processes for Helm. This extraction will resolve a number of issues with our existing
@@ -45,24 +45,24 @@ We can maintain backward compatibility for users referencing our raw or kustomiz
 
 ## Implementation
 
-The extraction is straightforward. Migrate the contents of `distribution/helm` into a new `timberio/helm-charts` git repository.
+The extraction is straightforward. Migrate the contents of `distribution/helm` into a new `vectordotdev/helm-charts` git repository.
 
 Existing CI jobs for our charts can be transferred to the new repository with minor changes, or replaced with the tooling available
 with `ct`. Our existing lint job calls a make target that lints all charts in the `distribution/helm` directory and could be replaced
 with the `ct lint` command, which is essentially the same but contains additional helpers.
 
 We can leverage DataDog's [script](https://github.com/DataDog/datadog-agent/blob/main/Dockerfiles/manifests/generate.sh) or update our
-existing scripts to keep the raw and kustomize resources in sync with changes to the `timberio/helm-charts` repository. This could be
+existing scripts to keep the raw and kustomize resources in sync with changes to the `vectordotdev/helm-charts` repository. This could be
 automated "dependabot" style by [triggering a workflow](https://docs.github.com/en/actions/reference/events-that-trigger-workflows#manual-events)
-when changes are merged in the `timberio/helm-charts` repository. Similarly, we can trigger workflows to update our charts' `appVersion`
-whenever releases are created in the `timberio/vector` repository to ensure our charts are always tracking the latest application version.
+when changes are merged in the `vectordotdev/helm-charts` repository. Similarly, we can trigger workflows to update our charts' `appVersion`
+whenever releases are created in the `vectordotdev/vector` repository to ensure our charts are always tracking the latest application version.
 It's not a requirement to automate these steps and scripts/make targets will be used until the need to automate them arises.
 
 The `k8s-test-framework` already contains an `external_chart` method, used for deploying DataDog's agent chart during integration tests.
 This allows us to update tests that expect Vector's charts to be located in the same repository to instead reference our hosted charts
 at https://packages.timber.io/helm.
 
-Issues directly related to Vector's Helm charts (or the resources generated from them) will be maintained in the `timberio/helm-charts`
+Issues directly related to Vector's Helm charts (or the resources generated from them) will be maintained in the `vectordotdev/helm-charts`
 repository. Existing issues will be migrated as needed.
 
 ## Rationale
@@ -95,15 +95,15 @@ ability to automate updates between the application and chart repositories.
 Our existing setup forces our testing strategy to rely on costly compilation and building steps for even minor changes,
 doing nothing continues this inefficiency as we expand our testing requirements to cover a wider spread of uses.
 
-### Version charts inside of `timberio/vector`
+### Version charts inside of `vectordotdev/vector`
 
 We could create unique tags for chart versions, `chart-agent-1.0.0` for example, and keep all charts in the application
 repository. This feels _hacky_ but likely would resolve the pain points with minimal adjustments to our existing workflows.
 
 ## Plan Of Attack
 
-- [ ] Copying charts from `distribution/helm` to `timberio/helm-charts` and ensure CI/CD is properly configured
-- [ ] PR `timberio/vector` to no longer require our charts to be local and remove `distribution/helm` directory
-- [ ] Migrate any integration tests that are _only_ testing configuration into the `timberio/helm-charts` repository
+- [ ] Copying charts from `distribution/helm` to `vectordotdev/helm-charts` and ensure CI/CD is properly configured
+- [ ] PR `vectordotdev/vector` to no longer require our charts to be local and remove `distribution/helm` directory
+- [ ] Migrate any integration tests that are _only_ testing configuration into the `vectordotdev/helm-charts` repository
 - [ ] Review existing issues related to the Helm charts, migrate what's still needed and close what isn't
 - [ ] Migrate stable releases to new helm repository, redirect existing repo to the new repository

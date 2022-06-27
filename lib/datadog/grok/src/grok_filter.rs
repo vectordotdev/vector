@@ -1,8 +1,7 @@
-use std::{convert::TryFrom, string::ToString};
+use std::{convert::TryFrom, fmt, string::ToString};
 
 use ordered_float::NotNan;
-use strum_macros::Display;
-use vrl_compiler::Value;
+use value::Value;
 
 use crate::{
     ast::{Function, FunctionArgument},
@@ -12,7 +11,7 @@ use crate::{
     parse_grok_rules::Error as GrokStaticError,
 };
 
-#[derive(Debug, Display, Clone)]
+#[derive(Debug, Clone)]
 pub enum GrokFilter {
     Date(DateFilter),
     Integer,
@@ -27,11 +26,30 @@ pub enum GrokFilter {
     Uppercase,
     Json,
     Array(
-        Option<(char, char)>,
+        Option<(String, String)>,
         Option<String>,
         Box<Option<GrokFilter>>,
     ),
     KeyValue(KeyValueFilter),
+}
+
+impl fmt::Display for GrokFilter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            GrokFilter::Date(..) => f.pad("Date(..)"),
+            GrokFilter::Integer => f.pad("Integer"),
+            GrokFilter::IntegerExt => f.pad("IntegerExt"),
+            GrokFilter::Number => f.pad("Number"),
+            GrokFilter::NumberExt => f.pad("NumberExt"),
+            GrokFilter::NullIf(..) => f.pad("NullIf(..)"),
+            GrokFilter::Scale(..) => f.pad("Scale(..)"),
+            GrokFilter::Lowercase => f.pad("Lowercase"),
+            GrokFilter::Uppercase => f.pad("Uppercase"),
+            GrokFilter::Json => f.pad("Json"),
+            GrokFilter::Array(..) => f.pad("Array(..)"),
+            GrokFilter::KeyValue(..) => f.pad("KeyValue(..)"),
+        }
+    }
 }
 
 impl TryFrom<&Function> for GrokFilter {
@@ -108,35 +126,50 @@ pub fn apply_filter(value: &Value, filter: &GrokFilter) -> Result<Value, GrokRun
             )),
         },
         GrokFilter::Number | GrokFilter::NumberExt => match value {
-            Value::Bytes(v) => Ok(String::from_utf8_lossy(v)
-                .parse::<f64>()
-                .map_err(|_e| {
-                    GrokRuntimeError::FailedToApplyFilter(filter.to_string(), value.to_string())
-                })?
-                .into()),
-            _ => Err(GrokRuntimeError::FailedToApplyFilter(
-                filter.to_string(),
-                value.to_string(),
-            )),
-        },
-        GrokFilter::Scale(scale_factor) => match value {
-            Value::Integer(v) => Ok(Value::Float(
-                NotNan::new((*v as f64) * scale_factor).expect("NaN"),
-            )),
-            Value::Float(v) => Ok(Value::Float(
-                NotNan::new(v.into_inner() * scale_factor).expect("NaN"),
-            )),
             Value::Bytes(v) => {
-                let v = String::from_utf8_lossy(v).parse::<f64>().map_err(|_e| {
-                    GrokRuntimeError::FailedToApplyFilter(filter.to_string(), value.to_string())
-                })?;
-                Ok(Value::Float(NotNan::new(v * scale_factor).expect("NaN")))
+                let v = Ok(Value::from_f64_or_zero(
+                    String::from_utf8_lossy(v).parse::<f64>().map_err(|_e| {
+                        GrokRuntimeError::FailedToApplyFilter(filter.to_string(), value.to_string())
+                    })?,
+                ));
+                match v {
+                    Ok(Value::Float(v)) if (v.into_inner() as i64) as f64 == v.into_inner() => {
+                        Ok(Value::Integer(v.into_inner() as i64))
+                    }
+                    _ => v,
+                }
             }
             _ => Err(GrokRuntimeError::FailedToApplyFilter(
                 filter.to_string(),
                 value.to_string(),
             )),
         },
+        GrokFilter::Scale(scale_factor) => {
+            let v = match value {
+                Value::Integer(v) => Ok(Value::Float(
+                    NotNan::new((*v as f64) * scale_factor).expect("NaN"),
+                )),
+                Value::Float(v) => Ok(Value::Float(
+                    NotNan::new(v.into_inner() * scale_factor).expect("NaN"),
+                )),
+                Value::Bytes(v) => {
+                    let v = String::from_utf8_lossy(v).parse::<f64>().map_err(|_e| {
+                        GrokRuntimeError::FailedToApplyFilter(filter.to_string(), value.to_string())
+                    })?;
+                    Ok(Value::Float(NotNan::new(v * scale_factor).expect("NaN")))
+                }
+                _ => Err(GrokRuntimeError::FailedToApplyFilter(
+                    filter.to_string(),
+                    value.to_string(),
+                )),
+            };
+            match v {
+                Ok(Value::Float(v)) if (v.into_inner() as i64) as f64 == v.into_inner() => {
+                    Ok(Value::Integer(v.into_inner() as i64))
+                }
+                _ => v,
+            }
+        }
         GrokFilter::Lowercase => match value {
             Value::Bytes(bytes) => Ok(String::from_utf8_lossy(bytes).to_lowercase().into()),
             _ => Err(GrokRuntimeError::FailedToApplyFilter(
@@ -180,7 +213,9 @@ pub fn apply_filter(value: &Value, filter: &GrokFilter) -> Result<Value, GrokRun
         GrokFilter::Array(brackets, delimiter, value_filter) => match value {
             Value::Bytes(bytes) => array::parse(
                 String::from_utf8_lossy(bytes).as_ref(),
-                brackets.to_owned(),
+                brackets
+                    .as_ref()
+                    .map(|(start, end)| (start.as_str(), end.as_str())),
                 delimiter.as_ref().map(|s| s.as_str()),
             )
             .map_err(|_e| {

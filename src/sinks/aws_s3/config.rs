@@ -1,14 +1,18 @@
 use std::convert::TryInto;
 
-use rusoto_s3::S3Client;
+use aws_sdk_s3::Client as S3Client;
+use codecs::encoding::{Framer, Serializer};
+use codecs::{CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder};
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
 use vector_core::sink::VectorSink;
 
 use super::sink::S3RequestOptions;
+use crate::aws::{AwsAuthentication, RegionOrEndpoint};
+use crate::sinks::util::encoding::EncodingConfigWithFramingAdapter;
 use crate::{
-    aws::rusoto::{AwsAuthentication, RegionOrEndpoint},
-    config::{DataType, GenerateConfig, ProxyConfig, SinkConfig, SinkContext},
+    codecs::Encoder,
+    config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     sinks::{
         s3_common::{
             self,
@@ -17,13 +21,14 @@ use crate::{
             sink::S3Sink,
         },
         util::{
-            encoding::{EncodingConfig, StandardEncodings},
+            encoding::{EncodingConfig, StandardEncodings, StandardEncodingsWithFramingMigrator},
             partitioner::KeyPartitioner,
             BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, ServiceBuilderExt,
             TowerRequestConfig,
         },
         Healthcheck,
     },
+    tls::TlsConfig,
 };
 
 const DEFAULT_KEY_PREFIX: &str = "date=%F/";
@@ -42,17 +47,26 @@ pub struct S3SinkConfig {
     pub options: S3Options,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    pub encoding: EncodingConfig<StandardEncodings>,
+    #[serde(flatten)]
+    pub encoding: EncodingConfigWithFramingAdapter<
+        EncodingConfig<StandardEncodings>,
+        StandardEncodingsWithFramingMigrator,
+    >,
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
     #[serde(default)]
     pub batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    // Deprecated name. Moved to auth.
-    pub assume_role: Option<String>,
+    pub tls: Option<TlsConfig>,
     #[serde(default)]
     pub auth: AwsAuthentication,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 impl GenerateConfig for S3SinkConfig {
@@ -65,12 +79,13 @@ impl GenerateConfig for S3SinkConfig {
             filename_extension: None,
             options: S3Options::default(),
             region: RegionOrEndpoint::default(),
-            encoding: StandardEncodings::Text.into(),
+            encoding: EncodingConfig::from(StandardEncodings::Text).into(),
             compression: Compression::gzip_default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
-            assume_role: None,
+            tls: Some(TlsConfig::default()),
             auth: AwsAuthentication::default(),
+            acknowledgements: Default::default(),
         })
         .unwrap()
     }
@@ -80,18 +95,22 @@ impl GenerateConfig for S3SinkConfig {
 #[typetag::serde(name = "aws_s3")]
 impl SinkConfig for S3SinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let service = self.create_service(&cx.proxy)?;
+        let service = self.create_service(&cx.proxy).await?;
         let healthcheck = self.build_healthcheck(service.client())?;
         let sink = self.build_processor(service, cx)?;
         Ok((sink, healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::new(self.encoding.config().1.input_type())
     }
 
     fn sink_type(&self) -> &'static str {
         "aws_s3"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 
@@ -130,27 +149,45 @@ impl S3SinkConfig {
             .filename_append_uuid
             .unwrap_or(DEFAULT_FILENAME_APPEND_UUID);
 
+        let transformer = self.encoding.transformer();
+        let (framer, serializer) = self.encoding.encoding()?;
+        let framer = match (framer, &serializer) {
+            (Some(framer), _) => framer,
+            (None, Serializer::Json(_)) => CharacterDelimitedEncoder::new(b',').into(),
+            (None, Serializer::Avro(_) | Serializer::Native(_)) => {
+                LengthDelimitedEncoder::new().into()
+            }
+            (
+                None,
+                Serializer::Logfmt(_)
+                | Serializer::NativeJson(_)
+                | Serializer::RawMessage(_)
+                | Serializer::Text(_),
+            ) => NewlineDelimitedEncoder::new().into(),
+        };
+        let encoder = Encoder::<Framer>::new(framer, serializer);
+
         let request_options = S3RequestOptions {
             bucket: self.bucket.clone(),
             api_options: self.options.clone(),
             filename_extension: self.filename_extension.clone(),
             filename_time_format,
             filename_append_uuid,
-            encoding: self.encoding.clone(),
+            encoder: (transformer, encoder),
             compression: self.compression,
         };
 
         let sink = S3Sink::new(cx, service, request_options, partitioner, batch_settings);
 
-        Ok(VectorSink::Stream(Box::new(sink)))
+        Ok(VectorSink::from_event_streamsink(sink))
     }
 
     pub fn build_healthcheck(&self, client: S3Client) -> crate::Result<Healthcheck> {
         s3_common::config::build_healthcheck(self.bucket.clone(), client)
     }
 
-    pub fn create_service(&self, proxy: &ProxyConfig) -> crate::Result<S3Service> {
-        s3_common::config::create_service(&self.region, &self.auth, self.assume_role.clone(), proxy)
+    pub async fn create_service(&self, proxy: &ProxyConfig) -> crate::Result<S3Service> {
+        s3_common::config::create_service(&self.region, &self.auth, proxy, &self.tls).await
     }
 }
 

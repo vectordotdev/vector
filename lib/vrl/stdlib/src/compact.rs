@@ -1,8 +1,61 @@
 use std::collections::BTreeMap;
 
+use ::value::Value;
 use vrl::prelude::*;
 
 use crate::util;
+
+fn compact(
+    recursive: Option<Value>,
+    null: Option<Value>,
+    string: Option<Value>,
+    object: Option<Value>,
+    array: Option<Value>,
+    nullish: Option<Value>,
+    value: Value,
+) -> Resolved {
+    let options = CompactOptions {
+        recursive: match recursive {
+            Some(expr) => expr.try_boolean()?,
+            None => true,
+        },
+
+        null: match null {
+            Some(expr) => expr.try_boolean()?,
+            None => true,
+        },
+
+        string: match string {
+            Some(expr) => expr.try_boolean()?,
+            None => true,
+        },
+
+        object: match object {
+            Some(expr) => expr.try_boolean()?,
+            None => true,
+        },
+
+        array: match array {
+            Some(expr) => expr.try_boolean()?,
+            None => true,
+        },
+
+        nullish: match nullish {
+            Some(expr) => expr.try_boolean()?,
+            None => false,
+        },
+    };
+
+    match value {
+        Value::Object(object) => Ok(Value::from(compact_object(object, &options))),
+        Value::Array(arr) => Ok(Value::from(compact_array(arr, &options))),
+        value => Err(value::Error::Expected {
+            got: value.kind(),
+            expected: Kind::array(Collection::any()) | Kind::object(Collection::any()),
+        }
+        .into()),
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Compact;
@@ -69,8 +122,8 @@ impl Function for Compact {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -146,56 +199,46 @@ impl CompactOptions {
 
 impl Expression for CompactFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let options = CompactOptions {
-            recursive: match &self.recursive {
-                Some(expr) => expr.resolve(ctx)?.try_boolean()?,
-                None => true,
-            },
+        let recursive = self
+            .recursive
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
+        let null = self
+            .null
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
+        let string = self
+            .string
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
+        let object = self
+            .object
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
+        let array = self
+            .array
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
+        let nullish = self
+            .nullish
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
+        let value = self.value.resolve(ctx)?;
 
-            null: match &self.null {
-                Some(expr) => expr.resolve(ctx)?.try_boolean()?,
-                None => true,
-            },
-
-            string: match &self.string {
-                Some(expr) => expr.resolve(ctx)?.try_boolean()?,
-                None => true,
-            },
-
-            object: match &self.object {
-                Some(expr) => expr.resolve(ctx)?.try_boolean()?,
-                None => true,
-            },
-
-            array: match &self.array {
-                Some(expr) => expr.resolve(ctx)?.try_boolean()?,
-                None => true,
-            },
-
-            nullish: match &self.nullish {
-                Some(expr) => expr.resolve(ctx)?.try_boolean()?,
-                None => false,
-            },
-        };
-
-        match self.value.resolve(ctx)? {
-            Value::Object(object) => Ok(Value::from(compact_object(object, &options))),
-            Value::Array(arr) => Ok(Value::from(compact_array(arr, &options))),
-            value => Err(value::Error::Expected {
-                got: value.kind(),
-                expected: Kind::Array | Kind::Object,
-            }
-            .into()),
-        }
+        compact(recursive, null, string, object, array, nullish, value)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        let td = self.value.type_def(state);
-
-        if td.is_array() {
-            TypeDef::new().array_mapped::<(), Kind>(map! { (): Kind::all() })
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        if self.value.type_def(state).is_array() {
+            TypeDef::array(Collection::any())
         } else {
-            TypeDef::new().object::<(), Kind>(map! { (): Kind::all() })
+            TypeDef::object(Collection::any())
         }
     }
 }
@@ -242,7 +285,7 @@ fn compact_array(array: Vec<Value>, options: &CompactOptions) -> Vec<Value> {
 
 #[cfg(test)]
 mod test {
-    use shared::btreemap;
+    use vector_common::btreemap;
 
     use super::*;
 
@@ -281,11 +324,17 @@ mod test {
                 Default::default(),
             ),
             (
-                vec![1.into(), Value::Object(map!["field2": 2]), 2.into()],
+                vec![
+                    Value::from(1),
+                    Value::Object(BTreeMap::from([(String::from("field2"), Value::from(2))])),
+                    Value::from(2),
+                ],
                 vec![
                     1.into(),
-                    Value::Object(map!["field1": Value::Null,
-                                    "field2": 2]),
+                    Value::Object(BTreeMap::from([
+                        (String::from("field1"), Value::Null),
+                        (String::from("field2"), Value::from(2)),
+                    ])),
                     2.into(),
                 ],
                 Default::default(),
@@ -328,43 +377,63 @@ mod test {
                 Default::default(),
             ),
             (
-                map!["key1": Value::from(1),
-                     "key2": Value::Object(map!["key2": Value::from(3)]),
-                     "key3": Value::from(2),
-                ],
-                map![
-                    "key1": Value::from(1),
-                    "key2": Value::Object(map!["key1": Value::Null,
-                                            "key2": Value::from(3),
-                                            "key3": Value::Null]),
-                    "key3": Value::from(2),
-                ],
+                BTreeMap::from([
+                    (String::from("key1"), Value::from(1)),
+                    (
+                        String::from("key2"),
+                        Value::Object(BTreeMap::from([(String::from("key2"), Value::from(3))])),
+                    ),
+                    (String::from("key3"), Value::from(2)),
+                ]),
+                BTreeMap::from([
+                    (String::from("key1"), Value::from(1)),
+                    (
+                        String::from("key2"),
+                        Value::Object(BTreeMap::from([
+                            (String::from("key1"), Value::Null),
+                            (String::from("key2"), Value::from(3)),
+                            (String::from("key3"), Value::Null),
+                        ])),
+                    ),
+                    (String::from("key3"), Value::from(2)),
+                ]),
                 Default::default(),
             ),
             (
-                map!["key1": Value::from(1),
-                     "key2": Value::Object(map!["key1": Value::Null,]),
-                     "key3": Value::from(2),
-                ],
-                map![
-                    "key1": Value::from(1),
-                    "key2": Value::Object(map!["key1": Value::Null,]),
-                    "key3": Value::from(2),
-                ],
+                BTreeMap::from([
+                    (String::from("key1"), Value::from(1)),
+                    (
+                        String::from("key2"),
+                        Value::Object(BTreeMap::from([(String::from("key1"), Value::Null)])),
+                    ),
+                    (String::from("key3"), Value::from(2)),
+                ]),
+                BTreeMap::from([
+                    (String::from("key1"), Value::from(1)),
+                    (
+                        String::from("key2"),
+                        Value::Object(BTreeMap::from([(String::from("key1"), Value::Null)])),
+                    ),
+                    (String::from("key3"), Value::from(2)),
+                ]),
                 CompactOptions {
                     recursive: false,
                     ..Default::default()
                 },
             ),
             (
-                map!["key1": Value::from(1),
-                     "key3": Value::from(2),
-                ],
-                map![
-                    "key1": Value::from(1),
-                    "key2": Value::Object(map!["key1": Value::Null,]),
-                    "key3": Value::from(2),
-                ],
+                BTreeMap::from([
+                    (String::from("key1"), Value::from(1)),
+                    (String::from("key3"), Value::from(2)),
+                ]),
+                BTreeMap::from([
+                    (String::from("key1"), Value::from(1)),
+                    (
+                        String::from("key2"),
+                        Value::Object(BTreeMap::from([(String::from("key1"), Value::Null)])),
+                    ),
+                    (String::from("key3"), Value::from(2)),
+                ]),
                 Default::default(),
             ),
             (
@@ -391,18 +460,15 @@ mod test {
         compact => Compact;
 
         with_map {
-            args: func_args![value: map!["key1": Value::Null,
-                                         "key2": 1,
-                                         "key3": "",
-            ]],
-            want: Ok(Value::Object(map!["key2": 1])),
-            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
+            args: func_args![value: Value::from(BTreeMap::from([(String::from("key1"), Value::Null), (String::from("key2"), Value::from(1)), (String::from("key3"), Value::from(""))]))],
+            want: Ok(Value::Object(BTreeMap::from([(String::from("key2"), Value::from(1))]))),
+            tdef: TypeDef::object(Collection::any()),
         }
 
         with_array {
             args: func_args![value: vec![Value::Null, Value::from(1), Value::from(""),]],
             want: Ok(Value::Array(vec![Value::from(1)])),
-            tdef: TypeDef::new().array_mapped::<(), Kind>(map! { (): Kind::all() }),
+            tdef: TypeDef::array(Collection::any()),
         }
 
         nullish {
@@ -414,8 +480,8 @@ mod test {
                 },
                 nullish: true
             ],
-            want: Ok(Value::Object(map!["key2": 1])),
-            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
+            want: Ok(Value::Object(BTreeMap::from([(String::from("key2"), Value::from(1))]))),
+            tdef: TypeDef::object(Collection::any()),
         }
     ];
 }

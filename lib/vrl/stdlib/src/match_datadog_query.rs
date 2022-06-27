@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use ::value::Value;
 use datadog_filter::{
     build_matcher,
     regex::{wildcard_regex, word_regex},
@@ -11,6 +12,8 @@ use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct MatchDatadogQuery;
+
+struct DynMatcher(Box<dyn Matcher<Value>>);
 
 impl Function for MatchDatadogQuery {
     fn identifier(&self) -> &'static str {
@@ -44,8 +47,8 @@ impl Function for MatchDatadogQuery {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -58,7 +61,7 @@ impl Function for MatchDatadogQuery {
 
         // Compile the Datadog search query to AST.
         let node = parse(&query).map_err(|e| {
-            Box::new(ExpressionError::from(e.to_string())) as Box<dyn DiagnosticError>
+            Box::new(ExpressionError::from(e.to_string())) as Box<dyn DiagnosticMessage>
         })?;
 
         // Build the matcher function that accepts a VRL event value. This will parse the `node`
@@ -67,6 +70,45 @@ impl Function for MatchDatadogQuery {
         let filter = build_matcher(&node, &VrlFilter::default());
 
         Ok(Box::new(MatchDatadogQueryFn { value, filter }))
+    }
+
+    fn compile_argument(
+        &self,
+        _args: &[(&'static str, Option<FunctionArgument>)],
+        _ctx: &mut FunctionCompileContext,
+        name: &str,
+        expr: Option<&expression::Expr>,
+    ) -> CompiledArgument {
+        match (name, expr) {
+            ("query", Some(expr)) => {
+                let query_value =
+                    expr.as_value()
+                        .ok_or_else(|| vrl::function::Error::UnexpectedExpression {
+                            keyword: "query",
+                            expected: "literal",
+                            expr: expr.clone(),
+                        })?;
+
+                let query = query_value
+                    .try_bytes_utf8_lossy()
+                    .expect("datadog search query should be a UTF8 string");
+
+                // Compile the Datadog search query to AST.
+                let node = parse(&query).map_err(|e| {
+                    Box::new(ExpressionError::from(e.to_string())) as Box<dyn DiagnosticMessage>
+                })?;
+
+                // Build the matcher function that accepts a VRL event value. This will parse the `node`
+                // at boot-time and return a boxed func that contains just the logic required to match a
+                // VRL `Value` against the Datadog Search Syntax literal.
+                let filter = build_matcher(&node, &VrlFilter::default());
+
+                Ok(Some(
+                    Box::new(DynMatcher(filter)) as Box<dyn std::any::Any + Send + Sync>
+                ))
+            }
+            _ => Ok(None),
+        }
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -100,13 +142,13 @@ impl Expression for MatchDatadogQueryFn {
         Ok(self.filter.run(&value).into())
     }
 
-    fn type_def(&self, _state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         type_def()
     }
 }
 
 fn type_def() -> TypeDef {
-    TypeDef::new().infallible().boolean()
+    TypeDef::boolean().infallible()
 }
 
 #[derive(Default, Clone)]
@@ -302,6 +344,13 @@ impl Filter<Value> for VrlFilter {
                             Comparison::Gt => *lhs > *rhs,
                             Comparison::Gte => *lhs >= *rhs,
                         },
+                        // Integer value - Float boundary
+                        (Value::Integer(lhs), ComparisonValue::Float(rhs)) => match comparator {
+                            Comparison::Lt => (*lhs as f64) < *rhs,
+                            Comparison::Lte => *lhs as f64 <= *rhs,
+                            Comparison::Gt => *lhs as f64 > *rhs,
+                            Comparison::Gte => *lhs as f64 >= *rhs,
+                        },
                         // Floats.
                         (Value::Float(lhs), ComparisonValue::Float(rhs)) => {
                             let lhs = lhs.into_inner();
@@ -310,6 +359,16 @@ impl Filter<Value> for VrlFilter {
                                 Comparison::Lte => lhs <= *rhs,
                                 Comparison::Gt => lhs > *rhs,
                                 Comparison::Gte => lhs >= *rhs,
+                            }
+                        }
+                        // Float value - Integer boundary
+                        (Value::Float(lhs), ComparisonValue::Integer(rhs)) => {
+                            let lhs = lhs.into_inner();
+                            match comparator {
+                                Comparison::Lt => lhs < *rhs as f64,
+                                Comparison::Lte => lhs <= *rhs as f64,
+                                Comparison::Gt => lhs > *rhs as f64,
+                                Comparison::Gte => lhs >= *rhs as f64,
                             }
                         }
                         // Where the rhs is a string ref, the lhs is coerced into a string.
@@ -342,7 +401,7 @@ impl Filter<Value> for VrlFilter {
             Field::Tag(_) => resolve_value(
                 buf,
                 Run::boxed(move |value| match value {
-                    Value::Array(v) => v.iter().any(|v| match string_value(v).split_once(":") {
+                    Value::Array(v) => v.iter().any(|v| match string_value(v).split_once(':') {
                         Some((_, lhs)) => {
                             let lhs = Cow::from(lhs);
 
@@ -1915,6 +1974,30 @@ mod test {
         kitchen_sink_2 {
             args: func_args![value: value!({"tags": ["c:that", "d:the_other"], "custom": {"b": "testing", "e": 3}}), query: "host:this OR ((@b:test* AND c:that) AND d:the_other @e:[1 TO 5])"],
             want: Ok(true),
+            tdef: type_def(),
+        }
+
+        integer_range_float_value_match {
+            args: func_args![value: value!({"custom": {"level": 7.0}}), query: "@level:[7 TO 10]"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        integer_range_float_value_no_match {
+            args: func_args![value: value!({"custom": {"level": 6.9}}), query: "@level:[7 TO 10]"],
+            want: Ok(false),
+            tdef: type_def(),
+        }
+
+        float_range_integer_value_match {
+            args: func_args![value: value!({"custom": {"level": 7}}), query: "@level:[7.0 TO 10.0]"],
+            want: Ok(true),
+            tdef: type_def(),
+        }
+
+        float_range_integer_value_no_match {
+            args: func_args![value: value!({"custom": {"level": 6}}), query: "@level:[7.0 TO 10.0]"],
+            want: Ok(false),
             tdef: type_def(),
         }
     ];

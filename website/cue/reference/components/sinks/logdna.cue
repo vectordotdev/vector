@@ -13,14 +13,14 @@ components: sinks: logdna: {
 	}
 
 	features: {
-		buffer: enabled:      true
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {
 				enabled:      true
 				common:       false
 				max_bytes:    10_000_000
-				timeout_secs: 1
+				timeout_secs: 1.0
 			}
 			compression: enabled: false
 			encoding: {
@@ -129,6 +129,7 @@ components: sinks: logdna: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	telemetry: metrics: {

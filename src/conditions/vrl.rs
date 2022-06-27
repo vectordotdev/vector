@@ -1,9 +1,11 @@
 use serde::{Deserialize, Serialize};
-use shared::TimeZone;
-use vrl::{diagnostic::Formatter, Program, Runtime, Value};
+use value::Value;
+use vector_common::TimeZone;
+use vrl::{diagnostic::Formatter, Program, Runtime, VrlRuntime};
 
+use crate::event::TargetEvents;
 use crate::{
-    conditions::{Condition, ConditionConfig, ConditionDescription},
+    conditions::{Condition, ConditionConfig, ConditionDescription, Conditional},
     emit,
     event::{Event, VrlTarget},
     internal_events::VrlConditionExecutionError,
@@ -11,7 +13,10 @@ use crate::{
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone, PartialEq)]
 pub struct VrlConfig {
-    pub source: String,
+    pub(crate) source: String,
+
+    #[serde(default)]
+    pub(crate) runtime: VrlRuntime,
 }
 
 inventory::submit! {
@@ -22,10 +27,7 @@ impl_generate_config_from_default!(VrlConfig);
 
 #[typetag::serde(name = "vrl")]
 impl ConditionConfig for VrlConfig {
-    fn build(
-        &self,
-        enrichment_tables: &enrichment::TableRegistry,
-    ) -> crate::Result<Box<dyn Condition>> {
+    fn build(&self, enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition> {
         // TODO(jean): re-add this to VRL
         // let constraint = TypeConstraint {
         //     allow_any: false,
@@ -36,85 +38,86 @@ impl ConditionConfig for VrlConfig {
         //     },
         // };
 
-        // Filter out functions that directly mutate the event.
-        //
-        // TODO(jean): expose this as a method on the `Function` trait, so we
-        // don't need to do this manually.
         let functions = vrl_stdlib::all()
             .into_iter()
-            .filter(|f| f.identifier() != "del")
-            .filter(|f| f.identifier() != "only_fields")
             .chain(enrichment::vrl_functions().into_iter())
             .chain(vector_vrl_functions::vrl_functions())
             .collect::<Vec<_>>();
 
-        let program = vrl::compile(
-            &self.source,
-            &functions,
-            Some(Box::new(enrichment_tables.clone())),
-        )
-        .map_err(|diagnostics| {
-            Formatter::new(&self.source, diagnostics)
-                .colored()
-                .to_string()
-        })?;
+        let mut state = vrl::state::ExternalEnv::default().read_only();
+        state.set_external_context(enrichment_tables.clone());
 
-        Ok(Box::new(Vrl {
-            program,
-            source: self.source.clone(),
-        }))
+        let (program, warnings) = vrl::compile_with_state(&self.source, &functions, &mut state)
+            .map_err(|diagnostics| {
+                Formatter::new(&self.source, diagnostics)
+                    .colored()
+                    .to_string()
+            })?;
+
+        if !warnings.is_empty() {
+            let warnings = Formatter::new(&self.source, warnings).colored().to_string();
+            warn!(message = "VRL compilation warning.", %warnings);
+        }
+
+        match self.runtime {
+            VrlRuntime::Ast => Ok(Condition::Vrl(Vrl {
+                program,
+                source: self.source.clone(),
+            })),
+        }
     }
 }
 
 //------------------------------------------------------------------------------
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Vrl {
     pub(super) program: Program,
     pub(super) source: String,
 }
 
 impl Vrl {
-    fn run(&self, event: &Event) -> vrl::RuntimeResult {
-        // TODO(jean): This clone exists until vrl-lang has an "immutable"
-        // mode.
-        //
-        // For now, mutability in reduce "vrl ends-when conditions" is
-        // allowed, but it won't mutate the original event, since we cloned it
-        // here.
-        //
-        // Having first-class immutability support in the language allows for
-        // more performance (one less clone), and boot-time errors when a
-        // program wants to mutate its events.
-        //
-        // see: https://github.com/timberio/vector/issues/4744
-        let mut target = VrlTarget::new(event.clone());
+    fn run(&self, event: Event) -> (Event, vrl::RuntimeResult) {
+        let mut target = VrlTarget::new(event, self.program.info());
         // TODO: use timezone from remap config
         let timezone = TimeZone::default();
-        Runtime::default().resolve(&mut target, &self.program, &timezone)
+
+        let result = Runtime::default().resolve(&mut target, &self.program, &timezone);
+        let original_event = match target.into_events() {
+            TargetEvents::One(event) => event,
+            _ => panic!("Event was modified in a condition. This is an internal compiler error."),
+        };
+        (original_event, result)
     }
 }
 
-impl Condition for Vrl {
-    fn check(&self, event: &Event) -> bool {
-        self.run(event)
+impl Conditional for Vrl {
+    fn check(&self, event: Event) -> (bool, Event) {
+        let (event, result) = self.run(event);
+
+        let result = result
             .map(|value| match value {
                 Value::Boolean(boolean) => boolean,
                 _ => false,
             })
-            .unwrap_or_else(|_| {
-                emit!(&VrlConditionExecutionError);
+            .unwrap_or_else(|err| {
+                emit!(VrlConditionExecutionError {
+                    error: err.to_string().as_ref()
+                });
                 false
-            })
+            });
+        (result, event)
     }
 
-    fn check_with_context(&self, event: &Event) -> Result<(), String> {
-        let value = self.run(event).map_err(|err| match err {
+    fn check_with_context(&self, event: Event) -> (Result<(), String>, Event) {
+        let (event, result) = self.run(event);
+
+        let value_result = result.map_err(|err| match err {
             vrl::Terminate::Abort(err) => {
                 let err = Formatter::new(
                     &self.source,
                     vrl::diagnostic::Diagnostic::from(
-                        Box::new(err) as Box<dyn vrl::diagnostic::DiagnosticError>
+                        Box::new(err) as Box<dyn vrl::diagnostic::DiagnosticMessage>
                     ),
                 )
                 .colored()
@@ -125,22 +128,32 @@ impl Condition for Vrl {
                 let err = Formatter::new(
                     &self.source,
                     vrl::diagnostic::Diagnostic::from(
-                        Box::new(err) as Box<dyn vrl::diagnostic::DiagnosticError>
+                        Box::new(err) as Box<dyn vrl::diagnostic::DiagnosticMessage>
                     ),
                 )
                 .colored()
                 .to_string();
                 format!("source execution failed: {}", err)
             }
-        })?;
+        });
 
-        match value {
+        let value = match value_result {
+            Ok(value) => value,
+            Err(err) => {
+                return (Err(err), event);
+            }
+        };
+
+        let result = match value {
             Value::Boolean(v) if v => Ok(()),
             Value::Boolean(v) if !v => Err("source execution resolved to false".into()),
             _ => Err("source execution resolved to a non-boolean value".into()),
-        }
+        };
+        (result, event)
     }
 }
+
+//------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod test {
@@ -219,7 +232,10 @@ mod test {
 
         for (event, source, build, check) in checks {
             let source = source.to_owned();
-            let config = VrlConfig { source };
+            let config = VrlConfig {
+                source,
+                runtime: Default::default(),
+            };
 
             assert_eq!(
                 config
@@ -231,7 +247,7 @@ mod test {
 
             if let Ok(cond) = config.build(&Default::default()) {
                 assert_eq!(
-                    cond.check_with_context(&event),
+                    cond.check_with_context(event.clone()).0,
                     check.map_err(|e| e.to_string())
                 );
             }

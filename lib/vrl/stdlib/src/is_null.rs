@@ -38,8 +38,8 @@ impl Function for IsNull {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -58,8 +58,8 @@ impl Expression for IsNullFn {
         self.value.resolve(ctx).map(|v| value!(v.is_null()))
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().boolean()
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        TypeDef::boolean().infallible()
     }
 }
 
@@ -73,13 +73,13 @@ mod tests {
         array {
             args: func_args![value: value!(null)],
             want: Ok(value!(true)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         integer {
             args: func_args![value: value!(1789)],
             want: Ok(value!(false)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
     ];
 }

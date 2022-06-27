@@ -6,34 +6,29 @@ following TOC is sorted progressively, starting with the basics and
 expanding into more specifics. Everyone from a first time contributor to a
 Vector team member will find this document useful.
 
-<!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
-
-1. [Introduction](#introduction)
-1. [Your First Contribution](#your-first-contribution)
-   1. [New sources, sinks, and transforms](#new-sources-sinks-and-transforms)
-1. [Workflow](#workflow)
-   1. [Git Branches](#git-branches)
-   1. [Git Commits](#git-commits)
-      1. [Style](#style)
-      1. [Signing-off](#signing-off)
-   1. [Github Pull Requests](#github-pull-requests)
-      1. [Title](#title)
-      1. [Reviews & Approvals](#reviews--approvals)
-      1. [Merge Style](#merge-style)
-   1. [CI](#ci)
-      1. [Releasing](#releasing)
-      1. [Testing](#testing)
-         1. [Skipping tests](#skipping-tests)
-         1. [Daily tests](#daily-tests)
-      1. [Flakey tests](#flakey-tests)
-         1. [Test harness](#test-harness)
-   1. [Deprecations](#deprecations)
-1. [Next steps](#next-steps)
-1. [Legal](#legal)
-   1. [CLA](#contributor-license-agreement)
-   1. [Granted rights and copyright assignment](#granted-rights-and-copyright-assignment)
-
-<!-- /MarkdownTOC -->
+- [Introduction](#introduction)
+- [Your First Contribution](#your-first-contribution)
+  - [New sources, sinks, and transforms](#new-sources-sinks-and-transforms)
+- [Workflow](#workflow)
+  - [Git Branches](#git-branches)
+  - [Git Commits](#git-commits)
+    - [Style](#style)
+  - [Github Pull Requests](#github-pull-requests)
+    - [Title](#title)
+    - [Reviews & Approvals](#reviews--approvals)
+    - [Merge Style](#merge-style)
+  - [CI](#ci)
+    - [Releasing](#releasing)
+    - [Testing](#testing)
+      - [Skipping tests](#skipping-tests)
+      - [Daily tests](#daily-tests)
+    - [Flakey tests](#flakey-tests)
+      - [Test harness](#test-harness)
+  - [Deprecations](#deprecations)
+- [Next steps](#next-steps)
+- [Legal](#legal)
+  - [Contributor License Agreement](#contributor-license-agreement)
+  - [Granted rights and copyright assignment](#granted-rights-and-copyright-assignment)
 
 ## Introduction
 
@@ -66,8 +61,8 @@ If you're contributing a new source, sink, or transform to Vector, thank you tha
 To merge a new source, sink, or transform, you need to:
 
 - [ ] Add tests, especially integration tests if your contribution connects to an external service.
-- [ ] Add instrumentation so folks using your integration can get insight into how it's working and performing. You can see some [example of instrumentation in existing integrations](https://github.com/timberio/vector/tree/master/src/internal_events).
-- [ ] Add documentation. You can see [examples in the `docs` directory](https://github.com/timberio/vector/blob/master/docs).
+- [ ] Add instrumentation so folks using your integration can get insight into how it's working and performing. You can see some [example of instrumentation in existing integrations](https://github.com/vectordotdev/vector/tree/master/src/internal_events).
+- [ ] Add documentation. You can see [examples in the `docs` directory](https://github.com/vectordotdev/vector/blob/master/docs).
 
 ## Workflow
 
@@ -88,7 +83,7 @@ complex changes.
 ### Github Pull Requests
 
 Once your changes are ready you must submit your branch as a [pull \
-request](https://github.com/timberio/vector/pulls).
+request](https://github.com/vectordotdev/vector/pulls).
 
 #### Title
 
@@ -102,7 +97,7 @@ format. Vector performs a pull request check to verify the pull request title
 in case you forget.
 
 A list of allowed sub-categories is defined
-[here](https://github.com/timberio/vector/tree/master/.github).
+[here](https://github.com/vectordotdev/vector/tree/master/.github).
 
 The following are all good examples of pull request titles:
 
@@ -162,7 +157,7 @@ ci-condition: skip
 Some long running tests are only run daily, rather than on every pull request.
 If needed, an administrator can kick off these tests manually via the button on
 the [nightly build action
-page](https://github.com/timberio/vector/actions?query=workflow%3Anightly)
+page](https://github.com/vectordotdev/vector/actions?query=workflow%3Anightly)
 
 #### Flakey tests
 
@@ -174,7 +169,7 @@ not have passing tests:
   - Does it fail if you rerun CI?
   - Can you reproduce locally?
 - Find or open an issue for the test failure
-  ([example](https://github.com/timberio/vector/issues/3781))
+  ([example](https://github.com/vectordotdev/vector/issues/3781))
 - Link the PR in the issue for the failing test so that there are more examples
 
 ##### Test harness
@@ -217,8 +212,8 @@ The full text of the CLA can be found at [https://cla.datadoghq.com/vectordotdev
 This is covered by the CLA.
 
 [urls.create_branch]: https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-and-deleting-branches-within-your-repository
-[urls.existing_issues]: https://github.com/timberio/vector/issues
+[urls.existing_issues]: https://github.com/vectordotdev/vector/issues
 [urls.fork_repo]: https://help.github.com/en/github/getting-started-with-github/fork-a-repo
-[urls.new_issue]: https://github.com/timberio/vector/issues/new
+[urls.new_issue]: https://github.com/vectordotdev/vector/issues/new
 [urls.submit_pr]: https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request-from-a-fork
-[urls.vector_test_harness]: https://github.com/timberio/vector-test-harness/
+[urls.vector_test_harness]: https://github.com/vectordotdev/vector-test-harness/

@@ -1,0 +1,16 @@
+[package]
+name = "vector_config"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@datadoghq.com>"]
+edition = "2021"
+publish = false
+
+[dependencies]
+encoding_rs = { version = "0.8", default-features = false, features = ["alloc", "serde"] }
+indexmap = { version = "1.9", default-features = false }
+num-traits = { version = "0.2.15", default-features = false }
+schemars = { version = "0.8.10", default-features = true, features = ["preserve_order"] }
+serde = { version = "1.0", default-features = false }
+serde_json = { version = "1.0.81", default-features = false }
+vector_config_common = { path = "../vector-config-common" }
+vector_config_macros = { path = "../vector-config-macros" }

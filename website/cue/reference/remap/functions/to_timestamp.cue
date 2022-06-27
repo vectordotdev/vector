@@ -5,6 +5,7 @@ remap: functions: to_timestamp: {
 	description: """
 		Coerces the `value` into a timestamp.
 		"""
+	notices: ["There is the possibility of precision loss due to float arithmetic when coercing floats."]
 
 	arguments: [
 		{
@@ -12,6 +13,18 @@ remap: functions: to_timestamp: {
 			description: "The value that is to be converted to a timestamp. If a string, must be a valid representation of a `timestamp`, and no `default` exists, an `ArgumentError` will be raised."
 			required:    true
 			type: ["string", "float", "integer", "timestamp"]
+		},
+		{
+			name:        "unit"
+			description: "The time unit."
+			type: ["string"]
+			required: false
+			enum: {
+				seconds:      "Express Unix time in seconds"
+				milliseconds: "Express Unix time in milliseconds"
+				nanoseconds:  "Express Unix time in nanoseconds"
+			}
+			default: "seconds"
 		},
 	]
 	internal_failure_reasons: [

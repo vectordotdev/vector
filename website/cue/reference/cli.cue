@@ -7,10 +7,6 @@ _default_flags: {
 		_short:      "h"
 		description: "Prints help information "
 	}
-	"version": {
-		_short:      "V"
-		description: "Prints version information"
-	}
 }
 
 cli: {
@@ -75,7 +71,7 @@ cli: {
 		}
 	}
 
-	#OptionType: "string" | "integer" | "enum"
+	#OptionType: "string" | "integer" | "enum" | "list"
 
 	name:     !=""
 	flags:    #Flags
@@ -104,6 +100,10 @@ cli: {
 			_short:      "v"
 			description: "Enable more detailed logging. Repeat to reduce further. Overrides `--verbose`."
 		}
+		"version": {
+			_short:      "V"
+			description: "Prints version information"
+		}
 		"watch-config": {
 			_short:      "w"
 			description: env_vars.VECTOR_WATCH_CONFIG.description
@@ -111,14 +111,7 @@ cli: {
 		}
 	}
 
-	// Reusable options
-	_core_options: {
-		"color": {
-			description: env_vars.VECTOR_COLOR.description
-			default:     env_vars.VECTOR_COLOR.type.string.default
-			enum:        env_vars.VECTOR_COLOR.type.string.enum
-			env_var:     "VECTOR_COLOR"
-		}
+	_core_config_options: {
 		"config": {
 			_short:      "c"
 			description: env_vars.VECTOR_CONFIG.description
@@ -145,6 +138,16 @@ cli: {
 			description: env_vars.VECTOR_CONFIG_YAML.description
 			type:        "string"
 			env_var:     "VECTOR_CONFIG_YAML"
+		}
+	}
+
+	// Reusable options
+	_core_options: _core_config_options & {
+		"color": {
+			description: env_vars.VECTOR_COLOR.description
+			default:     env_vars.VECTOR_COLOR.type.string.default
+			enum:        env_vars.VECTOR_COLOR.type.string.enum
+			env_var:     "VECTOR_COLOR"
 		}
 		"log-format": {
 			description: env_vars.VECTOR_LOG_FORMAT.description
@@ -261,15 +264,30 @@ cli: {
 
 		"tap": {
 			description: """
-				Observe log events from topology components.
+				Observe events flowing into components (transforms, sinks) and
+				out of components (sources, transforms). Events are sampled at
+				a specified interval.
 				"""
 
-			flags: _default_flags
+			flags: _default_flags & {
+				"quiet": {
+					_short:      "q"
+					description: "Quiet output includes only events. By default, diagnostic messages may appear on stderr."
+				}
+				"meta": {
+					_short:      "m"
+					description: "Event output includes the associated component_id as metadata. The actual event is nested under an `event` key."
+				}
+				"no-reconnect": {
+					_short:      "n"
+					description: "Whether to reconnect if the underlying Vector API connection drops. By default, tap will attempt to reconnect if the connection drops."
+				}
+			}
 
 			options: {
 				"interval": {
 					_short:      "i"
-					description: "Interval to sample metrics at, in milliseconds"
+					description: "Interval to sample events at, in milliseconds"
 					type:        "integer"
 					default:     500
 				}
@@ -280,19 +298,28 @@ cli: {
 				}
 				"limit": {
 					_short:      "l"
-					description: "Sample log events to the provided limit"
+					description: "Maximum number of events to sample each interval"
 					type:        "integer"
 					default:     100
 				}
 				"format": {
 					_short:      "f"
-					description: "Encoding format for logs printed to screen"
+					description: "Encoding format for events printed to screen"
 					type:        "enum"
 					default:     "json"
 					enum: {
-						json: "Output events as JSON"
-						yaml: "Output events as YAML"
+						json:   "Output events as JSON"
+						yaml:   "Output events as YAML"
+						logfmt: "Output events as logfmt"
 					}
+				}
+				"inputs-of": {
+					description: "Components (transforms, sinks) to observe for their inputs (comma-separated; accepts glob patterns)"
+					type:        "list"
+				}
+				"outputs-of": {
+					description: "Components (sources, transforms) to observe for their inputs (comma-separated; accepts glob patterns)"
+					type:        "list"
 				}
 			}
 
@@ -300,7 +327,11 @@ cli: {
 				components: {
 					type: "list"
 					description: """
-						Components to observe (comma-separated; accepts glob patterns).
+						Components (sources, transforms) to observe for their
+						outputs (comma-separated; accepts glob patterns). The
+						default value is `*` only if no other patterns are specified
+						(i.e. via `--outputs-of` or `--inputs-of`); otherwise the
+						default value is empty.
 						"""
 					default: "*"
 				}
@@ -315,11 +346,15 @@ cli: {
 
 			flags: _default_flags & {
 				"human-metrics": {
-					_short: "h"
+					_short: "H"
 					description: """
 						Humanize metrics, using numeric suffixes - e.g. 1,100 = 1.10 k,
 						1,000,000 = 1.00 M
 						"""
+				}
+				"no-reconnect": {
+					_short:      "n"
+					description: "Whether to reconnect if the underlying Vector API connection drops. By default, top will attempt to reconnect if the connection drops."
 				}
 			}
 

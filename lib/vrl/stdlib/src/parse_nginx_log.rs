@@ -1,9 +1,32 @@
 use std::collections::BTreeMap;
 
+use ::value::Value;
 use regex::Regex;
 use vrl::prelude::*;
 
 use crate::log_util;
+
+fn parse_nginx_log(
+    bytes: Value,
+    timestamp_format: Option<Value>,
+    format: &Bytes,
+    ctx: &Context,
+) -> Resolved {
+    let message = bytes.try_bytes_utf8_lossy()?;
+    let timestamp_format = match timestamp_format {
+        None => time_format_for_format(format.as_ref()),
+        Some(timestamp_format) => timestamp_format.try_bytes_utf8_lossy()?.to_string(),
+    };
+    let regex = regex_for_format(format.as_ref());
+    let captures = regex.captures(&message).ok_or("failed parsing log line")?;
+    log_util::log_fields(regex, &captures, &timestamp_format, ctx.timezone())
+        .map(rename_referrer)
+        .map_err(Into::into)
+}
+
+fn variants() -> Vec<Value> {
+    vec![value!("combined"), value!("error")]
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseNginxLog;
@@ -35,15 +58,13 @@ impl Function for ParseNginxLog {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
-        let variants = vec![value!("combined"), value!("error")];
-
         let value = arguments.required("value");
         let format = arguments
-            .required_enum("format", &variants)?
+            .required_enum("format", &variants())?
             .try_bytes()
             .expect("format not bytes");
 
@@ -73,6 +94,25 @@ impl Function for ParseNginxLog {
                 ),
             },
         ]
+    }
+
+    fn compile_argument(
+        &self,
+        _args: &[(&'static str, Option<FunctionArgument>)],
+        _ctx: &mut FunctionCompileContext,
+        name: &str,
+        expr: Option<&expression::Expr>,
+    ) -> CompiledArgument {
+        match (name, expr) {
+            ("format", Some(expr)) => {
+                let format = expr
+                    .as_enum("format", variants())?
+                    .try_bytes()
+                    .expect("format not bytes");
+                Ok(Some(Box::new(format) as _))
+            }
+            _ => Ok(None),
+        }
     }
 }
 
@@ -111,72 +151,66 @@ struct ParseNginxLogFn {
 impl Expression for ParseNginxLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
-        let message = bytes.try_bytes_utf8_lossy()?;
-        let timestamp_format = match &self.timestamp_format {
-            None => time_format_for_format(self.format.as_ref()),
-            Some(timestamp_format) => timestamp_format
-                .resolve(ctx)?
-                .try_bytes_utf8_lossy()?
-                .to_string(),
-        };
+        let timestamp_format = self
+            .timestamp_format
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
+        let format = &self.format;
 
-        let regex = regex_for_format(self.format.as_ref());
-
-        let captures = regex.captures(&message).ok_or("failed parsing log line")?;
-
-        log_util::log_fields(regex, &captures, &timestamp_format, ctx.timezone())
-            .map(rename_referrer)
-            .map_err(Into::into)
+        parse_nginx_log(bytes, timestamp_format, format, ctx)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new()
-            .fallible()
-            .object(match self.format.as_ref() {
-                b"combined" => type_def_combined(),
-                b"error" => type_def_error(),
-                _ => unreachable!(),
-            })
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        TypeDef::object(match self.format.as_ref() {
+            b"combined" => kind_combined(),
+            b"error" => kind_error(),
+            _ => unreachable!(),
+        })
+        .fallible()
     }
 }
 
-fn type_def_combined() -> BTreeMap<&'static str, TypeDef> {
-    map! {
-        "client": Kind::Bytes,
-        "user": Kind::Bytes | Kind::Null,
-        "timestamp": Kind::Timestamp,
-        "request": Kind::Bytes,
-        "method": Kind::Bytes,
-        "path": Kind::Bytes,
-        "protocol": Kind::Bytes,
-        "status": Kind::Integer,
-        "size": Kind::Integer,
-        "referer": Kind::Bytes | Kind::Null,
-        "agent": Kind::Bytes | Kind::Null,
-        "compression": Kind::Bytes | Kind::Null,
-    }
+fn kind_combined() -> BTreeMap<Field, Kind> {
+    BTreeMap::from([
+        ("client".into(), Kind::bytes()),
+        ("user".into(), Kind::bytes().or_null()),
+        ("timestamp".into(), Kind::timestamp()),
+        ("request".into(), Kind::bytes()),
+        ("method".into(), Kind::bytes()),
+        ("path".into(), Kind::bytes()),
+        ("protocol".into(), Kind::bytes()),
+        ("status".into(), Kind::integer()),
+        ("size".into(), Kind::integer()),
+        ("referer".into(), Kind::bytes().or_null()),
+        ("agent".into(), Kind::bytes().or_null()),
+        ("compression".into(), Kind::bytes().or_null()),
+    ])
 }
 
-fn type_def_error() -> BTreeMap<&'static str, TypeDef> {
-    map! {
-        "timestamp": Kind::Timestamp,
-        "severity": Kind::Bytes,
-        "pid": Kind::Integer,
-        "tid": Kind::Integer,
-        "cid": Kind::Integer,
-        "message": Kind::Bytes,
-        "client": Kind::Bytes | Kind::Null,
-        "server": Kind::Bytes | Kind::Null,
-        "request": Kind::Bytes | Kind::Null,
-        "host": Kind::Bytes | Kind::Null,
-        "port": Kind::Bytes | Kind::Null,
-    }
+fn kind_error() -> BTreeMap<Field, Kind> {
+    BTreeMap::from([
+        ("timestamp".into(), Kind::timestamp()),
+        ("severity".into(), Kind::bytes()),
+        ("pid".into(), Kind::integer()),
+        ("tid".into(), Kind::integer()),
+        ("cid".into(), Kind::integer()),
+        ("message".into(), Kind::bytes()),
+        ("excess".into(), Kind::float().or_null()),
+        ("zone".into(), Kind::bytes().or_null()),
+        ("client".into(), Kind::bytes().or_null()),
+        ("server".into(), Kind::bytes().or_null()),
+        ("request".into(), Kind::bytes().or_null()),
+        ("upstream".into(), Kind::bytes().or_null()),
+        ("host".into(), Kind::bytes().or_null()),
+        ("port".into(), Kind::bytes().or_null()),
+    ])
 }
 
 #[cfg(test)]
 mod tests {
     use chrono::prelude::*;
-    use shared::btreemap;
+    use vector_common::btreemap;
 
     use super::*;
 
@@ -199,7 +233,7 @@ mod tests {
                 "size" => 612,
                 "agent" => "curl/7.75.0",
             }),
-            tdef: TypeDef::new().fallible().object(type_def_combined()),
+            tdef: TypeDef::object(kind_combined()).fallible(),
         }
 
         combined_line_valid_no_compression {
@@ -219,12 +253,12 @@ mod tests {
                 "referer" => "https://my-url.com/my-path",
                 "agent" => "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36",
             }),
-            tdef: TypeDef::new().fallible().object(type_def_combined()),
+            tdef: TypeDef::object(kind_combined()).fallible(),
         }
 
         combined_line_valid_all_fields {
             args: func_args![
-                value: r#"172.17.0.1 alice - [01/Apr/2021:12:02:31 +0000] "POST /not-found HTTP/1.1" 404 153 "http://localhost/somewhere" "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.119 Safari/537.36" "2.75""#,
+                value: r#"172.17.0.1 - alice [01/Apr/2021:12:02:31 +0000] "POST /not-found HTTP/1.1" 404 153 "http://localhost/somewhere" "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.119 Safari/537.36" "2.75""#,
                 format: "combined"
             ],
             want: Ok(btreemap! {
@@ -241,7 +275,7 @@ mod tests {
                 "agent" => "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.119 Safari/537.36",
                 "compression" => "2.75",
             }),
-            tdef: TypeDef::new().fallible().object(type_def_combined()),
+            tdef: TypeDef::object(kind_combined()).fallible(),
         }
 
         error_line_valid {
@@ -261,7 +295,7 @@ mod tests {
                 "request" => "POST /not-found HTTP/1.1",
                 "host" => "localhost:8081",
             }),
-            tdef: TypeDef::new().fallible().object(type_def_error()),
+            tdef: TypeDef::object(kind_error()).fallible(),
         }
 
         error_line_with_referrer {
@@ -282,7 +316,7 @@ mod tests {
                 "host" => "65.21.190.83:31256",
                 "referer" => "http://65.21.190.83:31256/",
             }),
-            tdef: TypeDef::new().fallible().object(type_def_error()),
+            tdef: TypeDef::object(kind_error()).fallible(),
         }
 
         error_line_starting {
@@ -297,7 +331,49 @@ mod tests {
                 "tid" => 133309,
                 "message" => "signal process started",
             }),
-            tdef: TypeDef::new().fallible().object(type_def_error()),
+            tdef: TypeDef::object(kind_error()).fallible(),
+        }
+
+        error_line_with_upstream {
+            args: func_args![
+                value: r#"2022/04/15 08:16:13 [error] 7164#7164: *20 connect() failed (113: No route to host) while connecting to upstream, client: 10.244.0.0, server: test.local, request: "GET / HTTP/2.0", upstream: "http://127.0.0.1:80/""#,
+                format: "error"
+            ],
+            want: Ok(btreemap! {
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2022-04-15T08:16:13Z").unwrap().into()),
+                "severity" => "error",
+                "pid" => 7164,
+                "tid" => 7164,
+                "cid" => 20,
+                "message" => "connect() failed (113: No route to host) while connecting to upstream",
+                "client" => "10.244.0.0",
+                "server" => "test.local",
+                "request" => "GET / HTTP/2.0",
+                "upstream" => "http://127.0.0.1:80/",
+            }),
+            tdef: TypeDef::object(kind_error()).fallible(),
+        }
+
+        error_rate_limit {
+            args: func_args![
+                value: r#"2022/05/30 20:56:22 [error] 7164#7164: *38068741 limiting requests, excess: 50.416 by zone "api_access_token", client: 10.244.0.0, server: test.local, request: "GET / HTTP/2.0", host: "127.0.0.1:8080""#,
+                format: "error"
+            ],
+            want: Ok(btreemap! {
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2022-05-30T20:56:22Z").unwrap().into()),
+                "severity" => "error",
+                "pid" => 7164,
+                "tid" => 7164,
+                "cid" => 38068741,
+                "message" => "limiting requests",
+                "excess" => 50.416,
+                "zone" => "api_access_token",
+                "client" => "10.244.0.0",
+                "server" => "test.local",
+                "request" => "GET / HTTP/2.0",
+                "host" => "127.0.0.1:8080",
+            }),
+            tdef: TypeDef::object(kind_error()).fallible(),
         }
     ];
 }

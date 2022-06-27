@@ -33,7 +33,7 @@ pub async fn healthcheck(config: LokiConfig, client: HttpClient) -> crate::Resul
     let res = client.send(req).await?;
 
     let status = match fetch_status("ready", &config, &client).await? {
-        // Issue https://github.com/timberio/vector/issues/6463
+        // Issue https://github.com/vectordotdev/vector/issues/6463
         http::StatusCode::NOT_FOUND => {
             debug!("Endpoint `/ready` not found. Retrying healthcheck with top level query.");
             fetch_status("", &config, &client).await?

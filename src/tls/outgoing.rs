@@ -4,7 +4,9 @@ use snafu::ResultExt;
 use tokio::net::TcpStream;
 use tokio_openssl::SslStream;
 
-use super::{tls_connector, Connect, Handshake, MaybeTlsSettings, MaybeTlsStream, SslBuildError};
+use super::{
+    tls_connector, ConnectSnafu, HandshakeSnafu, MaybeTlsSettings, MaybeTlsStream, SslBuildSnafu,
+};
 
 impl MaybeTlsSettings {
     pub(crate) async fn connect(
@@ -12,16 +14,19 @@ impl MaybeTlsSettings {
         host: &str,
         addr: &SocketAddr,
     ) -> crate::tls::Result<MaybeTlsStream<TcpStream>> {
-        let stream = TcpStream::connect(addr).await.context(Connect)?;
+        let stream = TcpStream::connect(addr).await.context(ConnectSnafu)?;
 
         match self {
             MaybeTlsSettings::Raw(()) => Ok(MaybeTlsStream::Raw(stream)),
             MaybeTlsSettings::Tls(_) => {
                 let config = tls_connector(self)?;
-                let ssl = config.into_ssl(host).context(SslBuildError)?;
+                let ssl = config.into_ssl(host).context(SslBuildSnafu)?;
 
-                let mut stream = SslStream::new(ssl, stream).context(SslBuildError)?;
-                Pin::new(&mut stream).connect().await.context(Handshake)?;
+                let mut stream = SslStream::new(ssl, stream).context(SslBuildSnafu)?;
+                Pin::new(&mut stream)
+                    .connect()
+                    .await
+                    .context(HandshakeSnafu)?;
 
                 debug!(message = "Negotiated TLS.");
 

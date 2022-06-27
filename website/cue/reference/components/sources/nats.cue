@@ -4,6 +4,7 @@ components: sources: nats: {
 	title: "NATS"
 
 	features: {
+		acknowledgements: false
 		collect: {
 			checkpoint: enabled: false
 			from: components._nats.features.collect.from
@@ -56,10 +57,14 @@ components: sources: nats: {
 	}
 
 	telemetry: metrics: {
-		events_in_total:                 components.sources.internal_metrics.output.metrics.events_in_total
-		processed_bytes_total:           components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:          components.sources.internal_metrics.output.metrics.processed_events_total
-		component_received_events_total: components.sources.internal_metrics.output.metrics.component_received_events_total
+		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
+		processed_bytes_total:                components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:               components.sources.internal_metrics.output.metrics.processed_events_total
+		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
+		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
+		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
+		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
+		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 	}
 
 	how_it_works: components._nats.how_it_works

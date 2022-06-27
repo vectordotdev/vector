@@ -1,0 +1,95 @@
+name: Bug
+description: 🐛 Let us know about an unexpected error, a crash, or an incorrect behavior.
+labels:
+  - 'type: bug'
+body:
+- type: markdown
+  attributes:
+    value: |
+      Thank you for opening 🐛 bug report!
+
+- type: textarea
+  attributes:
+    label: A note for the community
+    value: |
+      <!-- Please keep this note for the community -->
+      * Please vote on this issue by adding a 👍 [reaction](https://blog.github.com/2016-03-10-add-reactions-to-pull-requests-issues-and-comments/) to the original issue to help the community and maintainers prioritize this request
+      * If you are interested in working on this issue or have submitted a pull request, please leave a comment
+      <!-- Thank you for keeping this note for the community -->
+
+- type: textarea
+  id: problem
+  attributes:
+    label: Problem
+    description: >
+      Please provide a clear and concise description of what the bug is,
+      including what currently happens and what you expected to happen.
+  validations:
+    required: true
+
+- type: textarea
+  id: config
+  attributes:
+    label: Configuration
+    description: |
+      Paste the relevant parts of your Vector configuration file.
+
+      !! If your config files contain sensitive information please remove it !!
+    render: text
+
+- type: input
+  id: version
+  attributes:
+    label: Version
+    description: |
+      Please paste the output of running `vector --version`.
+
+      If you are not running the latest version of Vector, please try upgrading
+      because your issue may have already been fixed.
+  validations:
+    required: true
+
+- type: textarea
+  id: debug
+  attributes:
+    label: Debug Output
+    description: |
+      Full debug output can be obtained by running Vector with the following:
+
+      ```
+      RUST_BACKTRACE=full vector -vvv <rest of commands>
+      ```
+
+      If the debug output is long, please create a GitHub Gist containing the debug output and paste the link here.
+
+      !! Debug output may contain sensitive information. Please review it before posting publicly. !!
+    render: text
+
+- type: textarea
+  id: data
+  attributes:
+    label: Example Data
+    description: |
+      Please provide any example data that will help debug the issue, for example:
+
+      ```
+      201.69.207.46 - kemmer6752 [07/06/2019:14:53:55 -0400] "PATCH /innovative/interfaces" 301 669
+      ```
+
+- type: textarea
+  id: context
+  attributes:
+    label: Additional Context
+    description: |
+      Is there anything atypical about your situation that we should know? For
+      example: is Vector running in Kubernetes? Are you passing any unusual command
+      line options or environment variables to opt-in to non-default behavior?
+
+- type: textarea
+  id: references
+  attributes:
+    label: References
+    description: |
+      Are there any other GitHub issues (open or closed) or Pull Requests that should be linked here? For example:
+
+      - #6017

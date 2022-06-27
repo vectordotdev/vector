@@ -1,14 +1,10 @@
-use std::{fmt, marker::PhantomData};
-
-use indexmap::map::IndexMap;
-use serde::{de, Deserialize, Serialize};
-pub use vector_core::serde::skip_serializing_if_default;
-
-#[cfg(feature = "codecs")]
-use crate::codecs::{
+use codecs::{
     decoding::{DeserializerConfig, FramingConfig},
-    BytesDecoderConfig, BytesDeserializerConfig, NewlineDelimitedDecoderConfig,
+    BytesDecoderConfig, BytesDeserializerConfig,
 };
+use indexmap::map::IndexMap;
+use serde::{Deserialize, Serialize};
+pub use vector_core::serde::{bool_or_struct, skip_serializing_if_default};
 
 pub const fn default_true() -> bool {
     true
@@ -25,24 +21,46 @@ pub fn default_max_length() -> usize {
     bytesize::kib(100u64) as usize
 }
 
-#[cfg(feature = "codecs")]
-pub fn default_framing_message_based() -> Box<dyn FramingConfig> {
-    Box::new(BytesDecoderConfig::new())
+pub fn default_framing_message_based() -> FramingConfig {
+    BytesDecoderConfig::new().into()
 }
 
-#[cfg(feature = "codecs")]
-pub fn default_framing_stream_based() -> Box<dyn FramingConfig> {
-    Box::new(NewlineDelimitedDecoderConfig::new())
+pub fn default_decoding() -> DeserializerConfig {
+    BytesDeserializerConfig::new().into()
 }
 
-#[cfg(feature = "codecs")]
-pub fn default_decoding() -> Box<dyn DeserializerConfig> {
-    Box::new(BytesDeserializerConfig::new())
-}
+/// Utilities for the `serde_json` crate.
+pub mod json {
+    use bytes::{BufMut, BytesMut};
+    use serde::Serialize;
 
-pub fn to_string(value: impl serde::Serialize) -> String {
-    let value = serde_json::to_value(value).unwrap();
-    value.as_str().unwrap().into()
+    /// Serialize the given data structure as JSON to `String`.
+    ///
+    /// # Panics
+    ///
+    /// Serialization can panic if `T`'s implementation of `Serialize` decides
+    /// to fail, or if `T` contains a map with non-string keys.
+    pub fn to_string(value: impl Serialize) -> String {
+        let value = serde_json::to_value(value).unwrap();
+        value.as_str().unwrap().into()
+    }
+
+    /// Serialize the given data structure as JSON to `BytesMut`.
+    ///
+    /// # Errors
+    ///
+    /// Serialization can fail if `T`'s implementation of `Serialize` decides to
+    /// fail, or if `T` contains a map with non-string keys.
+    pub fn to_bytes<T>(value: &T) -> serde_json::Result<BytesMut>
+    where
+        T: ?Sized + Serialize,
+    {
+        // Allocate same capacity as `serde_json::to_vec`:
+        // https://github.com/serde-rs/json/blob/5fe9bdd3562bf29d02d1ab798bbcff069173306b/src/ser.rs#L2195.
+        let mut bytes = BytesMut::with_capacity(128);
+        serde_json::to_writer((&mut bytes).writer(), value)?;
+        Ok(bytes)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -59,7 +77,7 @@ impl<V: 'static> Fields<V> {
     pub fn all_fields(self) -> impl Iterator<Item = (String, V)> {
         self.0
             .into_iter()
-            .map(|(k, v)| -> Box<dyn Iterator<Item = (String, V)>> {
+            .flat_map(|(k, v)| -> Box<dyn Iterator<Item = (String, V)>> {
                 match v {
                     // boxing is used as a way to avoid incompatible types of the match arms
                     FieldsOrValue::Value(v) => Box::new(std::iter::once((k, v))),
@@ -69,46 +87,48 @@ impl<V: 'static> Fields<V> {
                     ),
                 }
             })
-            .flatten()
     }
 }
 
-/// Enables deserializing from a value that could be a bool or a struct.
-/// Example:
-/// healthcheck: bool
-/// healthcheck.enabled: bool
-/// Both are accepted.
-pub fn bool_or_struct<'de, T, D>(deserializer: D) -> Result<T, D::Error>
-where
-    T: Deserialize<'de> + From<bool>,
-    D: de::Deserializer<'de>,
-{
-    struct BoolOrStruct<T>(PhantomData<fn() -> T>);
+/// Structure to handle when a configuration field can be a value
+/// or a list of values.
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Hash)]
+#[serde(untagged)]
+pub enum OneOrMany<T> {
+    One(T),
+    Many(Vec<T>),
+}
 
-    impl<'de, T> de::Visitor<'de> for BoolOrStruct<T>
-    where
-        T: Deserialize<'de> + From<bool>,
-    {
-        type Value = T;
-
-        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter.write_str("bool or map")
-        }
-
-        fn visit_bool<E>(self, value: bool) -> Result<T, E>
-        where
-            E: de::Error,
-        {
-            Ok(value.into())
-        }
-
-        fn visit_map<M>(self, map: M) -> Result<T, M::Error>
-        where
-            M: de::MapAccess<'de>,
-        {
-            Deserialize::deserialize(de::value::MapAccessDeserializer::new(map))
+impl<T: ToString> OneOrMany<T> {
+    pub fn stringify(&self) -> OneOrMany<String> {
+        match self {
+            Self::One(value) => value.to_string().into(),
+            Self::Many(values) => values
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .into(),
         }
     }
+}
 
-    deserializer.deserialize_any(BoolOrStruct(PhantomData))
+impl<T> OneOrMany<T> {
+    pub fn into_vec(self) -> Vec<T> {
+        match self {
+            Self::One(value) => vec![value],
+            Self::Many(list) => list,
+        }
+    }
+}
+
+impl<T> From<T> for OneOrMany<T> {
+    fn from(value: T) -> Self {
+        Self::One(value)
+    }
+}
+
+impl<T> From<Vec<T>> for OneOrMany<T> {
+    fn from(value: Vec<T>) -> Self {
+        Self::Many(value)
+    }
 }

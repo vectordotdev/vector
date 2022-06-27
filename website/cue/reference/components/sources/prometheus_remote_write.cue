@@ -13,6 +13,7 @@ components: sources: prometheus_remote_write: {
 	}
 
 	features: {
+		acknowledgements: true
 		multiline: enabled: false
 		receive: {
 			from: {
@@ -31,7 +32,6 @@ components: sources: prometheus_remote_write: {
 			}
 			tls: {
 				enabled:                true
-				can_enable:             true
 				can_verify_certificate: true
 				enabled_default:        false
 			}
@@ -49,7 +49,7 @@ components: sources: prometheus_remote_write: {
 	}
 
 	configuration: {
-		acknowledgements: configuration._acknowledgements
+		acknowledgements: configuration._source_acknowledgements
 		address: {
 			description: "The address to accept connections on. The address _must_ include a port."
 			required:    true

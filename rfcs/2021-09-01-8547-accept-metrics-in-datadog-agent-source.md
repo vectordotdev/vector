@@ -36,9 +36,9 @@ to store/manipulate distribution using [sketches], send those to Datadog using t
 metrics sinks would possibly benefit from having distribution stored internally with sketches as this would provide
 better aggregation and accuracy.
 
-[#7283]: https://github.com/timberio/vector/issues/7283
-[#8493]: https://github.com/timberio/vector/issues/8493
-[#8626]: https://github.com/timberio/vector/issues/8626
+[#7283]: https://github.com/vectordotdev/vector/issues/7283
+[#8493]: https://github.com/vectordotdev/vector/issues/8493
+[#8626]: https://github.com/vectordotdev/vector/issues/8626
 [sketches]: http://www.vldb.org/pvldb/vol12/p2195-masson.pdf
 
 ## Scope
@@ -117,7 +117,7 @@ A few details about the Datadog Agents & [Datadog metrics](https://docs.datadogh
 
 Vector has a nice description of its [metrics data
 model](https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/) and a [concise enum for
-representing it](https://github.com/timberio/vector/blob/master/lib/vector-core/src/event/metric.rs#L135-L169).
+representing it](https://github.com/vectordotdev/vector/blob/master/lib/vector-core/src/event/metric.rs#L135-L169).
 
 
 The implementation would then consist in:
@@ -139,14 +139,14 @@ The implementation would then consist in:
      Vector uses what's called a summary inside the Agent, implementing the complete DDSketch support in Vector is
      probably a good idea as sketches have convenient properties for wide consistent aggregation and limited error. To
      support smooth migration, full DDsktech (or compatible sketch) support is mandatory, as customers that emit
-     distribution metric from Datadog Agent would need it to migrate to Vector aggegation. This RFC assumes there will
+     distribution metric from Datadog Agent would need it to migrate to Vector aggregation. This RFC assumes there will
      be a complete sketch metric (likely to be DDSketch) that would be compatible and support the following scenario
      without loss of information: `(Agent Sketch) -> (Vector) -> (Datadog intake)`. This RFC focus on ingesting sketch
      and not the rest of the flow.
 
 **Regarding the tagging issue:** A -possibly temporary- work-around would be to store incoming tags with the complete
 "key:value" string as the key and an empty value to store those in the extisting map Vector uses to store
-[tags](https://github.com/timberio/vector/blob/master/lib/vector-core/src/event/metric.rs#L60) and slightly rework the
+[tags](https://github.com/vectordotdev/vector/blob/master/lib/vector-core/src/event/metric.rs#L60) and slightly rework the
 `datadog_metrics` sink not to append `:` if a tag key has the empty string as the corresponding value. However Datadog
 best practices can be followed with the current Vector data model, so unless something unforeseen or unexpected demand
 arise, Vector internal tag representation will not be changed following this RFC.
@@ -193,7 +193,7 @@ because of protocol conversion.
 
 For sketches, we could flatten sketches and compute usual derived metrics (min/max/average/count/some percentiles) and
 send those as gauge/count, but it would prevent (or at least impact) existing distribution/sketches users. Moreover if
-instead of sketches only derived metrics are used a lot of the tagging flexiblity will be lost. By submitting tagged
+instead of sketches only derived metrics are used a lot of the tagging flexibility will be lost. By submitting tagged
 sketches to the Datadog intake, any tag selector can be used to compute a distribution based on the sketches that bear
 matching tag. This cannot be done without sending sketches. But flattening sketches would have the benefit of simplify
 the implementation in Vector and remove the prerequisite of having sketches support inside Vector.
@@ -203,7 +203,7 @@ the implementation in Vector and remove the prerequisite of having sketches supp
 Instead of being done in the Agent, the request routing could be implemented either:
 
 1. In Vector, that would receive both metric and non-metric payload, simply proxying non-metric payload directly to
-   Datdog without further processing.
+   Datadog without further processing.
 2. Or in a third party middle layer (e.g. haproxy or similare). It could leverage the [documented
    haproxy](https://docs.datadoghq.com/agent/proxy/?tab=agentv6v7#haproxy) setup for Agent to divert selected routes to
    Vector, but it would have the advantage of resolving any migrations, not-yet-supported-metric-route in Vector and
@@ -227,8 +227,8 @@ None
 * [ ] Support `/api/beta/sketches` route, again in the `datadog_agent`, and validate the `Agent->Vector->Datadog`
   scenario for sketches/distributions. This would also required internal sketches support in Vector along with sending
   sketches from the `datadog_metrics` sinks, this is not directly addressed by this RFC but it is tracked in the
-  following issues: [#7283](https://github.com/timberio/vector/issues/7283),
-  [#8493](https://github.com/timberio/vector/issues/8493) & [#8626](https://github.com/timberio/vector/issues/8626).
+  following issues: [#7283](https://github.com/vectordotdev/vector/issues/7283),
+  [#8493](https://github.com/vectordotdev/vector/issues/8493) & [#8626](https://github.com/vectordotdev/vector/issues/8626).
 
 The later task depends on the issue [#9181](https://github.com/vectordotdev/vector/issues/9181).
 

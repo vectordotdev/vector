@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use indexmap::IndexMap;
-use shared::TimeZone;
 use vector::{
+    config::{DataType, Output},
     event::{Event, Value},
     transforms::{
         add_fields::AddFields,
@@ -14,12 +14,13 @@ use vector::{
         SyncTransform, TransformOutputsBuf,
     },
 };
+use vector_common::TimeZone;
 use vrl::prelude::*;
 
 criterion_group!(
     name = benches;
     // encapsulates CI noise we saw in
-    // https://github.com/timberio/vector/issues/5394
+    // https://github.com/vectordotdev/vector/issues/5394
     config = Criterion::default().noise_threshold(0.02);
     targets = benchmark_remap
 );
@@ -29,10 +30,11 @@ fn benchmark_remap(c: &mut Criterion) {
     let mut group = c.benchmark_group("remap");
 
     let add_fields_runner = |tform: &mut Box<dyn SyncTransform>, event: Event| {
-        let mut outputs = TransformOutputsBuf::new_with_capacity(Vec::new(), 1);
+        let mut outputs =
+            TransformOutputsBuf::new_with_capacity(vec![Output::default(DataType::all())], 1);
         tform.transform(event, &mut outputs);
         let result = outputs.take_primary();
-        let output_1 = result[0].as_log();
+        let output_1 = result.first().unwrap().as_log();
 
         debug_assert_eq!(output_1.get("foo").unwrap().to_string_lossy(), "bar");
         debug_assert_eq!(output_1.get("bar").unwrap().to_string_lossy(), "baz");
@@ -43,7 +45,7 @@ fn benchmark_remap(c: &mut Criterion) {
 
     group.bench_function("add_fields/remap", |b| {
         let mut tform: Box<dyn SyncTransform> = Box::new(
-            Remap::new(
+            Remap::new_ast(
                 RemapConfig {
                     source: Some(
                         indoc! {r#".foo = "bar"
@@ -60,7 +62,8 @@ fn benchmark_remap(c: &mut Criterion) {
                 },
                 &Default::default(),
             )
-            .unwrap(),
+            .unwrap()
+            .0,
         );
 
         let event = {
@@ -98,10 +101,11 @@ fn benchmark_remap(c: &mut Criterion) {
     });
 
     let json_parser_runner = |tform: &mut Box<dyn SyncTransform>, event: Event| {
-        let mut outputs = TransformOutputsBuf::new_with_capacity(Vec::new(), 1);
+        let mut outputs =
+            TransformOutputsBuf::new_with_capacity(vec![Output::default(DataType::all())], 1);
         tform.transform(event, &mut outputs);
         let result = outputs.take_primary();
-        let output_1 = result[0].as_log();
+        let output_1 = result.first().unwrap().as_log();
 
         debug_assert_eq!(
             output_1.get("foo").unwrap().to_string_lossy(),
@@ -117,7 +121,7 @@ fn benchmark_remap(c: &mut Criterion) {
 
     group.bench_function("parse_json/remap", |b| {
         let mut tform: Box<dyn SyncTransform> = Box::new(
-            Remap::new(
+            Remap::new_ast(
                 RemapConfig {
                     source: Some(".bar = parse_json!(string!(.foo))".to_owned()),
                     file: None,
@@ -128,7 +132,8 @@ fn benchmark_remap(c: &mut Criterion) {
                 },
                 &Default::default(),
             )
-            .unwrap(),
+            .unwrap()
+            .0,
         );
 
         let event = {
@@ -172,10 +177,11 @@ fn benchmark_remap(c: &mut Criterion) {
 
     let coerce_runner =
         |tform: &mut Box<dyn SyncTransform>, event: Event, timestamp: DateTime<Utc>| {
-            let mut outputs = TransformOutputsBuf::new_with_capacity(Vec::new(), 1);
+            let mut outputs =
+                TransformOutputsBuf::new_with_capacity(vec![Output::default(DataType::all())], 1);
             tform.transform(event, &mut outputs);
             let result = outputs.take_primary();
-            let output_1 = result[0].as_log();
+            let output_1 = result.first().unwrap().as_log();
 
             debug_assert_eq!(output_1.get("number").unwrap(), &Value::Integer(1234));
             debug_assert_eq!(output_1.get("bool").unwrap(), &Value::Boolean(true));
@@ -189,7 +195,7 @@ fn benchmark_remap(c: &mut Criterion) {
 
     group.bench_function("coerce/remap", |b| {
         let mut tform: Box<dyn SyncTransform> = Box::new(
-            Remap::new(RemapConfig {
+            Remap::new_ast(RemapConfig {
                 source: Some(indoc! {r#"
                     .number = to_int!(.number)
                     .bool = to_bool!(.bool)
@@ -202,7 +208,8 @@ fn benchmark_remap(c: &mut Criterion) {
                 drop_on_abort: true,
                     ..Default::default()
             }, &Default::default())
-            .unwrap(),
+            .unwrap()
+            .0,
         );
 
         let mut event = Event::from("coerce me");

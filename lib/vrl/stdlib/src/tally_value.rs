@@ -1,4 +1,10 @@
+use ::value::Value;
 use vrl::prelude::*;
+
+fn tally_value(array: Value, value: Value) -> Resolved {
+    let array = array.try_array()?;
+    Ok(array.iter().filter(|&v| v == &value).count().into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct TallyValue;
@@ -18,8 +24,8 @@ impl Function for TallyValue {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let array = arguments.required("array");
@@ -52,14 +58,14 @@ pub(crate) struct TallyValueFn {
 
 impl Expression for TallyValueFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let array = self.array.resolve(ctx)?.try_array()?;
+        let array = self.array.resolve(ctx)?;
         let value = self.value.resolve(ctx)?;
 
-        Ok(array.iter().filter(|&v| v == &value).count().into())
+        tally_value(array, value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().integer()
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        TypeDef::integer().infallible()
     }
 }
 
@@ -76,7 +82,7 @@ mod tests {
                 value: value!("foo"),
             ],
             want: Ok(value!(2)),
-            tdef: TypeDef::new().infallible().integer(),
+            tdef: TypeDef::integer().infallible(),
         }
     ];
 }

@@ -13,14 +13,14 @@ components: sinks: gcp_stackdriver_logs: {
 	}
 
 	features: {
-		buffer: enabled:      true
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {
 				enabled:      true
 				common:       false
 				max_bytes:    10_000_000
-				timeout_secs: 1
+				timeout_secs: 1.0
 			}
 			compression: enabled: false
 			encoding: {
@@ -35,7 +35,6 @@ components: sinks: gcp_stackdriver_logs: {
 			}
 			tls: {
 				enabled:                true
-				can_enable:             false
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        false
@@ -65,6 +64,7 @@ components: sinks: gcp_stackdriver_logs: {
 	}
 
 	configuration: {
+		api_key: configuration._gcp_api_key
 		billing_account_id: {
 			common: false
 			description: """
@@ -211,6 +211,7 @@ components: sinks: gcp_stackdriver_logs: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	how_it_works: {

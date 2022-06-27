@@ -31,7 +31,7 @@ Name: %{_name}
 Summary: A lightweight and ultra-fast tool for building observability pipelines
 Version: %{_cleaned_version}
 Release: %{_release}
-License: ASL 2.0
+License: MPL-2.0
 Group: Applications/System
 Source: %{_source}
 URL: %{_url}
@@ -66,6 +66,7 @@ getent passwd %{_username} > /dev/null || \
     --comment "Vector observability data router" %{_username}
 chown %{_username} %{_sharedstatedir}/%{_name}
 usermod -aG systemd-journal %{_username}  || true
+usermod -aG systemd-journal-remote %{_username}  || true
 
 %clean
 rm -rf %{buildroot}
@@ -82,5 +83,5 @@ rm -rf %{buildroot}
 %license LICENSE
 
 %changelog
-* Fri Jun 21 2019 Vector Devs <vector@timber.io> - 0.3.0
+* Fri Jun 21 2019 Vector Devs <vector@datadoghq.com> - 0.3.0
 - Release v0.3.0

@@ -5,12 +5,13 @@ use std::{
     task::Poll,
 };
 
-use buffers::{Ackable, Acker};
 use futures::{poll, FutureExt, Stream, StreamExt, TryFutureExt};
 use futures_util::future::poll_fn;
 use tokio::{pin, select};
 use tower::Service;
 use tracing::Instrument;
+use vector_buffers::{Ackable, Acker};
+use vector_common::internal_event::BytesSent;
 
 use super::FuturesUnorderedChunked;
 use crate::{
@@ -137,6 +138,12 @@ impl AcknowledgementTracker {
 pub trait DriverResponse {
     fn event_status(&self) -> EventStatus;
     fn events_sent(&self) -> EventsSent;
+
+    // TODO, remove the default implementation once all sinks have
+    // implemented this function.
+    fn bytes_sent(&self) -> Option<BytesSent> {
+        None
+    }
 }
 
 /// Drives the interaction between a stream of items and a service which processes them
@@ -288,13 +295,16 @@ where
                                         trace!(message = "Service call succeeded.", request_id);
                                         finalizers.update_status(response.event_status());
                                         if response.event_status() == EventStatus::Delivered {
-                                            emit(&response.events_sent());
+                                            if let Some(bytes_sent) = response.bytes_sent() {
+                                                emit(bytes_sent);
+                                            }
+                                            emit(response.events_sent());
                                         }
                                     }
                                 };
                                 (seq_num, ack_size)
                             })
-                            .instrument(info_span!("request", request_id));
+                            .instrument(info_span!("request", request_id).or_current());
 
                         in_flight.push(fut);
                     }
@@ -327,8 +337,6 @@ mod tests {
         time::Duration,
     };
 
-    use buffers::{Ackable, Acker};
-    use core_common::internal_event::EventsSent;
     use futures_util::{ready, stream};
     use proptest::{collection::vec as arb_vec, prop_assert_eq, proptest, strategy::Strategy};
     use rand::{prelude::StdRng, SeedableRng};
@@ -339,6 +347,8 @@ mod tests {
     };
     use tokio_util::sync::PollSemaphore;
     use tower::Service;
+    use vector_buffers::{Ackable, Acker};
+    use vector_common::internal_event::EventsSent;
 
     use super::{Driver, DriverResponse};
     use crate::{
@@ -371,6 +381,7 @@ mod tests {
             EventsSent {
                 count: 1,
                 byte_size: 1,
+                output: None,
             }
         }
     }
@@ -396,7 +407,7 @@ mod tests {
     #[allow(clippy::cast_possible_truncation)]
     #[allow(clippy::cast_precision_loss)]
     impl DelayService {
-        pub fn new(permits: usize, lower_bound: Duration, upper_bound: Duration) -> Self {
+        pub(crate) fn new(permits: usize, lower_bound: Duration, upper_bound: Duration) -> Self {
             assert!(upper_bound > lower_bound);
             Self {
                 semaphore: PollSemaphore::new(Arc::new(Semaphore::new(permits))),
@@ -411,7 +422,7 @@ mod tests {
             }
         }
 
-        pub fn get_sleep_dur(&mut self) -> Duration {
+        pub(crate) fn get_sleep_dur(&mut self) -> Duration {
             let lower = self.lower_bound_us;
             let upper = self.upper_bound_us;
 
@@ -434,9 +445,10 @@ mod tests {
             Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send + Sync>>;
 
         fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-            if self.permit.is_some() {
-                panic!("should not call poll_ready again after a successful call");
-            }
+            assert!(
+                self.permit.is_none(),
+                "should not call poll_ready again after a successful call"
+            );
 
             match ready!(self.semaphore.poll_acquire(cx)) {
                 None => panic!("semaphore should not be closed!"),

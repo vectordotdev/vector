@@ -1,6 +1,6 @@
 // These tests have been (inconsistently) hanging after the Tokio 1.x upgrade, most likely due to
 // some interaction between the Tokio runtime and the rusty_fork library.
-// For an attempt to fix these tests, see https://github.com/timberio/vector/pull/6926, which has
+// For an attempt to fix these tests, see https://github.com/vectordotdev/vector/pull/6926, which has
 // been blocked on several changes that would be required to upstream crates.
 /*
 
@@ -36,7 +36,7 @@ fn fork_test<T: std::future::Future<Output = ()>>(test_name: &'static str, fut: 
             // Since we are spawning the runtime from within a forked process, use one worker less
             // to account for the additional process.
             // This adjustment mainly serves to not overload CI workers with low resources.
-            let rt = runtime_constrained(std::cmp::max(1, num_cpus::get() - 1));
+            let rt = runtime_constrained(std::cmp::max(1, crate::num_threads() - 1));
             rt.block_on(fut);
         },
     )

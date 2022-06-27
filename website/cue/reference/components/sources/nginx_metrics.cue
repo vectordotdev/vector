@@ -13,6 +13,7 @@ components: sources: nginx_metrics: {
 	}
 
 	features: {
+		acknowledgements: false
 		collect: {
 			checkpoint: enabled: false
 			from: {
@@ -76,7 +77,6 @@ components: sources: nginx_metrics: {
 			}
 		}
 		tls: configuration._tls_connect & {_args: {
-			can_enable:             true
 			can_verify_certificate: true
 			can_verify_hostname:    true
 			enabled_default:        false
@@ -91,7 +91,7 @@ components: sources: nginx_metrics: {
 		mod_status: {
 			title: "Module `ngx_http_stub_status_module`"
 			body:  """
-				The [ngx_http_stub_status_module]9\(urls.nginx_stub_status_module))
+				The [ngx_http_stub_status_module](\(urls.nginx_stub_status_module))
 				module provides access to basic status information. Basic status
 				information is a simple web page with text data.
 				"""

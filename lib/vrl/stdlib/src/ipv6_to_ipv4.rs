@@ -1,6 +1,21 @@
 use std::net::IpAddr;
 
+use ::value::Value;
 use vrl::prelude::*;
+
+fn ipv6_to_ipv4(value: Value) -> Resolved {
+    let ip = value
+        .try_bytes_utf8_lossy()?
+        .parse()
+        .map_err(|err| format!("unable to parse IP address: {}", err))?;
+    match ip {
+        IpAddr::V4(addr) => Ok(addr.to_string().into()),
+        IpAddr::V6(addr) => match addr.to_ipv4() {
+            Some(addr) => Ok(addr.to_string().into()),
+            None => Err(format!("IPV6 address {} is not compatible with IPV4", addr).into()),
+        },
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Ipv6ToIpV4;
@@ -28,12 +43,11 @@ impl Function for Ipv6ToIpV4 {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
-
         Ok(Box::new(Ipv6ToIpV4Fn { value }))
     }
 }
@@ -45,24 +59,12 @@ struct Ipv6ToIpV4Fn {
 
 impl Expression for Ipv6ToIpV4Fn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let ip = self
-            .value
-            .resolve(ctx)?
-            .try_bytes_utf8_lossy()?
-            .parse()
-            .map_err(|err| format!("unable to parse IP address: {}", err))?;
-
-        match ip {
-            IpAddr::V4(addr) => Ok(addr.to_string().into()),
-            IpAddr::V6(addr) => match addr.to_ipv4() {
-                Some(addr) => Ok(addr.to_string().into()),
-                None => Err(format!("IPV6 address {} is not compatible with IPV4", addr).into()),
-            },
-        }
+        let value = self.value.resolve(ctx)?;
+        ipv6_to_ipv4(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().bytes()
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        TypeDef::bytes().fallible()
     }
 }
 
@@ -76,31 +78,31 @@ mod tests {
         error {
             args: func_args![value: "i am not an ipaddress"],
             want: Err(r#"unable to parse IP address: invalid IP address syntax"#.to_string()),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         incompatible {
             args: func_args![value: "2001:0db8:85a3::8a2e:0370:7334"],
             want: Err("IPV6 address 2001:db8:85a3::8a2e:370:7334 is not compatible with IPV4".to_string()),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         ipv4_compatible {
             args: func_args![value: "::ffff:192.168.0.1"],
             want: Ok(Value::from("192.168.0.1")),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         ipv6 {
             args: func_args![value: "0:0:0:0:0:ffff:c633:6410"],
             want: Ok(Value::from("198.51.100.16")),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         ipv4 {
             args: func_args![value: "198.51.100.16"],
             want: Ok(Value::from("198.51.100.16")),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
     ];
 }

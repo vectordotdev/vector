@@ -31,3 +31,5 @@
 /docs/usage/*   /docs/administration/:splat  301
 /docs/setup/installation/package-managers/vector-installer   /docs/setup/installation/manual/vector-installer  301
 /docs/reference/configuration/sources/generator /docs/reference/configuration/transforms/demo_logs 301
+/support-services https://www.datadoghq.com/product/observability-pipelines 301
+/support https://www.datadoghq.com/product/observability-pipelines 301

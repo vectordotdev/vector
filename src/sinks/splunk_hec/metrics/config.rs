@@ -3,18 +3,18 @@ use std::sync::Arc;
 use futures_util::FutureExt;
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
-use vector_core::{sink::VectorSink, transform::DataType};
+use vector_core::sink::VectorSink;
 
 use super::{request_builder::HecMetricsRequestBuilder, sink::HecMetricsSink};
 use crate::{
-    config::{GenerateConfig, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
         splunk_hec::common::{
             acknowledgements::HecClientAcknowledgementsConfig,
             build_healthcheck, build_http_batch_service, create_client, host_key,
             service::{HecService, HttpRequestBuilder},
-            SplunkHecDefaultBatchSettings,
+            EndpointTarget, SplunkHecDefaultBatchSettings,
         },
         util::{
             http::HttpRetryLogic, BatchConfig, Compression, ServiceBuilderExt, TowerRequestConfig,
@@ -22,7 +22,7 @@ use crate::{
         Healthcheck,
     },
     template::Template,
-    tls::TlsOptions,
+    tls::TlsConfig,
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -44,7 +44,7 @@ pub struct HecMetricsSinkConfig {
     pub batch: BatchConfig<SplunkHecDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
     #[serde(default)]
     pub acknowledgements: HecClientAcknowledgementsConfig,
 }
@@ -84,12 +84,16 @@ impl SinkConfig for HecMetricsSinkConfig {
         Ok((sink, healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
     fn sink_type(&self) -> &'static str {
         "splunk_hec_metrics"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements.inner)
     }
 }
 
@@ -112,6 +116,7 @@ impl HecMetricsSinkConfig {
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
         let http_request_builder = Arc::new(HttpRequestBuilder::new(
             self.endpoint.clone(),
+            EndpointTarget::default(),
             self.default_token.clone(),
             self.compression,
         ));
@@ -120,6 +125,7 @@ impl HecMetricsSinkConfig {
             .service(build_http_batch_service(
                 client,
                 Arc::clone(&http_request_builder),
+                EndpointTarget::Event,
             ));
 
         let service = HecService::new(
@@ -143,6 +149,6 @@ impl HecMetricsSinkConfig {
             default_namespace: self.default_namespace.clone(),
         };
 
-        Ok(VectorSink::Stream(Box::new(sink)))
+        Ok(VectorSink::from_event_streamsink(sink))
     }
 }

@@ -38,6 +38,9 @@
     {{ partial "javascript/head.html" . }}
   </head>
   <body class="dark:bg-dark font-sans antialiased flex flex-col min-h-full{{ if $hasBottomNav }} pb-16 lg:pb-0{{ end }}" onload="showBody()" style="visibility: hidden;">
+    <!-- Google Tag Manager (noscript) -->
+    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-M7MFKZ9" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+    <!-- End Google Tag Manager (noscript) -->
     <div class="flex-1 z-1">
       {{ if $displayBanner }}
       {{ partial "banner.html" . }}
@@ -47,6 +50,10 @@
 
       {{ block "main" . }}
       {{ end }}
+
+      {{/*  Include modal partial ONCE - Handles all instances of button-modal partial  */}}
+      {{/*  To add a modal, include another dict based on .Params.marketo_form  */}}
+      {{ partial "modal.html" (dict "form" (slice (dict "form_id" "12461" "form_title" "Sign up to receive emails on the latest Vector content and new releases" "form_thankyou" "Thank you for joining our Updates Newsletter"))) }}
     </div>
 
     {{/* For things pushed down with the footer (e.g. pagination) */}}

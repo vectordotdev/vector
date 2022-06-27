@@ -15,6 +15,7 @@ components: sources: logstash: {
 	}
 
 	features: {
+		acknowledgements: true
 		receive: {
 			from: {
 				service: services.logstash
@@ -50,7 +51,7 @@ components: sources: logstash: {
 	}
 
 	configuration: {
-		acknowledgements: configuration._acknowledgements
+		acknowledgements: configuration._source_acknowledgements
 		address: {
 			description: "The address to listen for TCP connections on."
 			required:    true
@@ -92,6 +93,7 @@ components: sources: logstash: {
 					`log_schema.timestamp_key`.
 					"""
 			}
+			client_metadata: fields._client_metadata
 			"*": {
 				description: "In addition to the defined fields, all fields from the Logstash message are inserted as root level fields."
 				required:    true

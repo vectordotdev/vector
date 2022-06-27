@@ -1,4 +1,11 @@
+use ::value::Value;
 use vrl::prelude::*;
+
+fn push(list: Value, item: Value) -> Resolved {
+    let mut list = list.try_array()?;
+    list.push(item);
+    Ok(list.into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Push;
@@ -40,8 +47,8 @@ impl Function for Push {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -59,27 +66,29 @@ struct PushFn {
 
 impl Expression for PushFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let mut list = self.value.resolve(ctx)?.try_array()?;
+        let list = self.value.resolve(ctx)?;
         let item = self.item.resolve(ctx)?;
 
-        list.push(item);
-
-        Ok(list.into())
+        push(list, item)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        let item = TypeDef::new()
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        let item = TypeDef::array(BTreeMap::from([(
+            0.into(),
+            self.item.type_def(state).into(),
+        )]));
+        self.value
+            .type_def(state)
+            .restrict_array()
+            .merge_append(item)
             .infallible()
-            .array_mapped::<i32, TypeDef>(map! {
-                0: self.item.type_def(state),
-            });
-
-        self.value.type_def(state).merge(item).infallible()
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use vector_common::btreemap;
+
     use super::*;
 
     test_function![
@@ -88,30 +97,30 @@ mod tests {
         empty_array {
             args: func_args![value: value!([]), item: value!("foo")],
             want: Ok(value!(["foo"])),
-            tdef: TypeDef::new().array_mapped::<i32, Kind>(map! {
-                0: Kind::Bytes,
+            tdef: TypeDef::array(btreemap! {
+                Index::from(0) => Kind::bytes(),
             }),
         }
 
         new_item {
             args: func_args![value: value!([11, false, 42.5]), item: value!("foo")],
             want: Ok(value!([11, false, 42.5, "foo"])),
-            tdef: TypeDef::new().array_mapped::<i32, Kind>(map! {
-                0: Kind::Integer,
-                1: Kind::Boolean,
-                2: Kind::Float,
-                3: Kind::Bytes,
+            tdef: TypeDef::array(btreemap! {
+                Index::from(0) => Kind::integer(),
+                Index::from(1) => Kind::boolean(),
+                Index::from(2) => Kind::float(),
+                Index::from(3) => Kind::bytes(),
             }),
         }
 
         already_exists_item {
             args: func_args![value: value!([11, false, 42.5]), item: value!(42.5)],
             want: Ok(value!([11, false, 42.5, 42.5])),
-            tdef: TypeDef::new().array_mapped::<i32, Kind>(map! {
-                0: Kind::Integer,
-                1: Kind::Boolean,
-                2: Kind::Float,
-                3: Kind::Float,
+            tdef: TypeDef::array(btreemap! {
+                Index::from(0) => Kind::integer(),
+                Index::from(1) => Kind::boolean(),
+                Index::from(2) => Kind::float(),
+                Index::from(3) => Kind::float(),
             }),
         }
     ];

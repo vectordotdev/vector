@@ -1,5 +1,11 @@
 use ::sha1::Digest;
+use ::value::Value;
 use vrl::prelude::*;
+
+fn sha1(value: Value) -> Resolved {
+    let value = value.try_bytes()?;
+    Ok(hex::encode(sha1::Sha1::digest(&value)).into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Sha1;
@@ -27,8 +33,8 @@ impl Function for Sha1 {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -44,13 +50,12 @@ struct Sha1Fn {
 
 impl Expression for Sha1Fn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?.try_bytes()?;
-
-        Ok(hex::encode(sha1::Sha1::digest(&value)).into())
+        let value = self.value.resolve(ctx)?;
+        sha1(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().bytes()
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        TypeDef::bytes().infallible()
     }
 }
 
@@ -64,7 +69,7 @@ mod tests {
         sha {
              args: func_args![value: "foo"],
              want: Ok("0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33"),
-             tdef: TypeDef::new().infallible().bytes(),
+             tdef: TypeDef::bytes().infallible(),
          }
     ];
 }

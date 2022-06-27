@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 use std::{collections::BTreeMap, convert::TryFrom};
 
 use indexmap::IndexMap;
@@ -59,7 +61,7 @@ pub enum ParserError {
     RequestNoNameLabel,
 }
 
-shared::impl_event_data_eq!(ParserError);
+vector_common::impl_event_data_eq!(ParserError);
 
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub struct GroupKey {
@@ -170,7 +172,7 @@ impl GroupKind {
                     let bucket = key.labels.remove("le").ok_or(ParserError::ExpectedLeTag)?;
                     let (_, bucket) = line::Metric::parse_value(&bucket)
                         .map_err(Into::into)
-                        .context(ParseLabelValue)?;
+                        .context(ParseLabelValueSnafu)?;
                     let count = try_f64_to_u32(metric.value)?;
                     matching_group(metrics, key)
                         .buckets
@@ -202,7 +204,7 @@ impl GroupKind {
                     let value = metric.value;
                     let (_, quantile) = line::Metric::parse_value(&quantile)
                         .map_err(Into::into)
-                        .context(ParseLabelValue)?;
+                        .context(ParseLabelValueSnafu)?;
                     matching_group(metrics, key)
                         .quantiles
                         .push(SummaryQuantile { quantile, value });
@@ -285,7 +287,7 @@ pub fn parse_text(input: &str) -> Result<Vec<MetricGroup>, ParserError> {
     let mut groups = Vec::new();
 
     for line in input.lines() {
-        let line = Line::parse(line).with_context(|| WithLine {
+        let line = Line::parse(line).with_context(|_| WithLineSnafu {
             line: line.to_owned(),
         })?;
         if let Some(line) = line {

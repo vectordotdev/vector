@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 use std::{collections::BTreeMap, env};
 
 use indoc::formatdoc;
@@ -45,7 +47,7 @@ pub fn get_override_name(namespace: &str, suffix: &str) -> String {
 
 /// Is the MULTINODE environment variable set?
 pub fn is_multinode() -> bool {
-    env::var("MULTINODE".to_string()).is_ok()
+    env::var("MULTINODE").is_ok()
 }
 
 /// Create config adding fullnameOverride entry. This allows multiple tests

@@ -1,5 +1,5 @@
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::{btree_map::Entry, BTreeMap},
     pin::Pin,
     time::Duration,
 };
@@ -9,9 +9,10 @@ use futures::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
     event::{metric, Event, EventMetadata},
     internal_events::{AggregateEventRecorded, AggregateFlushed, AggregateUpdateFailed},
+    schema,
     transforms::{TaskTransform, Transform},
 };
 
@@ -37,15 +38,15 @@ impl_generate_config_from_default!(AggregateConfig);
 #[typetag::serde(name = "aggregate")]
 impl TransformConfig for AggregateConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
-        Aggregate::new(self).map(Transform::task)
+        Aggregate::new(self).map(Transform::event_task)
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Metric
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+        vec![Output::default(DataType::Metric)]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -60,14 +61,14 @@ type MetricEntry = (metric::MetricData, EventMetadata);
 #[derive(Debug)]
 pub struct Aggregate {
     interval: Duration,
-    map: HashMap<metric::MetricSeries, MetricEntry>,
+    map: BTreeMap<metric::MetricSeries, MetricEntry>,
 }
 
 impl Aggregate {
     pub fn new(config: &AggregateConfig) -> crate::Result<Self> {
         Ok(Self {
             interval: Duration::from_millis(config.interval_ms),
-            map: HashMap::new(),
+            map: BTreeMap::new(),
         })
     }
 
@@ -82,7 +83,7 @@ impl Aggregate {
                     if existing.0.kind == data.kind && existing.0.update(&data) {
                         existing.1.merge(metadata);
                     } else {
-                        emit!(&AggregateUpdateFailed);
+                        emit!(AggregateUpdateFailed);
                         *existing = (data, metadata);
                     }
                 }
@@ -96,20 +97,21 @@ impl Aggregate {
             }
         };
 
-        emit!(&AggregateEventRecorded);
+        emit!(AggregateEventRecorded);
     }
 
     fn flush_into(&mut self, output: &mut Vec<Event>) {
-        for (series, entry) in self.map.drain() {
+        let map = std::mem::take(&mut self.map);
+        for (series, entry) in map.into_iter() {
             let metric = metric::Metric::from_parts(series, entry.0, entry.1);
             output.push(Event::Metric(metric));
         }
 
-        emit!(&AggregateFlushed);
+        emit!(AggregateFlushed);
     }
 }
 
-impl TaskTransform for Aggregate {
+impl TaskTransform<Event> for Aggregate {
     fn transform(
         mut self: Box<Self>,
         mut input_rx: Pin<Box<dyn Stream<Item = Event> + Send>>,
@@ -457,7 +459,7 @@ interval_ms = 999999
         // Queue up some events to be consumed & recorded
         let in_stream = Box::pin(stream::iter(inputs));
         // Kick off the transform process which should consume & record them
-        let mut out_stream = agg.transform(in_stream);
+        let mut out_stream = agg.transform_events(in_stream);
 
         // B/c the input stream has ended we will have gone through the `input_rx.next() => None`
         // part of the loop and do the shutting down final flush immediately. We'll already be able
@@ -515,7 +517,7 @@ interval_ms = 999999
         );
 
         let (mut tx, rx) = futures::channel::mpsc::channel(10);
-        let mut out_stream = agg.transform(Box::pin(rx));
+        let mut out_stream = agg.transform_events(Box::pin(rx));
 
         tokio::time::pause();
 

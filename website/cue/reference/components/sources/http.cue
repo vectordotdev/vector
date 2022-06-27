@@ -15,10 +15,11 @@ components: sources: http: {
 	}
 
 	features: {
+		acknowledgements: true
 		multiline: enabled: false
 		codecs: {
 			enabled:         true
-			default_framing: "newline_delimited"
+			default_framing: "`newline_delimited` for codecs other than `native`, which defaults to `length_delimited`"
 		}
 		receive: {
 			from: {
@@ -36,7 +37,6 @@ components: sources: http: {
 
 			tls: {
 				enabled:                true
-				can_enable:             true
 				can_verify_certificate: true
 				enabled_default:        false
 			}
@@ -54,7 +54,7 @@ components: sources: http: {
 	}
 
 	configuration: {
-		acknowledgements: configuration._acknowledgements
+		acknowledgements: configuration._source_acknowledgements
 		address: {
 			description: "The address to accept connections on. The address _must_ include a port."
 			required:    true
@@ -126,6 +126,22 @@ components: sources: http: {
 			type: string: {
 				default: "path"
 				examples: ["vector_http_path"]
+			}
+		}
+		method: {
+			common:      false
+			description: "Specifies the action of the HTTP request."
+			required:    false
+			type: string: {
+				default: "POST"
+				enum: {
+					"HEAD":   "HTTP HEAD method."
+					"GET":    "HTTP GET method."
+					"PUT":    "HTTP PUT method."
+					"POST":   "HTTP POST method."
+					"PATCH":  "HTTP PATCH method."
+					"DELETE": "HTTP DELETE method."
+				}
 			}
 		}
 	}

@@ -1,7 +1,7 @@
-// ## skip check-events ##
-
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
+
+use super::prelude::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct ConcatSubstringError<'a> {
@@ -13,19 +13,25 @@ pub struct ConcatSubstringError<'a> {
 }
 
 impl<'a> InternalEvent for ConcatSubstringError<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Substring error.",
-            self.condition,
-            self.source,
-            self.start,
-            self.end,
-            self.length,
-            internal_log_rate_secs = 30
+            error = "Unable to split string.",
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::PROCESSING,
+            condition = self.condition,
+            source = self.source,
+            start = self.start,
+            end = self.end,
+            length = self.length,
+            internal_log_rate_secs = 30,
         );
-    }
-
-    fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
+        // deprecated
         counter!("processing_errors_total", 1);
     }
 }
@@ -36,7 +42,7 @@ pub struct ConcatSubstringSourceMissing<'a> {
 }
 
 impl<'a> InternalEvent for ConcatSubstringSourceMissing<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         debug!(
             message = "Substring source missing.",
             self.source,

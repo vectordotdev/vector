@@ -2,14 +2,14 @@ use std::{
     io::ErrorKind,
     net::SocketAddr,
     pin::Pin,
-    sync::Arc,
     task::{Context, Poll},
     time::Duration,
 };
 
 use async_trait::async_trait;
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use futures::{stream::BoxStream, task::noop_waker_ref, SinkExt, StreamExt};
+use futures_util::{future::ready, stream};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::{
@@ -17,6 +17,8 @@ use tokio::{
     net::TcpStream,
     time::sleep,
 };
+use tokio_util::codec::Encoder;
+use vector_common::internal_event::{BytesSent, EventsSent};
 use vector_core::{buffers::Acker, ByteSizeOf};
 
 use crate::{
@@ -24,12 +26,12 @@ use crate::{
     dns,
     event::Event,
     internal_events::{
-        ConnectionOpen, OpenGauge, SocketMode, TcpSocketConnectionEstablished,
-        TcpSocketConnectionFailed, TcpSocketConnectionShutdown, TcpSocketError,
+        ConnectionOpen, OpenGauge, SocketMode, TcpSocketConnectionError,
+        TcpSocketConnectionEstablished, TcpSocketConnectionShutdown, TcpSocketError,
     },
-    sink::VecSinkExt,
     sinks::{
         util::{
+            encoding::Transformer,
             retries::ExponentialBackoff,
             socket_bytes_sink::{BytesSink, ShutdownCheck},
             EncodedEvent, SinkBuildError, StreamSink,
@@ -37,7 +39,7 @@ use crate::{
         Healthcheck, VectorSink,
     },
     tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsSettings, MaybeTlsStream, TlsConfig, TlsError},
+    tls::{MaybeTlsSettings, MaybeTlsStream, TlsEnableableConfig, TlsError},
 };
 
 #[derive(Debug, Snafu)]
@@ -53,11 +55,10 @@ enum TcpError {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(deny_unknown_fields)]
 pub struct TcpSinkConfig {
     address: String,
     keepalive: Option<TcpKeepaliveConfig>,
-    tls: Option<TlsConfig>,
+    tls: Option<TlsEnableableConfig>,
     send_buffer_bytes: Option<usize>,
 }
 
@@ -65,7 +66,7 @@ impl TcpSinkConfig {
     pub const fn new(
         address: String,
         keepalive: Option<TcpKeepaliveConfig>,
-        tls: Option<TlsConfig>,
+        tls: Option<TlsEnableableConfig>,
         send_buffer_bytes: Option<usize>,
     ) -> Self {
         Self {
@@ -88,17 +89,18 @@ impl TcpSinkConfig {
     pub fn build(
         &self,
         cx: SinkContext,
-        encode_event: impl Fn(Event) -> Option<Bytes> + Send + Sync + 'static,
+        transformer: Transformer,
+        encoder: impl Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync + 'static,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let uri = self.address.parse::<http::Uri>()?;
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
         let port = uri.port_u16().ok_or(SinkBuildError::MissingPort)?;
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
         let connector = TcpConnector::new(host, port, self.keepalive, tls, self.send_buffer_bytes);
-        let sink = TcpSink::new(connector.clone(), cx.acker(), encode_event);
+        let sink = TcpSink::new(connector.clone(), cx.acker(), transformer, encoder);
 
         Ok((
-            VectorSink::Stream(Box::new(sink)),
+            VectorSink::from_event_streamsink(sink),
             Box::pin(async move { connector.healthcheck().await }),
         ))
     }
@@ -146,7 +148,7 @@ impl TcpConnector {
         let ip = dns::Resolver
             .lookup_ip(self.host.clone())
             .await
-            .context(DnsError)?
+            .context(DnsSnafu)?
             .next()
             .ok_or(TcpError::NoAddresses)?;
 
@@ -154,7 +156,7 @@ impl TcpConnector {
         self.tls
             .connect(&self.host, &addr)
             .await
-            .context(ConnectError)
+            .context(ConnectSnafu)
             .map(|mut maybe_tls| {
                 if let Some(keepalive) = self.keepalive {
                     if let Err(error) = maybe_tls.set_keepalive(keepalive) {
@@ -177,13 +179,13 @@ impl TcpConnector {
         loop {
             match self.connect().await {
                 Ok(socket) => {
-                    emit!(&TcpSocketConnectionEstablished {
+                    emit!(TcpSocketConnectionEstablished {
                         peer_addr: socket.peer_addr().ok(),
                     });
                     return socket;
                 }
                 Err(error) => {
-                    emit!(&TcpSocketConnectionFailed { error });
+                    emit!(TcpSocketConnectionError { error });
                     sleep(backoff.next().unwrap()).await;
                 }
             }
@@ -195,22 +197,31 @@ impl TcpConnector {
     }
 }
 
-struct TcpSink {
+struct TcpSink<E>
+where
+    E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
+{
     connector: TcpConnector,
     acker: Acker,
-    encode_event: Arc<dyn Fn(Event) -> Option<Bytes> + Send + Sync>,
+    transformer: Transformer,
+    encoder: E,
 }
 
-impl TcpSink {
-    fn new(
+impl<E> TcpSink<E>
+where
+    E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync + 'static,
+{
+    const fn new(
         connector: TcpConnector,
         acker: Acker,
-        encode_event: impl Fn(Event) -> Option<Bytes> + Send + Sync + 'static,
+        transformer: Transformer,
+        encoder: E,
     ) -> Self {
         Self {
             connector,
             acker,
-            encode_event: Arc::new(encode_event),
+            transformer,
+            encoder,
         }
     }
 
@@ -250,42 +261,60 @@ impl TcpSink {
 }
 
 #[async_trait]
-impl StreamSink for TcpSink {
+impl<E> StreamSink<Event> for TcpSink<E>
+where
+    E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync + Sync + 'static,
+{
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         // We need [Peekable](https://docs.rs/futures/0.3.6/futures/stream/struct.Peekable.html) for initiating
         // connection only when we have something to send.
-        let encode_event = Arc::clone(&self.encode_event);
-        let mut input = input
-            .map(|mut event| {
-                let byte_size = event.size_of();
-                let finalizers = event.metadata_mut().take_finalizers();
-                encode_event(event)
-                    .map(|item| EncodedEvent {
-                        item,
-                        finalizers,
-                        byte_size,
-                    })
-                    .unwrap_or_else(|| EncodedEvent::new(Bytes::new(), 0))
-            })
-            .peekable();
+        let mut encoder = self.encoder.clone();
+        let mut input = input.map(|mut event| {
+            let byte_size = event.size_of();
+            let finalizers = event.metadata_mut().take_finalizers();
+            self.transformer.transform(&mut event);
+            let mut bytes = BytesMut::new();
+            if encoder.encode(event, &mut bytes).is_ok() {
+                let item = bytes.freeze();
+                EncodedEvent {
+                    item,
+                    finalizers,
+                    byte_size,
+                }
+            } else {
+                EncodedEvent::new(Bytes::new(), 0)
+            }
+        });
 
-        while Pin::new(&mut input).peek().await.is_some() {
+        while let Some(item) = input.next().await {
             let mut sink = self.connect().await;
-            let _open_token = OpenGauge::new().open(|count| emit!(&ConnectionOpen { count }));
+            let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
 
-            let result = match sink
-                .send_all_peekable(&mut (&mut input).map(|item| item.item).peekable())
-                .await
-            {
+            let mut mapped_input = stream::once(ready(item)).chain(&mut input).map(|event| {
+                emit!(EventsSent {
+                    count: 1,
+                    byte_size: event.byte_size,
+                    output: None,
+                });
+
+                emit!(BytesSent {
+                    byte_size: event.item.len(),
+                    protocol: "tcp",
+                });
+
+                Ok(event.item)
+            });
+
+            let result = match sink.send_all(&mut mapped_input).await {
                 Ok(()) => sink.close().await,
                 Err(error) => Err(error),
             };
 
             if let Err(error) = result {
                 if error.kind() == ErrorKind::Other && error.to_string() == "ShutdownCheck::Close" {
-                    emit!(&TcpSocketConnectionShutdown {});
+                    emit!(TcpSocketConnectionShutdown {});
                 } else {
-                    emit!(&TcpSocketError { error });
+                    emit!(TcpSocketError { error });
                 }
             }
         }

@@ -80,7 +80,7 @@ where
 }
 
 #[async_trait]
-impl<S> StreamSink for HecMetricsSink<S>
+impl<S> StreamSink<Event> for HecMetricsSink<S>
 where
     S: Service<HecRequest> + Send + 'static,
     S::Future: Send + 'static,
@@ -100,7 +100,7 @@ impl Partitioner for EventPartitioner {
     type Key = Option<Arc<str>>;
 
     fn partition(&self, item: &Self::Item) -> Self::Key {
-        item.event.metadata().splunk_hec_token().clone()
+        item.event.metadata().splunk_hec_token()
     }
 }
 
@@ -136,7 +136,7 @@ impl HecMetricsProcessedEventMetadata {
             MetricValue::Counter { value } => Some(value),
             MetricValue::Gauge { value } => Some(value),
             _ => {
-                emit!(&SplunkInvalidMetricReceivedError {
+                emit!(SplunkInvalidMetricReceivedError {
                     value: metric.value(),
                     kind: &metric.kind(),
                     error: "Metric kind not supported.".into(),

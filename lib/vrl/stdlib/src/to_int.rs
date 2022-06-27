@@ -1,5 +1,22 @@
-use shared::conversion::Conversion;
+use ::value::Value;
+use vector_common::conversion::Conversion;
 use vrl::prelude::*;
+
+fn to_int(value: Value) -> Resolved {
+    use Value::*;
+
+    match value {
+        Integer(_) => Ok(value),
+        Float(v) => Ok(Integer(v.into_inner() as i64)),
+        Boolean(v) => Ok(Integer(if v { 1 } else { 0 })),
+        Null => Ok(0.into()),
+        Bytes(v) => Conversion::Integer
+            .convert(v)
+            .map_err(|e| e.to_string().into()),
+        Timestamp(v) => Ok(v.timestamp().into()),
+        v => Err(format!("unable to coerce {} into integer", v.kind()).into()),
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct ToInt;
@@ -65,21 +82,21 @@ impl Function for ToInt {
                 title: "array",
                 source: "to_int!([])",
                 result: Err(
-                    r#"function call error for "to_int" at (0:11): unable to coerce "array" into "integer""#,
+                    r#"function call error for "to_int" at (0:11): unable to coerce array into integer"#,
                 ),
             },
             Example {
                 title: "object",
                 source: "to_int!({})",
                 result: Err(
-                    r#"function call error for "to_int" at (0:11): unable to coerce "object" into "integer""#,
+                    r#"function call error for "to_int" at (0:11): unable to coerce object into integer"#,
                 ),
             },
             Example {
                 title: "regex",
                 source: "to_int!(r'foo')",
                 result: Err(
-                    r#"function call error for "to_int" at (0:15): unable to coerce "regex" into "integer""#,
+                    r#"function call error for "to_int" at (0:15): unable to coerce regex into integer"#,
                 ),
             },
         ]
@@ -87,8 +104,8 @@ impl Function for ToInt {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -104,31 +121,20 @@ struct ToIntFn {
 
 impl Expression for ToIntFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        use Value::*;
-
         let value = self.value.resolve(ctx)?;
 
-        match value {
-            Integer(_) => Ok(value),
-            Float(v) => Ok(Integer(v.into_inner() as i64)),
-            Boolean(v) => Ok(Integer(if v { 1 } else { 0 })),
-            Null => Ok(0.into()),
-            Bytes(v) => Conversion::Integer
-                .convert(v)
-                .map_err(|e| e.to_string().into()),
-            Timestamp(v) => Ok(v.timestamp().into()),
-            v => Err(format!(r#"unable to coerce {} into "integer""#, v.kind()).into()),
-        }
+        to_int(value)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        TypeDef::new()
-            .with_fallibility(
-                self.value
-                    .type_def(state)
-                    .has_kind(Kind::Bytes | Kind::Array | Kind::Object | Kind::Regex),
-            )
-            .integer()
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        let td = self.value.type_def(state);
+
+        TypeDef::integer().with_fallibility(
+            td.contains_bytes()
+                || td.contains_array()
+                || td.contains_object()
+                || td.contains_regex(),
+        )
     }
 }
 
@@ -144,13 +150,13 @@ mod tests {
         string {
              args: func_args![value: "20"],
              want: Ok(20),
-             tdef: TypeDef::new().fallible().integer(),
+             tdef: TypeDef::integer().fallible(),
         }
 
         float {
              args: func_args![value: 20.5],
              want: Ok(20),
-             tdef: TypeDef::new().infallible().integer(),
+             tdef: TypeDef::integer().infallible(),
         }
 
         timezone {
@@ -158,7 +164,7 @@ mod tests {
                             .unwrap()
                             .with_timezone(&Utc)],
              want: Ok(1571227200),
-             tdef: TypeDef::new().infallible().integer(),
+             tdef: TypeDef::integer().infallible(),
          }
     ];
 }

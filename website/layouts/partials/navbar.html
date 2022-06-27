@@ -23,10 +23,10 @@
           </a>
         </div>
         <div class="hidden lg:block lg:ml-6">
-          <div class="flex space-x-4">
+          <div class="flex space-x-4 lg:space-x-2.5 xl:space-x-4">
             {{ range $menu }}
             {{ $isActive := hasPrefix $here .URL }}
-            <a href="{{ .URL }}" class="flex items-center tracking-tight px-2.5 rounded-sm text-normal font-normal">
+            <a href="{{ .URL }}" class="flex items-center tracking-tight px-2.5 rounded-sm lg:text-sm xl:text-base font-normal">
               <span class="dark:text-gray-300 hover:text-primary-dark dark:hover:text-secondary{{ if $isActive }} dark:text-primary text-secondary{{ end }}">
                 {{ .Name }}
               </span>
@@ -37,14 +37,12 @@
       </div>
 
 
-      <div class="flex-1 flex items-center justify-center px-2 lg:ml-6 lg:justify-end">
+      <div class="flex justify-end flex-grow items-center lg:ml-6 h-full">
         {{/* Dark/light mode toggler */}}
-        <div class="mr-6">
-          {{ partial "navbar/mode-toggler.html" . }}
-        </div>
+        {{ partial "navbar/mode-toggler.html" . }}
 
         {{/* Search bar */}}
-        <div class="max-w-xxs flex-grow">
+        <div class="max-w-xxs xl:flex-grow ml-4">
           <label for="search" class="sr-only">
             Search
           </label>
@@ -53,13 +51,16 @@
           <div id="site-search"></div>
         </div>
 
-        {{/* Social icons */}}
-        <div class="hidden lg:flex space-x-3.5 md:order-2 text-lg pt-1.5 ml-2 lg:ml-4 md:ml-3">
+        {{/* Social icons and signup button */}}
+        <div class="hidden lg:flex lg:order-2 text-lg ml-3 lg:ml-4 h-full items-center">
           {{ partial "social-buttons.html" (dict "color" true) }}
+          <div class="ml-4">
+            {{ partial "button-modal.html" (dict "context" . "form_id" "12461" "text" "Updates" "additional_classes" "h-11") }}
+          </div>
         </div>
 
         {{/* Mobile dropdown toggle */}}
-        <div class="flex lg:hidden">
+        <div class="flex lg:hidden ml-4">
           <button @click="open = !open" type="button"
             class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white"
             aria-controls="mobile-menu" aria-expanded="false">
@@ -95,8 +96,12 @@
       {{ end }}
     </div>
 
-    <div class="flex space-x-4 text-lg lg:hidden px-5 mb-2 mt-3.5">
+    <div class="flex text-lg px-5 mb-2 mt-3.5">
       {{ partial "social-buttons.html" (dict "color" true) }}
+    </div>
+
+    <div class="mx-5 mb-4 mt-3.5">
+      {{ partial "button-modal.html" (dict "context" . "form_id" "12461" "text" "Updates" "additional_classes" "h-11") }}
     </div>
   </div>
 </nav>

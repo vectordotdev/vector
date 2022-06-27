@@ -2,7 +2,8 @@ use std::fmt;
 
 use crate::{
     expression::{Array, Block, Group, Object, Resolved, Value},
-    Context, Expression, State, TypeDef,
+    state::{ExternalEnv, LocalEnv},
+    Context, Expression, TypeDef,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -11,6 +12,7 @@ pub struct Container {
 }
 
 impl Container {
+    #[must_use]
     pub fn new(variant: Variant) -> Self {
         Self { variant }
     }
@@ -26,7 +28,7 @@ pub enum Variant {
 
 impl Expression for Container {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        use Variant::*;
+        use Variant::{Array, Block, Group, Object};
 
         match &self.variant {
             Group(v) => v.resolve(ctx),
@@ -37,7 +39,7 @@ impl Expression for Container {
     }
 
     fn as_value(&self) -> Option<Value> {
-        use Variant::*;
+        use Variant::{Array, Block, Group, Object};
 
         match &self.variant {
             Group(v) => v.as_value(),
@@ -47,8 +49,8 @@ impl Expression for Container {
         }
     }
 
-    fn type_def(&self, state: &State) -> TypeDef {
-        use Variant::*;
+    fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
+        use Variant::{Array, Block, Group, Object};
 
         match &self.variant {
             Group(v) => v.type_def(state),
@@ -61,7 +63,7 @@ impl Expression for Container {
 
 impl fmt::Display for Container {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Variant::*;
+        use Variant::{Array, Block, Group, Object};
 
         match &self.variant {
             Group(v) => v.fmt(f),

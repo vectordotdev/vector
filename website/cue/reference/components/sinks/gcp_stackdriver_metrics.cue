@@ -13,14 +13,14 @@ components: sinks: gcp_stackdriver_metrics: {
 	}
 
 	features: {
-		buffer: enabled:      true
+		acknowledgements: true
 		healthcheck: enabled: false
 		send: {
 			batch: {
 				enabled:      true
 				common:       false
 				max_events:   1
-				timeout_secs: 1
+				timeout_secs: 1.0
 			}
 			compression: enabled: false
 			encoding: {
@@ -35,10 +35,9 @@ components: sinks: gcp_stackdriver_metrics: {
 			}
 			tls: {
 				enabled:                true
-				can_enable:             false
 				can_verify_certificate: true
 				can_verify_hostname:    true
-				enabled_default:        true
+				enabled_default:        false
 			}
 			to: {
 				service: services.gcp_cloud_monitoring
@@ -65,6 +64,7 @@ components: sinks: gcp_stackdriver_metrics: {
 	}
 
 	configuration: {
+		api_key: configuration._gcp_api_key
 		credentials_path: {
 			common:      true
 			description: "The filename for a Google Cloud service account credentials JSON file used to authenticate access to the Stackdriver Logging API. If this is unset, Vector checks the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename.\n\nIf no filename is named, Vector will attempt to fetch an instance service account for the compute instance the program is running on. If Vector is not running on a GCE instance, you must define a credentials file as above."
@@ -134,6 +134,7 @@ components: sinks: gcp_stackdriver_metrics: {
 			set:          false
 			summary:      false
 		}
+		traces: false
 	}
 
 	how_it_works: {

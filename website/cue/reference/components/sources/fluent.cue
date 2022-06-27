@@ -15,6 +15,7 @@ components: sources: fluent: {
 	}
 
 	features: {
+		acknowledgements: true
 		receive: {
 			from: {
 				service: services.fluent
@@ -50,7 +51,7 @@ components: sources: fluent: {
 	}
 
 	configuration: {
-		acknowledgements: configuration._acknowledgements
+		acknowledgements: configuration._source_acknowledgements
 		address: {
 			description: "The address to listen for TCP connections on."
 			required:    true
@@ -92,6 +93,7 @@ components: sources: fluent: {
 					examples: ["dummy.0"]
 				}
 			}
+			client_metadata: fields._client_metadata
 			"*": {
 				description: "In addition to the defined fields, all fields from the fluent message are inserted as root level fields."
 				required:    true

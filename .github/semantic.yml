@@ -15,7 +15,8 @@ types:
   - enhancement         # Any user observable enhancement to an existing feature.
   - feat                # Any user observable new feature, such as a new platform, source, transform, or sink.
   - fix                 # Any user observable bug fix.
-  - docs                # A documentation change
+  - docs                # A documentation change.
+  - revert              # A revert of a previous change.
 
 scopes:
   - new source
@@ -23,7 +24,9 @@ scopes:
   - new sink
 
   # domains
+  - ARC # Anything related to adaptive request concurrency
   - administration # Anything related to administration/operation
+  - api # Anything related to Vector's GraphQL API
   - architecture # Anything related to architecture
   - auth # Anything related to authentication/authorization
   - buffers # Anything related to Vector's memory/disk buffers
@@ -34,14 +37,15 @@ scopes:
   - config # Anything related to configuring Vector
   - core # Anything related to core crates i.e. vector-core, core-common, etc
   - data model # Anything related to Vector's internal data model
+  - delivery # Anything related to delivering events within Vector such as end-to-end acknowledgements
+  - deployment # Anything related to deploying Vector
   - deps # Anything related to Vector's dependencies
   - dev # Anything related to Vector's development environment
+  - durability # Anything related to the durability of Vector events
   - enriching # Anything related to enriching Vector's events with context data
   - exceptions # Anything related to Vector's exception events.
-  - extensions # Anything related to extending Vector (WASM, plugins, etc.)
   - external docs # Anything related to Vector's external, public documentation
   - filtering # Anything related to filtering within Vector
-  - graphql api # Anything related to Vector's GraphQL API
   - healthchecks # Anything related to Vector's healtchecks
   - internal docs # Anything related to Vector's internal documentation
   - logs # Anything related to Vector's log events
@@ -50,19 +54,19 @@ scopes:
   - observability # Anything related to monitoring/observing Vector
   - parsing # Anything related to parsing within Vector
   - performance # Anything related to Vector's performance
-  - pipelines # Anything related to Vector's pipelines
   - platforms # Anything related to Vector's supported platforms
   - privacy # Anything related to privacy/compliance
   - processing # Anything related to processing Vector's events (parsing, merging, reducing, etc.)
   - releasing # Anything related to releasing Vector
   - reliability # Anything related to Vector's reliability
   - reload # Anything related to reloading Vector (updating configuration)
-  - rfc # Anything related to Vector RFCs
+  - replay # Anything related to replaying data
   - schemas # Anything related to internal Vector event schemas
   - security # Anything related to security
   - setup # Anything related to setting up or installing Vector
   - shutdown # Anything related to the shutdown of Vector
   - sinks # Anything related to the Vector's sinks
+  - soak tests # Anything related to Vector's soak tests
   - sources # Anything related to the Vector's sources
   - startup # Anything related to the startup of Vector
   - templating # Anything related to templating Vector's configuration values
@@ -76,6 +80,7 @@ scopes:
   # platforms
   - amazon-linux platform # Anything `amazon-linux` platform related
   - apt platform # Anything `apt` platform related
+  - arm platform # Anything `arm` platform related
   - arm64 platform # Anything `arm64` platform related
   - centos platform # Anything `centos` platform related
   - debian platform # Anything `debian` platform related
@@ -121,12 +126,15 @@ scopes:
   - aws_ecs_metrics source # Anything `aws_ecs_metrics` source related
   - aws_kinesis_firehose source # Anything `aws_kinesis_firehose` source related
   - aws_s3 source # Anything `aws_s3` source related
+  - aws_sqs source # Anything `aws_sqs` source related
   - datadog_agent source # Anything `datadog_agent` source related
+  - demo_logs source # Anything `demo_logs` source related
   - dnstap source # Anything `dnstap` source related
   - docker_logs source # Anything `docker_logs` source related
+  - exec source # Anything `exec` source related
   - file source # Anything `file` source related
   - fluent source # Anything `fluent` source related
-  - generator source # Anything `generator` source related
+  - gcp_pubsub source # Anything `gcp_pubsub` source related
   - heroku_logs source # Anything `heroku_logs` source related
   - host_metrics source # Anything `host_metrics` source related
   - http source # Anything `http` source related
@@ -141,6 +149,7 @@ scopes:
   - postgresql_metrics source # Anything `postgresql_metrics` source related
   - prometheus_remote_write source # Anything `prometheus_remote_write` source related
   - prometheus_scrape source # Anything `prometheus_scrape` source related
+  - redis source # Anything `redis` source related
   - socket source # Anything `socket` source related
   - splunk_hec source # Anything `splunk_hec` source related
   - statsd source # Anything `statsd` source related
@@ -202,6 +211,7 @@ scopes:
   - gcp_cloud_storage sink # Anything `gcp_cloud_storage` sink related
   - gcp_pubsub sink # Anything `gcp_pubsub` sink related
   - gcp_stackdriver_logs sink # Anything `gcp_stackdriver_logs` sink related
+  - gcp_stackdriver_metrics sink # Anything `gcp_stackdriver_metrics` sink related
   - honeycomb sink # Anything `honeycomb` sink related
   - http sink # Anything `http` sink related
   - humio_logs sink # Anything `humio_logs` sink related
@@ -212,6 +222,7 @@ scopes:
   - logdna sink # Anything `logdna` sink related
   - loki sink # Anything `loki` sink related
   - nats sink # Anything `nats` sink related
+  - new_relic sink # Anything `new_relic` sink related
   - new_relic_logs sink # Anything `new_relic_logs` sink related
   - papertrail sink # Anything `papertrail` sink related
   - prometheus_exporter sink # Anything `prometheus_exporter` sink related

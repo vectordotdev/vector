@@ -48,7 +48,7 @@ force = true
 
 [[redirects]]
 from = "https://discussions.vector.dev/*"
-to = "https://github.com/timberio/vector/discussions"
+to = "https://github.com/vectordotdev/vector/discussions"
 status = 302
 force = true
 
@@ -73,6 +73,18 @@ force = true
 [[redirects]]
 from = "https://rustdoc.vector.dev/*"
 to = "https://vector-rustdoc.netlify.app/vector/:splat"
+status = 301
+force = true
+
+[[redirects]]
+from = "/support/"
+to = "https://www.datadoghq.com/product/observability-pipelines"
+status = 301
+force = true
+
+[[redirects]]
+from = "/support-services/"
+to = "https://www.datadoghq.com/product/observability-pipelines"
 status = 301
 force = true
 

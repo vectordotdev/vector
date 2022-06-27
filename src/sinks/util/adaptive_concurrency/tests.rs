@@ -28,12 +28,12 @@ use tower::Service;
 
 use super::controller::ControllerStatistics;
 use crate::{
-    config::{self, DataType, SinkConfig, SinkContext},
+    config::{self, AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     event::{metric::MetricValue, Event},
     metrics::{self},
     sinks::{
         util::{
-            retries::RetryLogic, sink, BatchSettings, Concurrency, EncodedEvent, EncodedLength,
+            retries::RetryLogic, BatchSettings, Concurrency, EncodedEvent, EncodedLength,
             TowerRequestConfig, VecBuffer,
         },
         Healthcheck, VectorSink,
@@ -91,7 +91,7 @@ impl LimitParams {
             self.knee_start
                 .map(|knee| {
                     self.knee_exp
-                        .unwrap_or_else(|| self.scale + 1.0)
+                        .unwrap_or(self.scale + 1.0)
                         .powf(level.saturating_sub(knee) as f64)
                         - 1.0
                 })
@@ -169,7 +169,6 @@ impl SinkConfig for TestConfig {
                 VecBuffer::new(batch_settings.size),
                 batch_settings.timeout,
                 cx.acker(),
-                sink::StdServiceLogic::default(),
             )
             .with_flat_map(|event| stream::iter(Some(Ok(EncodedEvent::new(event, 0)))))
             .sink_map_err(|error| panic!("Fatal test sink error: {}", error));
@@ -184,11 +183,11 @@ impl SinkConfig for TestConfig {
         );
         *self.controller_stats.lock().unwrap() = stats;
 
-        Ok((VectorSink::Sink(Box::new(sink)), healthcheck))
+        Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Any
+    fn input(&self) -> Input {
+        Input::all()
     }
 
     fn sink_type(&self) -> &'static str {
@@ -197,6 +196,10 @@ impl SinkConfig for TestConfig {
 
     fn typetag_deserialize(&self) {
         unimplemented!("not intended for use in real configs")
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
     }
 }
 
@@ -442,6 +445,7 @@ async fn run_test(params: TestParams) -> TestResults {
 
     let metrics = controller
         .capture_metrics()
+        .into_iter()
         .map(|metric| (metric.name().to_string(), metric))
         .collect::<HashMap<_, _>>();
     // Ensure basic statistics are captured, don't actually examine them

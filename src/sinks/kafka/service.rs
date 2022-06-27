@@ -21,7 +21,7 @@ use crate::{
 };
 
 pub struct KafkaRequest {
-    pub body: Vec<u8>,
+    pub body: Bytes,
     pub metadata: KafkaRequestMetadata,
     pub event_byte_size: usize,
 }
@@ -47,6 +47,7 @@ impl DriverResponse for KafkaResponse {
         EventsSent {
             count: 1,
             byte_size: self.event_byte_size,
+            output: None,
         }
     }
 }
@@ -69,7 +70,9 @@ pub struct KafkaService {
 }
 
 impl KafkaService {
-    pub const fn new(kafka_producer: FutureProducer<KafkaStatisticsContext>) -> KafkaService {
+    pub(crate) const fn new(
+        kafka_producer: FutureProducer<KafkaStatisticsContext>,
+    ) -> KafkaService {
         KafkaService { kafka_producer }
     }
 }
@@ -87,7 +90,8 @@ impl Service<KafkaRequest> for KafkaService {
         let kafka_producer = self.kafka_producer.clone();
 
         Box::pin(async move {
-            let mut record = FutureRecord::to(&request.metadata.topic).payload(&request.body);
+            let mut record =
+                FutureRecord::to(&request.metadata.topic).payload(request.body.as_ref());
             if let Some(key) = &request.metadata.key {
                 record = record.key(&key[..]);
             }
@@ -101,7 +105,7 @@ impl Service<KafkaRequest> for KafkaService {
             //rdkafka will internally retry forever if the queue is full
             let result = match kafka_producer.send(record, Timeout::Never).await {
                 Ok((_partition, _offset)) => {
-                    emit!(&BytesSent {
+                    emit!(BytesSent {
                         byte_size: request.body.len()
                             + request.metadata.key.map(|x| x.len()).unwrap_or(0),
                         protocol: "kafka"

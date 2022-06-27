@@ -1,45 +1,64 @@
 pub mod v1;
 pub mod v2;
 
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use crate::config::{
-    DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription,
+    GenerateConfig, Output, Resource, SourceConfig, SourceContext, SourceDescription,
 };
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+/// Marker type for the version one of the configuration for the `vector` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
 enum V1 {
+    /// Marker value for version one.
     #[serde(rename = "1")]
     V1,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+/// Configuration for version two of the `vector` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct VectorConfigV1 {
+    /// Version of the configuration.
     version: V1,
+
     #[serde(flatten)]
     config: v1::VectorConfig,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+/// Marker type for the version two of the configuration for the `vector` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
 enum V2 {
+    /// Marker value for version two.
     #[serde(rename = "2")]
     V2,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+/// Configuration for version two of the `vector` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct VectorConfigV2 {
-    version: V2,
+    /// Version of the configuration.
+    version: Option<V2>,
+
     #[serde(flatten)]
     config: v2::VectorConfig,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+/// Configurable for the `vector` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
 #[serde(untagged)]
 pub enum VectorConfig {
-    V1(VectorConfigV1),
-    V2(VectorConfigV2),
+    /// Configuration for version one.
+    V1(#[configurable(derived)] VectorConfigV1),
+
+    /// Configuration for version two.
+    V2(#[configurable(derived)] VectorConfigV2),
 }
 
 inventory::submit! {
@@ -51,7 +70,7 @@ impl GenerateConfig for VectorConfig {
         let config =
             toml::Value::try_into::<v2::VectorConfig>(v2::VectorConfig::generate_config()).unwrap();
         toml::Value::try_from(VectorConfigV2 {
-            version: V2::V2,
+            version: Some(V2::V2),
             config,
         })
         .unwrap()
@@ -68,10 +87,10 @@ impl SourceConfig for VectorConfig {
         }
     }
 
-    fn output_type(&self) -> DataType {
+    fn outputs(&self) -> Vec<Output> {
         match self {
-            VectorConfig::V1(v1) => v1.config.output_type(),
-            VectorConfig::V2(v2) => v2.config.output_type(),
+            VectorConfig::V1(v1) => v1.config.outputs(),
+            VectorConfig::V2(v2) => v2.config.outputs(),
         }
     }
 
@@ -81,11 +100,16 @@ impl SourceConfig for VectorConfig {
             VectorConfig::V2(v2) => v2.config.source_type(),
         }
     }
+
     fn resources(&self) -> Vec<Resource> {
         match self {
             VectorConfig::V1(v1) => v1.config.resources(),
             VectorConfig::V2(v2) => v2.config.resources(),
         }
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 

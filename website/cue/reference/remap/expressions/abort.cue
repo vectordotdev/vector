@@ -11,7 +11,14 @@ remap: expressions: abort: {
 		"""
 
 	grammar: {
-		source: "abort"
+		source: "abort ~ message?"
+		definitions: {
+			message: {
+				description: """
+					`message` is an optional debug message that can be used for diagnostic purposes and is included in a `remap` transform's dropped event metadata.
+					"""
+			}
+		}
 	}
 
 	examples: [

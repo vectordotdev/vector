@@ -16,12 +16,11 @@ components: sinks: prometheus_exporter: {
 	}
 
 	features: {
-		buffer: enabled:      false
+		acknowledgements: false
 		healthcheck: enabled: false
 		exposes: {
 			tls: {
 				enabled:                true
-				can_enable:             true
 				can_verify_certificate: true
 				enabled_default:        false
 			}
@@ -60,7 +59,7 @@ components: sinks: prometheus_exporter: {
 
 	configuration: {
 		address: {
-			description: "The address to expose for scraping."
+			description: "The address to expose for scraping. The metrics are exposed at the typical Prometheus exporter path, `/metrics`"
 			required:    true
 			warnings: []
 			type: string: {
@@ -114,6 +113,17 @@ components: sinks: prometheus_exporter: {
 				items: type: float: examples: [0.5, 0.75, 0.9, 0.95, 0.99]
 			}
 		}
+		distributions_as_summaries: {
+			common:      false
+			description: """
+				Whether or not to render [distributions](\(urls.vector_data_model)/metric#distribution) as a
+				[histogram](\(urls.vector_data_model)/metric#histogram) or
+				[summary](\(urls.vector_data_model)/metric#summary), which map one-to-one with the Prometheus
+				metric types of the same name.
+				"""
+			required:    false
+			type: bool: default: false
+		}
 	}
 
 	input: {
@@ -126,6 +136,7 @@ components: sinks: prometheus_exporter: {
 			set:          false
 			summary:      true
 		}
+		traces: false
 	}
 
 	examples: [

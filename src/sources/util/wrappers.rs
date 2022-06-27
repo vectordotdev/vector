@@ -37,6 +37,11 @@ impl<T, F> AfterRead<T, F> {
     pub const fn get_ref(&self) -> &T {
         &self.inner
     }
+
+    #[cfg(all(unix, feature = "sources-utils-unix"))]
+    pub fn get_mut_ref(&mut self) -> &mut T {
+        &mut self.inner
+    }
 }
 
 impl<T: AsyncRead, F> AsyncRead for AfterRead<T, F>
@@ -73,17 +78,5 @@ impl<T: AsyncWrite, F> AsyncWrite for AfterRead<T, F> {
 
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
         self.project().inner.poll_shutdown(cx)
-    }
-}
-
-#[cfg(feature = "tonic")]
-mod tonic {
-    use tonic::transport::server::Connected;
-
-    impl<T: Connected, F> Connected for super::AfterRead<T, F> {
-        type ConnectInfo = T::ConnectInfo;
-        fn connect_info(&self) -> Self::ConnectInfo {
-            self.inner.connect_info()
-        }
     }
 }

@@ -19,6 +19,8 @@
 //! `/v1/input` to `/api/v2/logs`, but the content of the above documentation
 //! still applies for `/api/v2/logs`.
 
+#[cfg(all(test, feature = "datadog-logs-integration-tests"))]
+mod integration_tests;
 #[cfg(test)]
 mod tests;
 
@@ -26,7 +28,9 @@ mod config;
 mod service;
 mod sink;
 
-use crate::{config::SinkDescription, sinks::datadog::logs::config::DatadogLogsConfig};
+pub(crate) use config::DatadogLogsConfig;
+
+use crate::config::SinkDescription;
 
 inventory::submit! {
     SinkDescription::new::<DatadogLogsConfig>("datadog_logs")

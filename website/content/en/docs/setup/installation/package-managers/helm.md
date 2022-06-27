@@ -69,7 +69,7 @@ To check available Helm chart configuration options:
 helm show values vector/vector
 ```
 
-The chart deploys an Aggragator by default, the full configuration can be found [here](https://github.com/vectordotdev/helm-charts/blob/develop/charts/vector/templates/configmap.yaml). For more information about configuration options, see the [Configuration] docs page.
+The chart deploys an Aggregator by default, the full configuration can be found [here](https://github.com/vectordotdev/helm-charts/blob/develop/charts/vector/templates/configmap.yaml). For more information about configuration options, see the [Configuration] docs page.
 
 ### Installing
 

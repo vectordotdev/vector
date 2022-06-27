@@ -1,4 +1,4 @@
-# issue: https://github.com/timberio/vector/issues/6266
+# issue: https://github.com/vectordotdev/vector/issues/6266
 # object: { "foo": null }
 # result: {}
 

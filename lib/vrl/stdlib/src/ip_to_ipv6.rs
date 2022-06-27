@@ -1,6 +1,18 @@
 use std::net::IpAddr;
 
+use ::value::Value;
 use vrl::prelude::*;
+
+fn ip_to_ipv6(value: Value) -> Resolved {
+    let ip: IpAddr = value
+        .try_bytes_utf8_lossy()?
+        .parse()
+        .map_err(|err| format!("unable to parse IP address: {}", err))?;
+    match ip {
+        IpAddr::V4(addr) => Ok(addr.to_ipv6_mapped().to_string().into()),
+        IpAddr::V6(addr) => Ok(addr.to_string().into()),
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct IpToIpv6;
@@ -28,8 +40,8 @@ impl Function for IpToIpv6 {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -45,21 +57,12 @@ struct IpToIpv6Fn {
 
 impl Expression for IpToIpv6Fn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let ip: IpAddr = self
-            .value
-            .resolve(ctx)?
-            .try_bytes_utf8_lossy()?
-            .parse()
-            .map_err(|err| format!("unable to parse IP address: {}", err))?;
-
-        match ip {
-            IpAddr::V4(addr) => Ok(addr.to_ipv6_mapped().to_string().into()),
-            IpAddr::V6(addr) => Ok(addr.to_string().into()),
-        }
+        let value = self.value.resolve(ctx)?;
+        ip_to_ipv6(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().bytes()
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        TypeDef::bytes().fallible()
     }
 }
 
@@ -74,19 +77,19 @@ mod tests {
             args: func_args![value: "i am not an ipaddress"],
             want: Err(
                     "unable to parse IP address: invalid IP address syntax"),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         valid {
             args: func_args![value: "192.168.0.1"],
             want: Ok(value!("::ffff:192.168.0.1")),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         ipv6_passthrough {
             args: func_args![value: "2404:6800:4003:c02::64"],
             want: Ok(value!("2404:6800:4003:c02::64")),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
     ];
 }

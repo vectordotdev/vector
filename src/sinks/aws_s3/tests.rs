@@ -6,28 +6,46 @@ mod integration_tests {
         time::Duration,
     };
 
-    use bytes::{Buf, BytesMut};
+    use aws_sdk_s3::error::CreateBucketErrorKind;
+    use aws_sdk_s3::model::{
+        DefaultRetention, ObjectLockConfiguration, ObjectLockEnabled, ObjectLockRetentionMode,
+        ObjectLockRule,
+    };
+    use aws_sdk_s3::output::GetObjectOutput;
+    use aws_sdk_s3::types::SdkError;
+    use aws_sdk_s3::Client as S3Client;
+    use bytes::Buf;
     use flate2::read::MultiGzDecoder;
     use futures::{stream, Stream};
     use pretty_assertions::assert_eq;
-    use rusoto_core::{region::Region, RusotoError};
-    use rusoto_s3::{S3Client, S3};
     use tokio_stream::StreamExt;
     use vector_core::{
         config::proxy::ProxyConfig,
-        event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent},
+        event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, EventArray, LogEvent},
     };
 
+    use crate::aws::create_client;
+    use crate::aws::{AwsAuthentication, RegionOrEndpoint};
+    use crate::common::s3::S3ClientBuilder;
     use crate::{
-        aws::rusoto::RegionOrEndpoint,
         config::SinkContext,
         sinks::{
             aws_s3::S3SinkConfig,
             s3_common::config::S3Options,
-            util::{encoding::StandardEncodings, BatchConfig, Compression, TowerRequestConfig},
+            util::{
+                encoding::{EncodingConfig, StandardEncodings},
+                BatchConfig, Compression, TowerRequestConfig,
+            },
         },
-        test_util::{random_lines_with_stream, random_string},
+        test_util::{
+            components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
+            random_lines_with_stream, random_string,
+        },
     };
+
+    fn s3_address() -> String {
+        std::env::var("S3_ADDRESS").unwrap_or_else(|_| "http://localhost:4566".into())
+    }
 
     #[tokio::test]
     async fn s3_insert_message_into_with_flat_key_prefix() {
@@ -40,11 +58,11 @@ mod integration_tests {
         let mut config = config(&bucket, 1000000);
         config.key_prefix = Some("test-prefix".to_string());
         let prefix = config.key_prefix.clone();
-        let service = config.create_service(&cx.globals.proxy).unwrap();
+        let service = config.create_service(&cx.globals.proxy).await.unwrap();
         let sink = config.build_processor(service, cx).unwrap();
 
         let (lines, events, receiver) = make_events_batch(100, 10);
-        sink.run(events).await.unwrap();
+        run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
         assert_eq!(receiver.await, BatchStatus::Delivered);
 
         let keys = get_keys(&bucket, prefix.unwrap()).await;
@@ -74,11 +92,11 @@ mod integration_tests {
         let mut config = config(&bucket, 1000000);
         config.key_prefix = Some("test-prefix/".to_string());
         let prefix = config.key_prefix.clone();
-        let service = config.create_service(&cx.globals.proxy).unwrap();
+        let service = config.create_service(&cx.globals.proxy).await.unwrap();
         let sink = config.build_processor(service, cx).unwrap();
 
         let (lines, events, receiver) = make_events_batch(100, 10);
-        sink.run(events).await.unwrap();
+        run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
         assert_eq!(receiver.await, BatchStatus::Delivered);
 
         let keys = get_keys(&bucket, prefix.unwrap()).await;
@@ -112,7 +130,7 @@ mod integration_tests {
             ..config(&bucket, 10)
         };
         let prefix = config.key_prefix.clone();
-        let service = config.create_service(&cx.globals.proxy).unwrap();
+        let service = config.create_service(&cx.globals.proxy).await.unwrap();
         let sink = config.build_processor(service, cx).unwrap();
 
         let (lines, _events) = random_lines_with_stream(100, 30, None);
@@ -126,11 +144,11 @@ mod integration_tests {
             } else {
                 3
             };
-            e.insert("i", format!("{}", i));
+            e.insert("i", i.to_string());
             Event::from(e)
         });
 
-        sink.run(stream::iter(events)).await.unwrap();
+        run_and_assert_sink_compliance(sink, stream::iter(events), &AWS_SINK_TAGS).await;
 
         // Hard-coded sleeps are bad, but we're waiting on localstack's state to converge.
         tokio::time::sleep(Duration::from_secs(1)).await;
@@ -171,11 +189,11 @@ mod integration_tests {
         };
 
         let prefix = config.key_prefix.clone();
-        let service = config.create_service(&cx.globals.proxy).unwrap();
+        let service = config.create_service(&cx.globals.proxy).await.unwrap();
         let sink = config.build_processor(service, cx).unwrap();
 
         let (lines, events, receiver) = make_events_batch(100, batch_size * batch_multiplier);
-        sink.run(events).await.unwrap();
+        run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
         assert_eq!(receiver.await, BatchStatus::Delivered);
 
         let keys = get_keys(&bucket, prefix.unwrap()).await;
@@ -208,30 +226,36 @@ mod integration_tests {
         create_bucket(&bucket, true).await;
 
         client()
-            .put_object_lock_configuration(rusoto_s3::PutObjectLockConfigurationRequest {
-                bucket: bucket.to_string(),
-                object_lock_configuration: Some(rusoto_s3::ObjectLockConfiguration {
-                    object_lock_enabled: Some(String::from("Enabled")),
-                    rule: Some(rusoto_s3::ObjectLockRule {
-                        default_retention: Some(rusoto_s3::DefaultRetention {
-                            days: Some(1),
-                            mode: Some(String::from("GOVERNANCE")),
-                            years: None,
-                        }),
-                    }),
-                }),
-                ..Default::default()
-            })
+            .await
+            .put_object_lock_configuration()
+            .bucket(bucket.to_string())
+            .object_lock_configuration(
+                ObjectLockConfiguration::builder()
+                    .object_lock_enabled(ObjectLockEnabled::Enabled)
+                    .rule(
+                        ObjectLockRule::builder()
+                            .default_retention(
+                                DefaultRetention::builder()
+                                    .days(1)
+                                    .mode(ObjectLockRetentionMode::Governance)
+                                    .set_years(None)
+                                    .build(),
+                            )
+                            .build(),
+                    )
+                    .build(),
+            )
+            .send()
             .await
             .unwrap();
 
         let config = config(&bucket, 1000000);
         let prefix = config.key_prefix.clone();
-        let service = config.create_service(&cx.globals.proxy).unwrap();
+        let service = config.create_service(&cx.globals.proxy).await.unwrap();
         let sink = config.build_processor(service, cx).unwrap();
 
         let (lines, events, receiver) = make_events_batch(100, 10);
-        sink.run(events).await.unwrap();
+        run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
         assert_eq!(receiver.await, BatchStatus::Delivered);
 
         let keys = get_keys(&bucket, prefix.unwrap()).await;
@@ -259,7 +283,7 @@ mod integration_tests {
         // Break the bucket name
         config.bucket = format!("BREAK{}IT", config.bucket);
         let prefix = config.key_prefix.clone();
-        let service = config.create_service(&cx.globals.proxy).unwrap();
+        let service = config.create_service(&cx.globals.proxy).await.unwrap();
         let sink = config.build_processor(service, cx).unwrap();
 
         let (_lines, events, receiver) = make_events_batch(1, 1);
@@ -277,14 +301,20 @@ mod integration_tests {
         create_bucket(&bucket, false).await;
 
         let config = config(&bucket, 1);
-        let service = config.create_service(&ProxyConfig::from_env()).unwrap();
+        let service = config
+            .create_service(&ProxyConfig::from_env())
+            .await
+            .unwrap();
         config.build_healthcheck(service.client()).unwrap();
     }
 
     #[tokio::test]
     async fn s3_healthchecks_invalid_bucket() {
         let config = config("s3_healthchecks_invalid_bucket", 1);
-        let service = config.create_service(&ProxyConfig::from_env()).unwrap();
+        let service = config
+            .create_service(&ProxyConfig::from_env())
+            .await
+            .unwrap();
         assert!(config
             .build_healthcheck(service.client())
             .unwrap()
@@ -292,25 +322,27 @@ mod integration_tests {
             .is_err());
     }
 
-    fn client() -> S3Client {
-        let region = Region::Custom {
-            name: "minio".to_owned(),
-            endpoint: "http://localhost:4566".to_owned(),
-        };
-
-        use rusoto_core::HttpClient;
-        use rusoto_credential::StaticProvider;
-
-        let p = StaticProvider::new_minimal("test-access-key".into(), "test-secret-key".into());
-        let d = HttpClient::new().unwrap();
-
-        S3Client::new_with(d, p, region)
+    async fn client() -> S3Client {
+        let auth = AwsAuthentication::test_auth();
+        let region = RegionOrEndpoint::with_both("minio", s3_address());
+        let proxy = ProxyConfig::default();
+        let tls_options = None;
+        create_client::<S3ClientBuilder>(
+            &auth,
+            region.region(),
+            region.endpoint().unwrap(),
+            &proxy,
+            &tls_options,
+            true,
+        )
+        .await
+        .unwrap()
     }
 
     fn config(bucket: &str, batch_size: usize) -> S3SinkConfig {
         let mut batch = BatchConfig::default();
         batch.max_events = Some(batch_size);
-        batch.timeout_secs = Some(5);
+        batch.timeout_secs = Some(5.0);
 
         S3SinkConfig {
             bucket: bucket.to_string(),
@@ -319,58 +351,60 @@ mod integration_tests {
             filename_append_uuid: None,
             filename_extension: None,
             options: S3Options::default(),
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4566".to_owned()),
-            encoding: StandardEncodings::Text.into(),
+            region: RegionOrEndpoint::with_both("minio", s3_address()),
+            encoding: EncodingConfig::from(StandardEncodings::Text).into(),
             compression: Compression::None,
             batch,
             request: TowerRequestConfig::default(),
-            assume_role: None,
+            tls: Default::default(),
             auth: Default::default(),
+            acknowledgements: Default::default(),
         }
     }
 
     fn make_events_batch(
         len: usize,
         count: usize,
-    ) -> (Vec<String>, impl Stream<Item = Event>, BatchStatusReceiver) {
-        let (lines, events) = random_lines_with_stream(len, count, None);
-
+    ) -> (
+        Vec<String>,
+        impl Stream<Item = EventArray>,
+        BatchStatusReceiver,
+    ) {
         let (batch, receiver) = BatchNotifier::new_with_receiver();
-        let events = events.map(move |event| event.into_log().with_batch_notifier(&batch).into());
+        let (lines, events) = random_lines_with_stream(len, count, Some(batch));
 
-        (lines, events, receiver)
+        (lines, events.map(Into::into), receiver)
     }
 
     async fn create_bucket(bucket: &str, object_lock_enabled: bool) {
-        use rusoto_s3::{CreateBucketError, CreateBucketRequest};
-
-        let req = CreateBucketRequest {
-            bucket: bucket.to_string(),
-            object_lock_enabled_for_bucket: Some(object_lock_enabled),
-            ..Default::default()
-        };
-
-        match client().create_bucket(req).await {
-            Ok(_) | Err(RusotoError::Service(CreateBucketError::BucketAlreadyOwnedByYou(_))) => {}
-            Err(e) => match e {
-                RusotoError::Unknown(resp) => {
-                    let body = String::from_utf8_lossy(&resp.body[..]);
-                    panic!("Couldn't create bucket: {:?}; Body {}", resp, body);
-                }
-                _ => panic!("Couldn't create bucket: {}", e),
+        match client()
+            .await
+            .create_bucket()
+            .bucket(bucket.to_string())
+            .object_lock_enabled_for_bucket(object_lock_enabled)
+            .send()
+            .await
+        {
+            Ok(_) => {}
+            Err(err) => match err {
+                SdkError::ServiceError { err, raw: _ } => match err.kind {
+                    CreateBucketErrorKind::BucketAlreadyOwnedByYou(_) => {}
+                    err => panic!("Failed to create bucket: {:?}", err),
+                },
+                err => panic!("Failed to create bucket: {:?}", err),
             },
         }
     }
 
-    async fn list_objects(bucket: &str, prefix: String) -> Option<Vec<rusoto_s3::Object>> {
+    async fn list_objects(bucket: &str, prefix: String) -> Option<Vec<aws_sdk_s3::model::Object>> {
         let prefix = prefix.split('/').next().unwrap().to_string();
 
         client()
-            .list_objects_v2(rusoto_s3::ListObjectsV2Request {
-                bucket: bucket.to_string(),
-                prefix: Some(prefix),
-                ..Default::default()
-            })
+            .await
+            .list_objects_v2()
+            .bucket(bucket.to_string())
+            .prefix(prefix)
+            .send()
             .await
             .unwrap()
             .contents
@@ -385,38 +419,30 @@ mod integration_tests {
             .collect()
     }
 
-    async fn get_object(bucket: &str, key: String) -> rusoto_s3::GetObjectOutput {
+    async fn get_object(bucket: &str, key: String) -> GetObjectOutput {
         client()
-            .get_object(rusoto_s3::GetObjectRequest {
-                bucket: bucket.to_string(),
-                key,
-                ..Default::default()
-            })
+            .await
+            .get_object()
+            .bucket(bucket.to_string())
+            .key(key)
+            .send()
             .await
             .unwrap()
     }
 
-    async fn get_lines(obj: rusoto_s3::GetObjectOutput) -> Vec<String> {
+    async fn get_lines(obj: GetObjectOutput) -> Vec<String> {
         let body = get_object_output_body(obj).await;
         let buf_read = BufReader::new(body);
         buf_read.lines().map(|l| l.unwrap()).collect()
     }
 
-    async fn get_gzipped_lines(obj: rusoto_s3::GetObjectOutput) -> Vec<String> {
+    async fn get_gzipped_lines(obj: GetObjectOutput) -> Vec<String> {
         let body = get_object_output_body(obj).await;
         let buf_read = BufReader::new(MultiGzDecoder::new(body));
         buf_read.lines().map(|l| l.unwrap()).collect()
     }
 
-    async fn get_object_output_body(obj: rusoto_s3::GetObjectOutput) -> impl std::io::Read {
-        let bytes = obj
-            .body
-            .unwrap()
-            .fold(BytesMut::new(), |mut store, bytes| {
-                store.extend_from_slice(&bytes.unwrap());
-                store
-            })
-            .await;
-        bytes.freeze().reader()
+    async fn get_object_output_body(obj: GetObjectOutput) -> impl std::io::Read {
+        obj.body.collect().await.unwrap().reader()
     }
 }

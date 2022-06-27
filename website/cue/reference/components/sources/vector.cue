@@ -19,6 +19,7 @@ components: sources: vector: {
 	}
 
 	features: {
+		acknowledgements: true
 		multiline: enabled: false
 		receive: {
 			from: {
@@ -35,7 +36,6 @@ components: sources: vector: {
 			keepalive: enabled:            true
 			tls: {
 				enabled:                true
-				can_enable:             true
 				can_verify_certificate: true
 				enabled_default:        false
 			}
@@ -53,7 +53,7 @@ components: sources: vector: {
 	}
 
 	configuration: {
-		acknowledgements: configuration._acknowledgements
+		acknowledgements: configuration._source_acknowledgements
 		address: {
 			description: """
 				The HTTP address to listen for connections on. It _must_ include a port.
@@ -82,7 +82,7 @@ components: sources: vector: {
 					"1": "Vector source API version 1"
 					"2": "Vector source API version 2"
 				}
-				default: "1"
+				default: "2"
 			}
 		}
 	}
@@ -91,6 +91,7 @@ components: sources: vector: {
 		logs: event: {
 			description: "A Vector event"
 			fields: {
+				client_metadata: fields._client_metadata
 				"*": {
 					description: "Vector transparently forwards data from another upstream Vector instance. The `vector` source will not modify or add fields."
 					required:    true
@@ -108,6 +109,8 @@ components: sources: vector: {
 	}
 
 	telemetry: metrics: {
+		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
+		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
 		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
 		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
 		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total

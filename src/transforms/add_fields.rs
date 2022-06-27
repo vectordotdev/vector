@@ -5,14 +5,16 @@ use serde::{Deserialize, Serialize};
 use toml::value::Value as TomlValue;
 
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
-    event::{Event, Value},
-    internal_events::{
-        AddFieldsFieldNotOverwritten, AddFieldsFieldOverwritten, TemplateRenderingFailed,
+    config::{
+        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
     },
+    event::{Event, Value},
+    internal_events::{AddFieldsFieldNotOverwritten, FieldOverwritten, TemplateRenderingError},
+    schema,
     serde::Fields,
     template::Template,
-    transforms::{FunctionTransform, Transform},
+    transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -69,12 +71,12 @@ impl TransformConfig for AddFieldsConfig {
         Ok(Transform::function(AddFields::new(fields, self.overwrite)?))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -104,14 +106,14 @@ impl AddFields {
 }
 
 impl FunctionTransform for AddFields {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         for (key, value_or_template) in self.fields.clone() {
-            let key_string = key.to_string(); // TODO: Step 6 of https://github.com/timberio/vector/blob/c4707947bd876a0ff7d7aa36717ae2b32b731593/rfcs/2020-05-25-more-usable-logevents.md#sales-pitch.
+            let key_string = key.to_string(); // TODO: Step 6 of https://github.com/vectordotdev/vector/blob/c4707947bd876a0ff7d7aa36717ae2b32b731593/rfcs/2020-05-25-more-usable-logevents.md#sales-pitch.
             let value = match value_or_template {
                 TemplateOrValue::Template(v) => match v.render_string(&event) {
                     Ok(v) => v,
                     Err(error) => {
-                        emit!(&TemplateRenderingFailed {
+                        emit!(TemplateRenderingError {
                             error,
                             field: Some(&key),
                             drop_event: false
@@ -123,13 +125,17 @@ impl FunctionTransform for AddFields {
                 TemplateOrValue::Value(v) => v,
             };
             if self.overwrite {
-                if event.as_mut_log().insert(&key_string, value).is_some() {
-                    emit!(&AddFieldsFieldOverwritten { field: &key });
+                if event
+                    .as_mut_log()
+                    .insert(key_string.as_str(), value)
+                    .is_some()
+                {
+                    emit!(FieldOverwritten { field: &key });
                 }
-            } else if event.as_mut_log().contains(&key_string) {
-                emit!(&AddFieldsFieldNotOverwritten { field: &key });
+            } else if event.as_mut_log().contains(key_string.as_str()) {
+                emit!(AddFieldsFieldNotOverwritten { field: &key });
             } else {
-                event.as_mut_log().insert(&key_string, value);
+                event.as_mut_log().insert(key_string.as_str(), value);
             }
         }
 
@@ -198,18 +204,21 @@ mod tests {
         let log = LogEvent::from("hello world");
         let mut expected = log.clone();
         expected.insert("float", 4.5);
-        expected.insert("int", 4);
+        expected.insert("int", 4_i64);
         expected.insert("string", "thisisastring");
         expected.insert("bool", true);
-        expected.insert("array", Value::Array(vec![1.into(), 2.into(), 3.into()]));
+        expected.insert(
+            "array",
+            Value::Array(vec![1_i64.into(), 2_i64.into(), 3_i64.into()]),
+        );
         expected.insert(
             "table",
-            Value::Map(vec![("key".into(), "value".into())].into_iter().collect()),
+            Value::Object(vec![("key".into(), "value".into())].into_iter().collect()),
         );
 
         let mut fields = IndexMap::new();
         fields.insert(String::from("float"), Value::from(4.5));
-        fields.insert(String::from("int"), Value::from(4));
+        fields.insert(String::from("int"), Value::from(4_i64));
         fields.insert(String::from("string"), Value::from("thisisastring"));
         fields.insert(String::from("bool"), Value::from(true));
         fields.insert(String::from("array"), Value::from(vec![1_isize, 2, 3]));

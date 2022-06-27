@@ -1,9 +1,13 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{
+        DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
+        TransformDescription,
+    },
     event::Event,
-    transforms::{FunctionTransform, Transform},
+    schema,
+    transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -34,12 +38,12 @@ impl TransformConfig for RemoveTagsConfig {
         Ok(Transform::function(RemoveTags::new(self.tags.clone())))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Metric
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+        vec![Output::default(DataType::Metric)]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -54,7 +58,7 @@ impl RemoveTags {
 }
 
 impl FunctionTransform for RemoveTags {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let metric = event.as_mut_metric();
 
         for tag in &self.tags {
@@ -70,7 +74,7 @@ impl FunctionTransform for RemoveTags {
 
 #[cfg(test)]
 mod tests {
-    use shared::btreemap;
+    use std::collections::BTreeMap;
 
     use super::*;
     use crate::{
@@ -90,14 +94,15 @@ mod tests {
             MetricKind::Incremental,
             MetricValue::Counter { value: 10.0 },
         )
-        .with_tags(Some(btreemap! {
-            "env" => "production",
-            "region" => "us-east-1",
-            "host" => "127.0.0.1",
-        }));
-        let expected = metric
-            .clone()
-            .with_tags(Some(btreemap! {"env" => "production"}));
+        .with_tags(Some(BTreeMap::from([
+            (String::from("env"), String::from("production")),
+            (String::from("region"), String::from("us-east-1")),
+            (String::from("host"), String::from("127.0.0.1")),
+        ])));
+        let expected = metric.clone().with_tags(Some(BTreeMap::from([(
+            String::from("env"),
+            String::from("production"),
+        )])));
 
         let mut transform = RemoveTags::new(vec!["region".into(), "host".into()]);
         let metric = transform_one(&mut transform, metric.into())
@@ -114,7 +119,10 @@ mod tests {
             MetricKind::Incremental,
             MetricValue::Counter { value: 10.0 },
         )
-        .with_tags(Some(btreemap! {"env" => "production"}));
+        .with_tags(Some(BTreeMap::from([(
+            String::from("env"),
+            String::from("production"),
+        )])));
         let expected = metric.clone().with_tags(None);
 
         let mut transform = RemoveTags::new(vec!["env".into()]);

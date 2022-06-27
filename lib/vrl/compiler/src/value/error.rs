@@ -1,9 +1,9 @@
-use diagnostic::DiagnosticError;
+use diagnostic::DiagnosticMessage;
 
 use super::Kind;
 use crate::ExpressionError;
 
-#[derive(thiserror::Error, Debug, PartialEq)]
+#[derive(thiserror::Error, Debug, PartialEq, Eq)]
 pub enum Error {
     #[error(
         r#"expected {}, got {got}"#,
@@ -57,9 +57,12 @@ pub enum Error {
     Merge(Kind, Kind),
 }
 
-impl DiagnosticError for Error {
+impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
-        use Error::*;
+        use Error::{
+            Add, And, Coerce, Div, DivideByZero, Expected, Ge, Gt, Le, Lt, Merge, Mul, NanFloat,
+            Or, Rem, Sub,
+        };
 
         match self {
             Expected { .. } => 300,

@@ -1,5 +1,6 @@
-use std::{collections::HashMap, future::ready, num::NonZeroU64, task::Poll};
+use std::{collections::HashMap, future::ready, task::Poll};
 
+use bytes::{Bytes, BytesMut};
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
 use http::{StatusCode, Uri};
 use hyper::{Body, Request};
@@ -10,19 +11,21 @@ use vector_core::ByteSizeOf;
 
 use super::Region;
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+    },
     event::{
         metric::{Metric, MetricValue},
         Event,
     },
     http::HttpClient,
-    internal_events::{SematextMetricsEncodeEventFailed, SematextMetricsInvalidMetricReceived},
+    internal_events::{SematextMetricsEncodeEventError, SematextMetricsInvalidMetricError},
     sinks::{
         influxdb::{encode_timestamp, encode_uri, influx_line_protocol, Field, ProtocolVersion},
         util::{
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             http::{HttpBatchService, HttpRetryLogic},
-            sink, BatchConfig, EncodedEvent, SinkBatchSettings, TowerRequestConfig,
+            BatchConfig, EncodedEvent, SinkBatchSettings, TowerRequestConfig,
         },
         Healthcheck, HealthcheckError, VectorSink,
     },
@@ -32,16 +35,16 @@ use crate::{
 #[derive(Clone)]
 struct SematextMetricsService {
     config: SematextMetricsConfig,
-    inner: HttpBatchService<BoxFuture<'static, Result<Request<Vec<u8>>>>>,
+    inner: HttpBatchService<BoxFuture<'static, Result<Request<Bytes>>>>,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub struct SematextMetricsDefaultBatchSettings;
+pub(crate) struct SematextMetricsDefaultBatchSettings;
 
 impl SinkBatchSettings for SematextMetricsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(20);
     const MAX_BYTES: Option<usize> = None;
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -51,9 +54,15 @@ struct SematextMetricsConfig {
     pub endpoint: Option<String>,
     pub token: String,
     #[serde(default)]
-    pub batch: BatchConfig<SematextMetricsDefaultBatchSettings>,
+    pub(self) batch: BatchConfig<SematextMetricsDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 inventory::submit! {
@@ -114,12 +123,16 @@ impl SinkConfig for SematextMetricsConfig {
         Ok((sink, healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
     fn sink_type(&self) -> &'static str {
         "sematext_metrics"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 
@@ -161,19 +174,18 @@ impl SematextMetricsService {
                 MetricsBuffer::new(batch.size),
                 batch.timeout,
                 cx.acker(),
-                sink::StdServiceLogic::default(),
             )
             .with_flat_map(move |event: Event| {
                 stream::iter({
                     let byte_size = event.size_of();
                     normalizer
-                        .apply(event)
+                        .normalize(event.into_metric())
                         .map(|item| Ok(EncodedEvent::new(item, byte_size)))
                 })
             })
             .sink_map_err(|error| error!(message = "Fatal sematext metrics sink error.", %error));
 
-        Ok(VectorSink::Sink(Box::new(sink)))
+        Ok(VectorSink::from_event_sink(sink))
     }
 }
 
@@ -191,21 +203,22 @@ impl Service<Vec<Metric>> for SematextMetricsService {
 
     fn call(&mut self, items: Vec<Metric>) -> Self::Future {
         let input = encode_events(&self.config.token, &self.config.default_namespace, items);
-        let body: Vec<u8> = input.item.into_bytes();
+        let body = input.item;
 
         self.inner.call(body)
     }
 }
 
+#[derive(Default)]
 struct SematextMetricNormalize;
 
 impl MetricNormalize for SematextMetricNormalize {
-    fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+    fn normalize(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         match &metric.value() {
             MetricValue::Gauge { .. } => state.make_absolute(metric),
             MetricValue::Counter { .. } => state.make_incremental(metric),
             _ => {
-                emit!(&SematextMetricsInvalidMetricReceived { metric: &metric });
+                emit!(SematextMetricsInvalidMetricError { metric: &metric });
                 None
             }
         }
@@ -214,7 +227,7 @@ impl MetricNormalize for SematextMetricNormalize {
 
 fn create_build_request(
     uri: http::Uri,
-) -> impl Fn(Vec<u8>) -> BoxFuture<'static, Result<Request<Vec<u8>>>> + Sync + Send + 'static {
+) -> impl Fn(Bytes) -> BoxFuture<'static, Result<Request<Bytes>>> + Sync + Send + 'static {
     move |body| {
         Box::pin(ready(
             Request::post(uri.clone())
@@ -229,8 +242,8 @@ fn encode_events(
     token: &str,
     default_namespace: &str,
     metrics: Vec<Metric>,
-) -> EncodedEvent<String> {
-    let mut output = String::new();
+) -> EncodedEvent<Bytes> {
+    let mut output = BytesMut::new();
     let byte_size = metrics.size_of();
     for metric in metrics.into_iter() {
         let (series, data, _metadata) = metric.into_parts();
@@ -260,12 +273,14 @@ fn encode_events(
             ts,
             &mut output,
         ) {
-            emit!(&SematextMetricsEncodeEventFailed { error });
+            emit!(SematextMetricsEncodeEventError { error });
         };
     }
 
-    output.pop();
-    EncodedEvent::new(output, byte_size)
+    if !output.is_empty() {
+        output.truncate(output.len() - 1);
+    }
+    EncodedEvent::new(output.freeze(), byte_size)
 }
 
 fn to_fields(label: String, value: f64) -> HashMap<String, Field> {
@@ -277,7 +292,7 @@ fn to_fields(label: String, value: f64) -> HashMap<String, Field> {
 #[cfg(test)]
 mod tests {
     use chrono::{offset::TimeZone, Utc};
-    use futures::{stream, StreamExt};
+    use futures::StreamExt;
     use indoc::indoc;
 
     use super::*;
@@ -405,7 +420,7 @@ mod tests {
             events.push(event);
         }
 
-        let _ = sink.run(stream::iter(events)).await.unwrap();
+        let _ = sink.run_events(events).await.unwrap();
 
         let output = rx.take(metrics.len()).collect::<Vec<_>>().await;
         assert_eq!("os,metric_type=counter,os.host=somehost,token=atoken swap.size=324292 1597784400000000000", output[0].1);

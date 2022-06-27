@@ -1,3 +1,11 @@
+#![deny(warnings)]
+#![deny(clippy::all)]
+#![deny(unreachable_pub)]
+#![deny(unused_allocation)]
+#![deny(unused_extern_crates)]
+#![deny(unused_assignments)]
+#![deny(unused_comparisons)]
+
 mod util;
 
 #[cfg(feature = "append")]
@@ -20,6 +28,8 @@ mod contains;
 mod decode_base64;
 #[cfg(feature = "decode_percent")]
 mod decode_percent;
+#[cfg(feature = "decrypt")]
+mod decrypt;
 #[cfg(feature = "del")]
 mod del;
 #[cfg(feature = "downcase")]
@@ -34,6 +44,8 @@ mod encode_key_value;
 mod encode_logfmt;
 #[cfg(feature = "encode_percent")]
 mod encode_percent;
+#[cfg(feature = "encrypt")]
+mod encrypt;
 #[cfg(feature = "ends_with")]
 mod ends_with;
 #[cfg(feature = "exists")]
@@ -46,6 +58,8 @@ mod flatten;
 mod float;
 #[cfg(feature = "floor")]
 mod floor;
+#[cfg(feature = "for_each")]
+mod for_each;
 #[cfg(feature = "format_int")]
 mod format_int;
 #[cfg(feature = "format_number")]
@@ -68,6 +82,10 @@ mod ip_aton;
 mod ip_cidr_contains;
 #[cfg(feature = "ip_ntoa")]
 mod ip_ntoa;
+#[cfg(feature = "ip_ntop")]
+mod ip_ntop;
+#[cfg(feature = "ip_pton")]
+mod ip_pton;
 #[cfg(feature = "ip_subnet")]
 mod ip_subnet;
 #[cfg(feature = "ip_to_ipv6")]
@@ -78,10 +96,14 @@ mod ipv6_to_ipv4;
 mod is_array;
 #[cfg(feature = "is_boolean")]
 mod is_boolean;
+#[cfg(feature = "is_empty")]
+mod is_empty;
 #[cfg(feature = "is_float")]
 mod is_float;
 #[cfg(feature = "is_integer")]
 mod is_integer;
+#[cfg(feature = "is_json")]
+mod is_json;
 #[cfg(feature = "is_null")]
 mod is_null;
 #[cfg(feature = "is_nullish")]
@@ -106,6 +128,10 @@ mod log;
     feature = "parse_nginx_log"
 ))]
 mod log_util;
+#[cfg(feature = "map_keys")]
+mod map_keys;
+#[cfg(feature = "map_values")]
+mod map_values;
 #[cfg(feature = "match")]
 mod r#match;
 #[cfg(feature = "match_any")]
@@ -180,6 +206,8 @@ mod parse_user_agent;
 mod parse_xml;
 #[cfg(feature = "push")]
 mod push;
+#[cfg(feature = "random_bytes")]
+mod random_bytes;
 #[cfg(feature = "redact")]
 mod redact;
 #[cfg(feature = "remove")]
@@ -210,6 +238,8 @@ mod string;
 mod strip_ansi_escape_codes;
 #[cfg(feature = "strip_whitespace")]
 mod strip_whitespace;
+#[cfg(feature = "strlen")]
+mod strlen;
 #[cfg(feature = "tag_types_externally")]
 mod tag_types_externally;
 #[cfg(feature = "tally")]
@@ -240,6 +270,8 @@ mod to_timestamp;
 mod to_unix_timestamp;
 #[cfg(feature = "truncate")]
 mod truncate;
+#[cfg(feature = "type_def")]
+mod type_def;
 #[cfg(feature = "unique")]
 mod unique;
 #[cfg(feature = "unnest")]
@@ -269,6 +301,8 @@ pub use contains::Contains;
 pub use decode_base64::DecodeBase64;
 #[cfg(feature = "decode_percent")]
 pub use decode_percent::DecodePercent;
+#[cfg(feature = "decrypt")]
+pub use decrypt::Decrypt;
 #[cfg(feature = "del")]
 pub use del::Del;
 #[cfg(feature = "downcase")]
@@ -283,6 +317,8 @@ pub use encode_key_value::EncodeKeyValue;
 pub use encode_logfmt::EncodeLogfmt;
 #[cfg(feature = "encode_percent")]
 pub use encode_percent::EncodePercent;
+#[cfg(feature = "encrypt")]
+pub use encrypt::Encrypt;
 #[cfg(feature = "ends_with")]
 pub use ends_with::EndsWith;
 #[cfg(feature = "exists")]
@@ -295,6 +331,8 @@ pub use flatten::Flatten;
 pub use float::Float;
 #[cfg(feature = "floor")]
 pub use floor::Floor;
+#[cfg(feature = "for_each")]
+pub use for_each::ForEach;
 #[cfg(feature = "format_int")]
 pub use format_int::FormatInt;
 #[cfg(feature = "format_number")]
@@ -317,6 +355,10 @@ pub use ip_aton::IpAton;
 pub use ip_cidr_contains::IpCidrContains;
 #[cfg(feature = "ip_ntoa")]
 pub use ip_ntoa::IpNtoa;
+#[cfg(feature = "ip_ntop")]
+pub use ip_ntop::IpNtop;
+#[cfg(feature = "ip_pton")]
+pub use ip_pton::IpPton;
 #[cfg(feature = "ip_subnet")]
 pub use ip_subnet::IpSubnet;
 #[cfg(feature = "ip_to_ipv6")]
@@ -327,10 +369,14 @@ pub use ipv6_to_ipv4::Ipv6ToIpV4;
 pub use is_array::IsArray;
 #[cfg(feature = "is_boolean")]
 pub use is_boolean::IsBoolean;
+#[cfg(feature = "is_empty")]
+pub use is_empty::IsEmpty;
 #[cfg(feature = "is_float")]
 pub use is_float::IsFloat;
 #[cfg(feature = "is_integer")]
 pub use is_integer::IsInteger;
+#[cfg(feature = "is_json")]
+pub use is_json::IsJson;
 #[cfg(feature = "is_null")]
 pub use is_null::IsNull;
 #[cfg(feature = "is_nullish")]
@@ -349,6 +395,10 @@ pub use join::Join;
 pub use length::Length;
 #[cfg(feature = "log")]
 pub use log::Log;
+#[cfg(feature = "map_keys")]
+pub use map_keys::MapKeys;
+#[cfg(feature = "map_values")]
+pub use map_values::MapValues;
 #[cfg(feature = "match_any")]
 pub use match_any::MatchAny;
 #[cfg(feature = "match_array")]
@@ -421,6 +471,8 @@ pub use parse_xml::ParseXml;
 pub use push::Push;
 #[cfg(feature = "match")]
 pub use r#match::Match;
+#[cfg(feature = "random_bytes")]
+pub use random_bytes::RandomBytes;
 #[cfg(feature = "redact")]
 pub use redact::Redact;
 #[cfg(feature = "remove")]
@@ -449,6 +501,8 @@ pub use string::String;
 pub use strip_ansi_escape_codes::StripAnsiEscapeCodes;
 #[cfg(feature = "strip_whitespace")]
 pub use strip_whitespace::StripWhitespace;
+#[cfg(feature = "strlen")]
+pub use strlen::Strlen;
 #[cfg(feature = "tag_types_externally")]
 pub use tag_types_externally::TagTypesExternally;
 #[cfg(feature = "tally")]
@@ -479,6 +533,8 @@ pub use to_timestamp::ToTimestamp;
 pub use to_unix_timestamp::ToUnixTimestamp;
 #[cfg(feature = "truncate")]
 pub use truncate::Truncate;
+#[cfg(feature = "type_def")]
+pub use type_def::TypeDef;
 #[cfg(feature = "unique")]
 pub use unique::Unique;
 #[cfg(feature = "unnest")]
@@ -517,6 +573,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(DecodeBase64),
         #[cfg(feature = "decode_percent")]
         Box::new(DecodePercent),
+        #[cfg(feature = "decrypt")]
+        Box::new(Decrypt),
         #[cfg(feature = "del")]
         Box::new(Del),
         #[cfg(feature = "downcase")]
@@ -531,6 +589,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(EncodeLogfmt),
         #[cfg(feature = "encode_percent")]
         Box::new(EncodePercent),
+        #[cfg(feature = "encrypt")]
+        Box::new(Encrypt),
         #[cfg(feature = "ends_with")]
         Box::new(EndsWith),
         #[cfg(feature = "exists")]
@@ -543,6 +603,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Float),
         #[cfg(feature = "floor")]
         Box::new(Floor),
+        #[cfg(feature = "for_each")]
+        Box::new(ForEach),
         #[cfg(feature = "format_int")]
         Box::new(FormatInt),
         #[cfg(feature = "format_number")]
@@ -565,6 +627,10 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(IpCidrContains),
         #[cfg(feature = "ip_ntoa")]
         Box::new(IpNtoa),
+        #[cfg(feature = "ip_ntop")]
+        Box::new(IpNtop),
+        #[cfg(feature = "ip_pton")]
+        Box::new(IpPton),
         #[cfg(feature = "ip_subnet")]
         Box::new(IpSubnet),
         #[cfg(feature = "ip_to_ipv6")]
@@ -575,10 +641,14 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(IsArray),
         #[cfg(feature = "is_boolean")]
         Box::new(IsBoolean),
+        #[cfg(feature = "is_empty")]
+        Box::new(IsEmpty),
         #[cfg(feature = "is_float")]
         Box::new(IsFloat),
         #[cfg(feature = "is_integer")]
         Box::new(IsInteger),
+        #[cfg(feature = "is_json")]
+        Box::new(IsJson),
         #[cfg(feature = "is_null")]
         Box::new(IsNull),
         #[cfg(feature = "is_nullish")]
@@ -597,6 +667,10 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Length),
         #[cfg(feature = "log")]
         Box::new(Log),
+        #[cfg(feature = "map_keys")]
+        Box::new(MapKeys),
+        #[cfg(feature = "map_values")]
+        Box::new(MapValues),
         #[cfg(feature = "match")]
         Box::new(Match),
         #[cfg(feature = "match_any")]
@@ -612,7 +686,7 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         #[cfg(feature = "now")]
         Box::new(Now),
         // We are not sure if this is the way we want to expose this functionality yet
-        // https://github.com/timberio/vector/issues/5607
+        // https://github.com/vectordotdev/vector/issues/5607
         //#[cfg(feature = "only_fields")]
         //Box::new(OnlyFields),
         #[cfg(feature = "object")]
@@ -673,6 +747,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseXml),
         #[cfg(feature = "push")]
         Box::new(Push),
+        #[cfg(feature = "random_bytes")]
+        Box::new(RandomBytes),
         #[cfg(feature = "redact")]
         Box::new(Redact),
         #[cfg(feature = "remove")]
@@ -703,6 +779,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(StripAnsiEscapeCodes),
         #[cfg(feature = "strip_whitespace")]
         Box::new(StripWhitespace),
+        #[cfg(feature = "strlen")]
+        Box::new(Strlen),
         #[cfg(feature = "tally")]
         Box::new(Tally),
         #[cfg(feature = "tally_value")]
@@ -733,6 +811,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ToUnixTimestamp),
         #[cfg(feature = "truncate")]
         Box::new(Truncate),
+        #[cfg(feature = "type_def")]
+        Box::new(TypeDef),
         #[cfg(feature = "unique")]
         Box::new(Unique),
         #[cfg(feature = "unnest")]

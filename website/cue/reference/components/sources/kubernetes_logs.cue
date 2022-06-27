@@ -20,6 +20,7 @@ components: sources: kubernetes_logs: {
 	}
 
 	features: {
+		acknowledgements: false
 		collect: {
 			checkpoint: enabled: true
 			from: {
@@ -166,6 +167,24 @@ components: sources: kubernetes_logs: {
 				}
 			}
 		}
+		node_annotation_fields: {
+			common:      false
+			description: "Configuration for how the events are annotated with Node metadata."
+			required:    false
+			type: object: {
+				examples: []
+				options: {
+					node_labels: {
+						common:      false
+						description: "Event field for Node labels."
+						required:    false
+						type: string: {
+							default: "kubernetes.node_labels"
+						}
+					}
+				}
+			}
+		}
 		auto_partial_merge: {
 			common:      false
 			description: "Automatically merge partial messages into a single event. Partial here is in respect to messages that were split by the Kubernetes Container Runtime log driver."
@@ -221,6 +240,18 @@ components: sources: kubernetes_logs: {
 			common: false
 			description: """
 				Specifies the label selector to filter `Pod`s with, to be used in
+				addition to the built-in `vector.dev/exclude` filter.
+				"""
+			required: false
+			type: string: {
+				default: ""
+				examples: ["my_custom_label!=my_value", "my_custom_label!=my_value,my_other_custom_label=my_value"]
+			}
+		}
+		extra_namespace_label_selector: {
+			common: false
+			description: """
+				Specifies the label selector to filter `Namespace`s with, to be used in
 				addition to the built-in `vector.dev/exclude` filter.
 				"""
 			required: false
@@ -472,7 +503,7 @@ components: sources: kubernetes_logs: {
 			body:  """
 					Vector will enrich data with Kubernetes context. A comprehensive
 					list of fields can be found in the
-					[`kubernetes_logs` source output docs](\(urls.vector_kubernetes_logs_source)#output).
+					[`kubernetes_logs` source output docs](\(urls.vector_kubernetes_logs_source)#output-data).
 					"""
 		}
 
@@ -624,7 +655,7 @@ components: sources: kubernetes_logs: {
 				Vector is tested extensively against Kubernetes. In addition to Kubernetes
 				being Vector's most popular installation method, Vector implements a
 				comprehensive end-to-end test suite for all minor Kubernetes versions starting
-				with `1.15`.
+				with `1.19`.
 				"""
 		}
 
@@ -673,6 +704,10 @@ components: sources: kubernetes_logs: {
 		k8s_watcher_http_error_total:           components.sources.internal_metrics.output.metrics.k8s_watcher_http_error_total
 		processed_bytes_total:                  components.sources.internal_metrics.output.metrics.processed_bytes_total
 		processed_events_total:                 components.sources.internal_metrics.output.metrics.processed_events_total
+		component_discarded_events_total:       components.sources.internal_metrics.output.metrics.component_discarded_events_total
+		component_errors_total:                 components.sources.internal_metrics.output.metrics.component_errors_total
+		component_received_bytes_total:         components.sources.internal_metrics.output.metrics.component_received_bytes_total
+		component_received_event_bytes_total:   components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 		component_received_events_total:        components.sources.internal_metrics.output.metrics.component_received_events_total
 	}
 }

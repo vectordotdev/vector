@@ -1,5 +1,6 @@
-#[cfg(feature = "datadog-pipelines")]
+#[cfg(feature = "enterprise")]
 use std::collections::BTreeMap;
+use std::path::Path;
 
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -7,12 +8,12 @@ use vector_core::{config::GlobalOptions, default_data_dir, transform::TransformC
 
 #[cfg(feature = "api")]
 use super::api;
-#[cfg(feature = "datadog-pipelines")]
-use super::datadog;
+#[cfg(feature = "enterprise")]
+use super::enterprise;
 use super::{
-    compiler, provider, ComponentKey, Config, EnrichmentTableConfig, EnrichmentTableOuter,
-    HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig, SourceOuter, TestDefinition,
-    TransformOuter,
+    compiler, provider, schema, ComponentKey, Config, EnrichmentTableConfig, EnrichmentTableOuter,
+    HealthcheckOptions, SecretBackend, SinkConfig, SinkOuter, SourceConfig, SourceOuter,
+    TestDefinition, TransformOuter,
 };
 
 #[derive(Deserialize, Serialize, Debug, Default)]
@@ -23,9 +24,11 @@ pub struct ConfigBuilder {
     #[cfg(feature = "api")]
     #[serde(default)]
     pub api: api::Options,
-    #[cfg(feature = "datadog-pipelines")]
     #[serde(default)]
-    pub datadog: Option<datadog::Options>,
+    pub schema: schema::Options,
+    #[cfg(feature = "enterprise")]
+    #[serde(default)]
+    pub enterprise: Option<enterprise::Options>,
     #[serde(default)]
     pub healthchecks: HealthcheckOptions,
     #[serde(default)]
@@ -37,23 +40,27 @@ pub struct ConfigBuilder {
     #[serde(default)]
     pub transforms: IndexMap<ComponentKey, TransformOuter<String>>,
     #[serde(default)]
-    pub tests: Vec<TestDefinition>,
+    pub tests: Vec<TestDefinition<String>>,
     pub provider: Option<Box<dyn provider::ProviderConfig>>,
+    #[serde(default)]
+    pub secret: IndexMap<ComponentKey, Box<dyn SecretBackend>>,
 }
 
-#[cfg(feature = "datadog-pipelines")]
+#[cfg(feature = "enterprise")]
 #[derive(Serialize)]
 struct ConfigBuilderHash<'a> {
     #[cfg(feature = "api")]
     api: &'a api::Options,
+    schema: &'a schema::Options,
     global: &'a GlobalOptions,
     healthchecks: &'a HealthcheckOptions,
     enrichment_tables: BTreeMap<&'a ComponentKey, &'a EnrichmentTableOuter>,
     sources: BTreeMap<&'a ComponentKey, &'a SourceOuter>,
     sinks: BTreeMap<&'a ComponentKey, &'a SinkOuter<String>>,
     transforms: BTreeMap<&'a ComponentKey, &'a TransformOuter<String>>,
-    tests: &'a Vec<TestDefinition>,
+    tests: &'a Vec<TestDefinition<String>>,
     provider: &'a Option<Box<dyn provider::ProviderConfig>>,
+    secret: BTreeMap<&'a ComponentKey, &'a dyn SecretBackend>,
 }
 
 impl Clone for ConfigBuilder {
@@ -74,14 +81,16 @@ impl From<Config> for ConfigBuilder {
             global,
             #[cfg(feature = "api")]
             api,
-            #[cfg(feature = "datadog-pipelines")]
-            datadog,
+            schema,
+            #[cfg(feature = "enterprise")]
+            enterprise,
             healthchecks,
             enrichment_tables,
             sources,
             sinks,
             transforms,
             tests,
+            secret,
             ..
         } = config;
 
@@ -95,12 +104,15 @@ impl From<Config> for ConfigBuilder {
             .map(|(key, sink)| (key, sink.map_inputs(ToString::to_string)))
             .collect();
 
+        let tests = tests.into_iter().map(TestDefinition::stringify).collect();
+
         ConfigBuilder {
             global,
             #[cfg(feature = "api")]
             api,
-            #[cfg(feature = "datadog-pipelines")]
-            datadog,
+            schema,
+            #[cfg(feature = "enterprise")]
+            enterprise,
             healthchecks,
             enrichment_tables,
             sources,
@@ -108,6 +120,7 @@ impl From<Config> for ConfigBuilder {
             transforms,
             provider: None,
             tests,
+            secret,
         }
     }
 }
@@ -180,6 +193,10 @@ impl ConfigBuilder {
             .insert(ComponentKey::from(id.into()), transform);
     }
 
+    pub fn set_data_dir(&mut self, path: &Path) {
+        self.global.data_dir = Some(path.to_owned());
+    }
+
     pub fn append(&mut self, with: Self) -> Result<(), Vec<String>> {
         let mut errors = Vec::new();
 
@@ -188,15 +205,11 @@ impl ConfigBuilder {
             errors.push(error);
         }
 
-        #[cfg(feature = "datadog-pipelines")]
+        self.schema = with.schema;
+
+        #[cfg(feature = "enterprise")]
         {
-            self.datadog = with.datadog;
-            if let Some(datadog) = &self.datadog {
-                if datadog.enabled {
-                    // enable other enterprise features
-                    self.global.enterprise = true;
-                }
-            }
+            self.enterprise = with.enterprise;
         }
 
         self.provider = with.provider;
@@ -258,6 +271,11 @@ impl ConfigBuilder {
                 errors.push(format!("duplicate test name found: {}", wt.name));
             }
         });
+        with.secret.keys().for_each(|k| {
+            if self.secret.contains_key(k) {
+                errors.push(format!("duplicate secret id found: {}", k));
+            }
+        });
         if !errors.is_empty() {
             return Err(errors);
         }
@@ -267,11 +285,12 @@ impl ConfigBuilder {
         self.sinks.extend(with.sinks);
         self.transforms.extend(with.transforms);
         self.tests.extend(with.tests);
+        self.secret.extend(with.secret);
 
         Ok(())
     }
 
-    #[cfg(feature = "datadog-pipelines")]
+    #[cfg(feature = "enterprise")]
     /// SHA256 hexadecimal representation of a config builder. This is generated by serializing
     /// an order-stable JSON of the config builder and feeding its bytes into a SHA256 hasher.
     pub fn sha256_hash(&self) -> String {
@@ -280,6 +299,7 @@ impl ConfigBuilder {
         let value = serde_json::to_string(&ConfigBuilderHash {
             #[cfg(feature = "api")]
             api: &self.api,
+            schema: &self.schema,
             global: &self.global,
             healthchecks: &self.healthchecks,
             enrichment_tables: self.enrichment_tables.iter().collect(),
@@ -288,9 +308,9 @@ impl ConfigBuilder {
             transforms: self.transforms.iter().collect(),
             tests: &self.tests,
             provider: &self.provider,
+            secret: self.secret.iter().map(|(k, v)| (k, v.as_ref())).collect(),
         })
         .expect("should serialize to JSON");
-
         let output = Sha256::digest(value.as_bytes());
 
         hex::encode(output)
@@ -307,7 +327,7 @@ impl ConfigBuilder {
     }
 }
 
-#[cfg(all(test, feature = "datadog-pipelines", feature = "api"))]
+#[cfg(all(test, feature = "enterprise", feature = "api"))]
 mod tests {
     use crate::config::ConfigBuilder;
 
@@ -324,6 +344,7 @@ mod tests {
         // hash is reproducible across versions.
         let expected_keys = [
             "api",
+            "schema",
             "global",
             "healthchecks",
             "enrichment_tables",
@@ -332,12 +353,14 @@ mod tests {
             "transforms",
             "tests",
             "provider",
+            "secret",
         ];
 
         let builder = ConfigBuilder::default();
 
         let value = json!(ConfigBuilderHash {
             api: &builder.api,
+            schema: &builder.schema,
             global: &builder.global,
             healthchecks: &builder.healthchecks,
             enrichment_tables: builder.enrichment_tables.iter().collect(),
@@ -346,6 +369,11 @@ mod tests {
             transforms: builder.transforms.iter().collect(),
             tests: &builder.tests,
             provider: &builder.provider,
+            secret: builder
+                .secret
+                .iter()
+                .map(|(k, v)| (k, v.as_ref()))
+                .collect(),
         });
 
         match value {
@@ -364,7 +392,7 @@ mod tests {
     /// should ideally be able to fix so that the original hash passes!
     fn version_hash_match() {
         assert_eq!(
-            "14def8ff43fe0255b3234a7c3d7488379a119b7dbcf311c77ad308a83173d92c",
+            "2bc405edda02d6a32f2a93332d5e73840670cce4731a78cf6f73e2f7df8e7229",
             ConfigBuilder::default().sha256_hash()
         );
     }

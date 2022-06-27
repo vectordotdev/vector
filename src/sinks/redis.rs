@@ -1,28 +1,33 @@
 use std::{
     convert::TryFrom,
-    num::NonZeroU64,
     task::{Context, Poll},
 };
 
+use bytes::{Bytes, BytesMut};
+use codecs::{encoding::SerializerConfig, JsonSerializerConfig, TextSerializerConfig};
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt, StreamExt};
 use redis::{aio::ConnectionManager, RedisError, RedisResult};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};
+use vector_common::internal_event::BytesSent;
 use vector_core::ByteSizeOf;
 
-use super::util::SinkBatchSettings;
 use crate::{
-    config::{self, log_schema, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    codecs::Encoder,
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+    },
     event::Event,
-    internal_events::{RedisEventSent, RedisSendEventFailed, TemplateRenderingFailed},
+    internal_events::{RedisSendEventError, TemplateRenderingError},
     sinks::util::{
         batch::BatchConfig,
-        encoding::{EncodingConfig, EncodingConfiguration},
+        encoding::{EncodingConfig, EncodingConfigAdapter, EncodingConfigMigrator, Transformer},
         retries::{RetryAction, RetryLogic},
         sink::Response,
-        BatchSink, Concurrency, EncodedEvent, EncodedLength, ServiceBuilderExt, TowerRequestConfig,
-        VecBuffer,
+        BatchSink, Concurrency, EncodedEvent, EncodedLength, ServiceBuilderExt, SinkBatchSettings,
+        TowerRequestConfig, VecBuffer,
     },
     template::{Template, TemplateParseError},
 };
@@ -85,13 +90,27 @@ pub struct RedisDefaultBatchSettings;
 impl SinkBatchSettings for RedisDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(1);
     const MAX_BYTES: Option<usize> = None;
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EncodingMigrator;
+
+impl EncodingConfigMigrator for EncodingMigrator {
+    type Codec = Encoding;
+
+    fn migrate(codec: &Self::Codec) -> SerializerConfig {
+        match codec {
+            Encoding::Text => TextSerializerConfig::new().into(),
+            Encoding::Json => JsonSerializerConfig::new().into(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct RedisSinkConfig {
-    encoding: EncodingConfig<Encoding>,
+    encoding: EncodingConfigAdapter<EncodingConfig<Encoding>, EncodingMigrator>,
     #[serde(default)]
     data_type: DataTypeConfig,
     #[serde(alias = "list")]
@@ -102,6 +121,12 @@ pub struct RedisSinkConfig {
     batch: BatchConfig<RedisDefaultBatchSettings>,
     #[serde(default)]
     request: TowerRequestConfig,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 impl GenerateConfig for RedisSinkConfig {
@@ -130,18 +155,22 @@ impl SinkConfig for RedisSinkConfig {
         if self.key.is_empty() {
             return Err("`key` cannot be empty.".into());
         }
-        let conn = self.build_client().await.context(RedisCreateFailed)?;
+        let conn = self.build_client().await.context(RedisCreateFailedSnafu)?;
         let healthcheck = RedisSinkConfig::healthcheck(conn.clone()).boxed();
         let sink = self.new(conn, cx)?;
         Ok((sink, healthcheck))
     }
 
-    fn input_type(&self) -> config::DataType {
-        config::DataType::Log
+    fn input(&self) -> Input {
+        Input::new(self.encoding.config().input_type())
     }
 
     fn sink_type(&self) -> &'static str {
         "redis"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 
@@ -156,8 +185,11 @@ impl RedisSinkConfig {
             ..Default::default()
         });
 
-        let key = Template::try_from(self.key.clone()).context(KeyTemplate)?;
-        let encoding = self.encoding.clone();
+        let key = Template::try_from(self.key.clone()).context(KeyTemplateSnafu)?;
+
+        let transformer = self.encoding.transformer();
+        let serializer = self.encoding.encoding()?;
+        let mut encoder = Encoder::<()>::new(serializer);
 
         let method = self.list_option.map(|option| option.method);
 
@@ -177,10 +209,12 @@ impl RedisSinkConfig {
             .service(redis);
 
         let sink = BatchSink::new(svc, buffer, batch.timeout, cx.acker())
-            .with_flat_map(move |e| stream::iter(encode_event(e, &key, &encoding)).map(Ok))
+            .with_flat_map(move |event| {
+                stream::iter(encode_event(event, &key, &transformer, &mut encoder)).map(Ok)
+            })
             .sink_map_err(|error| error!(message = "Sink failed to flush.", %error));
 
-        Ok(super::VectorSink::Sink(Box::new(sink)))
+        Ok(super::VectorSink::from_event_sink(sink))
     }
 
     async fn build_client(&self) -> RedisResult<ConnectionManager> {
@@ -192,6 +226,7 @@ impl RedisSinkConfig {
         trace!("Get Redis connection success.");
         conn
     }
+
     async fn healthcheck(mut conn: ConnectionManager) -> crate::Result<()> {
         redis::cmd("PING")
             .query_async(&mut conn)
@@ -203,7 +238,7 @@ impl RedisSinkConfig {
 #[derive(Debug, Clone)]
 struct RedisKvEntry {
     key: String,
-    value: Vec<u8>,
+    value: Bytes,
 }
 
 impl EncodedLength for RedisKvEntry {
@@ -221,12 +256,13 @@ impl ByteSizeOf for RedisKvEntry {
 fn encode_event(
     mut event: Event,
     key: &Template,
-    encoding: &EncodingConfig<Encoding>,
+    transformer: &Transformer,
+    encoder: &mut Encoder<()>,
 ) -> Option<EncodedEvent<RedisKvEntry>> {
     let key = key
         .render_string(&event)
         .map_err(|error| {
-            emit!(&TemplateRenderingFailed {
+            emit!(TemplateRenderingError {
                 error,
                 field: Some("key"),
                 drop_event: true,
@@ -234,21 +270,15 @@ fn encode_event(
         })
         .ok()?;
 
-    let byte_size = event.size_of();
-    encoding.apply_rules(&mut event);
+    let event_byte_size = event.size_of();
 
-    let value = match encoding.codec() {
-        Encoding::Json => serde_json::to_vec(event.as_log())
-            .map_err(|error| panic!("Unable to encode into JSON: {}", error))
-            .unwrap_or_default(),
-        Encoding::Text => event
-            .as_log()
-            .get(log_schema().message_key())
-            .map(|v| v.as_bytes().to_vec())
-            .unwrap_or_default(),
-    };
+    transformer.transform(&mut event);
 
-    let event = EncodedEvent::new(RedisKvEntry { key, value }, byte_size);
+    let mut bytes = BytesMut::new();
+    encoder.encode(event, &mut bytes).ok()?;
+    let value = bytes.freeze();
+
+    let event = EncodedEvent::new(RedisKvEntry { key, value }, event_byte_size);
     Some(event)
 }
 
@@ -307,24 +337,24 @@ impl Service<Vec<RedisKvEntry>> for RedisSink {
                 DataType::List(method) => match method {
                     Method::LPush => {
                         if count > 1 {
-                            pipe.atomic().lpush(kv.key, kv.value);
+                            pipe.atomic().lpush(kv.key, kv.value.as_ref());
                         } else {
-                            pipe.lpush(kv.key, kv.value);
+                            pipe.lpush(kv.key, kv.value.as_ref());
                         }
                     }
                     Method::RPush => {
                         if count > 1 {
-                            pipe.atomic().rpush(kv.key, kv.value);
+                            pipe.atomic().rpush(kv.key, kv.value.as_ref());
                         } else {
-                            pipe.rpush(kv.key, kv.value);
+                            pipe.rpush(kv.key, kv.value.as_ref());
                         }
                     }
                 },
                 DataType::Channel => {
                     if count > 1 {
-                        pipe.atomic().publish(kv.key, kv.value);
+                        pipe.atomic().publish(kv.key, kv.value.as_ref());
                     } else {
-                        pipe.publish(kv.key, kv.value);
+                        pipe.publish(kv.key, kv.value.as_ref());
                     }
                 }
             }
@@ -335,14 +365,15 @@ impl Service<Vec<RedisKvEntry>> for RedisSink {
             match &result {
                 Ok(res) => {
                     if res.is_successful() {
-                        emit!(&RedisEventSent { count, byte_size });
+                        emit!(BytesSent {
+                            byte_size,
+                            protocol: "tcp",
+                        });
                     } else {
                         warn!("Batch sending was not all successful and will be retried.")
                     }
                 }
-                Err(error) => emit!(&RedisSendEventFailed {
-                    error: error.to_string()
-                }),
+                Err(error) => emit!(RedisSendEventError::new(error)),
             };
             result
         })
@@ -353,7 +384,10 @@ impl Service<Vec<RedisKvEntry>> for RedisSink {
 mod tests {
     use std::{collections::HashMap, convert::TryFrom};
 
+    use codecs::{JsonSerializer, TextSerializer};
+
     use super::*;
+    use crate::config::log_schema;
 
     #[test]
     fn generate_config() {
@@ -368,7 +402,8 @@ mod tests {
         let result = encode_event(
             evt,
             &Template::try_from("key").unwrap(),
-            &EncodingConfig::from(Encoding::Json),
+            &Default::default(),
+            &mut Encoder::<()>::new(JsonSerializer::new().into()),
         )
         .unwrap()
         .item
@@ -384,7 +419,8 @@ mod tests {
         let event = encode_event(
             evt,
             &Template::try_from("key").unwrap(),
-            &EncodingConfig::from(Encoding::Text),
+            &Default::default(),
+            &mut Encoder::<()>::new(TextSerializer::new().into()),
         )
         .unwrap()
         .item
@@ -401,13 +437,8 @@ mod tests {
         let result = encode_event(
             evt,
             &Template::try_from("key").unwrap(),
-            &EncodingConfig {
-                codec: Encoding::Json,
-                schema: None,
-                only_fields: None,
-                except_fields: Some(vec!["key".into()]),
-                timestamp_format: None,
-            },
+            &Transformer::new(None, Some(vec!["key".into()]), None).unwrap(),
+            &mut Encoder::<()>::new(JsonSerializer::new().into()),
         )
         .unwrap()
         .item
@@ -421,11 +452,15 @@ mod tests {
 #[cfg(feature = "redis-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
+    use futures::stream;
     use rand::Rng;
     use redis::AsyncCommands;
 
     use super::*;
-    use crate::test_util::{random_lines_with_stream, random_string, trace_init};
+    use crate::test_util::{
+        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        random_lines_with_stream, random_string, trace_init,
+    };
 
     fn redis_server() -> String {
         std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379/0".to_owned())
@@ -444,7 +479,7 @@ mod integration_tests {
         let cnf = RedisSinkConfig {
             url: redis_server(),
             key: key.clone(),
-            encoding: Encoding::Json.into(),
+            encoding: EncodingConfig::from(Encoding::Json).into(),
             data_type: DataTypeConfig::List,
             list_option: Some(ListOption {
                 method: Method::LPush,
@@ -454,6 +489,7 @@ mod integration_tests {
                 rate_limit_num: Option::from(u64::MAX),
                 ..Default::default()
             },
+            acknowledgements: Default::default(),
         };
 
         // Publish events.
@@ -469,8 +505,7 @@ mod integration_tests {
             events.push(e);
         }
 
-        let stream = stream::iter(events.clone());
-        sink.run(stream).await.unwrap();
+        run_and_assert_sink_compliance(sink, stream::iter(events.clone()), &SINK_TAGS).await;
 
         let mut conn = cnf.build_client().await.unwrap();
 
@@ -503,7 +538,7 @@ mod integration_tests {
         let cnf = RedisSinkConfig {
             url: redis_server(),
             key: key.clone(),
-            encoding: Encoding::Json.into(),
+            encoding: EncodingConfig::from(Encoding::Json).into(),
             data_type: DataTypeConfig::List,
             list_option: Some(ListOption {
                 method: Method::RPush,
@@ -513,6 +548,7 @@ mod integration_tests {
                 rate_limit_num: Option::from(u64::MAX),
                 ..Default::default()
             },
+            acknowledgements: Default::default(),
         };
 
         // Publish events.
@@ -527,8 +563,7 @@ mod integration_tests {
             events.push(e);
         }
 
-        let stream = stream::iter(events.clone());
-        sink.run(stream).await.unwrap();
+        sink.run_events(events.clone()).await.unwrap();
 
         let mut conn = cnf.build_client().await.unwrap();
 
@@ -577,7 +612,7 @@ mod integration_tests {
         let cnf = RedisSinkConfig {
             url: redis_server(),
             key: key.clone(),
-            encoding: Encoding::Json.into(),
+            encoding: EncodingConfig::from(Encoding::Json).into(),
             data_type: DataTypeConfig::Channel,
             list_option: None,
             batch: BatchConfig::default(),
@@ -585,6 +620,7 @@ mod integration_tests {
                 rate_limit_num: Option::from(u64::MAX),
                 ..Default::default()
             },
+            acknowledgements: Default::default(),
         };
 
         // Publish events.

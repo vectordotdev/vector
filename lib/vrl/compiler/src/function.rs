@@ -1,22 +1,28 @@
+pub mod closure;
+
 use std::{
     collections::{BTreeMap, HashMap},
     fmt,
 };
 
-use diagnostic::{DiagnosticError, Label, Note};
+use anymap::AnyMap;
+use diagnostic::{DiagnosticMessage, Label, Note};
+use parser::ast::Ident;
+use value::{kind::Collection, Value};
 
 use crate::{
-    expression::{
-        container::Variant, Container, Expr, Expression, FunctionArgument, Literal, Query,
-    },
+    expression::{container::Variant, Block, Container, Expr, Expression, FunctionArgument},
     parser::Node,
-    value::Kind,
-    Span, Value,
+    state::{ExternalEnv, LocalEnv},
+    value::{kind, Kind},
+    Span,
 };
 
-pub type Compiled = Result<Box<dyn Expression>, Box<dyn DiagnosticError>>;
+pub type Compiled = Result<Box<dyn Expression>, Box<dyn DiagnosticMessage>>;
+pub type CompiledArgument =
+    Result<Option<Box<dyn std::any::Any + Send + Sync>>, Box<dyn DiagnosticMessage>>;
 
-pub trait Function: Sync + fmt::Debug {
+pub trait Function: Send + Sync + fmt::Debug {
     /// The identifier by which the function can be called.
     fn identifier(&self) -> &'static str;
 
@@ -33,9 +39,6 @@ pub trait Function: Sync + fmt::Debug {
     /// One or more examples demonstrating usage of the function in VRL source
     /// code.
     fn examples(&self) -> &'static [Example];
-    // fn examples(&self) -> &'static [Example] {
-    //     &[/* ODO */]
-    // }
 
     /// Compile a [`Function`] into a type that can be resolved to an
     /// [`Expression`].
@@ -47,8 +50,8 @@ pub trait Function: Sync + fmt::Debug {
     /// resolved to its final [`Value`].
     fn compile(
         &self,
-        state: &super::State,
-        info: &FunctionCompileContext,
+        state: (&mut LocalEnv, &mut ExternalEnv),
+        ctx: &mut FunctionCompileContext,
         arguments: ArgumentList,
     ) -> Compiled;
 
@@ -59,25 +62,86 @@ pub trait Function: Sync + fmt::Debug {
     fn parameters(&self) -> &'static [Parameter] {
         &[]
     }
+
+    /// Implement this function if you need to manipulate and store any function parameters
+    /// at compile time.
+    fn compile_argument(
+        &self,
+        _args: &[(&'static str, Option<FunctionArgument>)],
+        _ctx: &mut FunctionCompileContext,
+        _name: &str,
+        _expr: Option<&Expr>,
+    ) -> Result<Option<Box<dyn std::any::Any + Send + Sync>>, Box<dyn DiagnosticMessage>> {
+        Ok(None)
+    }
+
+    /// An optional closure definition for the function.
+    ///
+    /// This returns `None` by default, indicating the function doesn't accept
+    /// a closure.
+    fn closure(&self) -> Option<closure::Definition> {
+        None
+    }
 }
 
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Example {
     pub title: &'static str,
     pub source: &'static str,
     pub result: Result<&'static str, &'static str>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug)]
 pub struct FunctionCompileContext {
-    pub span: Span,
+    span: Span,
+    external_context: AnyMap,
+}
+
+impl FunctionCompileContext {
+    #[must_use]
+    pub fn new(span: Span) -> Self {
+        Self {
+            span,
+            external_context: AnyMap::new(),
+        }
+    }
+
+    /// Add an external context to the compile context.
+    #[must_use]
+    pub fn with_external_context(mut self, context: AnyMap) -> Self {
+        self.external_context = context;
+        self
+    }
+
+    /// Span information for the function call.
+    #[must_use]
+    pub fn span(&self) -> Span {
+        self.span
+    }
+
+    /// Get an immutable reference to a stored external context, if one exists.
+    #[must_use]
+    pub fn get_external_context<T: 'static>(&self) -> Option<&T> {
+        self.external_context.get::<T>()
+    }
+
+    /// Get a mutable reference to a stored external context, if one exists.
+    pub fn get_external_context_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        self.external_context.get_mut::<T>()
+    }
+
+    /// Consume the `FunctionCompileContext`, returning the (potentially mutated) `AnyMap`.
+    #[must_use]
+    pub fn into_external_context(self) -> AnyMap {
+        self.external_context
+    }
 }
 
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Parameter {
     /// The keyword of the parameter.
     ///
@@ -99,15 +163,67 @@ pub struct Parameter {
 }
 
 impl Parameter {
+    #[allow(arithmetic_overflow)]
+    #[must_use]
     pub fn kind(&self) -> Kind {
-        Kind::new(self.kind)
+        let mut kind = Kind::never();
+
+        let n = self.kind;
+
+        if (n & kind::BYTES) == kind::BYTES {
+            kind.add_bytes();
+        }
+
+        if (n & kind::INTEGER) == kind::INTEGER {
+            kind.add_integer();
+        }
+
+        if (n & kind::FLOAT) == kind::FLOAT {
+            kind.add_float();
+        }
+
+        if (n & kind::BOOLEAN) == kind::BOOLEAN {
+            kind.add_boolean();
+        }
+
+        if (n & kind::OBJECT) == kind::OBJECT {
+            kind.add_object(Collection::any());
+        }
+
+        if (n & kind::ARRAY) == kind::ARRAY {
+            kind.add_array(Collection::any());
+        }
+
+        if (n & kind::TIMESTAMP) == kind::TIMESTAMP {
+            kind.add_timestamp();
+        }
+
+        if (n & kind::REGEX) == kind::REGEX {
+            kind.add_regex();
+        }
+
+        if (n & kind::NULL) == kind::NULL {
+            kind.add_null();
+        }
+
+        kind
     }
 }
 
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, Default)]
-pub struct ArgumentList(HashMap<&'static str, Expr>);
+#[derive(Debug, Default, Clone)]
+pub struct ArgumentList {
+    pub(crate) arguments: HashMap<&'static str, Expr>,
+
+    /// A closure argument differs from regular arguments, in that it isn't an
+    /// expression by itself, and it also isn't tied to a parameter string in
+    /// the function call.
+    ///
+    /// We do still want to store the closure in the argument list, to allow
+    /// function implementors access to the closure through `Function::compile`.
+    closure: Option<FunctionClosure>,
+}
 
 impl ArgumentList {
     pub fn optional(&mut self, keyword: &'static str) -> Option<Box<dyn Expression>> {
@@ -118,12 +234,16 @@ impl ArgumentList {
         Box::new(self.required_expr(keyword)) as _
     }
 
-    pub fn optional_literal(&mut self, keyword: &'static str) -> Result<Option<Literal>, Error> {
+    #[cfg(feature = "expr-literal")]
+    pub fn optional_literal(
+        &mut self,
+        keyword: &'static str,
+    ) -> Result<Option<crate::expression::Literal>, Error> {
         self.optional_expr(keyword)
             .map(|expr| match expr {
                 Expr::Literal(literal) => Ok(literal),
                 Expr::Variable(var) if var.value().is_some() => {
-                    match var.value().unwrap().clone().into_expr() {
+                    match var.value().unwrap().clone().into() {
                         Expr::Literal(literal) => Ok(literal),
                         expr => Err(Error::UnexpectedExpression {
                             keyword,
@@ -141,7 +261,40 @@ impl ArgumentList {
             .transpose()
     }
 
-    pub fn required_literal(&mut self, keyword: &'static str) -> Result<Literal, Error> {
+    #[cfg(not(feature = "expr-literal"))]
+    pub fn optional_literal(
+        &mut self,
+        _: &'static str,
+    ) -> Result<Option<crate::expression::Noop>, Error> {
+        Ok(Some(crate::expression::Noop))
+    }
+
+    /// Returns the argument if it is a literal, an object or an array.
+    pub fn optional_value(&mut self, keyword: &'static str) -> Result<Option<Value>, Error> {
+        self.optional_expr(keyword)
+            .map(|expr| {
+                expr.try_into().map_err(|err| Error::UnexpectedExpression {
+                    keyword,
+                    expected: "literal",
+                    expr: err,
+                })
+            })
+            .transpose()
+    }
+
+    #[cfg(feature = "expr-literal")]
+    pub fn required_literal(
+        &mut self,
+        keyword: &'static str,
+    ) -> Result<crate::expression::Literal, Error> {
+        Ok(required(self.optional_literal(keyword)?))
+    }
+
+    #[cfg(not(feature = "expr-literal"))]
+    pub fn required_literal(
+        &mut self,
+        keyword: &'static str,
+    ) -> Result<crate::expression::Noop, Error> {
         Ok(required(self.optional_literal(keyword)?))
     }
 
@@ -151,7 +304,7 @@ impl ArgumentList {
         variants: &[Value],
     ) -> Result<Option<Value>, Error> {
         self.optional_literal(keyword)?
-            .map(|literal| literal.to_value())
+            .and_then(|literal| literal.as_value())
             .map(|value| {
                 variants
                     .iter()
@@ -174,7 +327,11 @@ impl ArgumentList {
         Ok(required(self.optional_enum(keyword, variants)?))
     }
 
-    pub fn optional_query(&mut self, keyword: &'static str) -> Result<Option<Query>, Error> {
+    #[cfg(feature = "expr-query")]
+    pub fn optional_query(
+        &mut self,
+        keyword: &'static str,
+    ) -> Result<Option<crate::expression::Query>, Error> {
         self.optional_expr(keyword)
             .map(|expr| match expr {
                 Expr::Query(query) => Ok(query),
@@ -187,14 +344,19 @@ impl ArgumentList {
             .transpose()
     }
 
-    pub fn required_query(&mut self, keyword: &'static str) -> Result<Query, Error> {
+    #[cfg(feature = "expr-query")]
+    pub fn required_query(
+        &mut self,
+        keyword: &'static str,
+    ) -> Result<crate::expression::Query, Error> {
         Ok(required(self.optional_query(keyword)?))
     }
 
     pub fn optional_regex(&mut self, keyword: &'static str) -> Result<Option<regex::Regex>, Error> {
         self.optional_expr(keyword)
             .map(|expr| match expr {
-                Expr::Literal(Literal::Regex(regex)) => Ok((*regex).clone()),
+                #[cfg(feature = "expr-literal")]
+                Expr::Literal(crate::expression::Literal::Regex(regex)) => Ok((*regex).clone()),
                 expr => Err(Error::UnexpectedExpression {
                     keyword,
                     expected: "regex",
@@ -252,19 +414,37 @@ impl ArgumentList {
         Ok(required(self.optional_array(keyword)?))
     }
 
+    #[must_use]
+    pub fn optional_closure(&self) -> Option<&FunctionClosure> {
+        self.closure.as_ref()
+    }
+
+    pub fn required_closure(&self) -> Result<FunctionClosure, Error> {
+        self.optional_closure()
+            .cloned()
+            .ok_or(Error::ExpectedFunctionClosure)
+    }
+
+    #[cfg(feature = "expr-function_call")]
     pub(crate) fn keywords(&self) -> Vec<&'static str> {
-        self.0.keys().copied().collect::<Vec<_>>()
+        self.arguments.keys().copied().collect::<Vec<_>>()
     }
 
+    #[cfg(feature = "expr-function_call")]
     pub(crate) fn insert(&mut self, k: &'static str, v: Expr) {
-        self.0.insert(k, v);
+        self.arguments.insert(k, v);
     }
 
-    fn optional_expr(&mut self, keyword: &'static str) -> Option<Expr> {
-        self.0.remove(keyword)
+    #[cfg(feature = "expr-function_call")]
+    pub(crate) fn set_closure(&mut self, closure: FunctionClosure) {
+        self.closure = Some(closure);
     }
 
-    fn required_expr(&mut self, keyword: &'static str) -> Expr {
+    pub(crate) fn optional_expr(&mut self, keyword: &'static str) -> Option<Expr> {
+        self.arguments.get(keyword).cloned()
+    }
+
+    pub fn required_expr(&mut self, keyword: &'static str) -> Expr {
         required(self.optional_expr(keyword))
     }
 }
@@ -275,11 +455,13 @@ fn required<T>(argument: Option<T>) -> T {
 
 impl From<HashMap<&'static str, Value>> for ArgumentList {
     fn from(map: HashMap<&'static str, Value>) -> Self {
-        Self(
-            map.into_iter()
-                .map(|(k, v)| (k, v.into_expr()))
+        Self {
+            arguments: map
+                .into_iter()
+                .map(|(k, v)| (k, v.into()))
                 .collect::<HashMap<_, _>>(),
-        )
+            closure: None,
+        }
     }
 }
 
@@ -297,7 +479,45 @@ impl From<Vec<Node<FunctionArgument>>> for ArgumentList {
             })
             .collect::<HashMap<_, _>>();
 
-        Self(arguments)
+        Self {
+            arguments,
+            ..Default::default()
+        }
+    }
+}
+
+impl From<ArgumentList> for Vec<(&'static str, Option<FunctionArgument>)> {
+    fn from(args: ArgumentList) -> Self {
+        args.arguments
+            .iter()
+            .map(|(key, expr)| {
+                (
+                    *key,
+                    Some(FunctionArgument::new(
+                        None,
+                        Node::new(Span::default(), expr.clone()),
+                    )),
+                )
+            })
+            .collect()
+    }
+}
+
+// -----------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FunctionClosure {
+    pub variables: Vec<Ident>,
+    pub block: Block,
+}
+
+impl FunctionClosure {
+    #[must_use]
+    pub fn new<T: Into<Ident>>(variables: Vec<T>, block: Block) -> Self {
+        Self {
+            variables: variables.into_iter().map(Into::into).collect(),
+            block,
+        }
     }
 }
 
@@ -328,22 +548,36 @@ pub enum Error {
         value: Value,
         error: &'static str,
     },
+
+    #[error(r#"missing function closure"#)]
+    ExpectedFunctionClosure,
+
+    #[error(r#"mutation of read-only value"#)]
+    ReadOnlyMutation { context: String },
 }
 
-impl diagnostic::DiagnosticError for Error {
+impl diagnostic::DiagnosticMessage for Error {
     fn code(&self) -> usize {
-        use Error::*;
+        use Error::{
+            ExpectedFunctionClosure, ExpectedStaticExpression, InvalidArgument, InvalidEnumVariant,
+            ReadOnlyMutation, UnexpectedExpression,
+        };
 
         match self {
             UnexpectedExpression { .. } => 400,
             InvalidEnumVariant { .. } => 401,
             ExpectedStaticExpression { .. } => 402,
             InvalidArgument { .. } => 403,
+            ExpectedFunctionClosure => 420,
+            ReadOnlyMutation { .. } => 315,
         }
     }
 
     fn labels(&self) -> Vec<Label> {
-        use Error::*;
+        use Error::{
+            ExpectedFunctionClosure, ExpectedStaticExpression, InvalidArgument, InvalidEnumVariant,
+            ReadOnlyMutation, UnexpectedExpression,
+        };
 
         match self {
             UnexpectedExpression {
@@ -368,13 +602,13 @@ impl diagnostic::DiagnosticError for Error {
                     format!(r#"invalid enum variant for argument "{}""#, keyword),
                     Span::default(),
                 ),
-                Label::context(format!("received: {}", value.to_string()), Span::default()),
+                Label::context(format!("received: {}", value), Span::default()),
                 Label::context(
                     format!(
                         "expected one of: {}",
                         variants
                             .iter()
-                            .map(|v| v.to_string())
+                            .map(std::string::ToString::to_string)
                             .collect::<Vec<_>>()
                             .join(", ")
                     ),
@@ -399,8 +633,14 @@ impl diagnostic::DiagnosticError for Error {
                     format!(r#"invalid argument "{}""#, keyword),
                     Span::default(),
                 ),
-                Label::context(format!("received: {}", value.to_string()), Span::default()),
+                Label::context(format!("received: {}", value), Span::default()),
                 Label::context(format!("error: {}", error), Span::default()),
+            ],
+
+            ExpectedFunctionClosure => vec![],
+            ReadOnlyMutation { context } => vec![
+                Label::primary(r#"mutation of read-only value"#, Span::default()),
+                Label::context(context, Span::default()),
             ],
         }
     }
@@ -410,8 +650,52 @@ impl diagnostic::DiagnosticError for Error {
     }
 }
 
-impl From<Error> for Box<dyn diagnostic::DiagnosticError> {
+impl From<Error> for Box<dyn diagnostic::DiagnosticMessage> {
     fn from(error: Error) -> Self {
         Box::new(error) as _
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parameter_kind() {
+        struct TestCase {
+            parameter_kind: u16,
+            kind: Kind,
+        }
+
+        for (
+            title,
+            TestCase {
+                parameter_kind,
+                kind,
+            },
+        ) in HashMap::from([
+            (
+                "bytes",
+                TestCase {
+                    parameter_kind: kind::BYTES,
+                    kind: Kind::bytes(),
+                },
+            ),
+            (
+                "integer",
+                TestCase {
+                    parameter_kind: kind::INTEGER,
+                    kind: Kind::integer(),
+                },
+            ),
+        ]) {
+            let parameter = Parameter {
+                keyword: "",
+                kind: parameter_kind,
+                required: false,
+            };
+
+            assert_eq!(parameter.kind(), kind, "{}", title);
+        }
     }
 }

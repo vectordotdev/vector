@@ -13,7 +13,7 @@ components: sinks: loki: {
 	}
 
 	features: {
-		buffer: enabled:      true
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {
@@ -21,9 +21,14 @@ components: sinks: loki: {
 				common:       false
 				max_bytes:    1_000_000
 				max_events:   100_000
-				timeout_secs: 1
+				timeout_secs: 1.0
 			}
-			compression: enabled: false
+			compression: {
+				enabled: true
+				default: "none"
+				algorithms: ["none", "gzip"]
+				levels: ["none", "fast", "default", "best", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+			}
 			encoding: {
 				enabled: true
 				codec: {
@@ -38,7 +43,6 @@ components: sinks: loki: {
 			}
 			tls: {
 				enabled:                true
-				can_enable:             false
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        false
@@ -65,7 +69,7 @@ components: sinks: loki: {
 
 	configuration: {
 		endpoint: {
-			description: "The base URL of the Loki instance."
+			description: "The base URL of the Loki instance. Vector will append `/loki/api/v1/push` to this."
 			required:    true
 			type: string: {
 				examples: ["http://localhost:3100"]
@@ -78,9 +82,11 @@ components: sinks: loki: {
 		labels: {
 			description: """
 				A set of labels that are attached to each batch of events. Both keys and values are templatable, which
-				enables you to attach dynamic labels to events. Note: If the set of labels has high cardinality, this
-				can cause drastic performance issues with Loki. To prevent this from happening, reduce the number of
-				unique label keys and values.
+				enables you to attach dynamic labels to events. Labels can be suffixed with a "*" to allow the expansion
+				of objects into multiple labels, see "How it works" for more information.
+
+				Note: If the set of labels has high cardinality, this can cause drastic performance issues with Loki.
+				To prevent this from happening, reduce the number of unique label keys and values.
 				"""
 			required: true
 			type: object: {
@@ -90,6 +96,7 @@ components: sinks: loki: {
 						"event":                 "{{ event_field }}"
 						"key":                   "value"
 						"\"{{ event_field }}\"": "{{ another_event_field }}"
+						"pod_labels_*":          "{{ kubernetes.pod_labels }}"
 					},
 				]
 				options: {
@@ -99,7 +106,7 @@ components: sinks: loki: {
 						required:    false
 						type: string: {
 							default: null
-							examples: ["vector", "{{ event_field }}"]
+							examples: ["vector", "{{ event_field }}", "{{ kubernetes.pod_labels }}"]
 							syntax: "template"
 						}
 					}
@@ -110,16 +117,18 @@ components: sinks: loki: {
 			common: false
 			description: """
 				Some sources may generate events with timestamps that aren't in strictly chronological order. The Loki
-				service can't accept a stream of such events. Vector sorts events before sending them to Loki, however
-				some late events might arrive after a batch has been sent. This option specifies what Vector should do
-				with those events.
+				service can't accept a stream of such events prior version 2.4.0. Vector sorts events before sending
+				them to Loki, however some late events might arrive after a batch has been sent. This option specifies
+				what Vector should do with those events. If you are using Loki 2.4.0 and newer, you should set this
+				option to "accept"
 				"""
 			required: false
 			type: string: {
 				default: "drop"
 				enum: {
-					"drop":              "Drop the event, with a warning."
+					"drop":              "Drop the event."
 					"rewrite_timestamp": "Rewrite timestamp of the event to the latest timestamp that was pushed."
+					"accept":            "Don't do anything, send events into Loki normally (needs Loki 2.4.0 and newer)"
 				}
 			}
 		}
@@ -129,6 +138,7 @@ components: sinks: loki: {
 			required:    false
 			type: bool: default: false
 		}
+
 		remove_timestamp: {
 			common:      false
 			description: "If this is set to `true` then the timestamp will be removed from the event payload. Note the event timestamp will still be sent as metadata to Loki for indexing."
@@ -155,6 +165,7 @@ components: sinks: loki: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	how_it_works: {
@@ -179,6 +190,32 @@ components: sinks: loki: {
 				accepted by Loki. If no timestamp is supplied with events
 				then the Loki sink will supply its own monotonically
 				increasing timestamp.
+				"""
+		}
+
+		label_expansion: {
+			title: "Label Expansion"
+			body: """
+				The `labels` option can be passed keys suffixed with "*" to
+				allow for setting multiple keys based on the contents of an
+				object. For example, with an object:
+
+				```json
+				{"kubernetes":{"pod_labels":{"app":"web-server","name":"unicorn"}}}
+				```
+
+				and a configuration:
+
+				```toml
+				[sinks.my_sink_id.labels]
+				pod_labels_*: "{{ kubernetes.pod_labels }}"
+				```
+
+				This would expand into two labels:
+
+				```toml
+				pod_labels_app: web-server
+				pod_labels_name: unicorn
 				"""
 		}
 	}

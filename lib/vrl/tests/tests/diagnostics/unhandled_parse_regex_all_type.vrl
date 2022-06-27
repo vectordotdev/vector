@@ -19,4 +19,5 @@
 .result = parse_regex_all!(.message, r'(?P<an>an.)')
 .a = sha3(.result[0].an)
 
+.result
 "can't work since all array access is error prone"

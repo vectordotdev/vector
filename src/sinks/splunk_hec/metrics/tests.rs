@@ -1,9 +1,9 @@
 use std::{collections::BTreeSet, sync::Arc};
 
 use chrono::{DateTime, Utc};
-use futures_util::{stream, StreamExt};
+use futures_util::StreamExt;
 use serde_json::{json, Value as JsonValue};
-use shared::btreemap;
+use vector_common::btreemap;
 use vector_core::{
     event::{Event, Metric, MetricKind, MetricValue},
     ByteSizeOf,
@@ -78,9 +78,7 @@ fn get_processed_event(
 
 fn get_event_with_token(token: &str) -> Event {
     let mut event = Event::from(get_counter());
-    event
-        .metadata_mut()
-        .set_splunk_hec_token(Some(Arc::from(token)));
+    event.metadata_mut().set_splunk_hec_token(Arc::from(token));
     event
 }
 
@@ -346,7 +344,7 @@ async fn splunk_passthrough_token() {
         Event::from(get_counter()),
     ];
 
-    let _ = sink.run(stream::iter(events)).await.unwrap();
+    let _ = sink.run_events(events).await.unwrap();
 
     let mut tokens = rx
         .take(3)

@@ -5,14 +5,17 @@ use serde::{Deserialize, Serialize};
 
 use super::Region;
 use crate::sinks::elasticsearch::BulkConfig;
+use crate::sinks::util::encoding::Transformer;
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    event::Event,
+    config::{
+        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+    },
+    event::EventArray,
     sinks::{
-        elasticsearch::{ElasticSearchConfig, ElasticSearchEncoder},
+        elasticsearch::ElasticsearchConfig,
         util::{
-            encoding::EncodingConfigFixed, http::RequestConfig, BatchConfig, Compression,
-            RealtimeSizeBasedDefaultBatchSettings, StreamSink, TowerRequestConfig,
+            http::RequestConfig, BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings,
+            StreamSink, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -30,13 +33,20 @@ pub struct SematextLogsConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
     )]
-    pub encoding: EncodingConfigFixed<ElasticSearchEncoder>,
+    pub encoding: Transformer,
 
     #[serde(default)]
     request: TowerRequestConfig,
 
     #[serde(default)]
     batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
+
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 inventory::submit! {
@@ -67,7 +77,7 @@ impl SinkConfig for SematextLogsConfig {
             }
         };
 
-        let (sink, healthcheck) = ElasticSearchConfig {
+        let (sink, healthcheck) = ElasticsearchConfig {
             endpoint,
             compression: Compression::None,
             doc_type: Some(
@@ -96,40 +106,49 @@ impl SinkConfig for SematextLogsConfig {
         Ok((VectorSink::Stream(Box::new(mapped_stream)), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
     fn sink_type(&self) -> &'static str {
         "sematext_logs"
     }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
+    }
 }
 
 struct MapTimestampStream {
-    inner: Box<dyn StreamSink + Send>,
+    inner: Box<dyn StreamSink<EventArray> + Send>,
 }
 
 #[async_trait]
-impl StreamSink for MapTimestampStream {
-    async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+impl StreamSink<EventArray> for MapTimestampStream {
+    async fn run(self: Box<Self>, input: BoxStream<'_, EventArray>) -> Result<(), ()> {
         let mapped_input = input.map(map_timestamp).boxed();
         self.inner.run(mapped_input).await
     }
 }
 
 /// Used to map `timestamp` to `@timestamp`.
-fn map_timestamp(mut event: Event) -> Event {
-    let log = event.as_mut_log();
+fn map_timestamp(mut events: EventArray) -> EventArray {
+    match &mut events {
+        EventArray::Logs(logs) => {
+            for log in logs {
+                if let Some(ts) = log.remove(crate::config::log_schema().timestamp_key()) {
+                    log.insert("@timestamp", ts);
+                }
 
-    if let Some(ts) = log.remove(crate::config::log_schema().timestamp_key()) {
-        log.insert("@timestamp", ts);
+                if let Some(host) = log.remove(crate::config::log_schema().host_key()) {
+                    log.insert("os.host", host);
+                }
+            }
+        }
+        _ => unreachable!("This sink only accepts logs"),
     }
 
-    if let Some(host) = log.remove(crate::config::log_schema().host_key()) {
-        log.insert("os.host", host);
-    }
-
-    event
+    events
 }
 
 #[cfg(test)]
@@ -175,7 +194,7 @@ mod tests {
         tokio::spawn(server);
 
         let (expected, events) = random_lines_with_stream(100, 10, None);
-        components::run_sink(sink, events, &HTTP_SINK_TAGS).await;
+        components::run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
 
         let output = rx.next().await.unwrap();
 

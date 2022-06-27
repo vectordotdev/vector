@@ -1,22 +1,23 @@
 use std::sync::Arc;
 
+use bytes::Bytes;
 use vector_core::event::{EventFinalizers, Finalizable};
 
 use super::{encoder::HecMetricsEncoder, sink::HecProcessedEvent};
 use crate::sinks::{
     splunk_hec::common::request::HecRequest,
-    util::{Compression, RequestBuilder},
+    util::{request_builder::EncodeResult, Compression, RequestBuilder},
 };
 
 pub struct HecMetricsRequestBuilder {
-    pub compression: Compression,
+    pub(super) compression: Compression,
 }
 
 impl RequestBuilder<(Option<Arc<str>>, Vec<HecProcessedEvent>)> for HecMetricsRequestBuilder {
     type Metadata = (usize, usize, EventFinalizers, Option<Arc<str>>);
     type Events = Vec<HecProcessedEvent>;
     type Encoder = HecMetricsEncoder;
-    type Payload = Vec<u8>;
+    type Payload = Bytes;
     type Request = HecRequest;
     type Error = std::io::Error;
 
@@ -47,14 +48,22 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<HecProcessedEvent>)> for HecMetricsRe
         )
     }
 
-    fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
+    fn build_request(
+        &self,
+        metadata: Self::Metadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
         let (events_count, events_byte_size, finalizers, passthrough_token) = metadata;
         HecRequest {
-            body: payload,
+            body: payload.into_payload(),
             finalizers,
             events_count,
             events_byte_size,
             passthrough_token,
+            index: None,
+            source: None,
+            sourcetype: None,
+            host: None,
         }
     }
 }

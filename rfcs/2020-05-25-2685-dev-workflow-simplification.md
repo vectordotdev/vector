@@ -150,10 +150,10 @@ Vector currently has an extensive `Makefile` and it does its job just fine. It i
 
 To help you picture it, common dev `make` tasks such as `make fmt` and `make check` do, roughly, the following:
 
-- Start `make`, [calculate](https://github.com/timberio/vector/blob/1d8e88057f68d9cf9292ddc9edb69a7f8d3b3f92/Makefile#L7-L14) the default features
-- [Run](https://github.com/timberio/vector/blob/1d8e88057f68d9cf9292ddc9edb69a7f8d3b3f92/Makefile#L3) the `/scripts/run.sh`. (via shebang this runs `env` which invokes `bash` )
+- Start `make`, [calculate](https://github.com/vectordotdev/vector/blob/1d8e88057f68d9cf9292ddc9edb69a7f8d3b3f92/Makefile#L7-L14) the default features
+- [Run](https://github.com/vectordotdev/vector/blob/1d8e88057f68d9cf9292ddc9edb69a7f8d3b3f92/Makefile#L3) the `/scripts/run.sh`. (via shebang this runs `env` which invokes `bash` )
 - Run the `/scripts/prepare-target-dir.sh` script (via shebang, `env` then `bash`)
-  - This `read` s then `grep`s the `docker-compose` yaml file, [running](https://github.com/timberio/vector/blob/1d8e88057f68d9cf9292ddc9edb69a7f8d3b3f92/scripts/prepare-target-dir.sh#L15-L17) `sed`, `sort`ing, then `uniq` ing the jobs
+  - This `read` s then `grep`s the `docker-compose` yaml file, [running](https://github.com/vectordotdev/vector/blob/1d8e88057f68d9cf9292ddc9edb69a7f8d3b3f92/scripts/prepare-target-dir.sh#L15-L17) `sed`, `sort`ing, then `uniq` ing the jobs
   - Make a directory as the current user for each of those.
 - Run the `./scripts/docker-compose-run.sh` script (via shebang, `bash` , no `env` call)
   - Sets some env vars

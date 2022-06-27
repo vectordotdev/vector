@@ -1,18 +1,18 @@
+use bytes::BytesMut;
 use chrono::Utc;
-use snafu::ResultExt;
+use tokio_util::codec::Encoder as _;
 use vector_core::{
     event::{EventFinalizers, Finalizable},
     ByteSizeOf,
 };
 
-use super::{CloudwatchLogsError, TemplateRenderingFailed};
+use super::TemplateRenderingError;
 use crate::{
+    codecs::Encoder,
     config::LogSchema,
     event::{Event, Value},
-    sinks::{
-        aws_cloudwatch_logs::{CloudwatchKey, IoError},
-        util::encoding::{Encoder, EncodingConfig, EncodingConfiguration, StandardEncodings},
-    },
+    internal_events::{AwsCloudwatchLogsEncoderError, AwsCloudwatchLogsMessageSizeError},
+    sinks::{aws_cloudwatch_logs::CloudwatchKey, util::encoding::Transformer},
     template::Template,
 };
 
@@ -24,7 +24,7 @@ const MAX_MESSAGE_SIZE: usize = MAX_EVENT_SIZE - EVENT_SIZE_OVERHEAD;
 #[derive(Clone)]
 pub struct CloudwatchRequest {
     pub key: CloudwatchKey,
-    pub message: String,
+    pub(super) message: String,
     pub event_byte_size: usize,
     pub timestamp: i64,
     pub finalizers: EventFinalizers,
@@ -40,35 +40,33 @@ pub struct CloudwatchRequestBuilder {
     pub group_template: Template,
     pub stream_template: Template,
     pub log_schema: LogSchema,
-    pub encoding: EncodingConfig<StandardEncodings>,
+    pub transformer: Transformer,
+    pub encoder: Encoder<()>,
 }
 
 impl CloudwatchRequestBuilder {
-    pub fn build(
-        &self,
-        mut event: Event,
-    ) -> Result<Option<CloudwatchRequest>, CloudwatchLogsError> {
+    pub fn build(&mut self, mut event: Event) -> Option<CloudwatchRequest> {
         let group = match self.group_template.render_string(&event) {
             Ok(b) => b,
             Err(error) => {
-                emit!(&TemplateRenderingFailed {
+                emit!(TemplateRenderingError {
                     error,
                     field: Some("group"),
                     drop_event: true,
                 });
-                return Ok(None);
+                return None;
             }
         };
 
         let stream = match self.stream_template.render_string(&event) {
             Ok(b) => b,
             Err(error) => {
-                emit!(&TemplateRenderingFailed {
+                emit!(TemplateRenderingError {
                     error,
                     field: Some("stream"),
                     drop_event: true,
                 });
-                return Ok(None);
+                return None;
             }
         };
         let key = CloudwatchKey { group, stream };
@@ -80,25 +78,28 @@ impl CloudwatchRequestBuilder {
 
         let finalizers = event.take_finalizers();
         let event_byte_size = event.size_of();
-        self.encoding.apply_rules(&mut event);
-        let mut message_bytes = vec![];
-        self.encoding
-            .encode_input(event, &mut message_bytes)
-            .context(IoError)?;
+        self.transformer.transform(&mut event);
+        let mut message_bytes = BytesMut::new();
+        if let Err(error) = self.encoder.encode(event, &mut message_bytes) {
+            emit!(AwsCloudwatchLogsEncoderError { error });
+            return None;
+        }
         let message = String::from_utf8_lossy(&message_bytes).to_string();
 
         if message.len() > MAX_MESSAGE_SIZE {
-            return Err(CloudwatchLogsError::EventTooLong {
-                length: message.len(),
+            emit!(AwsCloudwatchLogsMessageSizeError {
+                size: message.len(),
+                max_size: MAX_MESSAGE_SIZE,
             });
+            return None;
         }
-        Ok(Some(CloudwatchRequest {
+        Some(CloudwatchRequest {
             key,
             message,
             event_byte_size,
             timestamp,
             finalizers,
-        }))
+        })
     }
 }
 
@@ -123,11 +124,12 @@ mod tests {
 
     #[test]
     fn test() {
-        let request_builder = CloudwatchRequestBuilder {
+        let mut request_builder = CloudwatchRequestBuilder {
             group_template: "group".try_into().unwrap(),
             stream_template: "stream".try_into().unwrap(),
             log_schema: log_schema().clone(),
-            encoding: EncodingConfig::from(StandardEncodings::Text),
+            transformer: Default::default(),
+            encoder: Default::default(),
         };
         let timestamp = Utc::now();
         let message = "event message";
@@ -136,7 +138,7 @@ mod tests {
             .as_mut_log()
             .insert(log_schema().timestamp_key(), timestamp);
 
-        let request = request_builder.build(event).unwrap().unwrap();
+        let request = request_builder.build(event).unwrap();
         assert_eq!(request.timestamp, timestamp.timestamp_millis());
         assert_eq!(&request.message, message);
     }

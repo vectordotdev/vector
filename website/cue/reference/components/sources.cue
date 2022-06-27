@@ -166,9 +166,11 @@ components: sources: [Name=string]: {
 							type: string: {
 								default: "bytes"
 								enum: {
-									bytes:  "Events containing the byte frame as-is."
-									json:   "Events being parsed from a JSON string."
-									syslog: "Events being parsed from a Syslog message."
+									bytes:       "Events containing the byte frame as-is."
+									json:        "Events being parsed from a JSON string."
+									syslog:      "Events being parsed from a Syslog message."
+									native:      "Events being parsed from Vector's [native protobuf format](\(urls.native_proto_schema)) ([EXPERIMENTAL](/highlights/2022-03-31-native-event-codecs))."
+									native_json: "Events being parsed from Vector's [native JSON format](\(urls.native_json_schema)) ([EXPERIMENTAL](/highlights/2022-03-31-native-event-codecs))."
 								}
 							}
 						}
@@ -208,8 +210,7 @@ components: sources: [Name=string]: {
 			if features.collect.tls != _|_ {
 				if features.collect.tls.enabled {
 					tls: configuration._tls_connect & {_args: {
-						can_enable:             features.collect.tls.can_enable
-						can_verify_certificate: features.collect.tls.can_enable
+						can_verify_certificate: features.collect.tls.can_verify_certificate
 						can_verify_hostname:    features.collect.tls.can_verify_hostname
 						enabled_default:        features.collect.tls.enabled_default
 					}}
@@ -258,8 +259,7 @@ components: sources: [Name=string]: {
 
 			if features.receive.tls.enabled {
 				tls: configuration._tls_accept & {_args: {
-					can_enable:             features.receive.tls.can_enable
-					can_verify_certificate: features.receive.tls.can_enable
+					can_verify_certificate: features.receive.tls.can_verify_certificate
 					enabled_default:        features.receive.tls.enabled_default
 				}}
 			}
@@ -288,6 +288,25 @@ components: sources: [Name=string]: {
 					required:    true
 					type: string: {
 						examples: ["2019-02-13T19:48:34+00:00 [info] Started GET \"/\" for 127.0.0.1"]
+					}
+				}
+
+				_client_metadata: {
+					common:      false
+					description: "Client TLS metadata."
+					required:    false
+					type: object: {
+						options: {
+							subject: {
+								common:      true
+								description: "The subject from the client TLS certificate. Only added if `tls.client_metadata_key` is set. Key name depends on configured `client_metadata_key`"
+								required:    false
+								type: string: {
+									default: null
+									examples: [ "CN=localhost,OU=Vector,O=Datadog,L=New York,ST=New York,C=US"]
+								}
+							}
+						}
 					}
 				}
 			}

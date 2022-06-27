@@ -13,14 +13,14 @@ components: sinks: aws_s3: components._aws & {
 	}
 
 	features: {
-		buffer: enabled:      true
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {
 				enabled:      true
 				common:       true
 				max_bytes:    10000000
-				timeout_secs: 300
+				timeout_secs: 300.0
 			}
 			compression: {
 				enabled: true
@@ -41,7 +41,12 @@ components: sinks: aws_s3: components._aws & {
 				enabled: true
 				headers: false
 			}
-			tls: enabled: false
+			tls: {
+				enabled:                true
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        false
+			}
 			to: {
 				service: services.aws_s3
 
@@ -244,6 +249,7 @@ components: sinks: aws_s3: components._aws & {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	how_it_works: {

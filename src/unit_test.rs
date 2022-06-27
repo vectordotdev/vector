@@ -1,40 +1,41 @@
 use std::path::PathBuf;
 
+use clap::Parser;
 use colored::*;
-use structopt::StructOpt;
 
-use crate::config;
+use crate::config::{self, UnitTestResult};
+use crate::signal;
 
-#[derive(StructOpt, Debug)]
-#[structopt(rename_all = "kebab-case")]
+#[derive(Parser, Debug)]
+#[clap(rename_all = "kebab-case")]
 pub struct Opts {
     /// Vector config files in TOML format to test.
-    #[structopt(name = "config-toml", long, use_delimiter(true))]
+    #[clap(name = "config-toml", long, use_value_delimiter(true))]
     paths_toml: Vec<PathBuf>,
 
     /// Vector config files in JSON format to test.
-    #[structopt(name = "config-json", long, use_delimiter(true))]
+    #[clap(name = "config-json", long, use_value_delimiter(true))]
     paths_json: Vec<PathBuf>,
 
     /// Vector config files in YAML format to test.
-    #[structopt(name = "config-yaml", long, use_delimiter(true))]
+    #[clap(name = "config-yaml", long, use_value_delimiter(true))]
     paths_yaml: Vec<PathBuf>,
 
     /// Any number of Vector config files to test. If none are specified the
     /// default config path `/etc/vector/vector.toml` will be targeted.
-    #[structopt(use_delimiter(true))]
+    #[clap(use_value_delimiter(true))]
     paths: Vec<PathBuf>,
 
     /// Read configuration from files in one or more directories.
     /// File format is detected from the file name.
     ///
     /// Files not ending in .toml, .json, .yaml, or .yml will be ignored.
-    #[structopt(
+    #[clap(
         name = "config-dir",
-        short = "C",
+        short = 'C',
         long,
         env = "VECTOR_CONFIG_DIR",
-        use_delimiter(true)
+        use_value_delimiter(true)
     )]
     pub config_dirs: Vec<PathBuf>,
 }
@@ -57,9 +58,8 @@ impl Opts {
     }
 }
 
-pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
-    let mut aggregated_test_inspections = Vec::new();
-    let mut aggregated_test_errors = Vec::new();
+pub async fn cmd(opts: &Opts, signal_handler: &mut signal::SignalHandler) -> exitcode::ExitCode {
+    let mut aggregated_test_errors: Vec<(String, Vec<String>)> = Vec::new();
 
     let paths = opts.paths_with_formats();
     let paths = match config::process_paths(&paths) {
@@ -71,55 +71,35 @@ pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
     {
         println!("Running tests");
     }
-    match config::build_unit_tests(&paths).await {
-        Ok(mut tests) => {
-            tests.iter_mut().for_each(|t| {
-                let (test_inspections, test_errors) = t.run();
-                if !test_inspections.is_empty() {
-                    aggregated_test_inspections.push((t.name.clone(), test_inspections));
-                }
-                if !test_errors.is_empty() {
-                    #[allow(clippy::print_stdout)]
-                    {
-                        println!("test {} ... {}", t.name, "failed".red());
-                    }
-                    aggregated_test_errors.push((t.name.clone(), test_errors));
-                } else {
-                    #[allow(clippy::print_stdout)]
-                    {
-                        println!("test {} ... {}", t.name, "passed".green());
-                    }
-                }
-            });
+    match config::build_unit_tests_main(&paths, signal_handler).await {
+        Ok(tests) => {
             if tests.is_empty() {
                 #[allow(clippy::print_stdout)]
                 {
                     println!("{}", "No tests found.".yellow());
                 }
-            }
-        }
-        Err(errs) => {
-            error!("Failed to execute tests:\n{}.", errs.join("\n"));
-            return exitcode::CONFIG;
-        }
-    }
-
-    if !aggregated_test_inspections.is_empty() {
-        #[allow(clippy::print_stdout)]
-        {
-            println!("\ninspections:");
-        }
-        for (test_name, inspection) in aggregated_test_inspections {
-            #[allow(clippy::print_stdout)]
-            {
-                println!("\ntest {}:\n", test_name);
-            }
-            for inspect in inspection {
-                #[allow(clippy::print_stdout)]
-                {
-                    println!("{}\n", inspect);
+            } else {
+                for test in tests {
+                    let name = test.name.clone();
+                    let UnitTestResult { errors } = test.run().await;
+                    if !errors.is_empty() {
+                        #[allow(clippy::print_stdout)]
+                        {
+                            println!("test {} ... {}", name, "failed".red());
+                        }
+                        aggregated_test_errors.push((name, errors));
+                    } else {
+                        #[allow(clippy::print_stdout)]
+                        {
+                            println!("test {} ... {}", name, "passed".green());
+                        }
+                    }
                 }
             }
+        }
+        Err(errors) => {
+            error!("Failed to execute tests:\n{}.", errors.join("\n"));
+            return exitcode::CONFIG;
         }
     }
 

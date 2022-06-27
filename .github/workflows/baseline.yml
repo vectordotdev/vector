@@ -11,10 +11,10 @@ env:
 jobs:
   release-build-optimized:
     name: "Release Build (optimized)"
-    runs-on: [self-hosted, linux, x64, general]
+    runs-on: [linux, test-runner]
     steps:
       - uses: colpal/actions-clean@v1
-      - uses: actions/checkout@v2.4.0
+      - uses: actions/checkout@v3
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: cargo clean
@@ -22,7 +22,7 @@ jobs:
 
   release-build-normal:
     name: "Release Build (normal)"
-    runs-on: [self-hosted, linux, x64, general]
+    runs-on: [linux, test-runner]
     env:
       # We're not actually doing a debug build, we're just turning off the logic
       # in release-flags.sh so that we don't override the Cargo "release" profile
@@ -30,7 +30,7 @@ jobs:
       PROFILE: debug
     steps:
       - uses: colpal/actions-clean@v1
-      - uses: actions/checkout@v2.4.0
+      - uses: actions/checkout@v3
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: cargo clean
@@ -38,10 +38,10 @@ jobs:
 
   debug-build:
     name: "Debug Build"
-    runs-on: [self-hosted, linux, x64, general]
+    runs-on: [linux, test-runner]
     steps:
       - uses: colpal/actions-clean@v1
-      - uses: actions/checkout@v2.4.0
+      - uses: actions/checkout@v3
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: cargo clean
@@ -49,10 +49,10 @@ jobs:
 
   debug-rebuild:
     name: "Debug Rebuild"
-    runs-on: [self-hosted, linux, x64, general]
+    runs-on: [linux, test-runner]
     steps:
       - uses: colpal/actions-clean@v1
-      - uses: actions/checkout@v2.4.0
+      - uses: actions/checkout@v3
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: cargo clean
@@ -62,10 +62,10 @@ jobs:
 
   check:
     name: "Cargo Check"
-    runs-on: [self-hosted, linux, x64, general]
+    runs-on: [linux, test-runner]
     steps:
       - uses: colpal/actions-clean@v1
-      - uses: actions/checkout@v2.4.0
+      - uses: actions/checkout@v3
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: cargo clean

@@ -1,10 +1,9 @@
 use std::sync::Arc;
 
-use azure_core::{prelude::*, HttpError};
-use azure_storage::{
-    blob::{blob::responses::PutBlockBlobResponse, prelude::*},
-    core::prelude::*,
-};
+use azure_core::{new_http_client, HttpError};
+use azure_identity::{AutoRefreshingTokenCredential, DefaultAzureCredential};
+use azure_storage::prelude::*;
+use azure_storage_blobs::{blob::responses::PutBlockBlobResponse, prelude::*};
 use bytes::Bytes;
 use futures::FutureExt;
 use http::StatusCode;
@@ -53,8 +52,8 @@ impl RetryLogic for AzureBlobRetryLogic {
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
-            HttpError::UnexpectedStatusCode { received, .. } => {
-                received.is_server_error() || received == &StatusCode::TOO_MANY_REQUESTS
+            HttpError::StatusCode { status, .. } => {
+                status.is_server_error() || status == &StatusCode::TOO_MANY_REQUESTS
             }
             _ => false,
         }
@@ -77,6 +76,7 @@ impl DriverResponse for AzureBlobResponse {
         EventsSent {
             count: self.count,
             byte_size: self.events_byte_size,
+            output: None,
         }
     }
 }
@@ -101,7 +101,7 @@ pub fn build_healthcheck(
         match request {
             Ok(_) => Ok(()),
             Err(reason) => Err(match reason.downcast_ref::<HttpError>() {
-                Some(HttpError::UnexpectedStatusCode { received, .. }) => match *received {
+                Some(HttpError::StatusCode { status, .. }) => match *status {
                     StatusCode::FORBIDDEN => HealthcheckError::InvalidCredentials.into(),
                     StatusCode::NOT_FOUND => HealthcheckError::UnknownContainer {
                         container: container_name,
@@ -118,13 +118,41 @@ pub fn build_healthcheck(
 }
 
 pub fn build_client(
-    connection_string: String,
+    connection_string: Option<String>,
+    storage_account: Option<String>,
     container_name: String,
 ) -> crate::Result<Arc<ContainerClient>> {
-    let client =
-        StorageAccountClient::new_connection_string(new_http_client(), connection_string.as_str())?
+    let client;
+    match (connection_string, storage_account) {
+        (Some(connection_string_p), None) => {
+            client = StorageAccountClient::new_connection_string(
+                new_http_client(),
+                &connection_string_p,
+            )?
             .as_storage_client()
             .as_container_client(container_name);
+        }
+        (None, Some(storage_account_p)) => {
+            let creds = std::sync::Arc::new(DefaultAzureCredential::default());
+            let auto_creds = Box::new(AutoRefreshingTokenCredential::new(creds));
 
+            client = StorageAccountClient::new_token_credential(
+                new_http_client(),
+                storage_account_p,
+                auto_creds,
+            )
+            .as_storage_client()
+            .as_container_client(container_name);
+        }
+        (None, None) => {
+            return Err("Either `connection_string` or `storage_account` has to be provided".into())
+        }
+        (Some(_), Some(_)) => {
+            return Err(
+                "`connection_string` and `storage_account` can't be provided at the same time"
+                    .into(),
+            )
+        }
+    }
     Ok(client)
 }

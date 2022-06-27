@@ -1,4 +1,4 @@
-// Modified by `Vector Contributors <vector@timber.io>`.
+// Modified by `Vector Contributors <vector@datadoghq.com>`.
 // Based on `https://github.com/Dentosal/portpicker-rs` by `Hannes Karppila <hannes.karppila@gmail.com>`.
 // `portpicker-rs` LICENSE:
 // This is free and unencumbered software released into the public domain.
@@ -25,6 +25,8 @@
 // OTHER DEALINGS IN THE SOFTWARE.
 
 // For more information, please refer to <http://unlicense.org>
+
+#![deny(warnings)]
 
 use std::net::{IpAddr, SocketAddr, TcpListener, ToSocketAddrs, UdpSocket};
 

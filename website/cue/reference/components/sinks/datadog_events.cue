@@ -8,14 +8,10 @@ components: sinks: datadog_events: {
 	}
 
 	features: {
-		buffer: enabled:      true
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
-			batch: {
-				enabled:      false
-				common:       false
-				timeout_secs: 0
-			}
+			batch: enabled:       false
 			compression: enabled: false
 			encoding: enabled:    false
 			proxy: enabled:       true
@@ -25,10 +21,9 @@ components: sinks: datadog_events: {
 			}
 			tls: {
 				enabled:                true
-				can_enable:             true
 				can_verify_certificate: true
 				can_verify_hostname:    true
-				enabled_default:        true
+				enabled_default:        false
 			}
 			to: {
 				service: services.datadog_events
@@ -66,6 +61,7 @@ components: sinks: datadog_events: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	telemetry: metrics: {

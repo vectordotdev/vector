@@ -9,6 +9,7 @@ use http::{
 use hyper::Body;
 use snafu::ResultExt;
 use tower::Service;
+use vector_common::internal_event::BytesSent;
 use vector_core::{
     buffers::Ackable,
     event::{EventFinalizers, EventStatus, Finalizable},
@@ -17,7 +18,8 @@ use vector_core::{
 };
 
 use crate::{
-    http::{BuildRequest, CallRequest, HttpClient, HttpError},
+    http::{BuildRequestSnafu, CallRequestSnafu, HttpClient},
+    sinks::datadog::DatadogApiError,
     sinks::util::retries::{RetryAction, RetryLogic},
 };
 
@@ -26,17 +28,18 @@ use crate::{
 pub struct DatadogMetricsRetryLogic;
 
 impl RetryLogic for DatadogMetricsRetryLogic {
-    type Error = HttpError;
+    type Error = DatadogApiError;
     type Response = DatadogMetricsResponse;
 
-    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
-        true
+    fn is_retriable_error(&self, error: &Self::Error) -> bool {
+        error.is_retriable()
     }
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
         let status = response.status_code;
 
         match status {
+            StatusCode::FORBIDDEN => RetryAction::Retry("forbidden".into()),
             StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
             StatusCode::NOT_IMPLEMENTED => {
                 RetryAction::DontRetry("endpoint not implemented".into())
@@ -58,6 +61,7 @@ pub struct DatadogMetricsRequest {
     pub content_type: &'static str,
     pub finalizers: EventFinalizers,
     pub batch_size: usize,
+    pub raw_bytes: usize,
 }
 
 impl DatadogMetricsRequest {
@@ -112,6 +116,8 @@ pub struct DatadogMetricsResponse {
     body: Bytes,
     batch_size: usize,
     byte_size: usize,
+    raw_byte_size: usize,
+    protocol: String,
 }
 
 impl DriverResponse for DatadogMetricsResponse {
@@ -129,7 +135,15 @@ impl DriverResponse for DatadogMetricsResponse {
         EventsSent {
             count: self.batch_size,
             byte_size: self.byte_size,
+            output: None,
         }
+    }
+
+    fn bytes_sent(&self) -> Option<BytesSent> {
+        Some(BytesSent {
+            byte_size: self.raw_byte_size,
+            protocol: &self.protocol,
+        })
     }
 }
 
@@ -152,11 +166,13 @@ impl DatadogMetricsService {
 
 impl Service<DatadogMetricsRequest> for DatadogMetricsService {
     type Response = DatadogMetricsResponse;
-    type Error = HttpError;
+    type Error = DatadogApiError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
-        self.client.poll_ready(cx)
+        self.client
+            .poll_ready(cx)
+            .map_err(|error| DatadogApiError::HttpError { error })
     }
 
     fn call(&mut self, request: DatadogMetricsRequest) -> Self::Future {
@@ -166,11 +182,21 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
         Box::pin(async move {
             let byte_size = request.payload.len();
             let batch_size = request.batch_size;
+            let protocol = request.uri.scheme_str().unwrap_or("http").to_string();
+            let raw_byte_size = request.raw_bytes;
 
-            let request = request.into_http_request(api_key).context(BuildRequest)?;
-            let response = client.send(request).await?;
-            let (parts, body) = response.into_parts();
-            let mut body = hyper::body::aggregate(body).await.context(CallRequest)?;
+            let request = request
+                .into_http_request(api_key)
+                .context(BuildRequestSnafu)
+                .map_err(|error| DatadogApiError::HttpError { error })?;
+
+            let result = client.send(request).await;
+            let (parts, body) = DatadogApiError::from_result(result)?.into_parts();
+
+            let mut body = hyper::body::aggregate(body)
+                .await
+                .context(CallRequestSnafu)
+                .map_err(|error| DatadogApiError::HttpError { error })?;
             let body = body.copy_to_bytes(body.remaining());
 
             Ok(DatadogMetricsResponse {
@@ -178,6 +204,8 @@ impl Service<DatadogMetricsRequest> for DatadogMetricsService {
                 body,
                 batch_size,
                 byte_size,
+                raw_byte_size,
+                protocol,
             })
         })
     }

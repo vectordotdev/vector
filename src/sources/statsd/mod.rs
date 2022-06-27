@@ -1,23 +1,33 @@
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
 use bytes::Bytes;
-use futures::{SinkExt, StreamExt, TryFutureExt};
-use serde::{Deserialize, Serialize};
+use codecs::{
+    decoding::{self, Deserializer, Framer},
+    NewlineDelimitedDecoder,
+};
+use futures::{StreamExt, TryFutureExt};
 use smallvec::{smallvec, SmallVec};
 use tokio::net::UdpSocket;
 use tokio_util::udp::UdpFramed;
+use vector_config::configurable_component;
+use vector_core::ByteSizeOf;
 
 use self::parser::ParseError;
 use super::util::{SocketListenAddr, TcpNullAcker, TcpSource};
 use crate::{
-    codecs::{self, decoding::Deserializer, NewlineDelimitedDecoder},
-    config::{self, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription},
+    codecs::Decoder,
+    config::{
+        self, GenerateConfig, Output, Resource, SourceConfig, SourceContext, SourceDescription,
+    },
     event::Event,
-    internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
+    internal_events::{
+        EventsReceived, SocketBytesReceived, SocketMode, StatsdInvalidRecordError,
+        StatsdSocketError, StreamClosedError,
+    },
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsSettings, TlsConfig},
-    udp, Pipeline,
+    tls::{MaybeTlsSettings, TlsSourceConfig},
+    udp, SourceSender,
 };
 
 pub mod parser;
@@ -28,18 +38,32 @@ use parser::parse;
 #[cfg(unix)]
 use unix::{statsd_unix, UnixConfig};
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `statsd` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
-enum StatsdConfig {
-    Tcp(TcpConfig),
-    Udp(UdpConfig),
+pub enum StatsdConfig {
+    /// Listen on TCP.
+    Tcp(#[configurable(derived)] TcpConfig),
+
+    /// Listen on UDP.
+    Udp(#[configurable(derived)] UdpConfig),
+
+    /// Listen on UDS. (Unix domain socket)
     #[cfg(unix)]
-    Unix(UnixConfig),
+    Unix(#[configurable(derived)] UnixConfig),
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// UDP configuration for the `statsd` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct UdpConfig {
+    /// The address to listen for messages on.
     address: SocketAddr,
+
+    /// The size, in bytes, of the receive buffer used for each connection.
+    ///
+    /// This should not typically needed to be changed.
     receive_buffer_bytes: Option<usize>,
 }
 
@@ -52,20 +76,35 @@ impl UdpConfig {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
-struct TcpConfig {
+/// TCP configuration for the `statsd` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct TcpConfig {
+    /// The address to listen for connections on.
     address: SocketListenAddr,
+
+    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
+
+    #[configurable(derived)]
     #[serde(default)]
-    tls: Option<TlsConfig>,
+    tls: Option<TlsSourceConfig>,
+
+    /// The timeout before a connection is forcefully closed during shutdown.
     #[serde(default = "default_shutdown_timeout_secs")]
     shutdown_timeout_secs: u64,
+
+    /// The size, in bytes, of the receive buffer used for each connection.
+    ///
+    /// This should not typically needed to be changed.
     receive_buffer_bytes: Option<usize>,
+
+    /// The maximum number of TCP connections that will be allowed at any given time.
     connection_limit: Option<u32>,
 }
 
 impl TcpConfig {
-    #[cfg(all(test, feature = "sinks-prometheus"))]
+    #[cfg(test)]
     #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
     pub fn from_address(address: SocketListenAddr) -> Self {
         Self {
@@ -105,12 +144,18 @@ impl SourceConfig for StatsdConfig {
                 Ok(Box::pin(statsd_udp(config.clone(), cx.shutdown, cx.out)))
             }
             StatsdConfig::Tcp(config) => {
-                let tls = MaybeTlsSettings::from_config(&config.tls, true)?;
+                let tls_config = config.tls.as_ref().map(|tls| tls.tls_config.clone());
+                let tls_client_metadata_key = config
+                    .tls
+                    .as_ref()
+                    .and_then(|tls| tls.client_metadata_key.clone());
+                let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
                 StatsdTcpSource.run(
                     config.address,
                     config.keepalive,
                     config.shutdown_timeout_secs,
                     tls,
+                    tls_client_metadata_key,
                     config.receive_buffer_bytes,
                     cx,
                     false.into(),
@@ -118,12 +163,12 @@ impl SourceConfig for StatsdConfig {
                 )
             }
             #[cfg(unix)]
-            StatsdConfig::Unix(config) => Ok(statsd_unix(config.clone(), cx.shutdown, cx.out)),
+            StatsdConfig::Unix(config) => statsd_unix(config.clone(), cx.shutdown, cx.out),
         }
     }
 
-    fn output_type(&self) -> config::DataType {
-        config::DataType::Metric
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(config::DataType::Metric)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -138,25 +183,55 @@ impl SourceConfig for StatsdConfig {
             Self::Unix(_) => vec![],
         }
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
-#[derive(Debug, Clone)]
-pub struct StatsdDeserializer;
+#[derive(Debug, Default, Clone)]
+pub(crate) struct StatsdDeserializer {
+    socket_mode: Option<SocketMode>,
+}
 
-impl Deserializer for StatsdDeserializer {
+impl StatsdDeserializer {
+    pub const fn udp() -> Self {
+        Self {
+            socket_mode: Some(SocketMode::Udp),
+        }
+    }
+
+    #[cfg(unix)]
+    pub const fn unix() -> Self {
+        Self {
+            socket_mode: Some(SocketMode::Unix),
+        }
+    }
+}
+
+impl decoding::format::Deserializer for StatsdDeserializer {
     fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
+        if let Some(mode) = self.socket_mode {
+            emit!(SocketBytesReceived {
+                mode,
+                byte_size: bytes.len(),
+            });
+        }
+
         match std::str::from_utf8(&bytes)
             .map_err(ParseError::InvalidUtf8)
             .and_then(parse)
         {
             Ok(metric) => {
-                emit!(&StatsdEventReceived {
-                    byte_size: bytes.len()
+                let event = Event::Metric(metric);
+                emit!(EventsReceived {
+                    count: 1,
+                    byte_size: event.size_of(),
                 });
-                Ok(smallvec![Event::Metric(metric)])
+                Ok(smallvec![event])
             }
             Err(error) => {
-                emit!(&StatsdInvalidRecord {
+                emit!(StatsdInvalidRecordError {
                     error: &error,
                     bytes
                 });
@@ -169,10 +244,12 @@ impl Deserializer for StatsdDeserializer {
 async fn statsd_udp(
     config: UdpConfig,
     shutdown: ShutdownSignal,
-    mut out: Pipeline,
+    mut out: SourceSender,
 ) -> Result<(), ()> {
+    // TODO: This should probably be based off of the `socket` source in UDP mode. If it's missing features needed, we
+    // should add them. Reduce, reuse, recycle.
     let socket = UdpSocket::bind(&config.address)
-        .map_err(|error| emit!(&StatsdSocketError::bind(error)))
+        .map_err(|error| emit!(StatsdSocketError::bind(error)))
         .await?;
 
     if let Some(receive_buffer_bytes) = config.receive_buffer_bytes {
@@ -187,23 +264,21 @@ async fn statsd_udp(
         r#type = "udp"
     );
 
-    let codec = codecs::Decoder::new(
-        Box::new(NewlineDelimitedDecoder::new()),
-        Box::new(StatsdDeserializer),
+    let codec = Decoder::new(
+        Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
+        Deserializer::Boxed(Box::new(StatsdDeserializer::udp())),
     );
     let mut stream = UdpFramed::new(socket, codec).take_until(shutdown);
     while let Some(frame) = stream.next().await {
         match frame {
             Ok(((events, _byte_size), _sock)) => {
-                for metric in events {
-                    if let Err(error) = out.send(metric).await {
-                        error!(message = "Error sending metric.", %error);
-                        break;
-                    }
+                let count = events.len();
+                if let Err(error) = out.send_batch(events).await {
+                    emit!(StreamClosedError { error, count });
                 }
             }
             Err(error) => {
-                emit!(&StatsdSocketError::read(error));
+                emit!(StatsdSocketError::read(error));
             }
         }
     }
@@ -217,13 +292,13 @@ struct StatsdTcpSource;
 impl TcpSource for StatsdTcpSource {
     type Error = codecs::decoding::Error;
     type Item = SmallVec<[Event; 1]>;
-    type Decoder = codecs::Decoder;
+    type Decoder = Decoder;
     type Acker = TcpNullAcker;
 
     fn decoder(&self) -> Self::Decoder {
-        codecs::Decoder::new(
-            Box::new(NewlineDelimitedDecoder::new()),
-            Box::new(StatsdDeserializer),
+        Decoder::new(
+            Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
+            Deserializer::Boxed(Box::new(StatsdDeserializer::default())),
         )
     }
 
@@ -232,218 +307,164 @@ impl TcpSource for StatsdTcpSource {
     }
 }
 
-#[cfg(feature = "sinks-prometheus")]
 #[cfg(test)]
 mod test {
     use futures::channel::mpsc;
-    use hyper::body::to_bytes as body_to_bytes;
+    use futures_util::SinkExt;
     use tokio::{
         io::AsyncWriteExt,
-        time::{sleep, Duration},
+        time::{sleep, Duration, Instant},
     };
+    use vector_core::{config::ComponentKey, event::EventContainer};
 
     use super::*;
-    use crate::{
-        config,
-        sinks::prometheus::exporter::PrometheusExporterConfig,
-        test_util::{next_addr, start_topology},
+    use crate::test_util::{
+        collect_limited,
+        components::{assert_source_compliance, SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS},
+        metrics::{assert_counter, assert_distribution, assert_gauge, assert_set},
+        next_addr,
     };
+    use crate::{series, test_util::metrics::AbsoluteMetricState};
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<StatsdConfig>();
     }
 
-    fn parse_count(lines: &[&str], prefix: &str) -> usize {
-        lines
-            .iter()
-            .find(|s| s.starts_with(prefix))
-            .map(|s| s.split_whitespace().nth(1).unwrap())
-            .unwrap()
-            .parse::<usize>()
-            .unwrap()
-    }
-
     #[tokio::test]
     async fn test_statsd_udp() {
-        let in_addr = next_addr();
-        let config = StatsdConfig::Udp(UdpConfig::from_address(in_addr));
-        let (sender, mut receiver) = mpsc::channel(200);
-        tokio::spawn(async move {
-            let bind_addr = next_addr();
-            let socket = UdpSocket::bind(bind_addr).await.unwrap();
-            socket.connect(in_addr).await.unwrap();
-            while let Some(bytes) = receiver.next().await {
-                socket.send(bytes).await.unwrap();
-            }
-        });
-        test_statsd(config, sender).await;
+        assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async move {
+            let in_addr = next_addr();
+            let config = StatsdConfig::Udp(UdpConfig::from_address(in_addr));
+            let (sender, mut receiver) = mpsc::channel(200);
+            tokio::spawn(async move {
+                let bind_addr = next_addr();
+                let socket = UdpSocket::bind(bind_addr).await.unwrap();
+                socket.connect(in_addr).await.unwrap();
+                while let Some(bytes) = receiver.next().await {
+                    socket.send(bytes).await.unwrap();
+                }
+            });
+            test_statsd(config, sender).await;
+        })
+        .await;
     }
 
     #[tokio::test]
     async fn test_statsd_tcp() {
-        let in_addr = next_addr();
-        let config = StatsdConfig::Tcp(TcpConfig::from_address(in_addr.into()));
-        let (sender, mut receiver) = mpsc::channel(200);
-        tokio::spawn(async move {
-            while let Some(bytes) = receiver.next().await {
-                tokio::net::TcpStream::connect(in_addr)
-                    .await
-                    .unwrap()
-                    .write_all(bytes)
-                    .await
-                    .unwrap();
-            }
-        });
-        test_statsd(config, sender).await;
+        assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async move {
+            let in_addr = next_addr();
+            let config = StatsdConfig::Tcp(TcpConfig::from_address(in_addr.into()));
+            let (sender, mut receiver) = mpsc::channel(200);
+            tokio::spawn(async move {
+                while let Some(bytes) = receiver.next().await {
+                    tokio::net::TcpStream::connect(in_addr)
+                        .await
+                        .unwrap()
+                        .write_all(bytes)
+                        .await
+                        .unwrap();
+                }
+            });
+            test_statsd(config, sender).await;
+        })
+        .await;
     }
 
     #[cfg(unix)]
     #[tokio::test]
     async fn test_statsd_unix() {
-        let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
-        let config = StatsdConfig::Unix(UnixConfig {
-            path: in_path.clone(),
-        });
-        let (sender, mut receiver) = mpsc::channel(200);
-        tokio::spawn(async move {
-            while let Some(bytes) = receiver.next().await {
-                tokio::net::UnixStream::connect(&in_path)
-                    .await
-                    .unwrap()
-                    .write_all(bytes)
-                    .await
-                    .unwrap();
-            }
-        });
-        test_statsd(config, sender).await;
+        assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async move {
+            let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
+            let config = StatsdConfig::Unix(UnixConfig {
+                path: in_path.clone(),
+            });
+            let (sender, mut receiver) = mpsc::channel(200);
+            tokio::spawn(async move {
+                while let Some(bytes) = receiver.next().await {
+                    tokio::net::UnixStream::connect(&in_path)
+                        .await
+                        .unwrap()
+                        .write_all(bytes)
+                        .await
+                        .unwrap();
+                }
+            });
+            test_statsd(config, sender).await;
+        })
+        .await;
     }
 
-    async fn test_statsd(
-        statsd_config: StatsdConfig,
-        // could use unbounded channel,
-        // but we want to reserve the order messages.
-        mut sender: mpsc::Sender<&'static [u8]>,
-    ) {
-        let out_addr = next_addr();
+    async fn test_statsd(statsd_config: StatsdConfig, mut sender: mpsc::Sender<&'static [u8]>) {
+        // Build our statsd source and then spawn it.  We use a big pipeline buffer because each
+        // packet we send has a lot of metrics per packet.  We could technically count them all up
+        // and have a more accurate number here, but honestly, who cares?  This is big enough.
+        let component_key = ComponentKey::from("statsd");
+        let (tx, rx) = SourceSender::new_with_buffer(4096);
+        let (source_ctx, shutdown) = SourceContext::new_shutdown(&component_key, tx);
+        let sink = statsd_config
+            .build(source_ctx)
+            .await
+            .expect("failed to build statsd source");
 
-        let mut config = config::Config::builder();
-        config.add_source("in", statsd_config);
-        config.add_sink(
-            "out",
-            &["in"],
-            PrometheusExporterConfig {
-                address: out_addr,
-                tls: None,
-                default_namespace: Some("vector".into()),
-                buckets: vec![1.0, 2.0, 4.0],
-                quantiles: vec![],
-                flush_period_secs: 1,
-            },
-        );
+        tokio::spawn(async move {
+            sink.await.expect("sink should not fail");
+        });
 
-        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+        // Wait like 250ms to give the sink time to start running and become ready to handle
+        // traffic.
+        //
+        // TODO: It'd be neat if we could make `ShutdownSignal` track when it was polled at least once,
+        // and then surface that (via one of the related types, maybe) somehow so we could use it as
+        // a signal for "the sink is ready, it's polled the shutdown future at least once, which
+        // means it's trying to accept connections, etc" and would be far more deterministic than this.
+        sleep(Duration::from_millis(250)).await;
 
-        // Give some time for the topology to start
-        sleep(Duration::from_millis(100)).await;
-
+        // Send all of the messages.
         for _ in 0..100 {
             sender.send(
-                b"foo:1|c|#a,b:b\nbar:42|g\nfoo:1|c|#a,b:c\nglork:3|h|@0.1\nmilliglork:3000|ms|@0.1\nset:0|s\nset:1|s\n"
+                b"foo:1|c|#a,b:b\nbar:42|g\nfoo:1|c|#a,b:c\nglork:3|h|@0.1\nmilliglork:3000|ms|@0.2\nset:0|s\nset:1|s\n"
             ).await.unwrap();
-            // Space things out slightly to try to avoid dropped packets
+
+            // Space things out slightly to try to avoid dropped packets.
             sleep(Duration::from_millis(10)).await;
         }
 
-        // Give packets some time to flow through
-        sleep(Duration::from_millis(100)).await;
+        // Now wait for another small period of time to make sure we've processed the messages.
+        // After that, trigger shutdown so our source closes and allows us to deterministically read
+        // everything that was in up without having to know the exact count.
+        sleep(Duration::from_millis(250)).await;
+        shutdown
+            .shutdown_all(Instant::now() + Duration::from_millis(100))
+            .await;
 
-        let client = hyper::Client::new();
-        let response = client
-            .get(format!("http://{}/metrics", out_addr).parse().unwrap())
+        // Read all the events into a `MetricState`, which handles normalizing metrics and tracking
+        // cumulative values for incremental metrics, etc.  This will represent the final/cumulative
+        // values for each metric sent by the source into the pipeline.
+        let state = collect_limited(rx)
             .await
-            .unwrap();
-        assert!(response.status().is_success());
+            .into_iter()
+            .flat_map(EventContainer::into_events)
+            .collect::<AbsoluteMetricState>();
+        let metrics = state.finish();
 
-        let body = body_to_bytes(response.into_body()).await.unwrap();
-        let lines = std::str::from_utf8(&body)
-            .unwrap()
-            .lines()
-            .collect::<Vec<_>>();
-
-        // note that prometheus client reorders the labels
-        let vector_foo1 = parse_count(&lines, "vector_foo{a=\"true\",b=\"b\"");
-        let vector_foo2 = parse_count(&lines, "vector_foo{a=\"true\",b=\"c\"");
-        // packets get lost :(
-        assert!(vector_foo1 > 90);
-        assert!(vector_foo2 > 90);
-
-        let vector_bar = parse_count(&lines, "vector_bar");
-        assert_eq!(42, vector_bar);
-
-        assert_eq!(parse_count(&lines, "vector_glork_bucket{le=\"1\"}"), 0);
-        assert_eq!(parse_count(&lines, "vector_glork_bucket{le=\"2\"}"), 0);
-        assert!(parse_count(&lines, "vector_glork_bucket{le=\"4\"}") > 0);
-        assert!(parse_count(&lines, "vector_glork_bucket{le=\"+Inf\"}") > 0);
-        let glork_sum = parse_count(&lines, "vector_glork_sum");
-        let glork_count = parse_count(&lines, "vector_glork_count");
-        assert_eq!(glork_count * 3, glork_sum);
-
-        assert_eq!(parse_count(&lines, "vector_milliglork_bucket{le=\"1\"}"), 0);
-        assert_eq!(parse_count(&lines, "vector_milliglork_bucket{le=\"2\"}"), 0);
-        assert!(parse_count(&lines, "vector_milliglork_bucket{le=\"4\"}") > 0);
-        assert!(parse_count(&lines, "vector_milliglork_bucket{le=\"+Inf\"}") > 0);
-        let milliglork_sum = parse_count(&lines, "vector_milliglork_sum");
-        let milliglork_count = parse_count(&lines, "vector_milliglork_count");
-        assert_eq!(milliglork_count * 3, milliglork_sum);
-
-        // Set test
-        // Flush could have occurred
-        assert!(parse_count(&lines, "vector_set") <= 2);
-
-        // Flush test
-        {
-            // Wait for flush to happen
-            sleep(Duration::from_millis(2000)).await;
-
-            let response = client
-                .get(format!("http://{}/metrics", out_addr).parse().unwrap())
-                .await
-                .unwrap();
-            assert!(response.status().is_success());
-
-            let body = body_to_bytes(response.into_body()).await.unwrap();
-            let lines = std::str::from_utf8(&body)
-                .unwrap()
-                .lines()
-                .collect::<Vec<_>>();
-
-            // Check rested
-            assert_eq!(parse_count(&lines, "vector_set"), 0);
-
-            // Re-check that set is also reset------------
-
-            sender.send(b"set:0|s\nset:1|s\n").await.unwrap();
-            // Give packets some time to flow through
-            sleep(Duration::from_millis(100)).await;
-
-            let response = client
-                .get(format!("http://{}/metrics", out_addr).parse().unwrap())
-                .await
-                .unwrap();
-            assert!(response.status().is_success());
-
-            let body = body_to_bytes(response.into_body()).await.unwrap();
-            let lines = std::str::from_utf8(&body)
-                .unwrap()
-                .lines()
-                .collect::<Vec<_>>();
-
-            // Set test
-            assert_eq!(parse_count(&lines, "vector_set"), 2);
-        }
-
-        // Shut down server
-        topology.stop().await;
+        assert_counter(&metrics, series!("foo", "a" => "true", "b" => "b"), 100.0);
+        assert_counter(&metrics, series!("foo", "a" => "true", "b" => "c"), 100.0);
+        assert_gauge(&metrics, series!("bar"), 42.0);
+        assert_distribution(
+            &metrics,
+            series!("glork"),
+            3000.0,
+            1000,
+            &[(1.0, 0), (2.0, 0), (4.0, 1000), (f64::INFINITY, 1000)],
+        );
+        assert_distribution(
+            &metrics,
+            series!("milliglork"),
+            1500.0,
+            500,
+            &[(1.0, 0), (2.0, 0), (4.0, 500), (f64::INFINITY, 500)],
+        );
+        assert_set(&metrics, series!("set"), &["0", "1"]);
     }
 }

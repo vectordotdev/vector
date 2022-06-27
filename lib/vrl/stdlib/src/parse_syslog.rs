@@ -1,9 +1,20 @@
 use std::collections::BTreeMap;
 
+use ::value::Value;
 use chrono::{DateTime, Datelike, Utc};
-use shared::TimeZone;
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
+use vector_common::TimeZone;
 use vrl::prelude::*;
+
+pub(crate) fn parse_syslog(value: Value, ctx: &Context) -> Resolved {
+    let message = value.try_bytes_utf8_lossy()?;
+    let timezone = match ctx.timezone() {
+        TimeZone::Local => None,
+        TimeZone::Named(tz) => Some(*tz),
+    };
+    let parsed = syslog_loose::parse_message_with_year_exact_tz(&message, resolve_year, timezone)?;
+    Ok(message_to_value(parsed))
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseSyslog;
@@ -44,8 +55,8 @@ impl Function for ParseSyslog {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -62,20 +73,12 @@ pub(crate) struct ParseSyslogFn {
 impl Expression for ParseSyslogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let message = value.try_bytes_utf8_lossy()?;
 
-        let timezone = match ctx.timezone() {
-            TimeZone::Local => None,
-            TimeZone::Named(tz) => Some(*tz),
-        };
-        let parsed =
-            syslog_loose::parse_message_with_year_exact_tz(&message, resolve_year, timezone)?;
-
-        Ok(message_to_value(parsed))
+        parse_syslog(value, ctx)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().object(type_def())
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        TypeDef::object(inner_kind()).fallible()
     }
 }
 
@@ -144,24 +147,24 @@ fn message_to_value(message: Message<&str>) -> Value {
     result.into()
 }
 
-fn type_def() -> BTreeMap<&'static str, TypeDef> {
-    map! {
-        "message": Kind::Bytes,
-        "hostname": Kind::Bytes | Kind::Null,
-        "severity": Kind::Bytes | Kind::Null,
-        "facility": Kind::Bytes | Kind::Null,
-        "appname": Kind::Bytes | Kind::Null,
-        "msgid": Kind::Bytes | Kind::Null,
-        "timestamp": Kind::Timestamp | Kind::Null,
-        "procid": Kind::Bytes | Kind::Integer | Kind::Null,
-        "version": Kind::Integer | Kind::Null
-    }
+fn inner_kind() -> BTreeMap<Field, Kind> {
+    BTreeMap::from([
+        ("message".into(), Kind::bytes()),
+        ("hostname".into(), Kind::bytes().or_null()),
+        ("severity".into(), Kind::bytes().or_null()),
+        ("facility".into(), Kind::bytes().or_null()),
+        ("appname".into(), Kind::bytes().or_null()),
+        ("msgid".into(), Kind::bytes().or_null()),
+        ("timestamp".into(), Kind::timestamp().or_null()),
+        ("procid".into(), Kind::bytes().or_integer().or_null()),
+        ("version".into(), Kind::integer().or_null()),
+    ])
 }
 
 #[cfg(test)]
 mod tests {
     use chrono::TimeZone;
-    use shared::btreemap;
+    use vector_common::btreemap;
 
     use super::*;
 
@@ -184,13 +187,13 @@ mod tests {
                 "message" => "Try to override the THX port, maybe it will reboot the neural interface!",
                 "version" => 1,
             }),
-            tdef: TypeDef::new().fallible().object(type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         invalid {
             args: func_args![value: "not much of a syslog message"],
             want: Err("unable to parse input as valid syslog message".to_string()),
-            tdef: TypeDef::new().fallible().object(type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         haproxy {
@@ -203,7 +206,7 @@ mod tests {
                     "appname" => "haproxy",
                     "procid" => 73411,
             }),
-            tdef: TypeDef::new().fallible().object(type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         missing_pri {
@@ -214,7 +217,7 @@ mod tests {
                 "appname" => "haproxy",
                 "procid" => 73411,
             }),
-            tdef: TypeDef::new().fallible().object(type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         empty_sd_element {
@@ -230,7 +233,7 @@ mod tests {
                 "timestamp" => chrono::Utc.ymd(2019, 2, 13).and_hms_milli(19, 48, 34, 0),
                 "version" => 1,
             }),
-            tdef: TypeDef::new().fallible().object(type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         non_empty_sd_element {
@@ -247,7 +250,24 @@ mod tests {
                 "version" => 1,
                 "non_empty.x" => "1",
             }),
-            tdef: TypeDef::new().fallible().object(type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
+        }
+
+        empty_sd_value {
+            args: func_args![value: r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - [non_empty x=""][empty] qwerty"#],
+            want: Ok(btreemap!{
+                "message" => "qwerty",
+                "appname" => "root",
+                "facility" => "user",
+                "hostname" => "74794bfb6795",
+                "message" => "qwerty",
+                "procid" => 8449,
+                "severity" => "notice",
+                "timestamp" => chrono::Utc.ymd(2019, 2, 13).and_hms_milli(19, 48, 34, 0),
+                "version" => 1,
+                "non_empty.x" => "",
+            }),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         non_structured_data_in_message {
@@ -257,10 +277,10 @@ mod tests {
                 "facility" => "local0",
                 "hostname" => "master",
                 "severity" => "err",
-                "timestamp" => chrono::Utc.ymd(2021, 6, 8).and_hms_milli(11, 54, 8, 0),
+                "timestamp" => chrono::Utc.ymd(chrono::Utc::now().year(), 6, 8).and_hms_milli(11, 54, 8, 0),
                 "message" => "[Tue Jun 08 11:54:08.929301 2021] [php7:emerg] [pid 1374899] [client 95.223.77.60:41888] rest of message",
             }),
-            tdef: TypeDef::new().fallible().object(type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         escapes_in_structured_data_quote {
@@ -276,7 +296,7 @@ mod tests {
                 "timestamp" => chrono::Utc.ymd(2003, 10, 11).and_hms_milli(22,14,15,3),
                 "version" => 1
             }),
-            tdef: TypeDef::new().fallible().object(type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         escapes_in_structured_data_slash {
@@ -292,7 +312,7 @@ mod tests {
                 "timestamp" => chrono::Utc.ymd(2003, 10, 11).and_hms_milli(22,14,15,3),
                 "version" => 1
             }),
-            tdef: TypeDef::new().fallible().object(type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         escapes_in_structured_data_bracket {
@@ -308,7 +328,7 @@ mod tests {
                 "timestamp" => chrono::Utc.ymd(2003,10,11).and_hms_milli(22,14,15,3),
                 "version" => 1
             }),
-            tdef: TypeDef::new().fallible().object(type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
     ];
 }

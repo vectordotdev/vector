@@ -80,6 +80,7 @@ components: transforms: tag_cardinality_limit: {
 			set:          true
 			summary:      true
 		}
+		traces: false
 	}
 
 	examples: [

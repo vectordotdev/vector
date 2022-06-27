@@ -1,24 +1,29 @@
-use std::num::NonZeroU64;
+// TODO: In order to correctly assert component specification compliance, we would have to do some more advanced mocking
+// off the endpoint, which would include also providing a mock OAuth2 endpoint to allow for generating a token from the
+// mocked credentials. Let this TODO serve as a placeholder for doing that in the future.
 
+use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use futures::{sink::SinkExt, FutureExt};
-use http::{header::AUTHORIZATION, HeaderValue, Uri};
+use goauth::scopes::Scope;
+use http::Uri;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Metric, MetricValue},
+    gcp::{GcpAuthConfig, GcpAuthenticator},
     http::HttpClient,
     sinks::{
         gcp,
         util::{
             buffer::metrics::MetricsBuffer,
-            http::{BatchedHttpSink, HttpSink},
+            http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
             BatchConfig, SinkBatchSettings, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -27,22 +32,28 @@ pub struct StackdriverMetricsDefaultBatchSettings;
 impl SinkBatchSettings for StackdriverMetricsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(1);
     const MAX_BYTES: Option<usize> = None;
-    const TIMEOUT_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const TIMEOUT_SECS: f64 = 1.0;
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
-#[serde(deny_unknown_fields)]
 pub struct StackdriverConfig {
     pub project_id: String,
     pub resource: gcp::GcpTypedResource,
-    pub credentials_path: Option<String>,
+    #[serde(flatten)]
+    pub auth: GcpAuthConfig,
     #[serde(default = "default_metric_namespace_value")]
     pub default_namespace: String,
     #[serde(default)]
     pub request: TowerRequestConfig,
     #[serde(default)]
     pub batch: BatchConfig<StackdriverMetricsDefaultBatchSettings>,
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 fn default_metric_namespace_value() -> String {
@@ -59,17 +70,8 @@ inventory::submit! {
 #[typetag::serde(name = "gcp_stackdriver_metrics")]
 impl SinkConfig for StackdriverConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let mut token = gouth::Builder::new().scopes(&[
-            "https://www.googleapis.com/auth/cloud-platform",
-            "https://www.googleapis.com/auth/monitoring",
-            "https://www.googleapis.com/auth/monitoring.write",
-        ]);
+        let auth = self.auth.build(Scope::MonitoringWrite).await?;
 
-        if let Some(credentials_path) = self.credentials_path.as_ref() {
-            token = token.file(credentials_path);
-        }
-
-        let token = token.build()?;
         let healthcheck = healthcheck().boxed();
         let started = chrono::Utc::now();
         let request = self.request.unwrap_with(&TowerRequestConfig {
@@ -84,7 +86,7 @@ impl SinkConfig for StackdriverConfig {
         let sink = HttpEventSink {
             config: self.clone(),
             started,
-            token,
+            auth,
         };
 
         let sink = BatchedHttpSink::new(
@@ -99,30 +101,32 @@ impl SinkConfig for StackdriverConfig {
             |error| error!(message = "Fatal gcp_stackdriver_metrics sink error.", %error),
         );
 
-        Ok((VectorSink::Sink(Box::new(sink)), healthcheck))
+        Ok((VectorSink::from_event_sink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
     fn sink_type(&self) -> &'static str {
         "gcp_stackdriver_metrics"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        Some(&self.acknowledgements)
     }
 }
 
 struct HttpEventSink {
     config: StackdriverConfig,
     started: DateTime<Utc>,
-    token: gouth::Token,
+    auth: GcpAuthenticator,
 }
 
-#[async_trait::async_trait]
-impl HttpSink for HttpEventSink {
-    type Input = Metric;
-    type Output = Vec<Metric>;
+struct StackdriverMetricsEncoder;
 
-    fn encode_event(&self, event: Event) -> Option<Self::Input> {
+impl HttpEventEncoder<Metric> for StackdriverMetricsEncoder {
+    fn encode_event(&mut self, event: Event) -> Option<Metric> {
         let metric = event.into_metric();
 
         match metric.value() {
@@ -134,11 +138,22 @@ impl HttpSink for HttpEventSink {
             }
         }
     }
+}
+
+#[async_trait::async_trait]
+impl HttpSink for HttpEventSink {
+    type Input = Metric;
+    type Output = Vec<Metric>;
+    type Encoder = StackdriverMetricsEncoder;
+
+    fn build_encoder(&self) -> Self::Encoder {
+        StackdriverMetricsEncoder
+    }
 
     async fn build_request(
         &self,
         mut metrics: Self::Output,
-    ) -> crate::Result<hyper::Request<Vec<u8>>> {
+    ) -> crate::Result<hyper::Request<Bytes>> {
         let metric = metrics.pop().expect("only one metric");
         let (series, data, _metadata) = metric.into_parts();
         let namespace = series
@@ -199,20 +214,18 @@ impl HttpSink for HttpEventSink {
             }],
         };
 
-        let body = serde_json::to_vec(&series).unwrap();
+        let body = crate::serde::json::to_bytes(&series).unwrap().freeze();
+
         let uri: Uri = format!(
             "https://monitoring.googleapis.com/v3/projects/{}/timeSeries",
             self.config.project_id
         )
         .parse()?;
 
-        let request = hyper::Request::post(uri)
+        let mut request = hyper::Request::post(uri)
             .header("content-type", "application/json")
-            .header(
-                AUTHORIZATION,
-                self.token.header_value()?.parse::<HeaderValue>()?,
-            )
             .body(body)?;
+        self.auth.apply(&mut request);
 
         Ok(request)
     }

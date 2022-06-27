@@ -6,6 +6,7 @@ set -o nounset
 #set -o xtrace
 
 __dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SOAK_ROOT="${__dir}/.."
 
 display_usage() {
     echo ""
@@ -14,19 +15,23 @@ display_usage() {
     echo "Options:"
     echo "  --help: display this information"
     echo "  --soak: the experiment to run"
-    echo "  --local-image: whether to use a local vector image or remote, local if true"
+    echo "  --build-image: build the soak image if needed, default true"
     echo "  --variant: the variation of test in play, either 'baseline' or 'comparison'"
     echo "  --tag: the tag this test covers"
     echo "  --capture-dir: the directory in which to write captures"
     echo "  --cpus: the total number of CPUs to dedicate to the soak minikube, default 7"
     echo "  --memory: the total amount of memory dedicate to the soak minikube, default 8g"
     echo "  --vector-cpus: the total number of CPUs to give to soaked vector"
-    echo "  --warmup-seconds: the total number seconds to pause waiting for vector to warm up"
+    echo "  --warmup-seconds: the total number seconds to pause waiting for vector to warm up, default 30"
+    echo "  --total-samples: the total number of samples to take from vector, default 200"
+    echo "  --replicas: the total number of replica experiments to run, default 3"
     echo ""
 }
 
-
-USE_LOCAL_IMAGE="true"
+BUILD_IMAGE="true"
+REPLICAS=3
+TOTAL_SAMPLES=180
+WARMUP_SECONDS=30
 
 while [[ $# -gt 0 ]]; do
   key="$1"
@@ -47,8 +52,8 @@ while [[ $# -gt 0 ]]; do
           shift # past argument
           shift # past value
           ;;
-      --local-image)
-          USE_LOCAL_IMAGE=$2
+      --build-image)
+          BUILD_IMAGE=$2
           shift # past argument
           shift # past value
           ;;
@@ -67,6 +72,11 @@ while [[ $# -gt 0 ]]; do
           shift # past argument
           shift # past value
           ;;
+      --total-samples)
+          TOTAL_SAMPLES=$2
+          shift # past argument
+          shift # past value
+          ;;
       --cpus)
           SOAK_CPUS=$2
           shift # past argument
@@ -74,6 +84,11 @@ while [[ $# -gt 0 ]]; do
           ;;
       --memory)
           SOAK_MEMORY=$2
+          shift # past argument
+          shift # past value
+          ;;
+      --replicas)
+          REPLICAS=$(($2 - 1))
           shift # past argument
           shift # past value
           ;;
@@ -89,26 +104,47 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-pushd "${__dir}"
+pushd "${__dir}" > /dev/null
 
 IMAGE="vector:${TAG}"
-if [ "${USE_LOCAL_IMAGE}" = "true" ]; then
-    echo "Building images locally..."
+if [[ "$(docker images -q "$IMAGE" 2> /dev/null)" == "" ]]; then
+  if [ "${BUILD_IMAGE}" = "true" ]; then
+    echo "Image $IMAGE doesn't exist, building"
 
     ./build_container.sh "${TAG}" "${IMAGE}"
-else
-    REMOTE_IMAGE="ghcr.io/vectordotdev/vector/soak-vector:${TAG}"
-    docker pull "${REMOTE_IMAGE}"
-    docker image tag "${REMOTE_IMAGE}" "${IMAGE}"
+  else
+    echo "Image $IMAGE doesn't exist and --build-image was false"
+    exit 1
+  fi
 fi
 
-./run_experiment.sh --capture-dir "${CAPTURE_DIR}" \
-                    --variant "${VARIANT}" \
-                    --image "${IMAGE}" \
-                    --soak "${SOAK_NAME}" \
-                    --cpus "${SOAK_CPUS}" \
-                    --memory "${SOAK_MEMORY}" \
-                    --vector-cpus "${VECTOR_CPUS}" \
-                    --warmup-seconds "${WARMUP_SECONDS}"
+for ((idx=0; idx <= REPLICAS ; idx++))
+do
+    SOAK_CAPTURE_DIR="${CAPTURE_DIR}/${SOAK_NAME}/${VARIANT}/${idx}"
+    SOAK_CAPTURE_FILE="${SOAK_CAPTURE_DIR}/${VARIANT}.captures"
 
-popd
+    pushd "${SOAK_ROOT}/tests/${SOAK_NAME}/" > /dev/null
+    echo "[${VARIANT}] Captures will be recorded into ${SOAK_CAPTURE_DIR}"
+    mkdir -p "${SOAK_CAPTURE_DIR}"
+    touch "${SOAK_CAPTURE_FILE}"
+    # shellcheck disable=SC2140
+    DOCKER_BUILDKIT=1 docker run --cpus "${SOAK_CPUS}" --memory "${SOAK_MEMORY}" --network "host" --privileged --env RUST_LOG="info" \
+                   --mount type=bind,source="${SOAK_ROOT}/tests/${SOAK_NAME}/lading.yaml",target="/etc/lading/lading.yaml",readonly \
+                   --mount type=bind,source="${SOAK_ROOT}/tests/${SOAK_NAME}/vector.toml",target="/etc/vector/vector.toml",readonly \
+                   --mount type=bind,source="${SOAK_ROOT}/tests/${SOAK_NAME}/data",target="/data",readonly \
+                   --mount type=bind,source="${SOAK_CAPTURE_DIR}",target="/tmp/captures" \
+                   --user "$(id -u):$(id -g)" \
+                   "${IMAGE}" \
+                   --config-path "/etc/lading/lading.yaml" \
+                   --global-labels "variant=${VARIANT},target=vector,experiment=${SOAK_NAME}" \
+                   --capture-path "/tmp/captures/${VARIANT}.captures" \
+                   --target-environment-variables "VECTOR_THREADS=${VECTOR_CPUS},VECTOR_REQUIRE_HEALTHY=true" \
+                   --target-stderr-path /tmp/captures/vector.stderr.log \
+                   --target-stdout-path /tmp/captures/vector.stdout.log \
+                   --experiment-duration-seconds "${TOTAL_SAMPLES}" \
+                   --warmup-duration-seconds "${WARMUP_SECONDS}" \
+                   /usr/bin/vector
+    popd > /dev/null
+done
+
+popd > /dev/null

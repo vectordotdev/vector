@@ -1,11 +1,14 @@
+use std::fmt;
+
 use async_trait::async_trait;
 use chrono::{Duration, Utc};
 use futures::{future, stream::BoxStream, StreamExt};
+use tower::Service;
 use vector_core::{
     buffers::{Ackable, Acker},
     partition::Partitioner,
     sink::StreamSink,
-    stream::BatcherSettings,
+    stream::{BatcherSettings, DriverResponse},
 };
 
 use crate::{
@@ -13,39 +16,34 @@ use crate::{
     sinks::{
         aws_cloudwatch_logs::{
             request_builder::{CloudwatchRequest, CloudwatchRequestBuilder},
-            retry::CloudwatchRetryLogic,
-            service::{CloudwatchLogsPartitionSvc, CloudwatchResponse},
             CloudwatchKey,
         },
-        util::{service::Svc, SinkBuilderExt},
+        util::SinkBuilderExt,
     },
 };
 
-pub struct CloudwatchSink {
+pub struct CloudwatchSink<S> {
     pub batcher_settings: BatcherSettings,
-    pub request_builder: CloudwatchRequestBuilder,
+    pub(super) request_builder: CloudwatchRequestBuilder,
     pub acker: Acker,
-    pub service: Svc<CloudwatchLogsPartitionSvc, CloudwatchRetryLogic<CloudwatchResponse>>,
+    pub service: S,
 }
 
-impl CloudwatchSink {
+impl<S> CloudwatchSink<S>
+where
+    S: Service<BatchCloudwatchRequest> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
+    S::Error: fmt::Debug + Into<crate::Error> + Send,
+{
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let request_builder = self.request_builder;
+        let mut request_builder = self.request_builder;
         let batcher_settings = self.batcher_settings;
         let service = self.service;
         let acker = self.acker;
 
         input
-            .filter_map(|event| future::ready(request_builder.build(event).transpose()))
-            .filter_map(|request| async move {
-                match request {
-                    Err(e) => {
-                        error!("Failed to build Cloudwatch Logs request: {:?}.", e);
-                        None
-                    }
-                    Ok(req) => Some(req),
-                }
-            })
+            .filter_map(|event| future::ready(request_builder.build(event)))
             .filter(|req| {
                 let now = Utc::now();
                 let start = (now - Duration::days(14) + Duration::minutes(5)).timestamp_millis();
@@ -91,7 +89,13 @@ impl Partitioner for CloudwatchParititoner {
 }
 
 #[async_trait]
-impl StreamSink for CloudwatchSink {
+impl<S> StreamSink<Event> for CloudwatchSink<S>
+where
+    S: Service<BatchCloudwatchRequest> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Response: DriverResponse + Send + 'static,
+    S::Error: fmt::Debug + Into<crate::Error> + Send,
+{
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.run_inner(input).await
     }

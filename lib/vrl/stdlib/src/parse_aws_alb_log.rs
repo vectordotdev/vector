@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use ::value::Value;
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_while1},
@@ -9,6 +10,11 @@ use nom::{
     IResult,
 };
 use vrl::prelude::*;
+
+fn parse_aws_alb_log(bytes: Value) -> Resolved {
+    let bytes = bytes.try_bytes()?;
+    parse_log(&String::from_utf8_lossy(&bytes))
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseAwsAlbLog;
@@ -30,8 +36,8 @@ impl Function for ParseAwsAlbLog {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -61,52 +67,67 @@ impl ParseAwsAlbLogFn {
 
 impl Expression for ParseAwsAlbLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.try_bytes()?;
-
-        parse_log(&String::from_utf8_lossy(&bytes))
+        let bytes = self.value.resolve(ctx)?;
+        parse_aws_alb_log(bytes)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new()
-            .fallible() // Log parsing error
-            .object::<&str, Kind>(inner_type_def())
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        TypeDef::object(inner_kind()).fallible(/* log parsing error */)
     }
 }
 
-fn inner_type_def() -> BTreeMap<&'static str, Kind> {
-    map! {
-        "actions_executed": Kind::Bytes | Kind::Null,
-        "chosen_cert_arn": Kind::Bytes | Kind::Null,
-        "classification_reason": Kind::Bytes | Kind::Null,
-        "classification": Kind::Bytes | Kind::Null,
-        "client_host": Kind::Bytes,
-        "domain_name": Kind::Bytes | Kind::Null,
-        "elb_status_code": Kind::Bytes,
-        "elb": Kind::Bytes,
-        "error_reason": Kind::Bytes | Kind::Null,
-        "matched_rule_priority": Kind::Bytes | Kind::Null,
-        "received_bytes": Kind::Integer,
-        "redirect_url": Kind::Bytes | Kind::Null,
-        "request_creation_time": Kind::Bytes,
-        "request_method": Kind::Bytes,
-        "request_processing_time": Kind::Float,
-        "request_protocol": Kind::Bytes,
-        "request_url": Kind::Bytes,
-        "response_processing_time": Kind::Float,
-        "sent_bytes": Kind::Integer,
-        "ssl_cipher": Kind::Bytes | Kind::Null,
-        "ssl_protocol": Kind::Bytes | Kind::Null,
-        "target_group_arn": Kind::Bytes,
-        "target_host": Kind::Bytes | Kind::Null,
-        "target_port_list": Kind::Bytes | Kind::Null,
-        "target_processing_time": Kind::Float,
-        "target_status_code_list": Kind::Bytes | Kind::Null,
-        "target_status_code": Kind::Bytes | Kind::Null,
-        "timestamp": Kind::Bytes,
-        "trace_id": Kind::Bytes,
-        "type": Kind::Bytes,
-        "user_agent": Kind::Bytes,
-    }
+fn inner_kind() -> BTreeMap<Field, Kind> {
+    BTreeMap::from([
+        (
+            Field::from("actions_executed"),
+            Kind::bytes() | Kind::null(),
+        ),
+        (Field::from("chosen_cert_arn"), Kind::bytes() | Kind::null()),
+        (
+            Field::from("classification_reason"),
+            Kind::bytes() | Kind::null(),
+        ),
+        (Field::from("classification"), Kind::bytes() | Kind::null()),
+        (Field::from("client_host"), Kind::bytes()),
+        (Field::from("domain_name"), Kind::bytes() | Kind::null()),
+        (Field::from("elb_status_code"), Kind::bytes()),
+        (Field::from("elb"), Kind::bytes()),
+        (Field::from("error_reason"), Kind::bytes() | Kind::null()),
+        (
+            Field::from("matched_rule_priority"),
+            Kind::bytes() | Kind::null(),
+        ),
+        (Field::from("received_bytes"), Kind::integer()),
+        (Field::from("redirect_url"), Kind::bytes() | Kind::null()),
+        (Field::from("request_creation_time"), Kind::bytes()),
+        (Field::from("request_method"), Kind::bytes()),
+        (Field::from("request_processing_time"), Kind::float()),
+        (Field::from("request_protocol"), Kind::bytes()),
+        (Field::from("request_url"), Kind::bytes()),
+        (Field::from("response_processing_time"), Kind::float()),
+        (Field::from("sent_bytes"), Kind::integer()),
+        (Field::from("ssl_cipher"), Kind::bytes() | Kind::null()),
+        (Field::from("ssl_protocol"), Kind::bytes() | Kind::null()),
+        (Field::from("target_group_arn"), Kind::bytes()),
+        (Field::from("target_host"), Kind::bytes() | Kind::null()),
+        (
+            Field::from("target_port_list"),
+            Kind::bytes() | Kind::null(),
+        ),
+        (Field::from("target_processing_time"), Kind::float()),
+        (
+            Field::from("target_status_code_list"),
+            Kind::bytes() | Kind::null(),
+        ),
+        (
+            Field::from("target_status_code"),
+            Kind::bytes() | Kind::null(),
+        ),
+        (Field::from("timestamp"), Kind::bytes()),
+        (Field::from("trace_id"), Kind::bytes()),
+        (Field::from("type"), Kind::bytes()),
+        (Field::from("user_agent"), Kind::bytes()),
+    ])
 }
 
 fn parse_log(mut input: &str) -> Result<Value> {
@@ -153,9 +174,17 @@ fn parse_log(mut input: &str) -> Result<Value> {
     field_raw!("elb", take_anything);
     field!("client_host", '0'..='9' | 'a'..='f' | '.' | ':' | '-');
     field!("target_host", '0'..='9' | 'a'..='f' | '.' | ':' | '-');
-    field_parse!("request_processing_time", '0'..='9' | '.' | '-', f64);
-    field_parse!("target_processing_time", '0'..='9' | '.' | '-', f64);
-    field_parse!("response_processing_time", '0'..='9' | '.' | '-', f64);
+    field_parse!(
+        "request_processing_time",
+        '0'..='9' | '.' | '-',
+        NotNan<f64>
+    );
+    field_parse!("target_processing_time", '0'..='9' | '.' | '-', NotNan<f64>);
+    field_parse!(
+        "response_processing_time",
+        '0'..='9' | '.' | '-',
+        NotNan<f64>
+    );
     field!("elb_status_code", '0'..='9' | '-');
     field!("target_status_code", '0'..='9' | '-');
     field_parse!("received_bytes", '0'..='9' | '-', i64);
@@ -303,7 +332,7 @@ mod tests {
                              user_agent: "curl/7.46.0"
 
             })),
-            tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         two {
@@ -339,7 +368,7 @@ mod tests {
                               trace_id: "Root=1-58337281-1d84f3d73c47ec4e58577259",
                               type: "https",
                               user_agent: "curl/7.46.0"})),
-            tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         three {
@@ -375,7 +404,7 @@ mod tests {
                               trace_id: "Root=1-58337327-72bd00b0343d75b906739c42",
                               type: "h2",
                               user_agent: "curl/7.46.0"})),
-            tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         four {
@@ -411,7 +440,7 @@ mod tests {
                              trace_id: "Root=1-58337364-23a8c76965a2ef7629b185e3",
                              type: "ws",
                              user_agent: null})),
-            tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         five {
@@ -447,7 +476,7 @@ mod tests {
                               trace_id: "Root=1-58337364-23a8c76965a2ef7629b185e3",
                               type: "wss",
                               user_agent: null})),
-            tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         six {
@@ -483,7 +512,7 @@ mod tests {
                               trace_id: "Root=1-58337364-23a8c76965a2ef7629b185e3",
                               type: "http",
                               user_agent: "curl/7.46.0"})),
-            tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         seven {
@@ -519,7 +548,7 @@ mod tests {
                              trace_id: "Root=1-58337364-23a8c76965a2ef7629b185e3",
                              type: "http",
                              user_agent: "curl/7.46.0"})),
-            tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         eight {
@@ -555,7 +584,7 @@ mod tests {
                              target_status_code_list: ["200"],
                              classification: null,
                              classification_reason: null})),
-            tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         nine {
@@ -591,7 +620,7 @@ mod tests {
                              target_status_code_list: [],
                              classification: null,
                              classification_reason: null})),
-            tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         ten {
@@ -627,7 +656,7 @@ mod tests {
                              target_status_code_list: [],
                              classification: null,
                              classification_reason: null})),
-            tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         eleven {
@@ -663,7 +692,7 @@ mod tests {
                              target_status_code_list: ["200"],
                              classification: null,
                              classification_reason: null})),
-            tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
     ];
 }

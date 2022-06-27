@@ -1,6 +1,11 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 use crate::util;
+
+fn is_nullish(value: Value) -> Resolved {
+    Ok(util::is_nullish(&value).into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct IsNullish;
@@ -28,12 +33,11 @@ impl Function for IsNullish {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
-
         Ok(Box::new(IsNullishFn { value }))
     }
 }
@@ -45,11 +49,12 @@ struct IsNullishFn {
 
 impl Expression for IsNullishFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        Ok(util::is_nullish(&self.value.resolve(ctx)?).into())
+        let value = self.value.resolve(ctx)?;
+        is_nullish(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().boolean()
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        TypeDef::boolean().infallible()
     }
 }
 
@@ -62,63 +67,63 @@ mod tests {
         empty_string {
             args: func_args![value: value!("")],
             want: Ok(value!(true)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         single_space_string {
             args: func_args![value: value!(" ")],
             want: Ok(value!(true)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         multi_space_string {
             args: func_args![value: value!("     ")],
             want: Ok(value!(true)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         newline_string {
             args: func_args![value: value!("\n")],
             want: Ok(value!(true)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         carriage_return_string {
             args: func_args![value: value!("\r")],
             want: Ok(value!(true)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         dash_string {
             args: func_args![value: value!("-")],
             want: Ok(value!(true)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         null {
             args: func_args![value: value!(null)],
             want: Ok(value!(true)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         non_empty_string {
             args: func_args![value: value!("hello world")],
             want: Ok(value!(false)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         // Shows that a non-string/null literal returns false
         integer {
             args: func_args![value: value!(427)],
             want: Ok(value!(false)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         // Shows that a non-literal type returns false
         array {
             args: func_args![value: value!([1, 2, 3])],
             want: Ok(value!(false)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
     ];
 }

@@ -1,6 +1,16 @@
 use std::{convert::TryInto, net::Ipv4Addr};
 
+use ::value::Value;
 use vrl::prelude::*;
+
+fn ip_ntoa(value: Value) -> Resolved {
+    let i: u32 = value
+        .try_integer()?
+        .try_into()
+        .map_err(|_| String::from("cannot convert to bytes: integer does not fit in u32"))?;
+
+    Ok(Ipv4Addr::from(i).to_string().into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct IpNtoa;
@@ -28,8 +38,8 @@ impl Function for IpNtoa {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -45,18 +55,12 @@ struct IpNtoaFn {
 
 impl Expression for IpNtoaFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let i: u32 = self
-            .value
-            .resolve(ctx)?
-            .try_integer()?
-            .try_into()
-            .map_err(|_| String::from("cannot convert to bytes: integer does not fit in u32"))?;
-
-        Ok(Ipv4Addr::from(i).to_string().into())
+        let value = self.value.resolve(ctx)?;
+        ip_ntoa(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().bytes()
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        TypeDef::bytes().fallible()
     }
 }
 
@@ -70,13 +74,13 @@ mod tests {
         invalid {
             args: func_args![value: u32::MAX as i64 + 1],
             want: Err("cannot convert to bytes: integer does not fit in u32"),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         valid {
             args: func_args![value: 16909060],
             want: Ok(value!("1.2.3.4")),
-            tdef: TypeDef::new().fallible().bytes(),
+            tdef: TypeDef::bytes().fallible(),
         }
     ];
 }

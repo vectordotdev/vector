@@ -1,5 +1,19 @@
-use shared::tokenize;
+use ::value::Value;
+use vector_common::tokenize;
 use vrl::prelude::*;
+
+fn parse_tokens(value: Value) -> Resolved {
+    let string = value.try_bytes_utf8_lossy()?;
+    let tokens: Value = tokenize::parse(&string)
+        .into_iter()
+        .map(|token| match token {
+            "" | "-" => Value::Null,
+            _ => token.to_owned().into(),
+        })
+        .collect::<Vec<_>>()
+        .into();
+    Ok(tokens)
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseTokens;
@@ -21,8 +35,8 @@ impl Function for ParseTokens {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -47,24 +61,11 @@ struct ParseTokensFn {
 impl Expression for ParseTokensFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let string = value.try_bytes_utf8_lossy()?;
-
-        let tokens: Value = tokenize::parse(&string)
-            .into_iter()
-            .map(|token| match token {
-                "" | "-" => Value::Null,
-                _ => token.to_owned().into(),
-            })
-            .collect::<Vec<_>>()
-            .into();
-
-        Ok(tokens)
+        parse_tokens(value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().array_mapped::<(), Kind>(map! {
-            (): Kind::Bytes
-        })
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        TypeDef::array(Collection::from_unknown(Kind::bytes()))
     }
 }
 
@@ -87,9 +88,7 @@ mod tests {
                             "11881".into(),
 
                     ]),
-            tdef: TypeDef::new().array_mapped::<(), Kind>(map! {
-                (): Kind::Bytes
-            }),
+            tdef: TypeDef::array(Collection::from_unknown(Kind::bytes())),
         }
     ];
 }

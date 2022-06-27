@@ -13,7 +13,7 @@ components: sinks: aws_kinesis_firehose: components._aws & {
 	}
 
 	features: {
-		buffer: enabled:      true
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {
@@ -21,7 +21,7 @@ components: sinks: aws_kinesis_firehose: components._aws & {
 				common:       false
 				max_bytes:    4000000
 				max_events:   500
-				timeout_secs: 1
+				timeout_secs: 1.0
 			}
 			compression: {
 				enabled: true
@@ -41,7 +41,12 @@ components: sinks: aws_kinesis_firehose: components._aws & {
 				enabled: true
 				headers: false
 			}
-			tls: enabled: false
+			tls: {
+				enabled:                true
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        false
+			}
 			to: {
 				service: services.aws_kinesis_firehose
 
@@ -79,6 +84,7 @@ components: sinks: aws_kinesis_firehose: components._aws & {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	permissions: iam: [
