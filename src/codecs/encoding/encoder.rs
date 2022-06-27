@@ -115,7 +115,8 @@ impl Encoder<Framer> {
             ) => "application/json",
             (Serializer::Native(_), _) => "application/octet-stream",
             (
-                Serializer::Json(_)
+                Serializer::Avro(_)
+                | Serializer::Json(_)
                 | Serializer::Logfmt(_)
                 | Serializer::NativeJson(_)
                 | Serializer::RawMessage(_)
@@ -218,7 +219,7 @@ mod tests {
     where
         T: tokio_util::codec::Encoder<(), Error = BoxedFramingError>,
     {
-        pub(super) fn new(encoder: T, n: usize) -> Self {
+        pub(super) const fn new(encoder: T, n: usize) -> Self {
             Self(encoder, 0, n)
         }
     }

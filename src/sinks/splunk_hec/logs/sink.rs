@@ -16,8 +16,12 @@ use crate::{
     config::SinkContext,
     internal_events::SplunkEventTimestampInvalidType,
     internal_events::SplunkEventTimestampMissing,
+    internal_events::TemplateRenderingError,
     sinks::{
-        splunk_hec::common::{render_template_string, request::HecRequest},
+        splunk_hec::common::{
+            render_template_string, request::HecRequest, EndpointTarget, INDEX_FIELD,
+            SOURCETYPE_FIELD, SOURCE_FIELD,
+        },
         util::{processed_event::ProcessedEvent, SinkBuilderExt},
     },
     template::Template,
@@ -36,6 +40,7 @@ pub struct HecLogsSink<S> {
     pub host: String,
     pub timestamp_nanos_key: Option<String>,
     pub timestamp_key: String,
+    pub endpoint_target: EndpointTarget,
 }
 
 pub struct HecLogData<'a> {
@@ -46,6 +51,7 @@ pub struct HecLogData<'a> {
     pub host_key: &'a str,
     pub timestamp_nanos_key: Option<&'a String>,
     pub timestamp_key: &'a str,
+    pub endpoint_target: EndpointTarget,
 }
 
 impl<S> HecLogsSink<S>
@@ -66,11 +72,26 @@ where
             host_key: self.host.as_ref(),
             timestamp_nanos_key: self.timestamp_nanos_key.as_ref(),
             timestamp_key: self.timestamp_key.as_ref(),
+            endpoint_target: self.endpoint_target,
         };
 
         let sink = input
             .map(move |event| process_log(event, &data))
-            .batched_partitioned(EventPartitioner::default(), self.batch_settings)
+            .batched_partitioned(
+                if self.endpoint_target == EndpointTarget::Raw {
+                    // We only need to partition by the metadata fields for the raw endpoint since those fields
+                    // are sent via query parameters in the request.
+                    EventPartitioner::new(
+                        self.sourcetype.clone(),
+                        self.source.clone(),
+                        self.index.clone(),
+                        Some(self.host.clone()),
+                    )
+                } else {
+                    EventPartitioner::new(None, None, None, None)
+                },
+                self.batch_settings,
+            )
             .request_builder(builder_limit, self.request_builder)
             .filter_map(|request| async move {
                 match request {
@@ -100,15 +121,86 @@ where
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Hash, Eq)]
+pub(super) struct Partitioned {
+    pub(super) token: Option<Arc<str>>,
+    pub(super) source: Option<String>,
+    pub(super) sourcetype: Option<String>,
+    pub(super) index: Option<String>,
+    pub(super) host: Option<String>,
+}
+
 #[derive(Default)]
-struct EventPartitioner;
+struct EventPartitioner {
+    pub sourcetype: Option<Template>,
+    pub source: Option<Template>,
+    pub index: Option<Template>,
+    pub host_key: Option<String>,
+}
+
+impl EventPartitioner {
+    const fn new(
+        sourcetype: Option<Template>,
+        source: Option<Template>,
+        index: Option<Template>,
+        host_key: Option<String>,
+    ) -> Self {
+        Self {
+            sourcetype,
+            source,
+            index,
+            host_key,
+        }
+    }
+}
 
 impl Partitioner for EventPartitioner {
     type Item = HecProcessedEvent;
-    type Key = Option<Arc<str>>;
+    type Key = Option<Partitioned>;
 
     fn partition(&self, item: &Self::Item) -> Self::Key {
-        item.event.metadata().splunk_hec_token()
+        let emit_err = |error, field| {
+            emit!(TemplateRenderingError {
+                error,
+                field: Some(field),
+                drop_event: false,
+            })
+        };
+
+        let source = self.source.as_ref().and_then(|source| {
+            source
+                .render_string(&item.event)
+                .map_err(|error| emit_err(error, SOURCE_FIELD))
+                .ok()
+        });
+
+        let sourcetype = self.sourcetype.as_ref().and_then(|sourcetype| {
+            sourcetype
+                .render_string(&item.event)
+                .map_err(|error| emit_err(error, SOURCETYPE_FIELD))
+                .ok()
+        });
+
+        let index = self.index.as_ref().and_then(|index| {
+            index
+                .render_string(&item.event)
+                .map_err(|error| emit_err(error, INDEX_FIELD))
+                .ok()
+        });
+
+        let host = self
+            .host_key
+            .as_ref()
+            .and_then(|host_key| item.event.get(host_key.as_str()))
+            .and_then(|value| value.as_str().map(|s| s.to_string()));
+
+        Some(Partitioned {
+            token: item.event.metadata().splunk_hec_token(),
+            source,
+            sourcetype,
+            index,
+            host,
+        })
     }
 }
 
@@ -121,6 +213,7 @@ pub struct HecLogsProcessedEventMetadata {
     pub host: Option<Value>,
     pub timestamp: Option<f64>,
     pub fields: LogEvent,
+    pub endpoint_target: EndpointTarget,
 }
 
 impl ByteSizeOf for HecLogsProcessedEventMetadata {
@@ -141,15 +234,15 @@ pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
 
     let sourcetype = data
         .sourcetype
-        .and_then(|sourcetype| render_template_string(sourcetype, &log, "sourcetype"));
+        .and_then(|sourcetype| render_template_string(sourcetype, &log, SOURCETYPE_FIELD));
 
     let source = data
         .source
-        .and_then(|source| render_template_string(source, &log, "source"));
+        .and_then(|source| render_template_string(source, &log, SOURCE_FIELD));
 
     let index = data
         .index
-        .and_then(|index| render_template_string(index, &log, "index"));
+        .and_then(|index| render_template_string(index, &log, INDEX_FIELD));
 
     let host = log.get(data.host_key).cloned();
 
@@ -191,6 +284,7 @@ pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
         host,
         timestamp,
         fields,
+        endpoint_target: data.endpoint_target,
     };
 
     ProcessedEvent {

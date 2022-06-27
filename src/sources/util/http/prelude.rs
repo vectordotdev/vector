@@ -70,6 +70,8 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 HttpMethod::Delete => warp::delete().boxed(),
             };
 
+            // https://github.com/rust-lang/rust-clippy/issues/8148
+            #[allow(clippy::unnecessary_to_owned)]
             for s in path.split('/').filter(|&x| !x.is_empty()) {
                 filter = filter.and(warp::path(s.to_string())).boxed()
             }

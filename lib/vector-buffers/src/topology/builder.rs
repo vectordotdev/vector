@@ -136,7 +136,7 @@ impl<T: Bufferable> TopologyBuilder<T> {
             // sender/receiver/acker.  This is slightly awkward since we just end up actually giving
             // the handle to the `BufferSender`/`BufferReceiver` wrappers, but that's the price we
             // have to pay for letting each stage function in an opaque way when wrapped.
-            let usage_handle = buffer_usage.add_stage(stage_idx, stage.when_full);
+            let usage_handle = buffer_usage.add_stage(stage_idx);
             let provides_instrumentation = stage.untransformed.provides_instrumentation();
             let (sender, receiver, acker) = stage
                 .untransformed
@@ -211,7 +211,7 @@ impl<T: Bufferable> TopologyBuilder<T> {
         max_events: NonZeroUsize,
         when_full: WhenFull,
     ) -> (BufferSender<T>, BufferReceiver<T>) {
-        let usage_handle = BufferUsageHandle::noop(when_full);
+        let usage_handle = BufferUsageHandle::noop();
 
         let memory_buffer = Box::new(MemoryBuffer::new(max_events));
         let (sender, receiver, _) = memory_buffer

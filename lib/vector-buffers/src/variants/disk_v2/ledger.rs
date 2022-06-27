@@ -522,6 +522,19 @@ where
                 initial_buffer_size,
             );
     }
+
+    pub fn track_dropped_events(&self, count: u64) {
+        // We don't know how many bytes are represented by dropped events because we never actually had a chance to read
+        // them, so we have to use a byte size of 0 here.
+        //
+        // On the flipside, this would only matter if we incremented the buffer size and simultaneously skipped/lost the
+        // events within the same process lifecycle, since otherwise we'd start from the correct buffer size when
+        // loading the buffer initially.
+        //
+        // TODO: Can we do better here?
+        self.usage_handle
+            .increment_dropped_event_count_and_byte_size(count, 0, false);
+    }
 }
 
 impl<FS> Ledger<FS>

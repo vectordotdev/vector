@@ -1,0 +1,11 @@
+# read_only_recursive: .read_only
+# result:
+# error[E315]: mutation of read-only value
+#   ┌─ :2:1
+#   │
+# 2 │ .read_only = 5
+#   │ ^^^^^^^^^^^^ mutation of read-only value
+#   │
+#   = see language documentation at https://vrl.dev
+
+.read_only = 5

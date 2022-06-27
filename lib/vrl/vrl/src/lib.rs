@@ -1,3 +1,4 @@
+#![deny(warnings)]
 #![deny(clippy::all)]
 #![deny(unreachable_pub)]
 #![deny(unused_allocation)]
@@ -15,6 +16,7 @@ pub use compiler::{
 };
 pub use diagnostic;
 pub use runtime::{Runtime, RuntimeResult, Terminate};
+pub use vector_common::TimeZone;
 
 /// Compile a given source into the final [`Program`].
 pub fn compile(source: &str, fns: &[Box<dyn Function>]) -> compiler::Result {

@@ -212,6 +212,9 @@ components: sinks: [Name=string]: {
 											if codec == "ndjson" {
 												ndjson: "Newline delimited list of JSON encoded events."
 											}
+											if codec == "avro" {
+												avro: "Avro encoded event with a given schema."
+											}
 										}
 									}
 								}

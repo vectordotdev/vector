@@ -41,8 +41,9 @@ impl SyncTransform for Route {
     ) {
         let mut check_failed: usize = 0;
         for (output_name, condition) in &self.conditions {
-            if condition.check(&event) {
-                output.push_named(output_name, event.clone());
+            let (result, event) = condition.check(event.clone());
+            if result {
+                output.push_named(output_name, event);
             } else {
                 check_failed += 1;
             }

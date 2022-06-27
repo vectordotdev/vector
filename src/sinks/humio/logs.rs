@@ -8,7 +8,7 @@ use crate::{
     sinks::{
         splunk_hec::{
             common::{
-                acknowledgements::HecClientAcknowledgementsConfig, timestamp_key,
+                acknowledgements::HecClientAcknowledgementsConfig, timestamp_key, EndpointTarget,
                 SplunkHecDefaultBatchSettings,
             },
             logs::config::{HecEncoding, HecEncodingMigrator, HecLogsSinkConfig},
@@ -134,6 +134,7 @@ impl HumioLogsConfig {
                 ..Default::default()
             },
             timestamp_key: timestamp_key(),
+            endpoint_target: EndpointTarget::Event,
         }
     }
 }

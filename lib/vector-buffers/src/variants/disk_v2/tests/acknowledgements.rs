@@ -8,7 +8,6 @@ use crate::{
     variants::disk_v2::{
         acknowledgements::create_disk_v2_acker, ledger::Ledger, DiskBufferConfigBuilder,
     },
-    WhenFull,
 };
 
 #[tokio::test]
@@ -18,7 +17,7 @@ async fn ack_updates_ledger_correctly() {
 
         async move {
             // Create a standalone ledger.
-            let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
+            let usage_handle = BufferUsageHandle::noop();
             let config = DiskBufferConfigBuilder::from_path(data_dir)
                 .build()
                 .expect("creating buffer should not fail");
@@ -48,7 +47,7 @@ async fn ack_wakes_reader() {
 
         async move {
             // Create a standalone ledger.
-            let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
+            let usage_handle = BufferUsageHandle::noop();
             let config = DiskBufferConfigBuilder::from_path(data_dir)
                 .build()
                 .expect("creating buffer should not fail");

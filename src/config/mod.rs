@@ -548,24 +548,196 @@ pub struct TestOutput<T = OutputId> {
     feature = "transforms-json_parser"
 ))]
 mod tests {
-    use std::path::PathBuf;
+    use std::{collections::HashMap, path::PathBuf};
 
+    use crate::{config, topology};
     use indoc::indoc;
 
-    use super::{builder::ConfigBuilder, format, load_from_str, ComponentKey, Format};
+    use super::{builder::ConfigBuilder, format, load_from_str, ComponentKey, ConfigDiff, Format};
+
+    async fn load(config: &str, format: config::Format) -> Result<Vec<String>, Vec<String>> {
+        match config::load_from_str(config, format) {
+            Ok(c) => {
+                let diff = ConfigDiff::initial(&c);
+                let c2 = config::load_from_str(config, format).unwrap();
+                match (
+                    config::warnings(&c2),
+                    topology::builder::build_pieces(&c, &diff, HashMap::new()).await,
+                ) {
+                    (warnings, Ok(_pieces)) => Ok(warnings),
+                    (_, Err(errors)) => Err(errors),
+                }
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    #[tokio::test]
+    async fn bad_inputs() {
+        let err = load(
+            r#"
+            [sources.in]
+            type = "basic_source"
+
+            [transforms.sample]
+            type = "basic_transform"
+            inputs = []
+            suffix = "foo"
+            increase = 1.25
+
+            [transforms.sample2]
+            type = "basic_transform"
+            inputs = ["qwerty"]
+            suffix = "foo"
+            increase = 1.25
+
+            [sinks.out]
+            type = "basic_sink"
+            inputs = ["asdf", "in", "in"]
+            "#,
+            Format::Toml,
+        )
+        .await
+        .unwrap_err();
+
+        assert_eq!(
+            vec![
+                "Sink \"out\" has input \"in\" duplicated 2 times",
+                "Transform \"sample\" has no inputs",
+                "Input \"qwerty\" for transform \"sample2\" doesn't match any components.",
+                "Input \"asdf\" for sink \"out\" doesn't match any components.",
+            ],
+            err,
+        );
+    }
+
+    #[tokio::test]
+    async fn duplicate_name() {
+        let err = load(
+            r#"
+            [sources.foo]
+            type = "basic_source"
+
+            [sources.bar]
+            type = "basic_source"
+
+            [transforms.foo]
+            type = "basic_transform"
+            inputs = ["bar"]
+            suffix = "foo"
+            increase = 1.25
+
+            [sinks.out]
+            type = "basic_sink"
+            inputs = ["foo"]
+            "#,
+            Format::Toml,
+        )
+        .await
+        .unwrap_err();
+
+        assert_eq!(
+            err,
+            vec!["More than one component with name \"foo\" (source, transform).",]
+        );
+    }
+
+    #[tokio::test]
+    async fn warnings() {
+        let warnings = load(
+            r#"
+            [sources.in1]
+            type = "basic_source"
+
+            [sources.in2]
+            type = "basic_source"
+
+            [transforms.sample1]
+            type = "basic_transform"
+            inputs = ["in1"]
+            suffix = "foo"
+            increase = 1.25
+
+            [transforms.sample2]
+            type = "basic_transform"
+            inputs = ["in1"]
+            suffix = "foo"
+            increase = 1.25
+
+            [sinks.out]
+            type = "basic_sink"
+            inputs = ["sample1"]
+            "#,
+            Format::Toml,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            warnings,
+            vec![
+                "Transform \"sample2\" has no consumers",
+                "Source \"in2\" has no consumers",
+            ]
+        )
+    }
+
+    #[tokio::test]
+    async fn cycle() {
+        let errors = load(
+            r#"
+            [sources.in]
+            type = "basic_source"
+
+            [transforms.one]
+            type = "basic_transform"
+            inputs = ["in"]
+            suffix = "foo"
+            increase = 1.25
+
+            [transforms.two]
+            type = "basic_transform"
+            inputs = ["one", "four"]
+            suffix = "foo"
+            increase = 1.25
+
+            [transforms.three]
+            type = "basic_transform"
+            inputs = ["two"]
+            suffix = "foo"
+            increase = 1.25
+
+            [transforms.four]
+            type = "basic_transform"
+            inputs = ["three"]
+            suffix = "foo"
+            increase = 1.25
+
+            [sinks.out]
+            type = "basic_sink"
+            inputs = ["four"]
+            "#,
+            Format::Toml,
+        )
+        .await
+        .unwrap_err();
+
+        assert_eq!(
+            errors,
+            vec!["Cyclic dependency detected in the chain [ four -> two -> three -> four ]"]
+        )
+    }
 
     #[test]
     fn default_data_dir() {
         let config = load_from_str(
             indoc! {r#"
                 [sources.in]
-                  type = "file"
-                  include = ["/var/log/messages"]
+                type = "basic_source"
 
                 [sinks.out]
-                  type = "console"
-                  inputs = ["in"]
-                  encoding = "json"
+                type = "basic_sink"
+                inputs = ["in"]
             "#},
             Format::Toml,
         )
@@ -581,14 +753,12 @@ mod tests {
     fn default_schema() {
         let config = load_from_str(
             indoc! {r#"
-                [sources.in]
-                  type = "file"
-                  include = ["/var/log/messages"]
+            [sources.in]
+            type = "basic_source"
 
-                [sinks.out]
-                  type = "console"
-                  inputs = ["in"]
-                  encoding = "json"
+            [sinks.out]
+            type = "basic_sink"
+            inputs = ["in"]
             "#},
             Format::Toml,
         )
@@ -615,13 +785,11 @@ mod tests {
                   timestamp_key = "then"
 
                 [sources.in]
-                  type = "file"
-                  include = ["/var/log/messages"]
+                  type = "basic_source"
 
                 [sinks.out]
-                  type = "console"
+                  type = "basic_sink"
                   inputs = ["in"]
-                  encoding = "json"
             "#},
             Format::Toml,
         )
@@ -637,13 +805,11 @@ mod tests {
         let mut config: ConfigBuilder = format::deserialize(
             indoc! {r#"
                 [sources.in]
-                  type = "file"
-                  include = ["/var/log/messages"]
+                  type = "basic_source"
 
                 [sinks.out]
-                  type = "console"
+                  type = "basic_sink"
                   inputs = ["in"]
-                  encoding = "json"
             "#},
             Format::Toml,
         )
@@ -659,8 +825,10 @@ mod tests {
                           http = "http://proxy.inc:3128"
 
                         [transforms.foo]
-                          type = "json_parser"
+                          type = "basic_transform"
                           inputs = [ "in" ]
+                          suffix = "foo"
+                          increase = 1.25
 
                         [[tests]]
                           name = "check_simple_log"
@@ -695,13 +863,11 @@ mod tests {
         let mut config: ConfigBuilder = format::deserialize(
             indoc! {r#"
                 [sources.in]
-                  type = "file"
-                  include = ["/var/log/messages"]
+                  type = "basic_source"
 
                 [sinks.out]
-                  type = "console"
+                  type = "basic_sink"
                   inputs = ["in"]
-                  encoding = "json"
             "#},
             Format::Toml,
         )
@@ -712,17 +878,17 @@ mod tests {
                 format::deserialize(
                     indoc! {r#"
                         [sources.in]
-                          type = "file"
-                          include = ["/var/log/messages"]
+                          type = "basic_source"
 
                         [transforms.foo]
-                          type = "json_parser"
+                          type = "basic_transform"
                           inputs = [ "in" ]
+                          suffix = "foo"
+                          increase = 1.25
 
                         [sinks.out]
-                          type = "console"
+                          type = "basic_sink"
                           inputs = ["in"]
-                          encoding = "json"
                     "#},
                     Format::Toml,
                 )
@@ -769,7 +935,7 @@ mod tests {
     }
 
     #[test]
-    fn with_partial_proxy() {
+    fn with_partial_global_proxy() {
         let config: ConfigBuilder = format::deserialize(
             indoc! {r#"
                 [proxy]
@@ -780,8 +946,8 @@ mod tests {
                   endpoints = ["http://localhost:8000/basic_status"]
 
                 [sources.in.proxy]
-                  http = "http://server:3128"
-                  https = "http://other:3128"
+                  http = "http://server:3129"
+                  https = "http://other:3129"
                   no_proxy = ["localhost", "127.0.0.1"]
 
                 [sinks.out]
@@ -795,8 +961,40 @@ mod tests {
         assert_eq!(config.global.proxy.http, Some("http://server:3128".into()));
         assert_eq!(config.global.proxy.https, None);
         let source = config.sources.get(&ComponentKey::from("in")).unwrap();
-        assert_eq!(source.proxy.http, Some("http://server:3128".into()));
-        assert_eq!(source.proxy.https, Some("http://other:3128".into()));
+        assert_eq!(source.proxy.http, Some("http://server:3129".into()));
+        assert_eq!(source.proxy.https, Some("http://other:3129".into()));
+        assert!(source.proxy.no_proxy.matches("localhost"));
+    }
+
+    #[test]
+    fn with_partial_source_proxy() {
+        let config: ConfigBuilder = format::deserialize(
+            indoc! {r#"
+                [proxy]
+                  http = "http://server:3128"
+                  https = "http://other:3128"
+
+                [sources.in]
+                  type = "nginx_metrics"
+                  endpoints = ["http://localhost:8000/basic_status"]
+
+                [sources.in.proxy]
+                  http = "http://server:3129"
+                  no_proxy = ["localhost", "127.0.0.1"]
+
+                [sinks.out]
+                  type = "console"
+                  inputs = ["in"]
+                  encoding = "json"
+            "#},
+            Format::Toml,
+        )
+        .unwrap();
+        assert_eq!(config.global.proxy.http, Some("http://server:3128".into()));
+        assert_eq!(config.global.proxy.https, Some("http://other:3128".into()));
+        let source = config.sources.get(&ComponentKey::from("in")).unwrap();
+        assert_eq!(source.proxy.http, Some("http://server:3129".into()));
+        assert_eq!(source.proxy.https, None);
         assert!(source.proxy.no_proxy.matches("localhost"));
     }
 

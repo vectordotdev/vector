@@ -175,23 +175,25 @@ impl<'a> Container<'a> {
     }
 
     pub fn deprecated(&self) -> bool {
-        self.attrs.deprecated.is_present()
+        self.attrs.deprecated.is_some()
     }
 
     pub fn metadata(&self) -> impl Iterator<Item = &(String, String)> {
         self.attrs
             .metadata
             .iter()
-            .map(|metadata| &metadata.pairs)
-            .flatten()
+            .flat_map(|metadata| &metadata.pairs)
     }
 }
 
-#[derive(Debug, FromAttributes)]
-#[darling(attributes(configurable))]
+#[derive(Debug, Default, FromAttributes)]
+#[darling(default, attributes(configurable))]
 struct Attributes {
+    #[darling(default)]
     title: Option<String>,
+    #[darling(default)]
     description: Option<String>,
+    #[darling(default)]
     deprecated: Flag,
     #[darling(multiple)]
     metadata: Vec<Metadata>,

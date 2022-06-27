@@ -4,7 +4,6 @@ use std::{
     collections::{btree_map, BTreeMap},
     convert::AsRef,
     fmt::{self, Display, Formatter},
-    sync::Arc,
 };
 
 use chrono::{DateTime, Utc};
@@ -102,14 +101,14 @@ impl Metric {
 
     /// Consumes this metric, returning it with an updated set of event finalizers attached to `batch`.
     #[must_use]
-    pub fn with_batch_notifier(mut self, batch: &Arc<BatchNotifier>) -> Self {
+    pub fn with_batch_notifier(mut self, batch: &BatchNotifier) -> Self {
         self.metadata = self.metadata.with_batch_notifier(batch);
         self
     }
 
     /// Consumes this metric, returning it with an optionally updated set of event finalizers attached to `batch`.
     #[must_use]
-    pub fn with_batch_notifier_option(mut self, batch: &Option<Arc<BatchNotifier>>) -> Self {
+    pub fn with_batch_notifier_option(mut self, batch: &Option<BatchNotifier>) -> Self {
         self.metadata = self.metadata.with_batch_notifier_option(batch);
         self
     }
