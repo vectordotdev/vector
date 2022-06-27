@@ -65,31 +65,33 @@ struct ConfigBuilderHash<'a> {
 
 #[cfg(feature = "enterprise")]
 impl ConfigBuilderHash<'_> {
+    /// Sort inner JSON values to maintain a consistent ordering. This prevents
+    /// non-deterministically serializable structures like HashMap from
+    /// affecting the resulting hash. As a consequence, ordering that does not
+    /// affect the actual semantics of a configuration is not considered when
+    /// calculating the hash.
     fn into_hash(self) -> String {
         use sha2::{Digest, Sha256};
 
-        let value = self.to_sorted_string();
+        let value = to_sorted_json_string(self);
         let output = Sha256::digest(value.as_bytes());
 
         hex::encode(output)
     }
+}
 
-    /// Sort inner JSON values to maintain a consistent ordering. This
-    /// prevents non-deterministically serializable structures like HashMap from
-    /// affecting the resulting hash. As a consequence, ordering that does not
-    /// affect the actual semantics of a configuration is not considered when
-    /// calculating the hash.
-    fn to_sorted_string(&self) -> String {
-        // Converting to Value prior to serializing to JSON string is sufficient
-        // to sort our underlying keys. This is because Value::Map is backed (by
-        // default) by BTreeMap which maintains an implicit key order.
-        // Serializing Value (based on Map) is thus deterministic versus
-        // serializing ConfigBuilderHash (based on potential HashMap) directly.
-        let value = serde_json::to_value(&self)
-            .expect("Should serialize configuration hash builder to JSON. Please report.");
+// Converting to Value prior to serializing to JSON string is sufficient
+// to sort our underlying keys. This is because Value::Map is backed (by
+// default) by BTreeMap which maintains an implicit key order.
+// Serializing Value (based on Map) is thus deterministic versus
+// serializing ConfigBuilderHash (based on potential HashMap) directly.
+fn to_sorted_json_string<T>(value: T) -> String
+where
+    T: Serialize,
+{
+    let value = serde_json::to_value(value).expect("Should serialize to JSON. Please report.");
 
-        serde_json::to_string(&value).expect("Should serialize Value to JSON. Please report.")
-    }
+    serde_json::to_string(&value).expect("Should serialize Value to JSON string. Please report.")
 }
 
 #[cfg(feature = "enterprise")]
@@ -359,7 +361,9 @@ impl ConfigBuilder {
 
 #[cfg(all(test, feature = "enterprise-tests"))]
 mod tests {
-    use crate::config::ConfigBuilder;
+    use indexmap::IndexMap;
+
+    use crate::config::{builder::to_sorted_json_string, ConfigBuilder};
 
     use super::ConfigBuilderHash;
 
@@ -496,5 +500,14 @@ mod tests {
                 ConfigBuilderHash::from(&experiment_config).into_hash()
             );
         }
+    }
+
+    #[test]
+    fn test_to_sorted_json_string() {
+        let ordered_map = IndexMap::from([("z", 26), ("a", 1), ("d", 4), ("c", 3), ("b", 2)]);
+        assert_eq!(
+            r#"{"a":1,"b":2,"c":3,"d":4,"z":26}"#.to_string(),
+            to_sorted_json_string(ordered_map)
+        );
     }
 }
