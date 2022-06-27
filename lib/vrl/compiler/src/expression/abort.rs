@@ -7,8 +7,7 @@ use super::Expr;
 use crate::{
     expression::{ExpressionError, Resolved},
     state::{ExternalEnv, LocalEnv},
-    value::Kind,
-    value::VrlValueConvert,
+    value::{Kind, VrlValueConvert},
     Context, Expression, Span, TypeDef,
 };
 

@@ -128,7 +128,7 @@ fn hec_encoder(encoding: HecEncoding) -> HecLogsEncoder {
     let encoding: EncodingConfigAdapter<EncodingConfig<HecEncoding>, HecEncodingMigrator> =
         EncodingConfig::from(encoding).into();
     let transformer = encoding.transformer();
-    let serializer = encoding.encoding();
+    let serializer = encoding.encoding().unwrap();
     let encoder = Encoder::<()>::new(serializer);
     HecLogsEncoder {
         transformer,
