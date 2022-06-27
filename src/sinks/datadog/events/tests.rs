@@ -25,7 +25,7 @@ use crate::{
 fn random_events_with_stream(
     len: usize,
     count: usize,
-    batch: Option<Arc<BatchNotifier>>,
+    batch: Option<BatchNotifier>,
 ) -> (Vec<String>, impl Stream<Item = EventArray>) {
     let (lines, stream) = random_lines_with_stream(len, count, batch);
     (

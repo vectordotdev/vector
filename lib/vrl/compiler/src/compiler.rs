@@ -2,9 +2,9 @@ use diagnostic::{DiagnosticList, DiagnosticMessage, Severity, Span};
 use lookup::LookupBuf;
 use parser::ast::{self, Node, QueryTarget};
 
-use crate::parser::ast::RootExpr;
 use crate::{
     expression::*,
+    parser::ast::RootExpr,
     program::ProgramInfo,
     state::{ExternalEnv, LocalEnv},
     Function, Program,
@@ -357,11 +357,13 @@ impl<'a> Compiler<'a> {
                 let consequent_external = external.target().clone();
 
                 self.local = original_locals;
+                external.update_target(original_external);
 
                 let else_block = self.compile_block(block, external)?;
 
                 // assignments must be the result of either the if or else block, but not the original value
                 self.local = self.local.clone().merge(consequent_locals);
+
                 external.update_target(consequent_external.merge(external.target().clone()));
 
                 Some(IfStatement {

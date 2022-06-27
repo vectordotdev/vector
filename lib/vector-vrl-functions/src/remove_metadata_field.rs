@@ -29,7 +29,7 @@ impl Function for RemoveMetadataField {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "key",
-            kind: kind::BYTES,
+            kind: kind::ANY,
             required: true,
         }]
     }
@@ -44,11 +44,21 @@ impl Function for RemoveMetadataField {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        (_, external): (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let key = get_metadata_key(&mut arguments)?;
+
+        if let MetadataKey::Query(query) = &key {
+            if external.is_read_only_metadata_path(query.path()) {
+                return Err(vrl::function::Error::ReadOnlyMutation {
+                    context: format!("{} is read-only, and cannot be removed", query),
+                }
+                .into());
+            }
+        }
+
         Ok(Box::new(RemoveMetadataFieldFn { key }))
     }
 }

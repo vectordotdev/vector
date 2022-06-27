@@ -112,7 +112,7 @@ impl MetadataTarget for TargetValueRef<'_> {
     }
 
     fn remove_metadata(&mut self, path: &LookupBuf) -> Result<(), String> {
-        self.metadata.remove_by_path(path, true);
+        self.metadata.remove_by_path(path, false);
         Ok(())
     }
 }
@@ -168,7 +168,7 @@ impl MetadataTarget for TargetValue {
     }
 
     fn remove_metadata(&mut self, path: &LookupBuf) -> Result<(), String> {
-        self.metadata.remove_by_path(path, true);
+        self.metadata.remove_by_path(path, false);
         Ok(())
     }
 }

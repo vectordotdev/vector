@@ -20,7 +20,7 @@ use crate::{
     variants::disk_v2::{
         common::MAX_FILE_ID, writer::RecordWriter, Buffer, DiskBufferConfig, WriterError,
     },
-    EventCount, WhenFull,
+    EventCount,
 };
 
 mod action;
@@ -829,7 +829,7 @@ proptest! {
             // actions that are coupled to one another, in a lockstep fashion, with the model.
             let mut model = BufferModel::from_config(&config);
 
-            let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
+            let usage_handle = BufferUsageHandle::noop();
             let (writer, reader, acker, ledger) =
                 Buffer::<Record>::from_config_inner(config, usage_handle)
                     .await

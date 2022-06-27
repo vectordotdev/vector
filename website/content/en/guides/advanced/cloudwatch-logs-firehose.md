@@ -1,9 +1,9 @@
 ---
 title: Ingesting AWS CloudWatch Logs via AWS Kinesis Firehose
 description: Use CloudWatch Log subscriptions and Kinesis Firehose to robustly collect and route your CloudWatch logs.
-authors: ["jszwedko"]
+authors: ["jszwedko", "spencergilbert"]
 domains: ["sources", "transforms"]
-transforms: ["aws_cloudwatch_logs_subscription_parser"]
+transforms: ["remap"]
 weight: 2
 tags: ["aws", "cloudwatch", "logs", "firehose", "advanced", "guides", "guide"]
 ---
@@ -27,9 +27,9 @@ running Vector instances over HTTPS.
 You will learn how to:
 
 * Configure Vector to consume AWS CloudWatch Log events via the
- [`aws_kinesis_firehose`][aws_kinesis_firehose]] source and
- [`aws_cloudwatch_logs_subscription_parser`][aws_cloudwatch_logs_subscription_parser]
- transform
+ [`aws_kinesis_firehose`][aws_kinesis_firehose] source and
+ [`remap`][remap]
+ remap
 * Configure [AWS Kinesis Firehose][AWS Kinesis Firehose] to forward events to
   a remotely running Vector instance (or instances)
 
@@ -39,10 +39,6 @@ adapted to send them to any other [destination of your choice](https://vector.de
 
 The goal of this guide is to serve as a reference that you can customize for
 your specific needs.
-
-When you are done, you will end up with a setup that looks like:
-
-![AWS Kinesis Firehose to Vector](/img/guides/aws-kinesis-firehose-to-vector.png)
 
 ## Motivation
 
@@ -87,29 +83,35 @@ Let's take a look at the configuration we will be using:
 [sources.firehose]
   type = "aws_kinesis_firehose"
   address = "0.0.0.0:8080" # the public URL will be set when configuring Firehose
-  access_key = "${FIREHOSE_ACCESS_KEY}"my secret key" # this will also be set when configuring Firehose
+  access_key = "${FIREHOSE_ACCESS_KEY} # this will also be set when configuring Firehose
 
-[transforms.cloudwatch]
-  type = "aws_cloudwatch_logs_subscription_parser"
+[transforms.parse]
+  type = "remap"
   inputs = ["firehose"]
-
-[transforms.json]
-  type = "json_parser"
-  inputs = ["cloudwatch"]
+  drop_on_error = false
+  source = '''
+    parsed = parse_aws_cloudwatch_log_subscription_message!(.message)
+    . = unnest(parsed.log_events)
+    . = map_values(.) -> |value| {
+       event = del(value.log_events)
+       value |= event
+       message = del(.message)
+       . |= object!(parse_json!(message))
+    }
+  '''
 
 # you may want to add more transforms here
 
 [sinks.console]
   type = "console"
-  inputs = ["json"]
+  inputs = ["parse"]
   encoding.codec = "json"
 ```
 
 This will configure `vector` to listen for Firehose messages on the configured
 port. These messages will then be transformed, via the
-[`aws_cloudwatch_logs_subscription_parser`][aws_cloudwatch_logs_subscription_parser]
-to extract the individual log events, and then the `json_parser` to parse these
-events. Finally, they are written to the console.
+[`remap`][remap] transform to extract the individual log events, and then parse
+these events. Finally, they are written to the console.
 
 {{< info >}}
 AWS Kinesis Firehose will only forward to HTTPS (and not HTTP) endpoints running
@@ -276,8 +278,7 @@ This will configure Firehose to ship all events to `$VECTOR_ENDPOINT` using the
 provided access key. Any events that fail to be successfully processed after
 300 seconds will be written to the S3 bucket for further processing.
 
-See `[aws firehose
-create-delivery-stream](https://docs.aws.amazon.com/cli/latest/reference/firehose/create-delivery-stream.html)`
+See [aws firehose create-delivery-stream](https://docs.aws.amazon.com/cli/latest/reference/firehose/create-delivery-stream.html)
 for more configuration options.
 
 ## Setup CloudWatch Logs subscription
@@ -473,7 +474,36 @@ Firehose) and `timestamp` (parsed from the `timestamp` field of the request
 body). The `message` field is the decoded record data. In our case, this is an
 AWS CloudWatch Logs Subscription event.
 
-If we formatted it, it would look like:
+To extract and parse the originating events from this subscription event, we
+can use a [`remap`][remap] transform and leverage the [`parse_aws_cloudwatch_log_subscription_message`][parse_aws_cloudwatch_log_subscription_message],
+[`unnest`][unnest], [`map_values`][map_values], and [`parse_json`][parse_json]
+functions:
+
+```toml
+[transforms.parse]
+  type = "remap"
+  inputs = ["firehose"]
+  drop_on_error = false
+  source = '''
+    parsed = parse_aws_cloudwatch_log_subscription_message!(.message)
+    . = unnest(parsed.log_events)
+    . = map_values(.) -> |value| {
+       event = del(value.log_events)
+       value |= event
+       message = del(.message)
+       . |= object!(parse_json!(message))
+    }
+  '''
+```
+
+Let's step through this program one function at a time.
+
+```coffee
+parsed = parse_aws_cloudwatch_log_subscription_message!(.message)
+```
+
+This line will parse the `.message` field and store the results in a variable
+`parsed`. The contents of that variable would look like:
 
 ```json
 {
@@ -499,44 +529,42 @@ If we formatted it, it would look like:
 }
 ```
 
-To extract the originating events from this subscription event, we can use the
-[`aws_cloudwatch_logs_subscription_parser`][aws_cloudwatch_logs_subscription_parser]
-transform:
-
-```toml
-[transforms.cloudwatch]
-  type = "aws_cloudwatch_logs_subscription_parser"
-  inputs = ["firehose"]
+```coffee
+. = unnest(parsed.log_events)
 ```
 
 This will take the above event and output two new events:
 
 ```json
 {
-  "id": "35683658089614582423604394983260738922885519999578275840",
+  "log_events": {
+    "id": "35683658089614582423604394983260738922885519999578275840",
+    "message": "{\"bytes\":26780,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"157.130.216.193\",\"method\":\"PUT\",\"protocol\":\"HTTP/1.0\",\"referer\":\"https://www.principalcross-platform.io/markets/ubiquitous\",\"request\":\"/expedite/convergence\",\"source_type\":\"stdin\",\"status\":301,\"user-identifier\":\"-\"}",
+    "timestamp": "2020-09-14T19:09:29.039Z"
+  },
   "log_group": "/test/vector",
   "log_stream": "test",
-  "message": "{\"bytes\":26780,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"157.130.216.193\",\"method\":\"PUT\",\"protocol\":\"HTTP/1.0\",\"referer\":\"https://www.principalcross-platform.io/markets/ubiquitous\",\"request\":\"/expedite/convergence\",\"source_type\":\"stdin\",\"status\":301,\"user-identifier\":\"-\"}",
   "owner": "071959437513",
   "request_id": "ed1d787c-b9e2-4631-92dc-8e7c9d26d804",
   "source_arn": "arn:aws:firehose:us-east-1:111111111111:deliverystream/test",
   "subscription_filters": [
     "Destination"
   ],
-  "timestamp": "2020-09-14T19:09:29.039Z"
 }
 {
-  "id": "35683658089659183914001456229543810359430816722590236673",
+  "log_events": {
+    "id": "35683658089659183914001456229543810359430816722590236673",
+    "message": "{\"bytes\":17707,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"109.81.244.252\",\"method\":\"GET\",\"protocol\":\"HTTP/2.0\",\"referer\":\"http://www.investormission-critical.io/24/7/vortals\",\"request\":\"/scale/functionalities/optimize\",\"source_type\":\"stdin\",\"status\":502,\"user-identifier\":\"feeney1708\"}",
+    "timestamp": "2020-09-14T19:09:29.041Z"
+  },
   "log_group": "/test/vector",
   "log_stream": "test",
-  "message": "{\"bytes\":17707,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"109.81.244.252\",\"method\":\"GET\",\"protocol\":\"HTTP/2.0\",\"referer\":\"http://www.investormission-critical.io/24/7/vortals\",\"request\":\"/scale/functionalities/optimize\",\"source_type\":\"stdin\",\"status\":502,\"user-identifier\":\"feeney1708\"}",
   "owner": "071959437513",
   "request_id": "ed1d787c-b9e2-4631-92dc-8e7c9d26d804",
   "source_arn": "arn:aws:firehose:us-east-1:111111111111:deliverystream/test",
   "subscription_filters": [
     "Destination"
   ],
-  "timestamp": "2020-09-14T19:09:29.041Z"
 }
 ```
 
@@ -550,16 +578,30 @@ context:
 * `subcription_filters` the filters that matched to send the event
 * `timestamp` is overwritten with the timestamp from the log event
 
-This is pretty good, but, our original events are also JSON, so let's parse
-those out using the [`json_parser`][json_parser] transform:
+This is pretty good, but, our original events are also JSON and the `.id`,
+`.message`, and `.timestamp` fields are nested. The next function uses
+iteration to finish up our processing.
 
-```toml
-[transforms.json]
-  type = "json_parser"
-  inputs = ["cloudwatch"]
+```coffee
+. = map_values(.) -> |value| {
+   event = del(value.log_events)
+   value |= event
+   message = del(.message)
+   . |= object!(parse_json!(message))
+}
 ```
 
-This will give us the final result of:
+This snippet will iterate through the values in the root of the event,
+the two objects shown above. For each "value" (an object) we delete the
+`.log_events` field, saving it's contents in a variable `event`. We then
+merge the contents into `value`, which moves the `.id`, `.message`,
+and `.timestamp` fields into the root of that object.
+
+We then delete the `.message` field, storing the contents in a variable
+`message`. Finally we parse the variable as JSON, and merge the now structured
+fields into the root of the object.
+
+This will give us the final result of the following two events:
 
 ```json
 {
@@ -567,7 +609,7 @@ This will give us the final result of:
   "datetime": "14/Sep/2020:11:45:41 -0400",
   "host": "157.130.216.193",
   "id": "35683658089614582423604394983260738922885519999578275840",
-  "log_group": "/jesse/test",
+  "log_group": "/test/vector",
   "log_stream": "test",
   "method": "PUT",
   "owner": "071959437513",
@@ -589,7 +631,7 @@ This will give us the final result of:
   "datetime": "14/Sep/2020:11:45:41 -0400",
   "host": "109.81.244.252",
   "id": "35683658089659183914001456229543810359430816722590236673",
-  "log_group": "/jesse/test",
+  "log_group": "/test/vector",
   "log_stream": "test",
   "method": "GET",
   "owner": "071959437513",
@@ -613,9 +655,9 @@ Here are original events with all of the additional context!
 [aws_auth]: /docs/reference/configuration/sinks/aws_cloudwatch_logs/#aws-authentication
 [AWS CloudWatch Logs subscriptions]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Subscriptions.html
 [aws_kinesis_firehose]: /docs/reference/configuration/sources/aws_kinesis_firehose/
-[aws_cloudwatch_logs_subscription_parser]: /docs/reference/configuration/transforms/aws_cloudwatch_logs_subscription_parser/
 [AWS CloudWatch Logs]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html
 [AWS Kinesis Firehose]: https://aws.amazon.com/kinesis/data-firehose/?kinesis-blogs.sort-by=item.additionalFields.createdDate&kinesis-blogs.sort-order=desc
 [flog]: https://github.com/mingrammer/flog
-[json_parser]: /docs/reference/vrl/functions/#parse_json
-m
+[parse_aws_cloudwatch_log_subscription_message]: /docs/reference/vrl/functions/#parse_json
+[parse_json]: /docs/reference/vrl/functions/#parse_json
+[remap]: /docs/reference/configuration/transforms/remap/

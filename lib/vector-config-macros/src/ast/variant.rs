@@ -71,7 +71,7 @@ impl<'a> Variant<'a> {
     }
 
     pub fn deprecated(&self) -> bool {
-        self.attrs.deprecated.is_present()
+        self.attrs.deprecated.is_some()
     }
 
     pub fn visible(&self) -> bool {
@@ -85,8 +85,8 @@ impl<'a> Spanned for Variant<'a> {
     }
 }
 
-#[derive(Debug, FromAttributes)]
-#[darling(attributes(configurable))]
+#[derive(Debug, Default, FromAttributes)]
+#[darling(default, attributes(configurable))]
 struct Attributes {
     title: Option<String>,
     description: Option<String>,
