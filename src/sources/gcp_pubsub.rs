@@ -15,7 +15,7 @@ use tokio::sync::{mpsc, watch};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{
     metadata::{errors::InvalidMetadataValue, MetadataValue},
-    transport::{Certificate, Channel, ClientTlsConfig, Endpoint, Identity},
+    transport::{Certificate, ClientTlsConfig, Endpoint, Identity},
     Code, Request, Status,
 };
 use vector_common::{byte_size_of::ByteSizeOf, finalizer::UnorderedFinalizer};
@@ -25,7 +25,7 @@ use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{AcknowledgementsConfig, DataType, Output, SourceConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, Event, MaybeAsLogMut, Value},
-    gcp::{GcpAuthConfig, GcpCredentials, Scope, PUBSUB_URL},
+    gcp::{GcpAuthConfig, GcpAuthenticator, Scope, PUBSUB_URL},
     internal_events::{
         BytesReceived, GcpPubsubConnectError, GcpPubsubReceiveError, GcpPubsubStreamingPullError,
         StreamClosedError,
@@ -88,7 +88,7 @@ pub(crate) enum PubsubError {
     #[snafu(display("Invalid endpoint URI: {}", source))]
     Uri { source: InvalidUri },
     #[snafu(display("Could not create endpoint: {}", source))]
-    Endpoint { source: InvalidUri },
+    Endpoint { source: tonic::transport::Error },
     #[snafu(display("Could not set up endpoint TLS settings: {}", source))]
     EndpointTls { source: tonic::transport::Error },
     #[snafu(display("Could not connect: {}", source))]
@@ -123,12 +123,6 @@ pub struct PubsubConfig {
 
     /// The endpoint from which to pull data.
     pub endpoint: Option<String>,
-
-    /// Disables the loading of authentication credentials.
-    ///
-    /// Only used for tests.
-    #[serde(skip, default)]
-    pub skip_authentication: bool,
 
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
@@ -237,14 +231,15 @@ impl SourceConfig for PubsubConfig {
             (None, None) => default_retry_delay(),
         };
 
-        let credentials = if self.skip_authentication {
-            None
-        } else {
-            self.auth.make_credentials(Scope::PubSub).await?
-        };
+        let auth = self.auth.build(Scope::PubSub).await?;
 
-        let endpoint = self.endpoint.as_deref().unwrap_or(PUBSUB_URL).to_string();
-        let uri: Uri = endpoint.parse().context(UriSnafu)?;
+        let mut uri: Uri = self
+            .endpoint
+            .as_deref()
+            .unwrap_or(PUBSUB_URL)
+            .parse()
+            .context(UriSnafu)?;
+        auth.apply_uri(&mut uri);
 
         let tls = TlsSettings::from_options(&self.tls)?;
         let host = uri.host().unwrap_or("pubsub.googleapis.com");
@@ -256,27 +251,17 @@ impl SourceConfig for PubsubConfig {
             tls_config = tls_config.ca_certificate(Certificate::from_pem(authority));
         }
 
-        let mut endpoint = Channel::from_shared(endpoint).context(EndpointSnafu)?;
+        let mut endpoint: Endpoint = uri.to_string().parse().context(EndpointSnafu)?;
         if uri.scheme() != Some(&Scheme::HTTP) {
             endpoint = endpoint.tls_config(tls_config).context(EndpointTlsSnafu)?;
         }
 
-        let token_generator = match &credentials {
-            Some(credentials) => credentials.clone().spawn_regenerate_token(),
-            None => {
-                let (sender, receiver) = watch::channel(());
-                // This keeps the sender end of the watch open without
-                // actually sending anything, effectively creating an
-                // empty watch stream.
-                tokio::spawn(async move { sender.closed().await });
-                receiver
-            }
-        };
+        let token_generator = auth.spawn_regenerate_token();
 
         let source = PubsubSource {
             endpoint,
             uri,
-            credentials,
+            auth,
             token_generator,
             subscription: format!(
                 "projects/{}/subscriptions/{}",
@@ -319,7 +304,7 @@ impl_generate_config_from_default!(PubsubConfig);
 struct PubsubSource {
     endpoint: Endpoint,
     uri: Uri,
-    credentials: Option<GcpCredentials>,
+    auth: GcpAuthenticator,
     token_generator: watch::Receiver<()>,
     subscription: String,
     decoder: Decoder,
@@ -418,14 +403,13 @@ impl PubsubSource {
         let mut client = proto::subscriber_client::SubscriberClient::with_interceptor(
             connection,
             |mut req: Request<()>| {
-                if let Some(credentials) = &self.credentials {
-                    let authorization = MetadataValue::try_from(&credentials.make_token())
-                        .map_err(|_| {
-                            Status::new(
-                                Code::FailedPrecondition,
-                                "Invalid token text returned by GCP",
-                            )
-                        })?;
+                if let Some(token) = self.auth.make_token() {
+                    let authorization = MetadataValue::try_from(&token).map_err(|_| {
+                        Status::new(
+                            Code::FailedPrecondition,
+                            "Invalid token text returned by GCP",
+                        )
+                    })?;
                     req.metadata_mut().insert("authorization", authorization);
                 }
                 Ok(req)
@@ -899,7 +883,10 @@ mod integration_tests {
                 project: PROJECT.into(),
                 subscription: self.subscription.clone(),
                 endpoint: Some(gcp::PUBSUB_ADDRESS.clone()),
-                skip_authentication: true,
+                auth: GcpAuthConfig {
+                    skip_authentication: true,
+                    ..Default::default()
+                },
                 ack_deadline_secs: Some(ACK_DEADLINE as i32),
                 ..Default::default()
             };
