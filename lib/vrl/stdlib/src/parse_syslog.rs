@@ -274,7 +274,10 @@ mod tests {
                 "severity" => "notice",
                 "timestamp" => chrono::Utc.ymd(2019, 2, 13).and_hms_milli(19, 48, 34, 0),
                 "version" => 1,
-                "non_empty.x" => "",
+                "empty" => btreemap! {},
+                "non_empty" => btreemap! {
+                    "x" => "",
+                },
             }),
             tdef: TypeDef::object(inner_kind()).fallible(),
         }
