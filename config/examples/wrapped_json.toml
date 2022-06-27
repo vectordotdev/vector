@@ -17,9 +17,10 @@ data_dir = "/var/lib/vector"
 # Parse the data as JSON
 # Docs: https://vector.dev/docs/reference/transforms/remap
 [transforms.parse_json]
-  inputs       = ["logs"]
-  type         = "remap"
-  source       = '''
+  inputs        = ["logs"]
+  type          = "remap"
+  drop_on_error = false
+  source        = '''
   message = del(.message)
   . |= parse_json!(string!(message))
 
