@@ -1423,7 +1423,9 @@ fn test_config_outputs() {
                             .optional_field("appname", Kind::bytes(), None)
                             .optional_field("msgid", Kind::bytes(), None)
                             .optional_field("procid", Kind::integer().or_bytes(), None)
-                            .unknown_fields(Kind::bytes()),
+                            .unknown_fields(Kind::object(value::kind::Collection::from_unknown(
+                                Kind::bytes(),
+                            ))),
                     ),
                 )]),
             },
@@ -1448,7 +1450,9 @@ fn test_config_outputs() {
                                 .optional_field("appname", Kind::bytes(), None)
                                 .optional_field("msgid", Kind::bytes(), None)
                                 .optional_field("procid", Kind::integer().or_bytes(), None)
-                                .unknown_fields(Kind::bytes()),
+                                .unknown_fields(Kind::object(
+                                    value::kind::Collection::from_unknown(Kind::bytes()),
+                                )),
                         ),
                     ),
                     (Some(METRICS), None),

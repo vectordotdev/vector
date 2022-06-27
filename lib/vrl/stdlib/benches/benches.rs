@@ -1675,9 +1675,11 @@ bench_function! {
             "appname": "non",
             "procid": 2426,
             "msgid": "ID931",
-            "exampleSDID@32473.iut": "3",
-            "exampleSDID@32473.eventSource": "Application",
-            "exampleSDID@32473.eventID": "1011",
+            "exampleSDID@32473": {
+                "iut": "3",
+                "eventSource": "Application",
+                "eventID": "1011",
+            },
             "message": "Try to override the THX port, maybe it will reboot the neural interface!",
             "version": 1,
         }))
