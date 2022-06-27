@@ -78,13 +78,13 @@ impl ConfigBuilderHash<'_> {
     /// affecting the resulting hash. As a consequence, ordering that does not
     /// affect the actual semantics of a configuration is not considered when
     /// calculating the hash.
-    fn to_sorted_string(self) -> String {
+    fn to_sorted_string(&self) -> String {
         // Converting to Value prior to serializing to JSON string is sufficient
         // to sort our underlying keys. This is because Value::Map is backed (by
         // default) by BTreeMap which maintains an implicit key order.
         // Serializing Value (based on Map) is thus deterministic versus
         // serializing ConfigBuilderHash (based on potential HashMap) directly.
-        let value = serde_json::to_value(self)
+        let value = serde_json::to_value(&self)
             .expect("Should serialize configuration hash builder to JSON. Please report.");
 
         serde_json::to_string(&value).expect("Should serialize Value to JSON. Please report.")
