@@ -4,8 +4,7 @@ use anymap::AnyMap;
 use lookup::LookupBuf;
 use value::{Kind, Value};
 
-use crate::value::Collection;
-use crate::{parser::ast::Ident, type_def::Details};
+use crate::{parser::ast::Ident, type_def::Details, value::Collection};
 
 /// Local environment, limited to a given scope.
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -44,7 +43,7 @@ impl LocalEnv {
     }
 
     /// Merges two local envs together. This is useful in cases such as if statements
-    /// where different LocalEnv's can be created, and the result is decided at runtime.
+    /// where different `LocalEnv`'s can be created, and the result is decided at runtime.
     /// The compile-time type must be the union of the options.
     pub(crate) fn merge(mut self, other: Self) -> Self {
         for (ident, other_details) in other.bindings {
@@ -69,7 +68,7 @@ pub struct ExternalEnv {
 }
 
 // temporary until paths can point to metadata
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum PathRoot {
     Event,
     Metadata,
@@ -91,6 +90,7 @@ impl Default for ExternalEnv {
 impl ExternalEnv {
     /// Creates a new external environment that starts with an initial given
     /// [`Kind`].
+    #[must_use]
     pub fn new_with_kind(kind: Kind) -> Self {
         Self {
             target: Details {
@@ -201,6 +201,7 @@ pub struct Runtime {
 }
 
 impl Runtime {
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.variables.is_empty()
     }
@@ -209,6 +210,7 @@ impl Runtime {
         self.variables.clear();
     }
 
+    #[must_use]
     pub fn variable(&self, ident: &Ident) -> Option<&Value> {
         self.variables.get(ident)
     }

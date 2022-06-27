@@ -86,7 +86,7 @@ pub trait Function: Send + Sync + fmt::Debug {
 
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Example {
     pub title: &'static str,
     pub source: &'static str,
@@ -100,6 +100,7 @@ pub struct FunctionCompileContext {
 }
 
 impl FunctionCompileContext {
+    #[must_use]
     pub fn new(span: Span) -> Self {
         Self {
             span,
@@ -108,17 +109,20 @@ impl FunctionCompileContext {
     }
 
     /// Add an external context to the compile context.
+    #[must_use]
     pub fn with_external_context(mut self, context: AnyMap) -> Self {
         self.external_context = context;
         self
     }
 
     /// Span information for the function call.
+    #[must_use]
     pub fn span(&self) -> Span {
         self.span
     }
 
     /// Get an immutable reference to a stored external context, if one exists.
+    #[must_use]
     pub fn get_external_context<T: 'static>(&self) -> Option<&T> {
         self.external_context.get::<T>()
     }
@@ -129,6 +133,7 @@ impl FunctionCompileContext {
     }
 
     /// Consume the `FunctionCompileContext`, returning the (potentially mutated) `AnyMap`.
+    #[must_use]
     pub fn into_external_context(self) -> AnyMap {
         self.external_context
     }
@@ -136,7 +141,7 @@ impl FunctionCompileContext {
 
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Parameter {
     /// The keyword of the parameter.
     ///
@@ -159,6 +164,7 @@ pub struct Parameter {
 
 impl Parameter {
     #[allow(arithmetic_overflow)]
+    #[must_use]
     pub fn kind(&self) -> Kind {
         let mut kind = Kind::never();
 
@@ -408,6 +414,7 @@ impl ArgumentList {
         Ok(required(self.optional_array(keyword)?))
     }
 
+    #[must_use]
     pub fn optional_closure(&self) -> Option<&FunctionClosure> {
         self.closure.as_ref()
     }
@@ -505,6 +512,7 @@ pub struct FunctionClosure {
 }
 
 impl FunctionClosure {
+    #[must_use]
     pub fn new<T: Into<Ident>>(variables: Vec<T>, block: Block) -> Self {
         Self {
             variables: variables.into_iter().map(Into::into).collect(),
@@ -550,7 +558,10 @@ pub enum Error {
 
 impl diagnostic::DiagnosticMessage for Error {
     fn code(&self) -> usize {
-        use Error::*;
+        use Error::{
+            ExpectedFunctionClosure, ExpectedStaticExpression, InvalidArgument, InvalidEnumVariant,
+            ReadOnlyMutation, UnexpectedExpression,
+        };
 
         match self {
             UnexpectedExpression { .. } => 400,
@@ -563,7 +574,10 @@ impl diagnostic::DiagnosticMessage for Error {
     }
 
     fn labels(&self) -> Vec<Label> {
-        use Error::*;
+        use Error::{
+            ExpectedFunctionClosure, ExpectedStaticExpression, InvalidArgument, InvalidEnumVariant,
+            ReadOnlyMutation, UnexpectedExpression,
+        };
 
         match self {
             UnexpectedExpression {
@@ -594,7 +608,7 @@ impl diagnostic::DiagnosticMessage for Error {
                         "expected one of: {}",
                         variants
                             .iter()
-                            .map(|v| v.to_string())
+                            .map(std::string::ToString::to_string)
                             .collect::<Vec<_>>()
                             .join(", ")
                     ),

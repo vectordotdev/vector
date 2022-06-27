@@ -1,5 +1,4 @@
-use std::str::FromStr;
-use std::{collections::BTreeMap, fs, path::Path};
+use std::{collections::BTreeMap, fs, path::Path, str::FromStr};
 
 use ::value::Value;
 use lookup::LookupBuf;
