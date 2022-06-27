@@ -148,11 +148,16 @@ impl From<ResourceLog> for Event {
         let observed_timestamp = if rl.log_record.observed_time_unix_nano > 0 {
             rl.log_record.observed_time_unix_nano
         } else {
-            SystemTime::now().duration_since(UNIX_EPOCH)
-                .expect("SystemTime before UNIX EPOCH!").as_nanos() as u64
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("SystemTime before UNIX EPOCH!")
+                .as_nanos() as u64
         };
         le.insert(OBSERVED_TIME_UNIX_NANO_KEY, observed_timestamp);
-        le.insert(DROPPED_ATTRIBUTES_COUNT_KEY, rl.log_record.dropped_attributes_count);
+        le.insert(
+            DROPPED_ATTRIBUTES_COUNT_KEY,
+            rl.log_record.dropped_attributes_count,
+        );
 
         le.into()
     }
