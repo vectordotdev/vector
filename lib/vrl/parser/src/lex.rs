@@ -474,7 +474,7 @@ pub struct RawStringLiteralToken<S>(pub S);
 
 impl StringLiteralToken<&str> {
     /// Takes the string and splits it into segments of literals and templates.
-    /// A templated section is delimited by `{{..}}`. ``{{` can be escaped using
+    /// A templated section is delimited by `{{..}}`. `{{` can be escaped using
     /// `\{{...\}}`.
     pub fn template(&self, span: Span) -> TemplateString {
         let mut segments = Vec::new();
@@ -578,7 +578,7 @@ impl<'input> Iterator for Lexer<'input> {
                 Err(err) => return Some(Err(err)),
                 Ok(true) => {
                     // dbg!("LQuery"); // NOTE: uncomment this for debugging
-                    return Some(Ok(self.token2(start, start + 1, LQuery)));
+                    return Some(Ok((start, LQuery, start + 1)));
                 }
                 Ok(false) => (),
             }
@@ -589,7 +589,7 @@ impl<'input> Iterator for Lexer<'input> {
             // represent a physical character, instead it is a boundary marker.
             if let Some(pos) = self.query_end(start) {
                 // dbg!("RQuery"); // NOTE: uncomment this for debugging
-                return Some(Ok(self.token2(pos, pos + 1, RQuery)));
+                return Some(Ok((pos, RQuery, pos + 1)));
             }
 
             // Advance the internal iterator and emit the next token, or loop
@@ -654,7 +654,7 @@ impl<'input> Iterator for Lexer<'input> {
             // queries.
             } else if let Some(end) = self.rquery_indices.pop() {
                 // dbg!("RQuery"); // NOTE: uncomment this for debugging
-                return Some(Ok(self.token2(end, end + 1, RQuery)));
+                return Some(Ok((end, RQuery, end + 1)));
             }
 
             return None;
@@ -690,17 +690,7 @@ impl<'input> Lexer<'input> {
     }
 
     fn token(&mut self, start: usize, token: Token<&'input str>) -> Spanned<'input, usize> {
-        let end = self.next_index();
-        self.token2(start, end, token)
-    }
-
-    fn token2(
-        &mut self,
-        start: usize,
-        end: usize,
-        token: Token<&'input str>,
-    ) -> Spanned<'input, usize> {
-        (start, token, end)
+        (start, token, self.next_index())
     }
 
     fn query_end(&mut self, start: usize) -> Option<usize> {
@@ -1207,15 +1197,7 @@ impl<'input> Lexer<'input> {
     /// Returns Ok if the next char is a valid escape code.
     fn escape_code(&mut self, start: usize) -> Result<(), Error> {
         match self.bump() {
-            Some((_, '\n')) => Ok(()),
-            Some((_, '\'')) => Ok(()),
-            Some((_, '"')) => Ok(()),
-            Some((_, '\\')) => Ok(()),
-            Some((_, 'n')) => Ok(()),
-            Some((_, 'r')) => Ok(()),
-            Some((_, 't')) => Ok(()),
-            Some((_, '{')) => Ok(()),
-            Some((_, '}')) => Ok(()),
+            Some((_, '\n' | '\'' | '"' | '\\' | 'n' | 'r' | 't' | '{' | '}')) => Ok(()),
             Some((start, ch)) => Err(Error::EscapeChar {
                 start,
                 ch: Some(ch),
@@ -1303,7 +1285,7 @@ mod test {
         Arrow, Bang, Colon, Comma, Dot, Else, Equals, FloatLiteral, FunctionCall, Identifier, If,
         IntegerLiteral, LBrace, LBracket, LParen, LQuery, Newline, Operator, PathField, RBrace,
         RBracket, RParen, RQuery, RawStringLiteral, RegexLiteral, StringLiteral, TimestampLiteral,
-        True, L, R,
+        True,
     };
 
     fn lexer(input: &str) -> impl Iterator<Item = SpannedResult<'_, usize>> + '_ {

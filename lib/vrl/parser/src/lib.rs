@@ -8,13 +8,27 @@
     unused_assignments,
     unused_comparisons
 )]
+#![allow(
+    clippy::match_on_vec_items, // allowed in initial deny commit
+    clippy::missing_errors_doc, // allowed in initial deny commit
+    clippy::semicolon_if_nothing_returned, // allowed in initial deny commit
+    clippy::too_many_lines, // allowed in initial deny commit
+)]
 
 use std::borrow::ToOwned;
 
 use lalrpop_util::lalrpop_mod;
 lalrpop_mod!(
-    #[allow(clippy::all)]
-    #[allow(unused)]
+    #[allow(
+        warnings,
+        clippy::all,
+        clippy::pedantic,
+        unreachable_pub,
+        unused_allocation,
+        unused_extern_crates,
+        unused_assignments,
+        unused_comparisons
+    )]
     parser
 );
 
