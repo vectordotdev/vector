@@ -65,6 +65,15 @@ struct ConfigBuilderHash<'a> {
 }
 
 impl ConfigBuilderHash<'_> {
+    fn hash(self) -> String {
+        use sha2::{Digest, Sha256};
+
+        let value = self.to_sorted_string();
+        let output = Sha256::digest(value.as_bytes());
+
+        hex::encode(output)
+    }
+
     /// Sort inner JSON values to maintain a consistent ordering. This
     /// prevents non-deterministically serializable structures like HashMap from
     /// affecting the resulting hash. As a consequence, ordering that does not
@@ -96,6 +105,25 @@ impl ConfigBuilderHash<'_> {
                 }
             }
             _ => {}
+        }
+    }
+}
+
+impl<'a> From<&'a ConfigBuilder> for ConfigBuilderHash<'a> {
+    fn from(value: &'a ConfigBuilder) -> Self {
+        ConfigBuilderHash {
+            #[cfg(feature = "api")]
+            api: &value.api,
+            schema: &value.schema,
+            global: &value.global,
+            healthchecks: &value.healthchecks,
+            enrichment_tables: value.enrichment_tables.iter().collect(),
+            sources: value.sources.iter().collect(),
+            sinks: value.sinks.iter().collect(),
+            transforms: value.transforms.iter().collect(),
+            tests: &value.tests,
+            provider: &value.provider,
+            secret: value.secret.iter().map(|(k, v)| (k, v.as_ref())).collect(),
         }
     }
 }
@@ -347,7 +375,7 @@ impl ConfigBuilder {
             provider: &self.provider,
             secret: self.secret.iter().map(|(k, v)| (k, v.as_ref())).collect(),
         }
-        .to_sorted_string();
+        .hash();
 
         let value = serde_json::to_string(&ConfigBuilderHash {
             #[cfg(feature = "api")]
@@ -383,6 +411,8 @@ impl ConfigBuilder {
 #[cfg(all(test, feature = "enterprise-tests"))]
 mod tests {
     use crate::config::ConfigBuilder;
+
+    use super::ConfigBuilderHash;
 
     #[test]
     /// We are relying on `serde_json` to serialize keys in the ordered provided. If this test
@@ -433,6 +463,7 @@ mod tests {
             // Should serialize to a map.
             Value::Object(map) => {
                 // Check ordering.
+                println!("{:?}", map.keys().collect::<Vec<_>>());
                 assert!(map.keys().eq(expected_keys));
             }
             _ => panic!("should serialize to object"),
@@ -452,7 +483,7 @@ mod tests {
 
     #[test]
     fn version_hash_sorted() {
-        let _config = toml::from_str::<ConfigBuilder>(
+        let config = toml::from_str::<ConfigBuilder>(
             r#"
         [enterprise]
         api_key = "apikey"
@@ -481,5 +512,10 @@ mod tests {
         "#,
         )
         .unwrap();
+
+        let hash = ConfigBuilderHash::from(&config).hash();
+        for _ in 0..10 {
+            assert_eq!(ConfigBuilderHash::from(&config).hash(), hash);
+        }
     }
 }
