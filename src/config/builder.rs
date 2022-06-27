@@ -4,6 +4,7 @@ use std::path::Path;
 
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use vector_core::{config::GlobalOptions, default_data_dir, transform::TransformConfig};
 
 #[cfg(feature = "api")]
@@ -61,6 +62,40 @@ struct ConfigBuilderHash<'a> {
     tests: &'a Vec<TestDefinition<String>>,
     provider: &'a Option<Box<dyn provider::ProviderConfig>>,
     secret: BTreeMap<&'a ComponentKey, &'a dyn SecretBackend>,
+}
+
+impl ConfigBuilderHash<'_> {
+    /// Sort inner JSON values to maintain a consistent ordering. This
+    /// prevents non-deterministically serializable structures like HashMap from
+    /// affecting the resulting hash. As a consequence, ordering that does not
+    /// affect the actual semantics of a configuration is not considered when
+    /// calculating the hash.
+    fn to_sorted_string(self) -> String {
+        let mut value = serde_json::to_value(self)
+            .expect("Should serialize configuration hash builder to JSON. Please report.");
+        Self::sort_json_values(&mut value);
+        todo!()
+    }
+
+    fn sort_json_values(value: &mut Value) {
+        match value {
+            Value::Object(map) => {
+                let ordered_map: BTreeMap<String, Value> =
+                    serde_json::from_value(map.to_owned().into())
+                        .expect("Converting Value to BTreeMap failed.");
+                *value = serde_json::to_value(ordered_map)
+                    .expect("Converting BTreeMap back to Value failed.");
+                // iterate through key, values and continue sorting
+                todo!()
+            }
+            Value::Array(arr) => {
+                for value in arr.iter_mut() {
+                    Self::sort_json_values(value);
+                }
+            }
+            _ => {}
+        }
+    }
 }
 
 impl Clone for ConfigBuilder {
@@ -295,6 +330,22 @@ impl ConfigBuilder {
     /// an order-stable JSON of the config builder and feeding its bytes into a SHA256 hasher.
     pub fn sha256_hash(&self) -> String {
         use sha2::{Digest, Sha256};
+
+        let _value = ConfigBuilderHash {
+            #[cfg(feature = "api")]
+            api: &self.api,
+            schema: &self.schema,
+            global: &self.global,
+            healthchecks: &self.healthchecks,
+            enrichment_tables: self.enrichment_tables.iter().collect(),
+            sources: self.sources.iter().collect(),
+            sinks: self.sinks.iter().collect(),
+            transforms: self.transforms.iter().collect(),
+            tests: &self.tests,
+            provider: &self.provider,
+            secret: self.secret.iter().map(|(k, v)| (k, v.as_ref())).collect(),
+        }
+        .to_sorted_string();
 
         let value = serde_json::to_string(&ConfigBuilderHash {
             #[cfg(feature = "api")]
