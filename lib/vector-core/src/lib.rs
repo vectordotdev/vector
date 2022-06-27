@@ -8,6 +8,7 @@
 //! This library was extracted from the top-level project package, discussed in
 //! RFC 7027.
 
+#![deny(warnings)]
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
 #![deny(unreachable_pub)]

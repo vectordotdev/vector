@@ -379,7 +379,7 @@ struct Batch<'a> {
     events: Vec<LogEvent>,
     record_size: usize,
     exiting: Option<bool>,
-    batch: Option<Arc<BatchNotifier>>,
+    batch: Option<BatchNotifier>,
     receiver: Option<BatchStatusReceiver>,
     source: &'a mut JournaldSource,
     cursor: Option<String>,
@@ -555,7 +555,7 @@ impl Drop for RunningJournalctl {
     }
 }
 
-fn create_event(record: Record, batch: &Option<Arc<BatchNotifier>>) -> LogEvent {
+fn create_event(record: Record, batch: &Option<BatchNotifier>) -> LogEvent {
     let mut log = LogEvent::from_iter(record).with_batch_notifier_option(batch);
 
     // Convert some journald-specific field names into Vector standard ones.

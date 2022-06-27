@@ -160,7 +160,6 @@ if [ -z "${DISABLE_MOLD:-""}" ] ; then
     RUSTC_WRAPPER="${CARGO_BIN_DIR}/wrap-rustc"
     cat <<EOF >"$RUSTC_WRAPPER"
 #!/bin/sh
-set -x
 exec mold -run "\$@"
 EOF
     chmod +x "$RUSTC_WRAPPER"

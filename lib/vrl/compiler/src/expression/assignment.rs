@@ -190,7 +190,7 @@ impl Expression for Assignment {
 
 impl fmt::Display for Assignment {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Variant::*;
+        use Variant::{Infallible, Single};
 
         match &self.variant {
             Single { target, expr } => write!(f, "{} = {}", target, expr),
@@ -201,7 +201,7 @@ impl fmt::Display for Assignment {
 
 impl fmt::Debug for Assignment {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Variant::*;
+        use Variant::{Infallible, Single};
 
         match &self.variant {
             Single { target, expr } => write!(f, "{:?} = {:?}", target, expr),
@@ -263,7 +263,7 @@ impl Target {
     }
 
     fn insert(&self, value: Value, ctx: &mut Context) {
-        use Target::*;
+        use Target::{External, Internal, Noop};
 
         match self {
             Noop => {}
@@ -294,7 +294,7 @@ impl Target {
 
 impl fmt::Display for Target {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Target::*;
+        use Target::{External, Internal, Noop};
 
         match self {
             Noop => f.write_str("_"),
@@ -308,7 +308,7 @@ impl fmt::Display for Target {
 
 impl fmt::Debug for Target {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Target::*;
+        use Target::{External, Internal, Noop};
 
         match self {
             Noop => f.write_str("Noop"),
@@ -324,7 +324,7 @@ impl TryFrom<ast::AssignmentTarget> for Target {
     type Error = Error;
 
     fn try_from(target: ast::AssignmentTarget) -> Result<Self, Error> {
-        use Target::*;
+        use Target::{External, Internal, Noop};
 
         let target = match target {
             ast::AssignmentTarget::Noop => Noop,
@@ -381,7 +381,7 @@ where
     U: Expression + Clone,
 {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        use Variant::*;
+        use Variant::{Infallible, Single};
 
         let value = match self {
             Single { target, expr } => {
@@ -413,7 +413,7 @@ where
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
-        use Variant::*;
+        use Variant::{Infallible, Single};
 
         match self {
             Single { expr, .. } => expr.type_def(state),
@@ -428,7 +428,7 @@ where
     U: fmt::Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Variant::*;
+        use Variant::{Infallible, Single};
 
         match self {
             Single { target, expr } => write!(f, "{} = {}", target, expr),
@@ -478,7 +478,9 @@ impl std::error::Error for Error {
 
 impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
-        use ErrorVariant::*;
+        use ErrorVariant::{
+            FallibleAssignment, InfallibleAssignment, InvalidTarget, ReadOnly, UnnecessaryNoop,
+        };
 
         match &self.variant {
             UnnecessaryNoop(..) => 640,
@@ -490,7 +492,9 @@ impl DiagnosticMessage for Error {
     }
 
     fn labels(&self) -> Vec<Label> {
-        use ErrorVariant::*;
+        use ErrorVariant::{
+            FallibleAssignment, InfallibleAssignment, InvalidTarget, ReadOnly, UnnecessaryNoop,
+        };
 
         match &self.variant {
             UnnecessaryNoop(target_span) => vec![
@@ -524,7 +528,7 @@ impl DiagnosticMessage for Error {
     }
 
     fn notes(&self) -> Vec<Note> {
-        use ErrorVariant::*;
+        use ErrorVariant::{FallibleAssignment, InfallibleAssignment};
 
         match &self.variant {
             FallibleAssignment(..) | InfallibleAssignment(..) => vec![Note::SeeErrorDocs],

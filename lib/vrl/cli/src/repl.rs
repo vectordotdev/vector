@@ -1,7 +1,7 @@
+use core::TargetValue;
 use std::borrow::Cow::{self, Borrowed, Owned};
 
 use ::value::Value;
-use core::TargetValue;
 use indoc::indoc;
 use once_cell::sync::Lazy;
 use prettytable::{format, Cell, Row, Table};
@@ -16,10 +16,8 @@ use rustyline::{
 };
 use value::Secrets;
 use vector_common::TimeZone;
-
 use vector_vrl_functions::vrl_functions;
-use vrl::prelude::BTreeMap;
-use vrl::{diagnostic::Formatter, state, Runtime, Target, VrlRuntime};
+use vrl::{diagnostic::Formatter, prelude::BTreeMap, state, Runtime, Target, VrlRuntime};
 
 // Create a list of all possible error values for potential docs lookup
 static ERRORS: Lazy<Vec<String>> = Lazy::new(|| {

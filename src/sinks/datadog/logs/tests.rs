@@ -15,12 +15,18 @@ use vector_core::event::{BatchNotifier, BatchStatus, Event};
 
 use crate::{
     config::SinkConfig,
+    http::HttpError,
     sinks::{
         datadog::logs::DatadogLogsConfig,
+        datadog::DatadogApiError,
+        util::retries::RetryLogic,
         util::test::{build_test_server_status, load_sink},
     },
     test_util::{next_addr, random_lines_with_stream},
+    tls::TlsError,
 };
+
+use super::service::LogApiRetry;
 
 // The sink must support v1 and v2 API endpoints which have different codes for
 // signaling status. This enum allows us to signal which API endpoint and what
@@ -67,7 +73,7 @@ fn event_with_api_key(msg: &str, key: &str) -> Event {
 /// runs random lines through it, returning a vector of the random lines and a
 /// Receiver populated with the result of the sink's operation.
 ///
-/// Testers may set `http_status` and `batch_status`. The first controls what
+/// Testers may set `api_status` and `batch_status`. The first controls what
 /// status code faked HTTP responses will have, the second acts as a check on
 /// the `Receiver`'s status before being returned to the caller.
 async fn start_test(
@@ -429,4 +435,36 @@ async fn no_enterprise_headers_inner(api_status: ApiStatus) {
 
     assert_eq!(parts.headers.get("DD-EVP-ORIGIN").unwrap(), "vector");
     assert!(parts.headers.get("DD-EVP-ORIGIN-VERSION").is_some());
+}
+
+#[tokio::test]
+/// Assert the RetryLogic implementation of LogApiRetry
+async fn error_is_retriable() {
+    let retry = LogApiRetry;
+
+    // not retry-able
+    assert!(!retry.is_retriable_error(&DatadogApiError::BadRequest));
+    assert!(!retry.is_retriable_error(&DatadogApiError::PayloadTooLarge));
+    assert!(!retry.is_retriable_error(&DatadogApiError::HttpError {
+        error: HttpError::BuildRequest {
+            source: http::status::StatusCode::from_u16(6666).unwrap_err().into()
+        }
+    }));
+    assert!(!retry.is_retriable_error(&DatadogApiError::HttpError {
+        error: HttpError::MakeProxyConnector {
+            source: http::Uri::try_from("").unwrap_err()
+        }
+    }));
+
+    // retry-able
+    assert!(retry.is_retriable_error(&DatadogApiError::ServerError));
+    assert!(retry.is_retriable_error(&DatadogApiError::Forbidden));
+    assert!(retry.is_retriable_error(&DatadogApiError::HttpError {
+        error: HttpError::BuildTlsConnector {
+            source: TlsError::MissingKey
+        }
+    }));
+    // note: HttpError::CallRequest and HttpError::MakeHttpsConnector are all retry-able,
+    //       but are not straightforward to instantiate due to the design of
+    //       the crates they originate from.
 }

@@ -6,5 +6,6 @@
 // not great from a UX perspective.  `darling` lacks the ability to incrementally parse a field to avoid having to
 // expose a custom type that gets used downstream...
 
+#![deny(warnings)]
 pub mod num;
 pub mod validation;

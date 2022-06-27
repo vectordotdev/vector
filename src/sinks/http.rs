@@ -158,7 +158,8 @@ fn default_sink(encoding: Encoding) -> HttpSink {
     let encoding = EncodingConfigWithFramingAdapter::<EncodingConfig<Encoding>, Migrator>::legacy(
         encoding.into(),
     )
-    .encoding();
+    .encoding()
+    .unwrap();
     let framing = encoding
         .0
         .unwrap_or_else(|| NewlineDelimitedEncoder::new().into());
@@ -197,7 +198,7 @@ impl SinkConfig for HttpSinkConfig {
         request.add_old_option(self.headers.clone());
         validate_headers(&request.headers, &self.auth)?;
 
-        let encoding = self.encoding.encoding();
+        let encoding = self.encoding.encoding()?;
         let framing = encoding
             .0
             .unwrap_or_else(|| NewlineDelimitedEncoder::new().into());

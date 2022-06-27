@@ -3890,19 +3890,19 @@ if .custom.dd.env != null {
   }
 } else if .custom.dd_env != null {
   if (tag, err = "env:" + to_string(.custom.dd_env); err == null) {
-    .tags = push(.tags, tag)
+    .tags, err  = push(.tags, tag)
   }
 } else if .custom.Properties.dd.env != null {
   if (tag, err = "env:" + to_string(.custom.Properties.dd.env); err == null) {
-    .tags = push(.tags, tag)
+    .tags, err  = push(.tags, tag)
   }
 } else if .custom.properties.dd.env != null {
   if (tag, err = "env:" + to_string(.custom.properties.dd.env); err == null) {
-    .tags = push(.tags, tag)
+    .tags, err  = push(.tags, tag)
   }
 } else if .custom.Properties.dd_env != null {
   if (tag, err = "env:" + to_string(.custom.Properties.dd_env); err == null) {
-    .tags = push(.tags, tag)
+    .tags, err  = push(.tags, tag)
   }
 }
 del(.custom.dd.env)
@@ -3921,19 +3921,19 @@ if .custom.dd.version != null {
   }
 } else if .custom.dd_version != null {
   if (tag, err = "version:" + to_string(.custom.dd_version); err == null) {
-    .tags = push(.tags, tag)
+    .tags, err  = push(.tags, tag)
   }
 } else if .custom.Properties.dd.version != null {
   if (tag, err = "version:" + to_string(.custom.Properties.dd.version); err == null) {
-    .tags = push(.tags, tag)
+    .tags, err  = push(.tags, tag)
   }
 } else if .custom.properties.dd.version != null {
   if (tag, err = "version:" + to_string(.custom.properties.dd.version); err == null) {
-    .tags = push(.tags, tag)
+    .tags, err  = push(.tags, tag)
   }
 } else if .custom.Properties.dd_version != null {
   if (tag, err = "version:" + to_string(.custom.Properties.dd_version); err == null) {
-    .tags = push(.tags, tag)
+    .tags, err  = push(.tags, tag)
   }
 }
 del(.custom.dd.version)
