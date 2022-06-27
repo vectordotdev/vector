@@ -398,7 +398,7 @@ impl Application {
                                     emit!(VectorConfigLoadError);
                                 }
                             },
-                            Err(RecvError::Lagged(amt)) => warn!("Overflow, dropped {} signals", amt),
+                            Err(RecvError::Lagged(amt)) => warn!("Overflow, dropped {} signals.", amt),
                             Err(RecvError::Closed) => break SignalTo::Shutdown,
                             Ok(signal) => break signal,
                         }
