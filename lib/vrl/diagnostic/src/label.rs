@@ -10,7 +10,7 @@ pub struct Label {
 }
 
 impl Label {
-    pub fn primary(message: impl ToString, span: impl Into<Span>) -> Self {
+    pub fn primary(message: &impl ToString, span: impl Into<Span>) -> Self {
         Self {
             message: message.to_string(),
             primary: true,
@@ -18,7 +18,7 @@ impl Label {
         }
     }
 
-    pub fn context(message: impl ToString, span: impl Into<Span>) -> Self {
+    pub fn context(message: &impl ToString, span: impl Into<Span>) -> Self {
         Self {
             message: message.to_string(),
             primary: false,
