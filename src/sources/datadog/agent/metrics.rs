@@ -490,8 +490,6 @@ mod dd_proto {
     include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
 }
 
-use dd_proto::SketchPayload;
-
 pub(crate) fn decode_ddsketch(
     frame: Bytes,
     api_key: &Option<Arc<str>>,
