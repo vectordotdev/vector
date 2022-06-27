@@ -292,6 +292,8 @@ where
                 let finalizers = event.take_finalizers();
                 let mut bytes = BytesMut::new();
                 if encoder.encode(event, &mut bytes).is_err() {
+                    self.acker.ack(1);
+
                     continue;
                 }
 
@@ -309,6 +311,8 @@ where
                         });
                     }
                     Err(error) => {
+                        self.acker.ack(1);
+
                         emit!(UdpSocketError { error });
                         break;
                     }
