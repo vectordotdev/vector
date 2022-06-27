@@ -85,7 +85,12 @@ components: sinks: [Name=string]: {
 						}
 					}
 					max_size: {
-						description:   "The maximum size of the buffer on the disk."
+						description: """
+							The maximum size of the buffer on the disk. Must be at least 128 megabytes (134217728 bytes).
+
+							Note that during normal disk buffer operation, the disk buffer can create one additional 128
+							megabyte block so the minimum disk space required is actually 256 megabytes.
+							"""
 						required:      true
 						relevant_when: "type = \"disk\""
 						type: uint: {
