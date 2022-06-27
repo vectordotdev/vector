@@ -5,7 +5,7 @@
 //! This contains a hand-written state machine to maximize performance of the parser.
 //! This is important since a lot of parsing happens at runtime. Eventually Vector
 //! should pre-compile all paths. Once that happens it might make sense to re-write in something
-//! more readable like `nom` and simplify the coalescing segments.
+//! more readable.
 
 use std::borrow::Cow;
 use std::str::CharIndices;
@@ -29,6 +29,8 @@ pub struct JitLookup<'a> {
     chars: CharIndices<'a>,
     state: JitState,
     escape_buffer: String,
+    // keep track of the number of options in a coalesce to prevent size 1 coalesces
+    coalesce_count: u32,
 }
 
 impl<'a> JitLookup<'a> {
@@ -38,6 +40,7 @@ impl<'a> JitLookup<'a> {
             path,
             state: JitState::Start,
             escape_buffer: String::new(),
+            coalesce_count: 0,
         }
     }
 }
@@ -63,7 +66,6 @@ enum JitState {
     EscapedQuote,
     CoalesceStart,
     CoalesceField { start: usize },
-    // using u32 to not increase the size of `JitState`
     CoalesceFieldEnd { start: usize, end: usize },
     CoalesceEscapedFieldEnd,
     CoalesceQuote { start: usize },
@@ -253,50 +255,80 @@ impl<'a> Iterator for JitLookup<'a> {
                                 (None, JitState::CoalesceField { start })
                             }
                             ' ' => (None, JitState::CoalesceFieldEnd { start, end: index }),
-                            '|' => (
-                                Some(Some(BorrowedSegment::CoalesceField(Cow::Borrowed(
-                                    &self.path[start..index],
-                                )))),
-                                JitState::CoalesceStart,
-                            ),
-                            ')' => (
-                                Some(Some(BorrowedSegment::CoalesceEnd(Cow::Borrowed(
-                                    &self.path[start..index],
-                                )))),
-                                JitState::Continue,
-                            ),
+                            '|' => {
+                                self.coalesce_count += 1;
+                                (
+                                    Some(Some(BorrowedSegment::CoalesceField(Cow::Borrowed(
+                                        &self.path[start..index],
+                                    )))),
+                                    JitState::CoalesceStart,
+                                )
+                            }
+                            ')' => {
+                                if self.coalesce_count == 0 {
+                                    (Some(Some(BorrowedSegment::Invalid)), JitState::End)
+                                } else {
+                                    self.coalesce_count = 0;
+                                    (
+                                        Some(Some(BorrowedSegment::CoalesceEnd(Cow::Borrowed(
+                                            &self.path[start..index],
+                                        )))),
+                                        JitState::Continue,
+                                    )
+                                }
+                            }
                             _ => (Some(Some(BorrowedSegment::Invalid)), JitState::End),
                         },
                         JitState::CoalesceFieldEnd { start, end } => match c {
                             ' ' => (None, JitState::CoalesceFieldEnd { start, end }),
-                            '|' => (
-                                Some(Some(BorrowedSegment::CoalesceField(Cow::Borrowed(
-                                    &self.path[(start as usize)..(end as usize)],
-                                )))),
-                                JitState::CoalesceStart,
-                            ),
-                            ')' => (
-                                Some(Some(BorrowedSegment::CoalesceEnd(Cow::Borrowed(
-                                    &self.path[(start as usize)..(end as usize)],
-                                )))),
-                                JitState::Continue,
-                            ),
+                            '|' => {
+                                self.coalesce_count += 1;
+                                (
+                                    Some(Some(BorrowedSegment::CoalesceField(Cow::Borrowed(
+                                        &self.path[(start as usize)..(end as usize)],
+                                    )))),
+                                    JitState::CoalesceStart,
+                                )
+                            }
+                            ')' => {
+                                if self.coalesce_count == 0 {
+                                    (Some(Some(BorrowedSegment::Invalid)), JitState::End)
+                                } else {
+                                    self.coalesce_count = 0;
+                                    (
+                                        Some(Some(BorrowedSegment::CoalesceEnd(Cow::Borrowed(
+                                            &self.path[(start as usize)..(end as usize)],
+                                        )))),
+                                        JitState::Continue,
+                                    )
+                                }
+                            }
                             _ => (Some(Some(BorrowedSegment::Invalid)), JitState::End),
                         },
                         JitState::CoalesceEscapedFieldEnd => match c {
                             ' ' => (None, JitState::CoalesceEscapedFieldEnd),
-                            '|' => (
-                                (Some(Some(BorrowedSegment::CoalesceField(
-                                    std::mem::take(&mut self.escape_buffer).into(),
-                                )))),
-                                JitState::CoalesceStart,
-                            ),
-                            ')' => (
-                                (Some(Some(BorrowedSegment::CoalesceEnd(
-                                    std::mem::take(&mut self.escape_buffer).into(),
-                                )))),
-                                JitState::Continue,
-                            ),
+                            '|' => {
+                                self.coalesce_count += 1;
+                                (
+                                    (Some(Some(BorrowedSegment::CoalesceField(
+                                        std::mem::take(&mut self.escape_buffer).into(),
+                                    )))),
+                                    JitState::CoalesceStart,
+                                )
+                            }
+                            ')' => {
+                                if self.coalesce_count == 0 {
+                                    (Some(Some(BorrowedSegment::Invalid)), JitState::End)
+                                } else {
+                                    self.coalesce_count = 0;
+                                    (
+                                        (Some(Some(BorrowedSegment::CoalesceEnd(
+                                            std::mem::take(&mut self.escape_buffer).into(),
+                                        )))),
+                                        JitState::Continue,
+                                    )
+                                }
+                            }
                             _ => (Some(Some(BorrowedSegment::Invalid)), JitState::End),
                         },
                         JitState::CoalesceQuote { start } => match c {
@@ -347,8 +379,6 @@ mod test {
 
     #[test]
     fn parsing() {
-        // test .[0]
-
         let test_cases: Vec<(_, OwnedPath)> = vec![
             ("", owned_path!(OwnedSegment::Invalid)),
             (".", owned_path!()),
@@ -413,7 +443,6 @@ mod test {
                     OwnedSegment::coalesce_end("b")
                 ),
             ),
-            ("(a)", owned_path!(OwnedSegment::coalesce_end("a"))),
             (
                 ".(a|b)[1]",
                 owned_path!(
@@ -490,6 +519,7 @@ mod test {
                     OwnedSegment::coalesce_end("a")
                 ),
             ),
+            ("(a)", owned_path!(OwnedSegment::Invalid)),
         ];
 
         for (path, expected) in test_cases {

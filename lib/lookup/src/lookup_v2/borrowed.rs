@@ -8,7 +8,6 @@ pub enum BorrowedSegment<'a> {
     Field(Cow<'a, str>),
     Index(isize),
     CoalesceField(Cow<'a, str>),
-    // This has an optional field since the parser would have to emit 2 segments in 1 state otherwise
     CoalesceEnd(Cow<'a, str>),
     Invalid,
 }
@@ -111,7 +110,18 @@ impl quickcheck::Arbitrary for BorrowedSegment<'static> {
                     .shrink()
                     .map(|f| BorrowedSegment::Field(f.into())),
             ),
-            _ => todo!(),
+            BorrowedSegment::CoalesceField(field) => Box::new(
+                field
+                    .to_string()
+                    .shrink()
+                    .map(|f| BorrowedSegment::Field(f.into())),
+            ),
+            BorrowedSegment::CoalesceEnd(field) => Box::new(
+                field
+                    .to_string()
+                    .shrink()
+                    .map(|f| BorrowedSegment::Field(f.into())),
+            ),
         }
     }
 }
