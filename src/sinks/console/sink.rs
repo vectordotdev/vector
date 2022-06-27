@@ -82,7 +82,7 @@ mod test {
     use crate::{
         event::{
             metric::{Metric, MetricKind, MetricValue, StatisticKind},
-            Event, Value,
+            Event, LogEvent, Value,
         },
         sinks::util::encoding::{
             EncodingConfig, EncodingConfigWithFramingAdapter, StandardEncodings,
@@ -144,13 +144,15 @@ mod test {
 
     #[test]
     fn encodes_log_events() {
-        let mut event = Event::new_empty_log();
-        let log = event.as_mut_log();
+        let mut log = LogEvent::default();
         log.insert("x", Value::from("23"));
         log.insert("z", Value::from(25));
         log.insert("a", Value::from("0"));
 
-        let encoded = encode_event(event, EncodingConfig::from(StandardEncodings::Json).into());
+        let encoded = encode_event(
+            log.into(),
+            EncodingConfig::from(StandardEncodings::Json).into(),
+        );
         let expected = r#"{"a":"0","x":"23","z":25}"#;
         assert_eq!(encoded.unwrap(), expected);
     }

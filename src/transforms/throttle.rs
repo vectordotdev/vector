@@ -197,7 +197,7 @@ mod tests {
     use futures::SinkExt;
 
     use super::*;
-    use crate::event::Event;
+    use crate::event::LogEvent;
 
     #[test]
     fn generate_config() {
@@ -228,8 +228,8 @@ window_secs = 5
         // we trip it/set the interval in the future
         assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
 
-        tx.send(Event::new_empty_log()).await.unwrap();
-        tx.send(Event::new_empty_log()).await.unwrap();
+        tx.send(LogEvent::default().into()).await.unwrap();
+        tx.send(LogEvent::default().into()).await.unwrap();
 
         let mut count = 0_u8;
         while count < 2 {
@@ -243,14 +243,14 @@ window_secs = 5
 
         clock.advance(Duration::from_secs(2));
 
-        tx.send(Event::new_empty_log()).await.unwrap();
+        tx.send(LogEvent::default().into()).await.unwrap();
 
         // We should be back to pending, having the second event dropped
         assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
 
         clock.advance(Duration::from_secs(3));
 
-        tx.send(Event::new_empty_log()).await.unwrap();
+        tx.send(LogEvent::default().into()).await.unwrap();
 
         // The rate limiter should now be refreshed and allow an additional event through
         if let Some(_event) = out_stream.next().await {
@@ -294,8 +294,8 @@ exists(.special)
         // we trip it/set the interval in the future
         assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
 
-        tx.send(Event::new_empty_log()).await.unwrap();
-        tx.send(Event::new_empty_log()).await.unwrap();
+        tx.send(LogEvent::default().into()).await.unwrap();
+        tx.send(LogEvent::default().into()).await.unwrap();
 
         let mut count = 0_u8;
         while count < 2 {
@@ -309,14 +309,14 @@ exists(.special)
 
         clock.advance(Duration::from_secs(2));
 
-        tx.send(Event::new_empty_log()).await.unwrap();
+        tx.send(LogEvent::default().into()).await.unwrap();
 
         // We should be back to pending, having the second event dropped
         assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
 
-        let mut special_log = Event::new_empty_log();
-        special_log.as_mut_log().insert("special", "true");
-        tx.send(special_log).await.unwrap();
+        let mut special_log = LogEvent::default();
+        special_log.insert("special", "true");
+        tx.send(special_log.into()).await.unwrap();
         // The rate limiter should allow this log through regardless of current limit
         if let Some(_event) = out_stream.next().await {
         } else {
@@ -325,7 +325,7 @@ exists(.special)
 
         clock.advance(Duration::from_secs(3));
 
-        tx.send(Event::new_empty_log()).await.unwrap();
+        tx.send(LogEvent::default().into()).await.unwrap();
 
         // The rate limiter should now be refreshed and allow an additional event through
         if let Some(_event) = out_stream.next().await {
@@ -367,12 +367,12 @@ key_field = "{{ bucket }}"
         // we trip it/set the interval in the future
         assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
 
-        let mut log_a = Event::new_empty_log();
-        log_a.as_mut_log().insert("bucket", "a");
-        let mut log_b = Event::new_empty_log();
-        log_b.as_mut_log().insert("bucket", "b");
-        tx.send(log_a).await.unwrap();
-        tx.send(log_b).await.unwrap();
+        let mut log_a = LogEvent::default();
+        log_a.insert("bucket", "a");
+        let mut log_b = LogEvent::default();
+        log_b.insert("bucket", "b");
+        tx.send(log_a.into()).await.unwrap();
+        tx.send(log_b.into()).await.unwrap();
 
         let mut count = 0_u8;
         while count < 2 {

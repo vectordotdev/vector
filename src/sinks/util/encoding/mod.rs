@@ -401,9 +401,8 @@ mod tests {
     fn test_except() {
         let config: TestConfig = toml::from_str(TOML_EXCEPT_FIELD).unwrap();
         config.encoding.validate().unwrap();
-        let mut event = Event::new_empty_log();
+        let mut log = LogEvent::default();
         {
-            let log = event.as_mut_log();
             log.insert("a", 1);
             log.insert("a.b", 1);
             log.insert("a.b.c", 1);
@@ -416,6 +415,7 @@ mod tests {
             log.insert("e.a", 1);
             log.insert("e.b", 1);
         }
+        let mut event = Event::from(log);
         config.encoding.apply_rules(&mut event);
         assert!(!event.as_mut_log().contains("a.b.c"));
         assert!(!event.as_mut_log().contains("b"));
@@ -437,9 +437,8 @@ mod tests {
     fn test_only() {
         let config: TestConfig = toml::from_str(TOML_ONLY_FIELD).unwrap();
         config.encoding.validate().unwrap();
-        let mut event = Event::new_empty_log();
+        let mut log = LogEvent::default();
         {
-            let log = event.as_mut_log();
             log.insert("a", 1);
             log.insert("a.b", 1);
             log.insert("a.b.c", 1);
@@ -457,6 +456,7 @@ mod tests {
             log.insert("h", BTreeMap::new());
             log.insert("i", Vec::<Value>::new());
         }
+        let mut event = Event::from(log);
         config.encoding.apply_rules(&mut event);
         assert!(event.as_mut_log().contains("a.b.c"));
         assert!(event.as_mut_log().contains("b"));

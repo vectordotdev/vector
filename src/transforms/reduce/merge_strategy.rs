@@ -612,7 +612,7 @@ mod test {
     use serde_json::json;
 
     use super::*;
-    use crate::event::Event;
+    use crate::event::LogEvent;
 
     #[test]
     fn initial_values() {
@@ -872,9 +872,8 @@ mod test {
     fn merge(initial: Value, additional: Value, strategy: &MergeStrategy) -> Result<Value, String> {
         let mut merger = get_value_merger(initial, strategy)?;
         merger.add(additional)?;
-        let mut output = Event::new_empty_log();
-        let output = output.as_mut_log();
-        merger.insert_into("out".into(), output)?;
+        let mut output = LogEvent::default();
+        merger.insert_into("out".into(), &mut output)?;
         Ok(output.remove("out").unwrap())
     }
 }

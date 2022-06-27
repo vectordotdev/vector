@@ -976,7 +976,7 @@ mod tests {
         assert_eq!(uuid1.len(), 36);
 
         // check that the second batch has a different UUID
-        let log2 = Event::new_empty_log();
+        let log2 = LogEvent::default().into();
 
         let key = partitioner.partition(&log2).expect("key wasn't provided");
         let (metadata, _events) = request_builder.split_input((key, vec![log2]));
