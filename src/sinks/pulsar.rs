@@ -26,7 +26,7 @@ use crate::{
     config::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
     },
-    event::Event,
+    event::{Event, EventFinalizers, Finalizable},
     sinks::util::{
         encoding::{
             EncodingConfig, EncodingConfigAdapter, StandardEncodings, StandardEncodingsMigrator,
@@ -82,6 +82,7 @@ enum PulsarSinkState {
                 BoxedPulsarProducer,
                 Result<SendFuture, PulsarError>,
                 RequestMetadata,
+                EventFinalizers,
             ),
         >,
     ),
@@ -98,6 +99,7 @@ struct PulsarSink {
                 usize,
                 Result<CommandSendReceipt, PulsarError>,
                 RequestMetadata,
+                EventFinalizers,
             ),
         >,
     >,
@@ -238,7 +240,7 @@ impl PulsarSink {
 
     fn poll_in_flight_prepare(&mut self, cx: &mut Context<'_>) -> Poll<()> {
         if let PulsarSinkState::Sending(fut) = &mut self.state {
-            let (producer, result, metadata) = ready!(fut.as_mut().poll(cx));
+            let (producer, result, metadata, finalizers) = ready!(fut.as_mut().poll(cx));
 
             let seqno = self.seq_head;
             self.seq_head += 1;
@@ -249,7 +251,7 @@ impl PulsarSink {
                     Ok(fut) => fut.await,
                     Err(error) => Err(error),
                 };
-                (seqno, result, metadata)
+                (seqno, result, metadata, finalizers)
             }));
         }
 
@@ -278,6 +280,8 @@ impl Sink<Event> for PulsarSink {
 
         let metadata_builder = RequestMetadata::builder(&event);
         self.transformer.transform(&mut event);
+
+        let finalizers = event.take_finalizers();
         let mut bytes = BytesMut::new();
         self.encoder.encode(event, &mut bytes).map_err(|_| {
             // Error is handled by `Encoder`.
@@ -300,7 +304,7 @@ impl Sink<Event> for PulsarSink {
                     builder = builder.event_time(et as u64);
                 }
                 let result = builder.send().await;
-                (producer, result, metadata)
+                (producer, result, metadata, finalizers)
             })),
         );
 
@@ -313,7 +317,7 @@ impl Sink<Event> for PulsarSink {
         let this = Pin::into_inner(self);
         while !this.in_flight.is_empty() {
             match ready!(Pin::new(&mut this.in_flight).poll_next(cx)) {
-                Some((seqno, Ok(result), metadata)) => {
+                Some((seqno, Ok(result), metadata, finalizers)) => {
                     trace!(
                         message = "Pulsar sink produced message.",
                         message_id = ?result.message_id,
@@ -339,9 +343,11 @@ impl Sink<Event> for PulsarSink {
                         num_to_ack += 1;
                         this.seq_tail += 1
                     }
+
+                    drop(finalizers);
                     this.acker.ack(num_to_ack);
                 }
-                Some((_, Err(error), _)) => {
+                Some((_, Err(error), _, _)) => {
                     error!(message = "Pulsar sink generated an error.", %error);
                     return Poll::Ready(Err(()));
                 }
