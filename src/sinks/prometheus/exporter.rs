@@ -629,7 +629,7 @@ mod tests {
         let config = PrometheusExporterConfig {
             address,
             tls: tls_config,
-            expose_timestamp: expose_timestamp,
+            expose_timestamp,
             ..Default::default()
         };
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
