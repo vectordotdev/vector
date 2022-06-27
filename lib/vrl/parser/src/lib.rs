@@ -1,4 +1,15 @@
-#![deny(warnings)]
+#![deny(
+    warnings,
+    clippy::all,
+    clippy::pedantic,
+    unreachable_pub,
+    unused_allocation,
+    unused_extern_crates,
+    unused_assignments,
+    unused_comparisons
+)]
+
+use std::borrow::ToOwned;
 
 use lalrpop_util::lalrpop_mod;
 lalrpop_mod!(
@@ -28,7 +39,7 @@ pub fn parse(input: impl AsRef<str>) -> Result<Program, Error> {
         .map_err(|source| Error::ParseError {
             span: Span::new(0, input.as_ref().len()),
             source: source
-                .map_token(|t| t.map(|s| s.to_owned()))
+                .map_token(|t| t.map(ToOwned::to_owned))
                 .map_error(|err| err.to_string()),
             dropped_tokens: vec![],
         })
@@ -42,7 +53,7 @@ pub fn parse_path(input: impl AsRef<str>) -> Result<LookupBuf, Error> {
         .map_err(|source| Error::ParseError {
             span: Span::new(0, input.as_ref().len()),
             source: source
-                .map_token(|t| t.map(|s| s.to_owned()))
+                .map_token(|t| t.map(ToOwned::to_owned))
                 .map_error(|err| err.to_string()),
             dropped_tokens: vec![],
         })
@@ -62,7 +73,7 @@ pub fn parse_literal(input: impl AsRef<str>) -> Result<Literal, Error> {
         .map_err(|source| Error::ParseError {
             span: Span::new(0, input.as_ref().len()),
             source: source
-                .map_token(|t| t.map(|s| s.to_owned()))
+                .map_token(|t| t.map(ToOwned::to_owned))
                 .map_error(|err| err.to_string()),
             dropped_tokens: vec![],
         })
