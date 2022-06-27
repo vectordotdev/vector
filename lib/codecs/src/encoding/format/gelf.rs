@@ -97,15 +97,14 @@ impl GelfSerializer {
         err: Result<(), EventGelfConformity>,
         f: F,
     ) -> Result<(), EventGelfConformity> {
-        if let Some(clog) = clog {
+        if self.sanitize {
             // key is present per caller logic
-            let c_val = clog.get_mut(key).unwrap();
+            let c_val = clog.as_mut().unwrap().get_mut(key).unwrap();
             f(c_val);
             *conformed = true;
-            Ok(())
-        } else {
-            err
+            return Ok(());
         }
+        err
     }
 
     /// Return Ok if value is a string. Otherwise, determine if it is possible to conform
@@ -162,16 +161,23 @@ impl GelfSerializer {
             // if the value is a string and that string can be parse into an integer
             if value.is_bytes() {
                 std::str::from_utf8(value.as_bytes().unwrap())
-                    .map(|int_str| {
-                        int_str
-                            .parse::<i64>()
-                            .map(|integer| {
+                    .map(|value_str| match value_str.parse::<i64>() {
+                        Ok(integer) => {
+                            Ok(
                                 self.conform(clog, conformed, key, Err(conformable), |c_val| {
                                     *c_val = Value::Integer(integer);
+                                }),
+                            )
+                        }
+                        Err(_) => value_str
+                            .parse::<f64>()
+                            .map(|float| {
+                                self.conform(clog, conformed, key, Err(conformable), |c_val| {
+                                    *c_val = Value::Integer(float.round() as i64);
                                 })
                             })
-                            .map_err(|_| unconformable.clone())?
-                    })
+                            .map_err(|_| unconformable.clone()),
+                    }?)
                     .map_err(|_| unconformable)??;
             }
             // round off floats
@@ -280,9 +286,12 @@ impl GelfSerializer {
                     // additional fields must be only word chars, dashes and periods.
                     if !self.valid_regex.is_match(key) {
                         // replace offending characters with dashes
-                        if let Some(clog) = &mut conformed_log {
+                        if self.sanitize {
                             let new_key = self.invalid_regex.replace_all(key, "-");
-                            clog.rename_key(key.as_str(), &*new_key);
+                            conformed_log
+                                .as_mut()
+                                .unwrap()
+                                .rename_key(key.as_str(), &*new_key);
                             conformed = true;
                         } else {
                             return Err(EventGelfConformity::Conformable(format!(
@@ -344,63 +353,140 @@ impl Encoder<Event> for GelfSerializer {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use super::*;
     use vector_common::btreemap;
     use vector_core::event::{Event, EventMetadata};
 
-    /// TODO expand unit tests once confirmed encoding behavior
+    fn do_serialize(
+        expect_success: bool,
+        sanitize: bool,
+        event_fields: BTreeMap<String, Value>,
+    ) -> Option<serde_json::Value> {
+        let config = GelfSerializerConfig {
+            options: GelfSerializerOptions { sanitize },
+        };
+        let mut serializer = config.build();
+        let event: Event = LogEvent::from_map(event_fields, EventMetadata::default()).into();
+        let mut buffer = BytesMut::new();
+
+        if expect_success {
+            assert!(serializer.encode(event, &mut buffer).is_ok());
+            let buffer_str = std::str::from_utf8(&buffer).unwrap();
+            let result = serde_json::from_str(buffer_str);
+            assert!(result.is_ok());
+            Some(result.unwrap())
+        } else {
+            assert!(serializer.encode(event, &mut buffer).is_err());
+            None
+        }
+    }
+
     #[test]
     fn gelf_serializing_valid() {
-        let config = GelfSerializerConfig::default();
-        let mut serializer = config.build();
-
         let event_fields = btreemap! {
             VERSION => "1.1",
             HOST => "example.org",
             log_schema().message_key() => "Some message",
         };
-        let event: Event = LogEvent::from_map(event_fields, EventMetadata::default()).into();
 
-        let mut buffer = BytesMut::new();
+        let jsn = do_serialize(true, false, event_fields).unwrap();
 
-        assert!(serializer.encode(event, &mut buffer).is_ok());
+        assert_eq!(jsn.get(VERSION).unwrap(), "1.1");
+        assert_eq!(jsn.get(HOST).unwrap(), "example.org");
+        assert_eq!(jsn.get(log_schema().message_key()).unwrap(), "Some message");
     }
 
     #[test]
     fn gelf_serializing_invalid_sanitize() {
-        let config = GelfSerializerConfig {
-            options: GelfSerializerOptions { sanitize: true },
-        };
-        let mut serializer = config.build();
-
         let event_fields = btreemap! {
             VERSION => "1.1",
-            HOST => "example.org",
+            HOST => Value::Float(ordered_float::NotNan::new(1.2).unwrap()),
+            log_schema().message_key() => 1234,
+            FULL_MESSAGE => Value::Float(ordered_float::NotNan::new(3.4).unwrap()),
+            FACILITY => 42,
+            FILE => 0,
             LINE => "1",
-            log_schema().message_key() => "Some message",
+            LEVEL => "1.5",
+            "noUnderScore" => "foo",
         };
-        let event: Event = LogEvent::from_map(event_fields, EventMetadata::default()).into();
 
-        let mut buffer = BytesMut::new();
-
-        assert!(serializer.encode(event, &mut buffer).is_ok());
+        let jsn = do_serialize(true, true, event_fields).unwrap();
+        assert_eq!(jsn.get(VERSION).unwrap(), "1.1");
+        assert_eq!(jsn.get(HOST).unwrap(), "1.2");
+        assert_eq!(jsn.get(log_schema().message_key()).unwrap(), "1234");
+        assert_eq!(jsn.get(FULL_MESSAGE).unwrap(), "3.4");
+        assert_eq!(jsn.get(FACILITY).unwrap(), "42");
+        assert_eq!(jsn.get(FILE).unwrap(), "0");
+        assert_eq!(jsn.get(LINE).unwrap(), 1);
+        assert_eq!(jsn.get(LEVEL).unwrap(), 2);
     }
 
     #[test]
     fn gelf_serializing_invalid_no_sanitize() {
-        let config = GelfSerializerConfig::default();
-        let mut serializer = config.build();
-
-        let event_fields = btreemap! {
-            VERSION => "1.1",
-            HOST => "example.org",
-            LINE => "1",
-            log_schema().message_key() => "Some message",
-        };
-        let event: Event = LogEvent::from_map(event_fields, EventMetadata::default()).into();
-
-        let mut buffer = BytesMut::new();
-
-        assert!(serializer.encode(event, &mut buffer).is_err());
+        // no version
+        {
+            let event_fields = btreemap! {
+                HOST => "example.org",
+                log_schema().message_key() => "Some message",
+            };
+            do_serialize(false, false, event_fields);
+        }
+        // no host
+        {
+            let event_fields = btreemap! {
+                VERSION => "1.1",
+                log_schema().message_key() => "Some message",
+            };
+            do_serialize(false, false, event_fields);
+        }
+        // no message
+        {
+            let event_fields = btreemap! {
+                HOST => "example.org",
+                VERSION => "1.1",
+            };
+            do_serialize(false, false, event_fields);
+        }
+        // expected string
+        {
+            let event_fields = btreemap! {
+                HOST => "example.org",
+                VERSION => "1.1",
+                log_schema().message_key() => 0,
+            };
+            do_serialize(false, false, event_fields);
+        }
+        // expected integer
+        {
+            let event_fields = btreemap! {
+                HOST => "example.org",
+                VERSION => "1.1",
+                log_schema().message_key() => "Some message",
+                LINE => "1",
+            };
+            do_serialize(false, false, event_fields);
+        }
+        // invalid field name
+        {
+            let event_fields = btreemap! {
+                HOST => "example.org",
+                VERSION => "1.1",
+                log_schema().message_key() => "Some message",
+                "invalid%field" => "foo",
+            };
+            do_serialize(false, false, event_fields);
+        }
+        // missing underscore should still succeed.
+        {
+            let event_fields = btreemap! {
+                HOST => "example.org",
+                VERSION => "1.1",
+                log_schema().message_key() => "Some message",
+                "_invalidField" => "foo",
+            };
+            do_serialize(true, false, event_fields);
+        }
     }
 }
