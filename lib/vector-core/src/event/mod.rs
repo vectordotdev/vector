@@ -2,7 +2,6 @@ use std::{
     collections::{BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
     fmt::Debug,
-    sync::Arc,
 };
 
 pub use ::value::Value;
@@ -19,7 +18,7 @@ pub use r#ref::{EventMutRef, EventRef};
 use serde::{Deserialize, Serialize};
 pub use trace::TraceEvent;
 use vector_buffers::EventCount;
-use vector_common::EventDataEq;
+use vector_common::{finalization, EventDataEq};
 #[cfg(feature = "vrl")]
 pub use vrl_target::{TargetEvents, VrlTarget};
 
@@ -28,7 +27,6 @@ use crate::ByteSizeOf;
 pub mod array;
 pub mod discriminant;
 pub mod error;
-mod finalization;
 mod log_event;
 #[cfg(feature = "lua")]
 pub mod lua;
@@ -127,6 +125,16 @@ impl Event {
     ///
     /// If the event is a `LogEvent`, then `Some(log_event)` is returned, otherwise `None`.
     pub fn try_into_log(self) -> Option<LogEvent> {
+        match self {
+            Event::Log(log) => Some(log),
+            _ => None,
+        }
+    }
+
+    /// Return self as a `LogEvent` if possible
+    ///
+    /// If the event is a `LogEvent`, then `Some(&log_event)` is returned, otherwise `None`.
+    pub fn maybe_as_log(&self) -> Option<&LogEvent> {
         match self {
             Event::Log(log) => Some(log),
             _ => None,
@@ -250,17 +258,8 @@ impl Event {
         }
     }
 
-    pub fn add_batch_notifier(&mut self, batch: Arc<BatchNotifier>) {
-        let finalizer = EventFinalizer::new(batch);
-        match self {
-            Self::Log(log) => log.add_finalizer(finalizer),
-            Self::Metric(metric) => metric.add_finalizer(finalizer),
-            Self::Trace(trace) => trace.add_finalizer(finalizer),
-        }
-    }
-
     #[must_use]
-    pub fn with_batch_notifier(self, batch: &Arc<BatchNotifier>) -> Self {
+    pub fn with_batch_notifier(self, batch: &BatchNotifier) -> Self {
         match self {
             Self::Log(log) => log.with_batch_notifier(batch).into(),
             Self::Metric(metric) => metric.with_batch_notifier(batch).into(),
@@ -269,7 +268,7 @@ impl Event {
     }
 
     #[must_use]
-    pub fn with_batch_notifier_option(self, batch: &Option<Arc<BatchNotifier>>) -> Self {
+    pub fn with_batch_notifier_option(self, batch: &Option<BatchNotifier>) -> Self {
         match self {
             Self::Log(log) => log.with_batch_notifier_option(batch).into(),
             Self::Metric(metric) => metric.with_batch_notifier_option(batch).into(),
@@ -285,6 +284,17 @@ impl EventDataEq for Event {
             (Self::Metric(a), Self::Metric(b)) => a.event_data_eq(b),
             (Self::Trace(a), Self::Trace(b)) => a.event_data_eq(b),
             _ => false,
+        }
+    }
+}
+
+impl finalization::AddBatchNotifier for Event {
+    fn add_batch_notifier(&mut self, batch: BatchNotifier) {
+        let finalizer = EventFinalizer::new(batch);
+        match self {
+            Self::Log(log) => log.add_finalizer(finalizer),
+            Self::Metric(metric) => metric.add_finalizer(finalizer),
+            Self::Trace(trace) => trace.add_finalizer(finalizer),
         }
     }
 }

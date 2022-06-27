@@ -15,7 +15,6 @@ use openssl::{
     ssl::{SslConnector, SslMethod},
 };
 use postgres_openssl::MakeTlsConnector;
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_postgres::{
@@ -24,6 +23,7 @@ use tokio_postgres::{
     Client, Config, Error as PgError, NoTls, Row,
 };
 use tokio_stream::wrappers::IntervalStream;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -94,20 +94,56 @@ enum CollectError {
     QueryError { source: PgError },
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+/// Configuration of TLS when connecting to PostgreSQL.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 struct PostgresqlMetricsTlsConfig {
+    /// Absolute path to an additional CA certificate file.
+    ///
+    /// The certficate must be in the DER or PEM (X.509) format.
     ca_file: PathBuf,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+/// Configuration for the `postgresql_metrics` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
 #[serde(default, deny_unknown_fields)]
-struct PostgresqlMetricsConfig {
+pub struct PostgresqlMetricsConfig {
+    /// A list of PostgreSQL instances to scrape.
+    ///
+    /// Each endpoint must be in the [Connection URI
+    /// format](https://www.postgresql.org/docs/current/libpq-connect.html#id-1.7.3.8.3.6).
     endpoints: Vec<String>,
+
+    /// A list of databases to match (by using [POSIX Regular
+    /// Expressions](https://www.postgresql.org/docs/current/functions-matching.html#FUNCTIONS-POSIX-REGEXP)) against
+    /// the `datname` column for which you want to collect metrics from.
+    ///
+    /// If not set, metrics are collected from all databases. Specifying `""` will include metrics where `datname` is
+    /// `NULL`.
+    ///
+    /// This can be used in conjunction with `exclude_databases`.
     include_databases: Option<Vec<String>>,
+
+    /// A list of databases to match (by using [POSIX Regular
+    /// Expressions](https://www.postgresql.org/docs/current/functions-matching.html#FUNCTIONS-POSIX-REGEXP)) against
+    /// the `datname` column for which you don’t want to collect metrics from.
+    ///
+    /// Specifying `""` will include metrics where `datname` is `NULL`.
+    ///
+    /// This can be used in conjunction with `include_databases`.
     exclude_databases: Option<Vec<String>>,
+
+    /// The interval between scrapes, in seconds.
     scrape_interval_secs: u64,
+
+    /// Overrides the default namespace for the metrics emitted by the source.
+    ///
+    /// By default, `postgresql` is used.
     namespace: String,
+
+    #[configurable(derived)]
     tls: Option<PostgresqlMetricsTlsConfig>,
 }
 

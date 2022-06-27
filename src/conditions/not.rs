@@ -25,14 +25,16 @@ impl ConditionConfig for NotConfig {
 pub struct Not(Box<Condition>);
 
 impl Conditional for Not {
-    fn check(&self, e: &Event) -> bool {
-        !self.0.check(e)
+    fn check(&self, e: Event) -> (bool, Event) {
+        let (result, event) = self.0.check(e);
+        (!result, event)
     }
 
-    fn check_with_context(&self, e: &Event) -> Result<(), String> {
-        match self.0.check_with_context(e) {
-            Ok(()) => Err("event matches inner condition".to_string()),
-            Err(_) => Ok(()),
+    fn check_with_context(&self, e: Event) -> (Result<(), String>, Event) {
+        let (result, event) = self.0.check_with_context(e);
+        match result {
+            Ok(()) => (Err("event matches inner condition".to_string()), event),
+            Err(_) => (Ok(()), event),
         }
     }
 }

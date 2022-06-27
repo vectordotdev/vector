@@ -1,0 +1,63 @@
+// Copied from https://github.com/DataDog/sketches-go/blob/0a92170/ddsketch/pb/ddsketch.proto
+
+syntax = "proto3";
+
+package ddsketch_full;
+
+// A DDSketch is essentially a histogram that partitions the range of positive values into an infinite number of
+// indexed bins whose size grows exponentially. It keeps track of the number of values (or possibly floating-point
+// weights) added to each bin. Negative values are partitioned like positive values, symmetrically to zero.
+// The value zero as well as its close neighborhood that would be mapped to extreme bin indexes is mapped to a specific
+// counter.
+message DDSketch {
+    // The mapping between positive values and the bin indexes they belong to.
+    IndexMapping mapping = 1;
+
+    // The store for keeping track of positive values.
+    Store positiveValues = 2;
+
+    // The store for keeping track of negative values. A negative value v is mapped using its positive opposite -v.
+    Store negativeValues = 3;
+
+    // The count for the value zero and its close neighborhood (whose width depends on the mapping).
+    double zeroCount = 4;
+  }
+
+  // How to map positive values to the bins they belong to.
+  message IndexMapping {
+    // The gamma parameter of the mapping, such that bin index that a value v belongs to is roughly equal to
+    // log(v)/log(gamma).
+    double gamma = 1;
+
+    // An offset that can be used to shift all bin indexes.
+    double indexOffset = 2;
+
+    // To speed up the computation of the index a value belongs to, the computation of the log may be approximated using
+    // the fact that the log to the base 2 of powers of 2 can be computed at a low cost from the binary representation of
+    // the input value. Other values can be approximated by interpolating between successive powers of 2 (linearly,
+    // quadratically or cubically).
+    // NONE means that the log is to be computed exactly (no interpolation).
+    Interpolation interpolation = 3;
+    enum Interpolation {
+      NONE = 0;
+      LINEAR = 1;
+      QUADRATIC = 2;
+      CUBIC = 3;
+    }
+  }
+
+  // A Store maps bin indexes to their respective counts.
+  // Counts can be encoded sparsely using binCounts, but also in a contiguous way using contiguousBinCounts and
+  // contiguousBinIndexOffset. Given that non-empty bins are in practice usually contiguous or close to one another, the
+  // latter contiguous encoding method is usually more efficient than the sparse one.
+  // Both encoding methods can be used conjointly. If a bin appears in both the sparse and the contiguous encodings, its
+  // count value is the sum of the counts in each encodings.
+  message Store {
+    // The bin counts, encoded sparsely.
+    map<sint32, double> binCounts = 1;
+
+    // The bin counts, encoded contiguously. The values of contiguousBinCounts are the counts for the bins of indexes
+    // o, o+1, o+2, etc., where o is contiguousBinIndexOffset.
+    repeated double contiguousBinCounts = 2 [packed = true];
+    sint32 contiguousBinIndexOffset = 3;
+  }

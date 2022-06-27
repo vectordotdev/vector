@@ -10,7 +10,7 @@ services:
     volumes:
       - socket:/var/run/postgresql
       - ${PWD}/tests/data/postgres-init.sh:/postgres-init.sh:ro
-      - ${PWD}/tests/data:/certs:ro
+      - ${PWD}/tests/data/ca:/certs:ro
   runner:
     build:
       context: ${PWD}
@@ -28,8 +28,6 @@ services:
       - "postgresql_metrics-integration-tests"
       - "--lib"
       - "${FILTER:-::postgres}"
-      - "--"
-      - "--nocapture"
     depends_on:
       - postgres
     environment:

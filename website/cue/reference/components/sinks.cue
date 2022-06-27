@@ -212,6 +212,9 @@ components: sinks: [Name=string]: {
 											if codec == "ndjson" {
 												ndjson: "Newline delimited list of JSON encoded events."
 											}
+											if codec == "avro" {
+												avro: "Avro encoded event with a given schema."
+											}
 										}
 									}
 								}
@@ -577,7 +580,7 @@ components: sinks: [Name=string]: {
 		if features.send != _|_ {
 			if features.send.request.enabled {
 				rate_limits: {
-					title: "Rate limits & adapative concurrency"
+					title: "Rate limits & adaptive concurrency"
 					body:  null
 					sub_sections: [
 						{

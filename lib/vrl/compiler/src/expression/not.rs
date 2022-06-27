@@ -2,12 +2,11 @@ use std::fmt;
 
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 
-use crate::value::VrlValueConvert;
 use crate::{
     expression::{Expr, Resolved},
     parser::Node,
     state::{ExternalEnv, LocalEnv},
-    value::Kind,
+    value::{Kind, VrlValueConvert},
     Context, Expression, Span, TypeDef,
 };
 
@@ -85,7 +84,7 @@ impl std::error::Error for Error {
 
 impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
-        use ErrorVariant::*;
+        use ErrorVariant::NonBoolean;
 
         match &self.variant {
             NonBoolean(..) => 660,
@@ -93,7 +92,7 @@ impl DiagnosticMessage for Error {
     }
 
     fn labels(&self) -> Vec<Label> {
-        use ErrorVariant::*;
+        use ErrorVariant::NonBoolean;
 
         match &self.variant {
             NonBoolean(kind) => vec![
@@ -107,7 +106,7 @@ impl DiagnosticMessage for Error {
     }
 
     fn notes(&self) -> Vec<Note> {
-        use ErrorVariant::*;
+        use ErrorVariant::NonBoolean;
 
         match &self.variant {
             NonBoolean(..) => {

@@ -11,12 +11,12 @@ use snafu::Snafu;
 use crate::{
     config::{log_schema, AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
-    gcp::{GcpAuthConfig, GcpCredentials, Scope},
+    gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
     http::HttpClient,
     sinks::{
         gcs_common::config::healthcheck_response,
         util::{
-            encoding::{EncodingConfigWithDefault, EncodingConfiguration},
+            encoding::Transformer,
             http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
             BatchConfig, BoxedRawValue, JsonArrayBuffer, RealtimeSizeBasedDefaultBatchSettings,
             TowerRequestConfig,
@@ -49,10 +49,10 @@ pub struct StackdriverConfig {
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
     #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
+    pub encoding: Transformer,
 
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
@@ -76,21 +76,13 @@ fn default_endpoint() -> String {
 #[derive(Clone, Debug)]
 struct StackdriverSink {
     config: StackdriverConfig,
-    creds: Option<GcpCredentials>,
+    auth: GcpAuthenticator,
     severity_key: Option<String>,
     uri: Uri,
 }
 
 // 10MB limit for entries.write: https://cloud.google.com/logging/quotas#api-limits
 const MAX_BATCH_PAYLOAD_SIZE: usize = 10_000_000;
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-pub enum Encoding {
-    #[derivative(Default)]
-    Default,
-}
 
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
@@ -124,7 +116,7 @@ impl_generate_config_from_default!(StackdriverConfig);
 #[typetag::serde(name = "gcp_stackdriver_logs")]
 impl SinkConfig for StackdriverConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let creds = self.auth.make_credentials(Scope::LoggingWrite).await?;
+        let auth = self.auth.build(Scope::LoggingWrite).await?;
 
         let batch = self
             .batch
@@ -141,7 +133,7 @@ impl SinkConfig for StackdriverConfig {
 
         let sink = StackdriverSink {
             config: self.clone(),
-            creds,
+            auth,
             severity_key: self.severity_key.clone(),
             uri: self.endpoint.parse().unwrap(),
         };
@@ -216,7 +208,7 @@ impl HttpEventEncoder<serde_json::Value> for StackdriverEventEncoder {
             .unwrap_or_else(|| 0.into());
 
         let mut event = Event::Log(log);
-        self.config.encoding.apply_rules(&mut event);
+        self.config.encoding.transform(&mut event);
 
         let log = event.into_log();
 
@@ -263,10 +255,7 @@ impl HttpSink for StackdriverSink {
             .header("Content-Type", "application/json")
             .body(body)
             .unwrap();
-
-        if let Some(creds) = &self.creds {
-            creds.apply(&mut request);
-        }
+        self.auth.apply(&mut request);
 
         Ok(request)
     }
@@ -318,7 +307,7 @@ async fn healthcheck(client: HttpClient, sink: StackdriverSink) -> crate::Result
     let response = client.send(request).await?;
     healthcheck_response(
         response,
-        sink.creds.clone(),
+        sink.auth.clone(),
         HealthcheckError::NotFound.into(),
     )
 }
@@ -395,7 +384,7 @@ mod tests {
 
         let sink = StackdriverSink {
             config,
-            creds: None,
+            auth: GcpAuthenticator::None,
             severity_key: Some("anumber".into()),
             uri: default_endpoint().parse().unwrap(),
         };
@@ -437,7 +426,7 @@ mod tests {
 
         let sink = StackdriverSink {
             config,
-            creds: None,
+            auth: GcpAuthenticator::None,
             severity_key: Some("anumber".into()),
             uri: default_endpoint().parse().unwrap(),
         };
@@ -506,7 +495,7 @@ mod tests {
 
         let sink = StackdriverSink {
             config,
-            creds: None,
+            auth: GcpAuthenticator::None,
             severity_key: None,
             uri: default_endpoint().parse().unwrap(),
         };

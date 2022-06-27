@@ -60,6 +60,7 @@ impl Assignment {
 
                 let expr = expr.into_inner();
                 let target = Target::try_from(target.into_inner())?;
+                verify_mutable(&target, external, target_span, assignment_span)?;
                 let value = expr.as_value();
 
                 target.insert_type_def(local, external, type_def, value);
@@ -109,6 +110,7 @@ impl Assignment {
                 // set to being infallible, as the error will be captured by the
                 // "err" target.
                 let ok = Target::try_from(ok.into_inner())?;
+                verify_mutable(&ok, external, expr_span, ok_span)?;
                 let type_def = type_def.infallible();
                 let default_value = type_def.default_value();
                 let value = expr.as_value();
@@ -118,6 +120,7 @@ impl Assignment {
                 // "err" target is assigned `null` or a string containing the
                 // error message.
                 let err = Target::try_from(err.into_inner())?;
+                verify_mutable(&err, external, expr_span, err_span)?;
                 let type_def = TypeDef::bytes().add_null().infallible();
 
                 err.insert_type_def(local, external, type_def, None);
@@ -153,6 +156,28 @@ impl Assignment {
     }
 }
 
+fn verify_mutable(
+    target: &Target,
+    external: &ExternalEnv,
+    expr_span: Span,
+    assignment_span: Span,
+) -> Result<(), Error> {
+    match target {
+        Target::External(lookup_buf) => {
+            if external.is_read_only_event_path(lookup_buf) {
+                Err(Error {
+                    variant: ErrorVariant::ReadOnly,
+                    expr_span,
+                    assignment_span,
+                })
+            } else {
+                Ok(())
+            }
+        }
+        Target::Internal(_, _) | Target::Noop => Ok(()),
+    }
+}
+
 impl Expression for Assignment {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         self.variant.resolve(ctx)
@@ -165,7 +190,7 @@ impl Expression for Assignment {
 
 impl fmt::Display for Assignment {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Variant::*;
+        use Variant::{Infallible, Single};
 
         match &self.variant {
             Single { target, expr } => write!(f, "{} = {}", target, expr),
@@ -176,7 +201,7 @@ impl fmt::Display for Assignment {
 
 impl fmt::Debug for Assignment {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Variant::*;
+        use Variant::{Infallible, Single};
 
         match &self.variant {
             Single { target, expr } => write!(f, "{:?} = {:?}", target, expr),
@@ -201,63 +226,44 @@ impl Target {
         &self,
         local: &mut LocalEnv,
         external: &mut ExternalEnv,
-        type_def: TypeDef,
+        new_type_def: TypeDef,
         value: Option<Value>,
     ) {
-        use Target::*;
-
-        fn set_type_def(
-            current_type_def: &TypeDef,
-            new_type_def: TypeDef,
-            path: &LookupBuf,
-        ) -> TypeDef {
-            // If the assignment is onto root or has no path (root variable assignment), use the
-            // new type def, otherwise merge the type defs.
-            if path.is_root() {
-                new_type_def
-            } else {
-                current_type_def.clone().merge_overwrite(new_type_def)
-            }
-        }
-
         match self {
-            Noop => {}
-            Internal(ident, path) => {
-                let td = match path.is_root() {
-                    true => type_def,
-                    false => type_def.for_path(&path.to_lookup()),
-                };
-
+            Self::Noop => {}
+            Self::Internal(ident, path) => {
                 let type_def = match local.variable(ident) {
-                    None => td,
-                    Some(&Details { ref type_def, .. }) => set_type_def(type_def, td, path),
+                    None => {
+                        if path.is_root() {
+                            new_type_def
+                        } else {
+                            new_type_def.for_path(&path.to_lookup())
+                        }
+                    }
+                    Some(&Details { ref type_def, .. }) => type_def
+                        .clone()
+                        .with_type_set_at_path(&path.to_lookup(), new_type_def),
                 };
 
                 let details = Details { type_def, value };
-
                 local.insert_variable(ident.clone(), details);
             }
 
-            External(path) => {
-                let td = match path.is_root() {
-                    true => type_def,
-                    false => type_def.for_path(&path.to_lookup()),
-                };
-
-                let type_def = match external.target() {
-                    None => td,
-                    Some(&Details { ref type_def, .. }) => set_type_def(type_def, td, path),
-                };
-
-                let details = Details { type_def, value };
-
-                external.update_target(details);
+            Self::External(path) => {
+                external.update_target(Details {
+                    type_def: external
+                        .target()
+                        .type_def
+                        .clone()
+                        .with_type_set_at_path(&path.to_lookup(), new_type_def),
+                    value,
+                });
             }
         }
     }
 
     fn insert(&self, value: Value, ctx: &mut Context) {
-        use Target::*;
+        use Target::{External, Internal, Noop};
 
         match self {
             Noop => {}
@@ -288,7 +294,7 @@ impl Target {
 
 impl fmt::Display for Target {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Target::*;
+        use Target::{External, Internal, Noop};
 
         match self {
             Noop => f.write_str("_"),
@@ -302,7 +308,7 @@ impl fmt::Display for Target {
 
 impl fmt::Debug for Target {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Target::*;
+        use Target::{External, Internal, Noop};
 
         match self {
             Noop => f.write_str("Noop"),
@@ -318,7 +324,7 @@ impl TryFrom<ast::AssignmentTarget> for Target {
     type Error = Error;
 
     fn try_from(target: ast::AssignmentTarget) -> Result<Self, Error> {
-        use Target::*;
+        use Target::{External, Internal, Noop};
 
         let target = match target {
             ast::AssignmentTarget::Noop => Noop,
@@ -375,7 +381,7 @@ where
     U: Expression + Clone,
 {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        use Variant::*;
+        use Variant::{Infallible, Single};
 
         let value = match self {
             Single { target, expr } => {
@@ -407,7 +413,7 @@ where
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
-        use Variant::*;
+        use Variant::{Infallible, Single};
 
         match self {
             Single { expr, .. } => expr.type_def(state),
@@ -422,7 +428,7 @@ where
     U: fmt::Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Variant::*;
+        use Variant::{Infallible, Single};
 
         match self {
             Single { target, expr } => write!(f, "{} = {}", target, expr),
@@ -453,6 +459,9 @@ pub(crate) enum ErrorVariant {
 
     #[error("invalid assignment target")]
     InvalidTarget(Span),
+
+    #[error("mutation of read-only value")]
+    ReadOnly,
 }
 
 impl fmt::Display for Error {
@@ -469,18 +478,23 @@ impl std::error::Error for Error {
 
 impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
-        use ErrorVariant::*;
+        use ErrorVariant::{
+            FallibleAssignment, InfallibleAssignment, InvalidTarget, ReadOnly, UnnecessaryNoop,
+        };
 
         match &self.variant {
             UnnecessaryNoop(..) => 640,
             FallibleAssignment(..) => 103,
             InfallibleAssignment(..) => 104,
             InvalidTarget(..) => 641,
+            ReadOnly => 315,
         }
     }
 
     fn labels(&self) -> Vec<Label> {
-        use ErrorVariant::*;
+        use ErrorVariant::{
+            FallibleAssignment, InfallibleAssignment, InvalidTarget, ReadOnly, UnnecessaryNoop,
+        };
 
         match &self.variant {
             UnnecessaryNoop(target_span) => vec![
@@ -506,11 +520,15 @@ impl DiagnosticMessage for Error {
                 Label::primary("invalid assignment target", span),
                 Label::context("use one of variable or path", span),
             ],
+            ReadOnly => vec![Label::primary(
+                "mutation of read-only value",
+                self.assignment_span,
+            )],
         }
     }
 
     fn notes(&self) -> Vec<Note> {
-        use ErrorVariant::*;
+        use ErrorVariant::{FallibleAssignment, InfallibleAssignment};
 
         match &self.variant {
             FallibleAssignment(..) | InfallibleAssignment(..) => vec![Note::SeeErrorDocs],

@@ -2,12 +2,16 @@ use diagnostic::{DiagnosticList, DiagnosticMessage, Severity, Span};
 use lookup::LookupBuf;
 use parser::ast::{self, Node, QueryTarget};
 
-use crate::type_def::Details;
 use crate::{
-    expression::*,
+    expression::{
+        assignment, function_call, literal, predicate, query, Abort, Array, Assignment, Block,
+        Container, Error, Expr, Expression, FunctionArgument, FunctionCall, Group, IfStatement,
+        Literal, Noop, Not, Object, Op, Predicate, Query, Target, Unary, Variable,
+    },
+    parser::ast::RootExpr,
     program::ProgramInfo,
     state::{ExternalEnv, LocalEnv},
-    Function, Program, TypeDef,
+    Function, Program,
 };
 
 pub(crate) type Diagnostics = Vec<Box<dyn DiagnosticMessage>>;
@@ -65,11 +69,7 @@ impl<'a> Compiler<'a> {
         ast: parser::Program,
         external: &mut ExternalEnv,
     ) -> Result<(Program, DiagnosticList), DiagnosticList> {
-        let mut expressions = self.compile_root_exprs(ast, external);
-
-        if expressions.is_empty() {
-            expressions.push(Expr::Noop(Noop));
-        }
+        let expressions = self.compile_root_exprs(ast, external);
 
         let (errors, warnings): (Vec<_>, Vec<_>) =
             self.diagnostics.into_iter().partition(|diagnostic| {
@@ -92,48 +92,32 @@ impl<'a> Compiler<'a> {
         Ok((Program { expressions, info }, warnings.into()))
     }
 
-    fn compile_root_exprs(
-        &mut self,
-        nodes: impl IntoIterator<Item = Node<ast::RootExpr>>,
-        external: &mut ExternalEnv,
-    ) -> Vec<Expr> {
-        use ast::RootExpr::*;
-
-        nodes
-            .into_iter()
-            .filter_map(|node| match node.into_inner() {
-                Expr(expr) => {
-                    self.fallible_expression_error = None;
-
-                    let expr = self.compile_expr(expr, external)?;
-
-                    if let Some(error) = self.fallible_expression_error.take() {
-                        self.diagnostics.push(error);
-                    }
-
-                    Some(expr)
-                }
-                Error(err) => {
-                    self.handle_parser_error(err);
-                    None
-                }
-            })
-            .collect()
-    }
-
     fn compile_exprs(
         &mut self,
         nodes: impl IntoIterator<Item = Node<ast::Expr>>,
         external: &mut ExternalEnv,
     ) -> Option<Vec<Expr>> {
-        nodes
-            .into_iter()
-            .map(|node| self.compile_expr(node, external))
-            .collect::<Option<_>>()
+        let mut exprs = vec![];
+        for node in nodes {
+            let expr = self.compile_expr(node, external)?;
+            let type_def = expr.type_def((&self.local, external));
+            exprs.push(expr);
+
+            if type_def.is_never() {
+                // This is a terminal expression. Further expressions must not be
+                // compiled since they will never execute, but could alter the types of
+                // variables in local or external scopes through assignments.
+                break;
+            }
+        }
+        Some(exprs)
     }
 
     fn compile_expr(&mut self, node: Node<ast::Expr>, external: &mut ExternalEnv) -> Option<Expr> {
-        use ast::Expr::*;
+        use ast::Expr::{
+            Abort, Assignment, Container, FunctionCall, IfStatement, Literal, Op, Query, Unary,
+            Variable,
+        };
 
         let span = node.span();
 
@@ -170,7 +154,7 @@ impl<'a> Compiler<'a> {
         node: Node<ast::Literal>,
         external: &mut ExternalEnv,
     ) -> Option<Expr> {
-        use ast::Literal::*;
+        use ast::Literal::{Boolean, Float, Integer, Null, RawString, Regex, String, Timestamp};
         use bytes::Bytes;
 
         let (span, lit) = node.take();
@@ -218,7 +202,7 @@ impl<'a> Compiler<'a> {
         node: Node<ast::Container>,
         external: &mut ExternalEnv,
     ) -> Option<Container> {
-        use ast::Container::*;
+        use ast::Container::{Array, Block, Group, Object};
 
         let variant = match node.into_inner() {
             Group(node) => self.compile_group(*node, external)?.into(),
@@ -238,6 +222,52 @@ impl<'a> Compiler<'a> {
         let expr = self.compile_expr(node.into_inner().into_inner(), external)?;
 
         Some(Group::new(expr))
+    }
+
+    fn compile_root_exprs(
+        &mut self,
+        nodes: impl IntoIterator<Item = Node<ast::RootExpr>>,
+        external: &mut ExternalEnv,
+    ) -> Vec<Expr> {
+        let mut node_exprs = vec![];
+
+        // After a terminating expression, the state is stored, but the remaining expressions are checked.
+        let mut terminated_state = None;
+
+        for root_expr in nodes {
+            match root_expr.into_inner() {
+                RootExpr::Expr(node_expr) => {
+                    self.fallible_expression_error = None;
+
+                    if let Some(expr) = self.compile_expr(node_expr, external) {
+                        if let Some(error) = self.fallible_expression_error.take() {
+                            self.diagnostics.push(error);
+                        }
+
+                        if terminated_state.is_none() {
+                            let type_def = expr.type_def((&self.local, external));
+                            node_exprs.push(expr);
+                            // an expression that has the "never" type is a terminating expression
+                            if type_def.is_never() {
+                                terminated_state =
+                                    Some((self.local.clone(), external.target().clone()));
+                            }
+                        }
+                    }
+                }
+                RootExpr::Error(err) => self.handle_parser_error(err),
+            }
+        }
+
+        if let Some((local, details)) = terminated_state {
+            self.local = local;
+            external.update_target(details);
+        }
+
+        if node_exprs.is_empty() {
+            node_exprs.push(Expr::Noop(Noop));
+        }
+        node_exprs
     }
 
     fn compile_block(
@@ -324,28 +354,24 @@ impl<'a> Compiler<'a> {
             .ok()?;
 
         let original_locals = self.local.clone();
-        let original_external = external.target().cloned();
+        let original_external = external.target().clone();
 
         let consequent = self.compile_block(consequent, external)?;
 
         match alternative {
             Some(block) => {
                 let consequent_locals = self.local.clone();
-                let consequent_external = external.target().cloned();
+                let consequent_external = external.target().clone();
 
                 self.local = original_locals;
+                external.update_target(original_external);
 
                 let else_block = self.compile_block(block, external)?;
 
                 // assignments must be the result of either the if or else block, but not the original value
                 self.local = self.local.clone().merge(consequent_locals);
-                if let Some(details) = Details::merge_optional(
-                    consequent_external,
-                    external.target().cloned(),
-                    TypeDef::any(),
-                ) {
-                    external.update_target(details);
-                }
+
+                external.update_target(consequent_external.merge(external.target().clone()));
 
                 Some(IfStatement {
                     predicate,
@@ -356,14 +382,7 @@ impl<'a> Compiler<'a> {
             None => {
                 // assignments must be the result of either the if block or the original value
                 self.local = self.local.clone().merge(original_locals);
-
-                if let Some(details) = Details::merge_optional(
-                    original_external,
-                    external.target().cloned(),
-                    TypeDef::any(),
-                ) {
-                    external.update_target(details);
-                }
+                external.update_target(original_external.merge(external.target().clone()));
 
                 Some(IfStatement {
                     predicate,
@@ -389,7 +408,7 @@ impl<'a> Compiler<'a> {
         node: Node<ast::Predicate>,
         external: &mut ExternalEnv,
     ) -> Option<predicate::Result> {
-        use ast::Predicate::*;
+        use ast::Predicate::{Many, One};
 
         let (span, predicate) = node.take();
 
@@ -466,7 +485,10 @@ impl<'a> Compiler<'a> {
         external: &mut ExternalEnv,
     ) -> Option<Assignment> {
         use assignment::Variant;
-        use ast::{Assignment::*, AssignmentOp};
+        use ast::{
+            Assignment::{Infallible, Single},
+            AssignmentOp,
+        };
         use value::Value;
 
         let assignment = node.into_inner();
@@ -591,7 +613,7 @@ impl<'a> Compiler<'a> {
         // This data is exposed to the caller of the compiler, to allow any
         // potential external optimizations.
         if let Target::External = target {
-            self.external_queries.push(path.clone())
+            self.external_queries.push(path.clone());
         }
 
         Some(Query::new(target, path))
@@ -608,7 +630,7 @@ impl<'a> Compiler<'a> {
         node: Node<ast::QueryTarget>,
         external: &mut ExternalEnv,
     ) -> Option<query::Target> {
-        use ast::QueryTarget::*;
+        use ast::QueryTarget::{Container, External, FunctionCall, Internal};
 
         let span = node.span();
 
@@ -649,7 +671,7 @@ impl<'a> Compiler<'a> {
         //
         // See: https://github.com/vectordotdev/vector/issues/12547
         if ident.as_deref() == "get" {
-            self.external_queries.push(LookupBuf::root())
+            self.external_queries.push(LookupBuf::root());
         }
 
         let arguments = arguments
@@ -773,7 +795,7 @@ impl<'a> Compiler<'a> {
         node: Node<ast::Unary>,
         external: &mut ExternalEnv,
     ) -> Option<Unary> {
-        use ast::Unary::*;
+        use ast::Unary::Not;
 
         let variant = match node.into_inner() {
             Not(node) => self.compile_not(node, external)?.into(),
@@ -830,7 +852,7 @@ impl<'a> Compiler<'a> {
     }
 
     fn handle_parser_error(&mut self, error: parser::Error) {
-        self.diagnostics.push(Box::new(error))
+        self.diagnostics.push(Box::new(error));
     }
 
     #[allow(dead_code)]

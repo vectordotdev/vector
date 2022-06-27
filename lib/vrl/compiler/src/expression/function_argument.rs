@@ -29,7 +29,7 @@ impl FunctionArgument {
 
     #[cfg(feature = "expr-function_call")]
     pub(crate) fn keyword_span(&self) -> Option<crate::Span> {
-        self.ident.as_ref().map(|node| node.span())
+        self.ident.as_ref().map(Node::span)
     }
 
     pub(crate) fn parameter(&self) -> Option<Parameter> {

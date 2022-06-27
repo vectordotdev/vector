@@ -25,7 +25,7 @@ use crate::{
 fn random_events_with_stream(
     len: usize,
     count: usize,
-    batch: Option<Arc<BatchNotifier>>,
+    batch: Option<BatchNotifier>,
 ) -> (Vec<String>, impl Stream<Item = EventArray>) {
     let (lines, stream) = random_lines_with_stream(len, count, batch);
     (
@@ -130,7 +130,7 @@ async fn api_key_in_metadata() {
     let events = events.map(|mut events| {
         events.for_each_log(|log| {
             log.metadata_mut()
-                .set_datadog_api_key(Some(Arc::from("from_metadata")));
+                .set_datadog_api_key(Arc::from("from_metadata"));
         });
         events
     });

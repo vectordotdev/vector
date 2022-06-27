@@ -100,13 +100,26 @@ where
     Migrator: EncodingConfigMigrator<Codec = LegacyEncodingConfig::Codec> + Debug + Clone,
 {
     /// Create a new encoding configuration.
-    pub fn new(encoding: SerializerConfig) -> Self {
+    pub const fn new(encoding: SerializerConfig) -> Self {
         Self(
             EncodingWithTransformationConfig::<LegacyEncodingConfig, Migrator> {
                 encoding,
                 only_fields: None,
                 except_fields: None,
                 timestamp_format: None,
+                _marker: PhantomData,
+            },
+        )
+    }
+
+    /// Create a new encoding configuration with a `Transformer`.
+    pub fn with_transformer(encoding: SerializerConfig, transformer: Transformer) -> Self {
+        Self(
+            EncodingWithTransformationConfig::<LegacyEncodingConfig, Migrator> {
+                encoding,
+                only_fields: transformer.only_fields().clone(),
+                except_fields: transformer.except_fields().clone(),
+                timestamp_format: *transformer.timestamp_format(),
                 _marker: PhantomData,
             },
         )
@@ -128,12 +141,12 @@ where
     }
 
     /// Get the migrated configuration.
-    pub fn config(&self) -> &SerializerConfig {
+    pub const fn config(&self) -> &SerializerConfig {
         &self.0.encoding
     }
 
     /// Build the serializer for this configuration.
-    pub fn encoding(&self) -> Serializer {
+    pub fn encoding(&self) -> Result<Serializer, codecs::encoding::BuildError> {
         self.0.encoding.build()
     }
 }
@@ -263,7 +276,7 @@ where
         EncodingConfigWithFramingMigrator<Codec = LegacyEncodingConfig::Codec> + Debug + Clone,
 {
     /// Create a new encoding configuration.
-    pub fn new(framing: Option<FramingConfig>, encoding: SerializerConfig) -> Self {
+    pub const fn new(framing: Option<FramingConfig>, encoding: SerializerConfig) -> Self {
         Self {
             framing,
             encoding: EncodingWithTransformationConfig {
@@ -271,6 +284,24 @@ where
                 only_fields: None,
                 except_fields: None,
                 timestamp_format: None,
+                _marker: PhantomData,
+            },
+        }
+    }
+
+    /// Create a new encoding configuration with a `Transformer`.
+    pub fn with_transformer(
+        framing: Option<FramingConfig>,
+        encoding: SerializerConfig,
+        transformer: Transformer,
+    ) -> Self {
+        Self {
+            framing,
+            encoding: EncodingWithTransformationConfig {
+                encoding,
+                only_fields: transformer.only_fields().clone(),
+                except_fields: transformer.except_fields().clone(),
+                timestamp_format: *transformer.timestamp_format(),
                 _marker: PhantomData,
             },
         }
@@ -292,16 +323,16 @@ where
     }
 
     /// Get the migrated configuration.
-    pub fn config(&self) -> (&Option<FramingConfig>, &SerializerConfig) {
+    pub const fn config(&self) -> (&Option<FramingConfig>, &SerializerConfig) {
         (&self.framing, &self.encoding.encoding)
     }
 
     /// Build the framer and serializer for this configuration.
-    pub fn encoding(&self) -> (Option<Framer>, Serializer) {
-        (
+    pub fn encoding(&self) -> Result<(Option<Framer>, Serializer), codecs::encoding::BuildError> {
+        Ok((
             self.framing.as_ref().map(FramingConfig::build),
-            self.encoding.encoding.build(),
-        )
+            self.encoding.encoding.build()?,
+        ))
     }
 }
 

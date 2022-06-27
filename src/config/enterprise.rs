@@ -21,24 +21,26 @@ use super::{
     SourceOuter, TransformOuter,
 };
 use crate::{
-    built_info,
     common::datadog::{get_api_base_endpoint, Region},
+    conditions::AnyCondition,
     http::{HttpClient, HttpError},
     sinks::{
         datadog::{logs::DatadogLogsConfig, metrics::DatadogMetricsConfig},
         util::retries::ExponentialBackoff,
     },
     sources::{
-        host_metrics::{self, HostMetricsConfig},
+        host_metrics::{Collector, HostMetricsConfig},
         internal_logs::InternalLogsConfig,
         internal_metrics::InternalMetricsConfig,
     },
-    transforms::remap::RemapConfig,
+    transforms::{filter::FilterConfig, remap::RemapConfig},
 };
 
 static HOST_METRICS_KEY: &str = "#datadog_host_metrics";
 static TAG_METRICS_KEY: &str = "#datadog_tag_metrics";
 static TAG_LOGS_KEY: &str = "#datadog_tag_logs";
+static FILTER_METRICS_KEY: &str = "#datadog_filter_metrics";
+static PIPELINES_NAMESPACE_METRICS_KEY: &str = "#datadog_pipelines_namespace_metrics";
 static INTERNAL_METRICS_KEY: &str = "#datadog_internal_metrics";
 static INTERNAL_LOGS_KEY: &str = "#datadog_internal_logs";
 static DATADOG_METRICS_KEY: &str = "#datadog_metrics";
@@ -414,9 +416,6 @@ fn setup_logs_reporting(
 
     let configuration_key = &datadog.configuration_key;
     let vector_version = crate::vector_version();
-    let build_arch = built_info::TARGET_ARCH;
-    let build_os = built_info::TARGET_OS;
-    let build_vendor = built_info::TARGET_VENDOR;
     let tag_logs = RemapConfig {
         source: Some(format!(
             r#"
@@ -424,9 +423,6 @@ fn setup_logs_reporting(
             .vector.configuration_key = "{configuration_key}"
             .vector.configuration_version_hash = "{configuration_version_hash}"
             .vector.version = "{vector_version}"
-            .vector.arch = "{build_arch}"
-            .vector.os = "{build_os}"
-            .vector.vendor = "{build_vendor}"
             {}
         "#,
             custom_logs_tags_vrl,
@@ -469,18 +465,36 @@ fn setup_metrics_reporting(
     let host_metrics_id = OutputId::from(ComponentKey::from(HOST_METRICS_KEY));
     let tag_metrics_id = OutputId::from(ComponentKey::from(TAG_METRICS_KEY));
     let internal_metrics_id = OutputId::from(ComponentKey::from(INTERNAL_METRICS_KEY));
+    let filter_metrics_id = OutputId::from(ComponentKey::from(FILTER_METRICS_KEY));
+    let pipelines_namespace_metrics_id =
+        OutputId::from(ComponentKey::from(PIPELINES_NAMESPACE_METRICS_KEY));
     let datadog_metrics_id = ComponentKey::from(DATADOG_METRICS_KEY);
 
     // Create internal sources for host and internal metrics. We're using distinct sources here and
     // not attempting to reuse existing ones, to configure according to enterprise requirements.
+
+    // By default, host_metrics generates many metrics and some with high
+    // cardinality which can negatively impact customers' costs and downstream
+    // systems' performance. To avoid this, we explicitly set `collectors`.
     let host_metrics = HostMetricsConfig {
-        namespace: host_metrics::Namespace::from(Some("pipelines".to_owned())),
+        namespace: Some("vector.host".to_owned()),
         scrape_interval_secs: datadog.reporting_interval_secs,
+        collectors: Some(vec![
+            Collector::Cpu,
+            Collector::Disk,
+            Collector::Load,
+            Collector::Host,
+            Collector::Memory,
+            Collector::Network,
+        ]),
         ..Default::default()
     };
 
     let internal_metrics = InternalMetricsConfig {
-        namespace: Some("pipelines".to_owned()),
+        // While the default namespace for internal metrics is already "vector",
+        // setting the namespace here is meant for clarity and resistance
+        // against any future or accidental changes.
+        namespace: Some("vector".to_owned()),
         scrape_interval_secs: datadog.reporting_interval_secs,
         ..Default::default()
     };
@@ -502,6 +516,16 @@ fn setup_metrics_reporting(
         "#,
             custom_metric_tags_vrl
         )),
+        ..Default::default()
+    };
+
+    // Preserve the `pipelines` namespace for specific metrics
+    let filter_metrics = FilterConfig::from(AnyCondition::String(
+        r#".name == "component_received_bytes_total""#.to_string(),
+    ));
+
+    let pipelines_namespace_metrics = RemapConfig {
+        source: Some(r#".namespace = "pipelines""#.to_string()),
         ..Default::default()
     };
 
@@ -528,9 +552,22 @@ fn setup_metrics_reporting(
         TransformOuter::new(vec![host_metrics_id, internal_metrics_id], tag_metrics),
     );
 
+    config.transforms.insert(
+        filter_metrics_id.component.clone(),
+        TransformOuter::new(vec![tag_metrics_id.clone()], filter_metrics),
+    );
+
+    config.transforms.insert(
+        pipelines_namespace_metrics_id.component.clone(),
+        TransformOuter::new(vec![filter_metrics_id], pipelines_namespace_metrics),
+    );
+
     config.sinks.insert(
         datadog_metrics_id,
-        SinkOuter::new(vec![tag_metrics_id], Box::new(datadog_metrics)),
+        SinkOuter::new(
+            vec![tag_metrics_id, pipelines_namespace_metrics_id],
+            Box::new(datadog_metrics),
+        ),
     );
 }
 
@@ -563,8 +600,7 @@ pub(crate) fn report_configuration(
         // We need to create a JSON representation of config, based on the original files
         // that Vector was spawned with.
         let (table, _) = process_paths(&config_paths)
-            .map(|paths| load_source_from_paths(&paths).ok())
-            .flatten()
+            .and_then(|paths| load_source_from_paths(&paths).ok())
             .expect("Couldn't load source from config paths. Please report.");
 
         // Set the relevant fields needed to report a config to Datadog. This is a struct rather than

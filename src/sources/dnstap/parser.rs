@@ -623,7 +623,7 @@ impl<'a> DnstapParser<'a> {
         self.parent_key_path.push_field(key_path);
 
         for (i, query) in questions.iter().enumerate() {
-            self.parent_key_path.push_index(i);
+            self.parent_key_path.push_index(i as isize);
             self.log_dns_query_question(query);
             self.parent_key_path.segments.pop();
         }
@@ -828,7 +828,7 @@ impl<'a> DnstapParser<'a> {
         self.parent_key_path.push_field(key_path);
 
         options.iter().enumerate().for_each(|(i, opt)| {
-            self.parent_key_path.push_index(i);
+            self.parent_key_path.push_index(i as isize);
             self.log_edns_opt(opt);
             self.parent_key_path.segments.pop();
         });
@@ -855,7 +855,7 @@ impl<'a> DnstapParser<'a> {
         self.parent_key_path.push_field(key_path);
 
         for (i, record) in records.iter().enumerate() {
-            self.parent_key_path.push_index(i);
+            self.parent_key_path.push_index(i as isize);
             self.log_dns_record(record);
             self.parent_key_path.segments.pop();
         }

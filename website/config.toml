@@ -143,7 +143,7 @@ weight = 5
 
 [[languages.en.menus.navbar]]
 name = "Support"
-url = "/support-services"
+url = "https://www.datadoghq.com/product/observability-pipelines"
 weight = 6
 
 # Footer menu

@@ -77,7 +77,9 @@ impl RemapConfig {
         functions.append(&mut enrichment::vrl_functions());
         functions.append(&mut vector_vrl_functions::vrl_functions());
 
-        let mut state = vrl::state::ExternalEnv::new_with_kind(merged_schema_definition.into());
+        let mut state = vrl::state::ExternalEnv::new_with_kind(
+            merged_schema_definition.collection().clone().into(),
+        );
         state.set_external_context(enrichment_tables);
         state.set_external_context(MeaningList::default());
 
@@ -150,14 +152,13 @@ impl TransformConfig for RemapConfig {
 
                 state
                     .target_kind()
-                    .cloned()
-                    .and_then(Kind::into_object)
+                    .clone()
+                    .into_object()
                     .map(schema::Definition::from)
                     .map(|mut def| {
                         for (id, path) in meaning {
-                            def.register_known_meaning(path, &id)
+                            def = def.with_known_meaning(path, &id);
                         }
-
                         def
                     })
             })
@@ -165,7 +166,7 @@ impl TransformConfig for RemapConfig {
 
         // When a message is dropped and re-routed, we keep the original event, but also annotate
         // it with additional metadata.
-        let dropped_definition = merged_definition.clone().required_field(
+        let dropped_definition = merged_definition.clone().with_field(
             log_schema().metadata_key(),
             Kind::object(BTreeMap::from([
                 ("reason".into(), Kind::bytes()),
@@ -306,7 +307,7 @@ where
     }
 
     #[cfg(test)]
-    fn runner(&self) -> &Runner {
+    const fn runner(&self) -> &Runner {
         &self.runner
     }
 
@@ -494,7 +495,7 @@ mod tests {
     };
 
     fn test_default_schema_definition() -> schema::Definition {
-        schema::Definition::empty().required_field(
+        schema::Definition::empty().with_field(
             "a default field",
             Kind::integer().or_bytes(),
             Some("default"),
@@ -502,7 +503,7 @@ mod tests {
     }
 
     fn test_dropped_schema_definition() -> schema::Definition {
-        schema::Definition::empty().required_field(
+        schema::Definition::empty().with_field(
             "a dropped field",
             Kind::boolean().or_null(),
             Some("dropped"),
@@ -925,7 +926,7 @@ mod tests {
         let context = TransformContext {
             key: Some(ComponentKey::from("remapper")),
             schema_definitions,
-            merged_schema_definition: schema::Definition::empty().required_field(
+            merged_schema_definition: schema::Definition::empty().with_field(
                 "hello",
                 Kind::bytes(),
                 None,
@@ -1175,16 +1176,16 @@ mod tests {
         };
 
         let schema_definition = schema::Definition::empty()
-            .required_field("foo", Kind::bytes(), None)
-            .required_field(
+            .with_field("foo", Kind::bytes().or_null(), None)
+            .with_field(
                 "tags",
-                Kind::object(BTreeMap::from([("foo".into(), Kind::bytes())])),
+                Kind::object(BTreeMap::from([("foo".into(), Kind::bytes())])).or_null(),
                 None,
             );
 
         assert_eq!(
-            vec![Output::default(DataType::all()).with_schema_definition(schema_definition)],
             conf.outputs(&schema::Definition::empty()),
+            vec![Output::default(DataType::all()).with_schema_definition(schema_definition)]
         );
 
         let context = TransformContext {

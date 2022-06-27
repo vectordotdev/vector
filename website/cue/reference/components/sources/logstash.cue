@@ -93,6 +93,7 @@ components: sources: logstash: {
 					`log_schema.timestamp_key`.
 					"""
 			}
+			client_metadata: fields._client_metadata
 			"*": {
 				description: "In addition to the defined fields, all fields from the Logstash message are inserted as root level fields."
 				required:    true

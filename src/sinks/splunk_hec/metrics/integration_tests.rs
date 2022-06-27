@@ -1,4 +1,4 @@
-use std::{convert::TryFrom, sync::Arc};
+use std::convert::TryFrom;
 
 use futures::{future::ready, stream};
 use serde_json::Value as JsonValue;
@@ -42,7 +42,7 @@ async fn config() -> HecMetricsSinkConfig {
     }
 }
 
-fn get_gauge(batch: Arc<BatchNotifier>) -> Event {
+fn get_gauge(batch: BatchNotifier) -> Event {
     Metric::new(
         "example-gauge",
         MetricKind::Absolute,
@@ -55,7 +55,7 @@ fn get_gauge(batch: Arc<BatchNotifier>) -> Event {
     .into()
 }
 
-fn get_counter(batch: Arc<BatchNotifier>) -> Event {
+fn get_counter(batch: BatchNotifier) -> Event {
     Metric::new(
         "example-counter",
         MetricKind::Absolute,
@@ -77,7 +77,7 @@ async fn splunk_insert_counter_metric() {
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-    let event = get_counter(Arc::clone(&batch));
+    let event = get_counter(batch.clone());
     drop(batch);
     run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
@@ -100,7 +100,7 @@ async fn splunk_insert_gauge_metric() {
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-    let event = get_gauge(Arc::clone(&batch));
+    let event = get_gauge(batch.clone());
     drop(batch);
     run_and_assert_sink_compliance(sink, stream::once(ready(event)), &HTTP_SINK_TAGS).await;
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
@@ -125,7 +125,7 @@ async fn splunk_insert_multiple_counter_metrics() {
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
     let mut events = Vec::new();
     for _ in [..20] {
-        events.push(get_counter(Arc::clone(&batch)))
+        events.push(get_counter(batch.clone()))
     }
     drop(batch);
 
@@ -152,7 +152,7 @@ async fn splunk_insert_multiple_gauge_metrics() {
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
     let mut events = Vec::new();
     for _ in [..20] {
-        events.push(get_gauge(Arc::clone(&batch)))
+        events.push(get_gauge(batch.clone()))
     }
     drop(batch);
 

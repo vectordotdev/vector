@@ -12,8 +12,9 @@
 
 set -eu
 
-if [[ "$(git rev-parse --abbrev-ref HEAD)" == "master" ]]; then
-  echo "nightly"
-else
+# if this is a git tag, assume a real release
+if git describe --exact-match --tags HEAD 2> /dev/null ; then
   echo "latest"
+else
+  echo "nightly"
 fi
