@@ -80,11 +80,12 @@ impl ConfigBuilderHash<'_> {
     }
 }
 
-// Converting to Value prior to serializing to JSON string is sufficient
-// to sort our underlying keys. This is because Value::Map is backed (by
-// default) by BTreeMap which maintains an implicit key order.
-// Serializing Value (based on Map) is thus deterministic versus
-// serializing ConfigBuilderHash (based on potential HashMap) directly.
+/// Converting to Value prior to serializing to JSON string is sufficient
+/// to sort our underlying keys. This is because Value::Map is backed (by
+/// default) by BTreeMap which maintains an implicit key order.
+/// Serializing Value (based on Map) is thus deterministic versus
+/// serializing ConfigBuilderHash (based on potential HashMap) directly.
+#[cfg(feature = "enterprise")]
 fn to_sorted_json_string<T>(value: T) -> String
 where
     T: Serialize,
