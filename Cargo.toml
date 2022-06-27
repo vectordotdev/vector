@@ -781,8 +781,8 @@ enterprise-tests = [
   "sinks-blackhole",
 ]
 
-# grouping together features for benchmarks
-# excluing API client due to running out of memory during linking in Github Actions
+# Grouping together features for benchmarks. We exclude the API client due to it causing the build process to run out
+# of memory when those additional dependencies are built in CI.
 benches = [
   "sinks-file",
   "sinks-http",
