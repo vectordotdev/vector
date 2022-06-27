@@ -63,6 +63,7 @@ struct ConfigBuilderHash<'a> {
     secret: BTreeMap<&'a ComponentKey, &'a dyn SecretBackend>,
 }
 
+#[cfg(feature = "enterprise")]
 impl ConfigBuilderHash<'_> {
     fn into_hash(self) -> String {
         use sha2::{Digest, Sha256};
@@ -91,6 +92,7 @@ impl ConfigBuilderHash<'_> {
     }
 }
 
+#[cfg(feature = "enterprise")]
 impl<'a> From<&'a ConfigBuilder> for ConfigBuilderHash<'a> {
     fn from(value: &'a ConfigBuilder) -> Self {
         ConfigBuilderHash {
