@@ -106,7 +106,7 @@ fn serialize_field(field: &str, separator: Option<&str>) -> String {
     // Allocate enough to fit the field, a `.` and two `"` characters. This
     // should suffice for the majority of cases when no escape sequence is used.
 
-    let separator_len = separator.map(|x|x.len()).unwrap_or(0);
+    let separator_len = separator.map(|x| x.len()).unwrap_or(0);
     let mut string = String::with_capacity(field.as_bytes().len() + 2 + separator_len);
     if let Some(separator) = separator {
         string.push_str(separator);
