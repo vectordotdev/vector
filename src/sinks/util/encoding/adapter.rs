@@ -146,7 +146,7 @@ where
     }
 
     /// Build the serializer for this configuration.
-    pub const fn encoding(&self) -> Serializer {
+    pub fn encoding(&self) -> Result<Serializer, codecs::encoding::BuildError> {
         self.0.encoding.build()
     }
 }
@@ -328,11 +328,11 @@ where
     }
 
     /// Build the framer and serializer for this configuration.
-    pub fn encoding(&self) -> (Option<Framer>, Serializer) {
-        (
+    pub fn encoding(&self) -> Result<(Option<Framer>, Serializer), codecs::encoding::BuildError> {
+        Ok((
             self.framing.as_ref().map(FramingConfig::build),
-            self.encoding.encoding.build(),
-        )
+            self.encoding.encoding.build()?,
+        ))
     }
 }
 

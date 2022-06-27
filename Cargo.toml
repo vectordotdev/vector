@@ -151,21 +151,21 @@ metrics = { version = "0.17.1", default-features = false, features = ["std"] }
 metrics-tracing-context = { version = "0.9.0", default-features = false }
 
 # AWS - Official SDK
-aws-config = { version = "0.13.0", default-features = false, features = ["rustls"], optional = true }
-aws-types = { version = "0.13.0", default-features = false, features = ["hardcoded-credentials"], optional = true }
-aws-sdk-s3 = { version = "0.13.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-sqs = { version = "0.13.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-cloudwatch = { version = "0.13.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-cloudwatchlogs = { version = "0.13.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-elasticsearch = {version = "0.13.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-firehose = { version = "0.13.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-kinesis = { version = "0.13.0", default-features = false, features = ["rustls"], optional = true }
-aws-sigv4 = { version = "0.13.0", default-features = false, optional = true }
-aws-smithy-async = { version = "0.43.0", default-features = false, optional = true }
-aws-smithy-client = { version = "0.43.0", default-features = false, features = ["client-hyper"], optional = true}
-aws-smithy-http = { version = "0.43.0", default-features = false, features = ["event-stream"], optional = true }
-aws-smithy-http-tower = { version = "0.43.0", default-features = false, optional = true }
-aws-smithy-types = { version = "0.43.0", default-features = false, optional = true }
+aws-config = { version = "0.14.0", default-features = false, features = ["rustls"], optional = true }
+aws-types = { version = "0.14.0", default-features = false, features = ["hardcoded-credentials"], optional = true }
+aws-sdk-s3 = { version = "0.14.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-sqs = { version = "0.14.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-cloudwatch = { version = "0.14.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-cloudwatchlogs = { version = "0.14.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-elasticsearch = {version = "0.14.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-firehose = { version = "0.14.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-kinesis = { version = "0.14.0", default-features = false, features = ["rustls"], optional = true }
+aws-sigv4 = { version = "0.14.0", default-features = false, optional = true }
+aws-smithy-async = { version = "0.44.0", default-features = false, optional = true }
+aws-smithy-client = { version = "0.44.0", default-features = false, features = ["client-hyper"], optional = true}
+aws-smithy-http = { version = "0.44.0", default-features = false, features = ["event-stream"], optional = true }
+aws-smithy-http-tower = { version = "0.44.0", default-features = false, optional = true }
+aws-smithy-types = { version = "0.44.0", default-features = false, optional = true }
 
 # Azure
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b7171eb40909f7f2805f4622e076f8a6dbbe2d98", default-features = false, features = ["enable_reqwest"], optional = true }
@@ -174,7 +174,7 @@ azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev =
 azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b7171eb40909f7f2805f4622e076f8a6dbbe2d98", default-features = false, optional = true }
 
 # Tower
-tower = { version = "0.4.12", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util"] }
+tower = { version = "0.4.13", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util"] }
 # Serde
 serde = { version = "1.0.137", default-features = false, features = ["derive"] }
 serde-toml-merge = { version = "0.3.0", default-features = false }
@@ -220,7 +220,7 @@ vrl-stdlib = { path = "lib/vrl/stdlib" }
 arc-swap = { version = "1.5", default-features = false, optional = true }
 async-compression = { version = "0.3.12", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 avro-rs = { version = "0.13.0", default-features = false, optional = true }
-axum = { version = "0.5.7", default-features = false }
+axum = { version = "0.5.9", default-features = false }
 base64 = { version = "0.13.0", default-features = false, optional = true }
 bloom = { version = "0.3.2", default-features = false, optional = true }
 bollard = { version = "0.12.0", default-features = false, features = ["ssl"] }
@@ -228,12 +228,12 @@ bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.7", default-features = false }
-clap = { version = "3.1.18", default-features = false, features = ["derive", "env", "std"] }
+clap = { version = "3.2.6", default-features = false, features = ["derive", "env", "std"] }
 colored = { version = "2.0.0", default-features = false }
 csv = { version = "1.1", default-features = false, optional = true }
 derivative = { version = "2.2.0", default-features = false }
 dirs-next = { version = "2.0.0", default-features = false, optional = true }
-dyn-clone = { version = "1.0.5", default-features = false }
+dyn-clone = { version = "1.0.6", default-features = false }
 encoding_rs = { version = "0.8.31", default-features = false, features = ["serde"] }
 exitcode = { version = "1.1.2", default-features = false }
 flate2 = { version = "1.0.24", default-features = false, features = ["default"] }
@@ -250,7 +250,7 @@ http-body = { version = "0.4.5", default-features = false }
 hyper = { version = "0.14.19", default-features = false, features = ["client", "runtime", "http1", "http2", "server", "stream"] }
 hyper-openssl = { version = "0.9.2", default-features = false }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["openssl-tls"] }
-indexmap = { version = "~1.8.2", default-features = false, features = ["serde"] }
+indexmap = { version = "~1.9.1", default-features = false, features = ["serde"] }
 infer = { version = "0.8.1", default-features = false, optional = true}
 indoc = { version = "1.0.6", default-features = false }
 inventory = { version = "0.1.10", default-features = false }
@@ -262,7 +262,7 @@ lru = { version = "0.7.7", default-features = false, optional = true }
 maxminddb = { version = "0.23.0", default-features = false, optional = true }
 md-5 = { version = "0.10", default-features = false, optional = true }
 mongodb = { version = "2.2.2", default-features = false, features = ["tokio-runtime"], optional = true }
-nats = { version = "0.20.1", default-features = false, optional = true }
+nats = { version = "0.21.0", default-features = false, optional = true }
 nkeys = { version = "0.2.0", default-features = false, optional = true }
 nom = { version = "7.1.1", default-features = false, optional = true }
 notify = { version = "4.0.17", default-features = false }
@@ -273,7 +273,7 @@ ordered-float = { version = "3.0.0", default-features = false }
 percent-encoding = { version = "2.1.0", default-features = false }
 pin-project = { version = "1.0.10", default-features = false }
 postgres-openssl = { version = "0.5.0", default-features = false, features = ["runtime"], optional = true }
-pulsar = { version = "4.1", default-features = false, features = ["tokio-runtime"], optional = true }
+pulsar = { version = "4.1.2", default-features = false, features = ["tokio-runtime", "auth-oauth2"], optional = true }
 rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.3", default-features = false }
 rdkafka = { version = "0.27.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
@@ -355,14 +355,14 @@ h2 = { git = "https://github.com/hyperium/h2.git", rev = "f6aa3be6719270cd7b4094
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["api", "api-client", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "dep:vrl-cli", "enterprise"]
+default = ["api", "api-client", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "vrl-cli", "enterprise"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "dep:vrl-cli", "enterprise"]
+default-cmake = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "vrl-cli", "enterprise"]
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/vectordotdev/vector/pull/3081#issuecomment-659298042
-default-msvc = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "transforms", "dep:vrl-cli", "enterprise"]
-default-musl = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "dep:vrl-cli", "enterprise"]
-default-no-api-client = ["api", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "dep:vrl-cli", "enterprise"]
+default-msvc = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "transforms", "vrl-cli", "enterprise"]
+default-musl = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "vrl-cli", "enterprise"]
+default-no-api-client = ["api", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "vrl-cli", "enterprise"]
 default-no-vrl-cli = ["api", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "enterprise"]
 tokio-console = ["dep:console-subscriber", "tokio/tracing"]
 
@@ -372,16 +372,16 @@ all-metrics = ["sinks-metrics", "sources-metrics", "transforms-metrics", "enterp
 # Target specific release features.
 # The `make` tasks will select this according to the appropriate triple.
 # Use this section to turn off or on specific features for specific triples.
-target-aarch64-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "dep:vrl-cli", "enterprise"]
-target-aarch64-unknown-linux-musl = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "dep:vrl-cli", "enterprise"]
-target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "dep:vrl-cli", "enterprise"]
-target-armv7-unknown-linux-musleabihf = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "dep:vrl-cli", "enterprise"]
-target-x86_64-unknown-linux-gnu = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "dep:vrl-cli", "enterprise"]
-target-x86_64-unknown-linux-musl = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "dep:vrl-cli", "enterprise"]
+target-aarch64-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vrl-cli", "enterprise"]
+target-aarch64-unknown-linux-musl = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vrl-cli", "enterprise"]
+target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vrl-cli", "enterprise"]
+target-armv7-unknown-linux-musleabihf = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "vrl-cli", "enterprise"]
+target-x86_64-unknown-linux-gnu = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "vrl-cli", "enterprise"]
+target-x86_64-unknown-linux-musl = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vrl-cli", "enterprise"]
 # Does not currently build
-target-powerpc64le-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "dep:vrl-cli", "enterprise"]
+target-powerpc64le-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vrl-cli", "enterprise"]
 # Currently doesn't build due to lack of support for 64-bit atomics
-target-powerpc-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "dep:vrl-cli", "enterprise"]
+target-powerpc-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "vrl-cli", "enterprise"]
 
 # Enables features that work only on systems providing `cfg(unix)`
 unix = ["tikv-jemallocator"]
@@ -424,7 +424,7 @@ aws-core = [
 # Anything that requires Protocol Buffers.
 protobuf-build = ["dep:tonic-build", "dep:prost-build"]
 
-gcp = ["dep:goauth", "dep:smpl_jwt"]
+gcp = ["dep:base64", "dep:goauth", "dep:smpl_jwt"]
 
 # Enrichment Tables
 enrichment-tables = ["enrichment-tables-file"]
