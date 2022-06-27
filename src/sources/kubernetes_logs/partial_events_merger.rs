@@ -19,7 +19,7 @@ pub fn build(enabled: bool) -> PartialEventsMerger {
         let mut merge_strategies = IndexMap::new();
         merge_strategies.insert(
             crate::config::log_schema().message_key().to_string(),
-            MergeStrategy::Concat,
+            MergeStrategy::ConcatRaw,
         );
 
         // Group events by their file.
