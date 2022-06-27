@@ -5,7 +5,7 @@ use tokio_test::{assert_pending, task::spawn};
 use tracing::Instrument;
 
 use super::{
-    create_buffer_v2_with_max_buffer_size, create_buffer_v2_with_max_data_file_size,
+    create_buffer_v2_with_data_file_count_limit, create_buffer_v2_with_max_data_file_size,
     create_buffer_v2_with_max_record_size,
 };
 use crate::{
@@ -83,13 +83,8 @@ async fn writer_waits_when_buffer_is_full() {
             let second_record = SizedRecord(second_write_size);
 
             let max_data_file_size = get_minimum_data_file_size_for_record_payload(&second_record);
-            let (mut writer, mut reader, acker, ledger) = create_buffer_v2_with_max_buffer_size(
-                data_dir,
-                max_data_file_size * 2,
-                max_data_file_size,
-                max_data_file_size,
-            )
-            .await;
+            let (mut writer, mut reader, acker, ledger) =
+                create_buffer_v2_with_data_file_count_limit(data_dir, max_data_file_size, 2).await;
 
             assert_buffer_is_empty!(ledger);
 
@@ -403,13 +398,8 @@ async fn writer_try_write_returns_when_buffer_is_full() {
             let second_record = SizedRecord(write_size);
 
             let max_data_file_size = get_minimum_data_file_size_for_record_payload(&second_record);
-            let (mut writer, _, _, ledger) = create_buffer_v2_with_max_buffer_size(
-                data_dir,
-                max_data_file_size * 2,
-                max_data_file_size,
-                max_data_file_size,
-            )
-            .await;
+            let (mut writer, _, _, ledger) =
+                create_buffer_v2_with_data_file_count_limit(data_dir, max_data_file_size, 2).await;
 
             assert_buffer_is_empty!(ledger);
 
@@ -447,11 +437,10 @@ async fn writer_can_validate_last_write_when_buffer_is_full() {
             let second_record = SizedRecord(write_size);
 
             let max_data_file_size = get_minimum_data_file_size_for_record_payload(&second_record);
-            let (mut writer, _, _, ledger) = create_buffer_v2_with_max_buffer_size(
+            let (mut writer, _, _, ledger) = create_buffer_v2_with_data_file_count_limit(
                 data_dir.clone(),
-                max_data_file_size * 2,
                 max_data_file_size,
-                max_data_file_size,
+                2,
             )
             .await;
 
@@ -478,11 +467,10 @@ async fn writer_can_validate_last_write_when_buffer_is_full() {
             drop(writer);
             drop(ledger);
 
-            let (_, _, _, ledger) = create_buffer_v2_with_max_buffer_size::<_, SizedRecord>(
+            let (_, _, _, ledger) = create_buffer_v2_with_data_file_count_limit::<_, SizedRecord>(
                 data_dir,
-                max_data_file_size * 2,
                 max_data_file_size,
-                max_data_file_size,
+                2,
             )
             .await;
             assert_buffer_records!(ledger, 1);

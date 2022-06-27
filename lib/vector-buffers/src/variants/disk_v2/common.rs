@@ -8,6 +8,7 @@ use snafu::Snafu;
 
 use super::{
     io::{Filesystem, ProductionFilesystem},
+    ledger::LEDGER_LEN,
     record::RECORD_HEADER_LEN,
 };
 
@@ -56,6 +57,14 @@ pub(crate) const fn align16(amount: usize) -> usize {
         // Pad ourselves to meet the alignment requirements.
         (amount & !(SERIALIZER_ALIGNMENT - 1)) + SERIALIZER_ALIGNMENT
     }
+}
+
+fn get_minimum_max_buffer_size(max_data_file_size: u64) -> u64 {
+    let ledger_len: u64 = LEDGER_LEN
+        .try_into()
+        .expect("Vector does not support 128-bit architectures.");
+
+    (max_data_file_size * 2) + ledger_len
 }
 
 #[derive(Debug, Snafu)]
@@ -281,12 +290,13 @@ where
             });
         }
 
-        if max_buffer_size < max_data_file_size * 2 {
+        let minimum_max_buffer_size = get_minimum_max_buffer_size(max_data_file_size);
+        if max_buffer_size < minimum_max_buffer_size {
             return Err(BuildError::InvalidParameter {
                 param_name: "max_buffer_size",
                 reason: format!(
                     "must be greater than or equal to {} bytes",
-                    max_data_file_size * 2
+                    minimum_max_buffer_size
                 ),
             });
         }
