@@ -107,9 +107,16 @@ components: sinks: axiom: {
 	}
 
 	input: {
-		logs:    true
-		metrics: true
-		traces:  null
+		logs: true
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			set:          true
+			summary:      true
+		}
+		traces: false
 	}
 
 	how_it_works: {
