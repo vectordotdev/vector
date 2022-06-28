@@ -13,6 +13,8 @@ DATE="${DATE:-"$(date -u +%Y-%m-%d)"}"
 VERIFY_TIMEOUT="${VERIFY_TIMEOUT:-"30"}" # seconds
 VERIFY_RETRIES="${VERIFY_RETRIES:-"2"}"
 
+export AWS_REGION=us-east-1
+
 #
 # Setup
 #
