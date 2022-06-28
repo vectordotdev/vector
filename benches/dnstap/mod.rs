@@ -6,6 +6,7 @@ use vector::{
 };
 
 fn benchmark_query_parsing(c: &mut Criterion) {
+    let mut event = LogEvent::default();
     let schema = DnstapEventSchema::new();
     let mut parser = DnstapParser::new(&schema, &mut event);
     let raw_dnstap_data = "ChVqYW1lcy1WaXJ0dWFsLU1hY2hpbmUSC0JJTkQgOS4xNi4zcnoIAxACGAEiEAAAAAAAAA\
