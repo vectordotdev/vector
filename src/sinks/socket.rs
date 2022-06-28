@@ -95,7 +95,7 @@ impl SinkConfig for SocketSinkConfig {
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let transformer = self.encoding.transformer();
-        let (framer, serializer) = self.encoding.encoding();
+        let (framer, serializer) = self.encoding.encoding()?;
         let framer = framer.unwrap_or_else(|| match self.mode {
             Mode::Tcp(_) => NewlineDelimitedEncoder::new().into(),
             Mode::Udp(_) => BytesEncoder::new().into(),

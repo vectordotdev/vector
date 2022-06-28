@@ -59,9 +59,17 @@ components: transforms: reduce: {
 			}
 		}
 		group_by: {
-			common:      true
-			description: "An ordered list of fields by which to group events. Each group is combined independently, allowing you to keep independent events separate. When no fields are specified, all events will be combined in a single group. Events missing a specified field will be combined in their own group."
-			required:    false
+			common: true
+			description: """
+				An ordered list of fields by which to group events. Each group with matching values for the specified
+				keys is reduced independently, allowing you to keep independent event streams separate.
+
+				For example, if `group_by = ["host", "region"]`, then all incoming events that have the same host and
+				region will be grouped together before being reduced.
+
+				When no fields are specified, all events will be combined in a single group.
+				"""
+			required: false
 			type: array: {
 				default: []
 				items: type: string: {
