@@ -318,17 +318,17 @@ test-behavior-config: ## Runs configuration related behaviorial tests
 	${MAYBE_ENVIRONMENT_EXEC} cargo build --bin secret-backend-example
 	${MAYBE_ENVIRONMENT_EXEC} cargo run -- test tests/behavior/config/*
 
-.PHONY: test-behavior-enterprise
-test-behavior-enterprise: ## Runs enterprise related behaviorial tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --features "default, enterprise-tests" -- config::enterprise
-
 .PHONY: test-behavior-%
 test-behavior-%: ## Runs behaviorial test for a given category
 	${MAYBE_ENVIRONMENT_EXEC} cargo run -- test tests/behavior/$*/*
 
 .PHONY: test-behavior
 test-behavior: ## Runs all behaviorial tests
-test-behavior: test-behavior-transforms test-behavior-formats test-behavior-config test-behavior-enterprise
+test-behavior: test-behavior-transforms test-behavior-formats test-behavior-config
+
+.PHONY: test-enterprise
+test-enterprise: ## Runs enterprise related behavioral tests
+	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --workspace --no-fail-fast --features "enterprise-tests" --test enterprise
 
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
