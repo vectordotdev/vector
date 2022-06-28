@@ -43,6 +43,7 @@ scopes:
   - dev # Anything related to Vector's development environment
   - durability # Anything related to the durability of Vector events
   - enriching # Anything related to enriching Vector's events with context data
+  - enterprise # Anything related to Vector's enterprise features (Observability Pipelines)
   - exceptions # Anything related to Vector's exception events.
   - external docs # Anything related to Vector's external, public documentation
   - filtering # Anything related to filtering within Vector

@@ -818,6 +818,8 @@ enterprise-tests = [
   "enterprise",
   "sources-demo_logs",
   "sinks-blackhole",
+  "sinks-loki",
+  "api",
 ]
 
 # grouping together features for benchmarks
