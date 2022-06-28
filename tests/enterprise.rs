@@ -1,15 +1,16 @@
 #![cfg(feature = "enterprise-tests")]
 
-use std::{io::Write, path::PathBuf, str::FromStr, thread};
+use std::{env, path::PathBuf, str::FromStr, thread};
 
 use http::StatusCode;
-use indoc::formatdoc;
 
 use vector::{
     app::Application,
     cli::{Color, LogFormat, Opts, RootOpts},
 };
 use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
+
+const ENDPOINT_CONFIG_ENV_VAR: &'static str = "MOCK_SERVER_ENDPOINT";
 
 /// This mocked server will reply with the configured status code 3 times
 /// before falling back to a 200 OK
@@ -30,12 +31,6 @@ async fn build_test_server_error_and_recover(status_code: StatusCode) -> MockSer
         .await;
 
     mock_server
-}
-
-fn get_vector_config_file(config: impl Into<String>) -> tempfile::NamedTempFile {
-    let mut file = tempfile::NamedTempFile::new().unwrap();
-    let _ = writeln!(file, "{}", config.into());
-    file
 }
 
 fn get_root_opts(config_path: PathBuf) -> RootOpts {
@@ -68,28 +63,14 @@ async fn vector_continues_on_reporting_error() {
     let server = build_test_server_error_and_recover(StatusCode::NOT_IMPLEMENTED).await;
     let endpoint = server.uri();
 
-    let vector_config = formatdoc! {r#"
-        [enterprise]
-        application_key = "application_key"
-        api_key = "api_key"
-        configuration_key = "configuration_key"
-        endpoint = "{endpoint}"
-        max_retries = 1
-
-        [sources.in]
-        type = "demo_logs"
-        format = "syslog"
-        count = 3
-
-        [sinks.out]
-        type = "blackhole"
-        inputs = ["*"]
-    "#, endpoint=endpoint};
-
-    let config_file = get_vector_config_file(vector_config);
+    env::set_var(ENDPOINT_CONFIG_ENV_VAR, endpoint);
+    let config_file = PathBuf::from(format!(
+        "{}/tests/data/enterprise/base.toml",
+        env!("CARGO_MANIFEST_DIR")
+    ));
 
     let opts = Opts {
-        root: get_root_opts(config_file.path().to_path_buf()),
+        root: get_root_opts(config_file),
         sub_command: None,
     };
 
@@ -117,28 +98,14 @@ async fn vector_does_not_start_with_enterprise_misconfigured() {
     let server = build_test_server_error_and_recover(StatusCode::NOT_IMPLEMENTED).await;
     let endpoint = server.uri();
 
-    let vector_config = formatdoc! {r#"
-        [enterprise]
-        application_key = "application_key"
-        configuration_key = "configuration_key"
-        endpoint = "{endpoint}"
-        max_retries = 1
-
-        [sources.in]
-        type = "demo_logs"
-        format = "syslog"
-        count = 1
-        interval = 0.0
-
-        [sinks.out]
-        type = "blackhole"
-        inputs = ["*"]
-    "#, endpoint=endpoint};
-
-    let config_file = get_vector_config_file(vector_config);
+    env::set_var(ENDPOINT_CONFIG_ENV_VAR, endpoint);
+    let config_file = PathBuf::from(format!(
+        "{}/tests/data/enterprise/missing_api_key.toml",
+        env!("CARGO_MANIFEST_DIR")
+    ));
 
     let opts = Opts {
-        root: get_root_opts(config_file.path().to_path_buf()),
+        root: get_root_opts(config_file),
         sub_command: None,
     };
 
