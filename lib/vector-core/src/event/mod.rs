@@ -6,7 +6,6 @@ use std::{
 
 pub use ::value::Value;
 pub use array::{into_event_stream, EventArray, EventContainer, LogArray, MetricArray, TraceArray};
-use bytes::Bytes;
 pub use finalization::{
     BatchNotifier, BatchStatus, BatchStatusReceiver, EventFinalizer, EventFinalizers, EventStatus,
     Finalizable,
@@ -396,12 +395,6 @@ impl From<proto::SummaryQuantile> for metric::Quantile {
             quantile: quantile.quantile,
             value: quantile.value,
         }
-    }
-}
-
-impl From<Bytes> for Event {
-    fn from(message: Bytes) -> Self {
-        Event::Log(LogEvent::from(message))
     }
 }
 
