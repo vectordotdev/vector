@@ -4,6 +4,8 @@ use std::path::Path;
 
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "enterprise")]
+use serde_json::Value;
 use vector_core::{config::GlobalOptions, default_data_dir, transform::TransformConfig};
 
 #[cfg(feature = "api")]
@@ -80,19 +82,47 @@ impl ConfigBuilderHash<'_> {
     }
 }
 
-/// Converting to Value prior to serializing to JSON string is sufficient
-/// to sort our underlying keys. This is because Value::Map is backed (by
-/// default) by BTreeMap which maintains an implicit key order.
-/// Serializing Value (based on Map) is thus deterministic versus
-/// serializing ConfigBuilderHash (based on potential HashMap) directly.
+/// It may seem like converting to Value prior to serializing to JSON string is
+/// sufficient to sort our underlying keys. By default, Value::Map is backed by
+/// BTreeMap which maintains an implicit key order, so it's an enticing and
+/// simple approach. The issue however is the "by default". The underlying
+/// Value::Map structure can actually change depending on which serde features
+/// are enabled: IndexMap is the alternative and would break our intended
+/// behavior.
+///
+/// Rather than rely on the opaque underlying serde structures, we are explicit
+/// about sorting, sacrificing a bit of potential convenience for correctness.
 #[cfg(feature = "enterprise")]
 fn to_sorted_json_string<T>(value: T) -> String
 where
     T: Serialize,
 {
-    let value = serde_json::to_value(value).expect("Should serialize to JSON. Please report.");
+    let mut value = serde_json::to_value(value).expect("Should serialize to JSON. Please report.");
+    sort_json_value(&mut value);
 
     serde_json::to_string(&value).expect("Should serialize Value to JSON string. Please report.")
+}
+
+#[cfg(feature = "enterprise")]
+fn sort_json_value(value: &mut Value) {
+    match value {
+        Value::Array(arr) => {
+            for v in arr.iter_mut() {
+                sort_json_value(v);
+            }
+        }
+        Value::Object(map) => {
+            let mut ordered_map: BTreeMap<String, Value> =
+                serde_json::from_value(map.to_owned().into())
+                    .expect("Converting Value to BTreeMap failed.");
+            for v in ordered_map.values_mut() {
+                sort_json_value(v);
+            }
+            *value = serde_json::to_value(ordered_map)
+                .expect("Converting BTreeMap back to Value failed.");
+        }
+        _ => {}
+    }
 }
 
 #[cfg(feature = "enterprise")]
@@ -370,7 +400,10 @@ impl ConfigBuilder {
 mod tests {
     use indexmap::IndexMap;
 
-    use crate::config::{builder::to_sorted_json_string, ConfigBuilder};
+    use crate::config::{
+        builder::{sort_json_value, to_sorted_json_string},
+        ConfigBuilder,
+    };
 
     use super::ConfigBuilderHash;
 
@@ -401,23 +434,8 @@ mod tests {
 
         let builder = ConfigBuilder::default();
 
-        let value = json!(ConfigBuilderHash {
-            api: &builder.api,
-            schema: &builder.schema,
-            global: &builder.global,
-            healthchecks: &builder.healthchecks,
-            enrichment_tables: builder.enrichment_tables.iter().collect(),
-            sources: builder.sources.iter().collect(),
-            sinks: builder.sinks.iter().collect(),
-            transforms: builder.transforms.iter().collect(),
-            tests: &builder.tests,
-            provider: &builder.provider,
-            secret: builder
-                .secret
-                .iter()
-                .map(|(k, v)| (k, v.as_ref()))
-                .collect(),
-        });
+        let mut value = json!(ConfigBuilderHash::from(&builder));
+        sort_json_value(&mut value);
 
         match value {
             // Should serialize to a map.
