@@ -157,7 +157,7 @@ pub mod tests {
     use bytes::Bytes;
 
     use super::{super::test_util, *};
-    use crate::{test_util::trace_init, transforms::Transform};
+    use crate::{event::LogEvent, test_util::trace_init, transforms::Transform};
 
     fn make_long_string(base: &str, len: usize) -> String {
         base.chars().cycle().take(len).collect()
@@ -252,7 +252,7 @@ pub mod tests {
         trace_init();
         test_util::test_parser(
             || Transform::function(Cri::default()),
-            Event::from,
+            |bytes| LogEvent::from(bytes).into(),
             byte_cases(),
         );
     }
