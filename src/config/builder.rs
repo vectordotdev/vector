@@ -209,9 +209,17 @@ impl ConfigBuilder {
 
         #[cfg(feature = "enterprise")]
         {
-            if let Some(enterprise) = with.enterprise {
-                self.enterprise = Some(enterprise);
-            }
+            match (self.enterprise.as_ref(), with.enterprise) {
+                (Some(_), Some(_)) => {
+                    errors.push(
+                        "duplicate 'enterprise' definition, only one definition allowed".to_owned(),
+                    );
+                }
+                (None, Some(other)) => {
+                    self.enterprise = Some(other);
+                }
+                _ => {}
+            };
         }
 
         self.provider = with.provider;
@@ -436,7 +444,10 @@ mod tests {
             enterprise: Some(other_ent),
             ..Default::default()
         };
-        base.append(other).unwrap();
-        assert_eq!(base.enterprise.unwrap().application_key, "other");
+        let errors = base.append(other).unwrap_err();
+        assert_eq!(
+            errors[0],
+            "duplicate 'enterprise' definition, only one definition allowed"
+        );
     }
 }
