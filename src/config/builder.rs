@@ -360,7 +360,13 @@ impl ConfigBuilder {
     }
 }
 
-#[cfg(all(test, feature = "enterprise-tests"))]
+#[cfg(all(
+    test,
+    feature = "enterprise",
+    feature = "api",
+    feature = "sources-demo_logs",
+    feature = "sinks-loki"
+))]
 mod tests {
     use indexmap::IndexMap;
 
