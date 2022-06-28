@@ -1102,7 +1102,6 @@ mod behavior_tests {
         .join()
         .unwrap();
 
-        assert!(server.received_requests().await.unwrap().is_empty());
         assert!(vector_failed_to_start);
     }
 }
