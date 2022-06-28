@@ -779,6 +779,8 @@ enterprise-tests = [
   "enterprise",
   "sources-demo_logs",
   "sinks-blackhole",
+  "sinks-loki",
+  "api",
 ]
 
 # Grouping together features for benchmarks. We exclude the API client due to it causing the build process to run out
