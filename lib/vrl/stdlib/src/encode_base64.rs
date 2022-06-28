@@ -8,11 +8,11 @@ use crate::util::Base64Charset;
 fn encode_base64(value: Value, padding: Option<Value>, charset: Option<Value>) -> Resolved {
     let value = value.try_bytes()?;
     let padding = padding
-        .map(|v| v.try_boolean())
+        .map(VrlValueConvert::try_boolean)
         .transpose()?
         .unwrap_or(true);
     let charset = charset
-        .map(|v| v.try_bytes())
+        .map(VrlValueConvert::try_bytes)
         .transpose()?
         .map(|c| Base64Charset::from_str(&String::from_utf8_lossy(&c)))
         .transpose()?

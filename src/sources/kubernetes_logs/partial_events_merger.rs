@@ -19,11 +19,11 @@ pub fn build(enabled: bool) -> PartialEventsMerger {
         let mut merge_strategies = IndexMap::new();
         merge_strategies.insert(
             crate::config::log_schema().message_key().to_string(),
-            MergeStrategy::Concat,
+            MergeStrategy::ConcatRaw,
         );
 
-        // Group events by their file and the partial indicator field.
-        let group_by = vec![(&*FILE_KEY).to_string(), event::PARTIAL.to_string()];
+        // Group events by their file.
+        let group_by = vec![(&*FILE_KEY).to_string()];
 
         // As soon as we see an event that has no "partial" field, that's when we've hit the end of the split-up message
         // we've been incrementally aggregating.. or the message was never split up to begin with because it was already

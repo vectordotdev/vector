@@ -916,6 +916,14 @@ fn to_socket_protocol_name(socket_protocol: i32) -> Result<&'static str> {
         Ok("UDP")
     } else if socket_protocol == SocketProtocol::Tcp as i32 {
         Ok("TCP")
+    } else if socket_protocol == SocketProtocol::Dot as i32 {
+        Ok("DOT")
+    } else if socket_protocol == SocketProtocol::Doh as i32 {
+        Ok("DOH")
+    } else if socket_protocol == SocketProtocol::DnsCryptUdp as i32 {
+        Ok("DNSCryptUDP")
+    } else if socket_protocol == SocketProtocol::DnsCryptTcp as i32 {
+        Ok("DNSCryptTCP")
     } else {
         Err(Error::from(format!(
             "Unknown socket protocol: {}",
@@ -1083,6 +1091,10 @@ mod tests {
     fn test_get_socket_protocol_name() {
         assert_eq!("UDP", to_socket_protocol_name(1).unwrap());
         assert_eq!("TCP", to_socket_protocol_name(2).unwrap());
-        assert!(to_socket_protocol_name(3).is_err());
+        assert_eq!("DOT", to_socket_protocol_name(3).unwrap());
+        assert_eq!("DOH", to_socket_protocol_name(4).unwrap());
+        assert_eq!("DNSCryptUDP", to_socket_protocol_name(5).unwrap());
+        assert_eq!("DNSCryptTCP", to_socket_protocol_name(6).unwrap());
+        assert!(to_socket_protocol_name(7).is_err());
     }
 }

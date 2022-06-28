@@ -14,7 +14,7 @@ use lookup::path;
 pub const TIME: &str = "time";
 pub const LOG: &str = "log";
 
-/// Parser for the docker log format.
+/// Parser for the Docker log format.
 ///
 /// Expects logs to arrive in a JSONLines format with the fields names and
 /// contents specific to the implementation of the Docker `json` log driver.

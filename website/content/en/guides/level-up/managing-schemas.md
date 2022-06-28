@@ -310,8 +310,8 @@ output format
   encoding = "json"
 ```
 
-You can also use a transform like [`json_parser`][docs.transforms.json_parser] or
-[`grok_parser`][docs.transforms.grok_parser] to parse out data in a given field.
+You can also use a transform like [`remap`][docs.transforms.remap] or to parse out
+data in a given field.
 
 ## Parting thoughts
 

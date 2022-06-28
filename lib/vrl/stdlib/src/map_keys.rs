@@ -76,8 +76,8 @@ impl Function for MapKeys {
 
         Ok(Box::new(MapKeysFn {
             value,
-            closure,
             recursive,
+            closure,
         }))
     }
 

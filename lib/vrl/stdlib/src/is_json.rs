@@ -13,26 +13,23 @@ fn is_json(value: Value) -> Resolved {
 fn is_json_with_variant(value: Value, variant: &Bytes) -> Resolved {
     let bytes = value.try_bytes()?;
 
-    match serde_json::from_slice::<'_, serde::de::IgnoredAny>(&bytes) {
-        Err(_) => Ok(value!(false)),
-        Ok(_) => {
-            for c in bytes {
-                return match c {
-                    // Search for the first non whitespace char
-                    b' ' | b'\n' | b'\t' | b'\r' => continue,
-                    b'{' => Ok(value!(variant.as_ref() == b"object")),
-                    b'[' => Ok(value!(variant.as_ref() == b"array")),
-                    b't' | b'f' => Ok(value!(variant.as_ref() == b"bool")),
-                    b'-' | b'0'..=b'9' => Ok(value!(variant.as_ref() == b"number")),
-                    b'"' => Ok(value!(variant.as_ref() == b"string")),
-                    b'n' => Ok(value!(variant.as_ref() == b"null")),
-                    _ => Ok(value!(false)),
-                };
-            }
-            // Empty input value cannot be any type, not a specific variant
-            Ok(value!(false))
+    if serde_json::from_slice::<'_, serde::de::IgnoredAny>(&bytes).is_ok() {
+        for c in bytes {
+            return match c {
+                // Search for the first non whitespace char
+                b' ' | b'\n' | b'\t' | b'\r' => continue,
+                b'{' => Ok(value!(variant.as_ref() == b"object")),
+                b'[' => Ok(value!(variant.as_ref() == b"array")),
+                b't' | b'f' => Ok(value!(variant.as_ref() == b"bool")),
+                b'-' | b'0'..=b'9' => Ok(value!(variant.as_ref() == b"number")),
+                b'"' => Ok(value!(variant.as_ref() == b"string")),
+                b'n' => Ok(value!(variant.as_ref() == b"null")),
+                _ => break,
+            };
         }
     }
+
+    Ok(value!(false))
 }
 
 fn variants() -> Vec<Value> {

@@ -2,13 +2,11 @@ use std::pin::Pin;
 
 use criterion::{criterion_group, BatchSize, Criterion, Throughput};
 use futures::{stream, SinkExt, Stream, StreamExt};
-use indexmap::IndexMap;
 use indoc::indoc;
 use transforms::lua::v2::LuaConfig;
 use vector::{
-    config::{TransformConfig, TransformContext},
     event::Event,
-    test_util::{collect_ready, runtime},
+    test_util::collect_ready,
     transforms::{self, OutputBuffer, Transform},
 };
 

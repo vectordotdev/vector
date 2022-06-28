@@ -59,6 +59,7 @@ mod util;
 
 use self::namespace_metadata_annotator::NamespaceMetadataAnnotator;
 use self::node_metadata_annotator::NodeMetadataAnnotator;
+use self::parser::Parser;
 use self::pod_metadata_annotator::PodMetadataAnnotator;
 use futures::{future::FutureExt, stream::StreamExt};
 use k8s_paths_provider::K8sPathsProvider;
@@ -460,7 +461,7 @@ impl Source {
 
         let (file_source_tx, file_source_rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
 
-        let mut parser = parser::build();
+        let mut parser = Parser::new();
         let partial_events_merger = Box::new(partial_events_merger::build(auto_partial_merge));
 
         let checkpoints = checkpointer.view();

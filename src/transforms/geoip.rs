@@ -284,7 +284,7 @@ impl FunctionTransform for Geoip {
 mod tests {
     use std::collections::HashMap;
 
-    use value::Value;
+    use vector_core::event::LogEvent;
 
     use super::*;
     use crate::{event::Event, transforms::test::transform_one};
@@ -296,10 +296,11 @@ mod tests {
 
     #[test]
     fn geoip_city_lookup_success() {
-        let new_event = parse_one(
-            r#"{"remote_addr": "2.125.160.216", "request_path": "foo/bar"}"#,
-            "tests/data/GeoIP2-City-Test.mmdb",
-        );
+        let mut log = LogEvent::default();
+        let _ = log.insert("remote_addr", "2.125.160.216");
+        let _ = log.insert("request_path", "foo/bar");
+
+        let new_event = parse_one(log.into(), "tests/data/GeoIP2-City-Test.mmdb");
 
         let mut exp_geoip_attr = HashMap::new();
         exp_geoip_attr.insert("city_name", "Boxford");
@@ -327,10 +328,11 @@ mod tests {
 
     #[test]
     fn geoip_city_lookup_partial_results() {
-        let new_event = parse_one(
-            r#"{"remote_addr": "67.43.156.9", "request_path": "foo/bar"}"#,
-            "tests/data/GeoIP2-City-Test.mmdb",
-        );
+        let mut log = LogEvent::default();
+        let _ = log.insert("remote_addr", "67.43.156.9");
+        let _ = log.insert("request_path", "foo/bar");
+
+        let new_event = parse_one(log.into(), "tests/data/GeoIP2-City-Test.mmdb");
 
         let mut exp_geoip_attr = HashMap::new();
         exp_geoip_attr.insert("city_name", "");
@@ -358,10 +360,11 @@ mod tests {
 
     #[test]
     fn geoip_city_lookup_no_results() {
-        let new_event = parse_one(
-            r#"{"remote_addr": "10.1.12.1", "request_path": "foo/bar"}"#,
-            "tests/data/GeoIP2-City-Test.mmdb",
-        );
+        let mut log = LogEvent::default();
+        let _ = log.insert("remote_addr", "10.1.12.1");
+        let _ = log.insert("request_path", "foo/bar");
+
+        let new_event = parse_one(log.into(), "tests/data/GeoIP2-City-Test.mmdb");
 
         let mut exp_geoip_attr = HashMap::new();
         exp_geoip_attr.insert("city_name", "");
@@ -389,10 +392,11 @@ mod tests {
 
     #[test]
     fn geoip_isp_lookup_success() {
-        let new_event = parse_one(
-            r#"{"remote_addr": "208.192.1.2", "request_path": "foo/bar"}"#,
-            "tests/data/GeoIP2-ISP-Test.mmdb",
-        );
+        let mut log = LogEvent::default();
+        let _ = log.insert("remote_addr", "208.192.1.2");
+        let _ = log.insert("request_path", "foo/bar");
+
+        let new_event = parse_one(log.into(), "tests/data/GeoIP2-ISP-Test.mmdb");
 
         let mut exp_geoip_attr = HashMap::new();
         exp_geoip_attr.insert("autonomous_system_number", "701");
@@ -416,10 +420,11 @@ mod tests {
 
     #[test]
     fn geoip_isp_lookup_partial_results() {
-        let new_event = parse_one(
-            r#"{"remote_addr": "2600:7000::1", "request_path": "foo/bar"}"#,
-            "tests/data/GeoLite2-ASN-Test.mmdb",
-        );
+        let mut log = LogEvent::default();
+        let _ = log.insert("remote_addr", "2600:7000::1");
+        let _ = log.insert("request_path", "foo/bar");
+
+        let new_event = parse_one(log.into(), "tests/data/GeoLite2-ASN-Test.mmdb");
 
         let mut exp_geoip_attr = HashMap::new();
         exp_geoip_attr.insert("autonomous_system_number", "6939");
@@ -440,10 +445,11 @@ mod tests {
 
     #[test]
     fn geoip_isp_lookup_no_results() {
-        let new_event = parse_one(
-            r#"{"remote_addr": "10.1.12.1", "request_path": "foo/bar"}"#,
-            "tests/data/GeoLite2-ASN-Test.mmdb",
-        );
+        let mut log = LogEvent::default();
+        let _ = log.insert("remote_addr", "10.1.12.1");
+        let _ = log.insert("request_path", "foo/bar");
+
+        let new_event = parse_one(log.into(), "tests/data/GeoLite2-ASN-Test.mmdb");
 
         let mut exp_geoip_attr = HashMap::new();
         exp_geoip_attr.insert("autonomous_system_number", "0");
@@ -462,20 +468,7 @@ mod tests {
         }
     }
 
-    fn parse_one(text: &str, database: &str) -> Event {
-        let parsed_text = serde_json::from_str::<Value>(text)
-            .ok()
-            .and_then(|value| {
-                if let Value::Object(object) = value {
-                    Some(object)
-                } else {
-                    None
-                }
-            })
-            .expect("Input JSON string must represent a JSON object.");
-
-        let event = Event::from(parsed_text);
-
+    fn parse_one(event: Event, database: &str) -> Event {
         let mut augment = Geoip::new(
             database.to_string(),
             "remote_addr".to_string(),

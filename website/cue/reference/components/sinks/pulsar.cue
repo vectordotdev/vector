@@ -76,6 +76,48 @@ components: sinks: pulsar: {
 							examples: ["${PULSAR_TOKEN}", "123456789"]
 						}
 					}
+					oauth2: {
+						common:      false
+						description: "Options for OAuth2 authentication."
+						required:    false
+						type: object: {
+							examples: []
+							options: {
+								issuer_url: {
+									description: "The issuer url."
+									required:    true
+									type: string: {
+										examples: ["${OAUTH2_ISSUER_URL}", "https://oauth2.issuer"]
+									}
+								}
+								credentials_url: {
+									description: "The url for credentials. The data url is also supported."
+									required:    true
+									type: string: {
+										examples: ["{OAUTH2_CREDENTIALS_URL}", "file:///oauth2_credentials", "data:application/json;base64,cHVsc2FyCg=="]
+									}
+								}
+								audience: {
+									common:      false
+									description: "OAuth2 audience."
+									required:    false
+									type: string: {
+										default: null
+										examples: ["${OAUTH2_AUDIENCE}", "pulsar"]
+									}
+								}
+								scope: {
+									common:      false
+									description: "OAuth2 scope."
+									required:    false
+									type: string: {
+										default: null
+										examples: ["${OAUTH2_SCOPE}", "admin"]
+									}
+								}
+							}
+						}
+					}
 				}
 			}
 		}

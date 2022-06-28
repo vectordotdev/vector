@@ -1,7 +1,6 @@
 pub mod prelude;
 
 mod adaptive_concurrency;
-#[cfg(feature = "transforms-aggregate")]
 mod aggregate;
 #[cfg(feature = "sources-apache_metrics")]
 mod apache_metrics;
@@ -10,7 +9,7 @@ mod api;
 #[cfg(feature = "aws-core")]
 mod aws;
 #[cfg(feature = "sinks-aws_cloudwatch_logs")]
-mod aws_cloudwatch_logs_subscription_parser;
+mod aws_cloudwatch_logs;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
 mod aws_ec2_metadata;
 #[cfg(feature = "sources-aws_ecs_metrics")]
@@ -80,6 +79,7 @@ mod nginx_metrics;
 mod open;
 #[cfg(any(
     feature = "sinks-datadog_events",
+    feature = "sources-kubernetes_logs",
     feature = "transforms-geoip",
     feature = "transforms-log_to_metric",
 ))]
@@ -89,7 +89,6 @@ mod postgresql_metrics;
 mod process;
 #[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
 mod prometheus;
-mod pulsar;
 #[cfg(any(feature = "sources-redis", feature = "sinks-redis"))]
 mod redis;
 #[cfg(feature = "transforms-reduce")]
@@ -127,6 +126,9 @@ mod websocket;
 mod file;
 mod windows;
 
+#[cfg(feature = "sources-mongodb_metrics")]
+pub(crate) use mongodb_metrics::*;
+
 #[cfg(feature = "transforms-aggregate")]
 pub(crate) use self::aggregate::*;
 #[cfg(feature = "sources-apache_metrics")]
@@ -136,7 +138,7 @@ pub(crate) use self::api::*;
 #[cfg(feature = "aws-core")]
 pub(crate) use self::aws::*;
 #[cfg(feature = "sinks-aws_cloudwatch_logs")]
-pub(crate) use self::aws_cloudwatch_logs_subscription_parser::*;
+pub(crate) use self::aws_cloudwatch_logs::*;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
 pub(crate) use self::aws_ec2_metadata::*;
 #[cfg(feature = "sources-aws_ecs_metrics")]
@@ -209,6 +211,7 @@ pub(crate) use self::nats::*;
 pub(crate) use self::nginx_metrics::*;
 #[cfg(any(
     feature = "sinks-datadog_events",
+    feature = "sources-kubernetes_logs",
     feature = "transforms-geoip",
     feature = "transforms-log_to_metric",
 ))]
@@ -217,8 +220,6 @@ pub(crate) use self::parser::*;
 pub(crate) use self::postgresql_metrics::*;
 #[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
 pub(crate) use self::prometheus::*;
-#[cfg(feature = "sinks-pulsar")]
-pub(crate) use self::pulsar::*;
 #[cfg(any(feature = "sources-redis", feature = "sinks-redis"))]
 pub(crate) use self::redis::*;
 #[cfg(feature = "transforms-reduce")]
@@ -264,8 +265,6 @@ pub(crate) use self::{
     adaptive_concurrency::*, batch::*, common::*, conditions::*, encoding_transcode::*,
     heartbeat::*, open::*, process::*, socket::*, tcp::*, template::*, udp::*,
 };
-#[cfg(feature = "sources-mongodb_metrics")]
-pub(crate) use mongodb_metrics::*;
 
 // this version won't be needed once all `InternalEvent`s implement `name()`
 #[cfg(test)]

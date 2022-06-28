@@ -1118,7 +1118,7 @@ mod tests {
     }
 }
 
-#[cfg(all(test, feature = "sources-file", feature = "sinks-file",))]
+#[cfg(all(test, feature = "sources-file", feature = "sinks-file"))]
 mod acknowledgements_tests {
     use indoc::indoc;
 

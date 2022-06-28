@@ -63,10 +63,8 @@ impl FunctionTransform for Cri {
         let value = log.get(self.field).map(|s| s.coerce_to_bytes());
         match value {
             None => {
-                // The message field was missing, inexplicably.
-                //
-                // This is definitely wrong so make sure we track this. We'll still ultimately
-                // end up passing the event along, though.
+                // The message field was missing, inexplicably. If we can't find the message field, there's nothing for
+                // us to actually decode, so there's no event we could emit, and so we just emit the error and return.
                 emit!(ParserMissingFieldError { field: self.field });
                 return;
             }
@@ -114,12 +112,12 @@ impl FunctionTransform for Cri {
                             drop_original = false;
                         }
 
-                        let _ = log.insert(name.as_str(), value);
+                        drop(log.insert(name.as_str(), value));
                     }
 
                     // If we didn't overwrite the original field, remove it now.
                     if drop_original {
-                        let _ = log.remove(self.field);
+                        drop(log.remove(self.field));
                     }
                 }
             },

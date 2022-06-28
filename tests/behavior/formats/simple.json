@@ -3,7 +3,7 @@
     "add_fields_nested_json": {
       "inputs": [],
       "type": "remap",
-      "source": ".a.b = 123\n.x.y = 456\n.x.y = 789"
+      "source": ".a.b = 123\n.x.y = 456\n.x.z = 789\n"
     }
   },
   "tests": [
@@ -28,4 +28,3 @@
     }
   ]
 }
-

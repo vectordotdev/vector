@@ -89,6 +89,21 @@ components: sources: gcp_pubsub: {
 				examples: ["https://us-central1-pubsub.googleapis.com"]
 			}
 		}
+		full_response_size: {
+			common: false
+			description: """
+					The number of messages in a response to mark a stream as "busy".
+					This is used to determine if more streams should be started.
+					The GCP Pub/Sub servers send responses with 100 or more messages when
+					the subscription is busy.
+				"""
+			required: false
+			type: uint: {
+				default: 100
+				examples: [100, 128]
+				unit: null
+			}
+		}
 		keepalive_secs: {
 			common:      false
 			description: "The amount of time, in seconds, with no received activity before sending a keepalive request. If this is set larger than `60`, you may see periodic errors sent from the server."
@@ -96,6 +111,26 @@ components: sources: gcp_pubsub: {
 			type: float: {
 				default: 60.0
 				examples: [10.0]
+			}
+		}
+		max_concurrency: {
+			common:      false
+			description: "The maximum number of concurrent stream connections to open at once."
+			required:    false
+			type: uint: {
+				default: 5
+				examples: [1, 9]
+				unit: "concurrency"
+			}
+		}
+		poll_time_seconds: {
+			common:      false
+			description: "How often to poll the currently active streams to see if they are all busy and so open a new stream."
+			required:    false
+			type: float: {
+				default: 2.0
+				examples: [1.0, 5.0]
+				unit: "seconds"
 			}
 		}
 		project: {
@@ -181,6 +216,23 @@ components: sources: gcp_pubsub: {
 				Messages are received in a stream and are either acknowledged immediately after receiving
 				or after it has been fully processed by the sink(s), depending on if any of the sink(s)
 				have the `acknowledgements` setting enabled.
+				"""
+		}
+		auto_concurrency: {
+			title: "Automatic Concurrency Management"
+			body: """
+					The `gcp_pubsub` source automatically manages the number of concurrent active streams by
+					monitoring the traffic flowing over the streams.
+					When a stream receives full responses (as determined by the `full_response_size` setting),
+					it marks itself as being "busy".
+					Periodically, the source will poll all the active connections and will start a new stream
+					if all the active streams are marked as busy and fewer than `max_concurrency` streams are
+					active.
+					Conversely, when a stream passes an idle interval (configured by the
+					`idle_timeout_seconds` setting) with no traffic and no outstanding acknowledgements,
+					it will drop the connection unless there are no other streams active.
+					This combination of actions allows this source to respond dynamically to high load levels
+					without opening up extra connections at startup.
 				"""
 		}
 	}

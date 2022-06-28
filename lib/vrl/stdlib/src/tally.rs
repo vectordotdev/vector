@@ -7,7 +7,7 @@ fn tally(value: Value) -> Resolved {
     let value = value.try_array()?;
     #[allow(clippy::mutable_key_type)] // false positive due to bytes::Bytes
     let mut map: HashMap<Bytes, usize> = HashMap::new();
-    for value in value.into_iter() {
+    for value in value {
         if let Value::Bytes(value) = value {
             *map.entry(value).or_insert(0) += 1;
         } else {
