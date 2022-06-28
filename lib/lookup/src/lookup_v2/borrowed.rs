@@ -7,6 +7,8 @@ use std::slice::Iter;
 pub enum BorrowedSegment<'a> {
     Field(Cow<'a, str>),
     Index(isize),
+    CoalesceField(Cow<'a, str>),
+    CoalesceEnd(Cow<'a, str>),
     Invalid,
 }
 
@@ -49,9 +51,13 @@ impl From<isize> for BorrowedSegment<'_> {
 impl<'a, 'b: 'a> From<&'b OwnedSegment> for BorrowedSegment<'a> {
     fn from(segment: &'b OwnedSegment) -> Self {
         match segment {
-            OwnedSegment::Field(value) => BorrowedSegment::Field(value.as_str().into()),
+            OwnedSegment::Field(field) => BorrowedSegment::Field(field.as_str().into()),
             OwnedSegment::Index(value) => BorrowedSegment::Index(*value),
             OwnedSegment::Invalid => BorrowedSegment::Invalid,
+            OwnedSegment::CoalesceField(field) => {
+                BorrowedSegment::CoalesceField(field.as_str().into())
+            }
+            OwnedSegment::CoalesceEnd(field) => BorrowedSegment::CoalesceEnd(field.as_str().into()),
         }
     }
 }
@@ -99,6 +105,18 @@ impl quickcheck::Arbitrary for BorrowedSegment<'static> {
             BorrowedSegment::Invalid => Box::new(std::iter::empty()),
             BorrowedSegment::Index(index) => Box::new(index.shrink().map(BorrowedSegment::Index)),
             BorrowedSegment::Field(field) => Box::new(
+                field
+                    .to_string()
+                    .shrink()
+                    .map(|f| BorrowedSegment::Field(f.into())),
+            ),
+            BorrowedSegment::CoalesceField(field) => Box::new(
+                field
+                    .to_string()
+                    .shrink()
+                    .map(|f| BorrowedSegment::Field(f.into())),
+            ),
+            BorrowedSegment::CoalesceEnd(field) => Box::new(
                 field
                     .to_string()
                     .shrink()

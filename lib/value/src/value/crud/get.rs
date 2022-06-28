@@ -1,4 +1,4 @@
-use crate::value::crud::ValueCollection;
+use crate::value::crud::{get_matching_coalesce_key, ValueCollection};
 use crate::Value;
 use lookup::lookup_v2::BorrowedSegment;
 
@@ -16,6 +16,12 @@ pub fn get<'a>(
                         value = nested_value;
                     }
                 }
+            }
+            (Some(BorrowedSegment::CoalesceField(key)), Value::Object(map)) => {
+                let matched_key = get_matching_coalesce_key(key, map, &mut path_iter).ok()?;
+                value = map
+                    .get_value(matched_key.as_ref())
+                    .expect("this was already checked to exist");
             }
             (Some(BorrowedSegment::Index(index)), Value::Array(array)) => {
                 match array.get_value(&index) {
@@ -42,5 +48,33 @@ mod test {
             Some(Value::from(3))
         );
         assert_eq!(Value::from(json!([0, 1, 2, 3])).get("[-5]").cloned(), None);
+    }
+
+    #[test]
+    fn test_coalesce() {
+        assert_eq!(
+            Value::from(json!({"b": 2})).get("(a|b)").cloned(),
+            Some(Value::from(2))
+        );
+        assert_eq!(
+            Value::from(json!({"b": {"x": 5}})).get("(a|b).x").cloned(),
+            Some(Value::from(5))
+        );
+        assert_eq!(
+            Value::from(json!({"b": {"x": 5}}))
+                .get("(a|b).(y|x)")
+                .cloned(),
+            Some(Value::from(5))
+        );
+        assert_eq!(
+            Value::from(json!({"a": 1})).get("(a|b)").cloned(),
+            Some(Value::from(1))
+        );
+        assert_eq!(Value::from(json!({})).get("(a|b|c)").cloned(), None);
+
+        assert_eq!(
+            Value::from(json!({"a": true})).get("(a|b|c)").cloned(),
+            Some(Value::from(true))
+        );
     }
 }
