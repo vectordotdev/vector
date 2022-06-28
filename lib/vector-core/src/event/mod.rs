@@ -80,11 +80,6 @@ impl Finalizable for Event {
 }
 
 impl Event {
-    #[must_use]
-    pub fn new_empty_log() -> Self {
-        Event::Log(LogEvent::default())
-    }
-
     /// Return self as a `LogEvent`
     ///
     /// # Panics

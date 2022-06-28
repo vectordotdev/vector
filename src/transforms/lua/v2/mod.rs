@@ -351,7 +351,7 @@ mod tests {
     use crate::{
         event::{
             metric::{Metric, MetricKind, MetricValue},
-            Event, Value,
+            Event, LogEvent, Value,
         },
         test_util::trace_init,
         transforms::TaskTransform,
@@ -425,10 +425,10 @@ mod tests {
         )
         .unwrap();
 
-        let mut event = Event::new_empty_log();
-        event.as_mut_log().insert("name", "Bob");
+        let mut event = LogEvent::default();
+        event.insert("name", "Bob");
 
-        let in_stream = Box::pin(stream::iter(vec![event]));
+        let in_stream = Box::pin(stream::iter(vec![event.into()]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
 
@@ -450,7 +450,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::new_empty_log();
+        let event = LogEvent::default().into();
         let in_stream = Box::pin(stream::iter(vec![event]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await;
@@ -474,9 +474,9 @@ mod tests {
         )
         .unwrap();
 
-        let mut event = Event::new_empty_log();
-        event.as_mut_log().insert("host", "127.0.0.1");
-        let input = Box::pin(stream::iter(vec![event]));
+        let mut event = LogEvent::default();
+        event.insert("host", "127.0.0.1");
+        let input = Box::pin(stream::iter(vec![event.into()]));
         let output = transform.transform(input);
         let out = output.collect::<Vec<_>>().await;
 
@@ -503,7 +503,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::new_empty_log();
+        let event = LogEvent::default().into();
 
         let in_stream = Box::pin(stream::iter(vec![event]));
         let mut out_stream = transform.transform(in_stream);
@@ -528,7 +528,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::new_empty_log();
+        let event = LogEvent::default().into();
         let in_stream = Box::pin(stream::iter(vec![event]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
@@ -552,7 +552,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::new_empty_log();
+        let event = LogEvent::default().into();
         let in_stream = Box::pin(stream::iter(vec![event]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
@@ -576,7 +576,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::new_empty_log();
+        let event = LogEvent::default().into();
         let in_stream = Box::pin(stream::iter(vec![event]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
@@ -600,7 +600,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::new_empty_log();
+        let event = LogEvent::default().into();
         let in_stream = Box::pin(stream::iter(vec![event]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
@@ -625,7 +625,7 @@ mod tests {
         .unwrap();
 
         let err = transform
-            .process_single(Event::new_empty_log())
+            .process_single(LogEvent::default().into())
             .unwrap_err();
         let err = format_error(&err);
         assert!(
@@ -651,7 +651,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::new_empty_log();
+        let event = LogEvent::default().into();
         let in_stream = Box::pin(stream::iter(vec![event]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
@@ -674,7 +674,7 @@ mod tests {
         .unwrap();
 
         let err = transform
-            .process_single(Event::new_empty_log())
+            .process_single(LogEvent::default().into())
             .unwrap_err();
         let err = format_error(&err);
         assert!(err.contains("this is an error"), "{}", err);
@@ -737,7 +737,7 @@ mod tests {
         );
         let transform = from_config(&config).unwrap();
 
-        let event = Event::new_empty_log();
+        let event = LogEvent::default().into();
         let in_stream = Box::pin(stream::iter(vec![event]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
@@ -763,11 +763,11 @@ mod tests {
         )
         .unwrap();
 
-        let mut event = Event::new_empty_log();
-        event.as_mut_log().insert("name", "Bob");
-        event.as_mut_log().insert("friend", "Alice");
+        let mut event = LogEvent::default();
+        event.insert("name", "Bob");
+        event.insert("friend", "Alice");
 
-        let in_stream = Box::pin(stream::iter(vec![event]));
+        let in_stream = Box::pin(stream::iter(vec![event.into()]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
 

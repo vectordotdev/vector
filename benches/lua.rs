@@ -5,13 +5,13 @@ use futures::{stream, SinkExt, Stream, StreamExt};
 use indoc::indoc;
 use transforms::lua::v2::LuaConfig;
 use vector::{
-    event::Event,
+    event::{Event, LogEvent},
     test_util::collect_ready,
     transforms::{self, OutputBuffer, Transform},
 };
 
 fn bench_add_fields(c: &mut Criterion) {
-    let event = Event::new_empty_log();
+    let event = Event::from(LogEvent::default());
 
     let key = "the_key";
     let value = "this is the value";
@@ -86,9 +86,9 @@ fn bench_field_filter(c: &mut Criterion) {
     let num_events = 10;
     let events = (0..num_events)
         .map(|i| {
-            let mut event = Event::new_empty_log();
-            event.as_mut_log().insert("the_field", (i % 10).to_string());
-            event
+            let mut event = LogEvent::default();
+            event.insert("the_field", (i % 10).to_string());
+            Event::from(event)
         })
         .collect::<Vec<_>>();
 

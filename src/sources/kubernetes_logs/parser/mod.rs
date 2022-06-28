@@ -76,7 +76,7 @@ impl FunctionTransform for Parser {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{event::Event, test_util::trace_init, transforms::Transform};
+    use crate::{event::Event, event::LogEvent, test_util::trace_init, transforms::Transform};
 
     /// Picker has to work for all test cases for underlying parsers.
     fn cases() -> Vec<(String, Vec<Event>)> {
@@ -113,12 +113,12 @@ mod tests {
 
         let cases = vec![
             // No `message` field.
-            Event::new_empty_log(),
+            Event::from(LogEvent::default()),
             // Non-bytes `message` field.
             {
-                let mut input = Event::new_empty_log();
-                input.as_mut_log().insert("message", 123);
-                input
+                let mut input = LogEvent::default();
+                input.insert("message", 123);
+                input.into()
             },
         ];
 

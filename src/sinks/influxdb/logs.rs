@@ -491,18 +491,14 @@ mod tests {
 
     #[test]
     fn test_encode_nested_fields() {
-        let mut event = Event::new_empty_log();
+        let mut event = LogEvent::default();
 
-        event.as_mut_log().insert("a", 1);
-        event.as_mut_log().insert("nested.field", "2");
-        event.as_mut_log().insert("nested.bool", true);
-        event
-            .as_mut_log()
-            .insert("nested.array[0]", "example-value");
-        event
-            .as_mut_log()
-            .insert("nested.array[2]", "another-value");
-        event.as_mut_log().insert("nested.array[3]", 15);
+        event.insert("a", 1);
+        event.insert("nested.field", "2");
+        event.insert("nested.bool", true);
+        event.insert("nested.array[0]", "example-value");
+        event.insert("nested.array[2]", "another-value");
+        event.insert("nested.array[3]", 15);
 
         let sink = create_sink(
             "http://localhost:9999",
@@ -513,7 +509,7 @@ mod tests {
         );
         let mut encoder = sink.build_encoder();
 
-        let bytes = encoder.encode_event(event).unwrap();
+        let bytes = encoder.encode_event(event.into()).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
 
         let line_protocol = split_line_protocol(string);
