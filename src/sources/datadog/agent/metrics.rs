@@ -325,7 +325,7 @@ pub(crate) fn decode_ddseries_v2(
                     })
                     .collect::<Vec<_>>(),
                 Some(metric_payload::MetricType::Unspecified) | None => {
-                    warn!("unspecified metric type ({}).", serie.r#type);
+                    warn!("Unspecified metric type ({}).", serie.r#type);
                     Vec::new()
                 }
             }
