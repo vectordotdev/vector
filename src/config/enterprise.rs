@@ -761,7 +761,7 @@ async fn report_serialized_config_to_datadog<'a>(
     Err(ReportingError::MaxRetriesReached)
 }
 
-#[cfg(all(test, feature = "enterprise-tests"))]
+#[cfg(all(test, feature = "enterprise", feature = "sources-demo_logs", feature = "sinks-blackhole"))]
 mod test {
     use std::{
         collections::BTreeMap, io::Write, net::TcpListener, path::PathBuf, str::FromStr, thread,
@@ -962,7 +962,7 @@ mod test {
     /// without prior approval.
     #[tokio::test]
     async fn vector_continues_on_reporting_error() {
-        let _ = metrics::init_test();
+        // let _ = metrics::init_test();
 
         let server = build_test_server_error_and_recover(StatusCode::NOT_IMPLEMENTED).await;
         let endpoint = server.uri();
