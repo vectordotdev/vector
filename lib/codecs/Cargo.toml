@@ -11,6 +11,7 @@ bytes = { version = "1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 derivative = { version = "2", default-features = false }
 dyn-clone = { version = "1", default-features = false }
+lookup = { path = "../lookup", default-features = false }
 memchr = { version = "2", default-features = false }
 prost = { version = "0.10.4", default-features = false, features = ["std"] }
 serde = { version = "1", default-features = false, features = ["derive"] }

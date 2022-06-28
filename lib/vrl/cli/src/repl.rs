@@ -27,7 +27,7 @@ static ERRORS: Lazy<Vec<String>> = Lazy::new(|| {
         601, 620, 630, 640, 650, 651, 652, 660, 701,
     ]
     .iter()
-    .map(|i| i.to_string())
+    .map(std::string::ToString::to_string)
     .collect()
 });
 
@@ -45,7 +45,7 @@ const RESERVED_TERMS: &[&str] = &[
     "help docs",
 ];
 
-pub(crate) fn run(mut objects: Vec<TargetValue>, timezone: &TimeZone, vrl_runtime: VrlRuntime) {
+pub(crate) fn run(mut objects: Vec<TargetValue>, timezone: TimeZone, vrl_runtime: VrlRuntime) {
     let mut index = 0;
     let func_docs_regex = Regex::new(r"^help\sdocs\s(\w{1,})$").unwrap();
     let error_docs_regex = Regex::new(r"^help\serror\s(\w{1,})$").unwrap();
@@ -102,7 +102,7 @@ pub(crate) fn run(mut objects: Vec<TargetValue>, timezone: &TimeZone, vrl_runtim
 
                         // remove empty last object
                         if objects.last().map(|x| &x.value) == Some(&Value::Null) {
-                            let _ = objects.pop();
+                            let _last = objects.pop();
                         }
 
                         "."
@@ -121,7 +121,7 @@ pub(crate) fn run(mut objects: Vec<TargetValue>, timezone: &TimeZone, vrl_runtim
                     vrl_runtime,
                 );
 
-                let _ = std::mem::replace(&mut local_state, local);
+                let _v = std::mem::replace(&mut local_state, local);
 
                 let string = match result {
                     Ok(v) => v.to_string(),
@@ -133,8 +133,7 @@ pub(crate) fn run(mut objects: Vec<TargetValue>, timezone: &TimeZone, vrl_runtim
                     println!("{}\n", string);
                 }
             }
-            Err(ReadlineError::Interrupted) => break,
-            Err(ReadlineError::Eof) => break,
+            Err(ReadlineError::Interrupted | ReadlineError::Eof) => break,
             Err(err) => {
                 #[allow(clippy::print_stdout)]
                 {
@@ -152,7 +151,7 @@ fn resolve(
     program: &str,
     external: &mut state::ExternalEnv,
     local: state::LocalEnv,
-    timezone: &TimeZone,
+    timezone: TimeZone,
     vrl_runtime: VrlRuntime,
 ) -> (state::LocalEnv, Result<Value, String>) {
     let mut functions = stdlib::all();
@@ -169,20 +168,20 @@ fn resolve(
 
     (
         program.local_env().clone(),
-        execute(runtime, program, target, timezone, vrl_runtime),
+        execute(runtime, &program, target, timezone, vrl_runtime),
     )
 }
 
 fn execute(
     runtime: &mut Runtime,
-    program: vrl::Program,
+    program: &vrl::Program,
     object: &mut dyn Target,
-    timezone: &TimeZone,
+    timezone: TimeZone,
     vrl_runtime: VrlRuntime,
 ) -> Result<Value, String> {
     match vrl_runtime {
         VrlRuntime::Ast => runtime
-            .resolve(object, &program, timezone)
+            .resolve(object, program, &timezone)
             .map_err(|err| err.to_string()),
     }
 }
@@ -300,7 +299,7 @@ impl Validator for Repl {
             ctx.input(),
             &mut external_state,
             local_state,
-            &timezone,
+            timezone,
             VrlRuntime::Ast,
         );
 
