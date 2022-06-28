@@ -761,16 +761,17 @@ async fn report_serialized_config_to_datadog<'a>(
     Err(ReportingError::MaxRetriesReached)
 }
 
-#[cfg(all(test, feature = "enterprise", feature = "sources-demo_logs", feature = "sinks-blackhole"))]
+#[cfg(all(
+    test,
+    feature = "enterprise",
+    feature = "sources-demo_logs",
+    feature = "sinks-blackhole"
+))]
 mod test {
-    use std::{
-        collections::BTreeMap, io::Write, net::TcpListener, path::PathBuf, str::FromStr, thread,
-        time::Duration,
-    };
+    use std::{collections::BTreeMap, net::TcpListener, time::Duration};
 
     use http::StatusCode;
     use indexmap::IndexMap;
-    use indoc::formatdoc;
     use tokio::time::sleep;
     use value::Kind;
     use vector_common::btreemap;
@@ -782,11 +783,8 @@ mod test {
         PipelinesVersionPayload,
     };
     use crate::{
-        app::Application,
-        cli::{Color, LogFormat, Opts, RootOpts},
         config::enterprise::{convert_tags_to_vrl, default_max_retries},
         http::HttpClient,
-        metrics,
         test_util::next_addr,
     };
 
@@ -806,7 +804,7 @@ mod test {
 
     /// This mocked server will reply with the configured status code 3 times
     /// before falling back to a 200 OK
-    async fn build_test_server_error_and_recover(status_code: StatusCode) -> MockServer {
+    pub(super) async fn build_test_server_error_and_recover(status_code: StatusCode) -> MockServer {
         let mock_server = MockServer::start().await;
 
         Mock::given(matchers::method("POST"))
@@ -823,29 +821,6 @@ mod test {
             .await;
 
         mock_server
-    }
-
-    fn get_vector_config_file(config: impl Into<String>) -> tempfile::NamedTempFile {
-        let mut file = tempfile::NamedTempFile::new().unwrap();
-        let _ = writeln!(file, "{}", config.into());
-        file
-    }
-
-    fn get_root_opts(config_path: PathBuf) -> RootOpts {
-        RootOpts {
-            config_paths: vec![config_path],
-            config_dirs: vec![],
-            config_paths_toml: vec![],
-            config_paths_json: vec![],
-            config_paths_yaml: vec![],
-            require_healthy: None,
-            threads: None,
-            verbose: 0,
-            quiet: 3,
-            log_format: LogFormat::from_str("text").unwrap(),
-            color: Color::from_str("auto").unwrap(),
-            watch_config: false,
-        }
     }
 
     #[tokio::test]
@@ -954,6 +929,84 @@ mod test {
         .is_err());
     }
 
+    #[test]
+    fn dynamic_tags_to_remap_config_for_metrics() {
+        let tags = IndexMap::from([
+            ("pull_request".to_string(), "1234".to_string()),
+            ("replica".to_string(), "abcd".to_string()),
+            ("variant".to_string(), "baseline".to_string()),
+        ]);
+
+        let vrl = convert_tags_to_vrl(&tags, true);
+        assert_eq!(
+            vrl,
+            r#".tags = merge(.tags, {"pull_request":"1234","replica":"abcd","variant":"baseline"}, deep: true)"#
+        );
+        // We need to set up some state here to inform the VRL compiler that
+        // .tags is an object and merge() is thus a safe operation (mimicking
+        // the environment this code will actually run in).
+        let mut state = vrl::state::ExternalEnv::new_with_kind(Kind::object(btreemap! {
+            "tags" => Kind::object(BTreeMap::new()),
+        }));
+        assert!(
+            vrl::compile_with_state(vrl.as_str(), vrl_stdlib::all().as_ref(), &mut state).is_ok()
+        );
+    }
+
+    #[test]
+    fn dynamic_tags_to_remap_config_for_logs() {
+        let tags = IndexMap::from([
+            ("pull_request".to_string(), "1234".to_string()),
+            ("replica".to_string(), "abcd".to_string()),
+            ("variant".to_string(), "baseline".to_string()),
+        ]);
+        let vrl = convert_tags_to_vrl(&tags, false);
+
+        assert_eq!(
+            vrl,
+            r#". = merge(., {"pull_request":"1234","replica":"abcd","variant":"baseline"}, deep: true)"#
+        );
+        assert!(vrl::compile(vrl.as_str(), vrl_stdlib::all().as_ref()).is_ok());
+    }
+}
+
+#[cfg(all(test, feature = "default", feature = "enterprise-tests"))]
+mod behavior_tests {
+    use std::{io::Write, path::PathBuf, str::FromStr, thread};
+
+    use http::StatusCode;
+    use indoc::formatdoc;
+
+    use crate::{
+        app::Application,
+        cli::{Color, LogFormat, Opts, RootOpts},
+        config::enterprise::test::build_test_server_error_and_recover,
+        metrics,
+    };
+
+    fn get_vector_config_file(config: impl Into<String>) -> tempfile::NamedTempFile {
+        let mut file = tempfile::NamedTempFile::new().unwrap();
+        let _ = writeln!(file, "{}", config.into());
+        file
+    }
+
+    fn get_root_opts(config_path: PathBuf) -> RootOpts {
+        RootOpts {
+            config_paths: vec![config_path],
+            config_dirs: vec![],
+            config_paths_toml: vec![],
+            config_paths_json: vec![],
+            config_paths_yaml: vec![],
+            require_healthy: None,
+            threads: None,
+            verbose: 0,
+            quiet: 3,
+            log_format: LogFormat::from_str("text").unwrap(),
+            color: Color::from_str("auto").unwrap(),
+            watch_config: false,
+        }
+    }
+
     /// This test asserts that configuration reporting errors do NOT impact the
     /// rest of Vector starting and running.
     ///
@@ -962,7 +1015,7 @@ mod test {
     /// without prior approval.
     #[tokio::test]
     async fn vector_continues_on_reporting_error() {
-        // let _ = metrics::init_test();
+        let _ = metrics::init_test();
 
         let server = build_test_server_error_and_recover(StatusCode::NOT_IMPLEMENTED).await;
         let endpoint = server.uri();
@@ -1051,45 +1104,5 @@ mod test {
 
         assert!(server.received_requests().await.unwrap().is_empty());
         assert!(vector_failed_to_start);
-    }
-
-    #[test]
-    fn dynamic_tags_to_remap_config_for_metrics() {
-        let tags = IndexMap::from([
-            ("pull_request".to_string(), "1234".to_string()),
-            ("replica".to_string(), "abcd".to_string()),
-            ("variant".to_string(), "baseline".to_string()),
-        ]);
-
-        let vrl = convert_tags_to_vrl(&tags, true);
-        assert_eq!(
-            vrl,
-            r#".tags = merge(.tags, {"pull_request":"1234","replica":"abcd","variant":"baseline"}, deep: true)"#
-        );
-        // We need to set up some state here to inform the VRL compiler that
-        // .tags is an object and merge() is thus a safe operation (mimicking
-        // the environment this code will actually run in).
-        let mut state = vrl::state::ExternalEnv::new_with_kind(Kind::object(btreemap! {
-            "tags" => Kind::object(BTreeMap::new()),
-        }));
-        assert!(
-            vrl::compile_with_state(vrl.as_str(), vrl_stdlib::all().as_ref(), &mut state).is_ok()
-        );
-    }
-
-    #[test]
-    fn dynamic_tags_to_remap_config_for_logs() {
-        let tags = IndexMap::from([
-            ("pull_request".to_string(), "1234".to_string()),
-            ("replica".to_string(), "abcd".to_string()),
-            ("variant".to_string(), "baseline".to_string()),
-        ]);
-        let vrl = convert_tags_to_vrl(&tags, false);
-
-        assert_eq!(
-            vrl,
-            r#". = merge(., {"pull_request":"1234","replica":"abcd","variant":"baseline"}, deep: true)"#
-        );
-        assert!(vrl::compile(vrl.as_str(), vrl_stdlib::all().as_ref()).is_ok());
     }
 }
