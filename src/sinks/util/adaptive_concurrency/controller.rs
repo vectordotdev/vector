@@ -250,11 +250,10 @@ where
         start: Instant,
         response: &Result<L::Response, crate::Error>,
     ) {
-        let (use_rtt, is_back_pressure) = match self.logic.is_back_pressure(response) {
-            Some(is_back_pressure) => (false, is_back_pressure),
-            // Only adjust to the RTT when the request was successfully processed.
-            None => (true, false),
-        };
+        let is_back_pressure = self.logic.is_back_pressure(response);
+        // Only adjust to the RTT when the request was successfully processed.
+        let use_rtt = is_back_pressure.is_none();
+        let is_back_pressure = is_back_pressure.unwrap_or(false);
 
         self.adjust_to_response_inner(start, is_back_pressure, use_rtt)
     }
