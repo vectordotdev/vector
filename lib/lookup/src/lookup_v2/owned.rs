@@ -100,12 +100,13 @@ impl Serialize for OwnedPath {
 }
 
 fn serialize_field(field: &str, separator: Option<&str>) -> String {
+    // These characters should match the ones from the parser, implemented in `JitLookup`
     let needs_quotes = field
         .chars()
         .any(|c| !matches!(c, 'A'..='Z' | 'a'..='z' | '_' | '0'..='9' | '@'));
+
     // Allocate enough to fit the field, a `.` and two `"` characters. This
     // should suffice for the majority of cases when no escape sequence is used.
-
     let separator_len = separator.map(|x| x.len()).unwrap_or(0);
     let mut string = String::with_capacity(field.as_bytes().len() + 2 + separator_len);
     if let Some(separator) = separator {
@@ -287,6 +288,7 @@ mod test {
             ("foo.(a|b|c)", "foo.(a|b|c)"),
             ("[0].(a|b|c)", "[0].(a|b|c)"),
             (".(a|b|c).foo", "(a|b|c).foo"),
+            (".( a | b | c ).foo", "(a|b|c).foo"),
         ];
 
         for (path, expected) in test_cases {
