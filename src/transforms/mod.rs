@@ -122,6 +122,7 @@ pub enum Transforms {
 
 #[async_trait]
 impl TransformConfig for Transforms {
+    #[allow(unused_variables)]
     async fn build(&self, globals: &TransformContext) -> crate::Result<Transform> {
         match self {
             #[cfg(feature = "transforms-aggregate")]
@@ -154,6 +155,8 @@ impl TransformConfig for Transforms {
             Transforms::TagCardinalityLimit(inner) => inner.build(globals).await,
             #[cfg(feature = "transforms-throttle")]
             Transforms::Throttle(inner) => inner.build(globals).await,
+            #[allow(unreachable_patterns)]
+            _ => unimplemented!(),
         }
     }
 
@@ -189,9 +192,12 @@ impl TransformConfig for Transforms {
             Transforms::TagCardinalityLimit(inner) => inner.input(),
             #[cfg(feature = "transforms-throttle")]
             Transforms::Throttle(inner) => inner.input(),
+            #[allow(unreachable_patterns)]
+            _ => unimplemented!(),
         }
     }
 
+    #[allow(unused_variables)]
     fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
         match self {
             #[cfg(feature = "transforms-aggregate")]
@@ -224,6 +230,8 @@ impl TransformConfig for Transforms {
             Transforms::TagCardinalityLimit(inner) => inner.outputs(merged_definition),
             #[cfg(feature = "transforms-throttle")]
             Transforms::Throttle(inner) => inner.outputs(merged_definition),
+            #[allow(unreachable_patterns)]
+            _ => unimplemented!(),
         }
     }
 
@@ -259,6 +267,8 @@ impl TransformConfig for Transforms {
             Transforms::TagCardinalityLimit(inner) => inner.transform_type(),
             #[cfg(feature = "transforms-throttle")]
             Transforms::Throttle(inner) => inner.transform_type(),
+            #[allow(unreachable_patterns)]
+            _ => unimplemented!(),
         }
     }
 
@@ -294,6 +304,8 @@ impl TransformConfig for Transforms {
             Transforms::TagCardinalityLimit(inner) => inner.typetag_name(),
             #[cfg(feature = "transforms-throttle")]
             Transforms::Throttle(inner) => inner.typetag_name(),
+            #[allow(unreachable_patterns)]
+            _ => unimplemented!(),
         }
     }
 
@@ -329,6 +341,8 @@ impl TransformConfig for Transforms {
             Transforms::TagCardinalityLimit(inner) => inner.typetag_deserialize(),
             #[cfg(feature = "transforms-throttle")]
             Transforms::Throttle(inner) => inner.typetag_deserialize(),
+            #[allow(unreachable_patterns)]
+            _ => unimplemented!(),
         }
     }
 }
