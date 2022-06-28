@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::BTreeMap,
     convert::{TryFrom, TryInto},
     fmt::Debug,
 };
@@ -293,29 +293,18 @@ impl finalization::AddBatchNotifier for Event {
     }
 }
 
-impl From<BTreeMap<String, Value>> for Event {
-    fn from(map: BTreeMap<String, Value>) -> Self {
-        Self::Log(LogEvent::from(map))
-    }
-}
-
-impl From<HashMap<String, Value>> for Event {
-    fn from(map: HashMap<String, Value>) -> Self {
-        Self::Log(LogEvent::from(map))
-    }
-}
-
 impl TryFrom<serde_json::Value> for Event {
     type Error = crate::Error;
 
     fn try_from(map: serde_json::Value) -> Result<Self, Self::Error> {
         match map {
-            serde_json::Value::Object(fields) => Ok(Event::from(
+            serde_json::Value::Object(fields) => Ok(LogEvent::from(
                 fields
                     .into_iter()
                     .map(|(k, v)| (k, v.into()))
                     .collect::<BTreeMap<_, _>>(),
-            )),
+            )
+            .into()),
             _ => Err(crate::Error::from(
                 "Attempted to convert non-Object JSON into an Event.",
             )),
