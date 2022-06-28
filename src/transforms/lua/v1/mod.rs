@@ -2,8 +2,8 @@ use std::{future::ready, pin::Pin};
 
 use futures::{stream, Stream, StreamExt};
 use ordered_float::NotNan;
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use vector_config::configurable_component;
 
 use crate::{
     config::{DataType, Input, Output},
@@ -19,10 +19,17 @@ enum BuildError {
     InvalidLua { source: mlua::Error },
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the version one of the `lua` transform.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct LuaConfig {
+    /// The Lua program to execute for each event.
     source: String,
+
+    /// A list of directories to search when loading a Lua file via the `require` function.
+    ///
+    /// If not specified, the modules are looked up in the directories of Vector’s configs.
     #[serde(default)]
     search_dirs: Vec<String>,
 }

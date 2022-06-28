@@ -3,27 +3,38 @@ use std::{net::IpAddr, str::FromStr};
 use cidr_utils::cidr::IpCidr;
 use indexmap::IndexMap;
 use regex::Regex;
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use crate::{
-    conditions::{Condition, ConditionConfig, ConditionDescription, Conditional},
+    conditions::{Condition, Conditional, ConditionalConfig},
     event::{Event, Value},
 };
 
-#[derive(Deserialize, Serialize, Clone, Derivative)]
+/// Field predicate argument.
+#[configurable_component]
+#[derive(Clone, Derivative)]
 #[serde(untagged)]
 #[derivative(Debug)]
 pub(crate) enum CheckFieldsPredicateArg {
+    /// A string.
     #[derivative(Debug = "transparent")]
-    String(String),
+    String(#[configurable(transparent)] String),
+
+    /// An array of strings.
     #[derivative(Debug = "transparent")]
-    VecString(Vec<String>),
+    VecString(#[configurable(transparent)] Vec<String>),
+
+    /// An integer.
     #[derivative(Debug = "transparent")]
-    Integer(i64),
+    Integer(#[configurable(transparent)] i64),
+
+    /// A floating-point integer.
     #[derivative(Debug = "transparent")]
-    Float(f64),
+    Float(#[configurable(transparent)] f64),
+
+    /// A boolean.
     #[derivative(Debug = "transparent")]
-    Boolean(bool),
+    Boolean(#[configurable(transparent)] bool),
 }
 
 pub(crate) trait CheckFieldsPredicate:
@@ -33,8 +44,6 @@ pub(crate) trait CheckFieldsPredicate:
 }
 
 dyn_clone::clone_trait_object!(CheckFieldsPredicate);
-
-//------------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
 pub(crate) struct EqualsPredicate {
@@ -93,8 +102,6 @@ impl CheckFieldsPredicate for EqualsPredicate {
     }
 }
 
-//------------------------------------------------------------------------------
-
 #[derive(Debug, Clone)]
 struct ContainsPredicate {
     target: String,
@@ -131,8 +138,6 @@ impl CheckFieldsPredicate for ContainsPredicate {
         }
     }
 }
-
-//------------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
 struct StartsWithPredicate {
@@ -173,8 +178,6 @@ impl CheckFieldsPredicate for StartsWithPredicate {
     }
 }
 
-//------------------------------------------------------------------------------
-
 #[derive(Debug, Clone)]
 struct EndsWithPredicate {
     target: String,
@@ -211,8 +214,6 @@ impl CheckFieldsPredicate for EndsWithPredicate {
         }
     }
 }
-
-//------------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
 struct NotEqualsPredicate {
@@ -266,8 +267,6 @@ impl CheckFieldsPredicate for NotEqualsPredicate {
     }
 }
 
-//------------------------------------------------------------------------------
-
 #[derive(Debug, Clone)]
 struct RegexPredicate {
     target: String,
@@ -308,8 +307,6 @@ impl CheckFieldsPredicate for RegexPredicate {
     }
 }
 
-//------------------------------------------------------------------------------
-
 #[derive(Debug, Clone)]
 struct ExistsPredicate {
     target: String,
@@ -337,8 +334,6 @@ impl CheckFieldsPredicate for ExistsPredicate {
         }) == self.arg
     }
 }
-
-//------------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
 struct IpCidrPredicate {
@@ -383,8 +378,6 @@ impl CheckFieldsPredicate for IpCidrPredicate {
     }
 }
 
-//------------------------------------------------------------------------------
-
 #[derive(Debug, Clone)]
 struct NegatePredicate {
     subpred: Box<dyn CheckFieldsPredicate>,
@@ -406,8 +399,6 @@ impl CheckFieldsPredicate for NegatePredicate {
         !self.subpred.check(event)
     }
 }
-
-//------------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
 struct LengthEqualsPredicate {
@@ -451,8 +442,6 @@ impl CheckFieldsPredicate for LengthEqualsPredicate {
         }
     }
 }
-
-//------------------------------------------------------------------------------
 
 fn build_predicate(
     predicate: &str,
@@ -514,22 +503,23 @@ fn build_predicates(
     }
 }
 
-//------------------------------------------------------------------------------
-
-#[derive(Deserialize, Serialize, Debug, Default, Clone)]
-pub(crate) struct CheckFieldsConfig {
+/// A condition that checks the fields of an event against certain predicates.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
+pub struct CheckFieldsConfig {
+    /// A map of fields, the predicate to use, and the value to match with the predicate.
+    ///
+    /// The key is a compound of the field and the predicate, such as `host.eq`, where `host` is the field to look for
+    /// in the event, and `eq` is the equality predicate, meaning we'll check if the `host` field equals a certain
+    /// value. The value is the operand on the right hand side, such that `"host.eq" = "localhost"` would check to see
+    /// if the `host` fields equals the string `localhost`.
     #[serde(flatten, default)]
     predicates: IndexMap<String, CheckFieldsPredicateArg>,
 }
 
-inventory::submit! {
-    ConditionDescription::new::<CheckFieldsConfig>("check_fields")
-}
-
 impl_generate_config_from_default!(CheckFieldsConfig);
 
-#[typetag::serde(name = "check_fields")]
-impl ConditionConfig for CheckFieldsConfig {
+impl ConditionalConfig for CheckFieldsConfig {
     fn build(&self, _enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition> {
         warn!(message = "The `check_fields` condition is deprecated, use `vrl` instead.",);
         build_predicates(&self.predicates)
@@ -546,8 +536,6 @@ impl ConditionConfig for CheckFieldsConfig {
             })
     }
 }
-
-//------------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
 pub struct CheckFields {

@@ -3,8 +3,8 @@ use std::{num::NonZeroU32, pin::Pin, time::Duration};
 use async_stream::stream;
 use futures::{stream, Stream, StreamExt};
 use governor::{clock, Quota, RateLimiter};
-use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use vector_config::configurable_component;
 
 use crate::{
     conditions::{AnyCondition, Condition},
@@ -16,12 +16,26 @@ use crate::{
     transforms::{TaskTransform, Transform},
 };
 
-#[derive(Deserialize, Default, Serialize, Debug, Clone)]
+/// Configuration for the `throttle` transform.
+#[configurable_component(transform)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct ThrottleConfig {
+    /// The number of events allowed for a given bucket per configured `window_secs`.
+    ///
+    /// Each unique key will have its own `threshold`.
     threshold: u32,
+
+    /// The time window in which the configured `threshold` is applied, in seconds.
     window_secs: f64,
+
+    /// The name of the log field whose value will be hashed to determine if the event should be rate limited.
+    ///
+    /// Each unique key will create a buckets of related events to be rate limited separately. If left unspecified, or if the event doesn’t have `key_field`, the event be will not be rate limited separately.
+    #[configurable(metadata(templatable))]
     key_field: Option<Template>,
+
+    /// A logical condition used to exclude events from sampling.
     exclude: Option<AnyCondition>,
 }
 

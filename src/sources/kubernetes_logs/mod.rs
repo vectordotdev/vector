@@ -26,7 +26,7 @@ use kube::{
 };
 use vector_common::TimeZone;
 use vector_config::configurable_component;
-use vector_core::ByteSizeOf;
+use vector_core::{transform::TaskTransform, ByteSizeOf};
 
 use crate::{
     config::{
@@ -43,7 +43,7 @@ use crate::{
     kubernetes::custom_reflector,
     shutdown::ShutdownSignal,
     sources,
-    transforms::{FunctionTransform, OutputBuffer, TaskTransform},
+    transforms::{FunctionTransform, OutputBuffer},
     SourceSender,
 };
 

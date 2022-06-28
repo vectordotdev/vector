@@ -39,12 +39,10 @@ mod transient_state;
 mod source_finished;
 
 #[cfg(all(
-    feature = "sinks-console",
-    feature = "sources-splunk_hec",
-    feature = "sources-demo_logs",
+    feature = "sources-prometheus",
     feature = "sinks-prometheus",
-    feature = "transforms-log_to_metric",
-    feature = "sinks-socket",
+    feature = "sources-internal_metrics",
+    feature = "sources-splunk_hec"
 ))]
 mod reload;
 

@@ -3,28 +3,53 @@ use std::collections::HashSet;
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use crate::event::{LogEvent, Value};
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+/// Strategies for merging events.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum MergeStrategy {
+    /// Discard all but the first value found.
     Discard,
+
+    /// Discard all but the last value found.
+    ///
+    /// Works as a way to coalesce by not retaining `null`.
     Retain,
+
+    /// Sum all numeric values.
     Sum,
+
+    /// Keep the maximum numeric value seen.
     Max,
+
+    /// Keep the minimum numeric value seen.
     Min,
+
+    /// Append each value to an array.
     Array,
+
+    /// Concatenate each string value, delimited with a space.
     Concat,
+
+    /// Concatenate each string value, delimited with a newline.
     ConcatNewline,
+
+    /// Concatenate each string, without a delimiter.
     ConcatRaw,
+
+    /// Keep the shortest array seen.
     ShortestArray,
+
+    /// Keep the longest array seen.
     LongestArray,
+
+    /// Create a flattened array of all unique values.
     FlatUnique,
 }
-
-//------------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
 struct DiscardMerger {
@@ -47,8 +72,6 @@ impl ReduceValueMerger for DiscardMerger {
         Ok(())
     }
 }
-
-//------------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
 struct RetainMerger {
@@ -75,8 +98,6 @@ impl ReduceValueMerger for RetainMerger {
         Ok(())
     }
 }
-
-//------------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
 struct ConcatMerger {
@@ -118,8 +139,6 @@ impl ReduceValueMerger for ConcatMerger {
     }
 }
 
-//------------------------------------------------------------------------------
-
 #[derive(Debug, Clone)]
 struct ConcatArrayMerger {
     v: Vec<Value>,
@@ -147,8 +166,6 @@ impl ReduceValueMerger for ConcatArrayMerger {
     }
 }
 
-//------------------------------------------------------------------------------
-
 #[derive(Debug, Clone)]
 struct ArrayMerger {
     v: Vec<Value>,
@@ -171,8 +188,6 @@ impl ReduceValueMerger for ArrayMerger {
         Ok(())
     }
 }
-
-//------------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
 struct LongestArrayMerger {
@@ -206,8 +221,6 @@ impl ReduceValueMerger for LongestArrayMerger {
     }
 }
 
-//------------------------------------------------------------------------------
-
 #[derive(Debug, Clone)]
 struct ShortestArrayMerger {
     v: Vec<Value>,
@@ -240,7 +253,6 @@ impl ReduceValueMerger for ShortestArrayMerger {
     }
 }
 
-//------------------------------------------------------------------------------
 #[derive(Debug, Clone)]
 struct FlatUniqueMerger {
     v: HashSet<Value>,
@@ -286,8 +298,6 @@ impl ReduceValueMerger for FlatUniqueMerger {
     }
 }
 
-//------------------------------------------------------------------------------
-
 #[derive(Debug, Clone)]
 struct TimestampWindowMerger {
     started: DateTime<Utc>,
@@ -323,8 +333,6 @@ impl ReduceValueMerger for TimestampWindowMerger {
     }
 }
 
-//------------------------------------------------------------------------------
-
 #[derive(Debug, Clone)]
 enum NumberMergerValue {
     Int(i64),
@@ -342,8 +350,6 @@ impl From<NotNan<f64>> for NumberMergerValue {
         NumberMergerValue::Float(v)
     }
 }
-
-//------------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
 struct AddNumbersMerger {
@@ -389,8 +395,6 @@ impl ReduceValueMerger for AddNumbersMerger {
         Ok(())
     }
 }
-
-//------------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
 struct MaxNumberMerger {
@@ -451,8 +455,6 @@ impl ReduceValueMerger for MaxNumberMerger {
     }
 }
 
-//------------------------------------------------------------------------------
-
 #[derive(Debug, Clone)]
 struct MinNumberMerger {
     v: NumberMergerValue,
@@ -511,8 +513,6 @@ impl ReduceValueMerger for MinNumberMerger {
         Ok(())
     }
 }
-
-//------------------------------------------------------------------------------
 
 pub trait ReduceValueMerger: std::fmt::Debug + Send + Sync {
     fn add(&mut self, v: Value) -> Result<(), String>;

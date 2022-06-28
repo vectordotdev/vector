@@ -1,6 +1,7 @@
 use std::{str::FromStr, sync::Arc};
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
+use vector_config::configurable_component;
 
 use crate::{
     config::{
@@ -14,13 +15,36 @@ use crate::{
     Result,
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `geoip` transform.
+#[configurable_component(transform)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct GeoipConfig {
+    /// The field name that contains the IP address.
+    ///
+    /// This field should contain a valid IPv4 or IPv6 address.
     pub source: String,
+
+    /// Path to the [MaxMind GeoIP2](https://dev.maxmind.com/geoip/geoip2/downloadable) or [GeoLite2 binary city
+    /// database file](https://dev.maxmind.com/geoip/geoip2/geolite2/#Download_Access) (**GeoLite2-City.mmdb**).
+    ///
+    /// Other databases, such as the country database, are not supported.
     pub database: String,
+
+    /// The default field to insert the resulting GeoIP data into.
+    ///
+    /// See output for more info.
     #[serde(default = "default_geoip_target_field")]
     pub target: String,
+
+    /// The locale to use when querying the database.
+    ///
+    /// MaxMind includes localized versions of some of the fields within their database, such as country name. This
+    /// setting can control which of those localized versions are returned by the transform.
+    ///
+    /// More information on which portions of the geolocation data are localized, and what languages are available, can
+    /// be found
+    /// [here](https://support.maxmind.com/hc/en-us/articles/4414877149467-IP-Geolocation-Data#h_01FRRGRYTGZB29ERDBZCX3MR8Q).
     #[serde(default = "default_locale")]
     pub locale: String,
 }
