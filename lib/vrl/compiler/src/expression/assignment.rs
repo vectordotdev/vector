@@ -1,8 +1,8 @@
 use std::{convert::TryFrom, fmt};
 
 use diagnostic::{DiagnosticMessage, Label, Note};
-use lookup::LookupBuf;
-use value::Value;
+use lookup::{Lookup, LookupBuf, Segment};
+use value::{Kind, Value};
 
 use crate::{
     expression::{Expr, Resolved},
@@ -60,7 +60,17 @@ impl Assignment {
 
                 let expr = expr.into_inner();
                 let target = Target::try_from(target.into_inner())?;
-                verify_mutable(&target, external, target_span, assignment_span)?;
+                verify_mutable(&target, external, expr_span, assignment_span)?;
+                verify_overwriteable(
+                    &target,
+                    local,
+                    external,
+                    target_span,
+                    expr_span,
+                    assignment_span,
+                    expr.clone(),
+                )?;
+
                 let value = expr.as_value();
 
                 target.insert_type_def(local, external, type_def, value);
@@ -111,6 +121,16 @@ impl Assignment {
                 // "err" target.
                 let ok = Target::try_from(ok.into_inner())?;
                 verify_mutable(&ok, external, expr_span, ok_span)?;
+                verify_overwriteable(
+                    &ok,
+                    local,
+                    external,
+                    ok_span,
+                    expr_span,
+                    assignment_span,
+                    expr.clone(),
+                )?;
+
                 let type_def = type_def.infallible();
                 let default_value = type_def.default_value();
                 let value = expr.as_value();
@@ -121,6 +141,16 @@ impl Assignment {
                 // error message.
                 let err = Target::try_from(err.into_inner())?;
                 verify_mutable(&err, external, expr_span, err_span)?;
+                verify_overwriteable(
+                    &err,
+                    local,
+                    external,
+                    err_span,
+                    expr_span,
+                    assignment_span,
+                    expr.clone(),
+                )?;
+
                 let type_def = TypeDef::bytes().add_null().infallible();
 
                 err.insert_type_def(local, external, type_def, None);
@@ -176,6 +206,100 @@ fn verify_mutable(
         }
         Target::Internal(_, _) | Target::Noop => Ok(()),
     }
+}
+
+/// Ensure that the given target is allowed to be changed.
+///
+/// This returns an error if an assignment is done to an object field or array
+/// index, while the parent of the field/index isn't an actual object/array.
+fn verify_overwriteable(
+    target: &Target,
+    local: &LocalEnv,
+    external: &ExternalEnv,
+    target_span: Span,
+    expr_span: Span,
+    assignment_span: Span,
+    rhs_expr: Expr,
+) -> Result<(), Error> {
+    let mut path = target.lookup();
+
+    let root_kind = match target {
+        Target::Noop => Kind::any(),
+        Target::Internal(ident, _) => local
+            .variable(ident)
+            .map(|detail| detail.type_def.kind().clone())
+            .unwrap_or_else(Kind::any),
+        Target::External(_) => external.target_kind().clone(),
+    };
+
+    let mut parent_span = target_span;
+    let mut remainder_str = String::new();
+
+    // Walk the entire path from back to front. If the popped segment is a field
+    // or index, check the segment before it, and ensure that its kind is an
+    // object or array.
+    while let Some(last) = path.pop_back() {
+        let parent_kind = root_kind
+            .find_at_path(&path)
+            .ok()
+            .flatten()
+            .map(|kind| kind.into_owned())
+            .unwrap_or_else(Kind::any);
+
+        let (variant, segment_span, valid) = match last {
+            segment @ Segment::Field(_) | segment @ Segment::Coalesce(_) => {
+                let segment_str = segment.to_string();
+                let segment_start = parent_span.end() - segment_str.len();
+                let segment_span = Span::new(segment_start, parent_span.end());
+
+                parent_span = Span::new(parent_span.start(), segment_start - 1);
+                remainder_str.insert_str(0, &format!(".{}", segment_str));
+
+                ("object", segment_span, parent_kind.contains_object())
+            }
+            Segment::Index(index) => {
+                let segment_start = parent_span.end() - format!("[{index}]").len();
+                let segment_span = Span::new(segment_start, parent_span.end());
+
+                parent_span = Span::new(parent_span.start(), segment_start);
+                remainder_str.insert_str(0, &format!("[{index}]"));
+
+                ("array", segment_span, parent_kind.contains_array())
+            }
+        };
+
+        if valid {
+            continue;
+        }
+
+        let parent_str = match target {
+            Target::Internal(ident, _) => format!("{ident}{}", path),
+            Target::External(_) => {
+                if path.is_root() && remainder_str.starts_with('.') {
+                    remainder_str = remainder_str[1..].to_owned();
+                }
+
+                format!(".{}", path)
+            }
+            Target::Noop => unreachable!(),
+        };
+
+        return Err(Error {
+            variant: ErrorVariant::InvalidParentPathSegment {
+                variant,
+                parent_kind,
+                parent_span,
+                segment_span,
+                parent_str,
+                remainder_str,
+                rhs_expr,
+            },
+            expr_span,
+            assignment_span,
+        });
+    }
+
+    Ok(())
 }
 
 impl Expression for Assignment {
@@ -288,6 +412,14 @@ impl Target {
             External(path) => {
                 let _ = ctx.target_mut().target_insert(path, value);
             }
+        }
+    }
+
+    fn lookup(&self) -> Lookup<'_> {
+        match self {
+            Self::Noop => Lookup::root(),
+            Self::Internal(_, path) => path.to_lookup(),
+            Self::External(path) => path.to_lookup(),
         }
     }
 }
@@ -447,6 +579,7 @@ pub(crate) struct Error {
 }
 
 #[derive(thiserror::Error, Debug)]
+#[allow(clippy::large_enum_variant)]
 pub(crate) enum ErrorVariant {
     #[error("unnecessary no-op assignment")]
     UnnecessaryNoop(Span),
@@ -462,6 +595,17 @@ pub(crate) enum ErrorVariant {
 
     #[error("mutation of read-only value")]
     ReadOnly,
+
+    #[error("parent path segment rejects this mutation")]
+    InvalidParentPathSegment {
+        variant: &'static str,
+        parent_kind: Kind,
+        parent_span: Span,
+        parent_str: String,
+        segment_span: Span,
+        remainder_str: String,
+        rhs_expr: Expr,
+    },
 }
 
 impl fmt::Display for Error {
@@ -487,6 +631,7 @@ impl DiagnosticMessage for Error {
             FallibleAssignment(..) => 103,
             InfallibleAssignment(..) => 104,
             InvalidTarget(..) => 641,
+            InvalidParentPathSegment { .. } => 642,
             ReadOnly => 315,
         }
     }
@@ -524,6 +669,26 @@ impl DiagnosticMessage for Error {
                 "mutation of read-only value",
                 self.assignment_span,
             )],
+            InvalidParentPathSegment {
+                variant,
+                parent_kind,
+                parent_span,
+                segment_span,
+                ..
+            } => vec![
+                Label::primary(
+                    if variant == &"object" {
+                        "querying a field of a non-object type is unsupported"
+                    } else {
+                        "indexing into a non-array type is unsupported"
+                    },
+                    segment_span,
+                ),
+                Label::context(
+                    format!("this path resolves to a value of type {}", parent_kind),
+                    parent_span,
+                ),
+            ],
         }
     }
 
@@ -532,6 +697,34 @@ impl DiagnosticMessage for Error {
 
         match &self.variant {
             FallibleAssignment(..) | InfallibleAssignment(..) => vec![Note::SeeErrorDocs],
+            InvalidParentPathSegment {
+                variant,
+                parent_str,
+                remainder_str,
+                rhs_expr,
+                ..
+            } => {
+                let mut notes = vec![];
+
+                notes.append(&mut Note::solution(
+                    format!("change parent value to {variant}, before assignment"),
+                    if variant == &"object" {
+                        vec![
+                            format!("{parent_str} = {{}}"),
+                            format!("{parent_str}{remainder_str} = {rhs_expr}"),
+                        ]
+                    } else {
+                        vec![
+                            format!("{parent_str} = []"),
+                            format!("{parent_str}{remainder_str} = {rhs_expr}"),
+                        ]
+                    },
+                ));
+
+                notes.push(Note::SeeErrorDocs);
+
+                notes
+            }
             _ => vec![],
         }
     }
