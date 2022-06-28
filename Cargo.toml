@@ -493,7 +493,7 @@ sources-internal_logs = []
 sources-internal_metrics = []
 sources-journald = []
 sources-kafka = ["dep:rdkafka"]
-sources-kubernetes_logs = ["dep:file-source", "kubernetes", "transforms-merge", "transforms-regex_parser"]
+sources-kubernetes_logs = ["dep:file-source", "kubernetes", "transforms-reduce"]
 sources-logstash = ["listenfd", "tokio-util/net", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls"]
 sources-mongodb_metrics = ["dep:mongodb"]
 sources-nats = ["dep:nats", "dep:nkeys"]
@@ -522,38 +522,21 @@ sources-vector = ["listenfd", "sources-utils-tcp-keepalive", "sources-utils-tcp-
 # Transforms
 transforms = ["transforms-logs", "transforms-metrics"]
 transforms-logs = [
-  "transforms-add_fields",
-  "transforms-ansi_stripper",
-  "transforms-aws_cloudwatch_logs_subscription_parser",
   "transforms-aws_ec2_metadata",
-  "transforms-coercer",
-  "transforms-concat",
   "transforms-dedupe",
-  "transforms-field_filter",
   "transforms-filter",
   "transforms-geoip",
-  "transforms-grok_parser",
-  "transforms-json_parser",
-  "transforms-key_value_parser",
   "transforms-log_to_metric",
-  "transforms-logfmt_parser",
   "transforms-lua",
-  "transforms-merge",
   "transforms-metric_to_log",
   "transforms-pipelines",
   "transforms-reduce",
-  "transforms-regex_parser",
   "transforms-remap",
-  "transforms-remove_fields",
-  "transforms-rename_fields",
   "transforms-route",
   "transforms-sample",
-  "transforms-split",
   "transforms-throttle",
-  "transforms-tokenizer",
 ]
 transforms-metrics = [
-  "transforms-add_tags",
   "transforms-aggregate",
   "transforms-filter",
   "transforms-log_to_metric",
@@ -561,44 +544,25 @@ transforms-metrics = [
   "transforms-metric_to_log",
   "transforms-pipelines",
   "transforms-remap",
-  "transforms-remove_tags",
   "transforms-tag_cardinality_limit",
   "transforms-throttle",
 ]
 
-transforms-add_fields = []
-transforms-add_tags = []
 transforms-aggregate = []
-transforms-ansi_stripper = []
-transforms-aws_cloudwatch_logs_subscription_parser= []
 transforms-aws_ec2_metadata = ["dep:arc-swap"]
-transforms-coercer = []
-transforms-concat = []
 transforms-dedupe = ["dep:lru"]
-transforms-field_filter = []
 transforms-filter = []
 transforms-geoip = ["dep:maxminddb"]
-transforms-grok_parser = ["dep:grok"]
-transforms-json_parser = []
-transforms-key_value_parser = []
 transforms-log_to_metric = []
-transforms-logfmt_parser = ["dep:logfmt"]
 transforms-lua = ["dep:mlua", "vector_core/lua"]
-transforms-merge = []
 transforms-metric_to_log = []
 transforms-pipelines = ["transforms-filter", "transforms-route"]
 transforms-reduce = []
-transforms-regex_parser = []
 transforms-remap = []
-transforms-remove_fields = []
-transforms-remove_tags = []
-transforms-rename_fields = []
 transforms-route = []
 transforms-sample = ["dep:seahash"]
-transforms-split = []
 transforms-tag_cardinality_limit = ["dep:bloom"]
 transforms-throttle = ["dep:governor"]
-transforms-tokenizer = []
 
 # Sinks
 sinks = ["sinks-logs", "sinks-metrics"]
@@ -804,14 +768,11 @@ vector-api-tests = [
 ]
 vector-unit-test-tests = [
   "sources-demo_logs",
-  "transforms-add_fields",
   "transforms-remap",
   "transforms-route",
   "transforms-filter",
   "transforms-reduce",
-  "transforms-add_tags",
   "transforms-log_to_metric",
-  "transforms-remove_fields",
   "sinks-console"
 ]
 enterprise-tests = [
@@ -820,8 +781,8 @@ enterprise-tests = [
   "sinks-blackhole",
 ]
 
-# grouping together features for benchmarks
-# excluing API client due to running out of memory during linking in Github Actions
+# Grouping together features for benchmarks. We exclude the API client due to it causing the build process to run out
+# of memory when those additional dependencies are built in CI.
 benches = [
   "sinks-file",
   "sinks-http",
@@ -829,22 +790,15 @@ benches = [
   "sources-file",
   "sources-socket",
   "sources-syslog",
-  "transforms-add_fields",
-  "transforms-coercer",
-  "transforms-field_filter",
-  "transforms-json_parser",
   "transforms-lua",
-  "transforms-rename_fields",
-  "transforms-regex_parser",
   "transforms-sample",
-  "transforms-split",
 ]
 dnstap-benches = ["sources-dnstap"]
-language-benches = ["sinks-socket", "sources-socket", "transforms-add_fields", "transforms-json_parser", "transforms-lua", "transforms-regex_parser", "transforms-remap"]
+language-benches = ["sinks-socket", "sources-socket", "transforms-lua", "transforms-remap"]
 # Separate benching process for metrics due to the nature of the bootstrap procedures.
 statistic-benches = []
 metrics-benches = ["sinks-socket", "sources-socket"]
-remap-benches = ["transforms-add_fields", "transforms-coercer", "transforms-json_parser", "transforms-remap"]
+remap-benches = ["transforms-remap"]
 transform-benches = ["transforms-filter", "transforms-dedupe", "transforms-reduce", "transforms-route"]
 codecs-benches = []
 loki-benches = ["sinks-loki"]
