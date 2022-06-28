@@ -3,6 +3,7 @@
 //! This library includes common functionality relied upon by vector-core
 //! and core-related crates (e.g. buffers).
 
+#![deny(warnings)]
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
 #![deny(unreachable_pub)]
@@ -42,6 +43,7 @@ pub mod event_test_util;
 
 pub mod finalization;
 pub mod finalizer;
+pub use finalizer::EmptyStream;
 
 pub mod internal_event;
 

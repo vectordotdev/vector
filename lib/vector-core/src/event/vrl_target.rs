@@ -310,7 +310,7 @@ impl MetadataTarget for VrlTarget {
     }
 
     fn remove_metadata(&mut self, path: &LookupBuf) -> Result<(), String> {
-        self.metadata_mut().value_mut().remove(path, true);
+        self.metadata_mut().value_mut().remove(path, false);
         Ok(())
     }
 }

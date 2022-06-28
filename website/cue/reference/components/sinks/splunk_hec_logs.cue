@@ -79,6 +79,25 @@ components: sinks: splunk_hec_logs: {
 				examples: ["https://http-inputs-hec.splunkcloud.com", "https://hec.splunk.com:8088", "http://example.com"]
 			}
 		}
+		endpoint_target: {
+			common:      false
+			description: """
+                                     The Splunk endpoint to send to. Either the [event endpoint](\(urls.splunk_hec_event_endpoint)) or the
+                                     [raw endpoint](\(urls.splunk_hec_raw_endpoint)). [metadata](\(urls.splunk_hec_metadata)) for the event
+                                     endpoint is sent with each event. For the `raw` endpoint, configured [event metadata](\(urls.splunk_hec_metadata))
+                                     is sent as query parameters - except the `timestamp` field.
+                                     """
+			required:    false
+			warnings: []
+			type: string: {
+				default: "event"
+				enum: {
+					event: "[Event endpoint](\(urls.splunk_hec_event_endpoint))"
+					raw:   "[Raw endpoint](\(urls.splunk_hec_raw_endpoint))"
+				}
+				syntax: "literal"
+			}
+		}
 		host_key: {
 			common:      true
 			description: """
@@ -147,7 +166,6 @@ components: sinks: splunk_hec_logs: {
 			}
 		}
 	}
-
 	input: {
 		logs:    true
 		metrics: null

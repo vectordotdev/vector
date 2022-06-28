@@ -129,12 +129,18 @@ impl SourceConfig for SocketConfig {
                 let decoder = DecodingConfig::new(framing, decoding).build();
 
                 let tcp = tcp::RawTcpSource::new(config.clone(), decoder);
-                let tls = MaybeTlsSettings::from_config(config.tls(), true)?;
+                let tls_config = config.tls().as_ref().map(|tls| tls.tls_config.clone());
+                let tls_client_metadata_key = config
+                    .tls()
+                    .as_ref()
+                    .and_then(|tls| tls.client_metadata_key.clone());
+                let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
                 tcp.run(
                     config.address(),
                     config.keepalive(),
                     config.shutdown_timeout_secs(),
                     tls,
+                    tls_client_metadata_key,
                     config.receive_buffer_bytes(),
                     cx,
                     false.into(),
@@ -240,7 +246,7 @@ impl SourceConfig for SocketConfig {
 #[cfg(test)]
 mod test {
     use std::{
-        collections::HashMap,
+        collections::{BTreeMap, HashMap},
         net::{SocketAddr, UdpSocket},
         sync::{
             atomic::{AtomicBool, Ordering},
@@ -258,6 +264,7 @@ mod test {
         task::JoinHandle,
         time::{timeout, Duration, Instant},
     };
+    use vector_common::btreemap;
     use vector_core::event::EventContainer;
     #[cfg(unix)]
     use {
@@ -288,7 +295,7 @@ mod test {
             components::{assert_source_compliance, SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS},
             next_addr, random_string, send_lines, send_lines_tls, wait_for_tcp,
         },
-        tls::{self, TlsConfig, TlsEnableableConfig},
+        tls::{self, TlsConfig, TlsEnableableConfig, TlsSourceConfig},
         SourceSender,
     };
 
@@ -420,50 +427,18 @@ mod test {
             let addr = next_addr();
 
             let mut config = TcpConfig::from_address(addr.into());
-            config.set_tls(Some(TlsEnableableConfig::test_config()));
-
-            let server = SocketConfig::from(config)
-                .build(SourceContext::new_test(tx, None))
-                .await
-                .unwrap();
-            tokio::spawn(server);
-
-            let lines = vec!["one line".to_owned(), "another line".to_owned()];
-
-            wait_for_tcp(addr).await;
-            send_lines_tls(addr, "localhost".into(), lines.into_iter(), None)
-                .await
-                .unwrap();
-
-            let event = rx.next().await.unwrap();
-            assert_eq!(
-                event.as_log()[log_schema().message_key()],
-                "one line".into()
-            );
-
-            let event = rx.next().await.unwrap();
-            assert_eq!(
-                event.as_log()[log_schema().message_key()],
-                "another line".into()
-            );
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn tcp_with_tls_intermediate_ca() {
-        assert_source_compliance(&SOCKET_HIGH_CARDINALITY_PUSH_SOURCE_TAGS, async {
-            let (tx, mut rx) = SourceSender::new_test();
-            let addr = next_addr();
-
-            let mut config = TcpConfig::from_address(addr.into());
-            config.set_tls(Some(TlsEnableableConfig {
-                enabled: Some(true),
-                options: TlsConfig {
-                    crt_file: Some("tests/data/Chain_with_intermediate.crt".into()),
-                    key_file: Some("tests/data/Crt_from_intermediate.key".into()),
-                    ..Default::default()
+            config.set_tls(Some(TlsSourceConfig {
+                tls_config: TlsEnableableConfig {
+                    enabled: Some(true),
+                    options: TlsConfig {
+                        verify_certificate: Some(true),
+                        crt_file: Some(tls::TEST_PEM_CRT_PATH.into()),
+                        key_file: Some(tls::TEST_PEM_KEY_PATH.into()),
+                        ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
+                        ..Default::default()
+                    },
                 },
+                client_metadata_key: Some("tls_peer".into()),
             }));
 
             let server = SocketConfig::from(config)
@@ -480,21 +455,31 @@ mod test {
                 "localhost".into(),
                 lines.into_iter(),
                 std::path::Path::new(tls::TEST_PEM_CA_PATH),
+                std::path::Path::new(tls::TEST_PEM_CLIENT_CRT_PATH),
+                std::path::Path::new(tls::TEST_PEM_CLIENT_KEY_PATH),
             )
             .await
             .unwrap();
 
             let event = rx.next().await.unwrap();
             assert_eq!(
-                event.as_log()[crate::config::log_schema().message_key()],
+                event.as_log()[log_schema().message_key()],
                 "one line".into()
             );
 
+            let tls_meta: BTreeMap<String, value::Value> = btreemap!(
+                "subject" => "CN=localhost,OU=Vector,O=Datadog,L=New York,ST=New York,C=US"
+            );
+
+            assert_eq!(event.as_log()["tls_peer"], tls_meta.clone().into(),);
+
             let event = rx.next().await.unwrap();
             assert_eq!(
-                event.as_log()[crate::config::log_schema().message_key()],
+                event.as_log()[log_schema().message_key()],
                 "another line".into()
             );
+
+            assert_eq!(event.as_log()["tls_peer"], tls_meta.clone().into(),);
         })
         .await;
     }

@@ -63,7 +63,7 @@ pub async fn build_buffer(
     mode: WhenFull,
     overflow_mode: Option<WhenFull>,
 ) -> (BufferSender<u64>, BufferReceiver<u64>, BufferUsageHandle) {
-    let handle = BufferUsageHandle::noop(mode);
+    let handle = BufferUsageHandle::noop();
     let (tx, rx) = match mode {
         WhenFull::Overflow => {
             let overflow_mode = overflow_mode.expect("overflow mode cannot be empty");

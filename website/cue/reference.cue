@@ -7,6 +7,9 @@ _values: {
 	local_host:        "my-host.local"
 	remote_host:       "34.33.222.212"
 	instance:          "vector:9598"
+	client_metadata: {
+		subject: "CN=localhost,OU=Vector,O=Datadog,L=New York,ST=New York,C=US"
+	}
 }
 
 // `#Any` allows for any value.
@@ -52,7 +55,7 @@ _values: {
 // * `removed` - The component has been removed.
 #DevelopmentStatus: "beta" | "stable" | "deprecated" | "removed"
 
-#EncodingCodec: "json" | "logfmt" | "ndjson" | "text" | "native" | "native_json"
+#EncodingCodec: "json" | "logfmt" | "ndjson" | "text" | "native" | "native_json" | "avro"
 
 #Endpoint: {
 	description: string
