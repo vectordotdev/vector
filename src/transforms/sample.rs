@@ -356,6 +356,9 @@ mod tests {
     }
 
     fn random_events(n: usize) -> Vec<Event> {
-        random_lines(10).take(n).map(Event::from).collect()
+        random_lines(10)
+            .take(n)
+            .map(|e| Event::Log(LogEvent::from(e)))
+            .collect()
     }
 }

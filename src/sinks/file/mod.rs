@@ -455,7 +455,12 @@ mod tests {
         let sink = FileSink::new(&config, Acker::passthrough()).unwrap();
         let (input, _events) = random_lines_with_stream(100, 64, None);
 
-        let events = Box::pin(stream::iter(input.clone().into_iter().map(Event::from)));
+        let events = Box::pin(stream::iter(
+            input
+                .clone()
+                .into_iter()
+                .map(|e| Event::Log(LogEvent::from(e))),
+        ));
         run_and_assert_sink_compliance(
             VectorSink::from_event_streamsink(sink),
             events,
@@ -486,7 +491,12 @@ mod tests {
         let sink = FileSink::new(&config, Acker::passthrough()).unwrap();
         let (input, _) = random_lines_with_stream(100, 64, None);
 
-        let events = Box::pin(stream::iter(input.clone().into_iter().map(Event::from)));
+        let events = Box::pin(stream::iter(
+            input
+                .clone()
+                .into_iter()
+                .map(|e| Event::Log(LogEvent::from(e))),
+        ));
         run_and_assert_sink_compliance(
             VectorSink::from_event_streamsink(sink),
             events,
@@ -620,7 +630,7 @@ mod tests {
 
         // send initial payload
         for line in input.clone() {
-            tx.send(Event::from(line)).await.unwrap();
+            tx.send(Event::Log(LogEvent::from(line))).await.unwrap();
         }
 
         // wait for file to go idle and be closed

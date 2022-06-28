@@ -244,7 +244,11 @@ pub mod tests {
     #[test]
     fn test_parsing() {
         trace_init();
-        test_util::test_parser(|| Transform::function(Cri::default()), Event::from, cases());
+        test_util::test_parser(
+            || Transform::function(Cri::default()),
+            |s| Event::Log(LogEvent::from(s)),
+            cases(),
+        );
     }
 
     #[test]

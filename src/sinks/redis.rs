@@ -398,10 +398,10 @@ mod tests {
     #[test]
     fn redis_event_json() {
         let msg = "hello_world".to_owned();
-        let mut evt = Event::from(msg.clone());
-        evt.as_mut_log().insert("key", "value");
+        let mut evt = LogEvent::from(msg.clone());
+        evt.insert("key", "value");
         let result = encode_event(
-            evt,
+            evt.into(),
             &Template::try_from("key").unwrap(),
             &Default::default(),
             &mut Encoder::<()>::new(JsonSerializer::new().into()),
@@ -416,9 +416,9 @@ mod tests {
     #[test]
     fn redis_event_text() {
         let msg = "hello_world".to_owned();
-        let evt = Event::from(msg.clone());
+        let evt = LogEvent::from(msg.clone());
         let event = encode_event(
-            evt,
+            evt.into(),
             &Template::try_from("key").unwrap(),
             &Default::default(),
             &mut Encoder::<()>::new(TextSerializer::new().into()),
@@ -432,11 +432,11 @@ mod tests {
     #[test]
     fn redis_encode_event() {
         let msg = "hello_world";
-        let mut evt = Event::Log(LogEvent::from(msg));
-        evt.as_mut_log().insert("key", "value");
+        let mut evt = LogEvent::from(msg);
+        evt.insert("key", "value");
 
         let result = encode_event(
-            evt,
+            evt.into(),
             &Template::try_from("key").unwrap(),
             &Transformer::new(None, Some(vec!["key".into()]), None).unwrap(),
             &mut Encoder::<()>::new(JsonSerializer::new().into()),
@@ -456,6 +456,7 @@ mod integration_tests {
     use futures::stream;
     use rand::Rng;
     use redis::AsyncCommands;
+    use vector_core::event::LogEvent;
 
     use super::*;
     use crate::test_util::{
@@ -502,8 +503,8 @@ mod integration_tests {
         let mut events: Vec<Event> = Vec::new();
         for i in 0..num_events {
             let s: String = i.to_string();
-            let e = Event::from(s);
-            events.push(e);
+            let e = LogEvent::from(s);
+            events.push(e.into());
         }
 
         run_and_assert_sink_compliance(sink, stream::iter(events.clone()), &SINK_TAGS).await;
@@ -560,8 +561,8 @@ mod integration_tests {
         let mut events: Vec<Event> = Vec::new();
         for i in 0..num_events {
             let s: String = i.to_string();
-            let e = Event::from(s);
-            events.push(e);
+            let e = LogEvent::from(s);
+            events.push(e.into());
         }
 
         sink.run_events(events.clone()).await.unwrap();

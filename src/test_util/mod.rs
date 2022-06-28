@@ -271,7 +271,7 @@ pub fn random_events_with_stream(
     batch: Option<BatchNotifier>,
 ) -> (Vec<Event>, impl Stream<Item = EventArray>) {
     let events = (0..count)
-        .map(|_| Event::from(random_string(len)))
+        .map(|_| Event::from(LogEvent::from(random_string(len))))
         .collect::<Vec<_>>();
     let stream = map_batch_stream(
         stream::iter(events.clone()).map(|event| event.into_log()),
@@ -287,12 +287,13 @@ pub fn random_updated_events_with_stream<F>(
     update_fn: F,
 ) -> (Vec<Event>, impl Stream<Item = EventArray>)
 where
-    F: Fn((usize, Event)) -> Event,
+    F: Fn((usize, LogEvent)) -> LogEvent,
 {
     let events = (0..count)
-        .map(|_| Event::from(random_string(len)))
+        .map(|_| LogEvent::from(random_string(len)))
         .enumerate()
         .map(update_fn)
+        .map(Event::Log)
         .collect::<Vec<_>>();
     let stream = map_batch_stream(
         stream::iter(events.clone()).map(|event| event.into_log()),
