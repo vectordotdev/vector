@@ -78,18 +78,6 @@ jobs:
             docker:
               - 'distribution/docker/**'
 
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Setup upterm session
-        uses: lhotari/action-upterm@v1
-        with:
-          ## limits ssh access and adds the ssh public key for the user which triggered the workflow
-          limit-access-to-actor: true
-          ## limits ssh access and adds the ssh public keys of the listed GitHub users
-          limit-access-to-users: 001wwang
-
   # Remove this once https://github.com/vectordotdev/vector/issues/3771 is closed.
   # Then, modify the `cross-linux` job to run `test` instead of `build`.
   test-linux:
@@ -112,6 +100,13 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
+      - name: Setup upterm session
+        uses: lhotari/action-upterm@v1
+        with:
+          ## limits ssh access and adds the ssh public key for the user which triggered the workflow
+          limit-access-to-actor: true
+          ## limits ssh access and adds the ssh public keys of the listed GitHub users
+          limit-access-to-users: 001wwang
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
