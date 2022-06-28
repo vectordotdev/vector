@@ -1337,7 +1337,6 @@ mod pipelines_tests {
     use super::{load_from_str, Format};
 
     #[test]
-    #[ignore]
     fn forbid_pipeline_nesting() {
         let res = load_from_str(
             indoc! {r#"

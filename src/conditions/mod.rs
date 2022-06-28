@@ -35,9 +35,13 @@ pub enum Condition {
     DatadogSearch(DatadogSearchRunner),
 
     /// Matches any event.
+    ///
+    /// Used only for internal testing.
     AlwaysPass,
 
     /// Matches no event.
+    ///
+    /// Used only for internal testing.
     AlwaysFail,
 }
 
