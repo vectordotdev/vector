@@ -24,6 +24,7 @@ use kube::{
     },
     Client, Config as ClientConfig,
 };
+use vector_common::TimeZone;
 use vector_config::configurable_component;
 use vector_core::{transform::TaskTransform, ByteSizeOf};
 
@@ -138,6 +139,9 @@ pub struct Config {
     /// processed by the `kubernetes_logs` source.
     ingestion_timestamp_field: Option<String>,
 
+    /// The default time zone for timestamps without an explicit zone.
+    timezone: Option<TimeZone>,
+
     /// Optional path to a kubeconfig file readable by Vector. If not set,
     /// Vector will try to connect to Kubernetes using in-cluster configuration.
     kube_config_file: Option<PathBuf>,
@@ -180,6 +184,7 @@ impl Default for Config {
             fingerprint_lines: default_fingerprint_lines(),
             glob_minimum_cooldown_ms: default_glob_minimum_cooldown_ms(),
             ingestion_timestamp_field: None,
+            timezone: None,
             kube_config_file: None,
             delay_deletion_ms: default_delay_deletion_ms(),
         }
