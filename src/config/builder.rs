@@ -408,16 +408,15 @@ mod tests {
     use super::ConfigBuilderHash;
 
     #[test]
-    /// We are relying on `serde_json` to serialize keys in the ordered provided. If this test
-    /// fails, it likely means an implementation detail of serialization has changed, which is
-    /// likely to impact the final hash.
+    /// If this test fails, it likely means an implementation detail has changed
+    /// which is likely to impact the final hash.
     fn version_json_order() {
         use serde_json::{json, Value};
 
         use super::{ConfigBuilder, ConfigBuilderHash};
 
-        // Expected key order of serialization. This is important for guaranteeing that a
-        // hash is reproducible across versions.
+        // Expected key order. This is important for guaranteeing that a hash is
+        // reproducible across versions.
         let expected_keys = [
             "api",
             "enrichment_tables",
