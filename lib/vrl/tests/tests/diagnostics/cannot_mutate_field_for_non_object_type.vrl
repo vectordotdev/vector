@@ -1,0 +1,98 @@
+# result:
+#
+# error[E642]: parent path segment rejects this mutation
+#   ┌─ :3:5
+#   │
+# 3 │ foo.bar = {}
+#   │ --- ^^^ querying a field of a non-object type is unsupported
+#   │ │
+#   │ this path resolves to a value of type string
+#   │
+#   = try: change parent value to object, before assignment
+#   =
+#   =     foo = {}
+#   =     foo.bar = {  }
+#   =
+#   = see documentation about error handling at https://errors.vrl.dev/#handling
+#   = see language documentation at https://vrl.dev
+#
+# error[E642]: parent path segment rejects this mutation
+#   ┌─ :4:5
+#   │
+# 4 │ foo.bar.baz = "baz"
+#   │ --- ^^^ querying a field of a non-object type is unsupported
+#   │ │
+#   │ this path resolves to a value of type string
+#   │
+#   = try: change parent value to object, before assignment
+#   =
+#   =     foo = {}
+#   =     foo.bar.baz = "baz"
+#   =
+#   = see documentation about error handling at https://errors.vrl.dev/#handling
+#   = see language documentation at https://vrl.dev
+#
+# error[E642]: parent path segment rejects this mutation
+#   ┌─ :7:2
+#   │
+# 7 │ .bar = "bar"
+#   │ -^^^ querying a field of a non-object type is unsupported
+#   │ │
+#   │ this path resolves to a value of type string
+#   │
+#   = try: change parent value to object, before assignment
+#   =
+#   =     . = {}
+#   =     .bar = "bar"
+#   =
+#   = see documentation about error handling at https://errors.vrl.dev/#handling
+#   = see language documentation at https://vrl.dev
+#
+# error[E642]: parent path segment rejects this mutation
+#    ┌─ :10:6
+#    │
+# 10 │ .foo.bar = "bar"
+#    │ ---- ^^^ querying a field of a non-object type is unsupported
+#    │ │
+#    │ this path resolves to a value of type boolean
+#    │
+#    = try: change parent value to object, before assignment
+#    =
+#    =     .foo = {}
+#    =     .foo.bar = "bar"
+#    =
+#    = see documentation about error handling at https://errors.vrl.dev/#handling
+#    = see language documentation at https://vrl.dev
+#
+# error[E642]: parent path segment rejects this mutation
+#    ┌─ :13:5
+#    │
+# 13 │ foo.(bar | baz) = "bar baz"
+#    │ --- ^^^^^^^^^^^ querying a field of a non-object type is unsupported
+#    │ │
+#    │ this path resolves to a value of type integer
+#    │
+#    = try: change parent value to object, before assignment
+#    =
+#    =     foo = {}
+#    =     foo.(bar | baz) = "bar baz"
+#    =
+#    = see documentation about error handling at https://errors.vrl.dev/#handling
+#    = see language documentation at https://vrl.dev
+
+foo = "foo"
+foo.bar = {}
+foo.bar.baz = "baz"
+
+. = "foo"
+.bar = "bar"
+
+. = { "foo": true }
+.foo.bar = "bar"
+
+foo = 42
+foo.(bar | baz) = "bar baz"
+
+foo = {}
+foo.bar = {}
+foo.bar.baz = []

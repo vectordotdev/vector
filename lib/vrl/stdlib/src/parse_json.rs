@@ -79,13 +79,13 @@ fn validate_depth(value: Value) -> std::result::Result<u8, ExpressionError> {
     //
     // The upper cap is 128 because serde_json has the same recursion limit by default.
     // https://github.com/serde-rs/json/blob/4d57ebeea8d791b8a51c229552d2d480415d00e6/json/src/de.rs#L111
-    if !(1..=128).contains(&res) {
+    if (1..=128).contains(&res) {
+        Ok(res as u8)
+    } else {
         Err(ExpressionError::from(format!(
             "max_depth value should be greater than 0 and less than 128, got {}",
             res
         )))
-    } else {
-        Ok(res as u8)
     }
 }
 
