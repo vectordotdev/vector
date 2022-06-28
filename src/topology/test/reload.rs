@@ -200,7 +200,7 @@ async fn topology_disk_buffer_conflict() {
 #[tokio::test]
 async fn topology_reload_with_new_components() {
     // TODO: Write a test source that emits only metrics, and a test sink that can bind a TCP listener, so we can
-    // replace `internal_metrics` and `prometheus_exporter` here. We additionally need to ensure the metrics/ subsystem
+    // replace `internal_metrics` and `prometheus_exporter` here. We additionally need to ensure the metrics subsystem
     // is enabled to use `internal_metrics`, otherwise it throws an error when trying to build the component.
     let _ = crate::metrics::init_test();
 

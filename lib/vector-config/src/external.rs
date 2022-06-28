@@ -68,7 +68,7 @@ impl<'de> Configurable<'de> for toml::Value {
 
 impl<'de> Configurable<'de> for no_proxy::NoProxy {
     fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
-        // `NoProxy` (de)serializes itself as a vector of strings, without any constrain on the string value itself, so
+        // `NoProxy` (de)serializes itself as a vector of strings, without any constraints on the string value itself, so
         // we just... do that. We do set the element metadata to be transparent, the same as we do for `Vec<T>`, because
         // all of the pertinent information will be on `NoProxy` itself.
         let mut element_metadata = String::metadata();
