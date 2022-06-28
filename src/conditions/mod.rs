@@ -146,7 +146,7 @@ dyn_clone::clone_trait_object!(ConditionalConfig);
 
 /// An event matching condition.
 ///
-/// Many methods exist for matching for matching events, such as using a VRL expression, a Datadog Search query string,
+/// Many methods exist for matching events, such as using a VRL expression, a Datadog Search query string,
 /// or hard-coded matchers like "must be a metric" or "fields A, B, and C must match these constraints".
 ///
 /// As VRL is the most common way to apply conditions to events, this type provides a shortcut to define VRL expressions
