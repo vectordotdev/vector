@@ -4,6 +4,7 @@ use bytes::{BufMut, Bytes, BytesMut};
 use chrono::Utc;
 use codecs::StreamDecodingError;
 use http::StatusCode;
+use lookup::path;
 use tokio_util::codec::Decoder;
 use vector_core::ByteSizeOf;
 use warp::{filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response, Filter};
@@ -17,7 +18,6 @@ use crate::{
     },
     SourceSender,
 };
-use lookup::path;
 
 pub(crate) fn build_warp_filter(
     acknowledgements: bool,
