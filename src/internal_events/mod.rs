@@ -79,6 +79,7 @@ mod nginx_metrics;
 mod open;
 #[cfg(any(
     feature = "sinks-datadog_events",
+    feature = "sources-kubernetes_logs",
     feature = "transforms-geoip",
     feature = "transforms-log_to_metric",
 ))]
@@ -211,6 +212,7 @@ pub(crate) use self::nats::*;
 pub(crate) use self::nginx_metrics::*;
 #[cfg(any(
     feature = "sinks-datadog_events",
+    feature = "sources-kubernetes_logs",
     feature = "transforms-geoip",
     feature = "transforms-log_to_metric",
 ))]
