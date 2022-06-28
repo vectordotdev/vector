@@ -56,40 +56,40 @@ fn get_root_opts(config_path: PathBuf) -> RootOpts {
 /// In general, Vector should continue operating even in the event that the
 /// enterprise API is down/having issues. Do not modify this behavior
 /// without prior approval.
-#[tokio::test]
-async fn vector_continues_on_reporting_error() {
-    let _ = vector::metrics::init_test();
+// #[tokio::test]
+// async fn vector_continues_on_reporting_error() {
+//     let _ = vector::metrics::init_test();
 
-    let server = build_test_server_error_and_recover(StatusCode::NOT_IMPLEMENTED).await;
-    let endpoint = server.uri();
+//     let server = build_test_server_error_and_recover(StatusCode::NOT_IMPLEMENTED).await;
+//     let endpoint = server.uri();
 
-    env::set_var(ENDPOINT_CONFIG_ENV_VAR, endpoint);
-    let config_file = PathBuf::from(format!(
-        "{}/tests/data/enterprise/base.toml",
-        env!("CARGO_MANIFEST_DIR")
-    ));
+//     env::set_var(ENDPOINT_CONFIG_ENV_VAR, endpoint);
+//     let config_file = PathBuf::from(format!(
+//         "{}/tests/data/enterprise/base.toml",
+//         env!("CARGO_MANIFEST_DIR")
+//     ));
 
-    let opts = Opts {
-        root: get_root_opts(config_file),
-        sub_command: None,
-    };
+//     let opts = Opts {
+//         root: get_root_opts(config_file),
+//         sub_command: None,
+//     };
 
-    // Spawn a separate thread to avoid nested async runtime errors
-    let vector_continued = thread::spawn(|| {
-        // Configuration reporting is guaranteed to fail here due to API
-        // server issues. However, the app should still start up and run.
-        Application::prepare_from_opts(opts).map_or(false, |app| {
-            // Finish running the topology to avoid error logs
-            app.run();
-            true
-        })
-    })
-    .join()
-    .unwrap();
+//     // Spawn a separate thread to avoid nested async runtime errors
+//     let vector_continued = thread::spawn(|| {
+//         // Configuration reporting is guaranteed to fail here due to API
+//         // server issues. However, the app should still start up and run.
+//         Application::prepare_from_opts(opts).map_or(false, |app| {
+//             // Finish running the topology to avoid error logs
+//             app.run();
+//             true
+//         })
+//     })
+//     .join()
+//     .unwrap();
 
-    assert!(!server.received_requests().await.unwrap().is_empty());
-    assert!(vector_continued);
-}
+//     assert!(!server.received_requests().await.unwrap().is_empty());
+//     assert!(vector_continued);
+// }
 
 #[tokio::test]
 async fn vector_does_not_start_with_enterprise_misconfigured() {
