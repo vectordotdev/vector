@@ -285,7 +285,7 @@ impl<'de, T: Configurable<'de>> Metadata<'de, T> {
         }
     }
 
-    /// Gets a version of this metadata subtle for subschema use.
+    /// Gets a version of this metadata suitable for subschema use.
     ///
     /// This strips all custom attributes and validations, as well as some flags, which makes this exclusively useful
     /// for shuttling metadata from a type that (de)serializes to an entirely different type.
