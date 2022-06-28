@@ -1,6 +1,6 @@
 use std::{hash::Hash, marker::PhantomData, pin::Pin, sync::Arc, time::Duration};
 
-use futures_util::{future::BoxFuture, Stream, TryStream, TryStreamExt};
+use futures_util::{future::BoxFuture, stream::BoxStream, TryStream, TryStreamExt};
 use serde::{Deserialize, Serialize};
 use tower::{
     balance::p2c::Balance,
@@ -44,13 +44,7 @@ pub type TowerPartitionSink<S, B, RL, K> = PartitionBatchSink<Svc<S, RL>, B, K>;
 pub type DistributedService<S, RL, K, Req> = InnerSvc<
     CloneService<
         Balance<
-            Pin<
-                Box<
-                    dyn Stream<
-                            Item = Result<Change<K, HealthService<Timeout<S>, RL>>, crate::Error>,
-                        > + Send,
-                >,
-            >,
+            BoxStream<'static, Result<Change<K, HealthService<Timeout<S>, RL>>, crate::Error>>,
             Req,
         >,
     >,

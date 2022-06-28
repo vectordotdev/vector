@@ -1,13 +1,11 @@
 use std::{
     future::Future,
     pin::Pin,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
+    sync::Arc,
     task::{Context, Poll},
 };
 
+use crossbeam_utils::atomic::AtomicCell;
 use futures::{ready, FutureExt};
 use futures_util::{future::BoxFuture, TryFuture};
 use pin_project::pin_project;
@@ -29,6 +27,12 @@ enum ServiceState {
     Ready(OpenToken<fn(usize)>),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RequestError {
+    Backpressure,
+    Failure,
+}
+
 /// A service which estimates load on inner service and
 /// also forces backoff if the inner service is not healthy.
 pub struct HealthService<S, RL> {
@@ -37,10 +41,7 @@ pub struct HealthService<S, RL> {
     logic: RL,
     reactivate_delay: Duration,
     /// Serves as an estimate of load and for notifying about errors.
-    /// 0 - everything is fine
-    /// 1 - check health
-    /// 2 - backoff
-    request_handle: Arc<AtomicUsize>,
+    request_handle: Arc<AtomicCell<Option<RequestError>>>,
     state: ServiceState,
     open: OpenGauge,
 }
@@ -57,7 +58,7 @@ impl<S, RL> HealthService<S, RL> {
             inner,
             reactivate_delay,
             logic,
-            request_handle: Arc::new(AtomicUsize::new(0)),
+            request_handle: Arc::new(AtomicCell::new(None)),
             state: ServiceState::Healthcheck(healthcheck()),
             healthcheck: Box::new(healthcheck) as Box<_>,
             open,
@@ -81,7 +82,7 @@ where
                 ServiceState::Healthcheck(ref mut healthcheck) => {
                     if ready!(healthcheck.as_mut().poll(cx)) {
                         // Clear errors
-                        self.request_handle.store(0, Ordering::Release);
+                        self.request_handle.store(None);
                         ServiceState::Ready(self.open.clone().open(emit_active_endpoints))
                     } else {
                         ServiceState::Backoff {
@@ -99,23 +100,24 @@ where
                         ServiceState::Healthcheck((self.healthcheck)())
                     } else {
                         // Clear errors
-                        self.request_handle.store(0, Ordering::Release);
+                        self.request_handle.store(None);
                         ServiceState::Ready(self.open.clone().open(emit_active_endpoints))
                     }
                 }
                 ServiceState::Ready(_) => {
                     // Check for errors
-                    match self.request_handle.load(Ordering::Acquire) {
+                    match self.request_handle.load() {
                         // No errors
-                        0 => return self.inner.poll_ready(cx).map_err(Into::into),
-                        // Check if the service is healthy
-                        1 => ServiceState::Healthcheck((self.healthcheck)()),
+                        None => return self.inner.poll_ready(cx).map_err(Into::into),
                         // Backoff
-                        2 => ServiceState::Backoff {
+                        Some(RequestError::Backpressure) => ServiceState::Backoff {
                             timer: sleep(self.reactivate_delay).boxed(),
                             healthcheck: false,
                         },
-                        _ => unreachable!(),
+                        // Check if the service is healthy
+                        Some(RequestError::Failure) => {
+                            ServiceState::Healthcheck((self.healthcheck)())
+                        }
                     }
                 }
             }
@@ -147,7 +149,7 @@ pub struct HealthFuture<F, RL> {
     #[pin]
     inner: F,
     logic: RL,
-    request_handle: Arc<AtomicUsize>,
+    request_handle: Arc<AtomicCell<Option<RequestError>>>,
 }
 
 impl<F: TryFuture, RL> Future for HealthFuture<F, RL>
@@ -168,15 +170,12 @@ where
             None => (),
             // Backpressure
             Some(true) => {
-                let _ = this.request_handle.compare_exchange_weak(
-                    0,
-                    2,
-                    Ordering::Release,
-                    Ordering::Relaxed,
-                );
+                let _ = this
+                    .request_handle
+                    .compare_exchange(None, Some(RequestError::Backpressure));
             }
             // Failure
-            Some(false) => this.request_handle.store(1, Ordering::Release),
+            Some(false) => this.request_handle.store(Some(RequestError::Failure)),
         }
 
         Poll::Ready(output)
