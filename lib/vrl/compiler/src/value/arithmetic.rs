@@ -285,7 +285,7 @@ impl VrlValueArithmetic for Value {
     /// Similar to [`std::cmp::Eq`], but does a lossless comparison for integers
     /// and floats.
     fn eq_lossy(&self, rhs: &Self) -> bool {
-        use Value::*;
+        use Value::{Float, Integer};
 
         match self {
             Integer(lhv) => rhs

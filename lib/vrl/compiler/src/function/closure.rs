@@ -115,6 +115,7 @@ pub enum Output {
 }
 
 impl Output {
+    #[must_use]
     pub fn into_kind(self) -> Kind {
         match self {
             Output::Array { elements } => {

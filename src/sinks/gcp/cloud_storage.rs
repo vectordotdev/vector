@@ -21,7 +21,7 @@ use crate::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
     },
     event::Event,
-    gcp::{GcpAuthConfig, GcpCredentials, Scope},
+    gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
     http::HttpClient,
     serde::json::to_string,
     sinks::{
@@ -132,10 +132,7 @@ impl GenerateConfig for GcsSinkConfig {
 #[typetag::serde(name = "gcp_cloud_storage")]
 impl SinkConfig for GcsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let creds = self
-            .auth
-            .make_credentials(Scope::DevStorageReadWrite)
-            .await?;
+        let auth = self.auth.build(Scope::DevStorageReadWrite).await?;
         let base_url = format!("{}{}/", BASE_URL, self.bucket);
         let tls = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls, cx.proxy())?;
@@ -143,9 +140,9 @@ impl SinkConfig for GcsSinkConfig {
             self.bucket.clone(),
             client.clone(),
             base_url.clone(),
-            creds.clone(),
+            auth.clone(),
         )?;
-        let sink = self.build_sink(client, base_url, creds, cx)?;
+        let sink = self.build_sink(client, base_url, auth, cx)?;
 
         Ok((sink, healthcheck))
     }
@@ -168,7 +165,7 @@ impl GcsSinkConfig {
         &self,
         client: HttpClient,
         base_url: String,
-        creds: Option<GcpCredentials>,
+        auth: GcpAuthenticator,
         cx: SinkContext,
     ) -> crate::Result<VectorSink> {
         let request = self.request.unwrap_with(&TowerRequestConfig {
@@ -182,7 +179,7 @@ impl GcsSinkConfig {
 
         let svc = ServiceBuilder::new()
             .settings(request, GcsRetryLogic)
-            .service(GcsService::new(client, base_url, creds));
+            .service(GcsService::new(client, base_url, auth));
 
         let request_settings = RequestSettings::new(self)?;
 
@@ -379,7 +376,12 @@ mod tests {
 
         let config = default_config(StandardEncodings::Json);
         let sink = config
-            .build_sink(client, mock_endpoint.to_string(), None, context)
+            .build_sink(
+                client,
+                mock_endpoint.to_string(),
+                GcpAuthenticator::None,
+                context,
+            )
             .expect("failed to build sink");
 
         let event = Event::from("simple message");

@@ -630,10 +630,9 @@ mod test {
         fn there_is_map_called_empty(event: Event) -> bool {
             event
                 .as_log()
-                .all_fields()
-                .unwrap()
-                .find(|(key, _)| (&key[..]).starts_with("empty"))
-                == None
+                .get("empty")
+                .expect("empty exists")
+                .is_object()
         }
 
         let msg = format!(
@@ -666,7 +665,7 @@ mod test {
         );
 
         let event = event_from_bytes("host", None, msg.into()).unwrap();
-        assert!(!there_is_map_called_empty(event));
+        assert!(there_is_map_called_empty(event));
     }
 
     #[test]
@@ -680,6 +679,17 @@ mod test {
         assert_event_data_eq!(
             event_from_bytes("host", None, raw.to_owned().into()).unwrap(),
             event_from_bytes("host", None, cleaned.to_owned().into()).unwrap()
+        );
+    }
+
+    #[test]
+    fn handles_dots_in_sdata() {
+        let raw =
+            r#"<190>Feb 13 21:31:56 74794bfb6795 liblogging-stdlog:  [origin foo.bar="baz"] hello"#;
+        let event = event_from_bytes("host", None, raw.to_owned().into()).unwrap();
+        assert_eq!(
+            event.as_log().get(r#"origin."foo.bar""#),
+            Some(&Value::from("baz"))
         );
     }
 
@@ -736,8 +746,8 @@ mod test {
             expected.insert("appname", "liblogging-stdlog");
             expected.insert("origin.software", "rsyslogd");
             expected.insert("origin.swVersion", "8.24.0");
-            expected.insert("origin.x-pid", "8979");
-            expected.insert("origin.x-info", "http://www.rsyslog.com");
+            expected.insert(r#"origin."x-pid""#, "8979");
+            expected.insert(r#"origin."x-info""#, "http://www.rsyslog.com");
         }
 
         assert_event_data_eq!(event, expected);
@@ -768,8 +778,8 @@ mod test {
             expected.insert("appname", "liblogging-stdlog");
             expected.insert("origin.software", "rsyslogd");
             expected.insert("origin.swVersion", "8.24.0");
-            expected.insert("origin.x-pid", "9043");
-            expected.insert("origin.x-info", "http://www.rsyslog.com");
+            expected.insert(r#"origin."x-pid""#, "9043");
+            expected.insert(r#"origin."x-info""#, "http://www.rsyslog.com");
         }
 
         assert_event_data_eq!(

@@ -6,7 +6,7 @@ use vector_common::{conversion::Conversion, TimeZone};
 use vrl::{function::Error, prelude::*};
 
 fn to_timestamp(value: Value, unit: Unit) -> Resolved {
-    use Value::*;
+    use Value::{Bytes, Float, Integer, Timestamp};
 
     let value = match value {
         v @ Timestamp(_) => v,
@@ -236,7 +236,7 @@ enum Unit {
 
 impl Unit {
     fn all_value() -> Vec<Value> {
-        use Unit::*;
+        use Unit::{Milliseconds, Nanoseconds, Seconds};
 
         vec![Seconds, Milliseconds, Nanoseconds]
             .into_iter()
@@ -245,7 +245,7 @@ impl Unit {
     }
 
     const fn as_str(self) -> &'static str {
-        use Unit::*;
+        use Unit::{Milliseconds, Nanoseconds, Seconds};
 
         match self {
             Seconds => "seconds",
@@ -265,7 +265,7 @@ impl FromStr for Unit {
     type Err = &'static str;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        use Unit::*;
+        use Unit::{Milliseconds, Nanoseconds, Seconds};
 
         match s {
             "seconds" => Ok(Seconds),
@@ -315,7 +315,7 @@ mod tests {
         let tz = TimeZone::default();
         let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
         let f = ToTimestampFn {
-            value: Box::new(Literal::Integer(9999999999999)),
+            value: Box::new(Literal::Integer(9_999_999_999_999)),
             unit: Unit::default(),
         };
         let string = f.resolve(&mut ctx).err().unwrap().message();
@@ -329,7 +329,7 @@ mod tests {
         let tz = TimeZone::default();
         let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
         let f = ToTimestampFn {
-            value: Box::new(Literal::Float(NotNan::new(9999999999999.9).unwrap())),
+            value: Box::new(Literal::Float(NotNan::new(9_999_999_999_999.9).unwrap())),
             unit: Unit::default(),
         };
         let string = f.resolve(&mut ctx).err().unwrap().message();
@@ -340,49 +340,49 @@ mod tests {
         to_timestamp => ToTimestamp;
 
         integer {
-             args: func_args![value: 1431648000],
+             args: func_args![value: 1_431_648_000],
              want: Ok(chrono::Utc.ymd(2015, 5, 15).and_hms(0, 0, 0)),
              tdef: TypeDef::timestamp().fallible(),
         }
 
         integer_seconds {
-            args: func_args![value: 1609459200i64, unit: "seconds"],
+            args: func_args![value: 1_609_459_200_i64, unit: "seconds"],
             want: Ok(chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0,0,0,0)),
             tdef: TypeDef::timestamp().fallible(),
         }
 
         integer_milliseconds {
-            args: func_args![value: 1609459200000i64, unit: "milliseconds"],
+            args: func_args![value: 1_609_459_200_000_i64, unit: "milliseconds"],
             want: Ok(chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0,0,0,0)),
             tdef: TypeDef::timestamp().fallible(),
         }
 
         integer_nanoseconds {
-            args: func_args![value: 1609459200000000000i64, unit: "nanoseconds"],
+            args: func_args![value: 1_609_459_200_000_000_000_i64, unit: "nanoseconds"],
             want: Ok(chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0,0,0,0)),
             tdef: TypeDef::timestamp().fallible(),
         }
 
         float {
-            args: func_args![value: 1431648000.5],
+            args: func_args![value: 1_431_648_000.5],
             want: Ok(chrono::Utc.ymd(2015, 5, 15).and_hms_milli(0, 0, 0, 500)),
             tdef: TypeDef::timestamp().fallible(),
        }
 
         float_seconds {
-            args: func_args![value: 1609459200.0f64, unit: "seconds"],
+            args: func_args![value: 1_609_459_200.0_f64, unit: "seconds"],
             want: Ok(chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0,0,0,0)),
             tdef: TypeDef::timestamp().fallible(),
         }
 
         float_milliseconds {
-            args: func_args![value: 1609459200000.0f64, unit: "milliseconds"],
+            args: func_args![value: 1_609_459_200_000.0_f64, unit: "milliseconds"],
             want: Ok(chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0,0,0,0)),
             tdef: TypeDef::timestamp().fallible(),
         }
 
         float_nanoseconds {
-            args: func_args![value: 1609459200000000000.0f64, unit: "nanoseconds"],
+            args: func_args![value: 1_609_459_200_000_000_000.0_f64, unit: "nanoseconds"],
             want: Ok(chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0,0,0,0)),
             tdef: TypeDef::timestamp().fallible(),
         }

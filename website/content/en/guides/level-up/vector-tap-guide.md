@@ -117,7 +117,7 @@ message=test1 source_type=demo_logs timestamp=2022-02-22T20:57:02.430987800Z
 
 ### Configuration reloading support
 
-`tap` is compatabile with configuration reloading. In other words, if you add,
+`tap` is compatible with configuration reloading. In other words, if you add,
 remove, or edit existing components in your configuration, `tap` will adapt
 accordingly by re-matching your provided patterns.
 
@@ -197,7 +197,7 @@ Running this configuration, we expect to see our favorite ice cream logs appear
 in `stdout`. Unfortunately, we see nothing at all. The desired events don't look
 like they're ever reaching their destination.
 
-We can verify this by examing the inputs of the `store` sink with `vector tap
+We can verify this by examining the inputs of the `store` sink with `vector tap
 --inputs-of "store"`: indeed, no events appear. We can also narrow in and
 inspect the output of relevant upstream components like our `remap` transform.
 `vector tap --outputs-of "picky"` (which, in this case, is effectively the same
@@ -232,7 +232,7 @@ especially in larger, more complex setups where mistakes are not easy to find
 by simply reading a configuration file.
 
 Ultimately, `vector tap` is one tool in the wide range of Vector features that
-lets you safely and reliably set up your observabillity pipelines. Be sure to
+lets you safely and reliably set up your observability pipelines. Be sure to
 also check out [Vector unit testing] to verify the expected behavior of your
 transforms and [Vector internal observability] for more insight into Vector
 itself.

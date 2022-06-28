@@ -19,10 +19,12 @@ pub struct Block {
 }
 
 impl Block {
+    #[must_use]
     pub fn new(inner: Vec<Expr>, local_env: LocalEnv) -> Self {
         Self { inner, local_env }
     }
 
+    #[must_use]
     pub fn into_inner(self) -> Vec<Expr> {
         self.inner
     }
@@ -54,7 +56,7 @@ impl Expression for Block {
     /// Type information of future expressions in this block should not be considered after
     /// a terminating expression.
     ///
-    /// Since type definitions due to assignments are calculated outside of the "type_def" function,
+    /// Since type definitions due to assignments are calculated outside of the "`type_def`" function,
     /// assignments that can never execute might still have adjusted the type definition.
     /// Therefore, expressions after a terminating expression must not be included in a block.
     /// It is considered an internal compiler error if this situation occurs, which is checked here
@@ -67,9 +69,7 @@ impl Expression for Block {
         let mut fallible = false;
         let mut has_terminated = false;
         for expr in &self.inner {
-            if has_terminated {
-                panic!("VRL block contains an expression after a terminating expression. This is an internal compiler error. Please submit a bug report.");
-            }
+            assert!(!has_terminated, "VRL block contains an expression after a terminating expression. This is an internal compiler error. Please submit a bug report.");
             last = expr.type_def((&self.local_env, external));
             if last.is_never() {
                 has_terminated = true;

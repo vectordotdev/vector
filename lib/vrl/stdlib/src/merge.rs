@@ -79,7 +79,7 @@ impl Expression for MergeFn {
     }
 }
 
-/// Merges two BTreeMaps of Symbol’s value as variable is void: Values. The
+/// Merges two `BTreeMaps` of Symbol’s value as variable is void: Values. The
 /// second map is merged into the first one.
 ///
 /// If Symbol’s value as variable is void: deep is true, only the top level
