@@ -77,7 +77,7 @@ impl Condition {
 
 /// An event matching condition.
 ///
-/// Many methods exist for matching for matching events, such as using a VRL expression, a Datadog Search query string,
+/// Many methods exist for matching events, such as using a VRL expression, a Datadog Search query string,
 /// or hard-coded matchers like "must be a metric" or "fields A, B, and C must match these constraints".
 ///
 /// They can specified with an enum-style notation:
