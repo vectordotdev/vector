@@ -1,3 +1,6 @@
+#[allow(unused_imports)]
+use std::collections::HashSet;
+
 use async_trait::async_trait;
 use snafu::Snafu;
 
@@ -341,6 +344,44 @@ impl TransformConfig for Transforms {
             Transforms::TagCardinalityLimit(inner) => inner.typetag_deserialize(),
             #[cfg(feature = "transforms-throttle")]
             Transforms::Throttle(inner) => inner.typetag_deserialize(),
+            #[allow(unreachable_patterns)]
+            _ => unimplemented!(),
+        }
+    }
+
+    #[allow(unused_variables)]
+    fn nestable(&self, parents: &HashSet<&'static str>) -> bool {
+        match self {
+            #[cfg(feature = "transforms-aggregate")]
+            Transforms::Aggregate(inner) => inner.nestable(parents),
+            #[cfg(feature = "transforms-aws_ec2_metadata")]
+            Transforms::AwsEc2Metadata(inner) => inner.nestable(parents),
+            #[cfg(feature = "transforms-dedupe")]
+            Transforms::Dedupe(inner) => inner.nestable(parents),
+            #[cfg(feature = "transforms-filter")]
+            Transforms::Filter(inner) => inner.nestable(parents),
+            #[cfg(feature = "transforms-geoip")]
+            Transforms::Geoip(inner) => inner.nestable(parents),
+            #[cfg(feature = "transforms-log_to_metric")]
+            Transforms::LogToMetric(inner) => inner.nestable(parents),
+            #[cfg(feature = "transforms-lua")]
+            Transforms::Lua(inner) => inner.nestable(parents),
+            #[cfg(feature = "transforms-metric_to_log")]
+            Transforms::MetricToLog(inner) => inner.nestable(parents),
+            #[cfg(feature = "transforms-pipelines")]
+            Transforms::Pipelines(inner) => inner.nestable(parents),
+            #[cfg(feature = "transforms-reduce")]
+            Transforms::Reduce(inner) => inner.nestable(parents),
+            #[cfg(feature = "transforms-remap")]
+            Transforms::Remap(inner) => inner.nestable(parents),
+            #[cfg(feature = "transforms-route")]
+            Transforms::Route(inner) => inner.nestable(parents),
+            #[cfg(feature = "transforms-sample")]
+            Transforms::Sample(inner) => inner.nestable(parents),
+            #[cfg(feature = "transforms-tag_cardinality_limit")]
+            Transforms::TagCardinalityLimit(inner) => inner.nestable(parents),
+            #[cfg(feature = "transforms-throttle")]
+            Transforms::Throttle(inner) => inner.nestable(parents),
             #[allow(unreachable_patterns)]
             _ => unimplemented!(),
         }

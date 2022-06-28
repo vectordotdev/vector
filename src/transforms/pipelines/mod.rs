@@ -237,8 +237,8 @@ impl TransformConfig for PipelinesConfig {
         "pipelines"
     }
 
-    /// The pipelines transform shouldn't be embedded in another pipelines transform.
     fn nestable(&self, parents: &HashSet<&'static str>) -> bool {
+        // The pipelines transform shouldn't be embedded in another pipelines transform.
         !parents.contains(&self.transform_type())
     }
 }
