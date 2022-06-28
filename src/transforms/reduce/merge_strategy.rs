@@ -18,6 +18,7 @@ pub enum MergeStrategy {
     Array,
     Concat,
     ConcatNewline,
+    ConcatRaw,
     ShortestArray,
     LongestArray,
     FlatUnique,
@@ -80,11 +81,14 @@ impl ReduceValueMerger for RetainMerger {
 #[derive(Debug, Clone)]
 struct ConcatMerger {
     v: BytesMut,
-    join_by: char,
+    join_by: Option<Vec<u8>>,
 }
 
 impl ConcatMerger {
-    fn new(v: Bytes, join_by: char) -> Self {
+    fn new(v: Bytes, join_by: Option<char>) -> Self {
+        // We need to get the resulting bytes for this character in case it's actually a multi-byte character.
+        let join_by = join_by.map(|c| c.to_string().into_bytes());
+
         Self {
             v: BytesMut::from(&v[..]),
             join_by,
@@ -95,7 +99,9 @@ impl ConcatMerger {
 impl ReduceValueMerger for ConcatMerger {
     fn add(&mut self, v: Value) -> Result<(), String> {
         if let Value::Bytes(b) = v {
-            self.v.extend(&[self.join_by as u8]);
+            if let Some(buf) = self.join_by.as_ref() {
+                self.v.extend(&buf[..]);
+            }
             self.v.extend_from_slice(&b);
             Ok(())
         } else {
@@ -559,7 +565,7 @@ pub(crate) fn get_value_merger(
             )),
         },
         MergeStrategy::Concat => match v {
-            Value::Bytes(b) => Ok(Box::new(ConcatMerger::new(b, ' '))),
+            Value::Bytes(b) => Ok(Box::new(ConcatMerger::new(b, Some(' ')))),
             Value::Array(a) => Ok(Box::new(ConcatArrayMerger::new(a))),
             _ => Err(format!(
                 "expected string or array value, found: '{}'",
@@ -567,7 +573,14 @@ pub(crate) fn get_value_merger(
             )),
         },
         MergeStrategy::ConcatNewline => match v {
-            Value::Bytes(b) => Ok(Box::new(ConcatMerger::new(b, '\n'))),
+            Value::Bytes(b) => Ok(Box::new(ConcatMerger::new(b, Some('\n')))),
+            _ => Err(format!(
+                "expected string value, found: '{}'",
+                v.to_string_lossy()
+            )),
+        },
+        MergeStrategy::ConcatRaw => match v {
+            Value::Bytes(b) => Ok(Box::new(ConcatMerger::new(b, None))),
             _ => Err(format!(
                 "expected string value, found: '{}'",
                 v.to_string_lossy()
@@ -612,6 +625,8 @@ mod test {
         assert!(get_value_merger("foo".into(), &MergeStrategy::LongestArray).is_err());
         assert!(get_value_merger("foo".into(), &MergeStrategy::ShortestArray).is_err());
         assert!(get_value_merger("foo".into(), &MergeStrategy::Concat).is_ok());
+        assert!(get_value_merger("foo".into(), &MergeStrategy::ConcatNewline).is_ok());
+        assert!(get_value_merger("foo".into(), &MergeStrategy::ConcatRaw).is_ok());
         assert!(get_value_merger("foo".into(), &MergeStrategy::FlatUnique).is_ok());
 
         assert!(get_value_merger(42.into(), &MergeStrategy::Discard).is_ok());
@@ -624,6 +639,7 @@ mod test {
         assert!(get_value_merger(42.into(), &MergeStrategy::ShortestArray).is_err());
         assert!(get_value_merger(42.into(), &MergeStrategy::Concat).is_err());
         assert!(get_value_merger(42.into(), &MergeStrategy::ConcatNewline).is_err());
+        assert!(get_value_merger(42.into(), &MergeStrategy::ConcatRaw).is_err());
         assert!(get_value_merger(42.into(), &MergeStrategy::FlatUnique).is_ok());
 
         assert!(get_value_merger(42.into(), &MergeStrategy::Discard).is_ok());
@@ -636,6 +652,7 @@ mod test {
         assert!(get_value_merger(4.2.into(), &MergeStrategy::ShortestArray).is_err());
         assert!(get_value_merger(4.2.into(), &MergeStrategy::Concat).is_err());
         assert!(get_value_merger(4.2.into(), &MergeStrategy::ConcatNewline).is_err());
+        assert!(get_value_merger(4.2.into(), &MergeStrategy::ConcatRaw).is_err());
         assert!(get_value_merger(4.2.into(), &MergeStrategy::FlatUnique).is_ok());
 
         assert!(get_value_merger(true.into(), &MergeStrategy::Discard).is_ok());
@@ -648,6 +665,7 @@ mod test {
         assert!(get_value_merger(true.into(), &MergeStrategy::ShortestArray).is_err());
         assert!(get_value_merger(true.into(), &MergeStrategy::Concat).is_err());
         assert!(get_value_merger(true.into(), &MergeStrategy::ConcatNewline).is_err());
+        assert!(get_value_merger(true.into(), &MergeStrategy::ConcatRaw).is_err());
         assert!(get_value_merger(true.into(), &MergeStrategy::FlatUnique).is_ok());
 
         assert!(get_value_merger(Utc::now().into(), &MergeStrategy::Discard).is_ok());
@@ -660,6 +678,7 @@ mod test {
         assert!(get_value_merger(Utc::now().into(), &MergeStrategy::ShortestArray).is_err());
         assert!(get_value_merger(Utc::now().into(), &MergeStrategy::Concat).is_err());
         assert!(get_value_merger(Utc::now().into(), &MergeStrategy::ConcatNewline).is_err());
+        assert!(get_value_merger(Utc::now().into(), &MergeStrategy::ConcatRaw).is_err());
         assert!(get_value_merger(Utc::now().into(), &MergeStrategy::Discard).is_ok());
         assert!(get_value_merger(Utc::now().into(), &MergeStrategy::FlatUnique).is_ok());
 
@@ -673,6 +692,7 @@ mod test {
         assert!(get_value_merger(json!([]).into(), &MergeStrategy::ShortestArray).is_ok());
         assert!(get_value_merger(json!([]).into(), &MergeStrategy::Concat).is_ok());
         assert!(get_value_merger(json!([]).into(), &MergeStrategy::ConcatNewline).is_err());
+        assert!(get_value_merger(json!([]).into(), &MergeStrategy::ConcatRaw).is_err());
         assert!(get_value_merger(json!([]).into(), &MergeStrategy::FlatUnique).is_ok());
 
         assert!(get_value_merger(json!({}).into(), &MergeStrategy::Discard).is_ok());
@@ -685,6 +705,7 @@ mod test {
         assert!(get_value_merger(json!({}).into(), &MergeStrategy::ShortestArray).is_err());
         assert!(get_value_merger(json!({}).into(), &MergeStrategy::Concat).is_err());
         assert!(get_value_merger(json!({}).into(), &MergeStrategy::ConcatNewline).is_err());
+        assert!(get_value_merger(json!({}).into(), &MergeStrategy::ConcatRaw).is_err());
         assert!(get_value_merger(json!({}).into(), &MergeStrategy::FlatUnique).is_ok());
 
         assert!(get_value_merger(json!(null).into(), &MergeStrategy::Discard).is_ok());
@@ -697,6 +718,7 @@ mod test {
         assert!(get_value_merger(json!(null).into(), &MergeStrategy::ShortestArray).is_err());
         assert!(get_value_merger(json!(null).into(), &MergeStrategy::Concat).is_err());
         assert!(get_value_merger(json!(null).into(), &MergeStrategy::ConcatNewline).is_err());
+        assert!(get_value_merger(json!(null).into(), &MergeStrategy::ConcatRaw).is_err());
         assert!(get_value_merger(json!(null).into(), &MergeStrategy::FlatUnique).is_ok());
     }
 
@@ -717,6 +739,14 @@ mod test {
         assert_eq!(
             merge("foo".into(), "bar".into(), &MergeStrategy::Concat),
             Ok("foo bar".into())
+        );
+        assert_eq!(
+            merge("foo".into(), "bar".into(), &MergeStrategy::ConcatNewline),
+            Ok("foo\nbar".into())
+        );
+        assert_eq!(
+            merge("foo".into(), "bar".into(), &MergeStrategy::ConcatRaw),
+            Ok("foobar".into())
         );
         assert!(merge("foo".into(), 42.into(), &MergeStrategy::Concat).is_err());
         assert!(merge("foo".into(), 4.2.into(), &MergeStrategy::Concat).is_err());

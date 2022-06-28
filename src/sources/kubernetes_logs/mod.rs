@@ -60,6 +60,7 @@ mod util;
 
 use self::namespace_metadata_annotator::NamespaceMetadataAnnotator;
 use self::node_metadata_annotator::NodeMetadataAnnotator;
+use self::parser::Parser;
 use self::pod_metadata_annotator::PodMetadataAnnotator;
 use futures::{future::FutureExt, stream::StreamExt};
 use k8s_paths_provider::K8sPathsProvider;
@@ -236,7 +237,6 @@ struct Source {
     fingerprint_lines: usize,
     glob_minimum_cooldown: Duration,
     ingestion_timestamp_field: Option<String>,
-    timezone: TimeZone,
     delay_deletion: Duration,
 }
 
@@ -281,7 +281,6 @@ impl Source {
         let client = Client::try_from(client_config)?;
 
         let data_dir = globals.resolve_and_make_data_subdir(config.data_dir.as_ref(), key.id())?;
-        let timezone = config.timezone.unwrap_or(globals.timezone);
 
         let exclude_paths = prepare_exclude_paths(config)?;
 
@@ -315,7 +314,6 @@ impl Source {
             fingerprint_lines: config.fingerprint_lines,
             glob_minimum_cooldown,
             ingestion_timestamp_field: config.ingestion_timestamp_field.clone(),
-            timezone,
             delay_deletion,
         })
     }
@@ -343,7 +341,6 @@ impl Source {
             fingerprint_lines,
             glob_minimum_cooldown,
             ingestion_timestamp_field,
-            timezone,
             delay_deletion,
         } = self;
 
@@ -469,7 +466,7 @@ impl Source {
 
         let (file_source_tx, file_source_rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
 
-        let mut parser = parser::build(timezone);
+        let mut parser = Parser::new();
         let partial_events_merger = Box::new(partial_events_merger::build(auto_partial_merge));
 
         let checkpoints = checkpointer.view();

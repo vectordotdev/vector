@@ -64,6 +64,7 @@ components: sinks: gcp_stackdriver_metrics: {
 	}
 
 	configuration: {
+		api_key: configuration._gcp_api_key
 		credentials_path: {
 			common:      true
 			description: "The filename for a Google Cloud service account credentials JSON file used to authenticate access to the Stackdriver Logging API. If this is unset, Vector checks the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename.\n\nIf no filename is named, Vector will attempt to fetch an instance service account for the compute instance the program is running on. If Vector is not running on a GCE instance, you must define a credentials file as above."

@@ -3,8 +3,7 @@
 
 mod test_enrichment;
 
-use std::str::FromStr;
-use std::time::Instant;
+use std::{str::FromStr, time::Instant};
 
 use ::value::Value;
 use ansi_term::Colour;
@@ -14,9 +13,11 @@ use clap::Parser;
 use glob::glob;
 use value::Secrets;
 use vector_common::TimeZone;
-use vrl::prelude::{BTreeMap, VrlValueConvert};
-use vrl::{diagnostic::Formatter, state, Runtime, SecretTarget, Terminate};
-use vrl::{TargetValueRef, VrlRuntime};
+use vrl::{
+    diagnostic::Formatter,
+    prelude::{BTreeMap, VrlValueConvert},
+    state, Runtime, SecretTarget, TargetValueRef, Terminate, VrlRuntime,
+};
 use vrl_tests::{docs, Test};
 
 #[cfg(not(target_env = "msvc"))]

@@ -535,8 +535,8 @@ components: {
 		// `warnings` describes any warnings the user should know about the
 		// component.
 		//
-		// For example, the `grok_parser` might offer a performance warning
-		// since the `regex_parser` and other transforms are faster.
+		// For example, a transform might be known to have performance issues
+		// or a lack of support for specific features, etc.
 		warnings: [...string] | null // Allow for empty list
 
 		// `notices` communicates useful information to the user that is neither

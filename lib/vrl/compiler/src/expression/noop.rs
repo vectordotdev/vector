@@ -8,7 +8,7 @@ use crate::{
     Context, Expression, TypeDef,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Noop;
 
 impl Expression for Noop {
