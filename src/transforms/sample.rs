@@ -172,7 +172,7 @@ mod tests {
     use crate::{
         conditions::{Condition, ConditionalConfig, VrlConfig},
         config::log_schema,
-        event::Event,
+        event::{Event, LogEvent},
         test_util::random_lines,
         transforms::test::transform_one,
     };
@@ -267,7 +267,7 @@ mod tests {
     #[test]
     fn always_passes_events_matching_pass_list() {
         for key_field in &[None, Some(log_schema().message_key().into())] {
-            let event = Event::from("i am important");
+            let event = Event::Log(LogEvent::from("i am important"));
             let mut sampler = Sample::new(
                 0,
                 key_field.clone(),
@@ -287,7 +287,7 @@ mod tests {
     #[test]
     fn handles_key_field() {
         for key_field in &[None, Some("other_field".into())] {
-            let mut event = Event::from("nananana");
+            let mut event = Event::Log(LogEvent::from("nananana"));
             let log = event.as_mut_log();
             log.insert("other_field", "foo");
             let mut sampler = Sample::new(
@@ -349,7 +349,7 @@ mod tests {
                 key_field.clone(),
                 Some(condition_contains(log_schema().message_key(), "na")),
             );
-            let event = Event::from("nananana");
+            let event = Event::Log(LogEvent::from("nananana"));
             let passing = transform_one(&mut sampler, event).unwrap();
             assert!(passing.as_log().get("sample_rate").is_none());
         }

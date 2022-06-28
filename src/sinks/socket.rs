@@ -144,7 +144,7 @@ mod test {
     use super::*;
     use crate::{
         config::SinkContext,
-        event::Event,
+        event::{Event, LogEvent},
         test_util::{
             components::{run_and_assert_sink_compliance, SINK_TAGS},
             next_addr, next_addr_v6, random_lines_with_stream, trace_init, CountReceiver,
@@ -169,7 +169,7 @@ mod test {
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
 
-        let event = Event::from("raw log line");
+        let event = Event::Log(LogEvent::from("raw log line"));
         run_and_assert_sink_compliance(sink, stream::once(ready(event)), &SINK_TAGS).await;
 
         let mut buf = [0; 256];

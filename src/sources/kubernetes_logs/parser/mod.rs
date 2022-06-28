@@ -99,10 +99,10 @@ mod tests {
         let cases = vec!["", "qwe", "{"];
 
         for message in cases {
-            let input = Event::from(message);
+            let input = LogEvent::from(message);
             let mut parser = Parser::new();
             let mut output = OutputBuffer::default();
-            parser.transform(&mut output, input);
+            parser.transform(&mut output, input.into());
             assert!(output.is_empty(), "Expected no events: {:?}", output);
         }
     }
