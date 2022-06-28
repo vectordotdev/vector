@@ -458,6 +458,13 @@ jobs:
         with:
           name: vector-${{ env.VECTOR_VERSION }}-1.armv7.rpm
           path: target/artifacts
+      - name: Setup upterm session
+        uses: lhotari/action-upterm@v1
+        env:
+          AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
+          AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
+        with:
+          limit-access-to-users: jszwedko
       - env:
           AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
           AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
