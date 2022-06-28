@@ -1,9 +1,11 @@
+use std::borrow::Cow;
 use std::{convert::TryFrom, fmt};
 
 use diagnostic::{DiagnosticMessage, Label, Note};
 use lookup::{Lookup, LookupBuf, Segment};
 use value::{Kind, Value};
 
+use crate::expression::assignment::ErrorVariant::InvalidParentPathSegment;
 use crate::{
     expression::{Expr, Resolved},
     parser::{
@@ -227,8 +229,7 @@ fn verify_overwriteable(
         Target::Noop => Kind::any(),
         Target::Internal(ident, _) => local
             .variable(ident)
-            .map(|detail| detail.type_def.kind().clone())
-            .unwrap_or_else(Kind::any),
+            .map_or_else(Kind::any, |detail| detail.type_def.kind().clone()),
         Target::External(_) => external.target_kind().clone(),
     };
 
@@ -243,11 +244,10 @@ fn verify_overwriteable(
             .find_at_path(&path)
             .ok()
             .flatten()
-            .map(|kind| kind.into_owned())
-            .unwrap_or_else(Kind::any);
+            .map_or_else(Kind::any, Cow::into_owned);
 
         let (variant, segment_span, valid) = match last {
-            segment @ Segment::Field(_) | segment @ Segment::Coalesce(_) => {
+            segment @ (Segment::Field(_) | Segment::Coalesce(_)) => {
                 let segment_str = segment.to_string();
                 let segment_start = parent_span.end() - segment_str.len();
                 let segment_span = Span::new(segment_start, parent_span.end());
@@ -285,7 +285,7 @@ fn verify_overwriteable(
         };
 
         return Err(Error {
-            variant: ErrorVariant::InvalidParentPathSegment {
+            variant: InvalidParentPathSegment {
                 variant,
                 parent_kind,
                 parent_span,
