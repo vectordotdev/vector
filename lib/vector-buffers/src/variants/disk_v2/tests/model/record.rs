@@ -30,7 +30,7 @@ impl fmt::Display for DecodeError {
 
 impl error::Error for DecodeError {}
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Eq)]
 pub struct Record {
     id: u32,
     size: u32,
@@ -54,6 +54,12 @@ impl Record {
 
     pub const fn len(&self) -> usize {
         Self::header_len() + self.size as usize
+    }
+}
+
+impl PartialEq for Record {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id && self.size == other.size && self.event_count == other.event_count
     }
 }
 
