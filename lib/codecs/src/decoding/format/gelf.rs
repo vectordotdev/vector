@@ -3,7 +3,6 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use lookup::path;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use smallvec::{smallvec, SmallVec};
 use std::collections::HashMap;
 use value::Kind;
@@ -15,13 +14,19 @@ use vector_core::{
 
 use super::Deserializer;
 
+/// On GELF decoding behavior:
+///   Graylog has a relaxed decoding. They are much more lenient than the spec would
+///   suggest. We've elected to take a more strict approach to maintain backwards compatability
+///   in the event that we need to change the behavior to be more relaxed, so that prior versions
+///   of vector will still work with the new relaxed decoding.
+
 /// GELF Message fields. Definitions from https://docs.graylog.org/docs/gelf
 pub mod gelf_fields {
 
     /// <not a field> The latest version of the GELF specificaiton.
     pub const GELF_VERSION: &str = "1.1";
 
-    /// (required) GELF spec version – “1.1”.
+    /// (required) GELF spec version
     pub const VERSION: &str = "version";
 
     /// (required) The name of the host, source or application that sent this message.
@@ -82,7 +87,6 @@ impl GelfDeserializerConfig {
             // Allowed characters in field names are any word character (letter, number, underscore), dashes and dots.
             // Libraries SHOULD not allow to send id as additional field ( _id). Graylog server nodes omit this field automatically.
             .unknown_fields(Kind::bytes())
-        //
     }
 }
 
@@ -103,136 +107,98 @@ impl GelfDeserializer {
     /// Create a new GelfDeserializer
     pub fn new() -> GelfDeserializer {
         GelfDeserializer {
-            regex: Regex::new(r"^[\w\.\-]*$").unwrap(),
-        }
-    }
-
-    /// Returns a UTC DateTime from a numeric Value.
-    fn parse_timestamp(&self, val: &Value) -> DateTime<Utc> {
-        let mut secs = 0;
-        let mut nsecs = 0;
-        if val.is_f64() {
-            let val = val.as_f64().unwrap();
-            secs = f64::trunc(val) as i64;
-            nsecs = f64::fract(val) as u32;
-        } else if val.is_i64() {
-            secs = val.as_i64().unwrap();
-        } else if val.is_u64() {
-            secs = val.as_u64().unwrap() as i64;
-        }
-        let naive = NaiveDateTime::from_timestamp(secs, nsecs);
-        DateTime::<Utc>::from_utc(naive, Utc)
-    }
-
-    /// Attemps to parse an integer from a Value.
-    fn parse_number(&self, val: &Value) -> vector_core::Result<i64> {
-        if val.is_number() {
-            let mut number = 0;
-            if val.is_f64() {
-                number = f64::round(val.as_f64().unwrap()) as i64;
-            } else if val.is_u64() {
-                number = val.as_u64().unwrap() as i64;
-            } else if val.is_i64() {
-                number = val.as_i64().unwrap();
-            }
-            Ok(number)
-        } else if val.is_string() {
-            let val = val.as_str().unwrap();
-            val.parse::<i64>()
-                .or_else(|_| val.parse::<f64>().map(|number| number.round() as i64))
-                .map_err(|_| {
-                    format!(
-                        "Event field {} does not match GELF spec version {}: must be a number",
-                        VERSION, GELF_VERSION
-                    )
-                    .into()
-                })
-        } else {
-            Err(format!(
-                "Event field {} does not match GELF spec version {}: must be a number",
-                VERSION, GELF_VERSION
-            )
-            .into())
+            regex: Regex::new(r"^_[\w\.\-]*$").unwrap(),
         }
     }
 
     /// Builds a LogEvent from the parsed GelfMessage.
-    /// The logic does not follow strictly the documented GELF standard, it more closely
-    /// follows the behavior of graylog itself, which is more relaxed.
+    /// The logic follows strictly the documented GELF standard.
     fn message_to_event(&self, parsed: &GelfMessage) -> vector_core::Result<Event> {
-        let message = match (&parsed.short_message, &parsed.message) {
-            (Some(message), _) | (_, Some(message)) => message,
-            _ => {
-                return Err("Event must contain the field 'short_message'".into());
-            }
-        };
-        let mut event = Event::from(message.to_string());
+        let mut event = Event::from(parsed.short_message.to_string());
         let log = event.as_mut_log();
 
         // GELF spec defines the version as 1.1 which has not changed since 2013
-        // But graylog server does not reject any event which does not specify a version,
-        // has a mismatched version, or the version is not the expected type. Thus ignoring.
-
-        if let Some(host) = &parsed.host {
-            log.insert(HOST, host.to_string());
-        }
-        // TODO graylog sets field 'host' to client IP address if not specified in input.
-        // https://github.com/vectordotdev/vector/issues/13323
-
-        let timestamp_key = log_schema().timestamp_key();
-
-        // if the timestamp is not numeric, we set it to current UTC later
-        if let Some(timestamp) = &parsed.timestamp {
-            if timestamp.is_number() {
-                log.insert(timestamp_key, self.parse_timestamp(timestamp));
-            }
+        if parsed.version != GELF_VERSION {
+            return Err(format!(
+                "{} does not match GELF spec version ({})",
+                VERSION, GELF_VERSION
+            )
+            .into());
         }
 
-        if let Some(line) = &parsed.line {
-            log.insert(LINE, self.parse_number(line)?);
-        }
-        if let Some(level) = &parsed.level {
-            log.insert(LEVEL, self.parse_number(level)?);
+        log.insert(VERSION, parsed.version.to_string());
+        log.insert(HOST, parsed.host.to_string());
+
+        if let Some(full_message) = &parsed.full_message {
+            log.insert(FULL_MESSAGE, full_message.to_string());
         }
 
-        // FACILITY, FILE, FULL_MESSAGE can be any type and are optional
+        if let Some(timestamp) = parsed.timestamp {
+            let naive = NaiveDateTime::from_timestamp(
+                f64::trunc(timestamp) as i64,
+                f64::fract(timestamp) as u32,
+            );
+            log.insert(
+                log_schema().timestamp_key(),
+                DateTime::<Utc>::from_utc(naive, Utc),
+            );
+        // per GELF spec- add timestamp if not provided
+        } else {
+            log.insert(log_schema().timestamp_key(), Utc::now());
+        }
+
+        if let Some(level) = parsed.level {
+            log.insert(LEVEL, level);
+        }
+        if let Some(facility) = &parsed.facility {
+            log.insert(FACILITY, facility.to_string());
+        }
+        if let Some(line) = parsed.line {
+            log.insert(
+                LINE,
+                value::Value::Float(ordered_float::NotNan::new(line).unwrap()),
+            );
+        }
+        if let Some(file) = &parsed.file {
+            log.insert(FILE, file.to_string());
+        }
 
         if let Some(add) = &parsed.additional_fields {
             for (key, val) in add.iter() {
-                // Additional field names must be characters dashes or dots.
-                // Drop fields names that contain offending characters.
-                if !self.regex.is_match(key) {
+                // per GELF spec, filter out _id
+                if key == "_id" {
                     continue;
+                }
+                // per GELF spec, Additional field names must be characters dashes or dots
+                if !self.regex.is_match(key) {
+                    if key.starts_with('_') {
+                        return Err(format!("'{}' field is invalid. \
+                                           Additional field names must be prefixed with an underscore.", key).into());
+                    } else {
+                        return Err(format!("'{}' field contains invalid characters. Field names may \
+                                           contain only letters, numbers, underscores, dashes and dots.", key).into());
+                    }
                 }
 
                 let vector_val: value::Value = val.into();
-
-                // trim the leading underscore prefix if present
-                if let Some(stripped) = key.strip_prefix('_') {
-                    log.insert(path!(stripped), vector_val);
-                } else {
-                    log.insert(path!(key.as_str()), vector_val);
-                }
+                log.insert(path!(key.as_str()), vector_val);
             }
         }
-
-        // add a timestamp if not present
-        if !log.contains(timestamp_key) {
-            log.insert(timestamp_key, Utc::now());
-        }
-
         Ok(event)
     }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 struct GelfMessage {
-    host: Option<String>,
-    short_message: Option<String>,
-    message: Option<String>,
-    timestamp: Option<serde_json::Value>,
-    line: Option<serde_json::Value>,
-    level: Option<serde_json::Value>,
+    version: String,
+    host: String,
+    short_message: String,
+    full_message: Option<String>,
+    timestamp: Option<f64>,
+    level: Option<u8>,
+    facility: Option<String>,
+    line: Option<f64>,
+    file: Option<String>,
     #[serde(flatten)]
     additional_fields: Option<HashMap<String, serde_json::Value>>,
 }
@@ -327,19 +293,22 @@ mod tests {
             log.get(FACILITY),
             Some(&Value::Bytes(Bytes::from_static(b"foo")))
         );
-        assert_eq!(log.get(LINE), Some(&Value::Integer(42)));
+        assert_eq!(
+            log.get(LINE),
+            Some(&Value::Float(ordered_float::NotNan::new(42.0).unwrap()))
+        );
         assert_eq!(
             log.get(FILE),
             Some(&Value::Bytes(Bytes::from_static(b"/tmp/bar")))
         );
         assert_eq!(
-            log.get(path!(&add_on_int_in[1..])),
+            log.get(path!(add_on_int_in)),
             Some(&Value::Float(
                 ordered_float::NotNan::new(2001.1002).unwrap()
             ))
         );
         assert_eq!(
-            log.get(path!(&add_on_str_in[1..])),
+            log.get(path!(add_on_str_in)),
             Some(&Value::Bytes(Bytes::from_static(b"A Space Odyssey")))
         );
     }
@@ -347,65 +316,31 @@ mod tests {
     /// Validates deserializiation succeeds for edge case inputs.
     #[test]
     fn gelf_deserializing_edge_cases() {
-        // host is not specified
+        // timestamp is set if omitted from input
         {
             let input = json!({
+                HOST: "example.org",
                 SHORT_MESSAGE: "foobar",
-            });
-            assert!(deserialize_gelf_input(&input).is_ok());
-        }
-
-        //  message set instead of short_message
-        {
-            let input = json!({
-                "message": "foobar",
-            });
-            assert!(deserialize_gelf_input(&input).is_ok());
-        }
-
-        //  timestamp is wrong type
-        {
-            let input = json!({
-                "message": "foobar",
-                TIMESTAMP: "hammer time",
-            });
-            assert!(deserialize_gelf_input(&input).is_ok());
-        }
-
-        //  level / line
-        {
-            let input = json!({
-                "message": "foobar",
-                LINE: "-1",
-            });
-            assert!(deserialize_gelf_input(&input).is_ok());
-        }
-        {
-            let input = json!({
-                "message": "foobar",
-                LEVEL: "4.2",
-            });
-            assert!(deserialize_gelf_input(&input).is_ok());
-        }
-        {
-            let input = json!({
-                "message": "foobar",
-                LEVEL: 4.2,
-            });
-            assert!(deserialize_gelf_input(&input).is_ok());
-        }
-
-        //  invalid character in field name - field is dropped
-        {
-            let bad_key = "_invalid$field%name";
-            let input = json!({
-                "message": "foobar",
-                bad_key: "drop_me",
+                VERSION: "1.1",
             });
             let events = deserialize_gelf_input(&input).unwrap();
             assert_eq!(events.len(), 1);
             let log = events[0].as_log();
-            assert!(!log.contains(bad_key));
+            assert!(log.contains(log_schema().message_key()));
+        }
+
+        // filter out id
+        {
+            let input = json!({
+                HOST: "example.org",
+                SHORT_MESSAGE: "foobar",
+                VERSION: "1.1",
+                "_id": "S3creTz",
+            });
+            let events = deserialize_gelf_input(&input).unwrap();
+            assert_eq!(events.len(), 1);
+            let log = events[0].as_log();
+            assert!(!log.contains("_id"));
         }
     }
 
@@ -415,20 +350,45 @@ mod tests {
         fn validate_err(input: &serde_json::Value) {
             assert!(deserialize_gelf_input(input).is_err());
         }
+        //  invalid character in field name
+        validate_err(&json!({
+            HOST: "example.org",
+            SHORT_MESSAGE: "foobar",
+            VERSION: "1.1",
+            "_bad%key": "raboof",
+        }));
+
+        //  not prefixed with underscore
+        validate_err(&json!({
+            HOST: "example.org",
+            SHORT_MESSAGE: "foobar",
+            VERSION: "1.1",
+            "bad-key": "raboof",
+        }));
+
+        // missing short_message
+        validate_err(&json!({
+            HOST: "example.org",
+            VERSION: "1.1",
+        }));
+
+        // host is not specified
+        validate_err(&json!({
+            SHORT_MESSAGE: "foobar",
+            VERSION: "1.1",
+        }));
 
         // host is not a string
         validate_err(&json!({
             HOST: 42,
             SHORT_MESSAGE: "foobar",
-        }));
-
-        // missing message and short_message
-        validate_err(&json!({
-            HOST: "example.org",
+            VERSION: "1.1",
         }));
 
         //  level / line is string and not numeric
         validate_err(&json!({
+            HOST: "example.org",
+            VERSION: "1.1",
             SHORT_MESSAGE: "foobar",
             LEVEL: "baz",
         }));
