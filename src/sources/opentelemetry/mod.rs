@@ -1,8 +1,8 @@
 mod log;
 
 use crate::config::SourceDescription;
-use log::OpentelemetryLogConfig;
+use log::OpentelemetryConfig;
 
 inventory::submit! {
-    SourceDescription::new::<OpentelemetryLogConfig>("opentelemetry")
+    SourceDescription::new::<OpentelemetryConfig>("opentelemetry")
 }

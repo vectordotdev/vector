@@ -22,22 +22,31 @@ use vector_core::{
     ByteSizeOf,
 };
 
+pub const LOGS: &str = "logs";
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct OpentelemetryLogConfig {
+pub struct OpentelemetryConfig {
     address: SocketAddr,
     #[serde(default)]
     tls: Option<TlsEnableableConfig>,
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
+    /// If this setting is set to `true` logs, metrics and traces will be sent to different outputs.
+    ///
+    /// For a source component named `agent` the received logs, metrics, and traces can then be accessed by specifying
+    /// `agent.logs`, `agent.metrics`, and `agent.traces`, respectively, as the input to another component.
+    #[serde(default = "crate::serde::default_false")]
+    multiple_outputs: bool,
 }
 
-impl GenerateConfig for OpentelemetryLogConfig {
+impl GenerateConfig for OpentelemetryConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             address: "0.0.0.0:6788".parse().unwrap(),
             tls: None,
             acknowledgements: Default::default(),
+            multiple_outputs: false,
         })
         .unwrap()
     }
@@ -45,7 +54,7 @@ impl GenerateConfig for OpentelemetryLogConfig {
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "opentelemetry")]
-impl SourceConfig for OpentelemetryLogConfig {
+impl SourceConfig for OpentelemetryConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let tls_settings = MaybeTlsSettings::from_config(&self.tls, true)?;
         let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
@@ -63,7 +72,11 @@ impl SourceConfig for OpentelemetryLogConfig {
     }
 
     fn outputs(&self) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+        if self.multiple_outputs {
+            vec![Output::default(DataType::Log).with_port(LOGS)]
+        } else {
+            vec![Output::default(DataType::Log)]
+        }
     }
 
     fn source_type(&self) -> &'static str {
