@@ -7,6 +7,7 @@ use http::StatusCode;
 use vector::{
     app::Application,
     cli::{Color, LogFormat, Opts, RootOpts},
+    config::enterprise::{DATADOG_API_KEY_ENV_VAR_FULL, DATADOG_API_KEY_ENV_VAR_SHORT},
 };
 use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
 
@@ -98,6 +99,10 @@ async fn vector_does_not_start_with_enterprise_misconfigured() {
     let server = build_test_server_error_and_recover(StatusCode::NOT_IMPLEMENTED).await;
     let endpoint = server.uri();
 
+    // Control for API key environment variables which are an alternative, valid
+    // way of passing in an API key
+    env::remove_var(DATADOG_API_KEY_ENV_VAR_FULL);
+    env::remove_var(DATADOG_API_KEY_ENV_VAR_SHORT);
     env::set_var(ENDPOINT_CONFIG_ENV_VAR, endpoint);
     let config_file = PathBuf::from(format!(
         "{}/tests/data/enterprise/missing_api_key.toml",
@@ -117,5 +122,6 @@ async fn vector_does_not_start_with_enterprise_misconfigured() {
     .join()
     .unwrap();
 
+    assert!(server.received_requests().await.unwrap().is_empty());
     assert!(vector_failed_to_start);
 }

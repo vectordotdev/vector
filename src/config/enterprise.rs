@@ -49,6 +49,11 @@ static DATADOG_LOGS_KEY: &str = "#datadog_logs";
 static DATADOG_REPORTING_PRODUCT: &str = "Datadog Observability Pipelines";
 static DATADOG_REPORTING_PATH_STUB: &str = "/api/unstable/observability_pipelines/configuration";
 
+// Users can pass their Datadog API key through environment variables directly
+// rather than placing it in their configuration.
+pub static DATADOG_API_KEY_ENV_VAR_SHORT: &str = "DD_API_KEY";
+pub static DATADOG_API_KEY_ENV_VAR_FULL: &str = "DATADOG_API_KEY";
+
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Options {
@@ -281,7 +286,9 @@ impl TryFrom<&Config> for EnterpriseMetadata {
             // API key provided explicitly.
             Some(api_key) => api_key.clone(),
             // No API key; attempt to get it from the environment.
-            None => match env::var("DATADOG_API_KEY").or_else(|_| env::var("DD_API_KEY")) {
+            None => match env::var(DATADOG_API_KEY_ENV_VAR_FULL)
+                .or_else(|_| env::var(DATADOG_API_KEY_ENV_VAR_SHORT))
+            {
                 Ok(api_key) => api_key,
                 _ => return Err(EnterpriseError::MissingApiKey),
             },
