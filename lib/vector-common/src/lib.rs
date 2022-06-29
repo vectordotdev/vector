@@ -43,6 +43,7 @@ pub mod event_test_util;
 
 pub mod finalization;
 pub mod finalizer;
+pub use finalizer::EmptyStream;
 
 pub mod internal_event;
 

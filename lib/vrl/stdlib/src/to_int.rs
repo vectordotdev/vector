@@ -3,7 +3,7 @@ use vector_common::conversion::Conversion;
 use vrl::prelude::*;
 
 fn to_int(value: Value) -> Resolved {
-    use Value::*;
+    use Value::{Boolean, Bytes, Float, Integer, Null, Timestamp};
 
     match value {
         Integer(_) => Ok(value),
@@ -163,7 +163,7 @@ mod tests {
              args: func_args![value: DateTime::parse_from_rfc2822("Wed, 16 Oct 2019 12:00:00 +0000")
                             .unwrap()
                             .with_timezone(&Utc)],
-             want: Ok(1571227200),
+             want: Ok(1_571_227_200),
              tdef: TypeDef::integer().infallible(),
          }
     ];

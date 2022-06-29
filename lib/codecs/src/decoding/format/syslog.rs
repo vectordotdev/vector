@@ -1,13 +1,11 @@
 use bytes::Bytes;
 use chrono::{DateTime, Datelike, Utc};
-use lookup::lookup_v2::Path;
 use lookup::path;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use std::collections::BTreeMap;
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
-use value::kind::Collection;
-use value::Kind;
+use value::{kind::Collection, Kind};
 use vector_core::config::LogNamespace;
 use vector_core::event::LogEvent;
 use vector_core::{
@@ -34,10 +32,11 @@ impl SyslogDeserializerConfig {
     }
 
     /// The schema produced by the deserializer.
+
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match log_namespace {
             LogNamespace::Legacy => {
-                schema::Definition::empty_kind(Kind::any_object(), [log_namespace])
+                schema::Definition::legacy_empty()
                     // The `message` field is always defined. If parsing fails, the entire body becomes the
                     // message.
                     .with_field(log_schema().message_key(), Kind::bytes(), Some("message"))
@@ -58,7 +57,7 @@ impl SyslogDeserializerConfig {
                     .unknown_fields(Kind::object(Collection::from_unknown(Kind::bytes())))
             }
             LogNamespace::Vector => {
-                schema::Definition::empty_kind(Kind::any_object(), [log_namespace])
+                schema::Definition::empty_kind(Kind::object(Collection::empty()), [log_namespace])
                     .with_field("message", Kind::bytes(), Some("message"))
                     .optional_field("timestamp", Kind::timestamp(), Some("timestamp"))
                     .optional_field("hostname", Kind::bytes(), None)
@@ -165,12 +164,11 @@ fn insert_fields_from_syslog(
     }
 
     for element in parsed.structured_data.into_iter() {
+        let mut sdata: BTreeMap<String, Value> = BTreeMap::new();
         for (name, value) in element.params() {
-            let element_id_path = path!(element.id);
-            let name_path = path!(*name);
-            let path = element_id_path.concat(name_path);
-            log.insert(path, value);
+            sdata.insert(name.to_string(), value.into());
         }
+        log.insert(path!(element.id), sdata);
     }
 }
 

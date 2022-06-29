@@ -56,6 +56,10 @@ pub mod http;
 
 #[cfg(test)]
 pub mod metrics;
+
+#[cfg(test)]
+pub mod mock;
+
 pub mod stats;
 
 #[macro_export]

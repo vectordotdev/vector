@@ -1,4 +1,4 @@
-use std::{borrow::Cow, convert::TryFrom, fmt, hash::Hash, path::PathBuf};
+use std::{borrow::Cow, convert::TryFrom, hash::Hash, path::PathBuf};
 
 use bytes::Bytes;
 use chrono::{
@@ -7,11 +7,8 @@ use chrono::{
 };
 use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
-use serde::{
-    de::{self, Deserialize, Deserializer, Visitor},
-    ser::{Serialize, Serializer},
-};
 use snafu::Snafu;
+use vector_config::configurable_component;
 
 use crate::{
     config::log_schema,
@@ -20,10 +17,27 @@ use crate::{
 
 static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap());
 
-#[derive(Debug, Default, Eq, PartialEq, Hash, Clone)]
+/// A templated field.
+///
+/// In many cases, components can be configured in such a way where some portion of the component's functionality can be
+/// customized on a per-event basis. An example of this might be a sink that writes events to a file, where we want to
+/// provide the flexibility to specify which file an event should go to by using an event field itself as part of the
+/// input to the filename we use.
+///
+/// By using `Template`, users can specify either fixed strings or "templated" strings, which use a common syntax to
+/// refer to fields in an event that will serve as the input data when rendering the template.  While a fixed string may
+/// look something like `my-file.log`, a template string could look something like `my-file-{{key}}.log`, and the `key`
+/// field of the event being processed would serve as the value when rendering the template into a string.
+#[configurable_component]
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+#[serde(try_from = "String", into = "String")]
 pub struct Template {
     src: String,
+
+    #[serde(skip)]
     has_ts: bool,
+
+    #[serde(skip)]
     has_fields: bool,
 }
 
@@ -80,6 +94,12 @@ impl TryFrom<Cow<'_, str>> for Template {
                 has_ts: is_dynamic,
             })
         }
+    }
+}
+
+impl From<Template> for String {
+    fn from(template: Template) -> String {
+        template.src
     }
 }
 
@@ -198,43 +218,6 @@ fn render_timestamp(src: &str, event: EventRef<'_>) -> String {
         ts.format(src).to_string()
     } else {
         Utc::now().format(src).to_string()
-    }
-}
-
-impl<'de> Deserialize<'de> for Template {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        deserializer.deserialize_str(TemplateVisitor)
-    }
-}
-
-struct TemplateVisitor;
-
-impl<'de> Visitor<'de> for TemplateVisitor {
-    type Value = Template;
-
-    fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "a string")
-    }
-
-    fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        Template::try_from(s).map_err(de::Error::custom)
-    }
-}
-
-impl Serialize for Template {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        // TODO: determine if we should serialize this as a struct or just the
-        // str.
-        serializer.serialize_str(&self.src)
     }
 }
 

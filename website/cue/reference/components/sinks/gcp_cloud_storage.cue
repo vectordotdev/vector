@@ -90,6 +90,7 @@ components: sinks: gcp_cloud_storage: {
 				}
 			}
 		}
+		api_key: configuration._gcp_api_key
 		bucket: {
 			description: "The GCS bucket name."
 			required:    true

@@ -517,7 +517,7 @@ mod tests {
             101, 115, 115, 97, 103, 101, 163, 98, 97, 114,
         ];
 
-        let expected = Event::from(BTreeMap::from([
+        let expected = Event::Log(LogEvent::from(BTreeMap::from([
             (String::from("message"), Value::from("bar")),
             (String::from("tag"), Value::from("tag.name")),
             (
@@ -528,7 +528,7 @@ mod tests {
                         .into(),
                 ),
             ),
-        ]));
+        ])));
         let got = decode_all(message.clone()).unwrap();
         assert_event_data_eq!(got.0[0], expected);
         assert_eq!(got.1, message.len());
@@ -547,7 +547,7 @@ mod tests {
             101, 115, 115, 97, 103, 101, 163, 98, 97, 114, 129, 164, 115, 105, 122, 101, 1,
         ];
 
-        let expected = Event::from(BTreeMap::from([
+        let expected = Event::Log(LogEvent::from(BTreeMap::from([
             (String::from("message"), Value::from("bar")),
             (String::from("tag"), Value::from("tag.name")),
             (
@@ -558,7 +558,7 @@ mod tests {
                         .into(),
                 ),
             ),
-        ]));
+        ])));
         let got = decode_all(message.clone()).unwrap();
         assert_eq!(got.1, message.len());
         assert_event_data_eq!(got.0[0], expected);
@@ -582,7 +582,7 @@ mod tests {
         ];
 
         let expected = vec![
-            Event::from(BTreeMap::from([
+            Event::Log(LogEvent::from(BTreeMap::from([
                 (String::from("message"), Value::from("foo")),
                 (String::from("tag"), Value::from("tag.name")),
                 (
@@ -593,8 +593,8 @@ mod tests {
                             .into(),
                     ),
                 ),
-            ])),
-            Event::from(BTreeMap::from([
+            ]))),
+            Event::Log(LogEvent::from(BTreeMap::from([
                 (String::from("message"), Value::from("bar")),
                 (String::from("tag"), Value::from("tag.name")),
                 (
@@ -605,8 +605,8 @@ mod tests {
                             .into(),
                     ),
                 ),
-            ])),
-            Event::from(BTreeMap::from([
+            ]))),
+            Event::Log(LogEvent::from(BTreeMap::from([
                 (String::from("message"), Value::from("baz")),
                 (String::from("tag"), Value::from("tag.name")),
                 (
@@ -617,7 +617,7 @@ mod tests {
                             .into(),
                     ),
                 ),
-            ])),
+            ]))),
         ];
 
         let got = decode_all(message.clone()).unwrap();
@@ -648,7 +648,7 @@ mod tests {
         ];
 
         let expected = vec![
-            Event::from(BTreeMap::from([
+            Event::Log(LogEvent::from(BTreeMap::from([
                 (String::from("message"), Value::from("foo")),
                 (String::from("tag"), Value::from("tag.name")),
                 (
@@ -659,8 +659,8 @@ mod tests {
                             .into(),
                     ),
                 ),
-            ])),
-            Event::from(BTreeMap::from([
+            ]))),
+            Event::Log(LogEvent::from(BTreeMap::from([
                 (String::from("message"), Value::from("bar")),
                 (String::from("tag"), Value::from("tag.name")),
                 (
@@ -671,8 +671,8 @@ mod tests {
                             .into(),
                     ),
                 ),
-            ])),
-            Event::from(BTreeMap::from([
+            ]))),
+            Event::Log(LogEvent::from(BTreeMap::from([
                 (String::from("message"), Value::from("baz")),
                 (String::from("tag"), Value::from("tag.name")),
                 (
@@ -683,7 +683,7 @@ mod tests {
                             .into(),
                     ),
                 ),
-            ])),
+            ]))),
         ];
 
         let got = decode_all(message.clone()).unwrap();
@@ -715,7 +715,7 @@ mod tests {
         ];
 
         let expected = vec![
-            Event::from(BTreeMap::from([
+            Event::Log(LogEvent::from(BTreeMap::from([
                 (String::from("message"), Value::from("foo")),
                 (String::from("tag"), Value::from("tag.name")),
                 (
@@ -726,8 +726,8 @@ mod tests {
                             .into(),
                     ),
                 ),
-            ])),
-            Event::from(BTreeMap::from([
+            ]))),
+            Event::Log(LogEvent::from(BTreeMap::from([
                 (String::from("message"), Value::from("bar")),
                 (String::from("tag"), Value::from("tag.name")),
                 (
@@ -738,8 +738,8 @@ mod tests {
                             .into(),
                     ),
                 ),
-            ])),
-            Event::from(BTreeMap::from([
+            ]))),
+            Event::Log(LogEvent::from(BTreeMap::from([
                 (String::from("message"), Value::from("baz")),
                 (String::from("tag"), Value::from("tag.name")),
                 (
@@ -750,7 +750,7 @@ mod tests {
                             .into(),
                     ),
                 ),
-            ])),
+            ]))),
         ];
 
         let got = decode_all(message.clone()).unwrap();
@@ -783,7 +783,7 @@ mod tests {
         ];
 
         let expected = vec![
-            Event::from(BTreeMap::from([
+            Event::Log(LogEvent::from(BTreeMap::from([
                 (String::from("message"), Value::from("foo")),
                 (String::from("tag"), Value::from("tag.name")),
                 (
@@ -794,8 +794,8 @@ mod tests {
                             .into(),
                     ),
                 ),
-            ])),
-            Event::from(BTreeMap::from([
+            ]))),
+            Event::Log(LogEvent::from(BTreeMap::from([
                 (String::from("message"), Value::from("bar")),
                 (String::from("tag"), Value::from("tag.name")),
                 (
@@ -806,8 +806,8 @@ mod tests {
                             .into(),
                     ),
                 ),
-            ])),
-            Event::from(BTreeMap::from([
+            ]))),
+            Event::Log(LogEvent::from(BTreeMap::from([
                 (String::from("message"), Value::from("baz")),
                 (String::from("tag"), Value::from("tag.name")),
                 (
@@ -818,7 +818,7 @@ mod tests {
                             .into(),
                     ),
                 ),
-            ])),
+            ]))),
         ];
 
         let got = decode_all(message.clone()).unwrap();

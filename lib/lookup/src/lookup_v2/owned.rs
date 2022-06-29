@@ -54,45 +54,77 @@ impl Serialize for OwnedPath {
         if self.segments.is_empty() {
             serializer.serialize_str("<invalid>")
         } else {
+            let mut coalesce_i = 0;
+
             let path = self
                 .segments
                 .iter()
                 .enumerate()
                 .map(|(i, segment)| match segment {
                     OwnedSegment::Field(field) => {
-                        let needs_quotes = field
-                            .chars()
-                            .any(|c| !matches!(c, 'A'..='Z' | 'a'..='z' | '_' | '0'..='9' | '@'));
-                        // Allocate enough to fit the field, a `.` and two `"` characters. This
-                        // should suffice for the majority of cases when no escape sequence is used.
-                        let mut string = String::with_capacity(field.as_bytes().len() + 3);
-                        if i != 0 {
-                            string.push('.');
-                        }
-                        if needs_quotes {
-                            string.push('"');
-                            for c in field.chars() {
-                                if matches!(c, '"' | '\\') {
-                                    string.push('\\');
+                        serialize_field(field.as_ref(), (i != 0).then(|| "."))
+                    }
+
+                    OwnedSegment::CoalesceField(field) => {
+                        let output = serialize_field(
+                            field.as_ref(),
+                            Some(if coalesce_i == 0 {
+                                if i == 0 {
+                                    "("
+                                } else {
+                                    ".("
                                 }
-                                string.push(c);
-                            }
-                            string.push('"');
-                            string
-                        } else {
-                            string.push_str(field);
-                            string
-                        }
+                            } else {
+                                "|"
+                            }),
+                        );
+                        coalesce_i += 1;
+                        output
                     }
                     OwnedSegment::Index(index) => format!("[{}]", index),
                     OwnedSegment::Invalid => {
                         (if i == 0 { "<invalid>" } else { ".<invalid>" }).to_owned()
+                    }
+                    OwnedSegment::CoalesceEnd(field) => {
+                        format!(
+                            "{})",
+                            serialize_field(field.as_ref(), (coalesce_i != 0).then(|| "|"))
+                        )
                     }
                 })
                 .collect::<Vec<_>>()
                 .join("");
             serializer.serialize_str(&path)
         }
+    }
+}
+
+fn serialize_field(field: &str, separator: Option<&str>) -> String {
+    // These characters should match the ones from the parser, implemented in `JitLookup`
+    let needs_quotes = field
+        .chars()
+        .any(|c| !matches!(c, 'A'..='Z' | 'a'..='z' | '_' | '0'..='9' | '@'));
+
+    // Allocate enough to fit the field, a `.` and two `"` characters. This
+    // should suffice for the majority of cases when no escape sequence is used.
+    let separator_len = separator.map(|x| x.len()).unwrap_or(0);
+    let mut string = String::with_capacity(field.as_bytes().len() + 2 + separator_len);
+    if let Some(separator) = separator {
+        string.push_str(separator);
+    }
+    if needs_quotes {
+        string.push('"');
+        for c in field.chars() {
+            if matches!(c, '"' | '\\') {
+                string.push('\\');
+            }
+            string.push(c);
+        }
+        string.push('"');
+        string
+    } else {
+        string.push_str(field);
+        string
     }
 }
 
@@ -118,16 +150,27 @@ impl<'a, const N: usize> From<[BorrowedSegment<'a>; N]> for OwnedPath {
 pub enum OwnedSegment {
     Field(String),
     Index(isize),
+    CoalesceField(String),
+    CoalesceEnd(String),
     Invalid,
 }
 
 impl OwnedSegment {
     pub fn field(value: &str) -> OwnedSegment {
-        OwnedSegment::Field(value.into())
+        OwnedSegment::Field(value.to_string())
     }
     pub fn index(value: isize) -> OwnedSegment {
         OwnedSegment::Index(value)
     }
+
+    pub fn coalesce_field(field: impl Into<String>) -> OwnedSegment {
+        OwnedSegment::CoalesceField(field.into())
+    }
+
+    pub fn coalesce_end(field: impl Into<String>) -> OwnedSegment {
+        OwnedSegment::CoalesceEnd(field.into())
+    }
+
     pub fn is_field(&self) -> bool {
         matches!(self, OwnedSegment::Field(_))
     }
@@ -142,9 +185,11 @@ impl OwnedSegment {
 impl<'a> From<BorrowedSegment<'a>> for OwnedSegment {
     fn from(x: BorrowedSegment<'a>) -> Self {
         match x {
-            BorrowedSegment::Field(value) => OwnedSegment::Field((*value).to_owned()),
+            BorrowedSegment::Field(value) => OwnedSegment::Field(value.to_string()),
             BorrowedSegment::Index(value) => OwnedSegment::Index(value),
             BorrowedSegment::Invalid => OwnedSegment::Invalid,
+            BorrowedSegment::CoalesceField(field) => OwnedSegment::CoalesceField(field.to_string()),
+            BorrowedSegment::CoalesceEnd(field) => OwnedSegment::CoalesceEnd(field.to_string()),
         }
     }
 }
@@ -238,6 +283,12 @@ mod test {
             (r#"foo."a\"a"."b\\b".bar"#, r#"foo."a\"a"."b\\b".bar"#),
             ("<invalid>", "<invalid>"),
             (r#""🤖""#, r#""🤖""#),
+            (".(a|b)", "(a|b)"),
+            (".(a|b|c)", "(a|b|c)"),
+            ("foo.(a|b|c)", "foo.(a|b|c)"),
+            ("[0].(a|b|c)", "[0].(a|b|c)"),
+            (".(a|b|c).foo", "(a|b|c).foo"),
+            (".( a | b | c ).foo", "(a|b|c).foo"),
         ];
 
         for (path, expected) in test_cases {

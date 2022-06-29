@@ -75,8 +75,8 @@ mod test {
 
     #[test]
     fn to_lua_log() {
-        let mut event = Event::new_empty_log();
-        event.as_mut_log().insert("field", "value");
+        let mut event = LogEvent::default();
+        event.insert("field", "value");
 
         let assertions = vec![
             "type(event) == 'table'",
@@ -85,7 +85,7 @@ mod test {
             "event.log.field == 'value'",
         ];
 
-        assert_event(event, assertions);
+        assert_event(event.into(), assertions);
     }
 
     #[test]

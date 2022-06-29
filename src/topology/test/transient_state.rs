@@ -10,8 +10,7 @@ use crate::{
     config::{Config, DataType, Output, SourceConfig, SourceContext},
     sinks::blackhole::BlackholeConfig,
     sources::{stdin::StdinConfig, Source},
-    test_util::{start_topology, trace_init},
-    transforms::json_parser::JsonParserConfig,
+    test_util::{mock::transforms::BasicTransformConfig, start_topology, trace_init},
     Error,
 };
 
@@ -75,10 +74,7 @@ async fn closed_source() {
     old_config.add_transform(
         "trans",
         &["in"],
-        JsonParserConfig {
-            drop_field: true,
-            ..JsonParserConfig::default()
-        },
+        BasicTransformConfig::new("a".to_string(), 0.0),
     );
     old_config.add_sink(
         "out1",
@@ -105,10 +101,7 @@ async fn closed_source() {
     new_config.add_transform(
         "trans",
         &["in"],
-        JsonParserConfig {
-            drop_field: false,
-            ..JsonParserConfig::default()
-        },
+        BasicTransformConfig::new("a".to_string(), 0.0),
     );
     new_config.add_sink(
         "out1",
@@ -141,10 +134,7 @@ async fn remove_sink() {
     old_config.add_transform(
         "trans",
         &["in"],
-        JsonParserConfig {
-            drop_field: true,
-            ..JsonParserConfig::default()
-        },
+        BasicTransformConfig::new("a".to_string(), 0.0),
     );
     old_config.add_sink(
         "out1",
@@ -170,10 +160,7 @@ async fn remove_sink() {
     new_config.add_transform(
         "trans",
         &["in"],
-        JsonParserConfig {
-            drop_field: false,
-            ..JsonParserConfig::default()
-        },
+        BasicTransformConfig::new("b".to_string(), 0.0),
     );
     new_config.add_sink(
         "out1",
@@ -201,18 +188,12 @@ async fn remove_transform() {
     old_config.add_transform(
         "trans1",
         &["in"],
-        JsonParserConfig {
-            drop_field: true,
-            ..JsonParserConfig::default()
-        },
+        BasicTransformConfig::new("a".to_string(), 0.0),
     );
     old_config.add_transform(
         "trans2",
         &["trans1"],
-        JsonParserConfig {
-            drop_field: true,
-            ..JsonParserConfig::default()
-        },
+        BasicTransformConfig::new("a".to_string(), 0.0),
     );
     old_config.add_sink(
         "out1",
@@ -238,10 +219,7 @@ async fn remove_transform() {
     new_config.add_transform(
         "trans1",
         &["in"],
-        JsonParserConfig {
-            drop_field: false,
-            ..JsonParserConfig::default()
-        },
+        BasicTransformConfig::new("b".to_string(), 0.0),
     );
     new_config.add_sink(
         "out1",
@@ -270,10 +248,7 @@ async fn replace_transform() {
     old_config.add_transform(
         "trans1",
         &["in"],
-        JsonParserConfig {
-            drop_field: true,
-            ..JsonParserConfig::default()
-        },
+        BasicTransformConfig::new("a".to_string(), 0.0),
     );
     old_config.add_sink(
         "out1",
@@ -292,10 +267,7 @@ async fn replace_transform() {
     new_config.add_transform(
         "trans1",
         &["in"],
-        JsonParserConfig {
-            drop_field: false,
-            ..JsonParserConfig::default()
-        },
+        BasicTransformConfig::new("b".to_string(), 0.0),
     );
     new_config.add_sink(
         "out1",

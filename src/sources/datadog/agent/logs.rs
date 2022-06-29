@@ -89,12 +89,12 @@ pub(crate) fn decode_log_body(
 
     for LogMsg {
         message,
+        status,
         timestamp,
         hostname,
         service,
         ddsource,
         ddtags,
-        ..
     } in messages
     {
         let mut decoder = source.decoder.clone();
@@ -107,6 +107,13 @@ pub(crate) fn decode_log_body(
                         if let Event::Log(ref mut log) = event {
                             let namespace = &source.log_namespace;
                             let source_name = "datadog_agent";
+
+                            namespace.insert_source_metadata(
+                                source_name,
+                                log,
+                                path!("status"),
+                                status.clone(),
+                            );
                             namespace.insert_source_metadata(
                                 source_name,
                                 log,

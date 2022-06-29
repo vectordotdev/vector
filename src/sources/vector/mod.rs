@@ -20,7 +20,6 @@ enum V1 {
 /// Configuration for version two of the `vector` source.
 #[configurable_component]
 #[derive(Clone, Debug)]
-#[serde(deny_unknown_fields)]
 pub struct VectorConfigV1 {
     /// Version of the configuration.
     version: V1,
@@ -41,7 +40,6 @@ enum V2 {
 /// Configuration for version two of the `vector` source.
 #[configurable_component]
 #[derive(Clone, Debug)]
-#[serde(deny_unknown_fields)]
 pub struct VectorConfigV2 {
     /// Version of the configuration.
     version: Option<V2>,

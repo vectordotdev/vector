@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::BTreeMap,
     convert::{TryFrom, TryInto},
     fmt::Debug,
 };
@@ -78,11 +78,6 @@ impl Finalizable for Event {
 }
 
 impl Event {
-    #[must_use]
-    pub fn new_empty_log() -> Self {
-        Event::Log(LogEvent::default())
-    }
-
     /// This used to be the implementation for `Event::from(&'str)`, but this is now only
     /// valid for `LogNamespace::Legacy`
     pub fn from_str_legacy(msg: impl Into<String>) -> Self {
@@ -129,6 +124,16 @@ impl Event {
     ///
     /// If the event is a `LogEvent`, then `Some(log_event)` is returned, otherwise `None`.
     pub fn try_into_log(self) -> Option<LogEvent> {
+        match self {
+            Event::Log(log) => Some(log),
+            _ => None,
+        }
+    }
+
+    /// Return self as a `LogEvent` if possible
+    ///
+    /// If the event is a `LogEvent`, then `Some(&log_event)` is returned, otherwise `None`.
+    pub fn maybe_as_log(&self) -> Option<&LogEvent> {
         match self {
             Event::Log(log) => Some(log),
             _ => None,
@@ -293,29 +298,18 @@ impl finalization::AddBatchNotifier for Event {
     }
 }
 
-impl From<BTreeMap<String, Value>> for Event {
-    fn from(map: BTreeMap<String, Value>) -> Self {
-        Self::Log(LogEvent::from(map))
-    }
-}
-
-impl From<HashMap<String, Value>> for Event {
-    fn from(map: HashMap<String, Value>) -> Self {
-        Self::Log(LogEvent::from(map))
-    }
-}
-
 impl TryFrom<serde_json::Value> for Event {
     type Error = crate::Error;
 
     fn try_from(map: serde_json::Value) -> Result<Self, Self::Error> {
         match map {
-            serde_json::Value::Object(fields) => Ok(Event::from(
+            serde_json::Value::Object(fields) => Ok(LogEvent::from(
                 fields
                     .into_iter()
                     .map(|(k, v)| (k, v.into()))
                     .collect::<BTreeMap<_, _>>(),
-            )),
+            )
+            .into()),
             _ => Err(crate::Error::from(
                 "Attempted to convert non-Object JSON into an Event.",
             )),
