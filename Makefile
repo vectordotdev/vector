@@ -328,7 +328,7 @@ test-behavior: test-behavior-transforms test-behavior-formats test-behavior-conf
 
 .PHONY: test-enterprise
 test-enterprise: ## Runs enterprise related behavioral tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --workspace --no-fail-fast --features "enterprise-tests" --test enterprise --test-threads 1
+	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --workspace --no-fail-fast --no-default-features --features "enterprise-tests" --test enterprise
 
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
