@@ -1574,6 +1574,7 @@ dependencies = [
  "indoc",
  "lookup",
  "memchr",
+ "metrics",
  "once_cell",
  "ordered-float 3.0.0",
  "pretty_assertions",

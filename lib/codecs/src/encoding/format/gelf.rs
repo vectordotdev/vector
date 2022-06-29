@@ -1,4 +1,8 @@
 use crate::gelf_fields::*;
+use crate::internal_events::{
+    GelfSerializeFailedInvalidFieldName, GelfSerializeFailedInvalidType,
+    GelfSerializeFailedMissingField,
+};
 use bytes::{BufMut, BytesMut};
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -21,6 +25,12 @@ use vector_core::{
 
 /// Regex for matching valid field names. Must contain only word chars, periods and dashes.
 static VALID_FIELD: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[\w\.\-]*$").unwrap());
+
+static MISSING_FIELD_STR: &str = "LogEvent does not contain required field.";
+
+static INVALID_TYPE_STR: &str = "LogEvent contains a value with an invalid type.";
+
+static INVALID_FIELD_NAME_STR: &str = "LogEvent contains a value with an invalid type.";
 
 /// Config used to build a `GelfSerializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -77,11 +87,20 @@ impl GelfSerializer {
 
     /// Validates that the GELF required fields exist in the event.
     fn validate_required_fields(&mut self, log: &LogEvent) -> vector_core::Result<()> {
+        // emits the GelfSerializeFailedMissingField internal event and returns Err
+        fn emit_missing_field(field: &str) -> vector_core::Result<()> {
+            vector_core::internal_event::emit(GelfSerializeFailedMissingField {
+                field,
+                message: MISSING_FIELD_STR,
+            });
+            Err(format!("{}: {}", MISSING_FIELD_STR, field).into())
+        }
+
         if !log.contains(VERSION) {
-            return Err(format!("LogEvent does not contain required field '{}'", VERSION).into());
+            emit_missing_field(VERSION)?;
         }
         if !log.contains(HOST) {
-            return Err(format!("LogEvent does not contain required field '{}'", HOST).into());
+            emit_missing_field(HOST)?;
         }
 
         let message_key = log_schema().message_key();
@@ -94,11 +113,7 @@ impl GelfSerializer {
                     .unwrap()
                     .rename_key(message_key, SHORT_MESSAGE);
             } else {
-                return Err(format!(
-                    "LogEvent does not contain required field '{}'",
-                    SHORT_MESSAGE
-                )
-                .into());
+                emit_missing_field(SHORT_MESSAGE)?;
             }
         }
         Ok(())
@@ -106,6 +121,24 @@ impl GelfSerializer {
 
     /// Validates rules for field names and value types.
     fn validate_field_names_and_values(&mut self, log: &LogEvent) -> vector_core::Result<()> {
+        // emits the GelfSerializeFailedInvalidType internal event and returns Err
+        fn emit_invalid_type(
+            field: &str,
+            expected_type: &str,
+            actual_type: &str,
+        ) -> vector_core::Result<()> {
+            vector_core::internal_event::emit(GelfSerializeFailedInvalidType {
+                field,
+                expected_type,
+                actual_type,
+                message: INVALID_TYPE_STR,
+            });
+            Err(format!(
+                "{}: field: {} type: {} expected_type: {}",
+                INVALID_TYPE_STR, field, actual_type, expected_type
+            )
+            .into())
+        }
         if let Some(event_data) = log.as_map() {
             for (key, value) in event_data {
                 // validate string values
@@ -117,31 +150,25 @@ impl GelfSerializer {
                     || key == FILE
                 {
                     if !value.is_bytes() {
-                        return Err(
-                            format!("LogEvent field '{}' should be a UTF-8 string", key).into()
-                        );
+                        emit_invalid_type(key, "UTF-8 string", value.kind_str())?;
                     }
                 }
                 // validate timestamp value
                 else if key == TIMESTAMP {
                     if !(value.is_timestamp() || value.is_integer()) {
-                        return Err(format!(
-                            "LogEvent field '{}' should be a timestamp type or integer",
-                            log_schema().timestamp_key()
-                        )
-                        .into());
+                        emit_invalid_type(key, "timestamp or integer", value.kind_str())?;
                     }
                 }
                 // validate integer values
                 else if key == LEVEL {
                     if !value.is_integer() {
-                        return Err(format!("LogEvent field {} should be an integer", key).into());
+                        emit_invalid_type(key, "integer", value.kind_str())?;
                     }
                 }
                 // validate float values
                 else if key == LINE {
                     if !(value.is_float() || value.is_integer()) {
-                        return Err(format!("LogEvent field '{}' should be a number", key).into());
+                        emit_invalid_type(key, "number", value.kind_str())?;
                     }
                 } else {
                     // Additional fields must be prefixed with underscores.
@@ -159,11 +186,11 @@ impl GelfSerializer {
 
                     // additional fields must be only word chars, dashes and periods.
                     if !VALID_FIELD.is_match(key) {
-                        return Err(format!(
-                            "LogEvent field '{}' contains an invalid character",
-                            key
-                        )
-                        .into());
+                        vector_core::internal_event::emit(GelfSerializeFailedInvalidFieldName {
+                            field: key,
+                            message: INVALID_FIELD_NAME_STR,
+                        });
+                        return Err(format!("{}: {}", INVALID_FIELD_NAME_STR, key).into());
                     }
                 }
             }

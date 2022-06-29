@@ -6,6 +6,7 @@
 
 pub mod decoding;
 pub mod encoding;
+pub mod internal_events;
 
 pub use decoding::{
     gelf_fields, BytesDecoder, BytesDecoderConfig, BytesDeserializer, BytesDeserializerConfig,
