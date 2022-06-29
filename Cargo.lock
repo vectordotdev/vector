@@ -915,9 +915,9 @@ dependencies = [
 
 [[package]]
 name = "axum"
-version = "0.5.9"
+version = "0.5.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33d590cacd53140ff87cc2e192eb22fc3dc23c5b3f93b0d4f020677f98e8c629"
+checksum = "db018aeacdb84550c2c6c5a1c1f553f2a330294222f45c1dbe24f0b3d2320c01"
 dependencies = [
  "async-trait",
  "axum-core",
@@ -1572,6 +1572,7 @@ dependencies = [
  "dyn-clone",
  "futures 0.3.21",
  "indoc",
+ "lookup",
  "memchr",
  "pretty_assertions",
  "prost",
@@ -6095,9 +6096,9 @@ dependencies = [
 
 [[package]]
 name = "rkyv"
-version = "0.7.38"
+version = "0.7.39"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "517a3034eb2b1499714e9d1e49b2367ad567e07639b69776d35e259d9c27cca6"
+checksum = "cec2b3485b07d96ddfd3134767b8a447b45ea4eb91448d0a35180ec0ffd5ed15"
 dependencies = [
  "bytecheck",
  "hashbrown 0.12.0",
@@ -6109,9 +6110,9 @@ dependencies = [
 
 [[package]]
 name = "rkyv_derive"
-version = "0.7.38"
+version = "0.7.39"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "505c209ee04111a006431abf39696e640838364d67a107c559ababaf6fd8c9dd"
+checksum = "6eaedadc88b53e36dd32d940ed21ae4d850d5916f2581526921f553a72ac34c4"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -6885,9 +6886,9 @@ checksum = "eb703cfe953bccee95685111adeedb76fabe4e97549a58d16f03ea7b9367bb32"
 
 [[package]]
 name = "smallvec"
-version = "1.8.0"
+version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2dd574626839106c320a323308629dcb1acfc96e32a8cba364ddc61ac23ee83"
+checksum = "cc88c725d61fc6c3132893370cac4a0200e3fedf5da8331c570664b1987f5ca2"
 
 [[package]]
 name = "smol"
@@ -8437,6 +8438,7 @@ dependencies = [
  "vector_buffers",
  "vector_common",
  "vector_config",
+ "vector_config_common",
  "vector_config_macros",
  "vector_core",
  "vrl",
@@ -8551,10 +8553,12 @@ version = "0.1.0"
 dependencies = [
  "encoding_rs",
  "indexmap",
+ "no-proxy",
  "num-traits",
  "schemars",
  "serde",
  "serde_json",
+ "toml",
  "vector_config_common",
  "vector_config_macros",
 ]
@@ -8725,6 +8729,8 @@ dependencies = [
  "thiserror",
  "value",
  "vector_common",
+ "vector_config",
+ "vector_config_macros",
  "vrl-core",
  "vrl-diagnostic",
  "vrl-parser",

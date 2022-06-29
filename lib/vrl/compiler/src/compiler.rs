@@ -3,7 +3,11 @@ use lookup::LookupBuf;
 use parser::ast::{self, Node, QueryTarget};
 
 use crate::{
-    expression::*,
+    expression::{
+        assignment, function_call, literal, predicate, query, Abort, Array, Assignment, Block,
+        Container, Error, Expr, Expression, FunctionArgument, FunctionCall, Group, IfStatement,
+        Literal, Noop, Not, Object, Op, Predicate, Query, Target, Unary, Variable,
+    },
     parser::ast::RootExpr,
     program::ProgramInfo,
     state::{ExternalEnv, LocalEnv},
@@ -110,7 +114,10 @@ impl<'a> Compiler<'a> {
     }
 
     fn compile_expr(&mut self, node: Node<ast::Expr>, external: &mut ExternalEnv) -> Option<Expr> {
-        use ast::Expr::*;
+        use ast::Expr::{
+            Abort, Assignment, Container, FunctionCall, IfStatement, Literal, Op, Query, Unary,
+            Variable,
+        };
 
         let span = node.span();
 
@@ -147,7 +154,7 @@ impl<'a> Compiler<'a> {
         node: Node<ast::Literal>,
         external: &mut ExternalEnv,
     ) -> Option<Expr> {
-        use ast::Literal::*;
+        use ast::Literal::{Boolean, Float, Integer, Null, RawString, Regex, String, Timestamp};
         use bytes::Bytes;
 
         let (span, lit) = node.take();
@@ -195,7 +202,7 @@ impl<'a> Compiler<'a> {
         node: Node<ast::Container>,
         external: &mut ExternalEnv,
     ) -> Option<Container> {
-        use ast::Container::*;
+        use ast::Container::{Array, Block, Group, Object};
 
         let variant = match node.into_inner() {
             Group(node) => self.compile_group(*node, external)?.into(),
@@ -243,7 +250,7 @@ impl<'a> Compiler<'a> {
                             // an expression that has the "never" type is a terminating expression
                             if type_def.is_never() {
                                 terminated_state =
-                                    Some((self.local.clone(), external.target().clone()))
+                                    Some((self.local.clone(), external.target().clone()));
                             }
                         }
                     }
@@ -401,7 +408,7 @@ impl<'a> Compiler<'a> {
         node: Node<ast::Predicate>,
         external: &mut ExternalEnv,
     ) -> Option<predicate::Result> {
-        use ast::Predicate::*;
+        use ast::Predicate::{Many, One};
 
         let (span, predicate) = node.take();
 
@@ -478,7 +485,10 @@ impl<'a> Compiler<'a> {
         external: &mut ExternalEnv,
     ) -> Option<Assignment> {
         use assignment::Variant;
-        use ast::{Assignment::*, AssignmentOp};
+        use ast::{
+            Assignment::{Infallible, Single},
+            AssignmentOp,
+        };
         use value::Value;
 
         let assignment = node.into_inner();
@@ -603,7 +613,7 @@ impl<'a> Compiler<'a> {
         // This data is exposed to the caller of the compiler, to allow any
         // potential external optimizations.
         if let Target::External = target {
-            self.external_queries.push(path.clone())
+            self.external_queries.push(path.clone());
         }
 
         Some(Query::new(target, path))
@@ -620,7 +630,7 @@ impl<'a> Compiler<'a> {
         node: Node<ast::QueryTarget>,
         external: &mut ExternalEnv,
     ) -> Option<query::Target> {
-        use ast::QueryTarget::*;
+        use ast::QueryTarget::{Container, External, FunctionCall, Internal};
 
         let span = node.span();
 
@@ -661,7 +671,7 @@ impl<'a> Compiler<'a> {
         //
         // See: https://github.com/vectordotdev/vector/issues/12547
         if ident.as_deref() == "get" {
-            self.external_queries.push(LookupBuf::root())
+            self.external_queries.push(LookupBuf::root());
         }
 
         let arguments = arguments
@@ -785,7 +795,7 @@ impl<'a> Compiler<'a> {
         node: Node<ast::Unary>,
         external: &mut ExternalEnv,
     ) -> Option<Unary> {
-        use ast::Unary::*;
+        use ast::Unary::Not;
 
         let variant = match node.into_inner() {
             Not(node) => self.compile_not(node, external)?.into(),
@@ -842,7 +852,7 @@ impl<'a> Compiler<'a> {
     }
 
     fn handle_parser_error(&mut self, error: parser::Error) {
-        self.diagnostics.push(Box::new(error))
+        self.diagnostics.push(Box::new(error));
     }
 
     #[allow(dead_code)]

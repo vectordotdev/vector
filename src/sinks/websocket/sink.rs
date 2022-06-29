@@ -389,7 +389,7 @@ mod tests {
     use super::*;
     use crate::{
         config::{SinkConfig, SinkContext},
-        event::{Event, Value as EventValue},
+        event::{Event, LogEvent, Value as EventValue},
         sinks::util::encoding::{
             EncodingConfig, EncodingConfigAdapter, StandardEncodings, StandardEncodingsMigrator,
         },
@@ -428,13 +428,15 @@ mod tests {
 
     #[test]
     fn encodes_log_events() {
-        let mut event = Event::new_empty_log();
+        let mut log = LogEvent::default();
 
-        let log = event.as_mut_log();
         log.insert("str", EventValue::from("bar"));
         log.insert("num", EventValue::from(10));
 
-        let encoded = encode_event(event, EncodingConfig::from(StandardEncodings::Json).into());
+        let encoded = encode_event(
+            log.into(),
+            EncodingConfig::from(StandardEncodings::Json).into(),
+        );
         let expected = Message::text(r#"{"num":10,"str":"bar"}"#);
         assert_eq!(expected, encoded.unwrap());
     }

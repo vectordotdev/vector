@@ -20,7 +20,7 @@ use crate::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
         SourceConfig, SourceContext, SourceDescription,
     },
-    event::{Event, Value},
+    event::{Event, LogEvent, Value},
     serde::bool_or_struct,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsSourceConfig},
@@ -570,12 +570,13 @@ impl Decoder for LogstashDecoder {
 
 impl From<LogstashEventFrame> for Event {
     fn from(frame: LogstashEventFrame) -> Self {
-        frame
-            .fields
-            .into_iter()
-            .map(|(key, value)| (key, Value::from(value)))
-            .collect::<BTreeMap<_, _>>()
-            .into()
+        Event::Log(LogEvent::from(
+            frame
+                .fields
+                .into_iter()
+                .map(|(key, value)| (key, Value::from(value)))
+                .collect::<BTreeMap<_, _>>(),
+        ))
     }
 }
 

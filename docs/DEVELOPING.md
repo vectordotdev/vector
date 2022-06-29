@@ -389,12 +389,12 @@ times:
      'cargo test --lib --no-default-features --features=<component type>-<component id> <component type>::<component id>'
    ```
 
-   For example, if the component is `add_fields` transform, the command above
+   For example, if the component is `reduce` transform, the command above
    turns into
 
    ```sh
    cargo watch -s clear -s \
-     'cargo test --lib --no-default-features --features=transforms-add_fields transforms::add_fields'
+     'cargo test --lib --no-default-features --features=transforms-reduce transforms::reduce'
    ```
 
 #### Generating sample logs

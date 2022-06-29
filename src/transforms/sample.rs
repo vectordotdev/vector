@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use crate::{
     conditions::{AnyCondition, Condition},
@@ -12,11 +13,24 @@ use crate::{
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `sample` transform.
+#[configurable_component(transform)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct SampleConfig {
+    /// The rate at which events will be forwarded, expressed as `1/N`.
+    ///
+    /// For example, `rate = 10` means 1 out of every 10 events will be forwarded and the rest will be dropped.
     pub rate: u64,
+
+    /// The name of the log field whose value will be hashed to determine if the event should be passed.
+    ///
+    /// Consistently samples the same events. Actual rate of sampling may differ from the configured one if values in
+    /// the field are not uniformly distributed. If left unspecified, or if the event doesn’t have `key_field`, events
+    /// will be count rated.
     pub key_field: Option<String>,
+
+    /// A logical condition used to exclude events from sampling.
     pub exclude: Option<AnyCondition>,
 }
 
@@ -156,7 +170,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        conditions::{ConditionConfig, VrlConfig},
+        conditions::{Condition, ConditionalConfig, VrlConfig},
         config::log_schema,
         event::Event,
         test_util::random_lines,
@@ -164,12 +178,14 @@ mod tests {
     };
 
     fn condition_contains(key: &str, needle: &str) -> Condition {
-        VrlConfig {
+        let vrl_config = VrlConfig {
             source: format!(r#"contains!(."{}", "{}")"#, key, needle),
             runtime: Default::default(),
-        }
-        .build(&Default::default())
-        .unwrap()
+        };
+
+        vrl_config
+            .build(&Default::default())
+            .expect("should not fail to build VRL condition")
     }
 
     #[test]

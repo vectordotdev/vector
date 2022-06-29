@@ -1,17 +1,14 @@
-use darling::{
-    error::Accumulator,
-    util::{path_to_string, Flag},
-    FromAttributes, FromMeta,
-};
+use darling::{error::Accumulator, util::Flag, FromAttributes};
 use serde_derive_internals::{ast as serde_ast, Ctxt, Derive};
-use syn::{DeriveInput, ExprPath, Generics, Ident, NestedMeta};
+use syn::{DeriveInput, ExprPath, Generics, Ident, Type};
+use vector_config_common::attributes::CustomAttribute;
 
 use super::{
     util::{
         err_serde_failed, get_serde_default_value, try_extract_doc_title_description,
         DarlingResultIterator,
     },
-    Data, Field, Style, Tagging, Variant,
+    Data, Field, Metadata, Style, Tagging, Variant,
 };
 
 const ERR_NO_ENUM_TUPLES: &str = "enum variants cannot be tuples (multiple unnamed fields)";
@@ -19,12 +16,15 @@ const ERR_NO_ENUM_VARIANT_DESCRIPTION: &str = "enum variants must have a descrip
 const ERR_ENUM_UNTAGGED_DUPLICATES: &str = "enum variants must be unique in style/shape when in untagged mode i.e. there cannot be multiple unit variants, or tuple variants with the same fields, etc";
 const ERR_NO_UNIT_STRUCTS: &str = "unit structs are not supported by `Configurable`";
 const ERR_MISSING_DESC: &str = "all structs/enums must have a description i.e. `/// This is a description` or `#[configurable(description = \"This is a description...\")]`";
+const ERR_ASYMMETRIC_SERDE_TYPE_CONVERSION: &str = "any container using `from`/`try_from`/`into` via `#[serde(...)]` must do so symmetrically i.e. the from/into types must match";
+const ERR_SERDE_TYPE_CONVERSION_FROM_TRY_FROM: &str = "`#[serde(from)]` and `#[serde(try_from)]` cannot be identical, as it is impossible for an infallible conversion from T to also be fallible";
 
 pub struct Container<'a> {
     original: &'a DeriveInput,
     name: String,
     default_value: Option<ExprPath>,
     data: Data<'a>,
+    virtual_newtype: Option<Type>,
     attrs: Attributes,
 }
 
@@ -45,6 +45,75 @@ impl<'a> Container<'a> {
             None => Err(err_serde_failed(context)),
         }?;
 
+        let mut accumulator = Accumulator::default();
+
+        // Check if we're dealing with a "virtual" newtype.
+        //
+        // In some cases, types may (de)serialize themselves as another type, which is entirely normal... but
+        // they may do this with `serde` helper attributes rather than with a newtype wrapper or manually
+        // converting between types.
+        //
+        // For types doing this, it could be entirely irrelevant to document all of the internal fields, or at
+        // least enforce documenting them, because they don't truly represent the actual schema and all that
+        // might get used is the documentation on the type having `Configurable` derived.
+        //
+        // All of that said, we check to see if the `from`, `try_from`, or `into` helper attributes are being
+        // used from `serde`, and make sure the transformation is symmetric (it has to
+        // deserialize from T and serialize to T, no halfsies) since we can't express a schema that's
+        // half-and-half. Assuming it passes this requirement, we track the actual (de)serialized type and use
+        // that for our schema generation instead.
+        let virtual_newtype = if serde.attrs.type_from().is_some()
+            || serde.attrs.type_try_from().is_some()
+            || serde.attrs.type_into().is_some()
+        {
+            // if any of these are set, we start by checking `into`. If it's set, then that's fine, and we
+            // continue verifying. Otherwise, it implies that `from`/`try_from` are set, and we only allow
+            // symmetric conversions.
+            if let Some(into_ty) = serde.attrs.type_into() {
+                // Figure out which of `from` and `try_from` are set. Both cannot be set, because either the
+                // types are different -- which means asymmetric conversion -- or they're both the same, which
+                // would be a logical fallacy since you can't have a fallible conversion from T if you already
+                // have an infallible conversion from T.
+                //
+                // Similar, at least one of them must be set, otherwise that's an asymmetric conversion.
+                match (serde.attrs.type_from(), serde.attrs.type_try_from()) {
+                    (None, None) => {
+                        accumulator.push(
+                            darling::Error::custom(ERR_ASYMMETRIC_SERDE_TYPE_CONVERSION)
+                                .with_span(&serde.ident),
+                        );
+                        None
+                    }
+                    (Some(_), Some(_)) => {
+                        accumulator.push(
+                            darling::Error::custom(ERR_SERDE_TYPE_CONVERSION_FROM_TRY_FROM)
+                                .with_span(&serde.ident),
+                        );
+                        None
+                    }
+                    (Some(from_ty), None) | (None, Some(from_ty)) => {
+                        if into_ty == from_ty {
+                            Some(into_ty.clone())
+                        } else {
+                            accumulator.push(
+                                darling::Error::custom(ERR_ASYMMETRIC_SERDE_TYPE_CONVERSION)
+                                    .with_span(&serde.ident),
+                            );
+                            None
+                        }
+                    }
+                }
+            } else {
+                accumulator.push(
+                    darling::Error::custom(ERR_ASYMMETRIC_SERDE_TYPE_CONVERSION)
+                        .with_span(&serde.ident),
+                );
+                None
+            }
+        } else {
+            None
+        };
+
         // Once we have the `serde` side of things, we need to collect our own specific attributes for the container
         // and map things to our own `Container`.
         Attributes::from_attributes(&input.attrs)
@@ -53,14 +122,19 @@ impl<'a> Container<'a> {
             // build our data container based on whether or not we have a struct, enum, and do any neccessary
             // validation, etc.
             .and_then(|attrs| {
-                let mut accumulator = Accumulator::default();
                 let tagging: Tagging = serde.attrs.tag().into();
 
                 let data = match serde.data {
                     serde_ast::Data::Enum(variants) => {
                         let variants = variants
                             .iter()
-                            .map(|variant| Variant::from_ast(variant, tagging.clone()))
+                            .map(|variant| {
+                                Variant::from_ast(
+                                    variant,
+                                    tagging.clone(),
+                                    virtual_newtype.is_some(),
+                                )
+                            })
                             .collect_darling_results(&mut accumulator);
 
                         // Check the generated variants for conformance. We do this at a per-variant and per-enum level.
@@ -105,7 +179,7 @@ impl<'a> Container<'a> {
                         | serde_ast::Style::Newtype => {
                             let fields = fields
                                 .iter()
-                                .map(Field::from_ast)
+                                .map(|field| Field::from_ast(field, virtual_newtype.is_some()))
                                 .collect_darling_results(&mut accumulator);
 
                             Data::Struct(style.into(), fields)
@@ -139,6 +213,7 @@ impl<'a> Container<'a> {
                     name,
                     default_value,
                     data,
+                    virtual_newtype,
                     attrs,
                 };
 
@@ -170,6 +245,10 @@ impl<'a> Container<'a> {
         self.attrs.description.as_ref()
     }
 
+    pub fn virtual_newtype(&self) -> Option<Type> {
+        self.virtual_newtype.clone()
+    }
+
     pub fn default_value(&self) -> Option<ExprPath> {
         self.default_value.clone()
     }
@@ -178,11 +257,12 @@ impl<'a> Container<'a> {
         self.attrs.deprecated.is_some()
     }
 
-    pub fn metadata(&self) -> impl Iterator<Item = &(String, String)> {
+    pub fn metadata(&self) -> impl Iterator<Item = CustomAttribute> {
         self.attrs
             .metadata
-            .iter()
-            .flat_map(|metadata| &metadata.pairs)
+            .clone()
+            .into_iter()
+            .flat_map(|metadata| metadata.attributes())
     }
 }
 
@@ -209,53 +289,5 @@ impl Attributes {
         self.description = self.description.or(doc_description);
 
         Ok(self)
-    }
-}
-
-#[derive(Debug)]
-struct Metadata {
-    pairs: Vec<(String, String)>,
-}
-
-impl FromMeta for Metadata {
-    fn from_list(items: &[NestedMeta]) -> darling::Result<Self> {
-        let mut errors = Accumulator::default();
-
-        // Can't be empty.
-        if items.is_empty() {
-            errors.push(darling::Error::too_few_items(1));
-        }
-
-        errors = errors.checkpoint()?;
-
-        // Can't be anything other than name/value pairs.
-        let pairs = items
-            .iter()
-            .filter_map(|nmeta| match nmeta {
-                NestedMeta::Meta(meta) => match meta {
-                    syn::Meta::Path(_) => {
-                        errors.push(darling::Error::unexpected_type("path").with_span(nmeta));
-                        None
-                    }
-                    syn::Meta::List(_) => {
-                        errors.push(darling::Error::unexpected_type("list").with_span(nmeta));
-                        None
-                    }
-                    syn::Meta::NameValue(nv) => match &nv.lit {
-                        syn::Lit::Str(s) => Some((path_to_string(&nv.path), s.value())),
-                        lit => {
-                            errors.push(darling::Error::unexpected_lit_type(lit));
-                            None
-                        }
-                    },
-                },
-                NestedMeta::Lit(_) => {
-                    errors.push(darling::Error::unexpected_type("literal").with_span(nmeta));
-                    None
-                }
-            })
-            .collect::<Vec<(String, String)>>();
-
-        errors.finish_with(Metadata { pairs })
     }
 }
