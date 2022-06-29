@@ -14,18 +14,18 @@ pub struct Diagnostic {
 }
 
 impl Diagnostic {
-    pub fn error(code: usize, message: &impl ToString) -> Self {
+    pub fn error(code: usize, message: impl ToString) -> Self {
         Self::new(Severity::Error, code, message, vec![], vec![])
     }
 
-    pub fn bug(code: usize, message: &impl ToString) -> Self {
+    pub fn bug(code: usize, message: impl ToString) -> Self {
         Self::new(Severity::Bug, code, message, vec![], vec![])
     }
 
     pub fn new(
         severity: Severity,
         code: usize,
-        message: &impl ToString,
+        message: impl ToString,
         labels: Vec<Label>,
         notes: Vec<Note>,
     ) -> Self {
@@ -39,12 +39,12 @@ impl Diagnostic {
     }
 
     #[must_use]
-    pub fn with_primary(self, message: &impl ToString, span: impl Into<Span>) -> Self {
+    pub fn with_primary(self, message: impl ToString, span: impl Into<Span>) -> Self {
         self.with_label(Label::primary(message, span.into()))
     }
 
     #[must_use]
-    pub fn with_context(self, message: &impl ToString, span: impl Into<Span>) -> Self {
+    pub fn with_context(self, message: impl ToString, span: impl Into<Span>) -> Self {
         self.with_label(Label::context(message, span.into()))
     }
 
