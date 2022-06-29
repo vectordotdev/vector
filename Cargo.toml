@@ -166,7 +166,7 @@ aws-smithy-async = { version = "0.44.0", default-features = false, optional = tr
 aws-smithy-client = { version = "0.44.0", default-features = false, features = ["client-hyper"], optional = true}
 aws-smithy-http = { version = "0.44.0", default-features = false, features = ["event-stream"], optional = true }
 aws-smithy-http-tower = { version = "0.44.0", default-features = false, optional = true }
-aws-smithy-types = { version = "0.44.0", default-features = false, optional = true }
+aws-smithy-types = { version = "0.45.0", default-features = false, optional = true }
 
 # Azure
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b7171eb40909f7f2805f4622e076f8a6dbbe2d98", default-features = false, features = ["enable_reqwest"], optional = true }
