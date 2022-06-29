@@ -36,12 +36,15 @@ pub fn merged_definition(
     config: &dyn ComponentContainer,
     cache: &mut HashMap<(bool, Vec<OutputId>), Definition>,
 ) -> Definition {
+    if inputs.is_empty() {
+        return Definition::legacy_default();
+    }
+
     // Try to get the definition from the cache.
     if let Some(definition) = cache.get(&(config.schema_enabled(), inputs.to_vec())) {
         return definition.clone();
     }
 
-    // TODO: special case when inputs is empty?
     let mut definition = Definition::empty_kind(Kind::never(), []);
 
     for input in inputs {
@@ -347,126 +350,129 @@ mod tests {
 
     use super::*;
 
-    // this is just testing transforms with no inputs... which isn't valid?
-    // #[test]
-    // fn test_merged_definition() {
-    //     struct TestCase {
-    //         inputs: Vec<(&'static str, Option<String>)>,
-    //         sources: IndexMap<&'static str, Vec<Output>>,
-    //         transforms: IndexMap<&'static str, Vec<Output>>,
-    //         want: Definition,
-    //     }
-    //
-    //     impl ComponentContainer for TestCase {
-    //         fn schema_enabled(&self) -> bool {
-    //             true
-    //         }
-    //
-    //         fn source_outputs(&self, key: &ComponentKey) -> Option<Vec<Output>> {
-    //             self.sources.get(key.id()).cloned()
-    //         }
-    //
-    //         fn transform_inputs(&self, _key: &ComponentKey) -> Option<&[OutputId]> {
-    //             Some(&[])
-    //         }
-    //
-    //         fn transform_outputs(
-    //             &self,
-    //             key: &ComponentKey,
-    //             _merged_definition: &Definition,
-    //         ) -> Option<Vec<Output>> {
-    //             self.transforms.get(key.id()).cloned()
-    //         }
-    //     }
-    //
-    //     for (title, case) in HashMap::from([
-    //         (
-    //             "no inputs",
-    //             TestCase {
-    //                 inputs: vec![],
-    //                 sources: IndexMap::default(),
-    //                 transforms: IndexMap::default(),
-    //                 want: Definition::legacy_empty(),
-    //             },
-    //         ),
-    //         (
-    //             "single input, source with empty schema",
-    //             TestCase {
-    //                 inputs: vec![("foo", None)],
-    //                 sources: IndexMap::from([("foo", vec![Output::default(DataType::all())])]),
-    //                 transforms: IndexMap::default(),
-    //                 want: Definition::legacy_empty(),
-    //             },
-    //         ),
-    //         (
-    //             "single input, source with schema",
-    //             TestCase {
-    //                 inputs: vec![("source-foo", None)],
-    //                 sources: IndexMap::from([(
-    //                     "source-foo",
-    //                     vec![Output::default(DataType::all()).with_schema_definition(
-    //                         Definition::legacy_empty().with_field(
-    //                             "foo",
-    //                             Kind::integer().or_bytes(),
-    //                             Some("foo bar"),
-    //                         ),
-    //                     )],
-    //                 )]),
-    //                 transforms: IndexMap::default(),
-    //                 want: Definition::legacy_empty().with_field(
-    //                     "foo",
-    //                     Kind::integer().or_bytes(),
-    //                     Some("foo bar"),
-    //                 ),
-    //             },
-    //         ),
-    //         (
-    //             "multiple inputs, sources with schema",
-    //             TestCase {
-    //                 inputs: vec![("source-foo", None), ("source-bar", None)],
-    //                 sources: IndexMap::from([
-    //                     (
-    //                         "source-foo",
-    //                         vec![Output::default(DataType::all()).with_schema_definition(
-    //                             Definition::legacy_empty().with_field(
-    //                                 "foo",
-    //                                 Kind::integer().or_bytes(),
-    //                                 Some("foo bar"),
-    //                             ),
-    //                         )],
-    //                     ),
-    //                     (
-    //                         "source-bar",
-    //                         vec![Output::default(DataType::all()).with_schema_definition(
-    //                             Definition::legacy_empty().with_field(
-    //                                 "foo",
-    //                                 Kind::timestamp(),
-    //                                 Some("baz qux"),
-    //                             ),
-    //                         )],
-    //                     ),
-    //                 ]),
-    //                 transforms: IndexMap::default(),
-    //                 want: Definition::legacy_empty()
-    //                     .with_field("foo", Kind::integer().or_bytes(), Some("foo bar"))
-    //                     .with_field("foo", Kind::timestamp(), Some("baz qux")),
-    //             },
-    //         ),
-    //     ]) {
-    //         let inputs = case
-    //             .inputs
-    //             .iter()
-    //             .cloned()
-    //             .map(|(key, port)| OutputId {
-    //                 component: key.into(),
-    //                 port,
-    //             })
-    //             .collect::<Vec<_>>();
-    //
-    //         let got = merged_definition(&inputs, &case, &mut HashMap::default());
-    //         assert_eq!(got, case.want, "{}", title);
-    //     }
-    // }
+    #[test]
+    fn test_merged_definition() {
+        struct TestCase {
+            inputs: Vec<(&'static str, Option<String>)>,
+            sources: IndexMap<&'static str, Vec<Output>>,
+            transforms: IndexMap<&'static str, Vec<Output>>,
+            want: Definition,
+        }
+
+        impl ComponentContainer for TestCase {
+            fn schema_enabled(&self) -> bool {
+                true
+            }
+
+            fn source_outputs(&self, key: &ComponentKey) -> Option<Vec<Output>> {
+                self.sources.get(key.id()).cloned()
+            }
+
+            fn transform_inputs(&self, _key: &ComponentKey) -> Option<&[OutputId]> {
+                None
+            }
+
+            fn transform_outputs(
+                &self,
+                key: &ComponentKey,
+                _merged_definition: &Definition,
+            ) -> Option<Vec<Output>> {
+                self.transforms.get(key.id()).cloned()
+            }
+        }
+
+        for (title, case) in HashMap::from([
+            (
+                "no inputs",
+                TestCase {
+                    inputs: vec![],
+                    sources: IndexMap::default(),
+                    transforms: IndexMap::default(),
+                    want: Definition::legacy_default(),
+                },
+            ),
+            (
+                "single input, source with empty schema",
+                TestCase {
+                    inputs: vec![("foo", None)],
+                    sources: IndexMap::from([("foo", vec![Output::default(DataType::all())])]),
+                    transforms: IndexMap::default(),
+                    want: Definition::legacy_default(),
+                },
+            ),
+            (
+                "single input, source with schema",
+                TestCase {
+                    inputs: vec![("source-foo", None)],
+                    sources: IndexMap::from([(
+                        "source-foo",
+                        vec![Output::default(DataType::all()).with_schema_definition(
+                            Definition::legacy_empty().with_field(
+                                "foo",
+                                Kind::integer().or_bytes(),
+                                Some("foo bar"),
+                            ),
+                        )],
+                    )]),
+                    transforms: IndexMap::default(),
+                    want: Definition::legacy_empty().with_field(
+                        "foo",
+                        Kind::integer().or_bytes(),
+                        Some("foo bar"),
+                    ),
+                },
+            ),
+            (
+                "multiple inputs, sources with schema",
+                TestCase {
+                    inputs: vec![("source-foo", None), ("source-bar", None)],
+                    sources: IndexMap::from([
+                        (
+                            "source-foo",
+                            vec![Output::default(DataType::all()).with_schema_definition(
+                                Definition::legacy_empty().with_field(
+                                    "foo",
+                                    Kind::integer().or_bytes(),
+                                    Some("foo bar"),
+                                ),
+                            )],
+                        ),
+                        (
+                            "source-bar",
+                            vec![Output::default(DataType::all()).with_schema_definition(
+                                Definition::legacy_empty().with_field(
+                                    "foo",
+                                    Kind::timestamp(),
+                                    Some("baz qux"),
+                                ),
+                            )],
+                        ),
+                    ]),
+                    transforms: IndexMap::default(),
+                    want: Definition::legacy_empty()
+                        .with_field(
+                            "foo",
+                            Kind::integer().or_bytes().or_timestamp(),
+                            Some("foo bar"),
+                        )
+                        .with_known_meaning("foo", "baz qux"),
+                },
+            ),
+        ]) {
+            let inputs = case
+                .inputs
+                .iter()
+                .cloned()
+                .map(|(key, port)| OutputId {
+                    component: key.into(),
+                    port,
+                })
+                .collect::<Vec<_>>();
+
+            let got = merged_definition(&inputs, &case, &mut HashMap::default());
+            assert_eq!(got, case.want, "{}", title);
+        }
+    }
 
     #[test]
     fn test_expanded_definition() {
