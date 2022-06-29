@@ -1,4 +1,3 @@
-use crate::config::LogNamespace;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{fs::DirBuilder, path::PathBuf};
@@ -46,19 +45,9 @@ pub struct GlobalOptions {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
-
-    pub log_namespace: Option<bool>,
 }
 
 impl GlobalOptions {
-    /// Gets the value of the globally configured log namespace, or the default if it wasn't set
-    pub fn log_namespace(&self) -> LogNamespace {
-        self.log_namespace
-            .map_or(LogNamespace::Legacy, |use_vector_namespace| {
-                use_vector_namespace.into()
-            })
-    }
-
     /// Resolve the `data_dir` option in either the global or local config, and
     /// validate that it exists and is writable.
     ///

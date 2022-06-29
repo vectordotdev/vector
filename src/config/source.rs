@@ -55,6 +55,7 @@ pub struct SourceContext {
     pub out: SourceSender,
     pub proxy: ProxyConfig,
     pub acknowledgements: bool,
+    pub schema: schema::Options,
 
     /// Tracks the schema IDs assigned to schemas exposed by the source.
     ///
@@ -119,7 +120,7 @@ impl SourceContext {
     /// and will override any global default if it's set.
     pub fn log_namespace(&self, namespace: Option<bool>) -> LogNamespace {
         namespace
-            .or(self.globals.log_namespace)
+            .or(self.schema.log_namespace)
             .unwrap_or(false)
             .into()
     }

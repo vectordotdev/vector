@@ -77,7 +77,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
     } = builder;
 
     let str_expansions = to_string_expansions(&expansions);
-    let graph = match Graph::new(&sources, &transforms, &sinks, &str_expansions, &global) {
+    let graph = match Graph::new(&sources, &transforms, &sinks, &str_expansions, &schema) {
         Ok(graph) => graph,
         Err(graph_errors) => {
             errors.extend(graph_errors);
@@ -179,7 +179,7 @@ pub(crate) fn expand_globs(config: &mut ConfigBuilder) {
         .iter()
         .flat_map(|(key, s)| {
             s.inner
-                .outputs(config.global.log_namespace())
+                .outputs(config.schema.log_namespace())
                 .into_iter()
                 .map(|output| OutputId {
                     component: key.clone(),

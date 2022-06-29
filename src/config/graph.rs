@@ -1,7 +1,5 @@
-use std::collections::{HashMap, HashSet, VecDeque};
-
-use crate::config::GlobalOptions;
 use indexmap::{set::IndexSet, IndexMap};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use super::{
     schema, ComponentKey, DataType, Output, OutputId, SinkOuter, SourceOuter, TransformOuter,
@@ -39,9 +37,9 @@ impl Graph {
         transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
         expansions: &IndexMap<String, Vec<String>>,
-        global: &GlobalOptions,
+        schema: &schema::Options,
     ) -> Result<Self, Vec<String>> {
-        Self::new_inner(sources, transforms, sinks, expansions, false, global)
+        Self::new_inner(sources, transforms, sinks, expansions, false, schema)
     }
 
     pub fn new_unchecked(
@@ -49,9 +47,9 @@ impl Graph {
         transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
         expansions: &IndexMap<String, Vec<String>>,
-        global: &GlobalOptions,
+        schema: &schema::Options,
     ) -> Self {
-        Self::new_inner(sources, transforms, sinks, expansions, true, global)
+        Self::new_inner(sources, transforms, sinks, expansions, true, schema)
             .expect("errors ignored")
     }
 
@@ -61,7 +59,7 @@ impl Graph {
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
         expansions: &IndexMap<String, Vec<String>>,
         ignore_errors: bool,
-        global: &GlobalOptions,
+        schema: &schema::Options,
     ) -> Result<Self, Vec<String>> {
         let mut graph = Graph::default();
         let mut errors = Vec::new();
@@ -71,7 +69,7 @@ impl Graph {
             graph.nodes.insert(
                 id.clone(),
                 Node::Source {
-                    outputs: config.inner.outputs(global.log_namespace()),
+                    outputs: config.inner.outputs(schema.log_namespace()),
                 },
             );
         }

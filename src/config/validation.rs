@@ -147,7 +147,7 @@ pub fn check_resources(config: &ConfigBuilder) -> Result<(), Vec<String>> {
 pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     let mut errors = Vec::new();
     for (key, source) in config.sources.iter() {
-        let outputs = source.inner.outputs(config.global.log_namespace());
+        let outputs = source.inner.outputs(config.schema.log_namespace());
         if outputs
             .iter()
             .map(|output| output.port.as_deref().unwrap_or(""))
@@ -194,7 +194,7 @@ pub fn warnings(config: &Config) -> Vec<String> {
     let source_ids = config.sources.iter().flat_map(|(key, source)| {
         source
             .inner
-            .outputs(config.global.log_namespace())
+            .outputs(config.schema.log_namespace())
             .iter()
             .map(|output| {
                 if let Some(port) = &output.port {

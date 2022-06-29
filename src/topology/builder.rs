@@ -157,7 +157,7 @@ pub async fn build_pieces(
         debug!(component = %key, "Building new source.");
 
         let typetag = source.inner.source_type();
-        let source_outputs = source.inner.outputs(config.global.log_namespace());
+        let source_outputs = source.inner.outputs(config.schema.log_namespace());
 
         let span = error_span!(
             "source",
@@ -227,6 +227,7 @@ pub async fn build_pieces(
             proxy: ProxyConfig::merge_with_env(&config.global.proxy, &source.proxy),
             acknowledgements: source.sink_acknowledgements,
             schema_definitions,
+            schema: config.schema.clone(),
         };
         let server = match source.inner.build(context).await {
             Err(error) => {
