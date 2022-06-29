@@ -7,7 +7,7 @@ use std::{
 };
 
 use futures::{task::noop_waker, Stream};
-use vector::event::Event;
+use vector::event::{Event, LogEvent};
 
 // == Streams ==
 
