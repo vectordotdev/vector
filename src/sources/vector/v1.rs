@@ -176,6 +176,7 @@ mod test {
     use vector_common::assert_event_data_eq;
     #[cfg(not(target_os = "windows"))]
     use {
+        crate::event::proto,
         bytes::BytesMut,
         futures::SinkExt,
         prost::Message,
@@ -187,7 +188,7 @@ mod test {
         config::{ComponentKey, GlobalOptions, SinkContext, SourceContext},
         event::{
             metric::{MetricKind, MetricValue},
-            proto, Event, LogEvent, Metric,
+            Event, LogEvent, Metric,
         },
         shutdown::ShutdownSignal,
         sinks::vector::v1::VectorConfig as SinkConfig,
