@@ -3,8 +3,8 @@ use vrl::prelude::*;
 
 use crate::util;
 
-fn is_nullish(value: Value) -> Resolved {
-    Ok(util::is_nullish(&value).into())
+fn is_nullish(value: Value) -> bool {
+    util::is_nullish(&value)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -50,7 +50,7 @@ struct IsNullishFn {
 impl Expression for IsNullishFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        is_nullish(value)
+        Ok(is_nullish(value).into())
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {

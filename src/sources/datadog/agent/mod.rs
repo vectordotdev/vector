@@ -7,6 +7,14 @@ pub mod logs;
 pub mod metrics;
 pub mod traces;
 
+pub(crate) mod ddmetric_proto {
+    include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
+}
+
+pub(crate) mod ddtrace_proto {
+    include!(concat!(env!("OUT_DIR"), "/dd_trace.rs"));
+}
+
 use std::{fmt::Debug, io::Read, net::SocketAddr, sync::Arc};
 
 use bytes::{Buf, Bytes};

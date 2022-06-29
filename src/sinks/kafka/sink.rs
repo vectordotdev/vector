@@ -16,7 +16,7 @@ use vector_core::{buffers::Acker, config::log_schema};
 use super::config::{KafkaRole, KafkaSinkConfig};
 use crate::{
     codecs::Encoder,
-    event::Event,
+    event::{Event, LogEvent},
     kafka::KafkaStatisticsContext,
     sinks::{
         kafka::{
@@ -60,7 +60,7 @@ impl KafkaSink {
         let producer_config = config.to_rdkafka(KafkaRole::Producer)?;
         let producer = create_producer(producer_config)?;
         let transformer = config.encoding.transformer();
-        let serializer = config.encoding.encoding();
+        let serializer = config.encoding.encoding()?;
         let encoder = Encoder::<()>::new(serializer);
 
         Ok(KafkaSink {
@@ -97,7 +97,7 @@ pub(crate) async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
     let client = config.to_rdkafka(KafkaRole::Consumer).unwrap();
     let topic = match Template::try_from(config.topic)
         .context(TopicTemplateSnafu)?
-        .render_string(&Event::from(""))
+        .render_string(&LogEvent::from(""))
     {
         Ok(topic) => Some(topic),
         Err(error) => {

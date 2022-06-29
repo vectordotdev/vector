@@ -3,7 +3,7 @@ use vrl::prelude::*;
 
 fn to_string(value: Value) -> Resolved {
     use chrono::SecondsFormat;
-    use Value::*;
+    use Value::{Boolean, Bytes, Float, Integer, Null, Timestamp};
     let value = match value {
         v @ Bytes(_) => v,
         Integer(v) => v.to_string().into(),

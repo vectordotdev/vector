@@ -13,6 +13,38 @@ message CommonMetadata {
 	string api_key = 6;
 }
 
+message MetricPayload {
+    enum MetricType {
+        UNSPECIFIED = 0;
+        COUNT = 1;
+        RATE = 2;
+        GAUGE = 3;
+    }
+
+    message MetricPoint {
+        double value = 1;
+        int64 timestamp = 2;
+    }
+
+    message Resource {
+        string type = 1;
+        string name = 2;
+    }
+
+    message MetricSeries {
+        repeated Resource resources = 1;
+        string metric = 2;
+        repeated string tags = 3;
+        repeated MetricPoint points = 4;
+        MetricType type = 5;
+        string unit = 6;
+        string source_type_name = 7;
+        int64 interval = 8;
+        reserved 9;
+    }
+    repeated MetricSeries series = 1;
+}
+
 message SketchPayload {
 	message Sketch {
 		message Distribution {
