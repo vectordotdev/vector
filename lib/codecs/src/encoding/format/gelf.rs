@@ -10,6 +10,14 @@ use vector_core::{
     schema,
 };
 
+/// On GELF encoding behavior:
+///   Graylog has a relaxed parsing. They are much more lenient than the spec would
+///   suggest. We've elected to take a more strict approach to maintain backwards compatability
+///   in the event that we need to change the behavior to be more relaxed, so that prior versions
+///   of vector will still work.
+///   The exception is that if 'Additional fields' are found to be missing an underscore prefix and
+///   are otherwise valid field names, we prepend the underscore.
+
 /// Config used to build a `GelfSerializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct GelfSerializerConfig;
