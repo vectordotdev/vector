@@ -10,7 +10,7 @@ use schemars::{
 };
 use serde_json::{Map, Value};
 
-use crate::{num::ConfigurableNumber, Configurable, Metadata};
+use crate::{num::ConfigurableNumber, Configurable, CustomAttribute, Metadata};
 
 /// Finalizes the schema by ensuring all metadata is applied and registering it in the generator.
 ///
@@ -61,12 +61,6 @@ pub fn apply_metadata<'de, T>(schema: &mut SchemaObject, metadata: Metadata<'de,
 where
     T: Configurable<'de>,
 {
-    // Figure out if we're applying metadata to a schema reference or the actual schema itself.
-    // Some things only makes sense to add to the reference (like a default value to use), while
-    // some things only make sense to add to the schema itself (like custom metadata, validation,
-    // etc), and some things make sense being added to both. (like the description)
-    let is_schema_ref = schema.reference.is_some();
-
     // Set the title/description of this schema.
     //
     // By default, we want to populate `description` because most things don't need a title: their property name or type
@@ -92,11 +86,18 @@ where
 
     // Set any custom attributes as extensions on the schema.
     let mut custom_map = Map::new();
-    for (key, value) in metadata.custom_attributes() {
-        custom_map.insert(key.to_string(), Value::String(value.to_string()));
+    for attribute in metadata.custom_attributes() {
+        match attribute {
+            CustomAttribute::Flag(key) => {
+                custom_map.insert(key.to_string(), Value::Bool(true));
+            }
+            CustomAttribute::KeyValue { key, value } => {
+                custom_map.insert(key.to_string(), Value::String(value.to_string()));
+            }
+        }
     }
 
-    if !custom_map.is_empty() && !is_schema_ref {
+    if !custom_map.is_empty() {
         schema
             .extensions
             .insert("_metadata".to_string(), Value::Object(custom_map));

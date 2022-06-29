@@ -115,7 +115,8 @@ impl Encoder<Framer> {
             ) => "application/json",
             (Serializer::Native(_), _) => "application/octet-stream",
             (
-                Serializer::Json(_)
+                Serializer::Avro(_)
+                | Serializer::Json(_)
                 | Serializer::Logfmt(_)
                 | Serializer::NativeJson(_)
                 | Serializer::RawMessage(_)
@@ -184,6 +185,7 @@ mod tests {
     use codecs::{encoding::BoxedFramingError, TextSerializer};
     use futures_util::{SinkExt, StreamExt};
     use tokio_util::codec::FramedWrite;
+    use vector_core::event::LogEvent;
 
     use super::*;
 
@@ -248,9 +250,9 @@ mod tests {
             TextSerializer::new().into(),
         );
         let source = futures::stream::iter(vec![
-            Event::from("foo"),
-            Event::from("bar"),
-            Event::from("baz"),
+            Event::Log(LogEvent::from("foo")),
+            Event::Log(LogEvent::from("bar")),
+            Event::Log(LogEvent::from("baz")),
         ])
         .map(Ok);
         let sink = Vec::new();
@@ -267,9 +269,9 @@ mod tests {
             TextSerializer::new().into(),
         );
         let source = futures::stream::iter(vec![
-            Event::from("bar"),
-            Event::from("baz"),
-            Event::from("bat"),
+            Event::Log(LogEvent::from("bar")),
+            Event::Log(LogEvent::from("baz")),
+            Event::Log(LogEvent::from("bat")),
         ])
         .map(Ok);
         let sink = Vec::from("(foo)");
@@ -286,9 +288,9 @@ mod tests {
             TextSerializer::new().into(),
         );
         let source = futures::stream::iter(vec![
-            Event::from("foo"),
-            Event::from("bar"),
-            Event::from("baz"),
+            Event::Log(LogEvent::from("foo")),
+            Event::Log(LogEvent::from("bar")),
+            Event::Log(LogEvent::from("baz")),
         ])
         .map(Ok);
         let sink = Vec::new();
@@ -306,9 +308,9 @@ mod tests {
             TextSerializer::new().into(),
         );
         let source = futures::stream::iter(vec![
-            Event::from("bar"),
-            Event::from("baz"),
-            Event::from("bat"),
+            Event::Log(LogEvent::from("bar")),
+            Event::Log(LogEvent::from("baz")),
+            Event::Log(LogEvent::from("bat")),
         ])
         .map(Ok);
         let sink = Vec::from("(foo)");

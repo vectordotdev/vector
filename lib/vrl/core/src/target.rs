@@ -1,3 +1,5 @@
+use std::convert::AsRef;
+
 use lookup::LookupBuf;
 use value::{Secrets, Value};
 
@@ -189,7 +191,7 @@ impl SecretTarget for TargetValue {
 
 impl SecretTarget for Secrets {
     fn get_secret(&self, key: &str) -> Option<&str> {
-        self.get(key).map(|value| value.as_ref())
+        self.get(key).map(AsRef::as_ref)
     }
 
     fn insert_secret(&mut self, key: &str, value: &str) {
@@ -203,7 +205,7 @@ impl SecretTarget for Secrets {
 
 #[cfg(any(test, feature = "test"))]
 mod value_target_impl {
-    use super::*;
+    use super::{LookupBuf, MetadataTarget, SecretTarget, Target, Value};
 
     impl Target for Value {
         fn target_insert(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
@@ -317,7 +319,10 @@ mod tests {
             };
             let path = LookupBuf::from_segments(segments);
 
-            assert_eq!(target.target_get(&path).map(|v| v.cloned()), expect);
+            assert_eq!(
+                target.target_get(&path).map(Option::<&Value>::cloned),
+                expect
+            );
         }
     }
 
@@ -437,7 +442,7 @@ mod tests {
             );
             assert_eq!(target.value, expect);
             assert_eq!(
-                Target::target_get(&target, &path).map(|v| v.cloned()),
+                Target::target_get(&target, &path).map(Option::<&Value>::cloned),
                 Ok(Some(value))
             );
         }
@@ -535,7 +540,7 @@ mod tests {
                 Ok(value)
             );
             assert_eq!(
-                Target::target_get(&target, &LookupBuf::root()).map(|v| v.cloned()),
+                Target::target_get(&target, &LookupBuf::root()).map(Option::<&Value>::cloned),
                 Ok(expect)
             );
         }

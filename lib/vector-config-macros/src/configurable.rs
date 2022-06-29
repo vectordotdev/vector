@@ -1,8 +1,10 @@
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput, ExprPath, GenericParam, Ident, Lifetime, LifetimeDef};
-use vector_config_common::validation::Validation;
+use syn::{
+    parse_macro_input, DeriveInput, ExprPath, GenericParam, Ident, Lifetime, LifetimeDef, Type,
+};
+use vector_config_common::{attributes::CustomAttribute, validation::Validation};
 
 use crate::ast::{Container, Data, Field, Style, Tagging, Variant};
 
@@ -45,9 +47,14 @@ pub fn derive_configurable_impl(input: TokenStream) -> TokenStream {
     // Now we can go ahead and actually generate the method bodies for our `Configurable` impl,
     // which are varied based on whether we have a struct or enum container.
     let metadata_fn = build_metadata_fn(&container);
-    let generate_schema_fn = match container.data() {
-        Data::Struct(style, fields) => build_struct_generate_schema_fn(&container, style, fields),
-        Data::Enum(variants) => build_enum_generate_schema_fn(variants),
+    let generate_schema_fn = match container.virtual_newtype() {
+        Some(virtual_ty) => build_virtual_newtype_schema_fn(virtual_ty),
+        None => match container.data() {
+            Data::Struct(style, fields) => {
+                build_struct_generate_schema_fn(&container, style, fields)
+            }
+            Data::Enum(variants) => build_enum_generate_schema_fn(variants),
+        },
     };
 
     let name = container.ident();
@@ -80,6 +87,22 @@ fn build_metadata_fn(container: &Container<'_>) -> proc_macro2::TokenStream {
         fn metadata() -> ::vector_config::Metadata<#clt, Self> {
             #container_metadata
             #meta_ident
+        }
+    }
+}
+
+fn build_virtual_newtype_schema_fn(virtual_ty: Type) -> proc_macro2::TokenStream {
+    let (clt, _) = get_configurable_lifetime();
+
+    quote! {
+        fn generate_schema(schema_gen: &mut ::vector_config::schemars::gen::SchemaGenerator, overrides: ::vector_config::Metadata<#clt, Self>) -> ::vector_config::schemars::schema::SchemaObject {
+            // Virtual newtypes always shuttle their schema's metadata/overridden metadata when generating the schema
+            // for the wrapped type, otherwise we wouldn't be able to effectively document them. This does mean we end
+            // up dropping any default value for _this_ schema's metadata, including overridden metadata, so the wrapped
+            // type must have a default value for itself if having a default value is required.
+            let overrides = Self::metadata().merge(overrides).convert();
+
+            <#virtual_ty as ::vector_config::Configurable<#clt>>::generate_schema(schema_gen, overrides)
         }
     }
 }
@@ -129,7 +152,7 @@ fn generate_struct_field(field: &Field<'_>) -> proc_macro2::TokenStream {
 
     quote! {
         #field_metadata
-        let mut subschema = #field_as_configurable::generate_schema(schema_gen, #field_metadata_ref.clone());
+        let mut subschema = #field_as_configurable::generate_schema(schema_gen, #field_metadata_ref.as_subschema());
         ::vector_config::schema::finalize_schema(schema_gen, &mut subschema, #field_metadata_ref);
     }
 }
@@ -303,11 +326,7 @@ fn generate_container_metadata(
     let maybe_description = get_metadata_description(meta_ident, container.description());
     let maybe_default_value = get_metadata_default_value(meta_ident, container.default_value());
     let maybe_deprecated = get_metadata_deprecated(meta_ident, container.deprecated());
-    let maybe_custom_attributes = container.metadata().map(|(key, value)| {
-        quote! {
-            #meta_ident.add_custom_attribute(#key, #value);
-        }
-    });
+    let maybe_custom_attributes = get_metadata_custom_attributes(meta_ident, container.metadata());
 
     quote! {
         let mut #meta_ident = ::vector_config::Metadata::default();
@@ -315,7 +334,7 @@ fn generate_container_metadata(
         #maybe_description
         #maybe_default_value
         #maybe_deprecated
-        #(#maybe_custom_attributes)*
+        #maybe_custom_attributes
     }
 }
 
@@ -328,6 +347,7 @@ fn generate_field_metadata(meta_ident: &Ident, field: &Field<'_>) -> proc_macro2
     let maybe_deprecated = get_metadata_deprecated(meta_ident, field.deprecated());
     let maybe_transparent = get_metadata_transparent(meta_ident, field.transparent());
     let maybe_validation = get_metadata_validation(meta_ident, field.validation());
+    let maybe_custom_attributes = get_metadata_custom_attributes(meta_ident, field.metadata());
 
     quote! {
         let mut #meta_ident = #field_as_configurable::metadata();
@@ -337,6 +357,7 @@ fn generate_field_metadata(meta_ident: &Ident, field: &Field<'_>) -> proc_macro2
         #maybe_deprecated
         #maybe_transparent
         #maybe_validation
+        #maybe_custom_attributes
     }
 }
 
@@ -350,12 +371,14 @@ fn generate_variant_metadata(
     let description = get_metadata_description(meta_ident, variant.description())
         .expect("enum variants without a description should be rejected during AST parsing");
     let maybe_deprecated = get_metadata_deprecated(meta_ident, variant.deprecated());
+    let maybe_custom_attributes = get_metadata_custom_attributes(meta_ident, variant.metadata());
 
     quote! {
         let mut #meta_ident = #variant_as_configurable::metadata();
         #maybe_title
         #description
         #maybe_deprecated
+        #maybe_custom_attributes
     }
 }
 
@@ -440,6 +463,28 @@ fn get_metadata_validation(
 
     quote! {
         #(#mapped_validation)*
+    }
+}
+
+fn get_metadata_custom_attributes(
+    meta_ident: &Ident,
+    custom_attributes: impl Iterator<Item = CustomAttribute>,
+) -> proc_macro2::TokenStream {
+    let mapped_custom_attributes = custom_attributes
+        .map(|attr| match attr {
+            CustomAttribute::Flag(key) => quote! {
+                #meta_ident.add_custom_attribute(::vector_config_common::attributes::CustomAttribute::Flag(#key.to_string()));
+            },
+            CustomAttribute::KeyValue { key, value } => quote! {
+                #meta_ident.add_custom_attribute(::vector_config_common::attributes::CustomAttribute::KeyValue {
+                    key: #key.to_string(),
+                    value: #value.to_string(),
+                });
+            },
+        });
+
+    quote! {
+        #(#mapped_custom_attributes)*
     }
 }
 
