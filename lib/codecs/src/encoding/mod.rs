@@ -331,10 +331,11 @@ pub enum Serializer {
 }
 
 impl Serializer {
-    /// Check if the serializer supports encoding to JSON via `Serializer::to_json_value`.
-    pub fn supports_json(&self) -> bool {
+    /// Check if the serializer supports encoding an event to JSON via `Serializer::to_json_value`.
+    pub fn supports_json(&self, event: &Event) -> bool {
         match self {
-            Serializer::Gelf(_) | Serializer::Json(_) | Serializer::NativeJson(_) => true,
+            Serializer::Gelf(_) => event.maybe_as_log().is_some(),
+            Serializer::Json(_) | Serializer::NativeJson(_) => true,
             Serializer::Avro(_)
             | Serializer::Logfmt(_)
             | Serializer::Text(_)

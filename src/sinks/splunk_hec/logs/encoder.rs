@@ -82,7 +82,7 @@ impl Encoder<Vec<HecProcessedEvent>> for HecLogsEncoder {
                     }
                     EndpointTarget::Event => {
                         let serializer = encoder.serializer();
-                        let hec_event = if serializer.supports_json() {
+                        let hec_event = if serializer.supports_json(&event) {
                             HecEvent::Json(
                                 serializer
                                     .to_json_value(event)
