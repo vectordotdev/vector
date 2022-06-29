@@ -254,6 +254,7 @@ pub(crate) fn decode_ddseries_v2(
         .series
         .into_iter()
         .flat_map(|serie| {
+            let (namespace, name) = namespace_name_from_dd_metric(&serie.metric);
             let mut tags: BTreeMap<String, String> = serie
                 .tags
                 .iter()
@@ -283,7 +284,7 @@ pub(crate) fn decode_ddseries_v2(
                     .iter()
                     .map(|dd_point| {
                         Metric::new(
-                            serie.metric.clone(),
+                            name.to_string(),
                             MetricKind::Incremental,
                             MetricValue::Counter {
                                 value: dd_point.value,
@@ -291,6 +292,7 @@ pub(crate) fn decode_ddseries_v2(
                         )
                         .with_timestamp(Some(Utc.timestamp(dd_point.timestamp, 0)))
                         .with_tags(Some(tags.clone()))
+                        .with_namespace(namespace)
                     })
                     .collect::<Vec<_>>(),
                 Some(metric_payload::MetricType::Gauge) => serie
@@ -298,7 +300,7 @@ pub(crate) fn decode_ddseries_v2(
                     .iter()
                     .map(|dd_point| {
                         Metric::new(
-                            serie.metric.clone(),
+                            name.to_string(),
                             MetricKind::Absolute,
                             MetricValue::Gauge {
                                 value: dd_point.value,
@@ -306,6 +308,7 @@ pub(crate) fn decode_ddseries_v2(
                         )
                         .with_timestamp(Some(Utc.timestamp(dd_point.timestamp, 0)))
                         .with_tags(Some(tags.clone()))
+                        .with_namespace(namespace)
                     })
                     .collect::<Vec<_>>(),
                 Some(metric_payload::MetricType::Rate) => serie
@@ -314,7 +317,7 @@ pub(crate) fn decode_ddseries_v2(
                     .map(|dd_point| {
                         let i = Some(serie.interval).filter(|v| *v != 0).unwrap_or(1) as f64;
                         Metric::new(
-                            serie.metric.clone(),
+                            name.to_string(),
                             MetricKind::Incremental,
                             MetricValue::Counter {
                                 value: dd_point.value * i,
@@ -322,6 +325,7 @@ pub(crate) fn decode_ddseries_v2(
                         )
                         .with_timestamp(Some(Utc.timestamp(dd_point.timestamp, 0)))
                         .with_tags(Some(tags.clone()))
+                        .with_namespace(namespace)
                     })
                     .collect::<Vec<_>>(),
                 Some(metric_payload::MetricType::Unspecified) | None => {
