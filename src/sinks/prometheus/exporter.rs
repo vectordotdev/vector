@@ -75,7 +75,7 @@ pub struct PrometheusExporterConfig {
     #[serde(default = "default_flush_period_secs")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     pub flush_period_secs: Duration,
-    #[serde(default = "default_suppress_timestamp")]
+    #[serde(default)]
     pub suppress_timestamp: bool,
 }
 
