@@ -22,7 +22,7 @@ fn parse_query_string(bytes: Value) -> Resolved {
                         v.push(value.into());
                     }
                     v => {
-                        *v = Value::Array(vec![v.to_owned(), value.into()]);
+                        *v = Value::Array(vec![v.clone(), value.into()]);
                     }
                 };
             })

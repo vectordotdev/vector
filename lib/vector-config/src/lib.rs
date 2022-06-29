@@ -105,6 +105,7 @@ mod external;
 mod num;
 mod stdlib;
 
+use vector_config_common::attributes::CustomAttribute;
 // Re-export of the `#[configurable_component]` and `#[derive(Configurable)]` proc macros.
 pub use vector_config_macros::*;
 
@@ -122,7 +123,7 @@ pub struct Metadata<'de, T: Configurable<'de>> {
     title: Option<&'static str>,
     description: Option<&'static str>,
     default_value: Option<T>,
-    custom_attributes: Vec<(&'static str, &'static str)>,
+    custom_attributes: Vec<CustomAttribute>,
     deprecated: bool,
     transparent: bool,
     validations: Vec<validation::Validation>,
@@ -228,12 +229,12 @@ impl<'de, T: Configurable<'de>> Metadata<'de, T> {
         self.transparent = false;
     }
 
-    pub fn custom_attributes(&self) -> &[(&'static str, &'static str)] {
+    pub fn custom_attributes(&self) -> &[CustomAttribute] {
         &self.custom_attributes
     }
 
-    pub fn add_custom_attribute(&mut self, key: &'static str, value: &'static str) {
-        self.custom_attributes.push((key, value));
+    pub fn add_custom_attribute(&mut self, attribute: CustomAttribute) {
+        self.custom_attributes.push(attribute);
     }
 
     pub fn clear_custom_attributes(&mut self) {
@@ -268,6 +269,9 @@ impl<'de, T: Configurable<'de>> Metadata<'de, T> {
         }
     }
 
+    /// Converts this metadata from holding a default value of `T` to `U`.
+    ///
+    /// If a default value was present before, it is dropped.
     pub fn convert<U: Configurable<'de>>(self) -> Metadata<'de, U> {
         Metadata {
             title: self.title,
@@ -278,6 +282,21 @@ impl<'de, T: Configurable<'de>> Metadata<'de, T> {
             transparent: self.transparent,
             validations: self.validations,
             _de: PhantomData,
+        }
+    }
+
+    /// Gets a version of this metadata suitable for subschema use.
+    ///
+    /// This strips all custom attributes and validations, as well as some flags, which makes this exclusively useful
+    /// for shuttling metadata from a type that (de)serializes to an entirely different type.
+    pub fn as_subschema(&self) -> Self {
+        Self {
+            title: self.title,
+            description: self.description,
+            default_value: self.default_value.clone(),
+            custom_attributes: Vec::new(),
+            transparent: self.transparent,
+            ..Default::default()
         }
     }
 }

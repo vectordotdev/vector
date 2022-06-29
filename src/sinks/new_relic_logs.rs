@@ -200,7 +200,7 @@ mod tests {
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert!(matches!(
-            http_config.encoding.encoding().1,
+            http_config.encoding.encoding().unwrap().1,
             Serializer::Json(_)
         ));
         assert_eq!(http_config.batch.max_bytes, Some(MAX_PAYLOAD_SIZE));
@@ -242,7 +242,7 @@ mod tests {
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert!(matches!(
-            http_config.encoding.encoding().1,
+            http_config.encoding.encoding().unwrap().1,
             Serializer::Json(_)
         ));
         assert_eq!(http_config.batch.max_bytes, Some(MAX_PAYLOAD_SIZE));
@@ -282,7 +282,7 @@ mod tests {
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert!(matches!(
-            http_config.encoding.encoding().1,
+            http_config.encoding.encoding().unwrap().1,
             Serializer::Json(_)
         ));
         assert_eq!(http_config.batch.max_bytes, Some(838860));

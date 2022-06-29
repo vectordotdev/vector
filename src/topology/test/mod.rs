@@ -32,23 +32,17 @@ mod crash;
 #[cfg(all(feature = "sources-http", feature = "sinks-http"))]
 mod end_to_end;
 
-#[cfg(all(
-    feature = "sinks-blackhole",
-    feature = "sources-stdin",
-    feature = "transforms-json_parser"
-))]
+#[cfg(all(feature = "sinks-blackhole", feature = "sources-stdin"))]
 mod transient_state;
 
 #[cfg(all(feature = "sinks-console", feature = "sources-demo_logs"))]
 mod source_finished;
 
 #[cfg(all(
-    feature = "sinks-console",
-    feature = "sources-splunk_hec",
-    feature = "sources-demo_logs",
+    feature = "sources-prometheus",
     feature = "sinks-prometheus",
-    feature = "transforms-log_to_metric",
-    feature = "sinks-socket",
+    feature = "sources-internal_metrics",
+    feature = "sources-splunk_hec"
 ))]
 mod reload;
 

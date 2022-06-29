@@ -6,10 +6,10 @@ use std::{
     path::PathBuf,
 };
 
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use value::Kind;
 use vector_common::TimeZone;
+use vector_config::configurable_component;
 use vector_vrl_functions::set_semantic_meaning::MeaningList;
 use vrl::{
     diagnostic::{Formatter, Note},
@@ -31,18 +31,68 @@ use crate::{
 
 const DROPPED: &str = "dropped";
 
-#[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
+/// Configuration for the `remap` transform.
+#[configurable_component(transform)]
+#[derive(Clone, Debug, Derivative)]
 #[serde(deny_unknown_fields, default)]
 #[derivative(Default)]
 pub struct RemapConfig {
+    /// The [Vector Remap Language](https://vector.dev/docs/reference/vrl) (VRL) program to execute for each event.
+    ///
+    /// Required if `file` is missing.
     pub source: Option<String>,
+
+    /// File path to the [Vector Remap Language](https://vector.dev/docs/reference/vrl) (VRL) program to execute for each event.
+    ///
+    /// If a relative path is provided, its root is the current working directory.
+    ///
+    /// Required if `source` is missing.
     pub file: Option<PathBuf>,
+
+    /// The name of the timezone to apply to timestamp conversions that do not contain an explicit time zone.
+    ///
+    /// This overrides the [global `timezone`](https://vector.dev/docs/reference/configuration//global-options#timezone)
+    /// option. The time zone name may be any name in the [TZ
+    /// database](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones), or `local` to indicate system local
+    /// time.
     #[serde(default)]
     pub timezone: TimeZone,
+
+    /// Drops any event that encounters an error during processing.
+    ///
+    /// Normally, if a VRL program encounters an error when processing an event, the original, unmodified event will be
+    /// sent downstream. In some cases, you may not wish to send the event any further, such as if certain
+    /// transformation or enrichment is strictly required. Setting `drop_on_error` to `true` allows you to ensure these
+    /// events do not get processed any further.
+    ///
+    /// Additionally, dropped events can potentially be diverted to a specially named output for further logging and
+    /// analysis by setting `reroute_dropped`.
     pub drop_on_error: bool,
+
+    /// Drops any event that is manually aborted during processing.
+    ///
+    /// Normally, if a VRL program is manually aborted (via
+    /// [`abort`](https://vector.dev/docs/reference/vrl/expressions/#abort)) when processing an event, the original,
+    /// unmodified event will be sent downstream. In some cases, you may not wish to send the event any further, such as
+    /// if certain transformation or enrichment is strictly required. Setting `drop_on_abort` to `true` allows you to
+    /// ensure these events do not get processed any further.
+    ///
+    /// Additionally, dropped events can potentially be diverted to a specially-named output for further logging and
+    /// analysis by setting `reroute_dropped`.
     #[serde(default = "crate::serde::default_true")]
     pub drop_on_abort: bool,
+
+    /// Reroutes dropped events to a named output instead of halting processing on them.
+    ///
+    /// When using `drop_on_error` or `drop_on_abort`, events that are "dropped" are processed no further. In some
+    /// cases, it may be desirable to keep the events around for further analysis, debugging, or retrying.
+    ///
+    /// In these cases, `reroute_dropped` can be set to `true` which will forward the original event to a
+    /// specially-named output, `dropped`. The original event will be annotated with additional fields describing why
+    /// the event was dropped.
     pub reroute_dropped: bool,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub runtime: VrlRuntime,
 }

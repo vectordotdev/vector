@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, convert::TryFrom, num::ParseFloatError};
 
 use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use crate::{
     config::{
@@ -21,64 +21,137 @@ use crate::{
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `log_to_metric` transform.
+#[configurable_component(transform)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct LogToMetricConfig {
+    /// A list of metrics to generate.
     pub metrics: Vec<MetricConfig>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Specification of a counter derived from a log event.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct CounterConfig {
+    /// Name of the field in the event to generate the counter.
     field: String,
+
+    /// Overrides the name of the counter.
+    ///
+    /// If not specified, `field` is used as the name of the counter.
     name: Option<String>,
+
+    /// Sets the namespace for the counter.
     namespace: Option<String>,
+
+    /// Increments the counter by the value in `field`, instead of only by `1`.
     #[serde(default = "default_increment_by_value")]
     increment_by_value: bool,
+
+    #[configurable(derived)]
     #[serde(default = "default_kind")]
     kind: MetricKind,
+
+    /// Tags to apply to the counter.
     tags: Option<IndexMap<String, String>>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Specification of a gauge derived from a log event.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct GaugeConfig {
+    /// Name of the field in the event to generate the gauge from.
     pub field: String,
+
+    /// Overrides the name of the gauge.
+    ///
+    /// If not specified, `field` is used as the name of the gauge.
     pub name: Option<String>,
+
+    /// Sets the namespace for the gauge.
     pub namespace: Option<String>,
+
+    /// Tags to apply to the gauge.
     pub tags: Option<IndexMap<String, String>>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Specification of a set derived from a log event.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct SetConfig {
+    /// Name of the field in the event to generate the set from.
     field: String,
+
+    /// Overrides the name of the set.
+    ///
+    /// If not specified, `field` is used as the name of the set.
     name: Option<String>,
+
+    /// Sets the namespace for the set.
     namespace: Option<String>,
+
+    /// Tags to apply to the set.
     tags: Option<IndexMap<String, String>>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Specification of a histogram derived from a log event.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct HistogramConfig {
+    /// Name of the field in the event to generate the histogram from.
     field: String,
+
+    /// Overrides the name of the histogram.
+    ///
+    /// If not specified, `field` is used as the name of the histogram.
     name: Option<String>,
+
+    /// Sets the namespace for the histogram.
     namespace: Option<String>,
+
+    /// Tags to apply to the histogram.
     tags: Option<IndexMap<String, String>>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Specification of a summary derived from a log event.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct SummaryConfig {
+    /// Name of the field in the event to generate the summary from.
     field: String,
+
+    /// Overrides the name of the summary.
+    ///
+    /// If not specified, `field` is used as the name of the summary.
     name: Option<String>,
+
+    /// Sets the namespace for the summary.
     namespace: Option<String>,
+
+    /// Tags to apply to the summary.
     tags: Option<IndexMap<String, String>>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Specification of a metric derived from a log event.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum MetricConfig {
-    Counter(CounterConfig),
-    Histogram(HistogramConfig),
-    Gauge(GaugeConfig),
-    Set(SetConfig),
-    Summary(SummaryConfig),
+    /// A counter.
+    Counter(#[configurable(derived)] CounterConfig),
+
+    /// A histogram.
+    Histogram(#[configurable(derived)] HistogramConfig),
+
+    /// A gauge.
+    Gauge(#[configurable(derived)] GaugeConfig),
+
+    /// A set.
+    Set(#[configurable(derived)] SetConfig),
+
+    /// A summary.
+    Summary(#[configurable(derived)] SummaryConfig),
 }
 
 impl MetricConfig {

@@ -3,6 +3,7 @@
 
 #![deny(missing_docs)]
 
+mod avro;
 mod json;
 mod logfmt;
 mod native;
@@ -12,6 +13,7 @@ mod text;
 
 use std::fmt::Debug;
 
+pub use avro::{AvroSerializer, AvroSerializerConfig, AvroSerializerOptions};
 use dyn_clone::DynClone;
 pub use json::{JsonSerializer, JsonSerializerConfig};
 pub use logfmt::{LogfmtSerializer, LogfmtSerializerConfig};
