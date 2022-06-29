@@ -151,7 +151,7 @@ fn poll_http(
 
             match http_request_to_config_builder(&url, &tls_options, &headers, &proxy).await {
                 Ok(config_builder) => yield signal::SignalTo::ReloadFromConfigBuilder(config_builder),
-                Err(_) => return,
+                Err(_) => {},
             };
 
             info!(

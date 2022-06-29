@@ -22,7 +22,7 @@ fn parse_query_string(bytes: Value) -> Resolved {
                         v.push(value.into());
                     }
                     v => {
-                        *v = Value::Array(vec![v.to_owned(), value.into()]);
+                        *v = Value::Array(vec![v.clone(), value.into()]);
                     }
                 };
             })
@@ -68,11 +68,6 @@ impl Function for ParseQueryString {
             kind: kind::BYTES,
             required: true,
         }]
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        parse_query_string(value)
     }
 }
 

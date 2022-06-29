@@ -104,13 +104,6 @@ impl Function for ParseDuration {
             },
         ]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let unit = args.required("unit");
-
-        parse_duration(value, unit)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -177,7 +170,7 @@ mod tests {
         s_ns {
             args: func_args![value: "1 s",
                              unit: "ns"],
-            want: Ok(1000000000.0),
+            want: Ok(1_000_000_000.0),
             tdef: TypeDef::float().fallible(),
         }
 

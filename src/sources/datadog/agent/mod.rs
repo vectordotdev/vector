@@ -7,9 +7,18 @@ pub mod logs;
 pub mod metrics;
 pub mod traces;
 
+pub(crate) mod ddmetric_proto {
+    include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
+}
+
+pub(crate) mod ddtrace_proto {
+    include!(concat!(env!("OUT_DIR"), "/dd_trace.rs"));
+}
+
 use std::{fmt::Debug, io::Read, net::SocketAddr, sync::Arc};
 
 use bytes::{Buf, Bytes};
+use chrono::{serde::ts_milliseconds, DateTime, Utc};
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use futures::FutureExt;
@@ -19,6 +28,7 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tracing::Span;
 use value::Kind;
+use vector_config::configurable_component;
 use vector_core::event::{BatchNotifier, BatchStatus};
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
 
@@ -41,26 +51,53 @@ pub const LOGS: &str = "logs";
 pub const METRICS: &str = "metrics";
 pub const TRACES: &str = "traces";
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
-struct DatadogAgentConfig {
+/// Configuration for the `datadog_agent` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
+pub struct DatadogAgentConfig {
+    /// The address to accept connections on.
+    ///
+    /// The address _must_ include a port.
     address: SocketAddr,
-    tls: Option<TlsEnableableConfig>,
+
+    /// When incoming events contain a Datadog API key, if this setting is set to `true` the key will kept in the event
+    /// metadata and will be used if the event is sent to a Datadog sink.
     #[serde(default = "crate::serde::default_true")]
     store_api_key: bool,
-    #[serde(default = "default_framing_message_based")]
-    framing: FramingConfig,
-    #[serde(default = "default_decoding")]
-    decoding: DeserializerConfig,
-    #[serde(default, deserialize_with = "bool_or_struct")]
-    acknowledgements: AcknowledgementsConfig,
+
+    /// If this settings is set to `true`, logs won't be accepted by the component.
     #[serde(default = "crate::serde::default_false")]
     disable_logs: bool,
+
+    /// If this settings is set to `true`, metrics won't be accepted by the component.
     #[serde(default = "crate::serde::default_false")]
     disable_metrics: bool,
+
+    /// If this settings is set to `true`, traces won't be accepted by the component.
     #[serde(default = "crate::serde::default_false")]
     disable_traces: bool,
+
+    /// If this setting is set to `true` logs, metrics and traces will be sent to different outputs.
+    ///
+    /// For a source component named `agent` the received logs, metrics, and traces can then be accessed by specifying
+    /// `agent.logs`, `agent.metrics`, and `agent.traces`, respectively, as the input to another component.
     #[serde(default = "crate::serde::default_false")]
     multiple_outputs: bool,
+
+    #[configurable(derived)]
+    tls: Option<TlsEnableableConfig>,
+
+    #[configurable(derived)]
+    #[serde(default = "default_framing_message_based")]
+    framing: FramingConfig,
+
+    #[configurable(derived)]
+    #[serde(default = "default_decoding")]
+    decoding: DeserializerConfig,
+
+    #[configurable(derived)]
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    acknowledgements: AcknowledgementsConfig,
 }
 
 impl GenerateConfig for DatadogAgentConfig {
@@ -113,14 +150,7 @@ impl SourceConfig for DatadogAgentConfig {
         );
         let listener = tls.bind(&self.address).await?;
         let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
-        let filters = source.build_warp_filters(
-            cx.out,
-            acknowledgements,
-            !self.disable_logs,
-            !self.disable_metrics,
-            !self.disable_traces,
-            self.multiple_outputs,
-        )?;
+        let filters = source.build_warp_filters(cx.out, acknowledgements, self)?;
         let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
             let span = Span::current();
@@ -149,15 +179,16 @@ impl SourceConfig for DatadogAgentConfig {
     fn outputs(&self) -> Vec<Output> {
         let definition = match self.decoding {
             // See: `LogMsg` struct.
-            DeserializerConfig::Bytes => schema::Definition::empty()
-                .required_field("message", Kind::bytes(), Some("message"))
-                .required_field("status", Kind::bytes(), Some("severity"))
-                .required_field("timestamp", Kind::integer(), Some("timestamp"))
-                .required_field("hostname", Kind::bytes(), Some("host"))
-                .required_field("service", Kind::bytes(), None)
-                .required_field("ddsource", Kind::bytes(), None)
-                .required_field("ddtags", Kind::bytes(), None)
-                .merge(self.decoding.schema_definition()),
+            DeserializerConfig::Bytes => self
+                .decoding
+                .schema_definition()
+                .with_field("message", Kind::bytes(), Some("message"))
+                .with_field("status", Kind::bytes(), Some("severity"))
+                .with_field("timestamp", Kind::timestamp(), Some("timestamp"))
+                .with_field("hostname", Kind::bytes(), Some("host"))
+                .with_field("service", Kind::bytes(), Some("service"))
+                .with_field("ddsource", Kind::bytes(), Some("source"))
+                .with_field("ddtags", Kind::bytes(), Some("tags")),
 
             // JSON deserializer can overwrite existing fields at runtime, so we have to treat
             // those events as if there is no known type details we can provide, other than the
@@ -279,28 +310,25 @@ impl DatadogAgentSource {
         }
     }
 
-    pub(crate) fn build_warp_filters(
+    fn build_warp_filters(
         &self,
         out: SourceSender,
         acknowledgements: bool,
-        logs: bool,
-        metrics: bool,
-        traces: bool,
-        multiple_outputs: bool,
+        config: &DatadogAgentConfig,
     ) -> crate::Result<BoxedFilter<(Response,)>> {
-        let mut filters = logs.then(|| {
+        let mut filters = (!config.disable_logs).then(|| {
             logs::build_warp_filter(
                 acknowledgements,
-                multiple_outputs,
+                config.multiple_outputs,
                 out.clone(),
                 self.clone(),
             )
         });
 
-        if traces {
+        if !config.disable_traces {
             let trace_filter = traces::build_warp_filter(
                 acknowledgements,
-                multiple_outputs,
+                config.multiple_outputs,
                 out.clone(),
                 self.clone(),
             );
@@ -309,9 +337,13 @@ impl DatadogAgentSource {
                 .or(Some(trace_filter));
         }
 
-        if metrics {
-            let metrics_filter =
-                metrics::build_warp_filter(acknowledgements, multiple_outputs, out, self.clone());
+        if !config.disable_metrics {
+            let metrics_filter = metrics::build_warp_filter(
+                acknowledgements,
+                config.multiple_outputs,
+                out,
+                self.clone(),
+            );
             filters = filters
                 .map(|f| f.or(metrics_filter.clone()).unify().boxed())
                 .or(Some(metrics_filter));
@@ -370,7 +402,7 @@ pub(crate) async fn handle_request(
 ) -> Result<Response, Rejection> {
     match events {
         Ok(mut events) => {
-            let receiver = BatchNotifier::maybe_apply_to_events(acknowledgements, &mut events);
+            let receiver = BatchNotifier::maybe_apply_to(acknowledgements, &mut events);
             let count = events.len();
 
             if let Some(name) = output {
@@ -413,12 +445,16 @@ fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMe
 }
 
 // https://github.com/DataDog/datadog-agent/blob/a33248c2bc125920a9577af1e16f12298875a4ad/pkg/logs/processor/json.go#L23-L49
-#[derive(Deserialize, Clone, Serialize, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct LogMsg {
     pub message: Bytes,
     pub status: Bytes,
-    pub timestamp: i64,
+    #[serde(
+        deserialize_with = "ts_milliseconds::deserialize",
+        serialize_with = "ts_milliseconds::serialize"
+    )]
+    pub timestamp: DateTime<Utc>,
     pub hostname: Bytes,
     pub service: Bytes,
     pub ddsource: Bytes,

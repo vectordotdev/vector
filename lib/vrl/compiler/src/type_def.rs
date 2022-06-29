@@ -1,4 +1,4 @@
-//! TypeDefs
+//! `TypeDefs`
 //!
 //! The type definitions for typedefs record the various possible type definitions for the state
 //! that can be passed through a VRL program.
@@ -67,6 +67,7 @@ impl DerefMut for TypeDef {
 }
 
 impl TypeDef {
+    #[must_use]
     pub fn kind(&self) -> &Kind {
         &self.kind
     }
@@ -79,12 +80,12 @@ impl TypeDef {
             .find_at_path(path)
             .ok()
             .flatten()
-            .map(Cow::into_owned)
-            .unwrap_or_else(Kind::any);
+            .map_or_else(Kind::any, Cow::into_owned);
 
         Self { fallible, kind }
     }
 
+    #[must_use]
     pub fn for_path(self, path: &Lookup<'_>) -> TypeDef {
         let fallible = self.fallible;
         let kind = self
@@ -102,100 +103,124 @@ impl TypeDef {
     }
 
     #[inline]
+    #[must_use]
     pub fn fallible(mut self) -> Self {
         self.fallible = true;
         self
     }
 
     #[inline]
+    #[must_use]
     pub fn infallible(mut self) -> Self {
         self.fallible = false;
         self
     }
 
     #[inline]
+    #[must_use]
     pub fn with_fallibility(mut self, fallible: bool) -> Self {
         self.fallible = fallible;
         self
     }
 
     #[inline]
+    #[must_use]
     pub fn any() -> Self {
         Kind::any().into()
     }
 
     #[inline]
+    #[must_use]
     pub fn bytes() -> Self {
         Kind::bytes().into()
     }
 
     #[inline]
+    #[must_use]
     pub fn add_bytes(mut self) -> Self {
         self.kind.add_bytes();
         self
     }
 
     #[inline]
+    #[must_use]
     pub fn integer() -> Self {
         Kind::integer().into()
     }
 
     #[inline]
+    #[must_use]
     pub fn add_integer(mut self) -> Self {
         self.kind.add_integer();
         self
     }
 
     #[inline]
+    #[must_use]
     pub fn float() -> Self {
         Kind::float().into()
     }
 
     #[inline]
+    #[must_use]
     pub fn add_float(mut self) -> Self {
         self.kind.add_float();
         self
     }
 
     #[inline]
+    #[must_use]
     pub fn boolean() -> Self {
         Kind::boolean().into()
     }
 
     #[inline]
+    #[must_use]
     pub fn add_boolean(mut self) -> Self {
         self.kind.add_boolean();
         self
     }
 
     #[inline]
+    #[must_use]
     pub fn timestamp() -> Self {
         Kind::timestamp().into()
     }
 
     #[inline]
+    #[must_use]
     pub fn add_timestamp(mut self) -> Self {
         self.kind.add_timestamp();
         self
     }
 
     #[inline]
+    #[must_use]
     pub fn regex() -> Self {
         Kind::regex().into()
     }
 
     #[inline]
+    #[must_use]
     pub fn add_regex(mut self) -> Self {
         self.kind.add_regex();
         self
     }
 
     #[inline]
+    #[must_use]
     pub fn null() -> Self {
         Kind::null().into()
     }
 
     #[inline]
+    #[must_use]
+    pub fn never() -> Self {
+        Kind::never().into()
+    }
+
+    #[inline]
+    #[must_use]
     pub fn add_null(mut self) -> Self {
         self.kind.add_null();
         self
@@ -220,6 +245,7 @@ impl TypeDef {
     ///
     /// `TypeDef`s fallibility is kept unmodified.
     #[inline]
+    #[must_use]
     pub fn restrict_array(self) -> Self {
         let fallible = self.fallible;
         let collection = match self.kind.into_array() {
@@ -252,6 +278,7 @@ impl TypeDef {
     ///
     /// `TypeDef`s fallibility is kept unmodified.
     #[inline]
+    #[must_use]
     pub fn restrict_object(self) -> Self {
         let fallible = self.fallible;
         let collection = match self.kind.into_object() {
@@ -266,6 +293,7 @@ impl TypeDef {
     }
 
     #[inline]
+    #[must_use]
     pub fn with_kind(mut self, kind: Kind) -> Self {
         self.kind = kind;
         self
@@ -276,6 +304,7 @@ impl TypeDef {
     ///
     /// Used for functions that cant determine which indexes of a collection have been used in the
     /// result.
+    #[must_use]
     pub fn collect_subtypes(mut self) -> Self {
         if let Some(object) = self.kind.as_object_mut() {
             object.set_unknown(None);
@@ -291,10 +320,12 @@ impl TypeDef {
 
     // -------------------------------------------------------------------------
 
+    #[must_use]
     pub fn is_fallible(&self) -> bool {
         self.fallible
     }
 
+    #[must_use]
     pub fn is_infallible(&self) -> bool {
         !self.is_fallible()
     }
@@ -310,22 +341,12 @@ impl TypeDef {
         self
     }
 
+    #[must_use]
     pub fn merge_deep(mut self, other: Self) -> Self {
         self.merge(
             other,
             merge::Strategy {
-                depth: merge::Depth::Deep,
-                indices: merge::Indices::Keep,
-            },
-        );
-        self
-    }
-
-    pub fn merge_shallow(mut self, other: Self) -> Self {
-        self.merge(
-            other,
-            merge::Strategy {
-                depth: merge::Depth::Shallow,
+                collisions: merge::CollisionStrategy::Union,
                 indices: merge::Indices::Keep,
             },
         );
@@ -337,11 +358,12 @@ impl TypeDef {
     /// When merging arrays, the elements of `other` are *appended* to the elements of `self`.
     /// Meaning, the indices of `other` are updated, to continue onward from the last index of
     /// `self`.
+    #[must_use]
     pub fn merge_append(mut self, other: Self) -> Self {
         self.merge(
             other,
             merge::Strategy {
-                depth: merge::Depth::Shallow,
+                collisions: merge::CollisionStrategy::Overwrite,
                 indices: merge::Indices::Append,
             },
         );
@@ -350,28 +372,24 @@ impl TypeDef {
 
     pub fn merge(&mut self, other: Self, strategy: merge::Strategy) {
         self.fallible |= other.fallible;
+        self.kind.merge(other.kind, strategy);
+    }
 
-        // NOTE: technically we shouldn't do this, but to keep backward compatibility with the
-        // "old" `Kind` implementation, we consider a type that is marked as "any" equal to the old
-        // implementation's `unknown`, which, when merging, would discard that type.
-        //
-        // see: https://github.com/vectordotdev/vector/blob/18415050b60b08197e8135b7659390256995e844/lib/vrl/compiler/src/type_def.rs#L428-L429
-        if !self.is_any() && other.is_any() {
-            // keep `self`'s `kind` definition
-        } else if self.is_any() && !other.is_any() {
-            // overwrite `self`'s `kind` definition with `others`'s
-            self.kind = other.kind;
+    #[must_use]
+    pub fn with_type_set_at_path(self, path: &Lookup, other: Self) -> Self {
+        if path.is_root() {
+            other
         } else {
-            // merge the two `kind`s
-            self.kind.merge(other.kind, strategy);
+            self.merge_overwrite(other.for_path(path))
         }
     }
 
+    #[must_use]
     pub fn merge_overwrite(mut self, other: Self) -> Self {
         self.merge(
             other,
             merge::Strategy {
-                depth: merge::Depth::Shallow,
+                collisions: merge::CollisionStrategy::Overwrite,
                 indices: merge::Indices::Keep,
             },
         );
@@ -398,4 +416,61 @@ impl From<TypeDef> for Kind {
 pub(crate) struct Details {
     pub(crate) type_def: TypeDef,
     pub(crate) value: Option<Value>,
+}
+
+impl Details {
+    /// Returns the union of 2 possible states
+    pub(crate) fn merge(self, other: Self) -> Self {
+        Self {
+            type_def: self.type_def.merge_deep(other.type_def),
+            value: if self.value == other.value {
+                self.value
+            } else {
+                None
+            },
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn merge_details_same_literal() {
+        let a = Details {
+            type_def: TypeDef::integer(),
+            value: Some(Value::from(5)),
+        };
+        let b = Details {
+            type_def: TypeDef::float(),
+            value: Some(Value::from(5)),
+        };
+        assert_eq!(
+            a.merge(b),
+            Details {
+                type_def: TypeDef::integer().add_float(),
+                value: Some(Value::from(5))
+            }
+        )
+    }
+
+    #[test]
+    fn merge_details_different_literal() {
+        let a = Details {
+            type_def: TypeDef::any(),
+            value: Some(Value::from(5)),
+        };
+        let b = Details {
+            type_def: TypeDef::object(Collection::empty()),
+            value: Some(Value::from(6)),
+        };
+        assert_eq!(
+            a.merge(b),
+            Details {
+                type_def: TypeDef::any(),
+                value: None
+            }
+        )
+    }
 }

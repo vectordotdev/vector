@@ -18,15 +18,15 @@ services:
       - "datadog-logs-integration-tests"
       - "--lib"
       - "::datadog::logs::"
-      - "--"
-      - "--nocapture"
     environment:
       - TEST_DATADOG_API_KEY
     volumes:
       - ${PWD}:/code
+      - target:/code/target
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
 
 volumes:
+  target: {}
   cargogit: {}
   cargoregistry: {}

@@ -45,11 +45,6 @@ impl Function for IpAton {
 
         Ok(Box::new(IpAtonFn { value }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        ip_aton(value)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -83,7 +78,7 @@ mod tests {
 
         valid {
             args: func_args![value: "1.2.3.4"],
-            want: Ok(value!(16909060)),
+            want: Ok(value!(16_909_060)),
             tdef: TypeDef::integer().fallible(),
         }
     ];

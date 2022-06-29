@@ -2,13 +2,11 @@ use std::fmt;
 
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 
-use crate::value::VrlValueConvert;
 use crate::{
-    expression::{Expr, Noop, Resolved},
+    expression::{Expr, Resolved},
     parser::Node,
     state::{ExternalEnv, LocalEnv},
-    value::Kind,
-    vm::OpCode,
+    value::{Kind, VrlValueConvert},
     Context, Expression, Span, TypeDef,
 };
 
@@ -36,12 +34,6 @@ impl Not {
             inner: Box::new(expr),
         })
     }
-
-    pub fn noop() -> Self {
-        Not {
-            inner: Box::new(Noop.into()),
-        }
-    }
 }
 
 impl Expression for Not {
@@ -53,17 +45,6 @@ impl Expression for Not {
         let fallible = self.inner.type_def(state).is_fallible();
 
         TypeDef::boolean().with_fallibility(fallible)
-    }
-
-    fn compile_to_vm(
-        &self,
-        vm: &mut crate::vm::Vm,
-        state: (&mut LocalEnv, &mut ExternalEnv),
-    ) -> std::result::Result<(), String> {
-        self.inner.compile_to_vm(vm, state)?;
-        vm.write_opcode(OpCode::Not);
-
-        Ok(())
     }
 }
 
@@ -103,7 +84,7 @@ impl std::error::Error for Error {
 
 impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
-        use ErrorVariant::*;
+        use ErrorVariant::NonBoolean;
 
         match &self.variant {
             NonBoolean(..) => 660,
@@ -111,7 +92,7 @@ impl DiagnosticMessage for Error {
     }
 
     fn labels(&self) -> Vec<Label> {
-        use ErrorVariant::*;
+        use ErrorVariant::NonBoolean;
 
         match &self.variant {
             NonBoolean(kind) => vec![
@@ -125,7 +106,7 @@ impl DiagnosticMessage for Error {
     }
 
     fn notes(&self) -> Vec<Note> {
-        use ErrorVariant::*;
+        use ErrorVariant::NonBoolean;
 
         match &self.variant {
             NonBoolean(..) => {

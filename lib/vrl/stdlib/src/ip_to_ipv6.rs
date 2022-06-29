@@ -48,11 +48,6 @@ impl Function for IpToIpv6 {
 
         Ok(Box::new(IpToIpv6Fn { value }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        ip_to_ipv6(value)
-    }
 }
 
 #[derive(Debug, Clone)]

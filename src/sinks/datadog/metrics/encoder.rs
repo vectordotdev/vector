@@ -22,14 +22,14 @@ use super::config::{
 };
 use crate::{
     common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
-    sinks::util::{encode_namespace, Compressor},
+    sinks::util::{encode_namespace, Compression, Compressor},
 };
 
 const SERIES_PAYLOAD_HEADER: &[u8] = b"{\"series\":[";
 const SERIES_PAYLOAD_FOOTER: &[u8] = b"]}";
 const SERIES_PAYLOAD_DELIMITER: &[u8] = b",";
 
-mod ddsketch_proto {
+mod ddmetric_proto {
     include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
 }
 
@@ -520,12 +520,12 @@ where
                     let k = bins.into_iter().map(Into::into).collect();
                     let n = counts.into_iter().map(Into::into).collect();
 
-                    let sketch = ddsketch_proto::sketch_payload::Sketch {
+                    let sketch = ddmetric_proto::sketch_payload::Sketch {
                         metric: name,
                         tags,
                         host,
                         distributions: Vec::new(),
-                        dogsketches: vec![ddsketch_proto::sketch_payload::sketch::Dogsketch {
+                        dogsketches: vec![ddmetric_proto::sketch_payload::sketch::Dogsketch {
                             ts,
                             cnt,
                             min,
@@ -546,7 +546,7 @@ where
         }
     }
 
-    let sketch_payload = ddsketch_proto::SketchPayload {
+    let sketch_payload = ddmetric_proto::SketchPayload {
         // TODO: The "common metadata" fields are things that only very loosely apply to Vector, or
         // are hard to characterize -- for example, what's the API key for a sketch that didn't originate
         // from the Datadog Agent? -- so we're just omitting it here in the hopes it doesn't
@@ -560,7 +560,7 @@ where
 }
 
 fn get_compressor() -> Compressor {
-    Compressor::zlib_default()
+    Compression::zlib_default().into()
 }
 
 const fn max_uncompressed_header_len() -> usize {
@@ -678,13 +678,14 @@ mod tests {
 
     fn get_simple_counter() -> Metric {
         let value = MetricValue::Counter { value: 3.14 };
-        Metric::new("basic_counter", MetricKind::Incremental, value)
+        Metric::new("basic_counter", MetricKind::Incremental, value).with_timestamp(Some(ts()))
     }
 
     fn get_simple_sketch() -> Metric {
         let mut ddsketch = AgentDDSketch::with_agent_defaults();
         ddsketch.insert(3.14);
         Metric::new("basic_counter", MetricKind::Incremental, ddsketch.into())
+            .with_timestamp(Some(ts()))
     }
 
     fn get_compressed_empty_series_payload() -> Bytes {

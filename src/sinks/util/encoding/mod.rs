@@ -21,11 +21,11 @@
 //!
 //! ### [`EncodingConfigWithDefault<E>`]
 //!
-//! This configuration type is practically identical to [`EncodingConfigWithDefault<E>`], except it
-//! will use the `Default` implementation of `E` to create the codec if a value isn't specified in
-//! the configuration when deserialized.  Similarly, it won't write the codec during serialization
-//! if it's already the default value.  This is good when there's an obvious default codec to use,
-//! but you still want to provide the ability to change it.
+//! This configuration type is practically identical to [`EncodingConfig<E>`], except it will use
+//! the `Default` implementation of `E` to create the codec if a value isn't specified in the
+//! configuration when deserialized.  Similarly, it won't write the codec during serialization if
+//! it's already the default value.  This is good when there's an obvious default codec to use, but
+//! you still want to provide the ability to change it.
 //!
 //! ### [`EncodingConfigFixed<E>`]
 //!
@@ -78,6 +78,7 @@ use codecs::encoding::Framer;
 pub use config::EncodingConfig;
 pub use fixed::EncodingConfigFixed;
 use lookup::lookup_v2::{parse_path, OwnedPath};
+use lookup::path;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder as _;
 pub use with_default::EncodingConfigWithDefault;
@@ -94,17 +95,6 @@ pub trait Encoder<T> {
     ///
     /// If an I/O error is encountered while encoding the input, an error variant will be returned.
     fn encode_input(&self, input: T, writer: &mut dyn io::Write) -> io::Result<usize>;
-
-    /// Encodes the input into a String.
-    ///
-    /// # Errors
-    ///
-    /// If an I/O error is encountered while encoding the input, an error variant will be returned.
-    fn encode_input_to_string(&self, input: T) -> io::Result<String> {
-        let mut buffer = vec![];
-        self.encode_input(input, &mut buffer)?;
-        Ok(String::from_utf8_lossy(&buffer).to_string())
-    }
 }
 
 impl Encoder<Vec<Event>> for (Transformer, crate::codecs::Encoder<Framer>) {
@@ -115,19 +105,18 @@ impl Encoder<Vec<Event>> for (Transformer, crate::codecs::Encoder<Framer>) {
     ) -> io::Result<usize> {
         let mut encoder = self.1.clone();
         let mut bytes_written = 0;
-        if events.is_empty() {
-            bytes_written += writer.write(encoder.batch_prefix())?;
-            bytes_written += writer.write(encoder.batch_suffix())?;
-        } else {
-            let last = events.pop().unwrap();
-            bytes_written += writer.write(encoder.batch_prefix())?;
+        let batch_prefix = encoder.batch_prefix();
+        writer.write_all(batch_prefix)?;
+        bytes_written += batch_prefix.len();
+        if let Some(last) = events.pop() {
             for mut event in events {
                 self.0.transform(&mut event);
                 let mut bytes = BytesMut::new();
                 encoder
                     .encode(event, &mut bytes)
                     .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-                bytes_written += writer.write(&bytes)?;
+                writer.write_all(&bytes)?;
+                bytes_written += bytes.len();
             }
             let mut event = last;
             self.0.transform(&mut event);
@@ -135,9 +124,12 @@ impl Encoder<Vec<Event>> for (Transformer, crate::codecs::Encoder<Framer>) {
             encoder
                 .serialize(event, &mut bytes)
                 .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-            bytes_written += writer.write(&bytes)?;
-            bytes_written += writer.write(encoder.batch_suffix())?;
+            writer.write_all(&bytes)?;
+            bytes_written += bytes.len();
         }
+        let batch_suffix = encoder.batch_suffix();
+        writer.write_all(batch_suffix)?;
+        bytes_written += batch_suffix.len();
 
         Ok(bytes_written)
     }
@@ -151,7 +143,8 @@ impl Encoder<Event> for (Transformer, crate::codecs::Encoder<()>) {
         encoder
             .serialize(event, &mut bytes)
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-        writer.write(&bytes)
+        writer.write_all(&bytes)?;
+        Ok(bytes.len())
     }
 }
 
@@ -168,15 +161,17 @@ pub trait EncodingConfiguration {
 
     fn apply_only_fields(&self, log: &mut LogEvent) {
         if let Some(only_fields) = &self.only_fields() {
-            let mut to_remove = log
-                .keys()
-                .filter(|field| {
-                    let field_path = parse_path(field);
-                    !only_fields
-                        .iter()
-                        .any(|only| field_path.segments.starts_with(&only.segments[..]))
-                })
-                .collect::<Vec<_>>();
+            let mut to_remove = match log.keys() {
+                Some(keys) => keys
+                    .filter(|field| {
+                        let field_path = parse_path(field);
+                        !only_fields
+                            .iter()
+                            .any(|only| field_path.segments.starts_with(&only.segments[..]))
+                    })
+                    .collect::<Vec<_>>(),
+                None => vec![],
+            };
 
             // reverse sort so that we delete array elements at the end first rather than
             // the start so that any `nulls` at the end are dropped and empty arrays are
@@ -199,14 +194,26 @@ pub trait EncodingConfiguration {
         if let Some(timestamp_format) = &self.timestamp_format() {
             match timestamp_format {
                 TimestampFormat::Unix => {
-                    let mut unix_timestamps = Vec::new();
-                    for (k, v) in log.all_fields() {
-                        if let Value::Timestamp(ts) = v {
-                            unix_timestamps.push((k.clone(), Value::Integer(ts.timestamp())));
+                    if log.value().is_object() {
+                        let mut unix_timestamps = Vec::new();
+                        for (k, v) in log.all_fields().expect("must be an object") {
+                            if let Value::Timestamp(ts) = v {
+                                unix_timestamps.push((k.clone(), Value::Integer(ts.timestamp())));
+                            }
                         }
-                    }
-                    for (k, v) in unix_timestamps {
-                        log.insert(k.as_str(), v);
+                        for (k, v) in unix_timestamps {
+                            log.insert(k.as_str(), v);
+                        }
+                    } else {
+                        // root is not an object
+                        let timestamp = if let Value::Timestamp(ts) = log.value() {
+                            Some(ts.timestamp())
+                        } else {
+                            None
+                        };
+                        if let Some(ts) = timestamp {
+                            log.insert(path!(), Value::Integer(ts));
+                        }
                     }
                 }
                 // RFC3339 is the default serialization of a timestamp.
@@ -327,11 +334,12 @@ pub enum TimestampFormat {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use codecs::{
-        CharacterDelimitedEncoder, JsonSerializer, NewlineDelimitedEncoder, RawMessageSerializer,
+        CharacterDelimitedEncoder, JsonSerializer, NewlineDelimitedEncoder, TextSerializer,
     };
     use indoc::indoc;
-    use vector_common::btreemap;
 
     use super::*;
     use crate::{config::log_schema, sinks::util::encoding::Transformer};
@@ -393,9 +401,8 @@ mod tests {
     fn test_except() {
         let config: TestConfig = toml::from_str(TOML_EXCEPT_FIELD).unwrap();
         config.encoding.validate().unwrap();
-        let mut event = Event::new_empty_log();
+        let mut log = LogEvent::default();
         {
-            let log = event.as_mut_log();
             log.insert("a", 1);
             log.insert("a.b", 1);
             log.insert("a.b.c", 1);
@@ -408,6 +415,7 @@ mod tests {
             log.insert("e.a", 1);
             log.insert("e.b", 1);
         }
+        let mut event = Event::from(log);
         config.encoding.apply_rules(&mut event);
         assert!(!event.as_mut_log().contains("a.b.c"));
         assert!(!event.as_mut_log().contains("b"));
@@ -429,9 +437,8 @@ mod tests {
     fn test_only() {
         let config: TestConfig = toml::from_str(TOML_ONLY_FIELD).unwrap();
         config.encoding.validate().unwrap();
-        let mut event = Event::new_empty_log();
+        let mut log = LogEvent::default();
         {
-            let log = event.as_mut_log();
             log.insert("a", 1);
             log.insert("a.b", 1);
             log.insert("a.b.c", 1);
@@ -446,9 +453,10 @@ mod tests {
             log.insert("e[1]", 1);
             log.insert("\"f.z\"", 1);
             log.insert("\"g.z\"", 1);
-            log.insert("h", btreemap! {});
+            log.insert("h", BTreeMap::new());
             log.insert("i", Vec::<Value>::new());
         }
+        let mut event = Event::from(log);
         config.encoding.apply_rules(&mut event);
         assert!(event.as_mut_log().contains("a.b.c"));
         assert!(event.as_mut_log().contains("b"));
@@ -537,9 +545,10 @@ mod tests {
         let mut writer = Vec::new();
         let written = encoding
             .encode_input(
-                vec![Event::from(btreemap! {
-                    "key" => "value"
-                })],
+                vec![Event::Log(LogEvent::from(BTreeMap::from([(
+                    String::from("key"),
+                    Value::from("value"),
+                )])))],
                 &mut writer,
             )
             .unwrap();
@@ -562,15 +571,18 @@ mod tests {
         let written = encoding
             .encode_input(
                 vec![
-                    Event::from(btreemap! {
-                        "key" => "value1"
-                    }),
-                    Event::from(btreemap! {
-                        "key" => "value2"
-                    }),
-                    Event::from(btreemap! {
-                        "key" => "value3"
-                    }),
+                    Event::Log(LogEvent::from(BTreeMap::from([(
+                        String::from("key"),
+                        Value::from("value1"),
+                    )]))),
+                    Event::Log(LogEvent::from(BTreeMap::from([(
+                        String::from("key"),
+                        Value::from("value2"),
+                    )]))),
+                    Event::Log(LogEvent::from(BTreeMap::from([(
+                        String::from("key"),
+                        Value::from("value3"),
+                    )]))),
                 ],
                 &mut writer,
             )
@@ -613,9 +625,10 @@ mod tests {
         let mut writer = Vec::new();
         let written = encoding
             .encode_input(
-                vec![Event::from(btreemap! {
-                    "key" => "value"
-                })],
+                vec![Event::Log(LogEvent::from(BTreeMap::from([(
+                    String::from("key"),
+                    Value::from("value"),
+                )])))],
                 &mut writer,
             )
             .unwrap();
@@ -638,15 +651,18 @@ mod tests {
         let written = encoding
             .encode_input(
                 vec![
-                    Event::from(btreemap! {
-                        "key" => "value1"
-                    }),
-                    Event::from(btreemap! {
-                        "key" => "value2"
-                    }),
-                    Event::from(btreemap! {
-                        "key" => "value3"
-                    }),
+                    Event::Log(LogEvent::from(BTreeMap::from([(
+                        String::from("key"),
+                        Value::from("value1"),
+                    )]))),
+                    Event::Log(LogEvent::from(BTreeMap::from([(
+                        String::from("key"),
+                        Value::from("value2"),
+                    )]))),
+                    Event::Log(LogEvent::from(BTreeMap::from([(
+                        String::from("key"),
+                        Value::from("value3"),
+                    )]))),
                 ],
                 &mut writer,
             )
@@ -669,9 +685,10 @@ mod tests {
         let mut writer = Vec::new();
         let written = encoding
             .encode_input(
-                Event::from(btreemap! {
-                    "key" => "value"
-                }),
+                Event::Log(LogEvent::from(BTreeMap::from([(
+                    String::from("key"),
+                    Value::from("value"),
+                )]))),
                 &mut writer,
             )
             .unwrap();
@@ -684,15 +701,16 @@ mod tests {
     fn test_encode_event_text() {
         let encoding = (
             Transformer::default(),
-            crate::codecs::Encoder::<()>::new(RawMessageSerializer::new().into()),
+            crate::codecs::Encoder::<()>::new(TextSerializer::new().into()),
         );
 
         let mut writer = Vec::new();
         let written = encoding
             .encode_input(
-                Event::from(btreemap! {
-                    "message" => "value"
-                }),
+                Event::Log(LogEvent::from(BTreeMap::from([(
+                    String::from("message"),
+                    Value::from("value"),
+                )]))),
                 &mut writer,
             )
             .unwrap();

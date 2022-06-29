@@ -9,7 +9,7 @@ fn parse_regex(value: Value, numeric_groups: bool, pattern: &Regex) -> Resolved 
     let value = String::from_utf8_lossy(&bytes);
     let parsed = pattern
         .captures(&value)
-        .map(|capture| util::capture_regex_to_map(pattern, capture, numeric_groups))
+        .map(|capture| util::capture_regex_to_map(pattern, &capture, numeric_groups))
         .ok_or("could not find any pattern matches")?;
     Ok(parsed.into())
 }
@@ -109,21 +109,6 @@ impl Function for ParseRegex {
             }
             _ => Ok(None),
         }
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let pattern = args
-            .required_any("pattern")
-            .downcast_ref::<regex::Regex>()
-            .ok_or("no pattern")?;
-        let value = args.required("value");
-        let numeric_groups = args
-            .optional("numeric_groups")
-            .map(|value| value.try_boolean())
-            .transpose()?
-            .unwrap_or(false);
-
-        parse_regex(value, numeric_groups, pattern)
     }
 }
 

@@ -14,7 +14,7 @@ use crate::{
             acknowledgements::HecClientAcknowledgementsConfig,
             build_healthcheck, build_http_batch_service, create_client, host_key,
             service::{HecService, HttpRequestBuilder},
-            SplunkHecDefaultBatchSettings,
+            EndpointTarget, SplunkHecDefaultBatchSettings,
         },
         util::{
             http::HttpRetryLogic, BatchConfig, Compression, ServiceBuilderExt, TowerRequestConfig,
@@ -116,6 +116,7 @@ impl HecMetricsSinkConfig {
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
         let http_request_builder = Arc::new(HttpRequestBuilder::new(
             self.endpoint.clone(),
+            EndpointTarget::default(),
             self.default_token.clone(),
             self.compression,
         ));
@@ -124,6 +125,7 @@ impl HecMetricsSinkConfig {
             .service(build_http_batch_service(
                 client,
                 Arc::clone(&http_request_builder),
+                EndpointTarget::Event,
             ));
 
         let service = HecService::new(

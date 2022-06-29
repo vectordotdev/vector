@@ -2,7 +2,7 @@ version: "3"
 
 services:
   eventstoredb:
-    image: eventstore/eventstore
+    image: docker.io/eventstore/eventstore
     command: --insecure --stats-period-sec=1
     network_mode: host
     volumes:
@@ -20,20 +20,21 @@ services:
       - "nextest"
       - "run"
       - "--no-fail-fast"
+      - "--no-capture"
       - "--no-default-features"
       - "--features"
       - "eventstoredb_metrics-integration-tests"
       - "--lib"
       - "::eventstoredb_metrics::"
-      - "--"
-      - "--nocapture"
     depends_on:
       - eventstoredb
     volumes:
       - ${PWD}:/code
+      - target:/code/target
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
 
 volumes:
+  target: {}
   cargogit: {}
   cargoregistry: {}

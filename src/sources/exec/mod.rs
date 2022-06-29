@@ -11,7 +11,6 @@ use codecs::{
     StreamDecodingError,
 };
 use futures::{FutureExt, StreamExt};
-use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use snafu::Snafu;
 use tokio::{
@@ -22,6 +21,7 @@ use tokio::{
 };
 use tokio_stream::wrappers::IntervalStream;
 use tokio_util::codec::FramedRead;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -37,47 +37,80 @@ use crate::{
     shutdown::ShutdownSignal,
     SourceSender,
 };
+use lookup::path;
 
 pub mod sized_bytes_codec;
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `exec` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(default, deny_unknown_fields)]
 pub struct ExecConfig {
+    #[configurable(derived)]
     pub mode: Mode,
+
+    #[configurable(derived)]
     pub scheduled: Option<ScheduledConfig>,
+
+    #[configurable(derived)]
     pub streaming: Option<StreamingConfig>,
+
+    /// The command to be run, plus any arguments required.
     pub command: Vec<String>,
+
+    /// The directory in which to run the command.
     pub working_directory: Option<PathBuf>,
+
+    /// Whether or not the output from stderr should be included when generating events.
     #[serde(default = "default_include_stderr")]
     pub include_stderr: bool,
+
+    /// The maximum buffer size allowed before a log event will be generated.
     #[serde(default = "default_maximum_buffer_size")]
     pub maximum_buffer_size_bytes: usize,
+
+    #[configurable(derived)]
     framing: Option<FramingConfig>,
+
+    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
 }
 
-// TODO: Would be nice to combine the scheduled and streaming config with the mode enum once
-//       this serde ticket has been addressed (https://github.com/serde-rs/serde/issues/2013)
-#[derive(Deserialize, Serialize, Debug, Clone, Copy)]
+/// Mode of operation for running the command.
+#[configurable_component]
+#[derive(Clone, Copy, Debug)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Mode {
+    /// The command is run on a schedule.
     Scheduled,
+
+    /// The command is run until it exits, potentially being restarted.
     Streaming,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration options for scheduled commands.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ScheduledConfig {
+    /// The interval, in seconds, between scheduled command runs.
+    ///
+    /// If the command takes longer than `exec_interval_secs` to run, it will be killed.
     #[serde(default = "default_exec_interval_secs")]
     exec_interval_secs: u64,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration options for streaming commands.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct StreamingConfig {
+    /// Whether or not the command should be rerun if the command exits.
     #[serde(default = "default_respawn_on_exit")]
     respawn_on_exit: bool,
+
+    /// The amount of time, in seconds, that Vector will wait before rerunning a streaming command that exited.
     #[serde(default = "default_respawn_interval_secs")]
     respawn_interval_secs: u64,
 }
@@ -493,12 +526,12 @@ fn handle_event(
 
         // Add data stream of stdin or stderr (if needed)
         if let Some(data_stream) = data_stream {
-            log.try_insert_flat(STREAM_KEY, data_stream.clone());
+            log.try_insert(path!(STREAM_KEY), data_stream.clone());
         }
 
         // Add pid (if needed)
         if let Some(pid) = pid {
-            log.try_insert_flat(PID_KEY, pid as i64);
+            log.try_insert(path!(PID_KEY), pid as i64);
         }
 
         // Add hostname (if needed)
@@ -507,7 +540,7 @@ fn handle_event(
         }
 
         // Add command
-        log.try_insert_flat(COMMAND_KEY, config.command.clone());
+        log.try_insert(path!(COMMAND_KEY), config.command.clone());
     }
 }
 
@@ -554,7 +587,7 @@ mod tests {
     use futures::task::Poll;
 
     use super::*;
-    use crate::test_util::trace_init;
+    use crate::{event::LogEvent, test_util::trace_init};
 
     #[test]
     fn test_generate_config() {
@@ -568,7 +601,7 @@ mod tests {
         let data_stream = Some(STDOUT.to_string());
         let pid = Some(8888_u32);
 
-        let mut event = Bytes::from("hello world").into();
+        let mut event = LogEvent::from("hello world").into();
         handle_event(&config, &hostname, &data_stream, pid, &mut event);
         let log = event.as_log();
 
@@ -588,7 +621,7 @@ mod tests {
         let data_stream = Some(STDOUT.to_string());
         let pid = Some(8888_u32);
 
-        let mut event = Bytes::from("hello world").into();
+        let mut event = LogEvent::from("hello world").into();
         handle_event(&config, &hostname, &data_stream, pid, &mut event);
         let log = event.as_log();
 
@@ -704,7 +737,7 @@ mod tests {
             assert!(log.get(PID_KEY).is_some());
             assert!(log.get(log_schema().timestamp_key()).is_some());
 
-            assert_eq!(8, log.all_fields().count());
+            assert_eq!(8, log.all_fields().unwrap().count());
         } else {
             panic!("Expected to receive a linux event");
         }

@@ -1,32 +1,35 @@
 use ::value::Value;
 use vrl::prelude::*;
 
+#[inline]
 fn del(query: &expression::Query, ctx: &mut Context) -> Resolved {
     let path = query.path();
+
     if query.is_external() {
-        return Ok(ctx
+        Ok(ctx
             .target_mut()
             .target_remove(path, false)
             .ok()
             .flatten()
-            .unwrap_or(Value::Null));
-    }
-    if let Some(ident) = query.variable_ident() {
-        return match ctx.state_mut().variable_mut(ident) {
+            .unwrap_or(Value::Null))
+    } else if let Some(ident) = query.variable_ident() {
+        match ctx.state_mut().variable_mut(ident) {
             Some(value) => {
                 let new_value = value.get_by_path(path).cloned();
                 value.remove_by_path(path, false);
                 Ok(new_value.unwrap_or(Value::Null))
             }
             None => Ok(Value::Null),
-        };
-    }
-    if let Some(expr) = query.expression_target() {
+        }
+    } else if let Some(expr) = query.expression_target() {
         let value = expr.resolve(ctx)?;
 
-        return Ok(value.get_by_path(path).cloned().unwrap_or(Value::Null));
+        // No need to do the actual deletion, as the expression is only
+        // available as an argument to the function.
+        Ok(value.get_by_path(path).cloned().unwrap_or(Value::Null))
+    } else {
+        Ok(Value::Null)
     }
-    Ok(Value::Null)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -80,13 +83,22 @@ impl Function for Del {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        (local, external): (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let query = arguments.required_query("target")?;
 
-        Ok(Box::new(DelFn { query }))
+        if external.is_read_only_event_path(query.path()) {
+            return Err(vrl::function::Error::ReadOnlyMutation {
+                context: format!("{} is read-only, and cannot be deleted", query),
+            }
+            .into());
+        }
+
+        let return_type = query.type_def((local, external));
+
+        Ok(Box::new(DelFn { query, return_type }))
     }
 
     fn compile_argument(
@@ -114,25 +126,17 @@ impl Function for Del {
             _ => Ok(None),
         }
     }
-
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let query = args
-            .required_any("target")
-            .downcast_ref::<expression::Query>()
-            .unwrap();
-
-        del(query, ctx)
-    }
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct DelFn {
     query: expression::Query,
+    return_type: TypeDef,
 }
 
 impl DelFn {
     #[cfg(test)]
-    fn new(path: &str) -> Self {
+    fn new(path: &str, return_type: TypeDef) -> Self {
         use std::str::FromStr;
 
         Self {
@@ -140,6 +144,7 @@ impl DelFn {
                 expression::Target::External,
                 FromStr::from_str(path).unwrap(),
             ),
+            return_type,
         }
     }
 }
@@ -164,7 +169,8 @@ impl Expression for DelFn {
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
-        TypeDef::any()
+        // The return type can't be queried from the state since it was deleted in "update_state"
+        self.return_type.clone()
     }
 
     fn update_state(
@@ -175,17 +181,18 @@ impl Expression for DelFn {
         // FIXME(Jean): This should also delete non-external queries, as `del(foo.bar)` is
         // supported.
         if self.query.is_external() {
-            match self.query.delete_type_def(external) {
-                Err(value::kind::remove::Error::RootPath)
-                | Err(value::kind::remove::Error::CoalescedPath)
-                | Err(value::kind::remove::Error::NegativeIndexPath) => {
-                    // This function is (currently) infallible, so we ignore any errors here.
-                    //
-                    // see: https://github.com/vectordotdev/vector/issues/11264
-                }
-                Ok(_) => {}
+            if let Err(
+                value::kind::remove::Error::RootPath
+                | value::kind::remove::Error::CoalescedPath
+                | value::kind::remove::Error::NegativeIndexPath,
+            ) = self.query.delete_type_def(external)
+            {
+                // This function is (currently) infallible, so we ignore any errors here.
+                //
+                // see: https://github.com/vectordotdev/vector/issues/11264
             }
         }
+
         Ok(())
     }
 }
@@ -209,43 +216,43 @@ mod tests {
                 // String field exists
                 btreemap! { "exists" => "value" },
                 Ok(value!("value")),
-                DelFn::new("exists"),
+                DelFn::new("exists", TypeDef::bytes()),
             ),
             (
                 // String field doesn't exist
                 btreemap! { "exists" => "value" },
                 Ok(value!(null)),
-                DelFn::new("does_not_exist"),
+                DelFn::new("does_not_exist", TypeDef::null()),
             ),
             (
                 // Array field exists
                 btreemap! { "exists" => value!([1, 2, 3]) },
                 Ok(value!([1, 2, 3])),
-                DelFn::new("exists"),
+                DelFn::new("exists", value!([1, 2, 3]).kind().into()),
             ),
             (
                 // Null field exists
                 btreemap! { "exists" => value!(null) },
                 Ok(value!(null)),
-                DelFn::new("exists"),
+                DelFn::new("exists", TypeDef::null()),
             ),
             (
                 // Map field exists
                 btreemap! {"exists" => btreemap! { "foo" => "bar" }},
                 Ok(value!(btreemap! {"foo" => "bar" })),
-                DelFn::new("exists"),
+                DelFn::new("exists", value!(btreemap! {"foo" => "bar" }).kind().into()),
             ),
             (
                 // Integer field exists
                 btreemap! { "exists" => 127 },
                 Ok(value!(127)),
-                DelFn::new("exists"),
+                DelFn::new("exists", TypeDef::integer()),
             ),
             (
                 // Array field exists
                 btreemap! {"exists" => value!([1, 2, 3]) },
                 Ok(value!(2)),
-                DelFn::new(".exists[1]"),
+                DelFn::new(".exists[1]", TypeDef::integer()),
             ),
         ];
         let tz = TimeZone::default();

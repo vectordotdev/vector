@@ -2,20 +2,20 @@ version: "3"
 
 services:
   squid:
-    image: babim/squid
+    image: docker.io/babim/squid
     depends_on:
       - nginx-proxy
     networks:
       - public
       - proxy
   nginx:
-    image: nginx:1.19.4
+    image: docker.io/nginx:1.19.4
     networks:
       - public
     volumes:
       - ${PWD}/tests/data/nginx/:/etc/nginx:ro
   nginx-proxy:
-    image: nginx:1.19.4
+    image: docker.io/nginx:1.19.4
     networks:
       - proxy
     volumes:
@@ -37,8 +37,6 @@ services:
       - "nginx-integration-tests"
       - "--lib"
       - "::nginx_metrics::"
-      - "--"
-      - "--nocapture"
     depends_on:
       - nginx
       - squid
@@ -50,6 +48,7 @@ services:
       - public
     volumes:
       - ${PWD}:/code
+      - target:/code/target
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
 
@@ -58,5 +57,6 @@ networks:
   proxy: {}
 
 volumes:
+  target: {}
   cargogit: {}
   cargoregistry: {}

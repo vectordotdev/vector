@@ -8,12 +8,12 @@ mkfile_dir := $(dir $(mkfile_path))
 ifeq ($(OS),Windows_NT) # is Windows_NT on XP, 2000, 7, Vista, 10...
     export OPERATING_SYSTEM := Windows
 	export RUST_TARGET ?= "x86_64-unknown-windows-msvc"
-    export DEFAULT_FEATURES = default-msvc
+    export FEATURES ?= default-msvc
 	undefine DNSTAP_BENCHES
 else
     export OPERATING_SYSTEM := $(shell uname)  # same as "uname -s"
 	export RUST_TARGET ?= "x86_64-unknown-linux-gnu"
-    export DEFAULT_FEATURES = default
+    export FEATURES ?= default
 	export DNSTAP_BENCHES := dnstap-benches
 endif
 
@@ -169,12 +169,12 @@ environment-push: environment-prepare ## Publish a new version of the container 
 build: check-build-tools
 build: export CFLAGS += -g0 -O3
 build: ## Build the project in release mode (Supports `ENVIRONMENT=true`)
-	${MAYBE_ENVIRONMENT_EXEC} cargo build --release --no-default-features --features ${DEFAULT_FEATURES}
+	${MAYBE_ENVIRONMENT_EXEC} cargo build --release --no-default-features --features ${FEATURES}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
 .PHONY: build-dev
 build-dev: ## Build the project in development mode (Supports `ENVIRONMENT=true`)
-	${MAYBE_ENVIRONMENT_EXEC} cargo build --no-default-features --features ${DEFAULT_FEATURES}
+	${MAYBE_ENVIRONMENT_EXEC} cargo build --no-default-features --features ${FEATURES}
 
 .PHONY: build-x86_64-unknown-linux-gnu
 build-x86_64-unknown-linux-gnu: target/x86_64-unknown-linux-gnu/release/vector ## Build a release binary for the x86_64-unknown-linux-gnu triple.
@@ -296,11 +296,11 @@ target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 # https://github.com/rust-lang/cargo/issues/6454
 .PHONY: test
 test: ## Run the unit test suite
-	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --workspace --no-fail-fast --no-default-features --features "${DEFAULT_FEATURES}" ${SCOPE}
+	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --workspace --no-fail-fast --no-default-features --features "${FEATURES}" ${SCOPE}
 
 .PHONY: test-docs
 test-docs: ## Run the docs test suite
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --doc --workspace --no-fail-fast --no-default-features --features "${DEFAULT_FEATURES}" ${SCOPE}
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --doc --workspace --no-fail-fast --no-default-features --features "${FEATURES}" ${SCOPE}
 
 .PHONY: test-all
 test-all: test test-docs test-behavior test-integration ## Runs all tests: unit, docs, behaviorial, and integration.
@@ -313,16 +313,26 @@ test-x86_64-unknown-linux-gnu: cross-test-x86_64-unknown-linux-gnu ## Runs unit 
 test-aarch64-unknown-linux-gnu: cross-test-aarch64-unknown-linux-gnu ## Runs unit tests on the aarch64-unknown-linux-gnu triple
 	${EMPTY}
 
+.PHONY: test-behavior-config
+test-behavior-config: ## Runs configuration related behaviorial tests
+	${MAYBE_ENVIRONMENT_EXEC} cargo build --bin secret-backend-example
+	${MAYBE_ENVIRONMENT_EXEC} cargo run -- test tests/behavior/config/*
+
+.PHONY: test-behavior-%
+test-behavior-%: ## Runs behaviorial test for a given category
+	${MAYBE_ENVIRONMENT_EXEC} cargo run -- test tests/behavior/$*/*
+
 .PHONY: test-behavior
-test-behavior: ## Runs behaviorial test
-	${MAYBE_ENVIRONMENT_EXEC} cargo run -- test tests/behavior/**/*
+test-behavior: ## Runs all behaviorial tests
+test-behavior: test-behavior-transforms test-behavior-formats test-behavior-config
 
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
 test-integration: test-integration-aws test-integration-azure test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
+test-integration: test-integration-azure test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
 test-integration: test-integration-eventstoredb test-integration-fluent test-integration-gcp test-integration-humio test-integration-influxdb
-test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb_metrics test-integration-nats
-test-integration: test-integration-nginx test-integration-postgresql_metrics test-integration-prometheus test-integration-pulsar
+test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb test-integration-nats
+test-integration: test-integration-nginx test-integration-postgres test-integration-prometheus test-integration-pulsar
 test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent test-integration-datadog-logs
 test-integration: test-integration-datadog-traces test-integration-shutdown
 
@@ -341,18 +351,6 @@ test-integration-datadog-agent: ## Runs Datadog Agent integration tests
 	RUST_VERSION=${RUST_VERSION} ${CONTAINER_TOOL}-compose -f scripts/integration/docker-compose.datadog-agent.yml run --rm runner
 ifeq ($(AUTODESPAWN), true)
 	make test-integration-datadog-agent-cleanup
-endif
-
-.PHONY: test-integration-nats
-test-integration-nats: ## Runs NATS integration tests
-ifeq ($(AUTOSPAWN), true)
-	@scripts/setup_integration_env.sh nats stop
-	@scripts/setup_integration_env.sh nats start
-	sleep 10 # Many services are very slow... Give them a sec..
-endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features nats-integration-tests --lib ::nats::
-ifeq ($(AUTODESPAWN), true)
-	@scripts/setup_integration_env.sh nats stop
 endif
 
 test-integration-%-cleanup:
@@ -425,7 +423,7 @@ bench-all: bench-remap-functions
 
 .PHONY: check
 check: ## Run prerequisite code checks
-	${MAYBE_ENVIRONMENT_EXEC} cargo check --all --no-default-features --features ${DEFAULT_FEATURES}
+	${MAYBE_ENVIRONMENT_EXEC} cargo check --all --no-default-features --features ${FEATURES}
 
 .PHONY: check-all
 check-all: ## Check everything
@@ -435,7 +433,7 @@ check-all: check-scripts
 
 .PHONY: check-component-features
 check-component-features: ## Check that all component features are setup properly
-	${MAYBE_ENVIRONMENT_EXEC} cargo hack check --workspace --keep-going --each-feature --exclude-features "sources-utils-http sources-utils-http-encoding sources-utils-http-prelude sources-utils-http-query sources-utils-tcp-keepalive sources-utils-tcp-socket sources-utils-tls sources-utils-udp sources-utils-unix sinks-utils-udp" --all-targets
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-component-features
 
 .PHONY: check-clippy
 check-clippy: ## Check code with Clippy
@@ -663,3 +661,7 @@ git-hooks: ## Add Vector-local git hooks for commit sign-off
 cargo-install-%: override TOOL = $(@:cargo-install-%=%)
 cargo-install-%:
 	$(if $(findstring true,$(AUTOINSTALL)),cargo install ${TOOL} --quiet; cargo clean,)
+
+.PHONY: ci-generate-publish-metadata
+ci-generate-publish-metadata: ## Generates the necessary metadata required for building/publishing Vector.
+	@scripts/ci-generate-publish-metadata.sh

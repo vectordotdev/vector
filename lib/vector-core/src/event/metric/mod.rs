@@ -4,12 +4,12 @@ use std::{
     collections::{btree_map, BTreeMap},
     convert::AsRef,
     fmt::{self, Display, Formatter},
-    sync::Arc,
 };
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use vector_common::EventDataEq;
+use vector_config::configurable_component;
 #[cfg(feature = "vrl")]
 use vrl_lib::prelude::VrlValueConvert;
 
@@ -102,14 +102,14 @@ impl Metric {
 
     /// Consumes this metric, returning it with an updated set of event finalizers attached to `batch`.
     #[must_use]
-    pub fn with_batch_notifier(mut self, batch: &Arc<BatchNotifier>) -> Self {
+    pub fn with_batch_notifier(mut self, batch: &BatchNotifier) -> Self {
         self.metadata = self.metadata.with_batch_notifier(batch);
         self
     }
 
     /// Consumes this metric, returning it with an optionally updated set of event finalizers attached to `batch`.
     #[must_use]
-    pub fn with_batch_notifier_option(mut self, batch: &Option<Arc<BatchNotifier>>) -> Self {
+    pub fn with_batch_notifier_option(mut self, batch: &Option<BatchNotifier>) -> Self {
         self.metadata = self.metadata.with_batch_notifier_option(batch);
         self
     }
@@ -416,13 +416,23 @@ impl Finalizable for Metric {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, PartialOrd, Serialize)]
+/// Metric kind.
+///
+/// Metrics can be either absolute of incremental. Absolute metrics represent a sort of "last write wins" scenario,
+/// where the latest absolute value seen is meant to be the actual metric value.  In constrast, and perhaps intuitively,
+/// incremental metrics are meant to be additive, such that we don't know what total value of the metric is, but we know
+/// that we'll be adding or subtracting the given value from it.
+///
+/// Generally speaking, most metrics storage systems deal with incremental updates. A notable exception is Prometheus,
+/// which deals with, and expects, absolute values from clients.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd)]
 #[serde(rename_all = "snake_case")]
-/// A metric may be an incremental value, updating the previous value of
-/// the metric, or absolute, which sets the reference for future
-/// increments.
 pub enum MetricKind {
+    /// Incremental metric.
     Incremental,
+
+    /// Absolute metric.
     Absolute,
 }
 

@@ -136,17 +136,6 @@ impl Function for Redact {
             _ => Ok(None),
         }
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let redactor = Redactor::Full;
-        let filters = args
-            .required_any("filters")
-            .downcast_ref::<Vec<Filter>>()
-            .unwrap();
-
-        Ok(redact(value, filters, &redactor))
-    }
 }
 
 //-----------------------------------------------------------------------------
@@ -294,7 +283,7 @@ enum Redactor {
 
 impl Redactor {
     fn pattern(&self) -> &str {
-        use Redactor::*;
+        use Redactor::Full;
 
         match self {
             Full => "[REDACTED]",
@@ -312,7 +301,7 @@ impl FromStr for Redactor {
     type Err = &'static str;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        use Redactor::*;
+        use Redactor::Full;
 
         match s {
             "full" => Ok(Full),

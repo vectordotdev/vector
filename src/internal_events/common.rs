@@ -65,34 +65,6 @@ impl<'a> InternalEvent for EndpointBytesSent<'a> {
     }
 }
 
-#[cfg(feature = "aws-core")]
-pub struct AwsBytesSent {
-    pub byte_size: usize,
-    pub region: Option<aws_types::region::Region>,
-}
-
-#[cfg(feature = "aws-core")]
-impl InternalEvent for AwsBytesSent {
-    fn emit(self) {
-        let region = self
-            .region
-            .as_ref()
-            .map(|r| r.as_ref().to_string())
-            .unwrap_or_default();
-        trace!(
-            message = "Bytes sent.",
-            protocol = "https",
-            byte_size = %self.byte_size,
-            region = ?self.region,
-        );
-        counter!(
-            "component_sent_bytes_total", self.byte_size as u64,
-            "protocol" => "https",
-            "region" => region,
-        );
-    }
-}
-
 const STREAM_CLOSED: &str = "stream_closed";
 
 #[derive(Debug)]
@@ -122,17 +94,6 @@ impl InternalEvent for StreamClosedError {
             "error_type" => error_type::WRITER_FAILED,
             "stage" => error_stage::SENDING,
         );
-    }
-}
-
-#[derive(Debug)]
-pub struct FieldOverwritten<'a> {
-    pub(crate) field: &'a str,
-}
-
-impl<'a> InternalEvent for FieldOverwritten<'a> {
-    fn emit(self) {
-        debug!(message = "Field overwritten.", field = %self.field, internal_log_rate_secs = 30);
     }
 }
 

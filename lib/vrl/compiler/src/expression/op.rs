@@ -3,12 +3,11 @@ use std::fmt;
 use diagnostic::{DiagnosticMessage, Label, Note, Span, Urls};
 use value::Value;
 
-use crate::state::{ExternalEnv, LocalEnv};
-use crate::value::VrlValueArithmetic;
 use crate::{
-    expression::{self, Expr, Noop, Resolved},
+    expression::{self, Expr, Resolved},
     parser::{ast, Node},
-    vm::OpCode,
+    state::{ExternalEnv, LocalEnv},
+    value::VrlValueArithmetic,
     Context, Expression, TypeDef,
 };
 
@@ -76,37 +75,29 @@ impl Op {
             opcode,
         })
     }
-
-    pub fn noop() -> Self {
-        let lhs = Box::new(Noop.into());
-        let rhs = Box::new(Noop.into());
-
-        Op {
-            lhs,
-            rhs,
-            opcode: ast::Opcode::Eq,
-        }
-    }
 }
 
 impl Expression for Op {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        use ast::Opcode::*;
-        use value::Value::*;
+        use ast::Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Merge, Mul, Ne, Or, Rem, Sub};
+        use value::Value::{Boolean, Null};
 
-        if let Err = self.opcode {
-            return self.lhs.resolve(ctx).or_else(|_| self.rhs.resolve(ctx));
-        } else if let Or = self.opcode {
-            return self
-                .lhs
-                .resolve(ctx)?
-                .try_or(|| self.rhs.resolve(ctx))
-                .map_err(Into::into);
-        } else if let And = self.opcode {
-            return match self.lhs.resolve(ctx)? {
-                Null | Boolean(false) => Ok(false.into()),
-                v => v.try_and(self.rhs.resolve(ctx)?).map_err(Into::into),
-            };
+        match self.opcode {
+            Err => return self.lhs.resolve(ctx).or_else(|_| self.rhs.resolve(ctx)),
+            Or => {
+                return self
+                    .lhs
+                    .resolve(ctx)?
+                    .try_or(|| self.rhs.resolve(ctx))
+                    .map_err(Into::into);
+            }
+            And => {
+                return match self.lhs.resolve(ctx)? {
+                    Null | Boolean(false) => Ok(false.into()),
+                    v => v.try_and(self.rhs.resolve(ctx)?).map_err(Into::into),
+                };
+            }
+            _ => (),
         };
 
         let lhs = self.lhs.resolve(ctx)?;
@@ -131,7 +122,7 @@ impl Expression for Op {
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
-        use ast::Opcode::*;
+        use ast::Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Merge, Mul, Ne, Or, Rem, Sub};
         use value::Kind as K;
 
         let mut lhs_def = self.lhs.type_def(state);
@@ -156,7 +147,7 @@ impl Expression for Op {
             Or if !lhs_def.is_boolean() => {
                 // We can remove Null from the lhs since we know that if the lhs is Null
                 // we will be taking the rhs and only the rhs type_def will then be relevant.
-                lhs_def.remove_null().expect("not empty");
+                lhs_def.remove_null();
 
                 lhs_def.merge_deep(rhs_def)
             }
@@ -164,7 +155,7 @@ impl Expression for Op {
             Or => lhs_def.merge_deep(rhs_def),
 
             // ... | ...
-            Merge => lhs_def.merge_deep(rhs_def),
+            Merge => lhs_def.merge_overwrite(rhs_def),
 
             // null && ...
             And if lhs_def.is_null() => rhs_def
@@ -280,105 +271,6 @@ impl Expression for Op {
                 .with_kind(K::integer().or_float()),
         }
     }
-
-    fn compile_to_vm(
-        &self,
-        vm: &mut crate::vm::Vm,
-        state: (&mut LocalEnv, &mut ExternalEnv),
-    ) -> Result<(), String> {
-        let (local, external) = state;
-
-        self.lhs.compile_to_vm(vm, (local, external))?;
-
-        let err_jump = if self.opcode != ast::Opcode::Err {
-            // For all Ops other than the Err op, we want to jump to the end of
-            // the statement if the lhs results in an error.
-            Some(vm.emit_jump(OpCode::JumpIfErr))
-        } else {
-            None
-        };
-
-        // Note, not all opcodes want the RHS evaluated straight away, so we
-        // only compile the rhs in each branch as necessary.
-        match self.opcode {
-            ast::Opcode::Mul => {
-                self.rhs.compile_to_vm(vm, (local, external))?;
-                vm.write_opcode(OpCode::Multiply);
-            }
-            ast::Opcode::Div => {
-                self.rhs.compile_to_vm(vm, (local, external))?;
-                vm.write_opcode(OpCode::Divide);
-            }
-            ast::Opcode::Add => {
-                self.rhs.compile_to_vm(vm, (local, external))?;
-                vm.write_opcode(OpCode::Add);
-            }
-            ast::Opcode::Sub => {
-                self.rhs.compile_to_vm(vm, (local, external))?;
-                vm.write_opcode(OpCode::Subtract);
-            }
-            ast::Opcode::Rem => {
-                self.rhs.compile_to_vm(vm, (local, external))?;
-                vm.write_opcode(OpCode::Rem);
-            }
-            ast::Opcode::Or => {
-                // Or is rewritten as an if statement to allow short circuiting.
-                let if_jump = vm.emit_jump(OpCode::JumpIfTruthy);
-                vm.write_opcode(OpCode::Pop);
-                self.rhs.compile_to_vm(vm, (local, external))?;
-                vm.patch_jump(if_jump);
-            }
-            ast::Opcode::And => {
-                // And is rewritten as an if statement to allow short circuiting
-                // JumpAndSwapIfFalsey will take any value from the stack that is falsey and
-                // replace it with False
-                let if_jump = vm.emit_jump(OpCode::JumpAndSwapIfFalsey);
-                self.rhs.compile_to_vm(vm, (local, external))?;
-                vm.write_opcode(OpCode::And);
-                vm.patch_jump(if_jump);
-            }
-            ast::Opcode::Err => {
-                // Err is rewritten as an if statement to allow short circuiting
-                let if_jump = vm.emit_jump(OpCode::JumpIfNotErr);
-                vm.write_opcode(OpCode::ClearError);
-                self.rhs.compile_to_vm(vm, (local, external))?;
-                vm.patch_jump(if_jump);
-            }
-            ast::Opcode::Ne => {
-                self.rhs.compile_to_vm(vm, (local, external))?;
-                vm.write_opcode(OpCode::NotEqual);
-            }
-            ast::Opcode::Eq => {
-                self.rhs.compile_to_vm(vm, (local, external))?;
-                vm.write_opcode(OpCode::Equal);
-            }
-            ast::Opcode::Ge => {
-                self.rhs.compile_to_vm(vm, (local, external))?;
-                vm.write_opcode(OpCode::GreaterEqual);
-            }
-            ast::Opcode::Gt => {
-                self.rhs.compile_to_vm(vm, (local, external))?;
-                vm.write_opcode(OpCode::Greater);
-            }
-            ast::Opcode::Le => {
-                self.rhs.compile_to_vm(vm, (local, external))?;
-                vm.write_opcode(OpCode::LessEqual);
-            }
-            ast::Opcode::Lt => {
-                self.rhs.compile_to_vm(vm, (local, external))?;
-                vm.write_opcode(OpCode::Less);
-            }
-            ast::Opcode::Merge => {
-                self.rhs.compile_to_vm(vm, (local, external))?;
-                vm.write_opcode(OpCode::Merge);
-            }
-        };
-
-        if let Some(err_jump) = err_jump {
-            vm.patch_jump(err_jump);
-        }
-        Ok(())
-    }
 }
 
 impl fmt::Display for Op {
@@ -419,7 +311,7 @@ pub enum Error {
 
 impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
-        use Error::*;
+        use Error::{ChainedComparison, Expr, MergeNonObjects, UnnecessaryCoalesce};
 
         match self {
             ChainedComparison { .. } => 650,
@@ -430,7 +322,7 @@ impl DiagnosticMessage for Error {
     }
 
     fn message(&self) -> String {
-        use Error::*;
+        use Error::Expr;
 
         match self {
             Expr(err) => err.message(),
@@ -439,7 +331,7 @@ impl DiagnosticMessage for Error {
     }
 
     fn labels(&self) -> Vec<Label> {
-        use Error::*;
+        use Error::{ChainedComparison, Expr, MergeNonObjects, UnnecessaryCoalesce};
 
         match self {
             ChainedComparison { span } => vec![Label::primary("", span)],
@@ -474,7 +366,7 @@ impl DiagnosticMessage for Error {
     }
 
     fn notes(&self) -> Vec<Note> {
-        use Error::*;
+        use Error::{ChainedComparison, Expr};
 
         match self {
             ChainedComparison { .. } => vec![Note::SeeDocs(
@@ -493,8 +385,10 @@ impl DiagnosticMessage for Error {
 mod tests {
     use std::convert::TryInto;
 
-    use ast::Ident;
-    use ast::Opcode::*;
+    use ast::{
+        Ident,
+        Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Mul, Ne, Or, Rem, Sub},
+    };
     use ordered_float::NotNan;
 
     use super::*;
@@ -702,10 +596,17 @@ mod tests {
         }
 
         divide_dynamic_rhs {
-            expr: |_| Op {
-                lhs: Box::new(Literal::from(1).into()),
-                rhs: Box::new(Variable::noop(Ident::new("foo")).into()),
-                opcode: Div,
+            expr: |(local, _): (&mut LocalEnv, &mut ExternalEnv)| {
+                local.insert_variable(Ident::new("foo"), crate::type_def::Details {
+                    type_def: TypeDef::null(),
+                    value: None,
+                });
+
+                Op {
+                    lhs: Box::new(Literal::from(1).into()),
+                    rhs: Box::new(Variable::new(Span::default(), Ident::new("foo"), local).unwrap().into()),
+                    opcode: Div,
+                }
             },
             want: TypeDef::float().fallible(),
         }

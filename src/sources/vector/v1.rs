@@ -4,8 +4,8 @@ use codecs::{
     LengthDelimitedDecoder,
 };
 use prost::Message;
-use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -18,18 +18,33 @@ use crate::{
         Source,
     },
     tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
+    tls::{MaybeTlsSettings, TlsSourceConfig},
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for version one of the `vector` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct VectorConfig {
+    /// The address to listen for connections on.
+    ///
+    /// It _must_ include a port.
     address: SocketListenAddr,
+
+    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
+
+    /// The timeout, in seconds, before a connection is forcefully closed during shutdown.
     #[serde(default = "default_shutdown_timeout_secs")]
     shutdown_timeout_secs: u64,
-    tls: Option<TlsEnableableConfig>,
+
+    /// The size, in bytes, of the receive buffer used for each connection.
+    ///
+    /// This should not typically needed to be changed.
     receive_buffer_bytes: Option<usize>,
+
+    #[configurable(derived)]
+    tls: Option<TlsSourceConfig>,
 }
 
 const fn default_shutdown_timeout_secs() -> u64 {
@@ -39,8 +54,8 @@ const fn default_shutdown_timeout_secs() -> u64 {
 impl VectorConfig {
     #[cfg(test)]
     #[allow(unused)] // this test function is not always used in test, breaking
-                     // our cargo-hack run
-    pub fn set_tls(&mut self, config: Option<TlsEnableableConfig>) {
+                     // our check-component-features run
+    pub fn set_tls(&mut self, config: Option<TlsSourceConfig>) {
         self.tls = config;
     }
 
@@ -67,12 +82,19 @@ impl GenerateConfig for VectorConfig {
 impl VectorConfig {
     pub(super) async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let vector = VectorSource;
-        let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
+        let tls_config = self.tls.as_ref().map(|tls| tls.tls_config.clone());
+        let tls_client_metadata_key = self
+            .tls
+            .as_ref()
+            .and_then(|tls| tls.client_metadata_key.clone());
+
+        let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
         vector.run(
             self.address,
             self.keepalive,
             self.shutdown_timeout_secs,
             tls,
+            tls_client_metadata_key,
             self.receive_buffer_bytes,
             cx,
             false.into(),
@@ -175,7 +197,7 @@ mod test {
             components::{assert_source_compliance, SOCKET_PUSH_SOURCE_TAGS},
             next_addr, trace_init, wait_for_tcp,
         },
-        tls::{TlsConfig, TlsEnableableConfig},
+        tls::{TlsConfig, TlsEnableableConfig, TlsSourceConfig},
         SourceSender,
     };
 
@@ -243,7 +265,10 @@ mod test {
                 addr,
                 {
                     let mut config = VectorConfig::from_address(addr.into());
-                    config.set_tls(Some(TlsEnableableConfig::test_config()));
+                    config.set_tls(Some(TlsSourceConfig {
+                        tls_config: TlsEnableableConfig::test_config(),
+                        client_metadata_key: None,
+                    }));
                     config
                 },
                 {
@@ -290,7 +315,7 @@ mod test {
         wait_for_tcp(addr).await;
 
         let mut stream = TcpStream::connect(&addr).await.unwrap();
-        stream.write(b"hello world \n").await.unwrap();
+        stream.write_all(b"hello world \n").await.unwrap();
 
         tokio::time::sleep(Duration::from_secs(2)).await;
         stream.shutdown().await.unwrap();

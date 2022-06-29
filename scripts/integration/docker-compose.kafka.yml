@@ -2,11 +2,11 @@ version: "3"
 
 services:
   zookeeper:
-    image: wurstmeister/zookeeper
+    image: docker.io/wurstmeister/zookeeper
     ports:
       - 2181:2181
   kafka:
-    image: wurstmeister/kafka:2.13-2.6.0
+    image: docker.io/wurstmeister/kafka:2.13-2.6.0
     depends_on:
       - zookeeper
     environment:
@@ -14,8 +14,10 @@ services:
       - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
       - KAFKA_LISTENERS=PLAINTEXT://:9091,SSL://:9092,SASL_PLAINTEXT://:9093
       - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9091,SSL://kafka:9092,SASL_PLAINTEXT://kafka:9093
+      - KAFKA_SSL_KEYSTORE_TYPE=PKCS12
       - KAFKA_SSL_KEYSTORE_LOCATION=/certs/kafka.p12
       - KAFKA_SSL_KEYSTORE_PASSWORD=NOPASS
+      - KAFKA_SSL_TRUSTSTORE_TYPE=PKCS12
       - KAFKA_SSL_TRUSTSTORE_LOCATION=/certs/kafka.p12
       - KAFKA_SSL_TRUSTSTORE_PASSWORD=NOPASS
       - KAFKA_SSL_KEY_PASSWORD=NOPASS
@@ -29,7 +31,7 @@ services:
       - 9092:9092
       - 9093:9093
     volumes:
-      - ${PWD}/tests/data/kafka.p12:/certs/kafka.p12:ro
+      - ${PWD}/tests/data/ca/intermediate_server/private/kafka.p12:/certs/kafka.p12:ro
       - ${PWD}/tests/data/kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf
   runner:
     build:
@@ -48,17 +50,17 @@ services:
       - "kafka-integration-tests"
       - "--lib"
       - "${FILTER:-::kafka::}"
-      - "--"
-      - "--nocapture"
     depends_on:
       - kafka
     environment:
       - KAFKA_HOST=kafka
     volumes:
       - ${PWD}:/code
+      - target:/code/target
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
 
 volumes:
+  target: {}
   cargogit: {}
   cargoregistry: {}

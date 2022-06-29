@@ -15,12 +15,18 @@ use vector_core::event::{BatchNotifier, BatchStatus, Event};
 
 use crate::{
     config::SinkConfig,
+    http::HttpError,
     sinks::{
         datadog::logs::DatadogLogsConfig,
+        datadog::DatadogApiError,
+        util::retries::RetryLogic,
         util::test::{build_test_server_status, load_sink},
     },
     test_util::{next_addr, random_lines_with_stream},
+    tls::TlsError,
 };
+
+use super::service::LogApiRetry;
 
 // The sink must support v1 and v2 API endpoints which have different codes for
 // signaling status. This enum allows us to signal which API endpoint and what
@@ -57,7 +63,7 @@ fn event_with_api_key(msg: &str, key: &str) -> Event {
     let mut e = Event::from(msg);
     e.as_mut_log()
         .metadata_mut()
-        .set_datadog_api_key(Some(Arc::from(key)));
+        .set_datadog_api_key(Arc::from(key));
     e
 }
 
@@ -67,7 +73,7 @@ fn event_with_api_key(msg: &str, key: &str) -> Event {
 /// runs random lines through it, returning a vector of the random lines and a
 /// Receiver populated with the result of the sink's operation.
 ///
-/// Testers may set `http_status` and `batch_status`. The first controls what
+/// Testers may set `api_status` and `batch_status`. The first controls what
 /// status code faked HTTP responses will have, the second acts as a check on
 /// the `Receiver`'s status before being returned to the caller.
 async fn start_test(
@@ -215,8 +221,7 @@ async fn api_key_in_metadata_inner(api_status: ApiStatus) {
     let events = events.map(|mut e| {
         println!("EVENT: {:?}", e);
         e.for_each_log(|log| {
-            log.metadata_mut()
-                .set_datadog_api_key(Some(Arc::from(api_key)));
+            log.metadata_mut().set_datadog_api_key(Arc::from(api_key));
         });
         e
     });
@@ -333,7 +338,7 @@ async fn enterprise_headers_v1() {
 }
 
 async fn enterprise_headers_inner(api_status: ApiStatus) {
-    let (mut config, mut cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
+    let (mut config, cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
             default_api_key = "atoken"
             compression = "none"
         "#})
@@ -344,7 +349,7 @@ async fn enterprise_headers_inner(api_status: ApiStatus) {
     let endpoint = format!("http://{}", addr);
     config.endpoint = Some(endpoint.clone());
 
-    cx.globals.enterprise = true;
+    config.enterprise = true;
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (rx, _trigger, server) = test_server(addr, api_status);
@@ -356,8 +361,7 @@ async fn enterprise_headers_inner(api_status: ApiStatus) {
     let events = events.map(|mut e| {
         println!("EVENT: {:?}", e);
         e.for_each_log(|log| {
-            log.metadata_mut()
-                .set_datadog_api_key(Some(Arc::from(api_key)));
+            log.metadata_mut().set_datadog_api_key(Arc::from(api_key));
         });
         e
     });
@@ -398,7 +402,7 @@ async fn no_enterprise_headers_v1() {
 }
 
 async fn no_enterprise_headers_inner(api_status: ApiStatus) {
-    let (mut config, mut cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
+    let (mut config, cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
             default_api_key = "atoken"
             compression = "none"
         "#})
@@ -409,7 +413,6 @@ async fn no_enterprise_headers_inner(api_status: ApiStatus) {
     let endpoint = format!("http://{}", addr);
     config.endpoint = Some(endpoint.clone());
 
-    cx.globals.enterprise = false;
     let (sink, _) = config.build(cx).await.unwrap();
 
     let (rx, _trigger, server) = test_server(addr, api_status);
@@ -421,8 +424,7 @@ async fn no_enterprise_headers_inner(api_status: ApiStatus) {
     let events = events.map(|mut e| {
         println!("EVENT: {:?}", e);
         e.for_each_log(|log| {
-            log.metadata_mut()
-                .set_datadog_api_key(Some(Arc::from(api_key)));
+            log.metadata_mut().set_datadog_api_key(Arc::from(api_key));
         });
         e
     });
@@ -433,4 +435,36 @@ async fn no_enterprise_headers_inner(api_status: ApiStatus) {
 
     assert_eq!(parts.headers.get("DD-EVP-ORIGIN").unwrap(), "vector");
     assert!(parts.headers.get("DD-EVP-ORIGIN-VERSION").is_some());
+}
+
+#[tokio::test]
+/// Assert the RetryLogic implementation of LogApiRetry
+async fn error_is_retriable() {
+    let retry = LogApiRetry;
+
+    // not retry-able
+    assert!(!retry.is_retriable_error(&DatadogApiError::BadRequest));
+    assert!(!retry.is_retriable_error(&DatadogApiError::PayloadTooLarge));
+    assert!(!retry.is_retriable_error(&DatadogApiError::HttpError {
+        error: HttpError::BuildRequest {
+            source: http::status::StatusCode::from_u16(6666).unwrap_err().into()
+        }
+    }));
+    assert!(!retry.is_retriable_error(&DatadogApiError::HttpError {
+        error: HttpError::MakeProxyConnector {
+            source: http::Uri::try_from("").unwrap_err()
+        }
+    }));
+
+    // retry-able
+    assert!(retry.is_retriable_error(&DatadogApiError::ServerError));
+    assert!(retry.is_retriable_error(&DatadogApiError::Forbidden));
+    assert!(retry.is_retriable_error(&DatadogApiError::HttpError {
+        error: HttpError::BuildTlsConnector {
+            source: TlsError::MissingKey
+        }
+    }));
+    // note: HttpError::CallRequest and HttpError::MakeHttpsConnector are all retry-able,
+    //       but are not straightforward to instantiate due to the design of
+    //       the crates they originate from.
 }

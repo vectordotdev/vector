@@ -7,11 +7,10 @@ use crate::{
     expression::{levenstein, Resolved},
     parser::ast::Ident,
     state::{ExternalEnv, LocalEnv},
-    vm::{self, OpCode, Vm},
     Context, Expression, Span, TypeDef,
 };
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Variable {
     ident: Ident,
     value: Option<Value>,
@@ -24,7 +23,7 @@ impl Variable {
             None => {
                 let idents = local
                     .variable_idents()
-                    .map(|s| s.to_owned())
+                    .map(std::clone::Clone::clone)
                     .collect::<Vec<_>>();
 
                 return Err(Error::undefined(ident, span, idents));
@@ -41,10 +40,6 @@ impl Variable {
     pub fn value(&self) -> Option<&Value> {
         self.value.as_ref()
     }
-
-    pub fn noop(ident: Ident) -> Self {
-        Self { ident, value: None }
-    }
 }
 
 impl Expression for Variable {
@@ -60,23 +55,7 @@ impl Expression for Variable {
         local
             .variable(&self.ident)
             .cloned()
-            .map(|d| d.type_def)
-            .unwrap_or_else(|| TypeDef::null().infallible())
-    }
-
-    fn compile_to_vm(
-        &self,
-        vm: &mut Vm,
-        _state: (&mut LocalEnv, &mut ExternalEnv),
-    ) -> Result<(), String> {
-        vm.write_opcode(OpCode::GetPath);
-
-        // Store the required path in the targets list, write its index to the vm.
-        let variable = vm::Variable::Internal(self.ident().clone(), None);
-        let target = vm.get_target(&variable);
-        vm.write_primitive(target);
-
-        Ok(())
+            .map_or_else(|| TypeDef::null().infallible(), |d| d.type_def)
     }
 }
 
@@ -123,7 +102,7 @@ impl std::error::Error for Error {
 
 impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
-        use ErrorVariant::*;
+        use ErrorVariant::Undefined;
 
         match &self.variant {
             Undefined { .. } => 701,
@@ -131,7 +110,7 @@ impl DiagnosticMessage for Error {
     }
 
     fn labels(&self) -> Vec<Label> {
-        use ErrorVariant::*;
+        use ErrorVariant::Undefined;
 
         match &self.variant {
             Undefined { idents } => {

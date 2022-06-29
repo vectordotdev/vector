@@ -614,7 +614,7 @@ mod test {
     };
     use crate::{
         config::{log_schema, ComponentKey},
-        event::Event,
+        event::{Event, LogEvent},
         shutdown::SourceShutdownCoordinator,
         test_util::{collect_n, collect_n_stream},
         SourceSender,
@@ -662,17 +662,15 @@ mod test {
         }
 
         fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event> {
-            let mut event = Event::from(frame);
-            event
-                .as_mut_log()
-                .insert(log_schema().source_type_key(), "framestream");
+            let mut event = LogEvent::from(frame);
+            event.insert(log_schema().source_type_key(), "framestream");
             if let Some(host) = received_from {
-                event.as_mut_log().insert(self.host_key().as_str(), host);
+                event.insert(self.host_key().as_str(), host);
             }
 
             (self.extra_task_handling_routine.clone())();
 
-            Some(event)
+            Some(event.into())
         }
 
         fn socket_path(&self) -> PathBuf {

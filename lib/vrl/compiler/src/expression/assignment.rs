@@ -1,11 +1,13 @@
+use std::borrow::Cow;
 use std::{convert::TryFrom, fmt};
 
 use diagnostic::{DiagnosticMessage, Label, Note};
-use lookup::LookupBuf;
-use value::Value;
+use lookup::{Lookup, LookupBuf, Segment};
+use value::{Kind, Value};
 
+use crate::expression::assignment::ErrorVariant::InvalidParentPathSegment;
 use crate::{
-    expression::{Expr, Noop, Resolved},
+    expression::{Expr, Resolved},
     parser::{
         ast::{self, Ident},
         Node,
@@ -13,7 +15,6 @@ use crate::{
     state::{ExternalEnv, LocalEnv},
     type_def::Details,
     value::kind::DefaultValue,
-    vm::OpCode,
     Context, Expression, Span, TypeDef,
 };
 
@@ -27,6 +28,7 @@ impl Assignment {
         node: Node<Variant<Node<ast::AssignmentTarget>, Node<Expr>>>,
         local: &mut LocalEnv,
         external: &mut ExternalEnv,
+        fallible_rhs: Option<&dyn DiagnosticMessage>,
     ) -> Result<Self, Error> {
         let (_, variant) = node.take();
 
@@ -38,7 +40,7 @@ impl Assignment {
                 let type_def = expr.type_def((local, external));
 
                 // Fallible expressions require infallible assignment.
-                if type_def.is_fallible() {
+                if fallible_rhs.is_some() {
                     return Err(Error {
                         variant: ErrorVariant::FallibleAssignment(
                             target.to_string(),
@@ -60,6 +62,17 @@ impl Assignment {
 
                 let expr = expr.into_inner();
                 let target = Target::try_from(target.into_inner())?;
+                verify_mutable(&target, external, expr_span, assignment_span)?;
+                verify_overwriteable(
+                    &target,
+                    local,
+                    external,
+                    target_span,
+                    expr_span,
+                    assignment_span,
+                    expr.clone(),
+                )?;
+
                 let value = expr.as_value();
 
                 target.insert_type_def(local, external, type_def, value);
@@ -109,6 +122,17 @@ impl Assignment {
                 // set to being infallible, as the error will be captured by the
                 // "err" target.
                 let ok = Target::try_from(ok.into_inner())?;
+                verify_mutable(&ok, external, expr_span, ok_span)?;
+                verify_overwriteable(
+                    &ok,
+                    local,
+                    external,
+                    ok_span,
+                    expr_span,
+                    assignment_span,
+                    expr.clone(),
+                )?;
+
                 let type_def = type_def.infallible();
                 let default_value = type_def.default_value();
                 let value = expr.as_value();
@@ -118,6 +142,17 @@ impl Assignment {
                 // "err" target is assigned `null` or a string containing the
                 // error message.
                 let err = Target::try_from(err.into_inner())?;
+                verify_mutable(&err, external, expr_span, err_span)?;
+                verify_overwriteable(
+                    &err,
+                    local,
+                    external,
+                    err_span,
+                    expr_span,
+                    assignment_span,
+                    expr.clone(),
+                )?;
+
                 let type_def = TypeDef::bytes().add_null().infallible();
 
                 err.insert_type_def(local, external, type_def, None);
@@ -132,14 +167,6 @@ impl Assignment {
         };
 
         Ok(Self { variant })
-    }
-
-    pub(crate) fn noop() -> Self {
-        let target = Target::Noop;
-        let expr = Box::new(Expr::Noop(Noop));
-        let variant = Variant::Single { target, expr };
-
-        Self { variant }
     }
 
     /// Get a list of targets for this assignment.
@@ -161,6 +188,120 @@ impl Assignment {
     }
 }
 
+fn verify_mutable(
+    target: &Target,
+    external: &ExternalEnv,
+    expr_span: Span,
+    assignment_span: Span,
+) -> Result<(), Error> {
+    match target {
+        Target::External(lookup_buf) => {
+            if external.is_read_only_event_path(lookup_buf) {
+                Err(Error {
+                    variant: ErrorVariant::ReadOnly,
+                    expr_span,
+                    assignment_span,
+                })
+            } else {
+                Ok(())
+            }
+        }
+        Target::Internal(_, _) | Target::Noop => Ok(()),
+    }
+}
+
+/// Ensure that the given target is allowed to be changed.
+///
+/// This returns an error if an assignment is done to an object field or array
+/// index, while the parent of the field/index isn't an actual object/array.
+fn verify_overwriteable(
+    target: &Target,
+    local: &LocalEnv,
+    external: &ExternalEnv,
+    target_span: Span,
+    expr_span: Span,
+    assignment_span: Span,
+    rhs_expr: Expr,
+) -> Result<(), Error> {
+    let mut path = target.lookup();
+
+    let root_kind = match target {
+        Target::Noop => Kind::any(),
+        Target::Internal(ident, _) => local
+            .variable(ident)
+            .map_or_else(Kind::any, |detail| detail.type_def.kind().clone()),
+        Target::External(_) => external.target_kind().clone(),
+    };
+
+    let mut parent_span = target_span;
+    let mut remainder_str = String::new();
+
+    // Walk the entire path from back to front. If the popped segment is a field
+    // or index, check the segment before it, and ensure that its kind is an
+    // object or array.
+    while let Some(last) = path.pop_back() {
+        let parent_kind = root_kind
+            .find_at_path(&path)
+            .ok()
+            .flatten()
+            .map_or_else(Kind::any, Cow::into_owned);
+
+        let (variant, segment_span, valid) = match last {
+            segment @ (Segment::Field(_) | Segment::Coalesce(_)) => {
+                let segment_str = segment.to_string();
+                let segment_start = parent_span.end() - segment_str.len();
+                let segment_span = Span::new(segment_start, parent_span.end());
+
+                parent_span = Span::new(parent_span.start(), segment_start - 1);
+                remainder_str.insert_str(0, &format!(".{}", segment_str));
+
+                ("object", segment_span, parent_kind.contains_object())
+            }
+            Segment::Index(index) => {
+                let segment_start = parent_span.end() - format!("[{index}]").len();
+                let segment_span = Span::new(segment_start, parent_span.end());
+
+                parent_span = Span::new(parent_span.start(), segment_start);
+                remainder_str.insert_str(0, &format!("[{index}]"));
+
+                ("array", segment_span, parent_kind.contains_array())
+            }
+        };
+
+        if valid {
+            continue;
+        }
+
+        let parent_str = match target {
+            Target::Internal(ident, _) => format!("{ident}{}", path),
+            Target::External(_) => {
+                if path.is_root() && remainder_str.starts_with('.') {
+                    remainder_str = remainder_str[1..].to_owned();
+                }
+
+                format!(".{}", path)
+            }
+            Target::Noop => unreachable!(),
+        };
+
+        return Err(Error {
+            variant: InvalidParentPathSegment {
+                variant,
+                parent_kind,
+                parent_span,
+                segment_span,
+                parent_str,
+                remainder_str,
+                rhs_expr,
+            },
+            expr_span,
+            assignment_span,
+        });
+    }
+
+    Ok(())
+}
+
 impl Expression for Assignment {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         self.variant.resolve(ctx)
@@ -169,19 +310,11 @@ impl Expression for Assignment {
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
         self.variant.type_def(state)
     }
-
-    fn compile_to_vm(
-        &self,
-        vm: &mut crate::vm::Vm,
-        state: (&mut LocalEnv, &mut ExternalEnv),
-    ) -> Result<(), String> {
-        self.variant.compile_to_vm(vm, state)
-    }
 }
 
 impl fmt::Display for Assignment {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Variant::*;
+        use Variant::{Infallible, Single};
 
         match &self.variant {
             Single { target, expr } => write!(f, "{} = {}", target, expr),
@@ -192,7 +325,7 @@ impl fmt::Display for Assignment {
 
 impl fmt::Debug for Assignment {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Variant::*;
+        use Variant::{Infallible, Single};
 
         match &self.variant {
             Single { target, expr } => write!(f, "{:?} = {:?}", target, expr),
@@ -206,10 +339,10 @@ impl fmt::Debug for Assignment {
 // -----------------------------------------------------------------------------
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub enum Target {
+pub(crate) enum Target {
     Noop,
-    Internal(Ident, Option<LookupBuf>),
-    External(Option<LookupBuf>),
+    Internal(Ident, LookupBuf),
+    External(LookupBuf),
 }
 
 impl Target {
@@ -217,72 +350,53 @@ impl Target {
         &self,
         local: &mut LocalEnv,
         external: &mut ExternalEnv,
-        type_def: TypeDef,
+        new_type_def: TypeDef,
         value: Option<Value>,
     ) {
-        use Target::*;
-
-        fn set_type_def(
-            current_type_def: &TypeDef,
-            new_type_def: TypeDef,
-            path: &Option<LookupBuf>,
-        ) -> TypeDef {
-            // If the assignment is onto root or has no path (root variable assignment), use the
-            // new type def, otherwise merge the type defs.
-            if path.as_ref().map(|path| path.is_root()).unwrap_or(true) {
-                new_type_def
-            } else {
-                current_type_def.clone().merge_overwrite(new_type_def)
-            }
-        }
-
         match self {
-            Noop => {}
-            Internal(ident, path) => {
-                let td = match path {
-                    None => type_def,
-                    Some(path) => type_def.for_path(&path.to_lookup()),
-                };
-
+            Self::Noop => {}
+            Self::Internal(ident, path) => {
                 let type_def = match local.variable(ident) {
-                    None => td,
-                    Some(&Details { ref type_def, .. }) => set_type_def(type_def, td, path),
+                    None => {
+                        if path.is_root() {
+                            new_type_def
+                        } else {
+                            new_type_def.for_path(&path.to_lookup())
+                        }
+                    }
+                    Some(&Details { ref type_def, .. }) => type_def
+                        .clone()
+                        .with_type_set_at_path(&path.to_lookup(), new_type_def),
                 };
 
                 let details = Details { type_def, value };
-
                 local.insert_variable(ident.clone(), details);
             }
 
-            External(path) => {
-                let td = match path {
-                    None => type_def,
-                    Some(path) => type_def.for_path(&path.to_lookup()),
-                };
-
-                let type_def = match external.target() {
-                    None => td,
-                    Some(&Details { ref type_def, .. }) => set_type_def(type_def, td, path),
-                };
-
-                let details = Details { type_def, value };
-
-                external.update_target(details);
+            Self::External(path) => {
+                external.update_target(Details {
+                    type_def: external
+                        .target()
+                        .type_def
+                        .clone()
+                        .with_type_set_at_path(&path.to_lookup(), new_type_def),
+                    value,
+                });
             }
         }
     }
 
     fn insert(&self, value: Value, ctx: &mut Context) {
-        use Target::*;
+        use Target::{External, Internal, Noop};
 
         match self {
             Noop => {}
             Internal(ident, path) => {
                 // Get the provided path, or else insert into the variable
                 // without any path appended and return early.
-                let path = match path {
-                    Some(path) => path,
-                    None => return ctx.state_mut().insert_variable(ident.clone(), value),
+                let path = match path.is_root() {
+                    false => path,
+                    true => return ctx.state_mut().insert_variable(ident.clone(), value),
                 };
 
                 // Update existing variable using the provided path, or create a
@@ -296,38 +410,44 @@ impl Target {
             }
 
             External(path) => {
-                let _ = ctx
-                    .target_mut()
-                    .target_insert(path.as_ref().unwrap_or(&LookupBuf::root()), value);
+                let _ = ctx.target_mut().target_insert(path, value);
             }
+        }
+    }
+
+    fn lookup(&self) -> Lookup<'_> {
+        match self {
+            Self::Noop => Lookup::root(),
+            Self::Internal(_, path) => path.to_lookup(),
+            Self::External(path) => path.to_lookup(),
         }
     }
 }
 
 impl fmt::Display for Target {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Target::*;
+        use Target::{External, Internal, Noop};
 
         match self {
             Noop => f.write_str("_"),
-            Internal(ident, Some(path)) => write!(f, "{}{}", ident, path),
-            Internal(ident, None) => ident.fmt(f),
-            External(Some(path)) => write!(f, ".{}", path),
-            External(None) => f.write_str("."),
+            Internal(ident, path) if path.is_root() => ident.fmt(f),
+            Internal(ident, path) => write!(f, "{}{}", ident, path),
+            External(path) if path.is_root() => f.write_str("."),
+            External(path) => write!(f, ".{}", path),
         }
     }
 }
 
 impl fmt::Debug for Target {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Target::*;
+        use Target::{External, Internal, Noop};
 
         match self {
             Noop => f.write_str("Noop"),
-            Internal(ident, Some(path)) => write!(f, "Internal({}{})", ident, path),
-            Internal(ident, _) => write!(f, "Internal({})", ident),
-            External(Some(path)) => write!(f, "External({})", path),
-            External(_) => f.write_str("External(.)"),
+            Internal(ident, path) if path.is_root() => write!(f, "Internal({})", ident),
+            Internal(ident, path) => write!(f, "Internal({}{})", ident, path),
+            External(path) if path.is_root() => f.write_str("External(.)"),
+            External(path) => write!(f, "External({})", path),
         }
     }
 }
@@ -336,7 +456,7 @@ impl TryFrom<ast::AssignmentTarget> for Target {
     type Error = Error;
 
     fn try_from(target: ast::AssignmentTarget) -> Result<Self, Error> {
-        use Target::*;
+        use Target::{External, Internal, Noop};
 
         let target = match target {
             ast::AssignmentTarget::Noop => Noop,
@@ -349,8 +469,8 @@ impl TryFrom<ast::AssignmentTarget> for Target {
                 let span = Span::new(target_span.start(), path_span.end());
 
                 match target {
-                    ast::QueryTarget::Internal(ident) => Internal(ident, Some(path)),
-                    ast::QueryTarget::External => External(Some(path)),
+                    ast::QueryTarget::Internal(ident) => Internal(ident, path),
+                    ast::QueryTarget::External => External(path),
                     _ => {
                         return Err(Error {
                             variant: ErrorVariant::InvalidTarget(span),
@@ -360,8 +480,10 @@ impl TryFrom<ast::AssignmentTarget> for Target {
                     }
                 }
             }
-            ast::AssignmentTarget::Internal(ident, path) => Internal(ident, path.map(Into::into)),
-            ast::AssignmentTarget::External(path) => External(path.map(Into::into)),
+            ast::AssignmentTarget::Internal(ident, path) => {
+                Internal(ident, path.unwrap_or_else(LookupBuf::root))
+            }
+            ast::AssignmentTarget::External(path) => External(path.unwrap_or_else(LookupBuf::root)),
         };
 
         Ok(target)
@@ -391,7 +513,7 @@ where
     U: Expression + Clone,
 {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        use Variant::*;
+        use Variant::{Infallible, Single};
 
         let value = match self {
             Single { target, expr } => {
@@ -423,55 +545,12 @@ where
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
-        use Variant::*;
+        use Variant::{Infallible, Single};
 
         match self {
             Single { expr, .. } => expr.type_def(state),
             Infallible { expr, .. } => expr.type_def(state).infallible(),
         }
-    }
-
-    fn compile_to_vm(
-        &self,
-        vm: &mut crate::vm::Vm,
-        state: (&mut LocalEnv, &mut ExternalEnv),
-    ) -> Result<(), String> {
-        match self {
-            Variant::Single { target, expr } => {
-                // Compile the expression which will leave the result at the top of the stack.
-                expr.compile_to_vm(vm, state)?;
-
-                vm.write_opcode(OpCode::SetPath);
-
-                // Add the target to the list of targets, write its index as a primitive for the
-                //  `SetPath` opcode to retrieve.
-                let target = vm.get_target(&target.into());
-                vm.write_primitive(target);
-            }
-            Variant::Infallible {
-                ok,
-                err,
-                expr,
-                default,
-            } => {
-                // Compile the expression which will leave the result at the top of the stack.
-                expr.compile_to_vm(vm, state)?;
-                vm.write_opcode(OpCode::SetPathInfallible);
-
-                // Write the target for the `Ok` path.
-                let target = vm.get_target(&ok.into());
-                vm.write_primitive(target);
-
-                // Write the target for the `Error` path.
-                let target = vm.get_target(&err.into());
-                vm.write_primitive(target);
-
-                // Add the default value (the value to set to the `Ok` target should we have an error).
-                let default = vm.add_constant(default.clone());
-                vm.write_primitive(default);
-            }
-        }
-        Ok(())
     }
 }
 
@@ -481,7 +560,7 @@ where
     U: fmt::Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Variant::*;
+        use Variant::{Infallible, Single};
 
         match self {
             Single { target, expr } => write!(f, "{} = {}", target, expr),
@@ -493,13 +572,14 @@ where
 // -----------------------------------------------------------------------------
 
 #[derive(Debug)]
-pub struct Error {
+pub(crate) struct Error {
     variant: ErrorVariant,
     expr_span: Span,
     assignment_span: Span,
 }
 
 #[derive(thiserror::Error, Debug)]
+#[allow(clippy::large_enum_variant)]
 pub(crate) enum ErrorVariant {
     #[error("unnecessary no-op assignment")]
     UnnecessaryNoop(Span),
@@ -512,6 +592,20 @@ pub(crate) enum ErrorVariant {
 
     #[error("invalid assignment target")]
     InvalidTarget(Span),
+
+    #[error("mutation of read-only value")]
+    ReadOnly,
+
+    #[error("parent path segment rejects this mutation")]
+    InvalidParentPathSegment {
+        variant: &'static str,
+        parent_kind: Kind,
+        parent_span: Span,
+        parent_str: String,
+        segment_span: Span,
+        remainder_str: String,
+        rhs_expr: Expr,
+    },
 }
 
 impl fmt::Display for Error {
@@ -528,18 +622,24 @@ impl std::error::Error for Error {
 
 impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
-        use ErrorVariant::*;
+        use ErrorVariant::{
+            FallibleAssignment, InfallibleAssignment, InvalidTarget, ReadOnly, UnnecessaryNoop,
+        };
 
         match &self.variant {
             UnnecessaryNoop(..) => 640,
             FallibleAssignment(..) => 103,
             InfallibleAssignment(..) => 104,
             InvalidTarget(..) => 641,
+            InvalidParentPathSegment { .. } => 642,
+            ReadOnly => 315,
         }
     }
 
     fn labels(&self) -> Vec<Label> {
-        use ErrorVariant::*;
+        use ErrorVariant::{
+            FallibleAssignment, InfallibleAssignment, InvalidTarget, ReadOnly, UnnecessaryNoop,
+        };
 
         match &self.variant {
             UnnecessaryNoop(target_span) => vec![
@@ -565,14 +665,66 @@ impl DiagnosticMessage for Error {
                 Label::primary("invalid assignment target", span),
                 Label::context("use one of variable or path", span),
             ],
+            ReadOnly => vec![Label::primary(
+                "mutation of read-only value",
+                self.assignment_span,
+            )],
+            InvalidParentPathSegment {
+                variant,
+                parent_kind,
+                parent_span,
+                segment_span,
+                ..
+            } => vec![
+                Label::primary(
+                    if variant == &"object" {
+                        "querying a field of a non-object type is unsupported"
+                    } else {
+                        "indexing into a non-array type is unsupported"
+                    },
+                    segment_span,
+                ),
+                Label::context(
+                    format!("this path resolves to a value of type {}", parent_kind),
+                    parent_span,
+                ),
+            ],
         }
     }
 
     fn notes(&self) -> Vec<Note> {
-        use ErrorVariant::*;
+        use ErrorVariant::{FallibleAssignment, InfallibleAssignment};
 
         match &self.variant {
             FallibleAssignment(..) | InfallibleAssignment(..) => vec![Note::SeeErrorDocs],
+            InvalidParentPathSegment {
+                variant,
+                parent_str,
+                remainder_str,
+                rhs_expr,
+                ..
+            } => {
+                let mut notes = vec![];
+
+                notes.append(&mut Note::solution(
+                    format!("change parent value to {variant}, before assignment"),
+                    if variant == &"object" {
+                        vec![
+                            format!("{parent_str} = {{}}"),
+                            format!("{parent_str}{remainder_str} = {rhs_expr}"),
+                        ]
+                    } else {
+                        vec![
+                            format!("{parent_str} = []"),
+                            format!("{parent_str}{remainder_str} = {rhs_expr}"),
+                        ]
+                    },
+                ));
+
+                notes.push(Note::SeeErrorDocs);
+
+                notes
+            }
             _ => vec![],
         }
     }

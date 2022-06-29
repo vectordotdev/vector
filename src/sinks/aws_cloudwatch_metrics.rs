@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use std::{
     collections::BTreeMap,
     task::{Context, Poll},
@@ -8,11 +7,7 @@ use aws_sdk_cloudwatch::error::PutMetricDataError;
 use aws_sdk_cloudwatch::model::{Dimension, MetricDatum};
 use aws_sdk_cloudwatch::types::DateTime as AwsDateTime;
 use aws_sdk_cloudwatch::types::SdkError;
-use aws_sdk_cloudwatch::{Client as CloudwatchClient, Endpoint, Region};
-use aws_smithy_async::rt::sleep::AsyncSleep;
-use aws_smithy_client::erase::DynConnector;
-use aws_smithy_types::retry::RetryConfig;
-use aws_types::credentials::SharedCredentialsProvider;
+use aws_sdk_cloudwatch::{Client as CloudwatchClient, Region};
 use futures::{future, future::BoxFuture, stream, FutureExt, SinkExt};
 use serde::{Deserialize, Serialize};
 use tower::Service;
@@ -88,45 +83,16 @@ impl_generate_config_from_default!(CloudWatchMetricsSinkConfig);
 struct CloudwatchMetricsClientBuilder;
 
 impl ClientBuilder for CloudwatchMetricsClientBuilder {
-    type ConfigBuilder = aws_sdk_cloudwatch::config::Builder;
-    type Client = CloudwatchClient;
+    type Config = aws_sdk_cloudwatch::config::Config;
+    type Client = aws_sdk_cloudwatch::client::Client;
+    type DefaultMiddleware = aws_sdk_cloudwatch::middleware::DefaultMiddleware;
 
-    fn create_config_builder(
-        credentials_provider: SharedCredentialsProvider,
-    ) -> Self::ConfigBuilder {
-        aws_sdk_cloudwatch::config::Builder::new().credentials_provider(credentials_provider)
+    fn default_middleware() -> Self::DefaultMiddleware {
+        aws_sdk_cloudwatch::middleware::DefaultMiddleware::new()
     }
 
-    fn with_endpoint_resolver(
-        builder: Self::ConfigBuilder,
-        endpoint: Endpoint,
-    ) -> Self::ConfigBuilder {
-        builder.endpoint_resolver(endpoint)
-    }
-
-    fn with_region(builder: Self::ConfigBuilder, region: Region) -> Self::ConfigBuilder {
-        builder.region(region)
-    }
-
-    fn with_sleep_impl(
-        builder: Self::ConfigBuilder,
-        sleep_impl: Arc<dyn AsyncSleep>,
-    ) -> Self::ConfigBuilder {
-        builder.sleep_impl(sleep_impl)
-    }
-
-    fn with_retry_config(
-        builder: Self::ConfigBuilder,
-        retry_config: RetryConfig,
-    ) -> Self::ConfigBuilder {
-        builder.retry_config(retry_config)
-    }
-
-    fn client_from_conf_conn(
-        builder: Self::ConfigBuilder,
-        connector: DynConnector,
-    ) -> Self::Client {
-        Self::Client::from_conf_conn(builder.build(), connector)
+    fn build(client: aws_smithy_client::Client, config: &aws_types::SdkConfig) -> Self::Client {
+        aws_sdk_cloudwatch::client::Client::with_config(client, config.into())
     }
 }
 
@@ -187,6 +153,7 @@ impl CloudWatchMetricsSinkConfig {
             self.region.endpoint()?,
             proxy,
             &self.tls,
+            true,
         )
         .await
     }
@@ -511,13 +478,15 @@ mod tests {
 mod integration_tests {
     use chrono::offset::TimeZone;
     use chrono::Utc;
-    use futures::StreamExt;
     use rand::seq::SliceRandom;
 
     use super::*;
     use crate::{
         event::{metric::StatisticKind, Event, MetricKind},
-        test_util::random_string,
+        test_util::{
+            components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
+            random_string,
+        },
     };
 
     fn cloudwatch_address() -> String {
@@ -599,8 +568,7 @@ mod integration_tests {
             events.push(event);
         }
 
-        let stream = stream::iter(events).map(Into::into);
-        sink.run(stream).await.unwrap();
+        run_and_assert_sink_compliance(sink, stream::iter(events), &AWS_SINK_TAGS).await;
     }
 
     #[tokio::test]
@@ -628,7 +596,6 @@ mod integration_tests {
 
         events.shuffle(&mut rand::thread_rng());
 
-        let stream = stream::iter(events).map(Into::into);
-        sink.run(stream).await.unwrap();
+        run_and_assert_sink_compliance(sink, stream::iter(events), &AWS_SINK_TAGS).await;
     }
 }

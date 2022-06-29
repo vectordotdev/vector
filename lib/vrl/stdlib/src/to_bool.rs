@@ -3,7 +3,7 @@ use vector_common::conversion::Conversion;
 use vrl::prelude::*;
 
 fn to_bool(value: Value) -> Resolved {
-    use Value::*;
+    use Value::{Boolean, Bytes, Float, Integer, Null};
 
     match value {
         Boolean(_) => Ok(value),
@@ -157,12 +157,6 @@ impl Function for ToBool {
         let value = arguments.required("value");
 
         Ok(Box::new(ToBoolFn { value }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-
-        to_bool(value)
     }
 }
 

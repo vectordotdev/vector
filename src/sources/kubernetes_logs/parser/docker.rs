@@ -9,11 +9,12 @@ use crate::{
     internal_events::KubernetesLogsDockerFormatParseError,
     transforms::{FunctionTransform, OutputBuffer},
 };
+use lookup::path;
 
 pub const TIME: &str = "time";
 pub const LOG: &str = "log";
 
-/// Parser for the docker log format.
+/// Parser for the Docker log format.
 ///
 /// Expects logs to arrive in a JSONLines format with the fields names and
 /// contents specific to the implementation of the Docker `json` log driver.
@@ -51,7 +52,7 @@ fn parse_json(log: &mut LogEvent) -> Result<(), ParsingError> {
     match serde_json::from_slice(bytes.as_ref()) {
         Ok(JsonValue::Object(object)) => {
             for (key, value) in object {
-                log.insert_flat(key, value);
+                log.insert(path!(&key), value);
             }
             Ok(())
         }
@@ -146,7 +147,7 @@ pub mod tests {
     }
 
     /// Shared test cases.
-    pub fn cases() -> Vec<(String, Vec<LogEvent>)> {
+    pub fn cases() -> Vec<(String, Vec<Event>)> {
         vec![
             (
                 r#"{"log": "The actual log line\n", "stream": "stderr", "time": "2016-10-05T00:00:30.082640485Z"}"#.into(),

@@ -1,3 +1,7 @@
 [toolchain]
+<<<<<<< HEAD
 channel = "1.59.0"
+=======
+channel = "1.61.0"
+>>>>>>> master
 profile = "default"

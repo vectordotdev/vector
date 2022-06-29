@@ -10,17 +10,6 @@
 #    │                           did you mean "bar"?
 #    │
 #    = see language documentation at https://vrl.dev
-#
-# error[E701]: call to undefined variable
-#    ┌─ :25:23
-#    │
-# 25 │ result = push(result, bar)
-#    │                       ^^^
-#    │                       │
-#    │                       undefined variable
-#    │                       did you mean "foo"?
-#    │
-#    = see language documentation at https://vrl.dev
 
 foo = 5
 result = [foo]

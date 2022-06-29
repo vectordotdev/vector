@@ -3,8 +3,7 @@
 
 mod test_enrichment;
 
-use std::str::FromStr;
-use std::time::Instant;
+use std::{str::FromStr, time::Instant};
 
 use ::value::Value;
 use ansi_term::Colour;
@@ -12,21 +11,18 @@ use chrono::{DateTime, SecondsFormat, Utc};
 use chrono_tz::Tz;
 use clap::Parser;
 use glob::glob;
+use value::Secrets;
 use vector_common::TimeZone;
-use vrl::prelude::VrlValueConvert;
-use vrl::VrlRuntime;
-use vrl::{diagnostic::Formatter, state, Runtime, Terminate};
+use vrl::{
+    diagnostic::Formatter,
+    prelude::{BTreeMap, VrlValueConvert},
+    state, Runtime, SecretTarget, TargetValueRef, Terminate, VrlRuntime,
+};
 use vrl_tests::{docs, Test};
 
 #[cfg(not(target_env = "msvc"))]
 #[global_allocator]
 static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
-
-/// A list of tests currently only working on the "AST" runtime.
-///
-/// This list should ideally be zero, but might not be if specific features
-/// haven't been released on the "VM" runtime yet.
-static AST_ONLY_TESTS: &[&str] = &["functions/type_def/return type definition"];
 
 #[derive(Parser, Debug)]
 #[clap(name = "VRL Tests", about = "Vector Remap Language Tests")]
@@ -74,11 +70,7 @@ impl Cmd {
     }
 }
 
-fn should_run(name: &str, pat: &Option<String>, runtime: VrlRuntime) -> bool {
-    if matches!(runtime, VrlRuntime::Vm) && AST_ONLY_TESTS.contains(&name) {
-        return false;
-    }
-
+fn should_run(name: &str, pat: &Option<String>, _runtime: VrlRuntime) -> bool {
     if name == "tests/example.vrl" {
         return false;
     }
@@ -185,13 +177,22 @@ fn main() {
         let runtime = Runtime::new(state);
         let mut functions = stdlib::all();
         functions.append(&mut enrichment::vrl_functions());
+        functions.append(&mut vector_vrl_functions::vrl_functions());
         let test_enrichment = test_enrichment::test_enrichment_table();
 
-        let mut state = vrl::state::ExternalEnv::default();
-        state.set_external_context(test_enrichment.clone());
+        let mut external_env = vrl::state::ExternalEnv::default();
+        external_env.set_external_context(test_enrichment.clone());
+
+        // Set some read-only paths that can be tested
+        for (path, recursive) in &test.read_only_paths {
+            external_env.add_read_only_event_path(path.clone(), *recursive);
+        }
+        for (path, recursive) in &test.read_only_metadata_paths {
+            external_env.add_read_only_metadata_path(path.clone(), *recursive);
+        }
 
         let compile_start = Instant::now();
-        let program = vrl::compile_with_state(&test.source, &functions, &mut state);
+        let program = vrl::compile_with_state(&test.source, &functions, &mut external_env);
         let compile_end = compile_start.elapsed();
 
         let want = test.result.clone();
@@ -207,12 +208,10 @@ fn main() {
                 let run_start = Instant::now();
                 let result = run_vrl(
                     runtime,
-                    functions,
                     program,
                     &mut test,
                     timezone,
                     cmd.runtime,
-                    state,
                     test_enrichment,
                 );
                 let run_end = run_start.elapsed();
@@ -256,7 +255,6 @@ fn main() {
                                     }
                                 }
                             };
-
                             if got == want {
                                 print!("{}{}", Colour::Green.bold().paint("OK"), timings,);
                             } else {
@@ -392,23 +390,27 @@ fn main() {
 #[allow(clippy::too_many_arguments)]
 fn run_vrl(
     mut runtime: Runtime,
-    functions: Vec<Box<dyn vrl::Function>>,
     program: vrl::Program,
     test: &mut Test,
     timezone: TimeZone,
     vrl_runtime: VrlRuntime,
-    mut state: vrl::state::ExternalEnv,
     test_enrichment: enrichment::TableRegistry,
 ) -> Result<Value, Terminate> {
+    let mut metadata = Value::from(BTreeMap::new());
+    let mut target = TargetValueRef {
+        value: &mut test.object,
+        metadata: &mut metadata,
+        secrets: &mut Secrets::new(),
+    };
+
+    // Insert a dummy secret for examples to use
+    target.insert_secret("my_secret", "secret value");
+    target.insert_secret("datadog_api_key", "secret value");
+
     match vrl_runtime {
-        VrlRuntime::Vm => {
-            let vm = runtime.compile(functions, &program, &mut state).unwrap();
-            test_enrichment.finish_load();
-            runtime.run_vm(&vm, &mut test.object, &timezone)
-        }
         VrlRuntime::Ast => {
             test_enrichment.finish_load();
-            runtime.resolve(&mut test.object, &program, &timezone)
+            runtime.resolve(&mut target, &program, &timezone)
         }
     }
 }

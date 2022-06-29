@@ -2,6 +2,7 @@
 //! byte messages, byte frames and structured events.
 
 #![deny(missing_docs)]
+#![deny(warnings)]
 
 pub mod decoding;
 pub mod encoding;
@@ -19,7 +20,8 @@ pub use decoding::{SyslogDeserializer, SyslogDeserializerConfig};
 pub use encoding::{
     BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig,
     JsonSerializer, JsonSerializerConfig, LengthDelimitedEncoder, LengthDelimitedEncoderConfig,
-    NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer, NativeSerializerConfig,
-    NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig, RawMessageSerializer,
-    RawMessageSerializerConfig,
+    LogfmtSerializer, LogfmtSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig,
+    NativeSerializer, NativeSerializerConfig, NewlineDelimitedEncoder,
+    NewlineDelimitedEncoderConfig, RawMessageSerializer, RawMessageSerializerConfig,
+    TextSerializer, TextSerializerConfig,
 };

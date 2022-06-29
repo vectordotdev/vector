@@ -11,9 +11,9 @@ use codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     StreamDecodingError,
 };
-use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use tokio_util::codec::Decoder as _;
+use vector_config::configurable_component;
 use warp::http::{HeaderMap, StatusCode};
 
 use crate::{
@@ -25,21 +25,40 @@ use crate::{
     event::Event,
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
+    sources::http::HttpMethod,
     sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     tls::TlsEnableableConfig,
 };
+use lookup::path;
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub(crate) struct LogplexConfig {
+/// Configuration for `heroku_logs` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
+pub struct LogplexConfig {
+    /// The address to listen for connections on.
     address: SocketAddr,
+
+    /// A list of URL query parameters to include in the log event.
+    ///
+    /// These will override any values included in the body with conflicting names.
     #[serde(default)]
     query_parameters: Vec<String>,
+
+    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
+
+    #[configurable(derived)]
     auth: Option<HttpSourceAuthConfig>,
+
+    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     framing: FramingConfig,
+
+    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
+
+    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
 }
@@ -99,6 +118,7 @@ impl SourceConfig for LogplexConfig {
         source.run(
             self.address,
             "events",
+            HttpMethod::Post,
             true,
             &self.tls,
             &self.auth,
@@ -125,8 +145,11 @@ impl SourceConfig for LogplexConfig {
 }
 
 // Add a compatibility alias to avoid breaking existing configs
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct LogplexCompatConfig(LogplexConfig);
+
+/// Configuration for the `logplex` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
+pub struct LogplexCompatConfig(#[configurable(transparent)] LogplexConfig);
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "logplex")]
@@ -245,8 +268,8 @@ fn line_to_events(mut decoder: Decoder, line: String) -> SmallVec<[Event; 1]> {
 
                             log.try_insert(log_schema().host_key(), hostname.to_owned());
 
-                            log.try_insert_flat("app_name", app_name.to_owned());
-                            log.try_insert_flat("proc_id", proc_id.to_owned());
+                            log.try_insert(path!("app_name"), app_name.to_owned());
+                            log.try_insert(path!("proc_id"), proc_id.to_owned());
                         }
 
                         events.push(event);
