@@ -385,6 +385,7 @@ mod tests {
     use std::{collections::HashMap, convert::TryFrom};
 
     use codecs::{JsonSerializer, TextSerializer};
+    use vector_core::event::LogEvent;
 
     use super::*;
     use crate::config::log_schema;
@@ -431,7 +432,7 @@ mod tests {
     #[test]
     fn redis_encode_event() {
         let msg = "hello_world";
-        let mut evt = Event::from(msg);
+        let mut evt = Event::Log(LogEvent::from(msg));
         evt.as_mut_log().insert("key", "value");
 
         let result = encode_event(

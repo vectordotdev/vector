@@ -239,9 +239,9 @@ pub mod tests {
         ];
 
         for message in cases {
-            let input = Event::from(message);
+            let input = LogEvent::from(message);
             let mut output = OutputBuffer::default();
-            Docker.transform(&mut output, input);
+            Docker.transform(&mut output, input.into());
             assert!(output.is_empty(), "Expected no events: {:?}", output);
         }
     }

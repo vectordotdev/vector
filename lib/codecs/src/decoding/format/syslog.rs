@@ -9,7 +9,7 @@ use value::{kind::Collection, Kind};
 
 use vector_core::{
     config::{log_schema, DataType},
-    event::{Event, Value},
+    event::{Event, LogEvent, Value},
     schema,
 };
 
@@ -65,7 +65,7 @@ impl Deserializer for SyslogDeserializer {
         let line = std::str::from_utf8(&bytes)?;
         let line = line.trim();
         let parsed = syslog_loose::parse_message_with_year_exact(line, resolve_year)?;
-        let mut event = Event::from(parsed.msg);
+        let mut event = LogEvent::from(parsed.msg).into();
 
         insert_fields_from_syslog(&mut event, parsed);
 

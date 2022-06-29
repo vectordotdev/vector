@@ -451,7 +451,7 @@ mod tests {
 
     use codecs::JsonSerializer;
     use futures::stream::StreamExt;
-    use vector_core::event::{Event, Value};
+    use vector_core::event::{Event, LogEvent, Value};
 
     use super::{EventEncoder, KeyPartitioner, RecordFilter};
     use crate::{
@@ -469,7 +469,7 @@ mod tests {
             remove_label_fields: false,
             remove_timestamp: false,
         };
-        let mut event = Event::from("hello world");
+        let mut event = Event::Log(LogEvent::from("hello world"));
         let log = event.as_mut_log();
         log.insert(log_schema().timestamp_key(), chrono::Utc::now());
         let record = encoder.encode_event(event).unwrap();
@@ -508,7 +508,7 @@ mod tests {
             remove_label_fields: false,
             remove_timestamp: false,
         };
-        let mut event = Event::from("hello world");
+        let mut event = Event::Log(LogEvent::from("hello world"));
         let log = event.as_mut_log();
         log.insert(log_schema().timestamp_key(), chrono::Utc::now());
         log.insert("name", "foo");
@@ -540,7 +540,7 @@ mod tests {
             remove_label_fields: false,
             remove_timestamp: true,
         };
-        let mut event = Event::from("hello world");
+        let mut event = Event::Log(LogEvent::from("hello world"));
         let log = event.as_mut_log();
         log.insert(log_schema().timestamp_key(), chrono::Utc::now());
         let record = encoder.encode_event(event).unwrap();
@@ -568,7 +568,7 @@ mod tests {
             remove_label_fields: true,
             remove_timestamp: false,
         };
-        let mut event = Event::from("hello world");
+        let mut event = Event::Log(LogEvent::from("hello world"));
         let log = event.as_mut_log();
         log.insert(log_schema().timestamp_key(), chrono::Utc::now());
         log.insert("name", "foo");

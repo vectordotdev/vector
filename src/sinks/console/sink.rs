@@ -108,7 +108,7 @@ mod test {
 
     #[tokio::test]
     async fn component_spec_compliance() {
-        let event = Event::from("foo");
+        let event = Event::Log(LogEvent::from("foo"));
 
         let encoding: EncodingConfigWithFramingAdapter<
             EncodingConfig<StandardEncodings>,
@@ -135,7 +135,7 @@ mod test {
 
     #[test]
     fn encodes_raw_logs() {
-        let event = Event::from("foo");
+        let event = Event::Log(LogEvent::from("foo"));
         assert_eq!(
             "foo",
             encode_event(event, EncodingConfig::from(StandardEncodings::Text).into()).unwrap()
