@@ -366,12 +366,11 @@ configuration: {
 
 				```toml title="vector.toml"
 				[transforms.add_host]
-				  type = "add_fields"
-
-				  [transforms.add_host.fields]
-				    host = "${HOSTNAME}" # or "$HOSTNAME"
-				    environment = "${ENV:-development}" # default value when not present
-				    tenant = "${TENANT:?tenant must be supplied}" # required environment variable
+				  inputs = ["apache_logs"]
+				  type   = "remap"
+				  source = '''
+				  .host = get_env_var!("HOSTNAME")
+				  '''
 				```
 				"""
 

@@ -77,7 +77,7 @@ async fn sink_events() {
 
     // Send some events down the wire. Waiting until the first notifications are in
     // to ensure the event handler has been initialized.
-    let log_event = Event::new_empty_log();
+    let log_event = Event::from(LogEvent::default());
     let metric_event = Event::from(Metric::new(
         id.to_string(),
         MetricKind::Incremental,

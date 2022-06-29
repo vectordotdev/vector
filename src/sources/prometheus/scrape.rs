@@ -749,6 +749,7 @@ mod test {
                 quantiles: vec![],
                 distributions_as_summaries: false,
                 flush_period_secs: Duration::from_secs(1),
+                suppress_timestamp: false,
             },
         );
 

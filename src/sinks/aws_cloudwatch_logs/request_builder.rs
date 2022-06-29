@@ -119,6 +119,8 @@ impl ByteSizeOf for CloudwatchRequest {
 
 #[cfg(test)]
 mod tests {
+    use vector_core::event::LogEvent;
+
     use super::*;
     use crate::config::log_schema;
 
@@ -133,12 +135,10 @@ mod tests {
         };
         let timestamp = Utc::now();
         let message = "event message";
-        let mut event = Event::from(message);
-        event
-            .as_mut_log()
-            .insert(log_schema().timestamp_key(), timestamp);
+        let mut event = LogEvent::from(message);
+        event.insert(log_schema().timestamp_key(), timestamp);
 
-        let request = request_builder.build(event).unwrap();
+        let request = request_builder.build(event.into()).unwrap();
         assert_eq!(request.timestamp, timestamp.timestamp_millis());
         assert_eq!(&request.message, message);
     }
