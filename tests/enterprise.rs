@@ -99,8 +99,8 @@ async fn vector_does_not_start_with_enterprise_misconfigured() {
     let server = build_test_server_error_and_recover(StatusCode::NOT_IMPLEMENTED).await;
     let endpoint = server.uri();
 
-    // Control for API key environment variables which are an alternative, valid
-    // way of passing in an API key
+    // Control for API key environment variables which are an alternative
+    // way of passing in an API key, outside of a configuration
     env::remove_var(DATADOG_API_KEY_ENV_VAR_FULL);
     env::remove_var(DATADOG_API_KEY_ENV_VAR_SHORT);
     env::set_var(ENDPOINT_CONFIG_ENV_VAR, endpoint);
