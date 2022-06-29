@@ -88,7 +88,7 @@ pub mod ser_de {
     }
 }
 
-impl<'de> Configurable<'de> for TimeZone {
+impl Configurable for TimeZone {
     fn referencable_name() -> Option<&'static str> {
         Some("vector_common::TimeZone")
     }
@@ -97,7 +97,7 @@ impl<'de> Configurable<'de> for TimeZone {
         Some("Strongly-typed list of timezones as defined in the `tz` database.")
     }
 
-    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
+    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<Self>) -> SchemaObject {
         let mut schema = generate_string_schema();
         finalize_schema(gen, &mut schema, overrides);
         schema

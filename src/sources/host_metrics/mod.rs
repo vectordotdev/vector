@@ -12,12 +12,7 @@ use serde::{
 };
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
-use vector_config::{
-    configurable_component,
-    schema::{finalize_schema, generate_string_schema},
-    schemars::{gen::SchemaGenerator, schema::SchemaObject},
-    Configurable, Metadata,
-};
+use vector_config::{configurable_component, Configurable};
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -456,10 +451,25 @@ impl FilterList {
     }
 }
 
-// Pattern doesn't implement Deserialize or Serialize, and we can't
-// implement them ourselves due the orphan rules, so make a wrapper.
+/// A compiled Unix shell-style pattern.
+///
+/// - `?` matches any single character.
+/// - `*` matches any (possibly empty) sequence of characters.
+/// - `**` matches the current directory and arbitrary subdirectories. This sequence must form a single path component,
+///   so both `**a` and `b**` are invalid and will result in an error. A sequence of more than two consecutive `*`
+///   characters is also invalid.
+/// - `[...]` matches any character inside the brackets. Character sequences can also specify ranges of characters, as
+///   ordered by Unicode, so e.g. `[0-9]` specifies any character between 0 and 9 inclusive. An unclosed bracket is
+///   invalid.
+/// - `[!...]` is the negation of `[...]`, i.e. it matches any characters not in the brackets.
+///
+/// The metacharacters `?`, `*`, `[`, `]` can be matched by using brackets (e.g. `[?]`). When a `]` occurs immediately
+/// following `[` or `[!` then it is interpreted as being part of, rather then ending, the character set, so `]` and NOT
+/// `]` can be matched by `[]]` and `[!]]` respectively. The `-` character can be specified inside a character sequence
+/// pattern by placing it at the start or the end, e.g. `[abc-]`.
+#[configurable_component(no_ser, no_deser)]
 #[derive(Clone, Debug)]
-struct PatternWrapper(Pattern);
+struct PatternWrapper(#[configurable(transparent)] Pattern);
 
 impl PatternWrapper {
     fn new(pattern: impl AsRef<str>) -> Result<PatternWrapper, PatternError> {
@@ -498,24 +508,6 @@ impl<'de> Visitor<'de> for PatternVisitor {
 impl Serialize for PatternWrapper {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(self.0.as_str())
-    }
-}
-
-// NOTE: We have to do a manual implementation of `Configurable` because `configurable_component` derives
-// `Serialize`/`Deserialize` automatically, which we can't do here since they're already implemented by hand here.
-impl<'de> Configurable<'de> for PatternWrapper {
-    fn referencable_name() -> Option<&'static str> {
-        Some("glob::PatternWrapper")
-    }
-
-    fn description() -> Option<&'static str> {
-        Some("A compiled Unix shell style pattern.")
-    }
-
-    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
-        let mut schema = generate_string_schema();
-        finalize_schema(gen, &mut schema, overrides);
-        schema
     }
 }
 
