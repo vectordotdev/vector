@@ -89,15 +89,6 @@ pub struct GcpAuthConfig {
 }
 
 impl GcpAuthConfig {
-<<<<<<< HEAD
-    pub async fn make_credentials(&self, scope: Scope) -> crate::Result<Option<GcpCredentials>> {
-        let gap = std::env::var("GOOGLE_APPLICATION_CREDENTIALS").ok();
-        let creds_path = self.credentials_path.as_ref().or(gap.as_ref());
-        Ok(match (&creds_path, &self.api_key) {
-            (Some(path), _) => Some(GcpCredentials::from_file(path, scope).await?),
-            (None, Some(_)) => None,
-            (None, None) => Some(GcpCredentials::new_implicit(scope).await?),
-=======
     pub async fn build(&self, scope: Scope) -> crate::Result<GcpAuthenticator> {
         Ok(if self.skip_authentication {
             GcpAuthenticator::None
@@ -109,7 +100,6 @@ impl GcpAuthConfig {
                 (None, Some(api_key)) => GcpAuthenticator::from_api_key(api_key)?,
                 (None, None) => GcpAuthenticator::new_implicit().await?,
             }
->>>>>>> master
         })
     }
 }

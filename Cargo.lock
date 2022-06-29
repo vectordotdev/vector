@@ -7257,7 +7257,7 @@ name = "thingbuf"
 version = "0.1.2"
 source = "git+https://github.com/tobz/thingbuf.git#e04661fc72b08c4e2517a9f0bfb16aa7d2fed683"
 dependencies = [
- "parking_lot 0.12.0",
+ "parking_lot 0.12.1",
  "pin-project",
 ]
 

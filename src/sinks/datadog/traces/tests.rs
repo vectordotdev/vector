@@ -93,22 +93,11 @@ pub fn simple_trace_event(resource: String) -> TraceEvent {
     t.insert("host", "a_host");
     t.insert("env", "an_env");
     t.insert("trace_id", Value::Integer(123));
-<<<<<<< HEAD
-    t.insert("spans", Value::Array(vec![Value::from(simple_span())]));
-    t.insert(
-        "start_time",
-        Value::from(Utc.timestamp_nanos(1_431_648_000_000_002i64)),
-    );
-    t.insert(
-        "end_time",
-        Value::from(Utc.timestamp_nanos(1_431_648_000_000_003i64)),
-=======
     t.insert("target_tps", Value::Integer(10));
     t.insert("error_tps", Value::Integer(5));
     t.insert(
         "spans",
         Value::Array(vec![Value::from(simple_span(resource))]),
->>>>>>> master
     );
     t
 }

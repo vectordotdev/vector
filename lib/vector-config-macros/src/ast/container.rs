@@ -260,14 +260,9 @@ impl<'a> Container<'a> {
     pub fn metadata(&self) -> impl Iterator<Item = CustomAttribute> {
         self.attrs
             .metadata
-<<<<<<< HEAD
-            .iter()
-            .flat_map(|metadata| &metadata.pairs)
-=======
             .clone()
             .into_iter()
             .flat_map(|metadata| metadata.attributes())
->>>>>>> master
     }
 }
 
