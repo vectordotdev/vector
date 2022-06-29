@@ -52,6 +52,8 @@ pub mod mongodb_metrics;
 pub mod nats;
 #[cfg(feature = "sources-nginx_metrics")]
 pub mod nginx_metrics;
+#[cfg(all(unix, feature = "sources-pipe"))]
+pub mod pipe;
 #[cfg(feature = "sources-postgresql_metrics")]
 pub mod postgresql_metrics;
 #[cfg(feature = "sources-prometheus")]

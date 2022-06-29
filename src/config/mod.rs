@@ -3,6 +3,7 @@ use std::{
     fmt::{self, Display, Formatter},
     hash::Hash,
     net::SocketAddr,
+    os::raw::c_int,
     path::PathBuf,
 };
 
@@ -288,7 +289,7 @@ inventory::collect!(EnrichmentTableDescription);
 pub enum Resource {
     Port(SocketAddr, Protocol),
     SystemFdOffset(usize),
-    Stdin,
+    Fd(c_int),
     DiskBuffer(String),
 }
 
@@ -363,7 +364,7 @@ impl Display for Resource {
         match self {
             Resource::Port(address, protocol) => write!(fmt, "{} {}", protocol, address),
             Resource::SystemFdOffset(offset) => write!(fmt, "systemd {}th socket", offset + 1),
-            Resource::Stdin => write!(fmt, "stdin"),
+            Resource::Fd(fd) => write!(fmt, "fd: {}", fd),
             Resource::DiskBuffer(name) => write!(fmt, "disk buffer {:?}", name),
         }
     }

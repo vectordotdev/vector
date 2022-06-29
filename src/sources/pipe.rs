@@ -1,3 +1,7 @@
+use std::fs::File;
+use std::io::BufRead;
+use std::os::raw::c_int;
+use std::os::unix::io::FromRawFd;
 use std::{io, thread};
 
 use async_stream::stream;
@@ -8,23 +12,27 @@ use codecs::{
     StreamDecodingError,
 };
 use futures::{channel::mpsc, executor, SinkExt, StreamExt};
+use indoc::indoc;
 use tokio_util::{codec::FramedRead, io::StreamReader};
 use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::DecodingConfig,
-    config::{log_schema, Output, Resource, SourceConfig, SourceContext, SourceDescription},
+    config::{
+        log_schema, GenerateConfig, Output, Resource, SourceConfig, SourceContext,
+        SourceDescription,
+    },
     internal_events::{BytesReceived, OldEventsReceived, StreamClosedError},
     serde::default_decoding,
     shutdown::ShutdownSignal,
     SourceSender,
 };
-/// Configuration for the `stdin` source.
+/// Configuration for the `pipe` source.
 #[configurable_component(source)]
 #[derive(Clone, Debug)]
-#[serde(deny_unknown_fields, default)]
-pub struct StdinConfig {
+#[serde(deny_unknown_fields)]
+pub struct PipeConfig {
     /// The maximum buffer size, in bytes, of incoming messages.
     ///
     /// Messages larger than this are truncated.
@@ -44,35 +52,29 @@ pub struct StdinConfig {
     #[configurable(derived)]
     #[serde(default = "default_decoding")]
     pub decoding: DeserializerConfig,
-}
 
-impl Default for StdinConfig {
-    fn default() -> Self {
-        StdinConfig {
-            max_length: crate::serde::default_max_length(),
-            host_key: Default::default(),
-            framing: None,
-            decoding: default_decoding(),
-        }
-    }
+    /// The file descriptor number to read from.
+    pub fd: c_int,
 }
 
 inventory::submit! {
-    SourceDescription::new::<StdinConfig>("stdin")
+    SourceDescription::new::<PipeConfig>("pipe")
 }
 
-impl_generate_config_from_default!(StdinConfig);
+impl GenerateConfig for PipeConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(indoc! {r#"
+            fd = 500
+        "#})
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "stdin")]
-impl SourceConfig for StdinConfig {
+#[typetag::serde(name = "pipe")]
+impl SourceConfig for PipeConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        stdin_source(
-            io::BufReader::new(io::stdin()),
-            self.clone(),
-            cx.shutdown,
-            cx.out,
-        )
+        pipe_source(self.clone(), cx.shutdown, cx.out)
     }
 
     fn outputs(&self) -> Vec<Output> {
@@ -80,7 +82,7 @@ impl SourceConfig for StdinConfig {
     }
 
     fn source_type(&self) -> &'static str {
-        "stdin"
+        "pipe"
     }
 
     fn resources(&self) -> Vec<Resource> {
@@ -92,15 +94,12 @@ impl SourceConfig for StdinConfig {
     }
 }
 
-pub fn stdin_source<R>(
-    mut stdin: R,
-    config: StdinConfig,
+pub fn pipe_source(
+    config: PipeConfig,
     shutdown: ShutdownSignal,
     mut out: SourceSender,
-) -> crate::Result<super::Source>
-where
-    R: Send + io::BufRead + 'static,
-{
+) -> crate::Result<super::Source> {
+    let mut pipe = io::BufReader::new(unsafe { File::from_raw_fd(config.fd) });
     let host_key = config
         .host_key
         .unwrap_or_else(|| log_schema().host_key().to_string());
@@ -113,23 +112,23 @@ where
 
     let (mut sender, receiver) = mpsc::channel(1024);
 
-    // Spawn background thread with blocking I/O to process stdin.
+    // Spawn background thread with blocking I/O to process fd.
     //
     // This is recommended by Tokio, as otherwise the process will not shut down
     // until another newline is entered. See
     // https://github.com/tokio-rs/tokio/blob/a73428252b08bf1436f12e76287acbc4600ca0e5/tokio/src/io/stdin.rs#L33-L42
     thread::spawn(move || {
-        info!("Capturing STDIN.");
+        info!("Capturing fd.");
 
         loop {
-            let (buffer, len) = match stdin.fill_buf() {
+            let (buffer, len) = match pipe.fill_buf() {
                 Ok(buffer) if buffer.is_empty() => break, // EOF.
                 Ok(buffer) => (Ok(Bytes::copy_from_slice(buffer)), buffer.len()),
                 Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
                 Err(error) => (Err(error), 0),
             };
 
-            stdin.consume(len);
+            pipe.consume(len);
 
             if executor::block_on(sender.send(buffer)).is_err() {
                 // Receiver has closed so we should shutdown.
@@ -157,7 +156,7 @@ where
                         for mut event in events {
                             let log = event.as_mut_log();
 
-                            log.try_insert(log_schema().source_type_key(), Bytes::from("stdin"));
+                            log.try_insert(log_schema().source_type_key(), Bytes::from("pipe"));
                             log.try_insert(log_schema().timestamp_key(), now);
 
                             if let Some(hostname) = &hostname {
@@ -195,29 +194,38 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::io::Cursor;
+    use nix::unistd::{close, pipe, write};
 
     use super::*;
     use crate::{test_util::components::assert_source_compliance, SourceSender};
 
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<StdinConfig>();
+        crate::test_util::test_generate_config::<PipeConfig>();
     }
 
     #[tokio::test]
-    async fn stdin_decodes_line() {
+    async fn pipe_decodes_line() {
         assert_source_compliance(&["protocol"], async {
             let (tx, rx) = SourceSender::new_test();
-            let config = StdinConfig::default();
-            let buf = Cursor::new("hello world\nhello world again");
+            let (read_fd, write_fd) = pipe().unwrap();
+            let config = PipeConfig {
+                max_length: crate::serde::default_max_length(),
+                host_key: Default::default(),
+                framing: None,
+                decoding: default_decoding(),
+                fd: read_fd,
+            };
 
-            stdin_source(buf, config, ShutdownSignal::noop(), tx)
+            let mut stream = rx;
+
+            write(write_fd, b"hello world\nhello world again\n").unwrap();
+            close(write_fd).unwrap();
+
+            pipe_source(config, ShutdownSignal::noop(), tx)
                 .unwrap()
                 .await
                 .unwrap();
-
-            let mut stream = rx;
 
             let event = stream.next().await;
             assert_eq!(

@@ -333,6 +333,7 @@ azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git",
 base64 = "0.13.0"
 criterion = { version = "0.3.5", features = ["html_reports", "async_tokio"] }
 libc = "0.2.126"
+nix = "0.24.1"
 pretty_assertions = "1.2.1"
 proptest = "1.0"
 quickcheck = "1.0.3"
@@ -452,6 +453,7 @@ sources-logs = [
   "sources-kubernetes_logs",
   "sources-logstash",
   "sources-nats",
+  "sources-pipe",
   "sources-redis",
   "sources-socket",
   "sources-splunk_hec",
@@ -499,6 +501,7 @@ sources-logstash = ["listenfd", "tokio-util/net", "sources-utils-tcp-keepalive",
 sources-mongodb_metrics = ["dep:mongodb"]
 sources-nats = ["dep:nats", "dep:nkeys"]
 sources-nginx_metrics = ["dep:nom"]
+sources-pipe = ["tokio-util/io"]
 sources-postgresql_metrics = ["dep:postgres-openssl", "dep:tokio-postgres"]
 sources-prometheus = ["dep:prometheus-parser", "sinks-prometheus", "sources-http", "sources-utils-http"]
 sources-redis= ["dep:redis"]
