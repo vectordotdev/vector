@@ -6223,7 +6223,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bfa0f585226d2e68097d4f95d113b15b83a82e819ab25717ec0590d9584ef366"
 dependencies = [
- "semver 1.0.10",
+ "semver 1.0.11",
 ]
 
 [[package]]
@@ -6521,9 +6521,9 @@ dependencies = [
 
 [[package]]
 name = "semver"
-version = "1.0.10"
+version = "1.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a41d061efea015927ac527063765e73601444cdc344ba855bc7bd44578b25e1c"
+checksum = "3d92beeab217753479be2f74e54187a6aed4c125ff0703a866c3147a02f0c6dd"
 dependencies = [
  "serde",
 ]
@@ -8391,7 +8391,7 @@ dependencies = [
  "schannel",
  "seahash",
  "security-framework",
- "semver 1.0.10",
+ "semver 1.0.11",
  "serde",
  "serde-toml-merge",
  "serde_bytes",
