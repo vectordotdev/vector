@@ -9,6 +9,7 @@ mod sink;
 mod integration_tests;
 
 use crate::config::SinkDescription;
+pub use config::SqsSinkConfig;
 
 inventory::submit! {
     SinkDescription::new::<config::SqsSinkConfig>("aws_sqs")

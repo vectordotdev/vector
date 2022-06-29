@@ -3,6 +3,7 @@ use codecs::{
     BytesEncoder, JsonSerializerConfig, NewlineDelimitedEncoder, TextSerializerConfig,
 };
 use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 #[cfg(unix)]
 use crate::sinks::util::unix::UnixSinkConfig;
@@ -21,7 +22,7 @@ use crate::{
     },
 };
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Migrator;
 
 impl EncodingConfigWithFramingMigrator for Migrator {
@@ -37,23 +38,31 @@ impl EncodingConfigWithFramingMigrator for Migrator {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug)]
-// `#[serde(deny_unknown_fields)]` doesn't work when flattening internally tagged enums, see
-// https://github.com/serde-rs/serde/issues/1358.
+/// Configuration for the `socket` sink.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct SocketSinkConfig {
     #[serde(flatten)]
     pub mode: Mode,
+
     #[serde(flatten)]
     pub encoding: EncodingConfigWithFramingAdapter<EncodingConfig<Encoding>, Migrator>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Socket mode.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum Mode {
-    Tcp(TcpSinkConfig),
-    Udp(UdpSinkConfig),
+    /// TCP.
+    Tcp(#[configurable(transparent)] TcpSinkConfig),
+
+    /// UDP.
+    Udp(#[configurable(transparent)] UdpSinkConfig),
+
+    /// Unix Domain Socket.
     #[cfg(unix)]
-    Unix(UnixSinkConfig),
+    Unix(#[configurable(transparent)] UnixSinkConfig),
 }
 
 inventory::submit! {

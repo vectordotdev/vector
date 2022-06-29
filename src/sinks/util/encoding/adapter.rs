@@ -6,6 +6,7 @@ use std::marker::PhantomData;
 use codecs::encoding::{Framer, FramingConfig, Serializer, SerializerConfig};
 use lookup::lookup_v2::OwnedPath;
 use serde::{Deserialize, Deserializer, Serialize};
+use vector_config::configurable_component;
 
 use super::{validate_fields, EncodingConfiguration, TimestampFormat};
 use crate::{event::Event, serde::skip_serializing_if_default};
@@ -164,16 +165,19 @@ pub trait EncodingConfigWithFramingMigrator {
 
 /// This adapter serves to migrate sinks from the old sink-specific `EncodingConfig<T>` to the new
 /// `FramingConfig`/`SerializerConfig` encoding configuration while keeping backwards-compatibility.
-#[derive(Debug, Clone, Serialize)]
+#[configurable_component(no_deser)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct EncodingConfigWithFramingAdapter<LegacyEncodingConfig, Migrator>
 where
-    LegacyEncodingConfig: EncodingConfiguration + Debug + Clone + 'static,
-    Migrator:
-        EncodingConfigWithFramingMigrator<Codec = LegacyEncodingConfig::Codec> + Debug + Clone,
+    LegacyEncodingConfig: Serialize + Clone,
+    Migrator: Serialize + Clone,
 {
+    /// Framing scheme.
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     framing: Option<FramingConfig>,
+
+    /// Encoding scheme.
     encoding: EncodingWithTransformationConfig<LegacyEncodingConfig, Migrator>,
 }
 
