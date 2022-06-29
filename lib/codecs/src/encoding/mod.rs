@@ -8,10 +8,10 @@ use std::fmt::Debug;
 
 use bytes::BytesMut;
 pub use format::{
-    GelfSerializer, GelfSerializerConfig, GelfSerializerOptions, JsonSerializer,
-    JsonSerializerConfig, LogfmtSerializer, LogfmtSerializerConfig, NativeJsonSerializer,
-    NativeJsonSerializerConfig, NativeSerializer, NativeSerializerConfig, RawMessageSerializer,
-    RawMessageSerializerConfig, TextSerializer, TextSerializerConfig,
+    GelfSerializer, GelfSerializerConfig, JsonSerializer, JsonSerializerConfig, LogfmtSerializer,
+    LogfmtSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer,
+    NativeSerializerConfig, RawMessageSerializer, RawMessageSerializerConfig, TextSerializer,
+    TextSerializerConfig,
 };
 pub use framing::{
     BoxedFramer, BoxedFramingError, BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder,
@@ -183,11 +183,7 @@ impl tokio_util::codec::Encoder<()> for Framer {
 #[serde(tag = "codec", rename_all = "snake_case")]
 pub enum SerializerConfig {
     /// Configures the `GelfSerializer`.
-    Gelf {
-        /// Configuration options for the GelfSerializer
-        #[serde(default)]
-        options: GelfSerializerOptions,
-    },
+    Gelf,
     /// Configures the `JsonSerializer`.
     Json,
     /// Configures the `LogfmtSerializer`.
@@ -203,10 +199,8 @@ pub enum SerializerConfig {
 }
 
 impl From<GelfSerializerConfig> for SerializerConfig {
-    fn from(config: GelfSerializerConfig) -> Self {
-        Self::Gelf {
-            options: config.options,
-        }
+    fn from(_: GelfSerializerConfig) -> Self {
+        Self::Gelf
     }
 }
 
@@ -250,9 +244,7 @@ impl SerializerConfig {
     /// Build the `Serializer` from this configuration.
     pub fn build(&self) -> Serializer {
         match self {
-            SerializerConfig::Gelf { options } => {
-                Serializer::Gelf(GelfSerializerConfig::new(*options).build())
-            }
+            SerializerConfig::Gelf => Serializer::Gelf(GelfSerializerConfig::new().build()),
             SerializerConfig::Json => Serializer::Json(JsonSerializerConfig.build()),
             SerializerConfig::Logfmt => Serializer::Logfmt(LogfmtSerializerConfig.build()),
             SerializerConfig::Native => Serializer::Native(NativeSerializerConfig.build()),

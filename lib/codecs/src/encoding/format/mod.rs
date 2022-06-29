@@ -14,7 +14,7 @@ mod text;
 use std::fmt::Debug;
 
 use dyn_clone::DynClone;
-pub use gelf::{GelfSerializer, GelfSerializerConfig, GelfSerializerOptions};
+pub use gelf::{GelfSerializer, GelfSerializerConfig};
 pub use json::{JsonSerializer, JsonSerializerConfig};
 pub use logfmt::{LogfmtSerializer, LogfmtSerializerConfig};
 pub use native::{NativeSerializer, NativeSerializerConfig};
