@@ -228,7 +228,7 @@ async fn topology_reload_with_new_components() {
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn topology_readd_input() {
     // TODO: Write a test source that emits only metrics, and a test sink that can bind a TCP listener, so we can
     // replace `internal_metrics` and `prometheus_exporter` here. We additionally need to ensure the metrics subsystem
