@@ -28,127 +28,293 @@
 // vector of tags by hand, which is obviously a "do it once and then never change it" thing but would look a lot cleaner
 // in this proposed method.
 use std::{
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
-    thread,
-    time::Duration,
+    sync::atomic::{AtomicUsize, Ordering, AtomicBool}, collections::HashMap, mem::{MaybeUninit, self}, num::NonZeroUsize,
 };
 
-use arc_swap::ArcSwapOption;
-use crossbeam_utils::CachePadded;
-use metrics::Key;
-use once_cell::sync::OnceCell;
-use thingbuf::mpsc::blocking::{StaticChannel, StaticReceiver, StaticSender};
+use thread_local::ThreadLocal;
 use tracking_allocator::{
     AllocationGroupId, AllocationGroupToken, AllocationRegistry, AllocationTracker,
 };
-use vector_core::metrics::{Controller, Handle};
 
-static ALLOCATION_LUT: ArcSwapOption<Vec<Option<Arc<AllocationGroupEntry>>>> =
-    ArcSwapOption::const_empty();
+const POINTER_WIDTH: u32 = usize::BITS;
+const PAGE_COUNT: usize = (POINTER_WIDTH + 1) as usize;
 
-// TOOD: goal of new experimental design is to see if we can reduce atomic contention and reduce the cost of looking up
-// allocation group entries in the tracker phase.
-//
-// we've made changes to `tracking-allocator` that allow reusing allocation group ids which means that we should be able
-// to attempt to use a design that pre-allocates all storage up front with the expectation that, you know, we'll never
-// have a need for more than 1k allocation groups at the same time, or some number like that.
-//
-// this will let us avoid arc-swap and needing to do any atomics to even get access to the group entry for the given
-// group, and lets us avoid needing to (at least for now) consider a design that copies the entries and RCUs them into a
-// new vector
-//
-// further, this means that we now need to figure out when to reset the stats for a given allocation group, since we
-// need to know when to emit the final stats for a group that's been recycled... this will require tracking some sort of
-// information. a token can go out of scope _before_ all the allocations attached to it are actually deallocated, so we
-// need to figure out how to track that. it might be possible to store them in a finalized buffer of some sort, such
-// that when we get back a recycled group during registration, we mark that group as being pending finalization... and
-// essentially store new allocations for it in a separate area, and track deallocations for it separately... but then
-// again, we'd have no clue if the deallocs coming in were from new allocs or old allocs, so hmm.... we almost need to
-// consider the alloc/dealloc count as part of the "can this id be recycled?" logic itself, which is hard to do unless
-// `tracking-allocator` also starts tracking allocation metrics.... or we do the group registration recycling on our
-// end, which is hard to do unless we wrap the token in a custom way, which means reimplementing the logic for using
-// them with tracing, etc... hmmm....
+macro_rules! get_page_slots {
 
-const FIRST_LEVEL: usize = 64;
-const SECOND_LEVEL: usize = 64;
-const MAX_ALLOCATION_GROUP_ID: usize = FIRST_LEVEL * SECOND_LEVEL;
-
-type GroupLeaf = [CachePadded<AllocationGroupEntry>; SECOND_LEVEL];
-type GroupStorage = [GroupLeaf; FIRST_LEVEL];
-
-/*
-static REGISTRATION_EVENTS: OnceCell<RegistrationEvents> = OnceCell::new();
-
-struct RegistrationEvents {
-    tx: StaticSender<Option<RegistrationEvent>>,
-    rx: StaticReceiver<Option<RegistrationEvent>>,
 }
 
-impl RegistrationEvents {
-    fn from_channel<const N: usize>(
-        channel: &'static StaticChannel<Option<RegistrationEvent>, N>,
-    ) -> Self {
-        let (tx, rx) = channel.split();
-        Self { tx, rx }
-    }
+/// Snapshot of the statistics for an allocation group.
+struct GroupStatisticsSnapshot {
+    allocated_bytes: usize,
+    deallocated_bytes: usize,
+    allocations: usize,
+    deallocations: usize,
+}
 
-    fn push(&self, event: RegistrationEvent) {
-        self.tx
-            .send(Some(event))
-            .expect("received is static, and can never drop/disconnect")
-    }
-
-    fn pop(&self) -> RegistrationEvent {
-        self.rx
-            .recv()
-            .expect("sender is static, and can never drop/disconnect")
-            .expect("should never recv a legitimate None")
+impl GroupStatisticsSnapshot {
+    fn merge(&mut self, other: GroupStatisticsSnapshot) {
+        self.allocated_bytes += other.allocated_bytes;
+        self.allocations += other.allocations;
+        self.deallocated_bytes += other.deallocated_bytes;
+        self.deallocations += other.deallocations;
     }
 }
 
-#[derive(Clone)]
-struct RegistrationEvent {
-    group_entry: AllocationGroupEntry,
-    tags: Vec<(String, String)>,
-}
-*/
-
-struct AllocationGroupEntry {
-    allocated_bytes: AtomicU64,
-    deallocated_bytes: AtomicU64,
-    allocations: AtomicU64,
-    deallocations: AtomicU64,
+/// Statistics for an allocation group.
+struct GroupStatistics {
+    allocated_bytes: AtomicUsize,
+    deallocated_bytes: AtomicUsize,
+    allocations: AtomicUsize,
+    deallocations: AtomicUsize,
 }
 
-impl AllocationGroupEntry {
-    fn new() -> Self {
+impl GroupStatistics {
+    /// Creates a new `GroupStatistics`.
+    const fn new() -> Self {
         Self {
-            allocated_bytes: AtomicU64::new(0),
-            deallocated_bytes: AtomicU64::new(0),
-            allocations: AtomicU64::new(0),
-            deallocations: AtomicU64::new(0),
+            allocated_bytes: AtomicUsize::new(0),
+            deallocated_bytes: AtomicUsize::new(0),
+            allocations: AtomicUsize::new(0),
+            deallocations: AtomicUsize::new(0),
         }
     }
 
-    fn track_allocation(&self, bytes: u64) {
+    /// Tracks an allocation.
+    fn track_allocation(&self, bytes: usize) {
         self.allocated_bytes.fetch_add(bytes, Ordering::Relaxed);
         self.allocations.fetch_add(1, Ordering::Relaxed);
     }
 
-    fn track_deallocation(&self, bytes: u64) {
+    /// Tracks a deallocation.
+    fn track_deallocation(&self, bytes: usize) {
         self.deallocated_bytes.fetch_add(bytes, Ordering::Relaxed);
-        self.deallocations.fetch_add(1, Ordering::Relaxed);
+        self.deallocations.fetch_sub(1, Ordering::Relaxed);
+    }
+
+    /// Collects the current statistics values, resetting the counters back to zero.
+    fn collect(&self) -> GroupStatisticsSnapshot {
+        GroupStatisticsSnapshot {
+            allocated_bytes: self.allocated_bytes.swap(0, Ordering::Relaxed),
+            allocations: self.allocations.swap(0, Ordering::Relaxed),
+            deallocated_bytes: self.deallocated_bytes.swap(0, Ordering::Relaxed),
+            deallocations: self.deallocations.swap(0, Ordering::Relaxed),
+        }
     }
 }
 
-struct Tracker;
+/// A power-of-two-sized slice of group statistics.
+#[derive(Debug)]
+struct GroupStatisticsStoragePage {
+    page_size: usize,
+    initialized: AtomicBool,
+    slots: MaybeUninit<Box<[GroupStatistics]>>,
+}
+
+impl GroupStatisticsStoragePage {
+    /// Creates a new `GroupStatisticsStoragePage` in an uninitialized state.
+    ///
+    /// Callers must initialize the underlying storage by calling `initialize`, which will allocate enough storage to
+    /// store `N` elements, where `N` is equal to `2^page_exp`.
+    const fn new(page_size: usize) -> Self {
+        Self {
+            page_size,
+            initialized: AtomicBool::new(false),
+            slots: MaybeUninit::uninit(),
+        }
+    }
+
+    /// Gets whether or not this page has been initialized yet.
+    fn is_initialized(&self) -> bool {
+        self.initialized.load(Ordering::Release)
+    }
+
+    /// Initializes the page, allocating the necessary underlying storage.
+    fn initialize(&self) {
+        // Allocate the underlying storage for this page.
+        let mut slots = Vec::with_capacity(self.page_size);
+        slots.resize_with(self.page_size, GroupStatistics::new);
+
+        // Convert our storage and take ownership of it, and mark ourselves as initialized and ready for business.
+        self.slots.write(slots.into_boxed_slice());
+        self.initialized.store(true, Ordering::Release);
+    }
+
+    /// Gets a reference to the given slot.
+    ///
+    /// # Safety
+    /// 
+    /// It is the callers responsibility to ensure that they have a valid index for this page. This is given by passing
+    /// the regular group ID into `id_to_page`, where the page index and page subindex are given. A given page subindex
+    /// is only valid for the page index it was given with.
+    ///
+    /// Using any other values are instant UB, and will likely cause the process to abort.
+    unsafe fn get_slot_unchecked(&self, index: usize) -> &GroupStatistics {
+        self.slots.assume_init_ref().get_unchecked(index)
+    }
+
+    /// Gets a reference to all slots in the page.
+    ///
+    /// If the page has not yet been initialized (via `initialize`), then an empty slice is returned,
+    fn slots(&self) -> &[GroupStatistics] {
+        if self.initialized.load(Ordering::Relaxed) {
+            // SAFETY: We know that if `self.initialized` is `true`, then `initialize` has run and initialized `self.slots`.
+            unsafe { self.slots.assume_init_ref() }
+        } else {
+            &[]
+        }
+    }
+}
+
+impl Drop for GroupStatisticsStoragePage {
+    fn drop(&mut self) {
+        if *self.initialized.get_mut() {
+            // SAFETY: We know that if `self.initialized` is `true`, then `initialize` has run and initialized `self.slots`.
+            unsafe { self.slots.assume_init_drop() };
+        }
+    }
+}
+
+struct GroupStatisticsStorage {
+    page_init_mask: AtomicUsize,
+    pages: [GroupStatisticsStoragePage; PAGE_COUNT]
+}
+
+impl GroupStatisticsStorage {
+    fn new() -> Self {
+        let mut maybe_pages: [MaybeUninit<GroupStatisticsStoragePage>; PAGE_COUNT] = unsafe {
+            MaybeUninit::uninit().assume_init()
+        };
+
+        let mut page_idx: u32 = 0;
+        for page in &mut maybe_pages[..] {
+            let page_size = 2usize.pow(page_idx);
+            page.write(GroupStatisticsStoragePage::new(page_size));
+            page_idx += 1;
+        }
+
+        let pages = unsafe { mem::transmute::<_, [GroupStatisticsStoragePage; PAGE_COUNT]>(maybe_pages) };
+
+        Self {
+            page_init_mask: AtomicUsize::new(0),
+            pages,
+        }
+    }
+
+    /// Visits all group statistics present in storage.
+    ///
+    /// Callers must use `GroupStatistics::collect` to determine what has changed since the last visit, as all groups
+    /// present in storage will be visited each time `visit` is called.
+    fn visit<F>(&self, f: F)
+    where
+        F: Fn(NonZeroUsize, &GroupStatistics)
+    {}
+
+    fn try_claim_page_init(&self, page_idx: usize) -> bool {
+        // Try and mark the bit that corresponds to the page index.
+        let page_idx_bit = 1 << page_idx;
+        let previous_page_init_mask = self.page_init_mask.fetch_or(page_idx_bit, Ordering::AcqRel);
+
+        // If the bit wasn't already set, then this call has claimed the right to initialize the page.
+        previous_page_init_mask & page_idx_bit == 0
+    }
+
+    fn register_id(&self, id: NonZeroUsize) {
+        let (page_idx, _) = id_to_page(id);
+
+        // Page initialization can happen concurrently, so we need to protect it. This means that one concurrent caller
+        // will win the right to initialize the page, while others will wait until it is marked initialized.
+        //
+        // SAFETY: `page` can never be a value greater than `PAGE_COUNT`.
+        let page = unsafe { self.pages.get_unchecked(page_idx) };
+        if self.try_claim_page_init(page_idx) {
+            page.initialize();
+        } else {
+            // Wait for the page to be initialized.
+            unsafe { while !page.is_initialized() {} }
+        }
+    }
+
+    /// Gets a reference to the group statistics for given ID.
+    ///
+    /// # Safety
+    ///
+    /// This function assumes that the page where the given ID lives has been previously initialized via `register_id`.
+    /// Otherwise, this call will trigger instant UB, and will likely cause the process to abort.
+    unsafe fn get_statistics(&self, id: NonZeroUsize) -> &GroupStatistics {
+        let (page_idx, page_subidx) = id_to_page(id);
+        let page = self.pages.get_unchecked(page_idx);
+        page.get_slot_unchecked(page_subidx)
+    }
+}
+
+#[inline]
+const fn id_to_page(id: NonZeroUsize) -> (usize, usize) {
+    let page = POINTER_WIDTH - id.get().leading_zeros();
+    let page_size = 1 << page.saturating_sub(1);
+    let idx = id.get() ^ page_size;
+
+    // SAFETY: We can blindly cast to `usize` as both `POINTER_WIDTH` and `leading_zeros` will only ever return values
+    // that track the number of bits in a pointer, and it is impossible for `usize` to not be able to hold a number
+    // describing its own bit length.
+    (page as usize, idx)
+}
+
+struct Collector {
+    statistics: &'static ThreadLocal<GroupStatisticsStorage>,
+}
+
+impl Collector {
+    fn collect_statistics(&self) -> HashMap<usize, GroupStatisticsSnapshot> {
+        let mut groups = HashMap::new();
+
+        for local_groups in self.statistics.iter() {
+
+        }
+    }
+}
+
+struct Tracker {
+    statistics: &'static ThreadLocal<GroupStatisticsStorage>,
+}
+
+impl Tracker {
+    pub fn new() -> (Self, Collector) {
+        let statistics = Box::leak(Box::new(ThreadLocal::new()));
+
+        let tracker = Self { statistics };
+        let collector = Collector { statistics };
+
+        (tracker, collector)
+    }
+
+    fn get_group_stats(&self, group_id: AllocationGroupId) -> &GroupStatistics {
+        let group_id_idx = group_id.as_usize().get();
+        let local_stats = self.statistics.get_or(|| UnsafeCell::new(Vec::new()));
+
+        // Make sure our list of group statistics for this thread is already allocated up to a point where we can
+        // directly index into `self.statistics` to get a reference to it in the future.
+        //
+        // SAFETY: We have exclusive access to the `UnsafeCell<...>` as it is `!Sync`, so we can create a mutable
+        // reference to the contained `Vec<GroupStatistics>` as it will be the only mutable reference.
+        {
+            unsafe {
+                let local_stats_mut = &mut *local_stats.get();
+                if local_stats_mut.len() < group_id_idx {
+                    local_stats_mut.resize_with(group_id_idx - 1, || GroupStatistics::new());
+                }
+            }
+        }
+
+        // SAFETY: We know that the vector is sized large enough, and with an initialized value, to have a statistics
+        // entry at the index `group_id_idx` based on the prior call to `Vec::resize_with`.
+        unsafe { (&*local_stats.get()).get_unchecked(group_id_idx) }
+    }
+}
 
 impl AllocationTracker for Tracker {
     fn allocated(&self, _addr: usize, size: usize, group_id: AllocationGroupId) {
-        with_allocation_group_entry(group_id, |entry| entry.track_allocation(size as u64));
+        let local_stats_group = self.get_group_stats(group_id);
+        local_stats_group.track_allocation(size);
     }
 
     fn deallocated(
@@ -158,9 +324,8 @@ impl AllocationTracker for Tracker {
         source_group_id: AllocationGroupId,
         _current_group_id: AllocationGroupId,
     ) {
-        with_allocation_group_entry(source_group_id, |entry| {
-            entry.track_deallocation(size as u64)
-        });
+        let local_stats_group = self.get_group_stats(source_group_id);
+        local_stats_group.track_deallocation(size);
     }
 }
 
@@ -170,10 +335,10 @@ impl AllocationTracker for Tracker {
 /// handles registering allocation groups by attaching their atomic counters to our internal metrics backend, and then
 /// finally enables tracking which causes (de)allocation events to begin flowing.
 pub fn init_allocation_tracking() {
-    let _ = AllocationRegistry::set_global_tracker(Tracker {})
-        .expect("no other global tracker should be set yet");
+    let (tracker, _collector) = Tracker::new();
 
-    //thread::spawn(process_registration_events);
+    let _ = AllocationRegistry::set_global_tracker(tracker)
+        .expect("no other global tracker should be set yet");
 
     AllocationRegistry::enable_tracking();
 }
@@ -192,170 +357,5 @@ pub fn init_allocation_tracking() {
 /// traditional `metrics` macros, so the given tags should match the span fields that would traditionally be set for a
 /// given span in order to ensure that they match.
 pub fn acquire_allocation_group_token(_tags: Vec<(String, String)>) -> AllocationGroupToken {
-    let token =
-        AllocationGroupToken::register().expect("failed to register allocation group token");
-    let group_id = token.id();
-
-    // Register the atomic counters, etc, for this group token.
-    //let group_entry = register_allocation_group_token_entry(&group_id);
-    register_allocation_group_token_entry(&group_id);
-
-    // Send the group ID and entry to our late registration thread so that it can correctly wire up any allocation
-    // groups to our metrics backend once it's been initialized.
-    //let registration_events = get_registration_events();
-    //registration_events.push(RegistrationEvent { group_entry, tags });
-
-    token
+    AllocationGroupToken::register().expect("failed to register allocation group token")
 }
-
-/// Acquires an allocation group token.
-///
-/// This creates an allocation group which allows callers to enter/exit the allocation group context, associating all
-/// (de)allocations within the context with that group.  That token can (and typically is) associated with a
-/// /// `tracing::Span` such that the context is entered and exited as the span is entered and exited. This allows
-/// ensuring that we track all (de)allocations when the span is active.
-///
-/// # Tags
-///
-/// The provided `tags` are used for the metrics that get registered and attached to the allocation group. No tags from
-/// the traditional `metrics`/`tracing` are collected, as the metrics are updated directly rather than emitted via the
-/// traditional `metrics` macros, so the given tags should match the span fields that would traditionally be set for a
-/// given span in order to ensure that they match.
-pub fn acquire_allocation_group_token2(_tags: Vec<(String, String)>) -> AllocationGroupToken {
-    let token = AllocationGroupToken::register()
-        .expect("failed to register allocation group token");
-
-    let group_id = token.id();
-    if group_id.as_usize().get() > MAX_ALLOCATION_GROUP_ID {
-        panic!("registered more than {} allocation groups; this should be practically impossible given normal configuration sizes", MAX_ALLOCATION_GROUP_ID);
-    }
-
-    // Register the atomic counters, etc, for this group token.
-    //let group_entry = register_allocation_group_token_entry(&group_id);
-    register_allocation_group_token_entry(&group_id);
-
-    // Send the group ID and entry to our late registration thread so that it can correctly wire up any allocation
-    // groups to our metrics backend once it's been initialized.
-    //let registration_events = get_registration_events();
-    //registration_events.push(RegistrationEvent { group_entry, tags });
-
-    token
-}
-
-fn register_allocation_group_token_entry(group_id: &AllocationGroupId) {
-    AllocationRegistry::untracked(|| {
-        let group_id = group_id.as_usize().get();
-
-        // Create our allocated/deallocated counters and store them at their respective index in the global lookup
-        // table. This requires us to (potentially) resize the vector and fill it with empty values if we're racing
-        // another acquisition that is behind us, ID-wise.
-        ALLOCATION_LUT.rcu(|lut| {
-            let mut lut = lut.as_ref()
-                .map(|a| a.as_ref().clone())
-                .unwrap_or_else(|| Vec::new());
-
-            // Make sure the vector is long enough that we can directly index our group ID.
-            let minimum_len = group_id + 1;
-            if lut.len() < minimum_len {
-                lut.resize(minimum_len, None);
-            }
-
-            {
-                let entry = unsafe { lut.get_unchecked_mut(group_id) };
-                if entry.is_some() {
-                    panic!("allocation LUT entry was already populated for newly acquired allocation group token!");
-                }
-
-                *entry = Some(Arc::new(AllocationGroupEntry::new()));
-            }
-
-            Some(Arc::new(lut))
-        });
-    })
-}
-
-#[inline(always)]
-fn with_allocation_group_entry<F>(group_id: AllocationGroupId, f: F) -> bool
-where
-    F: FnOnce(&AllocationGroupEntry),
-{
-    let lut = ALLOCATION_LUT.load();
-    if let Some(inner) = lut.as_ref() {
-        if let Some(Some(entry)) = inner.get(group_id.as_usize().get()) {
-            f(entry);
-            true
-        } else {
-            false
-        }
-    } else {
-        false
-    }
-}
-
-/*
-fn get_registration_events() -> &'static RegistrationEvents {
-    REGISTRATION_EVENTS.get_or_init(|| {
-        static CHANNEL: StaticChannel<Option<RegistrationEvent>, 128> = StaticChannel::new();
-
-        RegistrationEvents::from_channel(&CHANNEL)
-    })
-}
-
-fn process_registration_events() {
-    AllocationRegistry::untracked(|| {
-        // We need to wait until our metrics backend is initialized so that we can meaningfully register our allocation
-        // groups, as we can't do so until we can get a reference to the global metrics controller.
-        let controller = loop {
-            match Controller::get() {
-                Ok(controller) => break controller,
-                Err(_) => thread::sleep(Duration::from_millis(100)),
-            }
-        };
-
-        // Now that we have a reference to the controller, process any existing registration events, and any future
-        // ones.
-        let registration_events = get_registration_events();
-        loop {
-            let event = registration_events.pop();
-
-            register_allocation_group_counter(
-                controller,
-                &event,
-                "component_allocated_bytes_total",
-                |e| e.allocated_bytes(),
-            );
-            register_allocation_group_counter(
-                controller,
-                &event,
-                "component_deallocated_bytes_total",
-                |e| e.deallocated_bytes(),
-            );
-            register_allocation_group_counter(
-                controller,
-                &event,
-                "component_allocations_total",
-                |e| e.allocations(),
-            );
-            register_allocation_group_counter(
-                controller,
-                &event,
-                "component_deallocations_total",
-                |e| e.deallocations(),
-            );
-        }
-    });
-}
-
-fn register_allocation_group_counter<F>(
-    controller: &Controller,
-    event: &RegistrationEvent,
-    name: &'static str,
-    get_handle: F,
-) where
-    F: Fn(&AllocationGroupEntry) -> &Arc<AtomicU64>,
-{
-    let key = Key::from_parts(name, &event.tags);
-    let handle = Handle::Counter(Arc::clone(get_handle(&event.group_entry)).into());
-    controller.register_handle(&key, handle);
-}
-*/

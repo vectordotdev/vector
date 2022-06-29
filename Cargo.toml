@@ -291,13 +291,13 @@ socket2 = { version = "0.4.4", default-features = false }
 stream-cancel = { version = "0.8.1", default-features = false }
 strip-ansi-escapes = { version = "0.1.1", default-features = false }
 syslog = { version = "6.0.1", default-features = false, optional = true }
-thingbuf = { git = "https://github.com/tobz/thingbuf.git", default-features = false, features = ["std", "static"], optional = true }
+thread_local = { version = "1.1.4", default-features = false, optional = true }
 tikv-jemallocator = { version = "0.5.0", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.6", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 tokio-tungstenite = {version = "0.17.1", default-features = false, features = ["connect"], optional = true}
 toml = { version = "0.5.9", default-features = false }
 tonic = { version = "0.7.2", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "compression"] }
-tracking-allocator = { path = "../tracking-allocator", default-features = false, features = ["tracing-compat"], optional = true }
+tracking-allocator = { version = "0.3.0", default-features = false, features = ["tracing-compat"], optional = true }
 trust-dns-proto = { version = "0.21.0", default-features = false, features = ["dnssec"], optional = true }
 typetag = { version = "0.1.8", default-features = false }
 url = { version = "2.2.2", default-features = false, features = ["serde"] }
@@ -389,7 +389,7 @@ target-powerpc-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "r
 
 # Enables features that work only on systems providing `cfg(unix)`
 unix = ["tikv-jemallocator", "allocation-tracking"]
-allocation-tracking = ["thingbuf", "tracking-allocator"]
+allocation-tracking = ["thread_local", "tracking-allocator"]
 
 # Enables kubernetes dependencies and shared code. Kubernetes-related sources,
 # transforms and sinks should depend on this feature.
