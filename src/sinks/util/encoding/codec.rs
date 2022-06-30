@@ -294,7 +294,7 @@ mod tests {
     use chrono::{SecondsFormat, Utc};
     use vector_core::{
         config::log_schema,
-        event::{Event, Metric, MetricKind, MetricValue},
+        event::{Event, LogEvent, Metric, MetricKind, MetricValue},
     };
 
     use super::StandardEncodings;
@@ -317,9 +317,9 @@ mod tests {
         let encoding = StandardEncodings::Text;
 
         let message = "log event";
-        let event = Event::from(message.to_string());
+        let event = LogEvent::from(message);
 
-        let result = encode_event(event, encoding).expect("should not have failed");
+        let result = encode_event(event.into(), encoding).expect("should not have failed");
         let encoded = std::str::from_utf8(&result).expect("result should be valid UTF-8");
 
         let expected = message;
@@ -331,10 +331,10 @@ mod tests {
         let encoding = StandardEncodings::Text;
 
         let message1 = "log event 1";
-        let event1 = Event::from(message1.to_string());
+        let event1 = Event::Log(LogEvent::from(message1));
 
         let message2 = "log event 2";
-        let event2 = Event::from(message2.to_string());
+        let event2 = Event::Log(LogEvent::from(message2));
 
         let result = encode_events(vec![event1, event2], encoding).expect("should not have failed");
         let encoded = std::str::from_utf8(&result).expect("result should be valid UTF-8");
@@ -393,10 +393,10 @@ mod tests {
         let encoding = StandardEncodings::Json;
 
         let message = "log event";
-        let mut event = Event::from(message.to_string());
-        event.as_mut_log().insert(ts_key, now);
+        let mut event = LogEvent::from(message);
+        event.insert(ts_key, now);
 
-        let result = encode_event(event, encoding).expect("should not have failed");
+        let result = encode_event(event.into(), encoding).expect("should not have failed");
         let encoded = std::str::from_utf8(&result).expect("result should be valid UTF-8");
 
         // We have to hard-code the transformation of the timestamp here, as `chrono::DateTime`
@@ -419,14 +419,15 @@ mod tests {
         let encoding = StandardEncodings::Json;
 
         let message1 = "log event1";
-        let mut event1 = Event::from(message1.to_string());
-        event1.as_mut_log().insert(ts_key, now);
+        let mut event1 = LogEvent::from(message1);
+        event1.insert(ts_key, now);
 
         let message2 = "log event2";
-        let mut event2 = Event::from(message2.to_string());
-        event2.as_mut_log().insert(ts_key, now);
+        let mut event2 = LogEvent::from(message2);
+        event2.insert(ts_key, now);
 
-        let result = encode_events(vec![event1, event2], encoding).expect("should not have failed");
+        let result = encode_events(vec![event1.into(), event2.into()], encoding)
+            .expect("should not have failed");
         let encoded = std::str::from_utf8(&result).expect("result should be valid UTF-8");
 
         // We have to hard-code the transformation of the timestamp here, as `chrono::DateTime`
@@ -502,10 +503,10 @@ mod tests {
         let encoding = StandardEncodings::Ndjson;
 
         let message = "log event";
-        let mut event = Event::from(message.to_string());
-        event.as_mut_log().insert(ts_key, now);
+        let mut event = LogEvent::from(message);
+        event.insert(ts_key, now);
 
-        let result = encode_event(event, encoding).expect("should not have failed");
+        let result = encode_event(event.into(), encoding).expect("should not have failed");
         let encoded = std::str::from_utf8(&result).expect("result should be valid UTF-8");
 
         // We have to hard-code the transformation of the timestamp here, as `chrono::DateTime`
@@ -528,14 +529,15 @@ mod tests {
         let encoding = StandardEncodings::Ndjson;
 
         let message1 = "log event1";
-        let mut event1 = Event::from(message1.to_string());
-        event1.as_mut_log().insert(ts_key, now);
+        let mut event1 = LogEvent::from(message1);
+        event1.insert(ts_key, now);
 
         let message2 = "log event2";
-        let mut event2 = Event::from(message2.to_string());
-        event2.as_mut_log().insert(ts_key, now);
+        let mut event2 = LogEvent::from(message2);
+        event2.insert(ts_key, now);
 
-        let result = encode_events(vec![event1, event2], encoding).expect("should not have failed");
+        let result = encode_events(vec![event1.into(), event2.into()], encoding)
+            .expect("should not have failed");
         let encoded = std::str::from_utf8(&result).expect("result should be valid UTF-8");
 
         // We have to hard-code the transformation of the timestamp here, as `chrono::DateTime`

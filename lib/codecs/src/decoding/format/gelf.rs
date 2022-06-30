@@ -10,6 +10,7 @@ use value::Kind;
 use vector_core::{
     config::{log_schema, DataType},
     event::Event,
+    event::LogEvent,
     schema,
 };
 
@@ -114,8 +115,7 @@ impl GelfDeserializer {
     /// Builds a LogEvent from the parsed GelfMessage.
     /// The logic follows strictly the documented GELF standard.
     fn message_to_event(&self, parsed: &GelfMessage) -> vector_core::Result<Event> {
-        let mut event = Event::from(parsed.short_message.to_string());
-        let log = event.as_mut_log();
+        let mut log = LogEvent::from(parsed.short_message.to_string());
 
         // GELF spec defines the version as 1.1 which has not changed since 2013
         if parsed.version != GELF_VERSION {
@@ -184,7 +184,7 @@ impl GelfDeserializer {
                 log.insert(path!(key.as_str()), vector_val);
             }
         }
-        Ok(event)
+        Ok(Event::Log(log))
     }
 }
 

@@ -576,7 +576,7 @@ fn build_outputs(
 fn build_input_event(input: &TestInput) -> Result<Event, String> {
     match input.type_str.as_ref() {
         "raw" => match input.value.as_ref() {
-            Some(v) => Ok(Event::from(v.clone())),
+            Some(v) => Ok(Event::Log(LogEvent::from(v.clone()))),
             None => Err("input type 'raw' requires the field 'value'".to_string()),
         },
         "log" => {

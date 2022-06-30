@@ -8,8 +8,8 @@ remap: {
 		description: string
 		return:      string
 
-		grammar?: #Grammar
-
+		grammar?:         #Grammar
+		characteristics?: remap.#Characteristics
 		examples: [remap.#Example, ...remap.#Example]
 	}
 

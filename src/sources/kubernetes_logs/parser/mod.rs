@@ -89,7 +89,11 @@ mod tests {
     #[test]
     fn test_parsing() {
         trace_init();
-        test_util::test_parser(|| Transform::function(Parser::new()), Event::from, cases());
+        test_util::test_parser(
+            || Transform::function(Parser::new()),
+            |s| Event::Log(LogEvent::from(s)),
+            cases(),
+        );
     }
 
     #[test]
