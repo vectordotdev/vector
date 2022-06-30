@@ -12,8 +12,9 @@ use crate::{
     assert_buffer_is_empty, assert_buffer_records, assert_buffer_size, assert_enough_bytes_written,
     assert_reader_writer_v2_file_positions,
     test::common::{install_tracing_helpers, with_temp_dir, SizedRecord},
-    variants::disk_v2::tests::{
-        align16_u32, get_corrected_max_record_size, get_minimum_data_file_size_for_record_payload,
+    variants::disk_v2::{
+        common::align16,
+        tests::{get_corrected_max_record_size, get_minimum_data_file_size_for_record_payload},
     },
 };
 
@@ -25,10 +26,12 @@ async fn writer_error_when_record_is_over_the_limit() {
         async move {
             // Create our buffer with and arbitrarily low max record size, and two write sizes where
             // the first will fit but the second will not.
-            let first_write_size = align16_u32(42);
+            let first_write_size = align16(42).try_into().unwrap();
             let first_record = SizedRecord(first_write_size);
 
-            let second_write_size = align16_u32(first_write_size + 1);
+            let second_write_size = align16((first_write_size + 1).try_into().unwrap())
+                .try_into()
+                .unwrap();
             let second_record = SizedRecord(second_write_size);
 
             let max_record_size = get_corrected_max_record_size(&first_record);

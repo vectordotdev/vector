@@ -59,12 +59,32 @@ pub(crate) const fn align16(amount: usize) -> usize {
     }
 }
 
-fn get_minimum_max_buffer_size(max_data_file_size: u64) -> u64 {
+/// Gets the maximum possible data file size given the type-level numerical limits and buffer invariants.
+fn get_maximum_data_file_size() -> u64 {
     let ledger_len: u64 = LEDGER_LEN
         .try_into()
-        .expect("Vector does not support 128-bit architectures.");
+        .expect("Ledger length cannot be greater than `u64`.");
+    (u64::MAX - ledger_len) / 2
+}
 
-    (max_data_file_size * 2) + ledger_len
+/// Gets the minimum buffer size for the the given maximum data file size.
+///
+/// This ensures that we are allowed to store enough bytes on-disk, as the buffer design requires being able to always
+/// write to a minimum number of data files, etc. This allow ensures that we're accounting for non-data file disk usage
+/// so that we do not overrun the specified maximum buffer size when considering the sum total of files placed on disk.
+fn get_minimum_buffer_size(max_data_file_size: u64) -> Option<u64> {
+    // We're doing this fallible conversion back-and-forth because we have to interoperate with `u64` and `usize`, and
+    // we need to ensure we're not getting values that can't be represented correctly in both types, as well as ensuring
+    // we're not implicitly overflowing and generating nonsensical numbers.
+    let ledger_len = LEDGER_LEN
+        .try_into()
+        .expect("Ledger length cannot be greater than `u64`.");
+
+    // We always need to be able to allocate two data files, so the buffer size has to be at least as big as 2x data
+    // files at their maximum allowed size, plus an allowance for the size of the ledger state itself.
+    max_data_file_size
+        .checked_mul(2)
+        .and_then(|doubled| doubled.checked_add(ledger_len))
 }
 
 #[derive(Debug, Snafu)]
@@ -268,7 +288,7 @@ where
         let max_buffer_size = self.max_buffer_size.unwrap_or(u64::MAX);
         let max_data_file_size = self.max_data_file_size.unwrap_or_else(|| {
             u64::try_from(DEFAULT_MAX_DATA_FILE_SIZE)
-                .expect("Vector does not support 128-bit architectures.")
+                .expect("Default maximum data file size should never be greater than 2^64 bytes.")
         });
         let max_record_size = self.max_record_size.unwrap_or(DEFAULT_MAX_RECORD_SIZE);
         let write_buffer_size = self.write_buffer_size.unwrap_or(DEFAULT_WRITE_BUFFER_SIZE);
@@ -283,20 +303,30 @@ where
             });
         }
 
-        if max_data_file_size > u64::MAX / 2 {
+        let data_file_size_mechanical_limit = get_maximum_data_file_size();
+        if max_data_file_size > data_file_size_mechanical_limit {
             return Err(BuildError::InvalidParameter {
                 param_name: "max_data_file_size",
-                reason: format!("cannot be greater than {} bytes", u64::MAX / 2),
+                reason: format!(
+                    "cannot be greater than {} bytes",
+                    data_file_size_mechanical_limit
+                ),
             });
         }
 
-        let minimum_max_buffer_size = get_minimum_max_buffer_size(max_data_file_size);
-        if max_buffer_size < minimum_max_buffer_size {
+        let minimum_buffer_size = match get_minimum_buffer_size(max_data_file_size) {
+            Some(value) => value,
+            None => {
+                unreachable!("maximum data file size should be correctly limited at this point")
+            }
+        };
+
+        if max_buffer_size < minimum_buffer_size {
             return Err(BuildError::InvalidParameter {
                 param_name: "max_buffer_size",
                 reason: format!(
                     "must be greater than or equal to {} bytes",
-                    minimum_max_buffer_size
+                    minimum_buffer_size
                 ),
             });
         }
@@ -318,8 +348,16 @@ where
             });
         }
 
-        let max_record_size_converted =
-            u64::try_from(max_record_size).expect("Vector does not support 128-bit architectures.");
+        let max_record_size_converted = match u64::try_from(max_record_size) {
+            Ok(value) => value,
+            Err(_) => {
+                return Err(BuildError::InvalidParameter {
+                    param_name: "max_record_size",
+                    reason: "must be less than 2^64 bytes".to_string(),
+                })
+            }
+        };
+
         if max_record_size_converted > max_data_file_size {
             return Err(BuildError::InvalidParameter {
                 param_name: "max_record_size",
@@ -496,7 +534,7 @@ mod tests {
         fn ensure_max_buffer_size_lower_bound(max_buffer_size in 1..u64::MAX, max_record_data_file_size in 1..u64::MAX) {
             let max_data_file_size = max_record_data_file_size;
             let max_record_size = usize::try_from(max_record_data_file_size)
-                .expect("Vector does not support 128-bit architectures.");
+                .expect("Maximum record size, and data file size, must be less than 2^64 bytes.");
 
             let result = DiskBufferConfigBuilder::from_path("/tmp/dummy/path")
                 .max_buffer_size(max_buffer_size)

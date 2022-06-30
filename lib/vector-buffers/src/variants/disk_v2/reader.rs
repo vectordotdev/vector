@@ -1075,7 +1075,7 @@ where
         let record_events: u64 = record
             .event_count()
             .try_into()
-            .expect("Vector does not support 128-bit platforms.");
+            .expect("Event count for a record cannot exceed 2^64 events.");
         let record_events = record_events
             .try_into()
             .map_err(|_| ReaderError::EmptyRecord)?;

@@ -708,7 +708,6 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Ledger")
             .field("config", &self.config)
-            //.field("ledger_lock", &self.ledger_lock)
             .field("state", &self.state.get_archive_ref())
             .field(
                 "total_buffer_size",

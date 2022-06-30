@@ -619,7 +619,7 @@ async fn writer_waits_for_reader_after_validate_last_write_fails_and_data_file_s
             let corrected_record_size = get_corrected_max_record_size(&record);
             let max_data_file_size = (corrected_record_size * 2)
                 .try_into()
-                .expect("Vector does not supports 128-bit architectures.");
+                .expect("Value should never exceed `u64::MAX`.");
 
             // Create our buffer with a low max data file size, which will let us quickly run through
             // the file ID range. We craft this number to allow for two records per data file.

@@ -386,8 +386,8 @@ where
         max_record_size: usize,
     ) -> Self {
         // These should also be getting checked at a higher level, but we're double-checking them here to be absolutely sure.
-        let max_record_size_converted =
-            u64::try_from(max_record_size).expect("Vector does not support 128-bit architectures.");
+        let max_record_size_converted = u64::try_from(max_record_size)
+            .expect("Maximum record size must be less than 2^64 bytes.");
 
         debug_assert!(
             max_record_size > RECORD_HEADER_LEN,
@@ -431,7 +431,7 @@ where
     /// If no bytes have written at all to a data file, then `amount` is allowed to exceed the
     /// limit, otherwise a record would never be able to be written.
     fn can_write(&self, amount: usize) -> bool {
-        let amount = u64::try_from(amount).expect("Vector does not support 128-bit architectures.");
+        let amount = u64::try_from(amount).expect("`amount` should need ever 2^64 bytes.");
 
         self.current_data_file_size + amount <= self.max_data_file_size
     }
@@ -625,8 +625,8 @@ where
             .context(IoSnafu)?;
 
         // Update our current data file size.
-        self.current_data_file_size +=
-            u64::try_from(serialized_len).expect("Vector does not support 128-bit architectures.");
+        self.current_data_file_size += u64::try_from(serialized_len)
+            .expect("Serialized length of record should never exceed 2^64 bytes.");
 
         Ok((serialized_len, flush_result))
     }

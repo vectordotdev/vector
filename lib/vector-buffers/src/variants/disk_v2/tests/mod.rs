@@ -13,7 +13,10 @@ use super::{
     record::RECORD_HEADER_LEN,
     Buffer, DiskBufferConfigBuilder, Ledger, Reader, Writer,
 };
-use crate::{buffer_usage_data::BufferUsageHandle, encoding::FixedEncodable, Acker, Bufferable};
+use crate::{
+    buffer_usage_data::BufferUsageHandle, encoding::FixedEncodable,
+    variants::disk_v2::common::align16, Acker, Bufferable,
+};
 
 type FilesystemUnderTest = ProductionFilesystem;
 
@@ -241,15 +244,15 @@ where
         "data file count limit must be at least 2"
     );
 
-    let max_record_size = usize::try_from(max_data_file_size)
-        .expect("Vector only supports 64-bit architectures when testing.");
+    let max_record_size = usize::try_from(max_data_file_size).unwrap();
 
     // We also have to compensate for the size of the ledger itself, as the configuration builder pays attention to that
     // in the context of the configured maximum buffer size.
-    let ledger_len: u64 = LEDGER_LEN
-        .try_into()
-        .expect("Vector only supports 64-bit architectures when testing");
-    let max_buffer_size = (max_data_file_size * data_file_count_limit) + ledger_len;
+    let ledger_len: u64 = LEDGER_LEN.try_into().unwrap();
+    let max_buffer_size = max_data_file_size
+        .checked_mul(data_file_count_limit)
+        .and_then(|n| n.checked_add(ledger_len))
+        .unwrap();
 
     let config = DiskBufferConfigBuilder::from_path(data_dir)
         .max_record_size(max_record_size)
@@ -305,8 +308,7 @@ where
     P: AsRef<Path>,
     R: Bufferable,
 {
-    let max_record_size =
-        usize::try_from(max_data_file_size).expect("Vector only supports 64-bit architectures.");
+    let max_record_size = usize::try_from(max_data_file_size).unwrap();
 
     let config = DiskBufferConfigBuilder::from_path(data_dir)
         .max_data_file_size(max_data_file_size)
@@ -345,28 +347,6 @@ where
         .expect("should not fail to create buffer")
 }
 
-const fn align16(amount: usize) -> usize {
-    const SERIALIZER_ALIGNMENT: usize = 16;
-
-    if amount % SERIALIZER_ALIGNMENT == 0 {
-        amount
-    } else {
-        // Pad ourselves to meet the alignment requirements.
-        (amount & !(SERIALIZER_ALIGNMENT - 1)) + SERIALIZER_ALIGNMENT
-    }
-}
-
-const fn align16_u32(amount: u32) -> u32 {
-    const SERIALIZER_ALIGNMENT: u32 = 16;
-
-    if amount % SERIALIZER_ALIGNMENT == 0 {
-        amount
-    } else {
-        // Pad ourselves to meet the alignment requirements.
-        (amount & !(SERIALIZER_ALIGNMENT - 1)) + SERIALIZER_ALIGNMENT
-    }
-}
-
 pub(crate) fn get_corrected_max_record_size<T>(payload: &T) -> usize
 where
     T: FixedEncodable,
@@ -385,5 +365,5 @@ where
 {
     // This is just the maximum record size, compensating for the record header length.
     let max_record_size = get_corrected_max_record_size(payload);
-    u64::try_from(max_record_size).expect("Vector does not support 128-bit architectures.")
+    u64::try_from(max_record_size).unwrap()
 }
