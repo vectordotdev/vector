@@ -599,6 +599,13 @@ impl AgentDDSketch {
 
         let mut lower = f64::NEG_INFINITY;
 
+        if buckets
+            .iter()
+            .any(|bucket| bucket.count > u64::from(u32::MAX))
+        {
+            return Err("bucket size greater than u32::MAX");
+        }
+
         for bucket in buckets {
             let mut upper = bucket.upper_limit;
             if upper.is_sign_positive() && upper.is_infinite() {
@@ -611,8 +618,7 @@ impl AgentDDSketch {
             // generally enforced at the source level by converting from cumulative buckets, or
             // enforced by the internal structures that hold bucketed data i.e. Vector's internal
             // `Histogram` data structure used for collecting histograms from `metrics`.
-            let count =
-                u32::try_from(bucket.count).map_err(|_| "bucket size greater than u32::MAX")?;
+            let count = u32::try_from(bucket.count).expect("count range has already been checked.");
 
             self.insert_interpolate_bucket(lower, upper, count);
             lower = bucket.upper_limit;
@@ -1061,6 +1067,7 @@ fn round_to_even(v: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::{round_to_even, AgentDDSketch, Config, AGENT_DEFAULT_EPS, MAX_KEY};
+    use crate::event::metric::Bucket;
 
     const FLOATING_POINT_ACCEPTABLE_ERROR: f64 = 1.0e-10;
 
@@ -1167,6 +1174,34 @@ mod tests {
         assert_eq!(start, min);
         assert!(median.abs() < FLOATING_POINT_ACCEPTABLE_ERROR);
         assert!((end - max).abs() < FLOATING_POINT_ACCEPTABLE_ERROR);
+    }
+
+    #[test]
+    fn test_out_of_range_buckets_error() {
+        let mut sketch = AgentDDSketch::with_agent_defaults();
+
+        let buckets = vec![
+            Bucket {
+                upper_limit: 5.4,
+                count: 32,
+            },
+            Bucket {
+                upper_limit: 5.8,
+                count: u64::from(u32::MAX) + 1,
+            },
+            Bucket {
+                upper_limit: 9.2,
+                count: 320,
+            },
+        ];
+
+        assert_eq!(
+            Err("bucket size greater than u32::MAX"),
+            sketch.insert_interpolate_buckets(buckets)
+        );
+
+        // Assert the sketch remains unchanged.
+        assert_eq!(sketch, AgentDDSketch::with_agent_defaults());
     }
 
     #[test]
