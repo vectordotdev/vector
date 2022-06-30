@@ -3,9 +3,8 @@ use std::{cell::RefCell, error::Error, fmt, rc::Rc};
 use compiler::ExpressionError;
 use lookup::LookupBuf;
 use value::Value;
-use vector_common::TimeZone;
 
-use crate::{state, BatchContext, Context, Program, Target};
+use crate::{state, BatchContext, Context, Program, Target, TimeZone};
 
 pub type RuntimeResult = Result<Value, Terminate>;
 

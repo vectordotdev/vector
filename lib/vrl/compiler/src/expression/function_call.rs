@@ -334,7 +334,7 @@ impl<'a> Builder<'a> {
 
                             let details = Details { type_def, value };
 
-                            local.insert_variable(call_ident.to_owned().into_inner(), details);
+                            local.insert_variable(call_ident.clone().into_inner(), details);
                         }
 
                         let variables = variables
@@ -568,6 +568,7 @@ impl FunctionCall {
         Ok(result)
     }
 
+    #[must_use]
     pub fn arguments_fmt(&self) -> Vec<String> {
         self.arguments
             .iter()
@@ -575,6 +576,7 @@ impl FunctionCall {
             .collect::<Vec<_>>()
     }
 
+    #[must_use]
     pub fn arguments_dbg(&self) -> Vec<String> {
         self.arguments
             .iter()
@@ -864,7 +866,12 @@ pub(crate) enum Error {
 
 impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
-        use Error::*;
+        use Error::{
+            AbortInfallible, ClosureArityMismatch, ClosureParameterTypeMismatch, Compilation,
+            FallibleArgument, InvalidArgumentKind, MissingArgument, MissingClosure,
+            ReturnTypeMismatch, Undefined, UnexpectedClosure, UnknownKeyword, UpdateState,
+            WrongNumberOfArgs,
+        };
 
         match self {
             Undefined { .. } => 105,
@@ -885,7 +892,12 @@ impl DiagnosticMessage for Error {
     }
 
     fn labels(&self) -> Vec<Label> {
-        use Error::*;
+        use Error::{
+            AbortInfallible, ClosureArityMismatch, ClosureParameterTypeMismatch, Compilation,
+            FallibleArgument, InvalidArgumentKind, MissingArgument, MissingClosure,
+            ReturnTypeMismatch, Undefined, UnexpectedClosure, UnknownKeyword, UpdateState,
+            WrongNumberOfArgs,
+        };
 
         match self {
             Undefined {
@@ -1061,7 +1073,10 @@ impl DiagnosticMessage for Error {
     }
 
     fn notes(&self) -> Vec<Note> {
-        use Error::*;
+        use Error::{
+            AbortInfallible, Compilation, FallibleArgument, InvalidArgumentKind, MissingClosure,
+            WrongNumberOfArgs,
+        };
 
         match self {
             WrongNumberOfArgs { .. } => vec![Note::SeeDocs(

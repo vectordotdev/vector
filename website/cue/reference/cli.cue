@@ -199,7 +199,7 @@ cli: {
 
 			args: {
 				pipeline: {
-					description: "Pipeline expression, e.g. `stdin/json_parser,add_fields/console`"
+					description: "Pipeline expression, e.g. `stdin/remap,filter/console`"
 					type:        "string"
 				}
 			}

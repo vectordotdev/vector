@@ -82,7 +82,7 @@ impl Query {
 
 impl Expression for Query {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        use Target::*;
+        use Target::{Container, External, FunctionCall, Internal};
 
         let value = match &self.target {
             External => {
@@ -106,7 +106,7 @@ impl Expression for Query {
     }
 
     fn resolve_batch(&self, ctx: &mut BatchContext) {
-        use Target::*;
+        use Target::{Container, External, FunctionCall, Internal};
 
         match &self.target {
             External => {
@@ -155,7 +155,7 @@ impl Expression for Query {
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
-        use Target::*;
+        use Target::{Container, External, FunctionCall, Internal};
 
         match &self.target {
             External => state
@@ -204,7 +204,7 @@ pub enum Target {
 
 impl fmt::Display for Target {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Target::*;
+        use Target::{Container, External, FunctionCall, Internal};
 
         match self {
             Internal(v) => v.fmt(f),
@@ -217,7 +217,7 @@ impl fmt::Display for Target {
 
 impl fmt::Debug for Target {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Target::*;
+        use Target::{Container, External, FunctionCall, Internal};
 
         match self {
             Internal(v) => write!(f, "Internal({:?})", v),

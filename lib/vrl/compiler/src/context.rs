@@ -21,6 +21,7 @@ impl<'a> Context<'a> {
     }
 
     /// Get a reference to the [`Target`].
+    #[must_use]
     pub fn target(&self) -> &dyn Target {
         self.target
     }
@@ -31,6 +32,7 @@ impl<'a> Context<'a> {
     }
 
     /// Get a reference to the [`runtime state`](Runtime).
+    #[must_use]
     pub fn state(&self) -> &Runtime {
         self.state
     }
@@ -41,6 +43,7 @@ impl<'a> Context<'a> {
     }
 
     /// Get a reference to the [`TimeZone`]
+    #[must_use]
     pub fn timezone(&self) -> &TimeZone {
         self.timezone
     }
@@ -57,6 +60,7 @@ pub struct BatchContext<'a> {
 
 impl<'a> BatchContext<'a> {
     /// Create a new [`BatchContext`].
+    #[must_use]
     pub fn new(
         indices: Vec<usize>,
         resolved_values: Vec<Resolved>,
@@ -73,6 +77,7 @@ impl<'a> BatchContext<'a> {
         }
     }
 
+    #[must_use]
     pub fn empty_with_timezone(timezone: TimeZone) -> Self {
         Self {
             indices: Vec::new(),
@@ -83,10 +88,12 @@ impl<'a> BatchContext<'a> {
         }
     }
 
+    #[must_use]
     pub fn len(&self) -> usize {
         self.resolved_values.len()
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.resolved_values.is_empty()
     }
@@ -183,6 +190,7 @@ impl<'a> BatchContext<'a> {
         self.states.extend(other.states);
     }
 
+    #[must_use]
     pub fn timezone(&self) -> TimeZone {
         self.timezone
     }
@@ -214,6 +222,7 @@ impl<'a> BatchContext<'a> {
     }
 
     #[allow(clippy::type_complexity)]
+    #[must_use]
     pub fn into_parts(
         self,
     ) -> (

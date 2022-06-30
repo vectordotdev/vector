@@ -155,7 +155,7 @@ impl Function for ParseKeyValue {
                     .map_err(|_| vrl::function::Error::InvalidEnumVariant {
                         keyword: "whitespace",
                         value,
-                        variants: Whitespace::all_value().to_vec(),
+                        variants: Whitespace::all_value(),
                     })?,
                 )),
             },
@@ -172,7 +172,7 @@ pub(crate) enum Whitespace {
 
 impl Whitespace {
     fn all_value() -> Vec<Value> {
-        use Whitespace::*;
+        use Whitespace::{Lenient, Strict};
 
         vec![Strict, Lenient]
             .into_iter()
@@ -181,7 +181,7 @@ impl Whitespace {
     }
 
     const fn as_str(self) -> &'static str {
-        use Whitespace::*;
+        use Whitespace::{Lenient, Strict};
 
         match self {
             Strict => "strict",
@@ -200,7 +200,7 @@ impl FromStr for Whitespace {
     type Err = &'static str;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        use Whitespace::*;
+        use Whitespace::{Lenient, Strict};
 
         match s {
             "strict" => Ok(Strict),
@@ -260,7 +260,7 @@ fn parse<'a>(
             // Create a descriptive error message if possible.
             nom::error::convert_error(input, e)
         }
-        _ => e.to_string(),
+        nom::Err::Incomplete(_) => e.to_string(),
     })?;
 
     if rest.trim().is_empty() {
@@ -289,9 +289,9 @@ fn parse_line<'a>(
     )(input)
 }
 
-/// Parses the field_delimiter between the key/value pairs.
-/// If the field_delimiter is a space, we parse as many as we can,
-/// If it is not a space eat any whitespace before our field_delimiter as well as the field_delimiter.
+/// Parses the `field_delimiter` between the key/value pairs.
+/// If the `field_delimiter` is a space, we parse as many as we can,
+/// If it is not a space eat any whitespace before our `field_delimiter` as well as the `field_delimiter`.
 fn parse_field_delimiter<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     field_delimiter: &'a str,
 ) -> impl Fn(&'a str) -> IResult<&'a str, &'a str, E> {
@@ -321,7 +321,7 @@ fn parse_key_value_<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
                         space0,
                         parse_key(key_value_delimiter, field_delimiter, standalone_key),
                     ),
-                    many_m_n(!standalone_key as usize, 1, tag(key_value_delimiter)),
+                    many_m_n(usize::from(!standalone_key), 1, tag(key_value_delimiter)),
                     parse_value(field_delimiter),
                 ))(input),
                 Whitespace::Lenient => tuple((
@@ -330,7 +330,7 @@ fn parse_key_value_<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
                         parse_key(key_value_delimiter, field_delimiter, standalone_key),
                     ),
                     many_m_n(
-                        !standalone_key as usize,
+                        usize::from(!standalone_key),
                         1,
                         delimited(space0, tag(key_value_delimiter), space0),
                     ),
@@ -389,12 +389,12 @@ fn parse_delimited<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     }
 }
 
-/// An undelimited value is all the text until our field_delimiter, or if it is the last value in the line,
+/// An undelimited value is all the text until our `field_delimiter`, or if it is the last value in the line,
 /// just take the rest of the string.
 fn parse_undelimited<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     field_delimiter: &'a str,
 ) -> impl Fn(&'a str) -> IResult<&'a str, &'a str, E> {
-    move |input| map(alt((take_until(field_delimiter), rest)), |s: &str| s.trim())(input)
+    move |input| map(alt((take_until(field_delimiter), rest)), str::trim)(input)
 }
 
 /// Parses the value.
@@ -402,7 +402,7 @@ fn parse_undelimited<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
 ///
 /// 1. Parse as a delimited field - currently the delimiter is hardcoded to a `"`.
 /// 2. If it does not start with one of the trim values, it is not a delimited field and we parse up to
-///    the next field_delimiter or the eof.
+///    the next `field_delimiter` or the eof.
 ///
 fn parse_value<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     field_delimiter: &'a str,
@@ -419,7 +419,7 @@ fn parse_value<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
 }
 
 /// Parses the key.
-/// Overall parsing strategies are the same as parse_value, but we don't need to convert the result to a `Value`.
+/// Overall parsing strategies are the same as `parse_value`, but we don't need to convert the result to a `Value`.
 /// Standalone key are handled here so a quoted standalone key that contains a delimiter will be dealt with correctly.
 fn parse_key<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     key_value_delimiter: &'a str,

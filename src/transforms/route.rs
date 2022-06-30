@@ -1,5 +1,6 @@
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 use vector_core::{
     event::{EventArray, EventContainer},
     transform::SyncTransform,
@@ -15,8 +16,6 @@ use crate::{
     schema,
     transforms::Transform,
 };
-
-//------------------------------------------------------------------------------
 
 pub(crate) const UNMATCHED_ROUTE: &str = "_unmatched";
 
@@ -67,12 +66,17 @@ impl SyncTransform for Route {
     }
 }
 
-//------------------------------------------------------------------------------
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `route` transform.
+#[configurable_component(transform)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct RouteConfig {
-    // Deprecated name
+    /// A table of route identifiers to logical conditions representing the filter of the route.
+    ///
+    /// Each route can then be referenced as an input by other components with the name `<transform_name>.<route_id>`. If
+    /// an event doesn’t match any route, it will be sent to the `<transform_name>._unmatched` output.
+    ///
+    /// Both `_unmatched`, as well as `_default`, are reserved output names and cannot be used as a route name.
     #[serde(alias = "lanes")]
     route: IndexMap<String, AnyCondition>,
 }
@@ -165,8 +169,6 @@ impl TransformConfig for RouteCompatConfig {
         self.0.transform_type()
     }
 }
-
-//------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod test {

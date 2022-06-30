@@ -39,7 +39,7 @@ impl Expression for Array {
     fn as_value(&self) -> Option<Value> {
         self.inner
             .iter()
-            .map(|expr| expr.as_value())
+            .map(Expr::as_value)
             .collect::<Option<Vec<_>>>()
             .map(Value::Array)
     }
@@ -70,7 +70,7 @@ impl fmt::Display for Array {
         let exprs = self
             .inner
             .iter()
-            .map(|e| e.to_string())
+            .map(Expr::to_string)
             .collect::<Vec<_>>()
             .join(", ");
 

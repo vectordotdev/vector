@@ -3,13 +3,12 @@ use std::fmt;
 use diagnostic::{DiagnosticMessage, Label, Note, Span, Urls};
 use value::Value;
 
-use crate::state::{ExternalEnv, LocalEnv};
-use crate::value::VrlValueArithmetic;
-use crate::BatchContext;
 use crate::{
     expression::{self, Expr, Resolved},
     parser::{ast, Node},
-    Context, Expression, TypeDef,
+    state::{ExternalEnv, LocalEnv},
+    value::VrlValueArithmetic,
+    BatchContext, Context, Expression, TypeDef,
 };
 
 #[derive(Clone, PartialEq)]
@@ -80,8 +79,8 @@ impl Op {
 
 impl Expression for Op {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        use ast::Opcode::*;
-        use value::Value::*;
+        use ast::Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Merge, Mul, Ne, Or, Rem, Sub};
+        use value::Value::{Boolean, Null};
 
         match self.opcode {
             Err => return self.lhs.resolve(ctx).or_else(|_| self.rhs.resolve(ctx)),
@@ -123,8 +122,8 @@ impl Expression for Op {
     }
 
     fn resolve_batch(&self, ctx: &mut BatchContext) {
-        use ast::Opcode::*;
-        use value::Value::*;
+        use ast::Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Merge, Mul, Ne, Or, Rem, Sub};
+        use value::Value::{Boolean, Null};
 
         match self.opcode {
             Err => {
@@ -289,7 +288,7 @@ impl Expression for Op {
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
-        use ast::Opcode::*;
+        use ast::Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Merge, Mul, Ne, Or, Rem, Sub};
         use value::Kind as K;
 
         let mut lhs_def = self.lhs.type_def(state);
@@ -478,7 +477,7 @@ pub enum Error {
 
 impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
-        use Error::*;
+        use Error::{ChainedComparison, Expr, MergeNonObjects, UnnecessaryCoalesce};
 
         match self {
             ChainedComparison { .. } => 650,
@@ -489,7 +488,7 @@ impl DiagnosticMessage for Error {
     }
 
     fn message(&self) -> String {
-        use Error::*;
+        use Error::Expr;
 
         match self {
             Expr(err) => err.message(),
@@ -498,7 +497,7 @@ impl DiagnosticMessage for Error {
     }
 
     fn labels(&self) -> Vec<Label> {
-        use Error::*;
+        use Error::{ChainedComparison, Expr, MergeNonObjects, UnnecessaryCoalesce};
 
         match self {
             ChainedComparison { span } => vec![Label::primary("", span)],
@@ -533,7 +532,7 @@ impl DiagnosticMessage for Error {
     }
 
     fn notes(&self) -> Vec<Note> {
-        use Error::*;
+        use Error::{ChainedComparison, Expr};
 
         match self {
             ChainedComparison { .. } => vec![Note::SeeDocs(
@@ -552,8 +551,10 @@ impl DiagnosticMessage for Error {
 mod tests {
     use std::convert::TryInto;
 
-    use ast::Ident;
-    use ast::Opcode::*;
+    use ast::{
+        Ident,
+        Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Mul, Ne, Or, Rem, Sub},
+    };
     use ordered_float::NotNan;
 
     use super::*;

@@ -72,33 +72,6 @@ impl InternalEvent for ParserMissingFieldError<'_> {
 }
 
 #[derive(Debug)]
-pub struct ParserTargetExistsError<'a> {
-    pub target_field: &'a str,
-}
-
-impl<'a> InternalEvent for ParserTargetExistsError<'a> {
-    fn emit(self) {
-        error!(
-            message = format!("Target field {:?} already exists.", self.target_field).as_str(),
-            error_code = "target_field_exists",
-            error_type = error_type::CONDITION_FAILED,
-            stage = error_stage::PROCESSING,
-            target_field = %self.target_field,
-            internal_log_rate_secs = 10
-        );
-        counter!(
-            "component_errors_total", 1,
-            "error_code" => "target_field_exists",
-            "error_type" => error_type::CONDITION_FAILED,
-            "stage" => error_stage::PROCESSING,
-            "target_field" => self.target_field.to_string(),
-        );
-        // deprecated
-        counter!("processing_errors_total", 1, "error_type" => "target_field_exists");
-    }
-}
-
-#[derive(Debug)]
 pub struct ParserConversionError<'a> {
     pub name: &'a str,
     pub error: crate::types::Error,

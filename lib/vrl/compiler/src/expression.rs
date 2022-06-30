@@ -153,8 +153,11 @@ pub enum Expr {
 
 impl Expr {
     pub fn as_str(&self) -> &str {
-        use container::Variant::*;
-        use Expr::*;
+        use container::Variant::{Array, Block, Group, Object};
+        use Expr::{
+            Abort, Assignment, Container, FunctionCall, IfStatement, Literal, Noop, Op, Query,
+            Unary, Variable,
+        };
 
         match self {
             #[cfg(feature = "expr-literal")]
@@ -243,7 +246,10 @@ impl Expr {
 
 impl Expression for Expr {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        use Expr::*;
+        use Expr::{
+            Abort, Assignment, Container, FunctionCall, IfStatement, Literal, Noop, Op, Query,
+            Unary, Variable,
+        };
 
         match self {
             #[cfg(feature = "expr-literal")]
@@ -269,7 +275,10 @@ impl Expression for Expr {
     }
 
     fn resolve_batch(&self, ctx: &mut BatchContext) {
-        use Expr::*;
+        use Expr::{
+            Abort, Assignment, Container, FunctionCall, IfStatement, Literal, Noop, Op, Query,
+            Unary, Variable,
+        };
 
         match self {
             #[cfg(feature = "expr-literal")]
@@ -295,7 +304,10 @@ impl Expression for Expr {
     }
 
     fn as_value(&self) -> Option<Value> {
-        use Expr::*;
+        use Expr::{
+            Abort, Assignment, Container, FunctionCall, IfStatement, Literal, Noop, Op, Query,
+            Unary, Variable,
+        };
 
         match self {
             #[cfg(feature = "expr-literal")]
@@ -321,7 +333,10 @@ impl Expression for Expr {
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
-        use Expr::*;
+        use Expr::{
+            Abort, Assignment, Container, FunctionCall, IfStatement, Literal, Noop, Op, Query,
+            Unary, Variable,
+        };
 
         match self {
             #[cfg(feature = "expr-literal")]
@@ -349,7 +364,10 @@ impl Expression for Expr {
 
 impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Expr::*;
+        use Expr::{
+            Abort, Assignment, Container, FunctionCall, IfStatement, Literal, Noop, Op, Query,
+            Unary, Variable,
+        };
 
         match self {
             #[cfg(feature = "expr-literal")]
@@ -456,7 +474,7 @@ impl From<Value> for Expr {
     fn from(value: Value) -> Self {
         use std::collections::BTreeMap;
 
-        use value::Value::*;
+        use value::Value::{Array, Boolean, Bytes, Float, Integer, Null, Object, Regex, Timestamp};
 
         match value {
             Bytes(v) => Literal::from(v).into(),
@@ -506,7 +524,7 @@ pub enum Error {
 
 impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
-        use Error::*;
+        use Error::{Fallible, Missing};
 
         match self {
             Fallible { .. } => 100,
@@ -515,7 +533,7 @@ impl DiagnosticMessage for Error {
     }
 
     fn labels(&self) -> Vec<Label> {
-        use Error::*;
+        use Error::{Fallible, Missing};
 
         match self {
             Fallible { span } => vec![
@@ -533,7 +551,7 @@ impl DiagnosticMessage for Error {
     }
 
     fn notes(&self) -> Vec<Note> {
-        use Error::*;
+        use Error::{Fallible, Missing};
 
         match self {
             Fallible { .. } => vec![Note::SeeErrorDocs],

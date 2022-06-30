@@ -32,12 +32,13 @@ use tokio_util::codec::Encoder as _;
 use vector_core::{
     buffers::Acker,
     internal_event::{BytesSent, EventsSent},
+    ByteSizeOf,
 };
 
 use crate::{
     codecs::Encoder,
     dns, emit,
-    event::Event,
+    event::{Event, EventStatus, Finalizable},
     internal_events::{
         ConnectionOpen, OpenGauge, WsConnectionError, WsConnectionEstablished,
         WsConnectionFailedError, WsConnectionShutdown,
@@ -191,19 +192,23 @@ pub struct WebSocketSink {
 }
 
 impl WebSocketSink {
-    pub fn new(config: &WebSocketSinkConfig, connector: WebSocketConnector, acker: Acker) -> Self {
+    pub fn new(
+        config: &WebSocketSinkConfig,
+        connector: WebSocketConnector,
+        acker: Acker,
+    ) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
-        let serializer = config.encoding.encoding();
+        let serializer = config.encoding.encoding()?;
         let encoder = Encoder::<()>::new(serializer);
 
-        Self {
+        Ok(Self {
             transformer,
             encoder,
             connector,
             acker,
             ping_interval: config.ping_interval.filter(|v| *v > 0),
             ping_timeout: config.ping_timeout.filter(|v| *v > 0),
-        }
+        })
     }
 
     async fn create_sink_and_stream(
@@ -277,16 +282,25 @@ impl WebSocketSink {
                     } else {
                         break;
                     };
-                    let mut bytes = BytesMut::new();
+
+                    let finalizers = event.take_finalizers();
+
                     self.transformer.transform(&mut event);
+
+                    let event_byte_size = event.size_of();
+
+                    let mut bytes = BytesMut::new();
                     let res = match self.encoder.encode(event, &mut bytes) {
                         Ok(()) => {
+                            finalizers.update_status(EventStatus::Delivered);
+
                             let message = Message::text(String::from_utf8_lossy(&bytes));
                             let message_len = message.len();
+
                             ws_sink.send(message).await.map(|_| {
                                 emit!(EventsSent {
                                     count: 1,
-                                    byte_size: message_len,
+                                    byte_size: event_byte_size,
                                     output: None
                                 });
                                 emit!(BytesSent {
@@ -297,9 +311,11 @@ impl WebSocketSink {
                         },
                         Err(_) => {
                             // Error is handled by `Encoder`.
+                            finalizers.update_status(EventStatus::Errored);
                             Ok(())
                         }
                     };
+
                     self.acker.ack(1);
                     res
                 },
@@ -373,7 +389,7 @@ mod tests {
     use super::*;
     use crate::{
         config::{SinkConfig, SinkContext},
-        event::{Event, Value as EventValue},
+        event::{Event, LogEvent, Value as EventValue},
         sinks::util::encoding::{
             EncodingConfig, EncodingConfigAdapter, StandardEncodings, StandardEncodingsMigrator,
         },
@@ -390,9 +406,9 @@ mod tests {
             EncodingConfig<StandardEncodings>,
             StandardEncodingsMigrator,
         >,
-    ) -> Result<Message, codecs::encoding::Error> {
+    ) -> crate::Result<Message> {
         let transformer = encoding.transformer();
-        let serializer = encoding.encoding();
+        let serializer = encoding.encoding()?;
         let mut encoder = Encoder::<()>::new(serializer);
 
         let mut bytes = BytesMut::new();
@@ -403,7 +419,7 @@ mod tests {
 
     #[test]
     fn encodes_raw_logs() {
-        let event = Event::from("foo");
+        let event = Event::Log(LogEvent::from("foo"));
         assert_eq!(
             Message::text("foo"),
             encode_event(event, EncodingConfig::from(StandardEncodings::Text).into()).unwrap()
@@ -412,13 +428,15 @@ mod tests {
 
     #[test]
     fn encodes_log_events() {
-        let mut event = Event::new_empty_log();
+        let mut log = LogEvent::default();
 
-        let log = event.as_mut_log();
         log.insert("str", EventValue::from("bar"));
         log.insert("num", EventValue::from(10));
 
-        let encoded = encode_event(event, EncodingConfig::from(StandardEncodings::Json).into());
+        let encoded = encode_event(
+            log.into(),
+            EncodingConfig::from(StandardEncodings::Json).into(),
+        );
         let expected = Message::text(r#"{"num":10,"str":"bar"}"#);
         assert_eq!(expected, encoded.unwrap());
     }
@@ -434,6 +452,7 @@ mod tests {
             encoding: EncodingConfig::from(StandardEncodings::Json).into(),
             ping_interval: None,
             ping_timeout: None,
+            acknowledgements: Default::default(),
         };
         let tls = MaybeTlsSettings::Raw(());
 
@@ -462,6 +481,7 @@ mod tests {
             encoding: EncodingConfig::from(StandardEncodings::Json).into(),
             ping_timeout: None,
             ping_interval: None,
+            acknowledgements: Default::default(),
         };
 
         send_events_and_assert(addr, config, tls).await;
@@ -478,6 +498,7 @@ mod tests {
             encoding: EncodingConfig::from(StandardEncodings::Json).into(),
             ping_interval: None,
             ping_timeout: None,
+            acknowledgements: Default::default(),
         };
         let tls = MaybeTlsSettings::Raw(());
 
