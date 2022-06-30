@@ -291,7 +291,17 @@ impl ConfigBuilder {
 
         #[cfg(feature = "enterprise")]
         {
-            self.enterprise = with.enterprise;
+            match (self.enterprise.as_ref(), with.enterprise) {
+                (Some(_), Some(_)) => {
+                    errors.push(
+                        "duplicate 'enterprise' definition, only one definition allowed".to_owned(),
+                    );
+                }
+                (None, Some(other)) => {
+                    self.enterprise = Some(other);
+                }
+                _ => {}
+            };
         }
 
         self.provider = with.provider;
@@ -402,7 +412,7 @@ mod tests {
 
     use crate::config::{
         builder::{sort_json_value, to_sorted_json_string},
-        ConfigBuilder,
+        enterprise, ConfigBuilder,
     };
 
     use super::ConfigBuilderHash;
@@ -454,6 +464,49 @@ mod tests {
         assert_eq!(
             "84112522217c90260692863950365f9149f87b723ceea7930eec863653d697c8",
             ConfigBuilder::default().sha256_hash()
+        );
+    }
+
+    #[test]
+    fn append_keeps_enterprise() {
+        let mut base = ConfigBuilder {
+            enterprise: Some(enterprise::Options::default()),
+            ..Default::default()
+        };
+        let other = ConfigBuilder::default();
+        base.append(other).unwrap();
+        assert!(base.enterprise.is_some());
+    }
+
+    #[test]
+    fn append_sets_enterprise() {
+        let mut base = ConfigBuilder::default();
+        let other = ConfigBuilder {
+            enterprise: Some(enterprise::Options::default()),
+            ..Default::default()
+        };
+        base.append(other).unwrap();
+        assert!(base.enterprise.is_some());
+    }
+
+    #[test]
+    fn append_overwrites_enterprise() {
+        let mut base_ent = enterprise::Options::default();
+        base_ent.application_key = "base".to_string();
+        let mut base = ConfigBuilder {
+            enterprise: Some(base_ent),
+            ..Default::default()
+        };
+        let mut other_ent = enterprise::Options::default();
+        other_ent.application_key = "other".to_string();
+        let other = ConfigBuilder {
+            enterprise: Some(other_ent),
+            ..Default::default()
+        };
+        let errors = base.append(other).unwrap_err();
+        assert_eq!(
+            errors[0],
+            "duplicate 'enterprise' definition, only one definition allowed"
         );
     }
 
