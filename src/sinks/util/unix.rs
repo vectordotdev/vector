@@ -11,7 +11,7 @@ use vector_core::{buffers::Acker, ByteSizeOf};
 
 use crate::{
     config::SinkContext,
-    event::Event,
+    event::{Event, Finalizable},
     internal_events::{
         ConnectionOpen, OpenGauge, SocketMode, UnixSocketConnectionError,
         UnixSocketConnectionEstablished, UnixSocketError,
@@ -155,8 +155,10 @@ where
         let mut input = input
             .map(|mut event| {
                 let byte_size = event.size_of();
-                let finalizers = event.metadata_mut().take_finalizers();
+
                 transformer.transform(&mut event);
+
+                let finalizers = event.take_finalizers();
                 let mut bytes = BytesMut::new();
                 if encoder.encode(event, &mut bytes).is_ok() {
                     let item = bytes.freeze();
@@ -176,7 +178,15 @@ where
             let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
 
             let result = match sink
-                .send_all_peekable(&mut (&mut input).map(|item| item.item).peekable())
+                .send_all_peekable(
+                    &mut (&mut input)
+                        .map(|item| {
+                            drop(item.finalizers);
+                            self.acker.ack(1);
+                            item.item
+                        })
+                        .peekable(),
+                )
                 .await
             {
                 Ok(()) => sink.close().await,
