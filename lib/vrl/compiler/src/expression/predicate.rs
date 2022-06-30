@@ -1,7 +1,6 @@
 use std::fmt;
 
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
-use value::Value;
 
 use crate::{
     expression::{Expr, Resolved},
@@ -55,11 +54,13 @@ impl Predicate {
 
 impl Expression for Predicate {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        self.inner
+        let (last, other) = self.inner.split_last().expect("at least one expression");
+
+        other
             .iter()
-            .map(|expr| expr.resolve(ctx))
-            .collect::<std::result::Result<Vec<_>, _>>()
-            .map(|mut v| v.pop().unwrap_or(Value::Boolean(false)))
+            .try_for_each(|expr| expr.resolve(ctx).map(|_| ()))?;
+
+        last.resolve(ctx)
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
