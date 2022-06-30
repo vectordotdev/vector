@@ -40,7 +40,6 @@ where
         where
             E: de::Error,
         {
-            error!("Bool value: {:?}", value);
             Ok(value.into())
         }
 
