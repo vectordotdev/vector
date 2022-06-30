@@ -52,6 +52,18 @@ impl Expression for UpcaseFn {
         upcase(value)
     }
 
+    fn resolve_batch(&self, ctx: &mut BatchContext) {
+        self.value.resolve_batch(ctx);
+        for resolved in ctx.resolved_values_mut() {
+            let temp = {
+                let mut moved = Ok(Value::Null);
+                std::mem::swap(resolved, &mut moved);
+                moved
+            };
+            *resolved = temp.and_then(upcase)
+        }
+    }
+
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::bytes().infallible()
     }
