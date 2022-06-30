@@ -192,6 +192,12 @@ impl Metric {
         self.data.timestamp
     }
 
+    /// Gets a reference to the interval coverred by this metric, if it exists.
+    #[inline]
+    pub fn interval(&self) -> Option<u64> {
+        self.data.interval
+    }
+
     /// Gets a reference to the value of this metric.
     #[inline]
     pub fn value(&self) -> &MetricValue {
