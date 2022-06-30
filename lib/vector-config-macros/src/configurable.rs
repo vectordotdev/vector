@@ -1,7 +1,7 @@
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput, ExprPath, Ident, Type};
+use syn::{parse_macro_input, DeriveInput, ExprPath, Ident, Type, parse_quote};
 use vector_config_common::{attributes::CustomAttribute, validation::Validation};
 
 use crate::ast::{Container, Data, Field, Style, Tagging, Variant};
@@ -22,6 +22,17 @@ pub fn derive_configurable_impl(input: TokenStream) -> TokenStream {
     };
 
     let (impl_generics, ty_generics, where_clause) = container.generics().split_for_impl();
+
+    let where_clause = where_clause.map(|clause| clause.clone())
+        .map(|mut clause| {
+            for typ in container.generics().type_params() {
+                let ty = typ.ident;
+                let predicate = parse_quote! { for<'de> #ty: ::serde::Deserialize<'de> };
+
+                // TODO: make the lifetime unique by generating it per loop iteration, and add the predicate to the
+                // where clause
+            }
+        });
 
     // Now we can go ahead and actually generate the method bodies for our `Configurable` impl,
     // which are varied based on whether we have a struct or enum container.

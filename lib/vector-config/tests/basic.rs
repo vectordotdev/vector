@@ -16,7 +16,7 @@ use vector_config::{configurable_component, schema::generate_root_schema};
 
 /// A templated string.
 #[configurable_component]
-#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+#[derive(Clone, Default, Eq, Hash, PartialEq)]
 #[serde(try_from = "String", into = "String")]
 pub struct Template {
     /// The template string.

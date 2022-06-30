@@ -244,7 +244,7 @@ pub enum Sinks {
 
     /// Loki.
     #[cfg(feature = "sinks-loki")]
-    Loki(#[configurable(derived)] loki::LokiSinkConfig),
+    Loki(#[configurable(derived)] loki::LokiConfig),
 
     /// NATS.
     #[cfg(feature = "sinks-nats")]

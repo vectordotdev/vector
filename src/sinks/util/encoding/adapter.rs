@@ -170,8 +170,8 @@ pub trait EncodingConfigWithFramingMigrator {
 #[serde(deny_unknown_fields)]
 pub struct EncodingConfigWithFramingAdapter<LegacyEncodingConfig, Migrator>
 where
-    LegacyEncodingConfig: Serialize + Clone,
-    Migrator: Serialize + Clone,
+    LegacyEncodingConfig: EncodingConfiguration + Clone + 'static,
+    Migrator: EncodingConfigWithFramingMigrator<Codec = LegacyEncodingConfig::Codec> + Clone,
 {
     /// Framing scheme.
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
@@ -181,45 +181,38 @@ where
     encoding: EncodingWithTransformationConfig<LegacyEncodingConfig, Migrator>,
 }
 
-impl<'de, LegacyEncodingConfig, Migrator> Deserialize<'de>
-    for EncodingConfigWithFramingAdapter<LegacyEncodingConfig, Migrator>
+impl<'de, LegacyEncodingConfig, Migrator> Deserialize<'de> for EncodingConfigWithFramingAdapter<LegacyEncodingConfig, Migrator>
 where
-    LegacyEncodingConfig: EncodingConfiguration + Deserialize<'de> + Debug + Clone + 'static,
-    LegacyEncodingConfig::Codec: Deserialize<'de> + Debug + Clone,
-    Migrator: EncodingConfigWithFramingMigrator<Codec = LegacyEncodingConfig::Codec>
-        + Deserialize<'de>
-        + Debug
-        + Clone,
+    LegacyEncodingConfig: EncodingConfiguration + Deserialize<'de> + Clone + 'static,
+    LegacyEncodingConfig::Codec: Deserialize<'de>,
+    Migrator: EncodingConfigWithFramingMigrator<Codec = LegacyEncodingConfig::Codec> + Deserialize<'de> + Clone,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        #[derive(Debug, Clone, Deserialize)]
+        #[derive(Deserialize)]
         #[serde(deny_unknown_fields)]
         struct EncodingWithFramingConfig<LegacyEncodingConfig, Migrator>
         where
-            LegacyEncodingConfig: EncodingConfiguration + Debug + Clone + 'static,
-            Migrator: EncodingConfigWithFramingMigrator<Codec = LegacyEncodingConfig::Codec>
-                + Debug
-                + Clone,
+            LegacyEncodingConfig: EncodingConfiguration + 'static,
+            Migrator: EncodingConfigWithFramingMigrator<Codec = LegacyEncodingConfig::Codec>,
         {
             #[serde(default)]
             framing: Option<FramingConfig>,
             encoding: EncodingConfig<LegacyEncodingConfig, Migrator>,
         }
 
-        #[derive(Debug, Clone, Deserialize)]
+        #[derive(Deserialize)]
         #[serde(untagged)]
         enum EncodingConfig<LegacyEncodingConfig, Migrator>
         where
-            LegacyEncodingConfig: EncodingConfiguration + Debug + Clone + 'static,
-            Migrator: EncodingConfigWithFramingMigrator<Codec = LegacyEncodingConfig::Codec>
-                + Debug
-                + Clone,
+            LegacyEncodingConfig: EncodingConfiguration + 'static,
+            Migrator: EncodingConfigWithFramingMigrator<Codec = LegacyEncodingConfig::Codec>,
         {
             /// The legacy sink-specific encoding configuration.
             LegacyEncodingConfig(LegacyEncodingConfig),
+
             /// The encoding configuration.
             Encoding(EncodingWithTransformationConfig<LegacyEncodingConfig, Migrator>),
         }
@@ -253,9 +246,9 @@ where
 impl<LegacyEncodingConfig, Migrator> From<LegacyEncodingConfig>
     for EncodingConfigWithFramingAdapter<LegacyEncodingConfig, Migrator>
 where
-    LegacyEncodingConfig: EncodingConfiguration + Debug + Clone + 'static,
+    LegacyEncodingConfig: EncodingConfiguration + Clone + 'static,
     Migrator:
-        EncodingConfigWithFramingMigrator<Codec = LegacyEncodingConfig::Codec> + Debug + Clone,
+        EncodingConfigWithFramingMigrator<Codec = LegacyEncodingConfig::Codec> + Clone,
 {
     fn from(config: LegacyEncodingConfig) -> Self {
         let (framing, encoding) = Migrator::migrate(config.codec());
@@ -275,9 +268,9 @@ where
 impl<LegacyEncodingConfig, Migrator>
     EncodingConfigWithFramingAdapter<LegacyEncodingConfig, Migrator>
 where
-    LegacyEncodingConfig: EncodingConfiguration + Debug + Clone + 'static,
+    LegacyEncodingConfig: EncodingConfiguration + Clone + 'static,
     Migrator:
-        EncodingConfigWithFramingMigrator<Codec = LegacyEncodingConfig::Codec> + Debug + Clone,
+        EncodingConfigWithFramingMigrator<Codec = LegacyEncodingConfig::Codec> + Clone,
 {
     /// Create a new encoding configuration.
     pub const fn new(framing: Option<FramingConfig>, encoding: SerializerConfig) -> Self {
@@ -361,9 +354,7 @@ impl<'de, LegacyEncodingConfig, Migrator> Deserialize<'de>
     where
         D: Deserializer<'de>,
     {
-        #[derive(Debug, Clone, Deserialize)]
-        // `#[serde(deny_unknown_fields)]` doesn't work when flattening internally tagged enums, see
-        // https://github.com/serde-rs/serde/issues/1358.
+        #[derive(Deserialize)]
         pub struct EncodingConfig {
             #[serde(flatten)]
             encoding: SerializerConfig,
