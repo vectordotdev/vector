@@ -164,18 +164,18 @@ fn back_and_forth_through_bytes() {
 
 #[test]
 fn serialization() {
-    let mut event = Event::from("raw log line");
-    event.as_mut_log().insert("foo", "bar");
-    event.as_mut_log().insert("bar", "baz");
+    let mut event = LogEvent::from("raw log line");
+    event.insert("foo", "bar");
+    event.insert("bar", "baz");
 
     let expected_all = serde_json::json!({
         "message": "raw log line",
         "foo": "bar",
         "bar": "baz",
-        "timestamp": event.as_log().get(log_schema().timestamp_key()),
+        "timestamp": event.get(log_schema().timestamp_key()),
     });
 
-    let actual_all = serde_json::to_value(event.as_log().all_fields().unwrap()).unwrap();
+    let actual_all = serde_json::to_value(event.all_fields().unwrap()).unwrap();
     assert_eq!(expected_all, actual_all);
 
     let rfc3339_re = Regex::new(r"\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\z").unwrap();
@@ -186,13 +186,13 @@ fn serialization() {
 fn type_serialization() {
     use serde_json::json;
 
-    let mut event = Event::from("hello world");
-    event.as_mut_log().insert("int", 4);
-    event.as_mut_log().insert("float", 5.5);
-    event.as_mut_log().insert("bool", true);
-    event.as_mut_log().insert("string", "thisisastring");
+    let mut event = LogEvent::from("hello world");
+    event.insert("int", 4);
+    event.insert("float", 5.5);
+    event.insert("bool", true);
+    event.insert("string", "thisisastring");
 
-    let map = serde_json::to_value(event.as_log().all_fields().unwrap()).unwrap();
+    let map = serde_json::to_value(event.all_fields().unwrap()).unwrap();
     assert_eq!(map["float"], json!(5.5));
     assert_eq!(map["int"], json!(4));
     assert_eq!(map["bool"], json!(true));

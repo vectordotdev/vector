@@ -11,7 +11,7 @@ use futures::{
 use http::request::Parts;
 use hyper::StatusCode;
 use indoc::indoc;
-use vector_core::event::{BatchNotifier, BatchStatus, Event};
+use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
 use crate::{
     config::SinkConfig,
@@ -60,7 +60,7 @@ fn test_server(
 }
 
 fn event_with_api_key(msg: &str, key: &str) -> Event {
-    let mut e = Event::from(msg);
+    let mut e = Event::Log(LogEvent::from(msg));
     e.as_mut_log()
         .metadata_mut()
         .set_datadog_api_key(Arc::from(key));
@@ -298,7 +298,7 @@ async fn multiple_api_keys_inner(api_status: ApiStatus) {
     let events = vec![
         event_with_api_key("mow", "pkc"),
         event_with_api_key("pnh", "vvo"),
-        Event::from("no API key in metadata"),
+        Event::Log(LogEvent::from("no API key in metadata")),
     ];
 
     let _ = sink.run_events(events).await.unwrap();

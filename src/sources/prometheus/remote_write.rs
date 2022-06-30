@@ -45,6 +45,18 @@ pub struct PrometheusRemoteWriteConfig {
     acknowledgements: AcknowledgementsConfig,
 }
 
+impl PrometheusRemoteWriteConfig {
+    #[cfg(test)]
+    pub fn from_address(address: SocketAddr) -> Self {
+        Self {
+            address,
+            tls: None,
+            auth: None,
+            acknowledgements: false.into(),
+        }
+    }
+}
+
 inventory::submit! {
     SourceDescription::new::<PrometheusRemoteWriteConfig>(SOURCE_NAME)
 }

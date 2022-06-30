@@ -8,18 +8,17 @@ use datadog_filter::{
 };
 use datadog_search_syntax::parse;
 use datadog_search_syntax::{Comparison, ComparisonValue, Field};
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 use vector_core::event::{Event, LogEvent, Value};
 
-use crate::conditions::{Condition, ConditionConfig, ConditionDescription, Conditional};
+use crate::conditions::{Condition, Conditional, ConditionalConfig};
 
-#[derive(Deserialize, Serialize, Debug, Default, Clone, PartialEq)]
-pub(crate) struct DatadogSearchConfig {
+/// A condition that uses the [Datadog Search](https://docs.datadoghq.com/logs/explorer/search_syntax/) query syntax against an event.
+#[configurable_component]
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct DatadogSearchConfig {
+    /// The query string.
     source: String,
-}
-
-inventory::submit! {
-    ConditionDescription::new::<DatadogSearchConfig>("datadog_search")
 }
 
 impl_generate_config_from_default!(DatadogSearchConfig);
@@ -38,8 +37,7 @@ impl Conditional for DatadogSearchRunner {
     }
 }
 
-#[typetag::serde(name = "datadog_search")]
-impl ConditionConfig for DatadogSearchConfig {
+impl ConditionalConfig for DatadogSearchConfig {
     fn build(&self, _enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition> {
         let node = parse(&self.source)?;
         let matcher = as_log(build_matcher(&node, &EventFilter::default()));
@@ -55,8 +53,6 @@ fn as_log(matcher: Box<dyn Matcher<LogEvent>>) -> Box<dyn Matcher<Event>> {
         _ => false,
     })
 }
-
-//------------------------------------------------------------------------------
 
 #[derive(Default, Clone)]
 struct EventFilter;
@@ -313,8 +309,6 @@ where
         func(String::from_utf8_lossy(&bytes))
     })
 }
-
-//------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod test {

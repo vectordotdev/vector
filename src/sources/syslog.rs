@@ -378,7 +378,7 @@ mod test {
     use super::*;
     use crate::{
         config::log_schema,
-        event::Event,
+        event::{Event, LogEvent},
         test_util::{
             components::{assert_source_compliance, SOCKET_PUSH_SOURCE_TAGS},
             next_addr, random_maps, random_string, send_encodable, send_lines, wait_for_tcp,
@@ -557,7 +557,7 @@ mod test {
             msg
         );
 
-        let mut expected = Event::from(msg);
+        let mut expected = Event::Log(LogEvent::from(msg));
 
         {
             let expected = expected.as_mut_log();
@@ -596,7 +596,7 @@ mod test {
             r#"[incorrect x]"#, msg
         );
 
-        let mut expected = Event::from(msg);
+        let mut expected = Event::Log(LogEvent::from(msg));
         {
             let expected = expected.as_mut_log();
             expected.insert(
@@ -699,7 +699,7 @@ mod test {
         let raw = format!(r#"<13>Feb 13 20:07:26 74794bfb6795 root[8539]: {}"#, msg);
         let event = event_from_bytes("host", None, raw.into()).unwrap();
 
-        let mut expected = Event::from(msg);
+        let mut expected = Event::Log(LogEvent::from(msg));
         {
             let value = event.as_log().get("timestamp").unwrap();
             let year = value.as_timestamp().unwrap().naive_local().year();
@@ -729,7 +729,7 @@ mod test {
         );
         let event = event_from_bytes("host", None, raw.into()).unwrap();
 
-        let mut expected = Event::from(msg);
+        let mut expected = Event::Log(LogEvent::from(msg));
         {
             let value = event.as_log().get("timestamp").unwrap();
             let year = value.as_timestamp().unwrap().naive_local().year();
@@ -761,7 +761,7 @@ mod test {
             msg
         );
 
-        let mut expected = Event::from(msg);
+        let mut expected = Event::Log(LogEvent::from(msg));
         {
             let expected = expected.as_mut_log();
             expected.insert(

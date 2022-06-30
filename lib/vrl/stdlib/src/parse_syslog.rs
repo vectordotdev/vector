@@ -96,7 +96,7 @@ fn resolve_year((month, _date, _hour, _min, _sec): IncompleteDate) -> i32 {
     }
 }
 
-/// Create a Value::Map from the fields of the given syslog message.
+/// Create a `Value::Map` from the fields of the given syslog message.
 fn message_to_value(message: Message<&str>) -> Value {
     let mut result = BTreeMap::new();
 
@@ -139,7 +139,7 @@ fn message_to_value(message: Message<&str>) -> Value {
         result.insert("procid".to_string(), value);
     }
 
-    for element in message.structured_data.into_iter() {
+    for element in message.structured_data {
         let mut sdata = BTreeMap::new();
         for (name, value) in element.params() {
             sdata.insert(name.to_string(), value.into());
