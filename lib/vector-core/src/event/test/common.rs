@@ -560,8 +560,15 @@ impl Arbitrary for MetricData {
             None
         };
 
+        let interval = if bool::arbitrary(g) {
+            Some(u64::arbitrary(g))
+        } else {
+            None
+        };
+
         MetricData {
             timestamp: dt,
+            interval,
             kind: MetricKind::arbitrary(g),
             value: MetricValue::arbitrary(g),
         }
