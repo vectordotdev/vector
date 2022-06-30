@@ -133,7 +133,7 @@ impl RemapConfig {
         functions.append(&mut vector_vrl_functions::vrl_functions());
 
         let mut state =
-            vrl::state::ExternalEnv::new_with_kind(merged_schema_definition.kind().clone());
+            vrl::state::ExternalEnv::new_with_kind(merged_schema_definition.event_kind().clone());
         state.set_external_context(enrichment_tables);
         state.set_external_context(MeaningList::default());
 
