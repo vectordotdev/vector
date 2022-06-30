@@ -227,7 +227,7 @@ pub async fn build_pieces(
             proxy: ProxyConfig::merge_with_env(&config.global.proxy, &source.proxy),
             acknowledgements: source.sink_acknowledgements,
             schema_definitions,
-            schema: config.schema.clone(),
+            schema: config.schema,
         };
         let server = match source.inner.build(context).await {
             Err(error) => {

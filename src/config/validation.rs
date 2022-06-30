@@ -1,4 +1,4 @@
-use crate::config::schema::Definition;
+use crate::config::schema;
 use crate::topology::schema::merged_definition;
 use std::collections::HashMap;
 use vector_core::internal_event::DEFAULT_OUTPUT;
@@ -161,7 +161,7 @@ pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
 
     for (key, transform) in config.transforms.iter() {
         // use the most general definition possible, since the real value isn't known yet.
-        let definition = Definition::any();
+        let definition = schema::Definition::any();
 
         if let Err(errs) = transform.inner.validate(&definition) {
             errors.extend(errs.into_iter().map(|msg| format!("Transform {key} {msg}")));

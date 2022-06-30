@@ -81,7 +81,7 @@ impl From<LookupBuf> for MeaningPointer {
 }
 
 impl Definition {
-    /// The most general possible definition. The `Kind` is `any`, and all log_namespaces are enabled.
+    /// The most general possible definition. The `Kind` is `any`, and all `log_namespaces` are enabled.
     pub fn any() -> Self {
         Self::empty_with_kind(Kind::any(), [LogNamespace::Legacy, LogNamespace::Vector])
     }
