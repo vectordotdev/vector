@@ -44,14 +44,26 @@ pub const MAX_FILE_ID: u16 = u16::MAX;
 #[cfg(test)]
 pub const MAX_FILE_ID: u16 = 6;
 
+// The alignment used by the record serializer.
+const SERIALIZER_ALIGNMENT: usize = 16;
+const MAX_ALIGNABLE_AMOUNT: usize = usize::MAX - SERIALIZER_ALIGNMENT;
+
 pub(crate) fn create_crc32c_hasher() -> Hasher {
     crc32fast::Hasher::new()
 }
 
+/// Aligns the given amount to 16.
+///
+/// This is required due to the overalignment used in record serialization, such that we can correctly determine minimum
+/// on-disk sizes for various elements, and account for those in size limits, etc.
 pub(crate) const fn align16(amount: usize) -> usize {
-    const SERIALIZER_ALIGNMENT: usize = 16;
+    // The amount must be less than `MAX_ALIGNABLE_AMOUNT` otherwise we'll overflow trying to align it, ending up with a
+    // nonsensicial value.
+    assert!(
+        amount <= MAX_ALIGNABLE_AMOUNT,
+        "`amount` must be less than `MAX_ALIGNABLE_AMOUNT`"
+    );
 
-    // Pad ourselves to meet the alignment requirements.
     ((amount + SERIALIZER_ALIGNMENT - 1) / SERIALIZER_ALIGNMENT) * SERIALIZER_ALIGNMENT
 }
 
@@ -424,7 +436,45 @@ where
 mod tests {
     use proptest::{prop_assert, proptest, test_runner::Config};
 
-    use super::{BuildError, DiskBufferConfigBuilder, MINIMUM_MAX_RECORD_SIZE};
+    use crate::variants::disk_v2::common::MAX_ALIGNABLE_AMOUNT;
+
+    use super::{
+        align16, BuildError, DiskBufferConfigBuilder, MINIMUM_MAX_RECORD_SIZE, SERIALIZER_ALIGNMENT,
+    };
+
+    #[test]
+    #[should_panic]
+    fn test_align16_too_large() {
+        // We forcefully panic if the input to `align16` is too large to align without overflow, primarily because
+        // that's a huge amount even on 32-bit systems and in non-test code, we only use `align16` in a const context,
+        // so it will panic during compilation, not at runtime.
+        align16(MAX_ALIGNABLE_AMOUNT + 1);
+    }
+
+    proptest! {
+        #![proptest_config(Config::with_cases(1000))]
+        #[test]
+        fn test_align16(input in 0..MAX_ALIGNABLE_AMOUNT) {
+            // You may think to yourself: "this test seems excessive and not necessary", but, au contraire! Our
+            // algorithm depends on integer division rounding towards zero, which is an invariant provided to Rust by
+            // way of LLVM itself. In order to avoid weird surprises down the line if that invariant changes, including
+            // a future where we, or others, potentially compile Vector with an alternative compiler that does not
+            // round towards zero... we're being extra careful and hedging our bet by having such a property test.
+
+            // Make sure we're actually aligned.
+            let aligned = align16(input);
+            prop_assert!(aligned % SERIALIZER_ALIGNMENT == 0);
+
+            // Make sure we're not overaligned, too.
+            let delta = if aligned >= input {
+                aligned - input
+            } else {
+                panic!("`aligned` must never be less than `input` in this test; inputs are crafted to obey `MAX_ALIGNABLE_AMOUNT`");
+            };
+
+            prop_assert!(delta <= SERIALIZER_ALIGNMENT, "`align16` returned overaligned input: input={} aligned={} delta={}", input, aligned, delta);
+        }
+    }
 
     #[test]
     fn basic_rejections() {
