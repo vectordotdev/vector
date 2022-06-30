@@ -4,7 +4,7 @@ use codespan_reporting::diagnostic;
 
 use crate::{DiagnosticMessage, Label, Note, Severity, Span};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Diagnostic {
     severity: Severity,
     code: usize,
@@ -38,36 +38,44 @@ impl Diagnostic {
         }
     }
 
+    #[must_use]
     pub fn with_primary(self, message: impl ToString, span: impl Into<Span>) -> Self {
         self.with_label(Label::primary(message, span.into()))
     }
 
+    #[must_use]
     pub fn with_context(self, message: impl ToString, span: impl Into<Span>) -> Self {
         self.with_label(Label::context(message, span.into()))
     }
 
+    #[must_use]
     pub fn with_label(mut self, label: Label) -> Self {
         self.labels.push(label);
         self
     }
 
+    #[must_use]
     pub fn with_note(mut self, note: Note) -> Self {
         self.notes.push(note);
         self
     }
 
+    #[must_use]
     pub fn severity(&self) -> Severity {
         self.severity
     }
 
+    #[must_use]
     pub fn message(&self) -> &str {
         &self.message
     }
 
+    #[must_use]
     pub fn notes(&self) -> &[Note] {
         &self.notes
     }
 
+    #[must_use]
     pub fn labels(&self) -> &[Label] {
         &self.labels
     }
@@ -75,18 +83,21 @@ impl Diagnostic {
     /// Returns `true` if the diagnostic represents either an
     /// [error](Severity::Error) or [bug](Severity::Bug).
     #[inline]
+    #[must_use]
     pub fn is_problem(&self) -> bool {
         self.severity.is_error() || self.severity.is_bug()
     }
 
     /// Returns `true` if the diagnostic represents a [bug](Severity::Bug).
     #[inline]
+    #[must_use]
     pub fn is_bug(&self) -> bool {
         self.severity.is_bug()
     }
 
     /// Returns `true` if the diagnostic represents an [error](Severity::Error).
     #[inline]
+    #[must_use]
     pub fn is_error(&self) -> bool {
         self.severity.is_error()
     }
@@ -94,12 +105,14 @@ impl Diagnostic {
     /// Returns `true` if the diagnostic represents a
     /// [warning](Severity::Warning).
     #[inline]
+    #[must_use]
     pub fn is_warning(&self) -> bool {
         self.severity.is_warning()
     }
 
     /// Returns `true` if the diagnostic represents a [note](Severity::Note).
     #[inline]
+    #[must_use]
     pub fn is_note(&self) -> bool {
         self.severity.is_note()
     }
@@ -119,7 +132,7 @@ impl From<Box<dyn DiagnosticMessage>> for Diagnostic {
 
 impl From<Diagnostic> for diagnostic::Diagnostic<()> {
     fn from(diag: Diagnostic) -> Self {
-        let mut notes = diag.notes.to_vec();
+        let mut notes = diag.notes.clone();
 
         // not all codes have a page on the site yet
         if diag.code >= 100 && diag.code <= 110 {
@@ -140,7 +153,7 @@ impl From<Diagnostic> for diagnostic::Diagnostic<()> {
 
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct DiagnosticList(Vec<Diagnostic>);
 
 impl DiagnosticList {
@@ -156,48 +169,57 @@ impl DiagnosticList {
     }
 
     /// Returns `true` if there are any errors or bugs in the parsed source.
+    #[must_use]
     pub fn is_err(&self) -> bool {
-        self.0.iter().any(|d| d.is_problem())
+        self.0.iter().any(Diagnostic::is_problem)
     }
 
     /// Returns the list of bug-level diagnostics.
+    #[must_use]
     pub fn bugs(&self) -> Vec<&Diagnostic> {
         self.0.iter().filter(|d| d.is_bug()).collect()
     }
 
     /// Returns the list of error-level diagnostics.
+    #[must_use]
     pub fn errors(&self) -> Vec<&Diagnostic> {
         self.0.iter().filter(|d| d.is_error()).collect()
     }
 
     /// Returns the list of warning-level diagnostics.
+    #[must_use]
     pub fn warnings(&self) -> Vec<&Diagnostic> {
         self.0.iter().filter(|d| d.is_warning()).collect()
     }
 
     /// Returns the list of note-level diagnostics.
+    #[must_use]
     pub fn notes(&self) -> Vec<&Diagnostic> {
         self.0.iter().filter(|d| d.is_note()).collect()
     }
 
     /// Returns `true` if there are any bug diagnostics.
+    #[must_use]
     pub fn has_bugs(&self) -> bool {
-        self.0.iter().any(|d| d.is_bug())
+        self.0.iter().any(Diagnostic::is_bug)
     }
 
     /// Returns `true` if there are any error diagnostics.
+    #[must_use]
     pub fn has_errors(&self) -> bool {
-        self.0.iter().any(|d| d.is_error())
+        self.0.iter().any(Diagnostic::is_error)
     }
 
     /// Returns `true` if there are any warning diagnostics.
+    #[must_use]
     pub fn has_warnings(&self) -> bool {
-        self.0.iter().any(|d| d.is_warning())
+        self.0.iter().any(Diagnostic::is_warning)
     }
 
     /// Returns `true` if there are any note diagnostics.
+    #[must_use]
     pub fn has_notes(&self) -> bool {
-        self.0.iter().any(|d| d.is_note())
+        self.0.iter().any(Diagnostic::is_note)
     }
 }
 

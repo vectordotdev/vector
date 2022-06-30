@@ -1107,16 +1107,20 @@ mod tests {
     }
 
     async fn channel_n(
-        messages: Vec<impl Into<Event> + Send + 'static>,
+        messages: Vec<impl Into<String> + Send + 'static>,
         sink: VectorSink,
         source: impl Stream<Item = Event> + Unpin,
     ) -> Vec<Event> {
         let n = messages.len();
 
         tokio::spawn(async move {
-            sink.run_events(messages.into_iter().map(Into::into))
-                .await
-                .unwrap();
+            sink.run_events(
+                messages
+                    .into_iter()
+                    .map(|s| Event::Log(LogEvent::from(s.into()))),
+            )
+            .await
+            .unwrap();
         });
 
         let events = collect_n(source, n).await;

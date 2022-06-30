@@ -1903,11 +1903,11 @@
       </span>
 
       <span class="flex space-x-1">
-        {{ if .config.common }}
+        {{ if $v.common }}
         {{ partial "badge.html" (dict "word" "common" "color" "blue") }}
         {{ end }}
 
-        {{ if .config.required }}
+        {{ if $v.required }}
         {{ partial "badge.html" (dict "word" "required" "color" "red") }}
         {{ else }}
         {{ partial "badge.html" (dict "word" "optional" "color" "blue") }}
