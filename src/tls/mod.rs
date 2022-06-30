@@ -103,6 +103,8 @@ pub enum TlsError {
     AddCertToStore { source: ErrorStack },
     #[snafu(display("Error setting up the verification certificate: {}", source))]
     SetVerifyCert { source: ErrorStack },
+    #[snafu(display("Error setting alpn protocols: {}", source))]
+    SetAlpnProtocols { source: ErrorStack },
     #[snafu(display("PKCS#12 parse failed: {}", source))]
     ParsePkcs12 { source: ErrorStack },
     #[snafu(display("TCP bind failed: {}", source))]

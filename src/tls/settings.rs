@@ -20,6 +20,7 @@ use super::{
     FileOpenFailedSnafu, FileReadFailedSnafu, MaybeTls, NewCaStackSnafu, NewStoreBuilderSnafu,
     ParsePkcs12Snafu, Pkcs12Snafu, PrivateKeyParseSnafu, Result, SetCertificateSnafu,
     SetPrivateKeySnafu, SetVerifyCertSnafu, TlsError, TlsIdentitySnafu, X509ParseSnafu,
+    SetAlpnProtocolsSnafu,
 };
 
 const PEM_START_MARKER: &str = "-----BEGIN ";
@@ -108,6 +109,11 @@ pub struct TlsConfig {
     /// Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
     pub verify_hostname: Option<bool>,
 
+    /// Sets the list of supported ALPN protolols.
+    ///
+    /// See: https://www.openssl.org/docs/man1.1.0/man3/SSL_CTX_set_alpn_protos.html
+    pub alpn_protocols: Option<Vec<String>>,
+
     /// Absolute path to an additional CA certificate file.
     ///
     /// The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
@@ -154,6 +160,7 @@ pub struct TlsSettings {
     pub(super) verify_hostname: bool,
     authorities: Vec<X509>,
     pub(super) identity: Option<IdentityStore>, // openssl::pkcs12::ParsedPkcs12 doesn't impl Clone yet
+    alpn_protocols: Option<Vec<u8>>,
 }
 
 #[derive(Clone)]
@@ -187,6 +194,7 @@ impl TlsSettings {
             verify_hostname: options.verify_hostname.unwrap_or(!for_server),
             authorities: options.load_authorities()?,
             identity: options.load_identity()?,
+            alpn_protocols: options.parse_alpn_protocols()?,
         })
     }
 
@@ -274,6 +282,13 @@ impl TlsSettings {
             load_mac_certs(context).unwrap();
         }
 
+        if self.alpn_protocols.is_some() {
+            let alpn = self.alpn_protocols.as_ref().unwrap();
+            context
+                .set_alpn_protos(alpn.as_slice())
+                .context(SetAlpnProtocolsSnafu)?;
+        }
+
         Ok(())
     }
 
@@ -313,6 +328,20 @@ impl TlsConfig {
                     |der| self.parse_pkcs12_identity(der),
                     |pem| self.parse_pem_identity(pem, &filename),
                 )
+            }
+        }
+    }
+
+    fn parse_alpn_protocols(&self) -> Result<Option<Vec<u8>>> {
+        match &self.alpn_protocols {
+            None => Ok(None),
+            Some(protocols) => {
+                let mut data: Vec<u8> = Vec::new();
+                for str in protocols.iter() {
+                    data.push(str.len().try_into().unwrap());
+                    data.append(&mut str.to_owned().into_bytes());
+                }
+                Ok(Some(data))
             }
         }
     }
