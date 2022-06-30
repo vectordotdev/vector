@@ -19,7 +19,7 @@ pub const DEFAULT_MAX_DATA_FILE_SIZE: usize = 128 * 1024 * 1024;
 pub const DEFAULT_MAX_RECORD_SIZE: usize = DEFAULT_MAX_DATA_FILE_SIZE;
 
 // The maximum record size has to be bigger than the record header itself, since we count the record header towards
-// sizing/space usage, etc... but we also use the overaligned version here to make sure we;re similarly accounting for
+// sizing/space usage, etc... but we also use the overaligned version here to make sure we're similarly accounting for
 // what `rkyv` will do when we serialize a record.
 pub const MINIMUM_MAX_RECORD_SIZE: usize = align16(RECORD_HEADER_LEN + 1);
 
