@@ -111,7 +111,8 @@ pub struct TlsConfig {
 
     /// Sets the list of supported ALPN protolols.
     ///
-    /// See: https://www.openssl.org/docs/man1.1.0/man3/SSL_CTX_set_alpn_protos.html
+    /// Declare the supported ALPN protocols, which are used during negotiation with peer. Prioritized in the order
+    /// they are defined.
     pub alpn_protocols: Option<Vec<String>>,
 
     /// Absolute path to an additional CA certificate file.
