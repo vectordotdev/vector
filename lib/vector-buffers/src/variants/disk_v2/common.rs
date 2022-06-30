@@ -51,12 +51,8 @@ pub(crate) fn create_crc32c_hasher() -> Hasher {
 pub(crate) const fn align16(amount: usize) -> usize {
     const SERIALIZER_ALIGNMENT: usize = 16;
 
-    if amount % SERIALIZER_ALIGNMENT == 0 {
-        amount
-    } else {
-        // Pad ourselves to meet the alignment requirements.
-        (amount & !(SERIALIZER_ALIGNMENT - 1)) + SERIALIZER_ALIGNMENT
-    }
+    // Pad ourselves to meet the alignment requirements.
+    ((amount + SERIALIZER_ALIGNMENT - 1) / SERIALIZER_ALIGNMENT) * SERIALIZER_ALIGNMENT
 }
 
 /// Gets the maximum possible data file size given the type-level numerical limits and buffer invariants.

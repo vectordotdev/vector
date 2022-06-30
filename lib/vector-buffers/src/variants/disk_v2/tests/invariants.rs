@@ -255,7 +255,7 @@ async fn writer_stops_when_hitting_file_that_reader_is_still_on() {
 
             // Now we should be consuming all data files, and our next write should block trying to
             // open the "first" data file until we do a read.
-            let mut blocked_write = spawn(async { writer.write_record(record).await });
+            let mut blocked_write = spawn(writer.write_record(record));
 
             // You might be looking at the assert_pending! calls below and wondering what's
             // happening there.  Essentially, the process of doing a read or write could contain a
