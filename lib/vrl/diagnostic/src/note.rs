@@ -35,7 +35,10 @@ impl Note {
 
 impl fmt::Display for Note {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Note::*;
+        use Note::{
+            Basic, CoerceValue, Example, Hint, SeeCodeDocs, SeeDocs, SeeErrorDocs, SeeFunctionDocs,
+            SeeLangDocs, UserErrorMessage,
+        };
 
         match self {
             Hint(hint) => {
@@ -62,7 +65,7 @@ impl fmt::Display for Note {
                 write!(f, "see language documentation at {}", url)
             }
             SeeCodeDocs(code) => {
-                let url = Urls::error_code_url(code);
+                let url = Urls::error_code_url(*code);
                 write!(f, "learn more about error code {} at {}", code, url)
             }
             SeeDocs(kind, url) => {

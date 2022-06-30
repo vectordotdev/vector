@@ -22,7 +22,7 @@ use crate::{
         log_schema, AcknowledgementsConfig, GenerateConfig, Output, Resource, SourceConfig,
         SourceContext, SourceDescription,
     },
-    event::Event,
+    event::{Event, LogEvent},
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     sources::http::HttpMethod,
@@ -290,7 +290,7 @@ fn line_to_events(mut decoder: Decoder, line: String) -> SmallVec<[Event; 1]> {
             internal_log_rate_secs = 10
         );
 
-        events.push(Event::from(line))
+        events.push(LogEvent::from(line).into())
     };
 
     let now = Utc::now();

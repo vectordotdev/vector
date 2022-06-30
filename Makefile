@@ -326,6 +326,10 @@ test-behavior-%: ## Runs behaviorial test for a given category
 test-behavior: ## Runs all behaviorial tests
 test-behavior: test-behavior-transforms test-behavior-formats test-behavior-config
 
+.PHONY: test-enterprise
+test-enterprise: ## Runs enterprise related behavioral tests
+	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --workspace --no-fail-fast --no-default-features --features "enterprise-tests" --test enterprise
+
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
 test-integration: test-integration-aws test-integration-azure test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch

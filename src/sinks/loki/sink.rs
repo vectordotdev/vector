@@ -590,7 +590,7 @@ mod tests {
         let base = chrono::Utc::now();
         let events = random_lines(100)
             .take(20)
-            .map(Event::from)
+            .map(|e| Event::Log(LogEvent::from(e)))
             .enumerate()
             .map(|(i, mut event)| {
                 let log = event.as_mut_log();
