@@ -261,7 +261,7 @@ mod tests {
                 "empty",
                 TestCase {
                     requirement: Requirement::empty(),
-                    definition: Definition::legacy_empty(),
+                    definition: Definition::empty_legacy_namespace(),
                     errors: vec![],
                 },
             ),
@@ -269,7 +269,7 @@ mod tests {
                 "missing required meaning",
                 TestCase {
                     requirement: Requirement::empty().required_meaning("foo", Kind::any()),
-                    definition: Definition::legacy_empty(),
+                    definition: Definition::empty_legacy_namespace(),
                     errors: vec![ValidationError::MeaningMissing { identifier: "foo" }],
                 },
             ),
@@ -279,7 +279,7 @@ mod tests {
                     requirement: Requirement::empty()
                         .required_meaning("foo", Kind::any())
                         .required_meaning("bar", Kind::any()),
-                    definition: Definition::legacy_empty(),
+                    definition: Definition::empty_legacy_namespace(),
                     errors: vec![
                         ValidationError::MeaningMissing { identifier: "bar" },
                         ValidationError::MeaningMissing { identifier: "foo" },
@@ -290,7 +290,7 @@ mod tests {
                 "missing optional meaning",
                 TestCase {
                     requirement: Requirement::empty().optional_meaning("foo", Kind::any()),
-                    definition: Definition::legacy_empty(),
+                    definition: Definition::empty_legacy_namespace(),
                     errors: vec![],
                 },
             ),
@@ -300,7 +300,7 @@ mod tests {
                     requirement: Requirement::empty()
                         .optional_meaning("foo", Kind::any())
                         .required_meaning("bar", Kind::any()),
-                    definition: Definition::legacy_empty(),
+                    definition: Definition::empty_legacy_namespace(),
                     errors: vec![ValidationError::MeaningMissing { identifier: "bar" }],
                 },
             ),
@@ -308,7 +308,7 @@ mod tests {
                 "invalid required meaning kind",
                 TestCase {
                     requirement: Requirement::empty().required_meaning("foo", Kind::boolean()),
-                    definition: Definition::legacy_empty().with_field(
+                    definition: Definition::empty_legacy_namespace().with_field(
                         "foo",
                         Kind::integer(),
                         Some("foo"),
@@ -324,7 +324,7 @@ mod tests {
                 "invalid optional meaning kind",
                 TestCase {
                     requirement: Requirement::empty().optional_meaning("foo", Kind::boolean()),
-                    definition: Definition::legacy_empty().with_field(
+                    definition: Definition::empty_legacy_namespace().with_field(
                         "foo",
                         Kind::integer(),
                         Some("foo"),
@@ -340,9 +340,9 @@ mod tests {
                 "duplicate meaning pointers",
                 TestCase {
                     requirement: Requirement::empty().optional_meaning("foo", Kind::boolean()),
-                    definition: Definition::legacy_empty()
+                    definition: Definition::empty_legacy_namespace()
                         .with_field("foo", Kind::integer(), Some("foo"))
-                        .merge(Definition::legacy_empty().with_field(
+                        .merge(Definition::empty_legacy_namespace().with_field(
                             "bar",
                             Kind::boolean(),
                             Some("foo"),

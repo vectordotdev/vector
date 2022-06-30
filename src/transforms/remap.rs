@@ -564,7 +564,7 @@ mod tests {
     };
 
     fn test_default_schema_definition() -> schema::Definition {
-        schema::Definition::legacy_empty().with_field(
+        schema::Definition::empty_legacy_namespace().with_field(
             "a default field",
             Kind::integer().or_bytes(),
             Some("default"),
@@ -572,7 +572,7 @@ mod tests {
     }
 
     fn test_dropped_schema_definition() -> schema::Definition {
-        schema::Definition::legacy_empty().with_field(
+        schema::Definition::empty_legacy_namespace().with_field(
             "a dropped field",
             Kind::boolean().or_null(),
             Some("dropped"),
@@ -995,7 +995,7 @@ mod tests {
         let context = TransformContext {
             key: Some(ComponentKey::from("remapper")),
             schema_definitions,
-            merged_schema_definition: schema::Definition::legacy_empty().with_field(
+            merged_schema_definition: schema::Definition::empty_legacy_namespace().with_field(
                 "hello",
                 Kind::bytes(),
                 None,
@@ -1244,7 +1244,7 @@ mod tests {
             ..Default::default()
         };
 
-        let schema_definition = schema::Definition::legacy_empty()
+        let schema_definition = schema::Definition::empty_legacy_namespace()
             .with_field("foo", Kind::bytes().or_null(), None)
             .with_field(
                 "tags",
@@ -1253,7 +1253,7 @@ mod tests {
             );
 
         assert_eq!(
-            conf.outputs(&schema::Definition::legacy_empty()),
+            conf.outputs(&schema::Definition::empty_legacy_namespace()),
             vec![Output::default(DataType::all()).with_schema_definition(schema_definition)]
         );
 

@@ -198,7 +198,7 @@ pub async fn build_pieces(
 
             let schema_definition = output
                 .log_schema_definition
-                .unwrap_or_else(schema::Definition::legacy_default);
+                .unwrap_or_else(schema::Definition::default_legacy_namespace);
 
             schema_definitions.insert(output.port, schema_definition);
         }

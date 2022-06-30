@@ -81,6 +81,7 @@ impl From<LookupBuf> for MeaningPointer {
 }
 
 impl Definition {
+    /// The most general possible definition. The `Kind` is `any`, and all log_namespaces are enabled.
     pub fn any() -> Self {
         Self::empty_with_kind(Kind::any(), [LogNamespace::Legacy, LogNamespace::Vector])
     }
@@ -98,13 +99,13 @@ impl Definition {
 
     /// An object with any fields, and the `Legacy` namespace.
     /// This is the default schema for a source that does not explicitely provide one yet
-    pub fn legacy_default() -> Self {
+    pub fn default_legacy_namespace() -> Self {
         Self::empty_with_kind(Kind::any_object(), [LogNamespace::Legacy])
     }
 
     /// An object with any fields, and the `Legacy` namespace.
     /// This is what most sources use for the legacy namespace.
-    pub fn legacy_empty() -> Self {
+    pub fn empty_legacy_namespace() -> Self {
         Self::empty_with_kind(Kind::object(Collection::empty()), [LogNamespace::Legacy])
     }
 
@@ -115,7 +116,7 @@ impl Definition {
         let is_vector = log_namespaces.contains(&LogNamespace::Vector);
         match (is_legacy, is_vector) {
             (false, false) => Self::empty_with_kind(Kind::any(), []),
-            (true, false) => Self::legacy_default(),
+            (true, false) => Self::default_legacy_namespace(),
             (false, true) => Self::empty_with_kind(Kind::any(), [LogNamespace::Vector]),
             (true, true) => {
                 Self::empty_with_kind(Kind::any(), [LogNamespace::Legacy, LogNamespace::Vector])
@@ -123,6 +124,7 @@ impl Definition {
         }
     }
 
+    /// The set of possible log namespaces that events can use. When merged, this is the union of all inputs.
     pub fn log_namespaces(&self) -> &BTreeSet<LogNamespace> {
         &self.log_namespaces
     }
@@ -347,7 +349,7 @@ mod tests {
                 },
             ),
         ]) {
-            let got = Definition::legacy_empty().with_field(path, kind, meaning);
+            let got = Definition::empty_legacy_namespace().with_field(path, kind, meaning);
             assert_eq!(got.kind(), want.kind(), "{}", title);
         }
     }
