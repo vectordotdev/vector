@@ -37,7 +37,8 @@ use vector::{
     test_util::{temp_dir, temp_file},
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
-use vector_buffers::{topology::channel::LimitedReceiver, Acker};
+use vector_buffers::topology::channel::LimitedReceiver;
+use vector_common::finalization::Finalizable;
 
 pub fn sink(channel_size: usize) -> (impl Stream<Item = EventArray>, MockSinkConfig) {
     let (tx, rx) = SourceSender::new_with_buffer(channel_size);
@@ -398,7 +399,6 @@ impl SinkConfig for MockSinkConfig {
         };
 
         let sink = MockSink {
-            acker: cx.acker(),
             sink: self.sink.clone(),
             health_tx,
         };
@@ -426,7 +426,6 @@ impl SinkConfig for MockSinkConfig {
 }
 
 struct MockSink {
-    acker: Acker,
     sink: Mode,
     health_tx: Option<oneshot::Sender<vector::Result<()>>>,
 }
@@ -441,12 +440,12 @@ impl StreamSink<Event> for MockSink {
                 }
 
                 // We have an inner sink, so forward the input normally
-                while let Some(event) = input.next().await {
+                while let Some(mut event) = input.next().await {
+                    let finalizers = event.take_finalizers();
                     if let Err(error) = sink.send_event(event).await {
                         error!(message = "Ingesting an event failed at mock sink.", %error);
                     }
-
-                    self.acker.ack(1);
+                    drop(finalizers);
                 }
             }
             Mode::Dead => {

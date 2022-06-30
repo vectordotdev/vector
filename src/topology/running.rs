@@ -498,12 +498,12 @@ impl RunningTopology {
                     // buffer) than it is to pass around info about which sinks are having their
                     // buffers reused and treat them differently at other stages.
                     let tx = buffer_tx.remove(key).unwrap();
-                    let (rx, acker) = match buffer {
-                        TaskOutput::Sink(rx, acker) => (rx.into_inner(), acker),
+                    let rx = match buffer {
+                        TaskOutput::Sink(rx) => rx.into_inner(),
                         _ => unreachable!(),
                     };
 
-                    buffers.insert(key.clone(), (tx, Arc::new(Mutex::new(Some(rx))), acker));
+                    buffers.insert(key.clone(), (tx, Arc::new(Mutex::new(Some(rx)))));
                 }
             }
         }

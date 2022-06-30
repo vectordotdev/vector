@@ -10,7 +10,7 @@ use futures::{ready, Sink};
 use pin_project::{pin_project, pinned_drop};
 use tokio::io::AsyncWrite;
 use tokio_util::codec::{BytesCodec, FramedWrite};
-use vector_buffers::Acker;
+use vector_common::finalization::EventFinalizers;
 
 use crate::internal_events::{SocketEventsSent, SocketMode};
 
@@ -37,10 +37,10 @@ where
     #[pin]
     inner: FramedWrite<T, BytesCodec>,
     shutdown_check: Box<dyn Fn(&mut T) -> ShutdownCheck + Send>,
-    acker: Acker,
     socket_mode: SocketMode,
     events_total: usize,
     bytes_total: usize,
+    finalizers: Vec<EventFinalizers>,
 }
 
 impl<T> BytesSink<T>
@@ -50,7 +50,6 @@ where
     pub(crate) fn new(
         inner: T,
         shutdown_check: impl Fn(&mut T) -> ShutdownCheck + Send + 'static,
-        acker: Acker,
         socket_mode: SocketMode,
     ) -> Self {
         Self {
@@ -58,14 +57,14 @@ where
             shutdown_check: Box::new(shutdown_check),
             events_total: 0,
             bytes_total: 0,
-            acker,
             socket_mode,
+            finalizers: Vec::new(),
         }
     }
 
     fn ack(&mut self) {
         if self.events_total > 0 {
-            self.acker.ack(self.events_total);
+            drop(std::mem::take(&mut self.finalizers));
 
             emit!(SocketEventsSent {
                 mode: self.socket_mode,

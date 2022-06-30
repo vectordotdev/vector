@@ -138,7 +138,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
                 transformer,
                 encoder,
             },
-            acker: cx.acker(),
+
             service: svc,
         };
 

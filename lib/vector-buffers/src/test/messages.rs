@@ -4,10 +4,53 @@ use bytes::{Buf, BufMut};
 use quickcheck::{Arbitrary, Gen};
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_common::finalization::{
-    AddBatchNotifier, BatchNotifier, EventFinalizer, EventFinalizers,
+    AddBatchNotifier, BatchNotifier, EventFinalizer, EventFinalizers, Finalizable,
 };
 
 use crate::{encoding::FixedEncodable, EventCount};
+
+macro_rules! message_wrapper {
+    ($id:ident: $ty:ty, $event_count:expr) => {
+        #[derive(Clone, Debug, Eq)]
+        pub(crate) struct $id(pub $ty, EventFinalizers);
+
+        impl $id {
+            pub const fn new(value: $ty) -> Self {
+                Self(value, EventFinalizers::DEFAULT)
+            }
+        }
+
+        impl AddBatchNotifier for $id {
+            fn add_batch_notifier(&mut self, batch: BatchNotifier) {
+                self.1.add(EventFinalizer::new(batch));
+            }
+        }
+
+        impl ByteSizeOf for $id {
+            fn allocated_bytes(&self) -> usize {
+                0
+            }
+        }
+
+        impl EventCount for $id {
+            fn event_count(&self) -> usize {
+                usize::try_from($event_count(self)).unwrap_or(usize::MAX)
+            }
+        }
+
+        impl Finalizable for $id {
+            fn take_finalizers(&mut self) -> EventFinalizers {
+                std::mem::take(&mut self.1)
+            }
+        }
+
+        impl PartialEq for $id {
+            fn eq(&self, other: &Self) -> bool {
+                self.0 == other.0
+            }
+        }
+    };
+}
 
 #[derive(Debug)]
 pub struct EncodeError;
@@ -93,14 +136,9 @@ impl FixedEncodable for Message {
     }
 }
 
-#[derive(Clone, Debug, Eq)]
-pub(crate) struct SizedRecord(pub u32, EventFinalizers);
+message_wrapper!(SizedRecord: u32, |_| 1);
 
 impl SizedRecord {
-    pub(crate) const fn new(n: u32) -> Self {
-        Self(n, EventFinalizers::DEFAULT)
-    }
-
     fn encoded_len(&self) -> usize {
         let payload_len: usize = self
             .0
@@ -108,30 +146,6 @@ impl SizedRecord {
             .expect("`SizedRecord` should never have a payload length greater than `usize`.");
 
         payload_len + mem::size_of_val(&self.0)
-    }
-}
-
-impl AddBatchNotifier for SizedRecord {
-    fn add_batch_notifier(&mut self, batch: BatchNotifier) {
-        self.1.add(EventFinalizer::new(batch));
-    }
-}
-
-impl ByteSizeOf for SizedRecord {
-    fn allocated_bytes(&self) -> usize {
-        0
-    }
-}
-
-impl EventCount for SizedRecord {
-    fn event_count(&self) -> usize {
-        1
-    }
-}
-
-impl PartialEq for SizedRecord {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
     }
 }
 
@@ -222,30 +236,11 @@ impl FixedEncodable for UndecodableRecord {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct MultiEventRecord(pub u32);
+message_wrapper!(MultiEventRecord: u32, |m: &Self| m.0);
 
 impl MultiEventRecord {
-    pub fn encoded_size(self) -> usize {
+    pub fn encoded_size(&self) -> usize {
         usize::try_from(self.0).unwrap_or(usize::MAX) + std::mem::size_of::<u32>()
-    }
-}
-
-impl AddBatchNotifier for MultiEventRecord {
-    fn add_batch_notifier(&mut self, batch: BatchNotifier) {
-        drop(batch); // We never check acknowledgements for this type
-    }
-}
-
-impl ByteSizeOf for MultiEventRecord {
-    fn allocated_bytes(&self) -> usize {
-        0
-    }
-}
-
-impl EventCount for MultiEventRecord {
-    fn event_count(&self) -> usize {
-        usize::try_from(self.0).unwrap_or(usize::MAX)
     }
 }
 
@@ -275,38 +270,19 @@ impl FixedEncodable for MultiEventRecord {
     {
         let event_count = buffer.get_u32();
         buffer.advance(usize::try_from(event_count).unwrap_or(usize::MAX));
-        Ok(MultiEventRecord(event_count))
+        Ok(MultiEventRecord::new(event_count))
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct PoisonPillMultiEventRecord(pub u32);
-
-impl AddBatchNotifier for PoisonPillMultiEventRecord {
-    fn add_batch_notifier(&mut self, batch: BatchNotifier) {
-        drop(batch); // We never check acknowledgements for this type
-    }
-}
+message_wrapper!(PoisonPillMultiEventRecord: u32, |m: &Self| m.0);
 
 impl PoisonPillMultiEventRecord {
     pub fn poisoned() -> Self {
-        Self(42)
+        Self::new(42)
     }
 
     pub fn encoded_size(&self) -> usize {
         usize::try_from(self.0).unwrap_or(usize::MAX) + std::mem::size_of::<u32>()
-    }
-}
-
-impl ByteSizeOf for PoisonPillMultiEventRecord {
-    fn allocated_bytes(&self) -> usize {
-        0
-    }
-}
-
-impl EventCount for PoisonPillMultiEventRecord {
-    fn event_count(&self) -> usize {
-        usize::try_from(self.0).unwrap_or(usize::MAX)
     }
 }
 
@@ -340,6 +316,6 @@ impl FixedEncodable for PoisonPillMultiEventRecord {
         }
 
         buffer.advance(usize::try_from(event_count).unwrap_or(usize::MAX));
-        Ok(PoisonPillMultiEventRecord(event_count))
+        Ok(PoisonPillMultiEventRecord::new(event_count))
     }
 }

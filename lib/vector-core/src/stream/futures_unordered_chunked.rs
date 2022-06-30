@@ -21,7 +21,7 @@ use pin_project::pin_project;
 #[pin_project]
 #[derive(Debug)]
 #[must_use = "streams do nothing unless polled"]
-pub struct FuturesUnorderedChunked<F: Future> {
+pub(crate) struct FuturesUnorderedChunked<F: Future> {
     #[pin]
     futures: FuturesUnordered<F>,
     items: Vec<F::Output>,
@@ -37,7 +37,7 @@ impl<F: Future> FuturesUnorderedChunked<F> {
     /// # Panics
     ///
     /// Will panic if `chunk_size` is zero.
-    pub fn new(chunk_size: usize) -> Self {
+    pub(crate) fn new(chunk_size: usize) -> Self {
         assert!(chunk_size > 0);
 
         Self {
@@ -50,19 +50,19 @@ impl<F: Future> FuturesUnorderedChunked<F> {
     /// Pushes a new future into the set.
     ///
     /// Callers must poll this stream in order to drive the underlying futures that have been stored.
-    pub fn push(&mut self, fut: F) {
+    pub(crate) fn push(&mut self, fut: F) {
         self.futures.push(fut);
     }
 
     /// Returns `true` if the set contains no futures.
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.futures.is_empty()
     }
 
     /// Returns the number of futures contained in the set.
     ///
     /// This represents the total number of in-flight futures.
-    pub fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.futures.len()
     }
 }

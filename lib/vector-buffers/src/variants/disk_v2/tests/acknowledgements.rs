@@ -1,13 +1,12 @@
 use std::sync::Arc;
 
 use tokio_test::{assert_pending, assert_ready, task::spawn};
+use vector_common::finalization::BatchNotifier;
 
 use crate::{
     buffer_usage_data::BufferUsageHandle,
     test::with_temp_dir,
-    variants::disk_v2::{
-        acknowledgements::create_disk_v2_acker, ledger::Ledger, DiskBufferConfigBuilder,
-    },
+    variants::disk_v2::{ledger::Ledger, DiskBufferConfigBuilder},
 };
 
 #[tokio::test]
@@ -26,13 +25,16 @@ async fn ack_updates_ledger_correctly() {
                 .expect("ledger should not fail to load/create");
             assert_eq!(ledger.consume_pending_acks(), 0);
 
-            // Create our acker and make sure it's empty.
+            // Create our ledger, and make sure it's empty.
             let ledger = Arc::new(ledger);
-            let acker = create_disk_v2_acker(Arc::clone(&ledger));
+            let finalizer = Arc::clone(&ledger).spawn_finalizer();
             assert_eq!(ledger.consume_pending_acks(), 0);
 
             // Now make sure it updates pending acks.
-            acker.ack(42);
+            let (batch, receiver) = BatchNotifier::new_with_receiver();
+            finalizer.add(42, receiver);
+            drop(batch);
+            tokio::task::yield_now().await;
             assert_eq!(ledger.consume_pending_acks(), 42);
             assert_eq!(ledger.consume_pending_acks(), 0);
         }
@@ -55,17 +57,21 @@ async fn ack_wakes_reader() {
                 .await
                 .expect("ledger should not fail to load/create");
 
-            // Create our acker, as well as a future for awaiting writer progress, and make sure
-            // it's not yet woken up.
+            // Create our ledger, as well as a future for awaiting
+            // writer progress, and make sure it's not yet woken up.
             let ledger = Arc::new(ledger);
-            let acker = create_disk_v2_acker(Arc::clone(&ledger));
+            let finalizer = Arc::clone(&ledger).spawn_finalizer();
 
             let mut wait_for_writer = spawn(ledger.wait_for_writer());
             assert_pending!(wait_for_writer.poll());
             assert!(!wait_for_writer.is_woken());
 
             // Now fire off an acknowledgement, and make sure our call woke up and can complete.
-            acker.ack(314);
+            let (batch, receiver) = BatchNotifier::new_with_receiver();
+            finalizer.add(1, receiver);
+            drop(batch);
+            tokio::task::yield_now().await;
+
             assert!(wait_for_writer.is_woken());
             assert_ready!(wait_for_writer.poll());
         }

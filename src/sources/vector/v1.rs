@@ -185,7 +185,7 @@ mod test {
 
     use super::VectorConfig;
     use crate::{
-        config::{ComponentKey, GlobalOptions, SinkContext, SourceContext},
+        config::{ComponentKey, GlobalOptions, SourceContext},
         event::{
             metric::{MetricKind, MetricValue},
             Event, LogEvent, Metric,
@@ -216,8 +216,7 @@ mod test {
         tokio::spawn(server);
         wait_for_tcp(addr).await;
 
-        let cx = SinkContext::new_test();
-        let (sink, _) = sink.build(cx).await.unwrap();
+        let (sink, _) = sink.build().await.unwrap();
 
         let events = vec![
             Event::Log(LogEvent::from("test")),

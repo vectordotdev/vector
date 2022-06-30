@@ -14,7 +14,7 @@ use crate::{
         channel::{BufferReceiver, BufferSender},
     },
     variants::{DiskV1Buffer, DiskV2Buffer, MemoryBuffer},
-    Acker, Bufferable, WhenFull,
+    Bufferable, WhenFull,
 };
 
 #[derive(Debug, Snafu)]
@@ -322,9 +322,7 @@ impl BufferConfig {
     /// Builds the buffer components represented by this configuration.
     ///
     /// The caller gets back a `Sink` and `Stream` implementation that represent a way to push items
-    /// into the buffer, as well as pop items out of the buffer, respectively.  The `Acker` is
-    /// provided to callers in order to update the buffer when popped items have been processed and
-    /// can be dropped or deleted, depending on the underlying buffer implementation.
+    /// into the buffer, as well as pop items out of the buffer, respectively.
     ///
     /// # Errors
     ///
@@ -339,7 +337,7 @@ impl BufferConfig {
         data_dir: Option<PathBuf>,
         buffer_id: String,
         span: Span,
-    ) -> Result<(BufferSender<T>, BufferReceiver<T>, Acker), BufferBuildError>
+    ) -> Result<(BufferSender<T>, BufferReceiver<T>), BufferBuildError>
     where
         T: Bufferable + Clone,
     {

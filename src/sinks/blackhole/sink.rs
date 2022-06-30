@@ -13,7 +13,7 @@ use tokio::{
     sync::watch,
     time::{interval, sleep_until},
 };
-use vector_core::{buffers::Acker, internal_event::EventsSent, ByteSizeOf};
+use vector_core::{internal_event::EventsSent, ByteSizeOf};
 
 use crate::{
     event::{EventArray, EventContainer},
@@ -24,17 +24,15 @@ pub struct BlackholeSink {
     total_events: Arc<AtomicUsize>,
     total_raw_bytes: Arc<AtomicUsize>,
     config: BlackholeConfig,
-    acker: Acker,
     last: Option<Instant>,
 }
 
 impl BlackholeSink {
-    pub fn new(config: BlackholeConfig, acker: Acker) -> Self {
+    pub fn new(config: BlackholeConfig) -> Self {
         BlackholeSink {
             config,
             total_events: Arc::new(AtomicUsize::new(0)),
             total_raw_bytes: Arc::new(AtomicUsize::new(0)),
-            acker,
             last: None,
         }
     }
@@ -94,8 +92,6 @@ impl StreamSink<EventArray> for BlackholeSink {
                 byte_size: message_len,
                 output: None,
             });
-
-            self.acker.ack(events.len());
         }
 
         // Notify the reporting task to shutdown.

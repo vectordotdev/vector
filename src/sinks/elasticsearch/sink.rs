@@ -4,7 +4,6 @@ use async_trait::async_trait;
 use futures::{future, stream::BoxStream, StreamExt};
 use tower::Service;
 use vector_core::{
-    buffers::Acker,
     stream::{BatcherSettings, DriverResponse},
     ByteSizeOf,
 };
@@ -43,7 +42,6 @@ pub struct ElasticsearchSink<S> {
     pub request_builder: ElasticsearchRequestBuilder,
     pub transformer: Transformer,
     pub service: S,
-    pub acker: Acker,
     pub metric_to_log: MetricToLog,
     pub mode: ElasticsearchCommonMode,
     pub id_key_field: Option<String>,
@@ -87,7 +85,7 @@ where
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(self.service, self.acker);
+            .into_driver(self.service);
 
         sink.run().await
     }
