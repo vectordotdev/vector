@@ -387,12 +387,6 @@ impl From<proto::SummaryQuantile> for metric::Quantile {
     }
 }
 
-impl From<String> for Event {
-    fn from(line: String) -> Self {
-        LogEvent::from(line).into()
-    }
-}
-
 impl From<LogEvent> for Event {
     fn from(log: LogEvent) -> Self {
         Event::Log(log)
