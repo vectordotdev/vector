@@ -76,7 +76,7 @@ pub fn merged_definition(
         if let Some(inputs) = config.transform_inputs(key) {
             let merged_definition = merged_definition(inputs, config, cache);
 
-            let maybe_transform_definition = config
+            let transform_definition = config
                 .transform_output_for_port(key, &input.port, &merged_definition)
                 .expect("transform must exist - already found inputs")
                 .unwrap_or_else(|| {
