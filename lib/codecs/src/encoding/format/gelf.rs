@@ -1,7 +1,7 @@
 use crate::gelf_fields::*;
 use crate::internal_events::{
-    GelfSerializeFailedInvalidFieldName, GelfSerializeFailedInvalidType,
-    GelfSerializeFailedMissingField,
+    codec_format::FORMAT_TYPE_GELF, SerializeFailedInvalidFieldName, SerializeFailedInvalidType,
+    SerializeFailedMissingField,
 };
 use bytes::{BufMut, BytesMut};
 use once_cell::sync::Lazy;
@@ -89,9 +89,10 @@ impl GelfSerializer {
     fn validate_required_fields(&mut self, log: &LogEvent) -> vector_core::Result<()> {
         // emits the GelfSerializeFailedMissingField internal event and returns Err
         fn emit_missing_field(field: &str) -> vector_core::Result<()> {
-            vector_core::internal_event::emit(GelfSerializeFailedMissingField {
-                field,
+            vector_core::internal_event::emit(SerializeFailedMissingField {
+                format_type: FORMAT_TYPE_GELF,
                 message: MISSING_FIELD_STR,
+                field,
             });
             Err(format!("{}: {}", MISSING_FIELD_STR, field).into())
         }
@@ -127,11 +128,12 @@ impl GelfSerializer {
             expected_type: &str,
             actual_type: &str,
         ) -> vector_core::Result<()> {
-            vector_core::internal_event::emit(GelfSerializeFailedInvalidType {
+            vector_core::internal_event::emit(SerializeFailedInvalidType {
+                format_type: FORMAT_TYPE_GELF,
+                message: INVALID_TYPE_STR,
                 field,
                 expected_type,
                 actual_type,
-                message: INVALID_TYPE_STR,
             });
             Err(format!(
                 "{}: field: {} type: {} expected_type: {}",
@@ -186,9 +188,10 @@ impl GelfSerializer {
 
                     // additional fields must be only word chars, dashes and periods.
                     if !VALID_FIELD.is_match(key) {
-                        vector_core::internal_event::emit(GelfSerializeFailedInvalidFieldName {
-                            field: key,
+                        vector_core::internal_event::emit(SerializeFailedInvalidFieldName {
+                            format_type: FORMAT_TYPE_GELF,
                             message: INVALID_FIELD_NAME_STR,
+                            field: key,
                         });
                         return Err(format!("{}: {}", INVALID_FIELD_NAME_STR, key).into());
                     }
