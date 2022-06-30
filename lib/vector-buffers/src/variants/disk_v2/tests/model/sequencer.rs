@@ -211,7 +211,7 @@ impl ActionSequencer {
             actions,
             read_state: ReadState::Idle(reader),
             write_state: WriteState::Idle(writer),
-            unacked_events: Default::default(),
+            unacked_events: VecDeque::default(),
         }
     }
 
