@@ -228,7 +228,7 @@ mod tests {
     use chrono::TimeZone;
 
     use super::*;
-    use crate::event::{Event, MetricKind, MetricValue};
+    use crate::event::{Event, LogEvent, MetricKind, MetricValue};
 
     #[test]
     fn get_fields() {
@@ -263,7 +263,7 @@ mod tests {
 
     #[test]
     fn render_log_static() {
-        let event = Event::from("hello world");
+        let event = Event::Log(LogEvent::from("hello world"));
         let template = Template::try_from("foo").unwrap();
 
         assert_eq!(Ok(Bytes::from("foo")), template.render(&event))
@@ -271,7 +271,7 @@ mod tests {
 
     #[test]
     fn render_log_dynamic() {
-        let mut event = Event::from("hello world");
+        let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("log_stream", "stream");
         let template = Template::try_from("{{log_stream}}").unwrap();
 
@@ -280,7 +280,7 @@ mod tests {
 
     #[test]
     fn render_log_dynamic_with_prefix() {
-        let mut event = Event::from("hello world");
+        let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("log_stream", "stream");
         let template = Template::try_from("abcd-{{log_stream}}").unwrap();
 
@@ -289,7 +289,7 @@ mod tests {
 
     #[test]
     fn render_log_dynamic_with_postfix() {
-        let mut event = Event::from("hello world");
+        let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("log_stream", "stream");
         let template = Template::try_from("{{log_stream}}-abcd").unwrap();
 
@@ -298,7 +298,7 @@ mod tests {
 
     #[test]
     fn render_log_dynamic_missing_key() {
-        let event = Event::from("hello world");
+        let event = Event::Log(LogEvent::from("hello world"));
         let template = Template::try_from("{{log_stream}}-{{foo}}").unwrap();
 
         assert_eq!(
@@ -311,7 +311,7 @@ mod tests {
 
     #[test]
     fn render_log_dynamic_multiple_keys() {
-        let mut event = Event::from("hello world");
+        let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("foo", "bar");
         event.as_mut_log().insert("baz", "quux");
         let template = Template::try_from("stream-{{foo}}-{{baz}}.log").unwrap();
@@ -324,7 +324,7 @@ mod tests {
 
     #[test]
     fn render_log_dynamic_weird_junk() {
-        let mut event = Event::from("hello world");
+        let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("foo", "bar");
         event.as_mut_log().insert("baz", "quux");
         let template = Template::try_from(r"{stream}{\{{}}}-{{foo}}-{{baz}}.log").unwrap();
@@ -339,7 +339,7 @@ mod tests {
     fn render_log_timestamp_strftime_style() {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
-        let mut event = Event::from("hello world");
+        let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert(log_schema().timestamp_key(), ts);
 
         let template = Template::try_from("abcd-%F").unwrap();
@@ -351,7 +351,7 @@ mod tests {
     fn render_log_timestamp_multiple_strftime_style() {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
-        let mut event = Event::from("hello world");
+        let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert(log_schema().timestamp_key(), ts);
 
         let template = Template::try_from("abcd-%F_%T").unwrap();
@@ -366,7 +366,7 @@ mod tests {
     fn render_log_dynamic_with_strftime() {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
-        let mut event = Event::from("hello world");
+        let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("foo", "butts");
         event.as_mut_log().insert(log_schema().timestamp_key(), ts);
 
@@ -382,7 +382,7 @@ mod tests {
     fn render_log_dynamic_with_nested_strftime() {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
-        let mut event = Event::from("hello world");
+        let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("format", "%F");
         event.as_mut_log().insert(log_schema().timestamp_key(), ts);
 
@@ -398,7 +398,7 @@ mod tests {
     fn render_log_dynamic_with_reverse_nested_strftime() {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
-        let mut event = Event::from("hello world");
+        let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("\"%F\"", "foo");
         event.as_mut_log().insert(log_schema().timestamp_key(), ts);
 

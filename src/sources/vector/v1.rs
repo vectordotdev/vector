@@ -193,7 +193,7 @@ mod test {
         config::{ComponentKey, GlobalOptions, SinkContext, SourceContext},
         event::{
             metric::{MetricKind, MetricValue},
-            Event, Metric,
+            Event, LogEvent, Metric,
         },
         shutdown::ShutdownSignal,
         sinks::vector::v1::VectorConfig as SinkConfig,
@@ -225,14 +225,14 @@ mod test {
         let (sink, _) = sink.build(cx).await.unwrap();
 
         let events = vec![
-            Event::from("test"),
-            Event::from("events"),
-            Event::from("to roundtrip"),
-            Event::from("through"),
-            Event::from("the native"),
-            Event::from("sink"),
-            Event::from("and"),
-            Event::from("source"),
+            Event::Log(LogEvent::from("test")),
+            Event::Log(LogEvent::from("events")),
+            Event::Log(LogEvent::from("to roundtrip")),
+            Event::Log(LogEvent::from("through")),
+            Event::Log(LogEvent::from("the native")),
+            Event::Log(LogEvent::from("sink")),
+            Event::Log(LogEvent::from("and")),
+            Event::Log(LogEvent::from("source")),
             Event::Metric(Metric::new(
                 String::from("also test a metric"),
                 MetricKind::Absolute,
@@ -312,6 +312,7 @@ mod test {
                 proxy: Default::default(),
                 acknowledgements: false,
                 schema_definitions: HashMap::default(),
+                schema: Default::default(),
             })
             .await
             .unwrap();
@@ -351,12 +352,13 @@ mod test {
                 proxy: Default::default(),
                 acknowledgements: false,
                 schema_definitions: HashMap::default(),
+                schema: Default::default(),
             })
             .await
             .unwrap();
         tokio::spawn(server);
 
-        let event = proto::EventWrapper::from(Event::from("short"));
+        let event = proto::EventWrapper::from(Event::Log(LogEvent::from("short")));
         let event_len = event.encoded_len();
         let full_len = event_len + 4;
 

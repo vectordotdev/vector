@@ -28,7 +28,7 @@ use crate::{
         self, compiler::expand_macros, loading, ComponentKey, Config, ConfigBuilder, ConfigPath,
         SinkOuter, SourceOuter, TestDefinition, TestInput, TestInputValue, TestOutput,
     },
-    event::{Event, Value},
+    event::{Event, LogEvent, Value},
     schema,
     serde::OneOrMany,
     signal,
@@ -584,12 +584,12 @@ fn build_outputs(
 fn build_input_event(input: &TestInput) -> Result<Event, String> {
     match input.type_str.as_ref() {
         "raw" => match input.value.as_ref() {
-            Some(v) => Ok(Event::from_str_legacy(v.clone())),
+            Some(v) => Ok(Event::Log(LogEvent::from_str_legacy(v.clone()))),
             None => Err("input type 'raw' requires the field 'value'".to_string()),
         },
         "log" => {
             if let Some(log_fields) = &input.log_fields {
-                let mut event = Event::from_str_legacy("");
+                let mut event = LogEvent::from_str_legacy("");
                 for (path, value) in log_fields {
                     let value: Value = match value {
                         TestInputValue::String(s) => Value::from(s.to_owned()),
@@ -599,9 +599,9 @@ fn build_input_event(input: &TestInput) -> Result<Event, String> {
                             NotNan::new(*f).map_err(|_| "NaN value not supported".to_string())?,
                         ),
                     };
-                    event.as_mut_log().insert(path.as_str(), value);
+                    event.insert(path.as_str(), value);
                 }
-                Ok(event)
+                Ok(event.into())
             } else {
                 Err("input type 'log' requires the field 'log_fields'".to_string())
             }

@@ -1505,7 +1505,7 @@ async fn decode_series_endpoint_v2() {
                     r#type: "host".to_string(),
                     name: "random_host".to_string(),
                 }],
-                metric: "dd_gauge".to_string(),
+                metric: "namespace.dd_gauge".to_string(),
                 tags: vec!["foo:bar".to_string()],
                 points: vec![
                     ddmetric_proto::metric_payload::MetricPoint {
@@ -1527,7 +1527,7 @@ async fn decode_series_endpoint_v2() {
                     r#type: "host".to_string(),
                     name: "another_random_host".to_string(),
                 }],
-                metric: "dd_rate".to_string(),
+                metric: "another_namespace.dd_rate".to_string(),
                 tags: vec!["foo:bar:baz".to_string()],
                 points: vec![ddmetric_proto::metric_payload::MetricPoint {
                     value: 3.14,
@@ -1594,6 +1594,7 @@ async fn decode_series_endpoint_v2() {
                 metric.tags().unwrap()["source_type_name"],
                 "a_random_source_type_name".to_string()
             );
+            assert_eq!(metric.namespace(), Some("namespace"));
 
             assert_eq!(
                 &events[0].metadata().datadog_api_key().as_ref().unwrap()[..],
@@ -1614,6 +1615,7 @@ async fn decode_series_endpoint_v2() {
                 metric.tags().unwrap()["source_type_name"],
                 "a_random_source_type_name".to_string()
             );
+            assert_eq!(metric.namespace(), Some("namespace"));
 
             assert_eq!(
                 &events[1].metadata().datadog_api_key().as_ref().unwrap()[..],
@@ -1642,6 +1644,7 @@ async fn decode_series_endpoint_v2() {
                 metric.tags().unwrap()["source_type_name"],
                 "another_random_source_type_name".to_string()
             );
+            assert_eq!(metric.namespace(), Some("another_namespace"));
 
             assert_eq!(
                 &events[2].metadata().datadog_api_key().as_ref().unwrap()[..],
@@ -1667,6 +1670,7 @@ async fn decode_series_endpoint_v2() {
                 metric.tags().unwrap()["source_type_name"],
                 "a_very_random_source_type_name".to_string()
             );
+            assert_eq!(metric.namespace(), None);
 
             assert_eq!(
                 &events[3].metadata().datadog_api_key().as_ref().unwrap()[..],

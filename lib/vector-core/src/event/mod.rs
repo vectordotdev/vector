@@ -78,12 +78,6 @@ impl Finalizable for Event {
 }
 
 impl Event {
-    /// This used to be the implementation for `Event::from(&'str)`, but this is now only
-    /// valid for `LogNamespace::Legacy`
-    pub fn from_str_legacy(msg: impl Into<String>) -> Self {
-        LogEvent::from_str_legacy(msg).into()
-    }
-
     /// Return self as a `LogEvent`
     ///
     /// # Panics
@@ -388,33 +382,6 @@ impl From<proto::SummaryQuantile> for metric::Quantile {
         Self {
             quantile: quantile.quantile,
             value: quantile.value,
-        }
-    }
-}
-
-#[cfg(any(test, feature = "test"))]
-mod test_utils {
-    use super::*;
-    use bytes::Bytes;
-
-    // these rely on the global log schema, which is no longer supported when using the
-    // "LogNamespace::Vector" namespace.
-
-    impl From<Bytes> for Event {
-        fn from(message: Bytes) -> Self {
-            Event::Log(LogEvent::from(message))
-        }
-    }
-
-    impl From<&str> for Event {
-        fn from(line: &str) -> Self {
-            LogEvent::from(line).into()
-        }
-    }
-
-    impl From<String> for Event {
-        fn from(line: String) -> Self {
-            LogEvent::from(line).into()
         }
     }
 }

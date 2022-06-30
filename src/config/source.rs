@@ -81,6 +81,7 @@ impl SourceContext {
                 proxy: Default::default(),
                 acknowledgements: false,
                 schema_definitions: HashMap::default(),
+                schema: Default::default(),
             },
             shutdown,
         )
@@ -99,6 +100,7 @@ impl SourceContext {
             proxy: Default::default(),
             acknowledgements: false,
             schema_definitions: schema_definitions.unwrap_or_default(),
+            schema: Default::default(),
         }
     }
 

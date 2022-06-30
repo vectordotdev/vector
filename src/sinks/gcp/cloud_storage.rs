@@ -385,7 +385,7 @@ mod tests {
             )
             .expect("failed to build sink");
 
-        let event = Event::from("simple message");
+        let event = Event::Log(LogEvent::from("simple message"));
         run_and_assert_sink_compliance(sink, stream::once(ready(event)), &SINK_TAGS).await;
     }
 
@@ -394,8 +394,8 @@ mod tests {
         crate::test_util::trace_init();
 
         let message = "hello world".to_string();
-        let mut event = Event::from(message);
-        event.as_mut_log().insert("key", "value");
+        let mut event = LogEvent::from(message);
+        event.insert("key", "value");
 
         let sink_config = GcsSinkConfig {
             key_prefix: Some("key: {{ key }}".into()),
@@ -404,7 +404,7 @@ mod tests {
         let key = sink_config
             .key_partitioner()
             .unwrap()
-            .partition(&event)
+            .partition(&Event::Log(event))
             .expect("key wasn't provided");
 
         assert_eq!(key, "key: value");

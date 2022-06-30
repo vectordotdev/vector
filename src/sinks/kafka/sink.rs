@@ -16,7 +16,7 @@ use vector_core::{buffers::Acker, config::log_schema};
 use super::config::{KafkaRole, KafkaSinkConfig};
 use crate::{
     codecs::Encoder,
-    event::Event,
+    event::{Event, LogEvent},
     kafka::KafkaStatisticsContext,
     sinks::{
         kafka::{
@@ -97,7 +97,7 @@ pub(crate) async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
     let client = config.to_rdkafka(KafkaRole::Consumer).unwrap();
     let topic = match Template::try_from(config.topic)
         .context(TopicTemplateSnafu)?
-        .render_string(&Event::from_str_legacy(""))
+        .render_string(&LogEvent::from_str_legacy(""))
     {
         Ok(topic) => Some(topic),
         Err(error) => {

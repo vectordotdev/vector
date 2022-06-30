@@ -691,6 +691,7 @@ mod test {
                 out: sender,
                 proxy: Default::default(),
                 acknowledgements: false,
+                schema: Default::default(),
                 schema_definitions: HashMap::default(),
             })
             .await

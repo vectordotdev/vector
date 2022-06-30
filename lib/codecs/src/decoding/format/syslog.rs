@@ -7,10 +7,9 @@ use std::collections::BTreeMap;
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
 use value::{kind::Collection, Kind};
 use vector_core::config::LogNamespace;
-use vector_core::event::LogEvent;
 use vector_core::{
     config::{log_schema, DataType},
-    event::{Event, Value},
+    event::{Event, LogEvent, Value},
     schema,
 };
 
