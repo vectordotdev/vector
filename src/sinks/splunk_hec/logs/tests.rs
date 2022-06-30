@@ -5,7 +5,7 @@ use futures_util::StreamExt;
 use serde::Deserialize;
 use vector_core::{
     config::log_schema,
-    event::{Event, Value},
+    event::{Event, LogEvent, Value},
 };
 
 use super::{config::HecEncodingMigrator, sink::HecProcessedEvent};
@@ -57,7 +57,7 @@ fn get_processed_event_timestamp(
     timestamp: Option<Value>,
     timestamp_key: &str,
 ) -> HecProcessedEvent {
-    let mut event = Event::from("hello world");
+    let mut event = Event::Log(LogEvent::from("hello world"));
     event
         .as_mut_log()
         .insert("event_sourcetype", "test_sourcetype");
@@ -106,7 +106,7 @@ fn get_processed_event() -> HecProcessedEvent {
 }
 
 fn get_event_with_token(msg: &str, token: &str) -> Event {
-    let mut event = Event::from(msg);
+    let mut event = Event::Log(LogEvent::from(msg));
     event.metadata_mut().set_splunk_hec_token(Arc::from(token));
     event
 }
@@ -224,7 +224,7 @@ async fn splunk_passthrough_token() {
     let events = vec![
         get_event_with_token("message-1", "passthrough-token-1"),
         get_event_with_token("message-2", "passthrough-token-2"),
-        Event::from("default token will be used"),
+        Event::Log(LogEvent::from("default token will be used")),
     ];
 
     let _ = sink.run_events(events).await.unwrap();

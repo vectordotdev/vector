@@ -35,11 +35,11 @@ mitigate this with the `generate` subcommand, which can be used to generate the
 boilerplate for you. The command expects a list of components, where it then
 creates a config with all of those components connected in a linear chain.
 
-For example, if we wished to create a chain of three transforms; `json_parser`,
-`add_fields`, and `remove_fields`, we can run:
+For example, if we wished to create a chain of three transforms; `remap`, `filter`,
+and `reduce`, we can run:
 
 ```bash
-vector generate /json_parser,add_fields,remove_fields > vector.toml
+vector generate /remap,filter,reduce > vector.toml
 # Find out more with `vector generate --help`
 ```
 
@@ -49,17 +49,17 @@ with an `inputs` field that specifies the component before it:
 ```toml title="vector.toml"
 [transforms.transform0]
   inputs = [ "somewhere" ]
-  type = "json_parser"
+  type = "remap"
   # etc ...
 
 [transforms.transform1]
   inputs = [ "transform0" ]
-  type = "add_fields"
+  type = "filter"
   # etc ...
 
 [transforms.transform2]
   inputs = [ "transform1" ]
-  type = "remove_fields"
+  type = "reduce"
   # etc ...
 ```
 

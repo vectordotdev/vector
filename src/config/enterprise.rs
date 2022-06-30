@@ -49,6 +49,11 @@ static DATADOG_LOGS_KEY: &str = "#datadog_logs";
 static DATADOG_REPORTING_PRODUCT: &str = "Datadog Observability Pipelines";
 static DATADOG_REPORTING_PATH_STUB: &str = "/api/unstable/observability_pipelines/configuration";
 
+// Users can pass their Datadog API key through environment variables directly
+// rather than placing it in their configuration.
+pub static DATADOG_API_KEY_ENV_VAR_SHORT: &str = "DD_API_KEY";
+pub static DATADOG_API_KEY_ENV_VAR_FULL: &str = "DATADOG_API_KEY";
+
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Options {
@@ -281,7 +286,9 @@ impl TryFrom<&Config> for EnterpriseMetadata {
             // API key provided explicitly.
             Some(api_key) => api_key.clone(),
             // No API key; attempt to get it from the environment.
-            None => match env::var("DATADOG_API_KEY").or_else(|_| env::var("DD_API_KEY")) {
+            None => match env::var(DATADOG_API_KEY_ENV_VAR_FULL)
+                .or_else(|_| env::var(DATADOG_API_KEY_ENV_VAR_SHORT))
+            {
                 Ok(api_key) => api_key,
                 _ => return Err(EnterpriseError::MissingApiKey),
             },
@@ -761,16 +768,17 @@ async fn report_serialized_config_to_datadog<'a>(
     Err(ReportingError::MaxRetriesReached)
 }
 
-#[cfg(all(test, feature = "enterprise-tests"))]
+#[cfg(all(
+    test,
+    feature = "enterprise",
+    feature = "sources-demo_logs",
+    feature = "sinks-blackhole"
+))]
 mod test {
-    use std::{
-        collections::BTreeMap, io::Write, net::TcpListener, path::PathBuf, str::FromStr, thread,
-        time::Duration,
-    };
+    use std::{collections::BTreeMap, net::TcpListener, time::Duration};
 
     use http::StatusCode;
     use indexmap::IndexMap;
-    use indoc::formatdoc;
     use tokio::time::sleep;
     use value::Kind;
     use vector_common::btreemap;
@@ -782,11 +790,8 @@ mod test {
         PipelinesVersionPayload,
     };
     use crate::{
-        app::Application,
-        cli::{Color, LogFormat, Opts, RootOpts},
         config::enterprise::{convert_tags_to_vrl, default_max_retries},
         http::HttpClient,
-        metrics,
         test_util::next_addr,
     };
 
@@ -823,29 +828,6 @@ mod test {
             .await;
 
         mock_server
-    }
-
-    fn get_vector_config_file(config: impl Into<String>) -> tempfile::NamedTempFile {
-        let mut file = tempfile::NamedTempFile::new().unwrap();
-        let _ = writeln!(file, "{}", config.into());
-        file
-    }
-
-    fn get_root_opts(config_path: PathBuf) -> RootOpts {
-        RootOpts {
-            config_paths: vec![config_path],
-            config_dirs: vec![],
-            config_paths_toml: vec![],
-            config_paths_json: vec![],
-            config_paths_yaml: vec![],
-            require_healthy: None,
-            threads: None,
-            verbose: 0,
-            quiet: 3,
-            log_format: LogFormat::from_str("text").unwrap(),
-            color: Color::from_str("auto").unwrap(),
-            watch_config: false,
-        }
     }
 
     #[tokio::test]
@@ -952,105 +934,6 @@ mod test {
         )
         .await
         .is_err());
-    }
-
-    /// This test asserts that configuration reporting errors do NOT impact the
-    /// rest of Vector starting and running.
-    ///
-    /// In general, Vector should continue operating even in the event that the
-    /// enterprise API is down/having issues. Do not modify this behavior
-    /// without prior approval.
-    #[tokio::test]
-    async fn vector_continues_on_reporting_error() {
-        let _ = metrics::init_test();
-
-        let server = build_test_server_error_and_recover(StatusCode::NOT_IMPLEMENTED).await;
-        let endpoint = server.uri();
-
-        let vector_config = formatdoc! {r#"
-            [enterprise]
-            application_key = "application_key"
-            api_key = "api_key"
-            configuration_key = "configuration_key"
-            endpoint = "{endpoint}"
-            max_retries = 1
-
-            [sources.in]
-            type = "demo_logs"
-            format = "syslog"
-            count = 3
-
-            [sinks.out]
-            type = "blackhole"
-            inputs = ["*"]
-        "#, endpoint=endpoint};
-
-        let config_file = get_vector_config_file(vector_config);
-
-        let opts = Opts {
-            root: get_root_opts(config_file.path().to_path_buf()),
-            sub_command: None,
-        };
-
-        // Spawn a separate thread to avoid nested async runtime errors
-        let vector_continued = thread::spawn(|| {
-            // Configuration reporting is guaranteed to fail here due to API
-            // server issues. However, the app should still start up and run.
-            Application::prepare_from_opts(opts).map_or(false, |app| {
-                // Finish running the topology to avoid error logs
-                app.run();
-                true
-            })
-        })
-        .join()
-        .unwrap();
-
-        assert!(!server.received_requests().await.unwrap().is_empty());
-        assert!(vector_continued);
-    }
-
-    #[tokio::test]
-    async fn vector_does_not_start_with_enterprise_misconfigured() {
-        let _ = metrics::init_test();
-
-        let server = build_test_server_error_and_recover(StatusCode::NOT_IMPLEMENTED).await;
-        let endpoint = server.uri();
-
-        let vector_config = formatdoc! {r#"
-            [enterprise]
-            application_key = "application_key"
-            configuration_key = "configuration_key"
-            endpoint = "{endpoint}"
-            max_retries = 1
-
-            [sources.in]
-            type = "demo_logs"
-            format = "syslog"
-            count = 1
-            interval = 0.0
-
-            [sinks.out]
-            type = "blackhole"
-            inputs = ["*"]
-        "#, endpoint=endpoint};
-
-        let config_file = get_vector_config_file(vector_config);
-
-        let opts = Opts {
-            root: get_root_opts(config_file.path().to_path_buf()),
-            sub_command: None,
-        };
-
-        let vector_failed_to_start = thread::spawn(|| {
-            // With [enterprise] configured but no API key, starting the app
-            // should fail
-            Application::prepare_from_opts(opts).is_err()
-        })
-        .join()
-        .unwrap();
-
-        assert!(server.received_requests().await.unwrap().is_empty());
-        assert!(vector_failed_to_start);
     }
 
     #[test]

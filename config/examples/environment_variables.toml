@@ -17,13 +17,13 @@ data_dir = "/var/lib/vector"
   ignore_older = 86400 # 1 day
 
 # Add a field based on the value of the HOSTNAME env var
-# Docs: https://vector.dev/docs/reference/transforms/add_fields
+# Docs: https://vector.dev/docs/reference/transforms/remap
 [transforms.add_host]
   inputs       = ["apache_logs"]
-  type         = "add_fields"
-
-  [transforms.add_host.fields]
-    host = "${HOSTNAME}"
+  type         = "remap"
+  source       = '''
+  .host = get_env_var!("HOSTNAME")
+  '''
 
 # Print the data to STDOUT for inspection
 # Docs: https://vector.dev/docs/reference/sinks/console

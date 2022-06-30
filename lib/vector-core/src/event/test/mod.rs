@@ -8,17 +8,12 @@ use super::*;
 
 #[test]
 fn event_iteration() {
-    let mut event = Event::new_empty_log();
+    let mut log = LogEvent::default();
 
-    event
-        .as_mut_log()
-        .insert("\"Ke$ha\"", "It's going down, I'm yelling timber");
-    event
-        .as_mut_log()
-        .insert("Pitbull", "The bigger they are, the harder they fall");
+    log.insert("\"Ke$ha\"", "It's going down, I'm yelling timber");
+    log.insert("Pitbull", "The bigger they are, the harder they fall");
 
-    let all = event
-        .as_log()
+    let all = log
         .all_fields()
         .unwrap()
         .map(|(k, v)| (k, v.to_string_lossy()))
@@ -42,8 +37,7 @@ fn event_iteration() {
 
 #[test]
 fn event_iteration_order() {
-    let mut event = Event::new_empty_log();
-    let log = event.as_mut_log();
+    let mut log = LogEvent::default();
     log.insert("lZDfzKIL", Value::from("tOVrjveM"));
     log.insert("o9amkaRY", Value::from("pGsfG7Nr"));
     log.insert("YRjhxXcg", Value::from("nw8iM5Jr"));

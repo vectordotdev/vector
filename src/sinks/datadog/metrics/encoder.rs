@@ -29,7 +29,7 @@ const SERIES_PAYLOAD_HEADER: &[u8] = b"{\"series\":[";
 const SERIES_PAYLOAD_FOOTER: &[u8] = b"]}";
 const SERIES_PAYLOAD_DELIMITER: &[u8] = b",";
 
-mod ddsketch_proto {
+mod ddmetric_proto {
     include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
 }
 
@@ -520,12 +520,12 @@ where
                     let k = bins.into_iter().map(Into::into).collect();
                     let n = counts.into_iter().map(Into::into).collect();
 
-                    let sketch = ddsketch_proto::sketch_payload::Sketch {
+                    let sketch = ddmetric_proto::sketch_payload::Sketch {
                         metric: name,
                         tags,
                         host,
                         distributions: Vec::new(),
-                        dogsketches: vec![ddsketch_proto::sketch_payload::sketch::Dogsketch {
+                        dogsketches: vec![ddmetric_proto::sketch_payload::sketch::Dogsketch {
                             ts,
                             cnt,
                             min,
@@ -546,7 +546,7 @@ where
         }
     }
 
-    let sketch_payload = ddsketch_proto::SketchPayload {
+    let sketch_payload = ddmetric_proto::SketchPayload {
         // TODO: The "common metadata" fields are things that only very loosely apply to Vector, or
         // are hard to characterize -- for example, what's the API key for a sketch that didn't originate
         // from the Datadog Agent? -- so we're just omitting it here in the hopes it doesn't

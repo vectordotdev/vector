@@ -9,7 +9,7 @@ fn parse_regex_all(value: Value, numeric_groups: bool, pattern: &Regex) -> Resol
     let value = String::from_utf8_lossy(&bytes);
     Ok(pattern
         .captures_iter(&value)
-        .map(|capture| util::capture_regex_to_map(pattern, capture, numeric_groups).into())
+        .map(|capture| util::capture_regex_to_map(pattern, &capture, numeric_groups).into())
         .collect::<Vec<Value>>()
         .into())
 }

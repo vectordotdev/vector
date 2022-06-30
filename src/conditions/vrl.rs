@@ -1,32 +1,31 @@
-use serde::{Deserialize, Serialize};
 use value::Value;
 use vector_common::TimeZone;
+use vector_config::configurable_component;
 use vrl::{diagnostic::Formatter, Program, Runtime, VrlRuntime};
 
 use crate::event::TargetEvents;
 use crate::{
-    conditions::{Condition, ConditionConfig, ConditionDescription, Conditional},
+    conditions::{Condition, Conditional, ConditionalConfig},
     emit,
     event::{Event, VrlTarget},
     internal_events::VrlConditionExecutionError,
 };
 
-#[derive(Deserialize, Serialize, Debug, Default, Clone, PartialEq)]
+/// A condition that uses the [Vector Remap Language](https://vector.dev/docs/reference/vrl) (VRL) [boolean expression](https://vector.dev/docs/reference/vrl#boolean-expressions) against an event.
+#[configurable_component]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct VrlConfig {
+    /// The VRL boolean expression.
     pub(crate) source: String,
 
+    #[configurable(derived)]
     #[serde(default)]
     pub(crate) runtime: VrlRuntime,
 }
 
-inventory::submit! {
-    ConditionDescription::new::<VrlConfig>("vrl")
-}
-
 impl_generate_config_from_default!(VrlConfig);
 
-#[typetag::serde(name = "vrl")]
-impl ConditionConfig for VrlConfig {
+impl ConditionalConfig for VrlConfig {
     fn build(&self, enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition> {
         // TODO(jean): re-add this to VRL
         // let constraint = TypeConstraint {
@@ -67,8 +66,6 @@ impl ConditionConfig for VrlConfig {
         }
     }
 }
-
-//------------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
 pub struct Vrl {
@@ -152,8 +149,6 @@ impl Conditional for Vrl {
         (result, event)
     }
 }
-
-//------------------------------------------------------------------------------
 
 #[cfg(test)]
 mod test {

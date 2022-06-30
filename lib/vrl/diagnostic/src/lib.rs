@@ -1,4 +1,20 @@
-#![deny(warnings)]
+#![deny(
+    warnings,
+    clippy::all,
+    clippy::pedantic,
+    unreachable_pub,
+    unused_allocation,
+    unused_extern_crates,
+    unused_assignments,
+    unused_comparisons
+)]
+#![allow(
+    clippy::match_bool, // allowed in initial deny commit
+    clippy::missing_errors_doc, // allowed in initial deny commit
+    clippy::module_name_repetitions, // allowed in initial deny commit
+    clippy::semicolon_if_nothing_returned,  // allowed in initial deny commit
+    clippy::needless_pass_by_value,  // allowed in initial deny commit
+)]
 
 mod diagnostic;
 mod formatter;
@@ -59,6 +75,7 @@ impl Urls {
         VRL_DOCS_ROOT_URL.into()
     }
 
+    #[must_use]
     pub fn func_docs(ident: &str) -> String {
         format!("{}/{}", VRL_FUNCS_ROOT_URL, ident)
     }
@@ -67,10 +84,11 @@ impl Urls {
         format!("{}/#handling", VRL_ERROR_DOCS_ROOT_URL)
     }
 
-    fn error_code_url(code: &usize) -> String {
+    fn error_code_url(code: usize) -> String {
         format!("{}/{}", VRL_ERROR_DOCS_ROOT_URL, code)
     }
 
+    #[must_use]
     pub fn expression_docs_url(expr: &str) -> String {
         format!("{}/expressions/{}", VRL_DOCS_ROOT_URL, expr)
     }

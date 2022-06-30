@@ -35,7 +35,7 @@ use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
     codecs::Encoder,
     config::{GenerateConfig, Input, SinkConfig, SinkContext},
-    gcp::{GcpAuthConfig, GcpCredentials},
+    gcp::{GcpAuthConfig, GcpAuthenticator},
     http::HttpClient,
     serde::json::to_string,
     sinks::{
@@ -227,10 +227,7 @@ impl DatadogArchivesSinkConfig {
                     .gcp_cloud_storage
                     .as_ref()
                     .expect("gcs config wasn't provided");
-                let creds = gcs_config
-                    .auth
-                    .make_credentials(Scope::DevStorageReadWrite)
-                    .await?;
+                let auth = gcs_config.auth.build(Scope::DevStorageReadWrite).await?;
                 let base_url = format!("{}{}/", BASE_URL, self.bucket);
                 let tls = TlsSettings::from_options(&self.tls)?;
                 let client = HttpClient::new(tls, cx.proxy())?;
@@ -238,10 +235,10 @@ impl DatadogArchivesSinkConfig {
                     self.bucket.clone(),
                     client.clone(),
                     base_url.clone(),
-                    creds.clone(),
+                    auth.clone(),
                 )?;
                 let sink = self
-                    .build_gcs_sink(client, base_url, creds, cx)
+                    .build_gcs_sink(client, base_url, auth, cx)
                     .map_err(|error| error.to_string())?;
                 Ok((sink, healthcheck))
             }
@@ -301,7 +298,7 @@ impl DatadogArchivesSinkConfig {
         &self,
         client: HttpClient,
         base_url: String,
-        creds: Option<GcpCredentials>,
+        auth: GcpAuthenticator,
         cx: SinkContext,
     ) -> crate::Result<VectorSink> {
         let request = self.request.unwrap_with(&Default::default());
@@ -312,7 +309,7 @@ impl DatadogArchivesSinkConfig {
 
         let svc = ServiceBuilder::new()
             .settings(request, GcsRetryLogic)
-            .service(GcsService::new(client, base_url, creds));
+            .service(GcsService::new(client, base_url, auth));
 
         let gcs_config = self
             .gcp_cloud_storage
@@ -785,7 +782,7 @@ mod tests {
 
     #[test]
     fn encodes_event() {
-        let mut event = Event::from("test message");
+        let mut event = Event::Log(LogEvent::from("test message"));
         let log_mut = event.as_mut_log();
         log_mut.insert("service", "test-service");
         log_mut.insert("not_a_reserved_attribute", "value");
@@ -880,7 +877,7 @@ mod tests {
 
     #[test]
     fn generates_valid_id() {
-        let log1 = Event::from("test event 1");
+        let log1 = Event::Log(LogEvent::from("test event 1"));
         let mut writer = Cursor::new(Vec::new());
         let encoding = DatadogArchivesEncoding::new(Default::default());
         let _ = encoding.encode_input(vec![log1], &mut writer);
@@ -895,7 +892,7 @@ mod tests {
         validate_event_id(id1);
 
         // check that id is different for the next event
-        let log2 = Event::from("test event 2");
+        let log2 = Event::Log(LogEvent::from("test event 2"));
         let mut writer = Cursor::new(Vec::new());
         let _ = encoding.encode_input(vec![log2], &mut writer);
         let encoded = writer.into_inner();
@@ -912,7 +909,7 @@ mod tests {
 
     #[test]
     fn generates_date_if_missing() {
-        let log = Event::from("test message");
+        let log = Event::Log(LogEvent::from("test message"));
         let mut writer = Cursor::new(Vec::new());
         let encoding = DatadogArchivesEncoding::new(Default::default());
         let _ = encoding.encode_input(vec![log], &mut writer);
@@ -951,7 +948,7 @@ mod tests {
     #[test]
     fn s3_build_request() {
         let fake_buf = Bytes::new();
-        let mut log = Event::from("test message");
+        let mut log = Event::Log(LogEvent::from("test message"));
         let timestamp = DateTime::parse_from_rfc3339("2021-08-23T18:00:27.879+02:00")
             .expect("invalid test case")
             .with_timezone(&Utc);
@@ -979,7 +976,7 @@ mod tests {
         assert_eq!(uuid1.len(), 36);
 
         // check that the second batch has a different UUID
-        let log2 = Event::new_empty_log();
+        let log2 = LogEvent::default().into();
 
         let key = partitioner.partition(&log2).expect("key wasn't provided");
         let (metadata, _events) = request_builder.split_input((key, vec![log2]));
