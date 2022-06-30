@@ -1,3 +1,15 @@
+//! The [`IfStatement`] expression.
+//!
+//! An `if` expression is a conditional branch in program control.
+//!
+//! The syntax of an `if` expression is a [`Predicate`], followed by
+//! a consequent [`Block`], and an optional trailing alternative `Block`. The
+//! condition operands must have the boolean type. If a condition operand
+//! evaluates to true, the consequent block is executed and the alternative
+//! block is skipped. If a condition operand evaluates to false, the consequent
+//! block is skipped and the optional alternative block is evaluated. If no
+//! alternative is provided, then the condition resolves to `null`.
+
 use std::fmt;
 
 use value::Value;
@@ -9,11 +21,14 @@ use crate::{
     Context, Expression, TypeDef,
 };
 
+/// The [`IfStatement`] expression.
+///
+/// See module-level documentation for more details.
 #[derive(Debug, Clone, PartialEq)]
 pub struct IfStatement {
-    pub predicate: Predicate,
-    pub consequent: Block,
-    pub alternative: Option<Block>,
+    pub(crate) predicate: Predicate,
+    pub(crate) consequent: Block,
+    pub(crate) alternative: Option<Block>,
 }
 
 impl Expression for IfStatement {

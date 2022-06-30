@@ -1,3 +1,11 @@
+//! The [`Not`] expression.
+//!
+//! The expression is used to negate a boolean value, meaning `true` becomes
+//! `false` and vice versa.
+//!
+//! It is a compile-time error to try and negate a type that isn't known to be
+//! a boolean at runtime.
+
 use std::fmt;
 
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
@@ -12,12 +20,21 @@ use crate::{
 
 pub(crate) type Result = std::result::Result<Not, Error>;
 
+/// The [`Not`] expression.
+///
+/// See module-level documentation for more details.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Not {
     inner: Box<Expr>,
 }
 
 impl Not {
+    /// Create a new [`Not`] expression.
+    ///
+    /// # Errors
+    ///
+    /// If the wrapped expression isn't known to be exactly a boolean, an error
+    /// is returned.
     pub fn new(node: Node<Expr>, not_span: Span, state: (&LocalEnv, &ExternalEnv)) -> Result {
         let (expr_span, expr) = node.take();
         let type_def = expr.type_def(state);

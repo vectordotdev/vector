@@ -36,20 +36,20 @@ pub trait Target: std::fmt::Debug + MetadataTarget + SecretTarget {
     ///   .foo[2][-1]
     ///   ```
     ///
-    /// When inserting into a coalesced path, the implementor is encouraged to
+    /// When inserting into a coalesced path, the implementer is encouraged to
     /// insert into the right-most segment if none exists, but can return an
     /// error if needed.
     fn target_insert(&mut self, path: &LookupBuf, value: Value) -> Result<(), String>;
 
     /// Get a value for a given path, or `None` if no value is found.
     ///
-    /// See [`Target::insert`] for more details.
+    /// See [`Target::target_insert`] for more details.
     fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String>;
 
     /// Get a mutable reference to the value for a given path, or `None` if no
     /// value is found.
     ///
-    /// See [`Target::insert`] for more details.
+    /// See [`Target::target_insert`] for more details.
     fn target_get_mut(&mut self, path: &LookupBuf) -> Result<Option<&mut Value>, String>;
 
     /// Remove the given path from the object.

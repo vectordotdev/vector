@@ -1,3 +1,8 @@
+//! The [`Noop`] expression.
+//!
+//! This expression is equivalent to `Literal::Null`, but is used internally to
+//! indicate that the actual return value doesn't matter.
+
 use std::fmt;
 
 use value::Value;
@@ -8,6 +13,9 @@ use crate::{
     Context, Expression, TypeDef,
 };
 
+/// The [`Noop`] expression.
+///
+/// See module-level documentation for more details.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Noop;
 

@@ -1,3 +1,22 @@
+//! The [`Object`] expression.
+//!
+//! An object is a static type, but the key/value pairs within an object can be
+//! dynamic. Meaning, the compiler knows at runtime that the expression is an
+//! object, but it might not know the eventual value of a key/value pair. Note
+//! that keys **are** statically known, as they can only be static strings.
+//!
+//! For example:
+//!
+//! ```coffee
+//! { "foo": "foo", "bar": .bar }
+//! ```
+//!
+//! In this example, the compiler knows the program contains an object, and
+//! knows the "foo" key has a value of type string, but cannot know the value of
+//! the "bar" key, as this is tied to the target's `bar` field at runtime.
+//!
+//! Objects are allowed to have zero fields (`{}`).
+
 use std::{collections::BTreeMap, fmt, ops::Deref};
 
 use value::Value;
@@ -8,6 +27,9 @@ use crate::{
     Context, Expression, TypeDef,
 };
 
+/// The [`Object`] expression.
+///
+/// See module-level documentation for more details.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Object {
     inner: BTreeMap<String, Expr>,
@@ -15,7 +37,7 @@ pub struct Object {
 
 impl Object {
     #[must_use]
-    pub fn new(inner: BTreeMap<String, Expr>) -> Self {
+    pub(crate) fn new(inner: BTreeMap<String, Expr>) -> Self {
         Self { inner }
     }
 }

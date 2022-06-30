@@ -243,7 +243,12 @@ impl ArgumentList {
             .map(|expr| match expr {
                 Expr::Literal(literal) => Ok(literal),
                 Expr::Variable(var) if var.value().is_some() => {
-                    match var.value().unwrap().clone().into() {
+                    match var
+                        .value()
+                        .expect("ensured by match-arm predicate")
+                        .clone()
+                        .into()
+                    {
                         Expr::Literal(literal) => Ok(literal),
                         expr => Err(Error::UnexpectedExpression {
                             keyword,

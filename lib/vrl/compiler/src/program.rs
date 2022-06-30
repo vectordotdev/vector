@@ -6,6 +6,8 @@ use crate::{
     Context, Expression,
 };
 
+/// A valid compiled program that can be resolved against an external
+/// [`Target`](crate::Target).
 #[derive(Debug, Clone)]
 pub struct Program {
     pub(crate) expressions: Block,
@@ -33,7 +35,7 @@ impl Program {
         &self.info
     }
 
-    /// Resolve the program to its final [`Value`].
+    /// Resolve the program to its final [`Value`](value::Value).
     ///
     /// # Errors
     ///
@@ -43,6 +45,11 @@ impl Program {
     }
 }
 
+/// Additional details about the compiled program.
+///
+/// This information is additive, it is not needed to successfully resolve
+/// a compiled program, but can be used by the callee to determine how to use
+/// the program at runtime.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProgramInfo {
     /// Returns whether the compiled program can fail at runtime.
@@ -57,10 +64,11 @@ pub struct ProgramInfo {
     /// statement in the source.
     pub abortable: bool,
 
-    /// A list of possible queries made to the external [`Target`] at runtime.
+    /// A list of possible queries made to the external
+    /// [`Target`](crate::Target) at runtime.
     pub target_queries: Vec<LookupBuf>,
 
-    /// A list of possible assignments made to the external [`Target`] at
-    /// runtime.
+    /// A list of possible assignments made to the external
+    /// [`Target`](crate::Target) at runtime.
     pub target_assignments: Vec<LookupBuf>,
 }

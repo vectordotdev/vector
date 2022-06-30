@@ -1,3 +1,11 @@
+//! The [`FunctionArgument`] expression.
+//!
+//! A function argument wraps a regular VRL expression provided to the
+//! [`FunctionCall`](crate::FunctionCall) expression.
+//!
+//! The type adds additional metadata needed for the function call to validate
+//! the argument.
+
 use std::{fmt, ops::Deref};
 
 use crate::{
@@ -6,6 +14,9 @@ use crate::{
     Parameter,
 };
 
+/// The [`FunctionArgument`] expression.
+///
+/// See module-level documentation for more details.
 #[derive(Clone, Debug, PartialEq)]
 pub struct FunctionArgument {
     ident: Option<Node<Ident>>,
@@ -36,6 +47,7 @@ impl FunctionArgument {
         self.parameter
     }
 
+    /// The inner expression wrapped by this [`FunctionArgument`].
     pub fn expr(&self) -> &Expr {
         self.expr.inner()
     }

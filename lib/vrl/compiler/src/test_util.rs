@@ -9,6 +9,7 @@ macro_rules! expr {
     }};
 }
 
+/// Macro to test the type definition of an expression.
 #[macro_export]
 macro_rules! test_type_def {
     ($($name:ident { expr: $expr:expr, want: $def:expr, })+) => {
@@ -29,6 +30,7 @@ macro_rules! test_type_def {
     };
 }
 
+/// Macro to quickly generate a list of arguments for a function.
 #[macro_export]
 macro_rules! func_args {
     () => (
@@ -41,6 +43,7 @@ macro_rules! func_args {
     };
 }
 
+/// Macro to run micro-benchmarks against a function.
 #[macro_export]
 macro_rules! bench_function {
     ($name:tt => $func:path; $($case:ident { args: $args:expr, want: $(Ok($ok:expr))? $(Err($err:expr))? $(,)* })+) => {
@@ -70,6 +73,7 @@ macro_rules! bench_function {
     };
 }
 
+/// Macro to test the result of resolving a function.
 #[macro_export]
 macro_rules! test_function {
 
@@ -138,39 +142,4 @@ macro_rules! __prep_bench_or_test {
             $want,
         )
     }};
-}
-
-#[macro_export]
-macro_rules! type_def {
-    (unknown) => {
-        TypeDef::any()
-    };
-
-    (bytes) => {
-        TypeDef::bytes()
-    };
-
-    (object {$(unknown => $unknown:expr,)? $($key:literal => $value:expr,)+ }) => {{
-        let mut v = value::kind::Collection::from(::std::collections::BTreeMap::from([$(($key.into(), $value.into()),)+]));
-        $(v.set_unknown(value::Kind::from($unknown)))?;
-
-        TypeDef::object(v)
-    }};
-
-    (array [ $($value:expr,)+ ]) => {{
-        $(let v = value::kind::Collection::from_unknown(value::Kind::from($value));)+
-
-        TypeDef::array(v)
-    }};
-
-    (array { $(unknown => $unknown:expr,)? $($idx:literal => $value:expr,)+ }) => {{
-        let mut v = value::kind::Collection::from(::std::collections::BTreeMap::from([$(($idx.into(), $value.into()),)+]));
-        $(v.set_unknown(value::Kind::from($unknown)))?;
-
-        TypeDef::array(v)
-    }};
-
-    (array) => {
-        TypeDef::array(value::kind::Collection::any())
-    };
 }

@@ -1,3 +1,45 @@
+//! The [`Block`] expression.
+//!
+//! A block is a grouped set of expressions, for which the local scope lives as
+//! long as the block itself.
+//!
+//! As an example:
+//!
+//! ```coffee
+//! { "foo"; "bar" }
+//! ```
+//!
+//! This block (delimited by `{` and `}`) contains two literal string
+//! expressions.
+//!
+//! A block **cannot** be empty (`{}`), as that syntax is used to create empty
+//! literal objects.
+//!
+//! A block can also contain dynamic values, and can manipulate the state of the
+//! program at runtime:
+//!
+//! ```coffee
+//! foo = true
+//!
+//! {
+//!     foo
+//!     bar = false
+//!     foo = false
+//! }
+//!
+//! bar
+//! foo
+//! ```
+//!
+//! In this example, the `foo` variable is read from within the block, which
+//! works as expected. However, reading `bar` outside the block triggers
+//! a compiler error instead of returning `false`, because `bar` was defined
+//! within the local scope of the block, and that scope is gone after the block
+//! ends.
+//!
+//! Mutating `foo` is allowed, and persists across the block boundary, as that
+//! variable is originally defined outside of the block.
+
 use std::fmt;
 
 use crate::{
@@ -6,6 +48,9 @@ use crate::{
     Context, Expression, TypeDef,
 };
 
+/// The [`Block`] expression.
+///
+/// See module-level documentation for more details.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Block {
     inner: Vec<Expr>,
@@ -19,11 +64,16 @@ pub struct Block {
 }
 
 impl Block {
+    /// Create a new [`Block`] expression.
+    ///
+    /// The [`LocalEnv`] is used to pass along to child expressions, to ensure
+    /// they use the same scope as the block itself.
     #[must_use]
     pub fn new(inner: Vec<Expr>, local_env: LocalEnv) -> Self {
         Self { inner, local_env }
     }
 
+    /// Get the list of expressions stored within the block.
     #[must_use]
     pub fn into_inner(self) -> Vec<Expr> {
         self.inner

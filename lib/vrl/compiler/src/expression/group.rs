@@ -1,3 +1,11 @@
+//! The [`Group`] expression.
+//!
+//! A parenthesized expression wraps a single expression, evaluating to that
+//! expression.
+//!
+//! Parentheses can be used to explicitly modify the precedence order of
+//! subexpressions within an expression.
+
 use std::fmt;
 
 use crate::{
@@ -6,12 +14,16 @@ use crate::{
     Context, Expression, TypeDef,
 };
 
+/// The [`Group`] expression.
+///
+/// See module-level documentation for more details.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Group {
     inner: Box<Expr>,
 }
 
 impl Group {
+    /// Create a new [`Group`] expression.
     pub fn new(inner: Expr) -> Self {
         Self {
             inner: Box::new(inner),

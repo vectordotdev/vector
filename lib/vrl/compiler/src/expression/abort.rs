@@ -1,3 +1,25 @@
+//! The [`Abort`] expression, used to stop a program at runtime.
+//!
+//! The expression allows aborting a program without an abort message:
+//!
+//!
+//! ```coffee
+//! abort
+//! ```
+//!
+//! Or with a message:
+//!
+//! ```coffee
+//! abort "this isn't right"
+//! ```
+//!
+//! The message can be any expression that is known to resolve to a string at
+//! runtime:
+//!
+//! ```coffee
+//! abort string(.message) ?? "aborted with non-string message"
+//! ```
+
 use std::fmt;
 
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
@@ -11,6 +33,9 @@ use crate::{
     Context, Expression, Span, TypeDef,
 };
 
+/// The [`Abort`] expression, used to stop a program at runtime.
+///
+/// See module-level documentation for more details.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Abort {
     span: Span,

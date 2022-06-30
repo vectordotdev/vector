@@ -1,3 +1,12 @@
+//! The VRL compiler crate.
+//!
+//! This crate is responsible for turning a syntactically valid AST into
+//! a semantically valid VRL program.
+//!
+//! A compiled program is guaranteed to run to completion at runtime, unless
+//! explicitly asked not to (e.g. by explicitly allowing errors at runtime, or
+//! aborting using the `abort` statement).
+
 #![deny(
     warnings,
     clippy::all,
@@ -6,7 +15,9 @@
     unused_allocation,
     unused_extern_crates,
     unused_assignments,
-    unused_comparisons
+    unused_comparisons,
+    missing_docs,
+    rustdoc::all
 )]
 #![allow(
     clippy::cast_possible_truncation, // allowed in initial deny commit
@@ -19,7 +30,6 @@
     clippy::match_same_arms, // allowed in initial deny commit
     clippy::match_wild_err_arm, // allowed in initial deny commit
     clippy::missing_errors_doc, // allowed in initial deny commit
-    clippy::missing_panics_doc, // allowed in initial deny commit
     clippy::module_name_repetitions, // allowed in initial deny commit
     clippy::needless_pass_by_value, // allowed in initial deny commit
     clippy::return_self_not_must_use, // allowed in initial deny commit
@@ -115,7 +125,7 @@ pub fn compile_for_repl(
         .map(|(program, _)| program)
 }
 
-/// Similar to [`compile`], except that it takes a pre-generated [`State`]
+/// Similar to [`compile`], except that it takes a pre-generated [`ExternalEnv`]
 /// object, allowing running multiple successive programs based on each others
 /// state.
 ///

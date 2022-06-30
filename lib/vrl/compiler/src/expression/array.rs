@@ -1,3 +1,21 @@
+//! The [`Array`] expression.
+//!
+//! An array is a static type, but the items within an array can be dynamic.
+//! Meaning, the compiler knows at runtime that the expression is an array, but
+//! it might not know the eventual value of all items at runtime.
+//!
+//! For example:
+//!
+//! ```coffee
+//! [ "foo", .bar ]
+//! ```
+//!
+//! In this example, the compiler knows the program contains an array, and knows
+//! the first item in the array is a string, but cannot know the value of the
+//! second element, as this is tied to the target's `bar` field at runtime.
+//!
+//! Arrays are allowed to have zero elements (`[]`).
+
 use std::{collections::BTreeMap, fmt, ops::Deref};
 
 use value::Value;
@@ -8,12 +26,16 @@ use crate::{
     Context, Expression, TypeDef,
 };
 
+/// The [`Array`] expression.
+///
+/// See module-level documentation for more details.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Array {
     inner: Vec<Expr>,
 }
 
 impl Array {
+    #[must_use]
     pub(crate) fn new(inner: Vec<Expr>) -> Self {
         Self { inner }
     }

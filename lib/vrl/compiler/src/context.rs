@@ -2,6 +2,8 @@ use vector_common::TimeZone;
 
 use crate::{state::Runtime, Target};
 
+/// Accumulative contextual information used at runtime to track state across
+/// program execution.
 pub struct Context<'a> {
     target: &'a mut dyn Target,
     state: &'a mut Runtime,
