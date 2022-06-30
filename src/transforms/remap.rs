@@ -529,11 +529,7 @@ where
     }
 
     fn transform_all(&mut self, events: EventArray, output: &mut TransformOutputsBuf) {
-        let events_len = events.len();
-        let output_capacity = output.capacity();
-        if events_len > output_capacity {
-            output.reserve(events_len - output_capacity);
-        }
+        output.reserve(events.len());
 
         // If a program can fail or abort at runtime and we know that we will still need to forward
         // the event in that case (either to the main output or `dropped`, depending on the

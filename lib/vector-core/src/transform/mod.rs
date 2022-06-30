@@ -143,11 +143,7 @@ pub trait FunctionTransform: Send + dyn_clone::DynClone + Sync {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event);
 
     fn transform_all(&mut self, output: &mut OutputBuffer, events: EventArray) {
-        let events_len = events.len();
-        let output_capacity = output.capacity();
-        if events_len > output_capacity {
-            output.reserve(events_len - output_capacity);
-        }
+        output.reserve(events.len());
 
         for event in events.into_events() {
             self.transform(output, event);
