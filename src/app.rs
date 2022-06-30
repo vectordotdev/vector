@@ -39,6 +39,8 @@ use crate::internal_events::{
     VectorStarted, VectorStopped,
 };
 
+use tokio::sync::broadcast::error::RecvError;
+
 pub struct ApplicationConfig {
     pub config_paths: Vec<config::ConfigPath>,
     pub topology: RunningTopology,
@@ -292,9 +294,9 @@ impl Application {
 
             let signal = loop {
                 tokio::select! {
-                    Ok(signal) = signal_rx.recv() => {
+                    signal = signal_rx.recv() => {
                         match signal {
-                            SignalTo::ReloadFromConfigBuilder(config_builder) => {
+                            Ok(SignalTo::ReloadFromConfigBuilder(config_builder)) => {
                                 match config_builder.build().map_err(handle_config_errors) {
                                     Ok(mut new_config) => {
                                         new_config.healthchecks.set_require_healthy(opts.require_healthy);
@@ -343,7 +345,7 @@ impl Application {
                                     }
                                 }
                             }
-                            SignalTo::ReloadFromDisk => {
+                            Ok(SignalTo::ReloadFromDisk) => {
                                 // Reload paths
                                 config_paths = config::process_paths(&opts.config_paths_with_formats()).unwrap_or(config_paths);
 
@@ -395,8 +397,10 @@ impl Application {
                                 } else {
                                     emit!(VectorConfigLoadError);
                                 }
-                            }
-                            _ => break signal,
+                            },
+                            Err(RecvError::Lagged(amt)) => warn!("Overflow, dropped {} signals.", amt),
+                            Err(RecvError::Closed) => break SignalTo::Shutdown,
+                            Ok(signal) => break signal,
                         }
                     }
                     // Trigger graceful shutdown if a component crashed, or all sources have ended.
