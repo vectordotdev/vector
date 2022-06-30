@@ -1,6 +1,10 @@
 use std::{collections::BTreeMap, fs, net::IpAddr, sync::Arc, time::SystemTime};
 
 use enrichment::{Case, Condition, IndexHandle, Table};
+use maxminddb::{
+    geoip2::{City, Isp},
+    MaxMindDBError, Reader,
+};
 use serde::{Deserialize, Serialize};
 use value::Value;
 
@@ -58,17 +62,30 @@ pub struct Geoip {
     config: GeoipConfig,
     dbreader: Arc<maxminddb::Reader<Vec<u8>>>,
     last_modified: SystemTime,
-    indexes: Vec<(Case, Vec<String>)>,
 }
 
 impl Geoip {
     pub fn new(config: GeoipConfig) -> crate::Result<Self> {
-        Ok(Geoip {
+        let table = Geoip {
             last_modified: fs::metadata(&config.path)?.modified()?,
-            dbreader: Arc::new(maxminddb::Reader::open_readfile(config.path.clone())?),
+            dbreader: Arc::new(Reader::open_readfile(config.path.clone())?),
             config,
-            indexes: Vec::new(),
-        })
+        };
+
+        // Check if we can read database with dummy Ip.
+        let ip = IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0));
+        let result = if table.has_isp_db() {
+            table.dbreader.lookup::<Isp>(ip).map(|_| ())
+        } else {
+            table.dbreader.lookup::<City>(ip).map(|_| ())
+        };
+
+        match result {
+            Ok(_) | Err(MaxMindDBError::AddressNotFoundError(_)) => (),
+            Err(error) => return Err(error.into()),
+        }
+
+        Ok(table)
     }
 
     fn has_isp_db(&self) -> bool {
@@ -88,7 +105,7 @@ impl Geoip {
         };
 
         if self.has_isp_db() {
-            let data = self.dbreader.lookup::<maxminddb::geoip2::Isp>(ip).ok()?;
+            let data = self.dbreader.lookup::<Isp>(ip).ok()?;
 
             add_field(
                 "autonomous_system_number",
@@ -103,7 +120,7 @@ impl Geoip {
 
             add_field("organization", data.organization.map(Into::into));
         } else {
-            let data = self.dbreader.lookup::<maxminddb::geoip2::City>(ip).ok()?;
+            let data = self.dbreader.lookup::<City>(ip).ok()?;
 
             add_field(
                 "city_name",
@@ -205,9 +222,13 @@ impl Table for Geoip {
         select: Option<&[String]>,
         index: Option<IndexHandle>,
     ) -> Result<BTreeMap<String, Value>, String> {
-        self.find_table_rows(case, condition, select, index)?
-            .pop()
-            .ok_or_else(|| "IP not found".to_string())
+        let mut rows = self.find_table_rows(case, condition, select, index)?;
+
+        match rows.pop() {
+            Some(row) if rows.is_empty() => Ok(row),
+            Some(_) => Err("More than 1 row found".to_string()),
+            None => Err("IP not found".to_string()),
+        }
     }
 
     /// Search the enrichment table data with the given condition.
@@ -242,22 +263,17 @@ impl Table for Geoip {
     ///
     /// # Errors
     /// Errors if the fields are not in the table.
-    fn add_index(&mut self, case: Case, fields: &[&str]) -> Result<IndexHandle, String> {
+    fn add_index(&mut self, _: Case, fields: &[&str]) -> Result<IndexHandle, String> {
         match fields.len() {
             0 => Err("IP field is required".to_string()),
-            1 => {
-                let index = IndexHandle(self.indexes.len());
-                self.indexes
-                    .push((case, fields.iter().map(|field| field.to_string()).collect()));
-                Ok(index)
-            }
+            1 => Ok(IndexHandle(0)),
             _ => Err("Only one field is allowed".to_string()),
         }
     }
 
     /// Returns a list of the field names that are in each index
     fn index_fields(&self) -> Vec<(Case, Vec<String>)> {
-        self.indexes.clone()
+        Vec::new()
     }
 
     /// Returns true if the underlying data has changed and the table needs reloading.

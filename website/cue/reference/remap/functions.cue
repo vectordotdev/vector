@@ -81,21 +81,26 @@ remap: {
 		whose value needs to be a valid IP address. Example: `{"ip": .ip }`. If a return field is expected
 		and without a value, `null` will be used. This table can return following fields:
 
-		* `autonomous_system_number`
-		* `autonomous_system_organization`
-		* `isp`
-		* `organization`
-		* `city_name`
-		* `continent_code`
-		* `country_code`
-		* `country_name`
-		* `region_code`
-		* `region_name`
-		* `metro_code`		
-		* `latitude`
-		* `longitude`		
-		* `postal_code`
-		* `timezone`
+		* ISP databases:
+
+			* `autonomous_system_number`
+			* `autonomous_system_organization`
+			* `isp`
+			* `organization`
+
+		* City databases:
+
+			* `city_name`
+			* `continent_code`
+			* `country_code`
+			* `country_name`
+			* `region_code`
+			* `region_name`
+			* `metro_code`		
+			* `latitude`
+			* `longitude`		
+			* `postal_code`
+			* `timezone`
 
 		To use this function, you need to update your Vector configuration to
 		include an
