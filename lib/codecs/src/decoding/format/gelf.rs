@@ -1,6 +1,7 @@
 use bytes::Bytes;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use lookup::path;
+use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
@@ -19,6 +20,9 @@ use super::Deserializer;
 ///   suggest. We've elected to take a more strict approach to maintain backwards compatability
 ///   in the event that we need to change the behavior to be more relaxed, so that prior versions
 ///   of vector will still work with the new relaxed decoding.
+
+/// Regex for matching valid field names. Must contain only word chars, periods and dashes.
+static VALID_FIELD_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^_[\w\.\-]*$").unwrap());
 
 /// GELF Message fields. Definitions from https://docs.graylog.org/docs/gelf
 pub mod gelf_fields {
@@ -93,9 +97,7 @@ impl GelfDeserializerConfig {
 /// Deserializer that builds an `Event` from a byte frame containing a GELF log
 /// message.
 #[derive(Debug, Clone)]
-pub struct GelfDeserializer {
-    regex: Regex,
-}
+pub struct GelfDeserializer;
 
 impl Default for GelfDeserializer {
     fn default() -> Self {
@@ -106,9 +108,7 @@ impl Default for GelfDeserializer {
 impl GelfDeserializer {
     /// Create a new GelfDeserializer
     pub fn new() -> GelfDeserializer {
-        GelfDeserializer {
-            regex: Regex::new(r"^_[\w\.\-]*$").unwrap(),
-        }
+        GelfDeserializer
     }
 
     /// Builds a LogEvent from the parsed GelfMessage.
@@ -170,7 +170,7 @@ impl GelfDeserializer {
                     continue;
                 }
                 // per GELF spec, Additional field names must be characters dashes or dots
-                if !self.regex.is_match(key) {
+                if !VALID_FIELD_REGEX.is_match(key) {
                     if key.starts_with('_') {
                         return Err(format!("'{}' field is invalid. \
                                            Additional field names must be prefixed with an underscore.", key).into());
