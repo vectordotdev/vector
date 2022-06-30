@@ -9,6 +9,9 @@ pub struct MetricData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timestamp: Option<DateTime<Utc>>,
 
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub interval: Option<u64>,
+
     pub kind: MetricKind,
 
     #[serde(flatten)]
@@ -38,6 +41,7 @@ impl MetricData {
     pub fn into_absolute(self) -> Self {
         Self {
             timestamp: self.timestamp,
+            interval: self.interval,
             kind: MetricKind::Absolute,
             value: self.value,
         }
@@ -50,6 +54,7 @@ impl MetricData {
     pub fn into_incremental(self) -> Self {
         Self {
             timestamp: self.timestamp,
+            interval: self.interval,
             kind: MetricKind::Incremental,
             value: self.value,
         }
@@ -58,19 +63,21 @@ impl MetricData {
     /// Creates a `MetricData` directly from the raw components of another `MetricData`.
     pub fn from_parts(
         timestamp: Option<DateTime<Utc>>,
+        interval: Option<u64>,
         kind: MetricKind,
         value: MetricValue,
     ) -> Self {
         Self {
             timestamp,
+            interval,
             kind,
             value,
         }
     }
 
     /// Decomposes a `MetricData` into its individual parts.
-    pub fn into_parts(self) -> (Option<DateTime<Utc>>, MetricKind, MetricValue) {
-        (self.timestamp, self.kind, self.value)
+    pub fn into_parts(self) -> (Option<DateTime<Utc>>, Option<u64>, MetricKind, MetricValue) {
+        (self.timestamp, self.interval, self.kind, self.value)
     }
 
     /// Updates this metric by adding the value from `other`.

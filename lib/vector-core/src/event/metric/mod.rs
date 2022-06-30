@@ -65,6 +65,7 @@ impl Metric {
             },
             data: MetricData {
                 timestamp: None,
+                interval: None,
                 kind,
                 value,
             },
