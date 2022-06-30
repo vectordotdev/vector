@@ -621,10 +621,11 @@
 
         {{/* Badges */}}
         <span class="flex space-x-1">
+          {{ $href := "/docs/reference/vrl/expressions/#function-call-characteristics" | relURL }}
           {{ if $infallible }}
-          {{ partial "badge.html" (dict "word" "infallible" "color" "blue") }}
+          {{ partial "badge.html" (dict "word" "infallible" "color" "blue" "inline" true "href" $href) }}
           {{ else }}
-          {{ partial "badge.html" (dict "word" "fallible" "color" "yellow") }}
+          {{ partial "badge.html" (dict "word" "fallible" "color" "yellow" "inline" true "href" $href) }}
           {{ end }}
         </span>
       </span>
