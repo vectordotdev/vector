@@ -24,7 +24,7 @@ use vector_core::{
 ///   are otherwise valid field names, we prepend the underscore.
 
 /// Regex for matching valid field names. Must contain only word chars, periods and dashes.
-static VALID_FIELD: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[\w\.\-]*$").unwrap());
+static VALID_FIELD_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[\w\.\-]*$").unwrap());
 
 static MISSING_FIELD_STR: &str = "LogEvent does not contain required field.";
 
@@ -187,7 +187,7 @@ impl GelfSerializer {
                     }
 
                     // additional fields must be only word chars, dashes and periods.
-                    if !VALID_FIELD.is_match(key) {
+                    if !VALID_FIELD_REGEX.is_match(key) {
                         vector_core::internal_event::emit(SerializeFailedInvalidFieldName {
                             format_type: FORMAT_TYPE_GELF,
                             message: INVALID_FIELD_NAME_STR,
