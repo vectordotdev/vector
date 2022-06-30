@@ -372,6 +372,9 @@ mod test_utils {
 
     // these rely on the global log schema, which is no longer supported when using the
     // "LogNamespace::Vector" namespace.
+    // The tests that rely on this are testing the "Legacy" log namespace. As these
+    // tests are updated, they should be migrated away from using these implementations
+    // to make it more clear which namespace is being used
 
     impl From<Bytes> for LogEvent {
         fn from(message: Bytes) -> Self {
