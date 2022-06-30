@@ -31,8 +31,7 @@ static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 static ALLOC: tracking_allocator::Allocator<tikv_jemallocator::Jemalloc> =
     tracking_allocator::Allocator::from_allocator(tikv_jemallocator::Jemalloc);
 
-#[cfg(feature = "allocation-tracking")]
-pub mod allocations;
+pub mod internal_telemetry;
 
 #[macro_use]
 #[allow(unreachable_pub)]
