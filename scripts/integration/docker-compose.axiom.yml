@@ -21,7 +21,7 @@ services:
     restart: unless-stopped
     environment:
       AXIOM_POSTGRES_URL: "postgres://axiom:axiom@postgres?sslmode=disable&connect_timeout=5"
-      AXIOM_DB_URL: "http://axiom-db:80"
+      AXIOM_DB_URL: "http://axiom-db:8080"
       AXIOM_HTTP_PORT: "80"
     depends_on:
       - axiom-db
