@@ -462,7 +462,7 @@ fn get_loose_end_outputs_sink(config: &ConfigBuilder) -> Option<SinkOuter<String
     let transform_ids = config.transforms.iter().flat_map(|(key, transform)| {
         transform
             .inner
-            .outputs(&schema::Definition::empty_kind(
+            .outputs(&schema::Definition::empty_with_kind(
                 Kind::any(),
                 [LogNamespace::Legacy, LogNamespace::Vector],
             ))

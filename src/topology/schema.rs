@@ -45,7 +45,7 @@ pub fn merged_definition(
         return definition.clone();
     }
 
-    let mut definition = Definition::empty_kind(Kind::never(), []);
+    let mut definition = Definition::empty_with_kind(Kind::never(), []);
 
     for input in inputs {
         let key = &input.component;

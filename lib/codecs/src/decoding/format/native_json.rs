@@ -26,10 +26,13 @@ impl NativeJsonDeserializerConfig {
     /// The schema produced by the deserializer.
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match log_namespace {
-            LogNamespace::Vector => schema::Definition::empty_kind(Kind::json(), [log_namespace]),
-            LogNamespace::Legacy => {
-                schema::Definition::empty_kind(Kind::object(Collection::json()), [log_namespace])
+            LogNamespace::Vector => {
+                schema::Definition::empty_with_kind(Kind::json(), [log_namespace])
             }
+            LogNamespace::Legacy => schema::Definition::empty_with_kind(
+                Kind::object(Collection::json()),
+                [log_namespace],
+            ),
         }
     }
 }

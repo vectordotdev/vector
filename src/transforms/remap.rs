@@ -203,7 +203,7 @@ impl TransformConfig for RemapConfig {
                     .expect("context exists")
                     .0;
 
-                let mut new_type_def = Definition::empty_kind(
+                let mut new_type_def = Definition::empty_with_kind(
                     state.target_kind().clone(),
                     input_definition.log_namespaces().clone(),
                 );
@@ -213,13 +213,16 @@ impl TransformConfig for RemapConfig {
                 new_type_def
             })
             .unwrap_or_else(|_| {
-                Definition::empty_kind(Kind::never(), input_definition.log_namespaces().clone())
+                Definition::empty_with_kind(
+                    Kind::never(),
+                    input_definition.log_namespaces().clone(),
+                )
             });
 
         // When a message is dropped and re-routed, we keep the original event, but also annotate
         // it with additional metadata.
         let mut dropped_definition =
-            Definition::empty_kind(Kind::never(), input_definition.log_namespaces().clone());
+            Definition::empty_with_kind(Kind::never(), input_definition.log_namespaces().clone());
 
         // The vector namespace appends the dropped fields to the "event metadata", which doesn't yet have a schema
         if input_definition
