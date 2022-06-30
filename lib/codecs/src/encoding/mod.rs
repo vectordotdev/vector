@@ -8,9 +8,10 @@ use std::fmt::Debug;
 
 use bytes::BytesMut;
 pub use format::{
-    JsonSerializer, JsonSerializerConfig, LogfmtSerializer, LogfmtSerializerConfig,
-    NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer, NativeSerializerConfig,
-    RawMessageSerializer, RawMessageSerializerConfig, TextSerializer, TextSerializerConfig,
+    AvroSerializer, AvroSerializerConfig, AvroSerializerOptions, JsonSerializer,
+    JsonSerializerConfig, LogfmtSerializer, LogfmtSerializerConfig, NativeJsonSerializer,
+    NativeJsonSerializerConfig, NativeSerializer, NativeSerializerConfig, RawMessageSerializer,
+    RawMessageSerializerConfig, TextSerializer, TextSerializerConfig,
 };
 pub use framing::{
     BoxedFramer, BoxedFramingError, BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder,
@@ -19,6 +20,9 @@ pub use framing::{
 };
 use serde::{Deserialize, Serialize};
 use vector_core::{config::DataType, event::Event, schema};
+
+/// An error that occurred while building an encoder.
+pub type BuildError = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 /// An error that occurred while encoding structured events into byte frames.
 #[derive(Debug)]
@@ -181,6 +185,11 @@ impl tokio_util::codec::Encoder<()> for Framer {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag = "codec", rename_all = "snake_case")]
 pub enum SerializerConfig {
+    /// Configures the `AvroSerializer`.
+    Avro {
+        /// Options for the avro serializer.
+        avro: AvroSerializerOptions,
+    },
     /// Configures the `JsonSerializer`.
     Json,
     /// Configures the `LogfmtSerializer`.
@@ -193,6 +202,12 @@ pub enum SerializerConfig {
     RawMessage,
     /// Configures the `TextSerializer`.
     Text,
+}
+
+impl From<AvroSerializerConfig> for SerializerConfig {
+    fn from(config: AvroSerializerConfig) -> Self {
+        Self::Avro { avro: config.avro }
+    }
 }
 
 impl From<JsonSerializerConfig> for SerializerConfig {
@@ -233,24 +248,30 @@ impl From<TextSerializerConfig> for SerializerConfig {
 
 impl SerializerConfig {
     /// Build the `Serializer` from this configuration.
-    pub const fn build(&self) -> Serializer {
+    pub fn build(&self) -> Result<Serializer, Box<dyn std::error::Error + Send + Sync + 'static>> {
         match self {
-            SerializerConfig::Json => Serializer::Json(JsonSerializerConfig.build()),
-            SerializerConfig::Logfmt => Serializer::Logfmt(LogfmtSerializerConfig.build()),
-            SerializerConfig::Native => Serializer::Native(NativeSerializerConfig.build()),
+            SerializerConfig::Avro { avro } => Ok(Serializer::Avro(
+                AvroSerializerConfig::new(avro.schema.clone()).build()?,
+            )),
+            SerializerConfig::Json => Ok(Serializer::Json(JsonSerializerConfig.build())),
+            SerializerConfig::Logfmt => Ok(Serializer::Logfmt(LogfmtSerializerConfig.build())),
+            SerializerConfig::Native => Ok(Serializer::Native(NativeSerializerConfig.build())),
             SerializerConfig::NativeJson => {
-                Serializer::NativeJson(NativeJsonSerializerConfig.build())
+                Ok(Serializer::NativeJson(NativeJsonSerializerConfig.build()))
             }
             SerializerConfig::RawMessage => {
-                Serializer::RawMessage(RawMessageSerializerConfig.build())
+                Ok(Serializer::RawMessage(RawMessageSerializerConfig.build()))
             }
-            SerializerConfig::Text => Serializer::Text(TextSerializerConfig.build()),
+            SerializerConfig::Text => Ok(Serializer::Text(TextSerializerConfig.build())),
         }
     }
 
     /// The data type of events that are accepted by this `Serializer`.
     pub fn input_type(&self) -> DataType {
         match self {
+            SerializerConfig::Avro { avro } => {
+                AvroSerializerConfig::new(avro.schema.clone()).input_type()
+            }
             SerializerConfig::Json => JsonSerializerConfig.input_type(),
             SerializerConfig::Logfmt => LogfmtSerializerConfig.input_type(),
             SerializerConfig::Native => NativeSerializerConfig.input_type(),
@@ -263,6 +284,9 @@ impl SerializerConfig {
     /// The schema required by the serializer.
     pub fn schema_requirement(&self) -> schema::Requirement {
         match self {
+            SerializerConfig::Avro { avro } => {
+                AvroSerializerConfig::new(avro.schema.clone()).schema_requirement()
+            }
             SerializerConfig::Json => JsonSerializerConfig.schema_requirement(),
             SerializerConfig::Logfmt => LogfmtSerializerConfig.schema_requirement(),
             SerializerConfig::Native => NativeSerializerConfig.schema_requirement(),
@@ -276,6 +300,8 @@ impl SerializerConfig {
 /// Serialize structured events as bytes.
 #[derive(Debug, Clone)]
 pub enum Serializer {
+    /// Uses an `AvroSerializer` for serialization.
+    Avro(AvroSerializer),
     /// Uses a `JsonSerializer` for serialization.
     Json(JsonSerializer),
     /// Uses a `LogfmtSerializer` for serialization.
@@ -295,7 +321,8 @@ impl Serializer {
     pub fn supports_json(&self) -> bool {
         match self {
             Serializer::Json(_) | Serializer::NativeJson(_) => true,
-            Serializer::Logfmt(_)
+            Serializer::Avro(_)
+            | Serializer::Logfmt(_)
             | Serializer::Text(_)
             | Serializer::Native(_)
             | Serializer::RawMessage(_) => false,
@@ -312,13 +339,20 @@ impl Serializer {
         match self {
             Serializer::Json(serializer) => serializer.to_json_value(event),
             Serializer::NativeJson(serializer) => serializer.to_json_value(event),
-            Serializer::Logfmt(_)
+            Serializer::Avro(_)
+            | Serializer::Logfmt(_)
             | Serializer::Text(_)
             | Serializer::Native(_)
             | Serializer::RawMessage(_) => {
                 panic!("Serializer does not support JSON")
             }
         }
+    }
+}
+
+impl From<AvroSerializer> for Serializer {
+    fn from(serializer: AvroSerializer) -> Self {
+        Self::Avro(serializer)
     }
 }
 
@@ -363,6 +397,7 @@ impl tokio_util::codec::Encoder<Event> for Serializer {
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         match self {
+            Serializer::Avro(serializer) => serializer.encode(event, buffer),
             Serializer::Json(serializer) => serializer.encode(event, buffer),
             Serializer::Logfmt(serializer) => serializer.encode(event, buffer),
             Serializer::Native(serializer) => serializer.encode(event, buffer),

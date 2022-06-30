@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Metric, MetricValue},
-    gcp::{GcpAuthConfig, GcpCredentials},
+    gcp::{GcpAuthConfig, GcpAuthenticator},
     http::HttpClient,
     sinks::{
         gcp,
@@ -70,7 +70,7 @@ inventory::submit! {
 #[typetag::serde(name = "gcp_stackdriver_metrics")]
 impl SinkConfig for StackdriverConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let creds = self.auth.make_credentials(Scope::MonitoringWrite).await?;
+        let auth = self.auth.build(Scope::MonitoringWrite).await?;
 
         let healthcheck = healthcheck().boxed();
         let started = chrono::Utc::now();
@@ -86,7 +86,7 @@ impl SinkConfig for StackdriverConfig {
         let sink = HttpEventSink {
             config: self.clone(),
             started,
-            creds,
+            auth,
         };
 
         let sink = BatchedHttpSink::new(
@@ -120,7 +120,7 @@ impl SinkConfig for StackdriverConfig {
 struct HttpEventSink {
     config: StackdriverConfig,
     started: DateTime<Utc>,
-    creds: Option<GcpCredentials>,
+    auth: GcpAuthenticator,
 }
 
 struct StackdriverMetricsEncoder;
@@ -225,10 +225,7 @@ impl HttpSink for HttpEventSink {
         let mut request = hyper::Request::post(uri)
             .header("content-type", "application/json")
             .body(body)?;
-
-        if let Some(creds) = &self.creds {
-            creds.apply(&mut request);
-        }
+        self.auth.apply(&mut request);
 
         Ok(request)
     }

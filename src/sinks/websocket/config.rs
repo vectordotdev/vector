@@ -22,6 +22,12 @@ pub struct WebSocketSinkConfig {
         EncodingConfigAdapter<EncodingConfig<StandardEncodings>, StandardEncodingsMigrator>,
     pub ping_interval: Option<u64>,
     pub ping_timeout: Option<u64>,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 impl GenerateConfig for WebSocketSinkConfig {
@@ -32,6 +38,7 @@ impl GenerateConfig for WebSocketSinkConfig {
             encoding: EncodingConfig::from(StandardEncodings::Json).into(),
             ping_interval: None,
             ping_timeout: None,
+            acknowledgements: Default::default(),
         })
         .unwrap()
     }
@@ -42,7 +49,7 @@ impl GenerateConfig for WebSocketSinkConfig {
 impl SinkConfig for WebSocketSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let connector = self.build_connector()?;
-        let ws_sink = WebSocketSink::new(self, connector.clone(), cx.acker());
+        let ws_sink = WebSocketSink::new(self, connector.clone(), cx.acker())?;
 
         Ok((
             VectorSink::from_event_streamsink(ws_sink),
@@ -59,7 +66,7 @@ impl SinkConfig for WebSocketSinkConfig {
     }
 
     fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        None
+        Some(&self.acknowledgements)
     }
 }
 

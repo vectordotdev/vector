@@ -27,8 +27,7 @@ impl Predicate {
         let (span, exprs) = node.take();
         let type_def = exprs
             .last()
-            .map(|expr| expr.type_def(state))
-            .unwrap_or_else(TypeDef::null);
+            .map_or_else(TypeDef::null, |expr| expr.type_def(state));
 
         if let Some(error) = fallible_predicate {
             return Err(Error::Fallible {
@@ -48,6 +47,7 @@ impl Predicate {
         Ok(Self { inner: exprs })
     }
 
+    #[must_use]
     pub fn new_unchecked(inner: Vec<Expr>) -> Self {
         Self { inner }
     }
@@ -137,7 +137,7 @@ pub(crate) enum Error {
 
 impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
-        use Error::*;
+        use Error::{Fallible, NonBoolean};
 
         match self {
             NonBoolean { .. } => 102,
@@ -146,7 +146,7 @@ impl DiagnosticMessage for Error {
     }
 
     fn labels(&self) -> Vec<Label> {
-        use Error::*;
+        use Error::{Fallible, NonBoolean};
 
         match self {
             NonBoolean { kind, span } => vec![
@@ -158,7 +158,7 @@ impl DiagnosticMessage for Error {
     }
 
     fn notes(&self) -> Vec<Note> {
-        use Error::*;
+        use Error::{Fallible, NonBoolean};
 
         match self {
             NonBoolean { .. } => vec![

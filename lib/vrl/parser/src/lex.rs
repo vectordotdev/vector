@@ -5,11 +5,11 @@ use ordered_float::NotNan;
 
 use crate::template_string::{StringSegment, TemplateString};
 
-pub type Tok<'input> = Token<&'input str>;
-pub type SpannedResult<'input, Loc> = Result<Spanned<'input, Loc>, Error>;
-pub type Spanned<'input, Loc> = (Loc, Tok<'input>, Loc);
+pub(crate) type Tok<'input> = Token<&'input str>;
+pub(crate) type SpannedResult<'input, Loc> = Result<Spanned<'input, Loc>, Error>;
+pub(crate) type Spanned<'input, Loc> = (Loc, Tok<'input>, Loc);
 
-#[derive(thiserror::Error, Clone, Debug, PartialEq)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq, Eq)]
 pub enum Error {
     #[error("syntax error")]
     ParseError {
@@ -47,7 +47,10 @@ pub enum Error {
 
 impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
-        use Error::*;
+        use Error::{
+            EscapeChar, Literal, NumericLiteral, ParseError, ReservedKeyword, StringLiteral,
+            UnexpectedParseError,
+        };
 
         match self {
             ParseError { source, .. } => match source {
@@ -67,7 +70,10 @@ impl DiagnosticMessage for Error {
     }
 
     fn labels(&self) -> Vec<Label> {
-        use Error::*;
+        use Error::{
+            EscapeChar, Literal, NumericLiteral, ParseError, ReservedKeyword, StringLiteral,
+            UnexpectedParseError,
+        };
 
         fn update_expected(expected: Vec<String>) -> Vec<String> {
             expected
@@ -111,7 +117,9 @@ impl DiagnosticMessage for Error {
                         r#""true""#,
                         r#""if""#,
                     ];
-                    let is_any_ident = any_ident.iter().all(|i| expected.contains(&i.to_string()));
+                    let is_any_ident = any_ident
+                        .iter()
+                        .all(|i| expected.contains(&(*i).to_string()));
                     if is_any_ident {
                         expected = expected
                             .into_iter()
@@ -191,7 +199,7 @@ impl DiagnosticMessage for Error {
 // -----------------------------------------------------------------------------
 
 #[derive(Debug)]
-pub struct Lexer<'input> {
+pub(crate) struct Lexer<'input> {
     input: &'input str,
     chars: Peekable<CharIndices<'input>>,
 
@@ -303,7 +311,13 @@ pub enum Token<S> {
 
 impl<S> Token<S> {
     pub(crate) fn map<R>(self, f: impl Fn(S) -> R) -> Token<R> {
-        use self::Token::*;
+        use self::Token::{
+            Abort, Arrow, Bang, Colon, Comma, Dot, Else, Equals, Escape, False, FloatLiteral,
+            FunctionCall, Identifier, If, IntegerLiteral, InvalidToken, LBrace, LBracket, LParen,
+            LQuery, MergeEquals, Newline, Null, Operator, PathField, Question, RBrace, RBracket,
+            RParen, RQuery, RawStringLiteral, RegexLiteral, ReservedIdentifier, SemiColon,
+            StringLiteral, TimestampLiteral, True, Underscore,
+        };
 
         match self {
             Identifier(s) => Identifier(f(s)),
@@ -364,7 +378,13 @@ where
     S: fmt::Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use self::Token::*;
+        use self::Token::{
+            Abort, Arrow, Bang, Colon, Comma, Dot, Else, Equals, Escape, False, FloatLiteral,
+            FunctionCall, Identifier, If, IntegerLiteral, InvalidToken, LBrace, LBracket, LParen,
+            LQuery, MergeEquals, Newline, Null, Operator, PathField, Question, RBrace, RBracket,
+            RParen, RQuery, RawStringLiteral, RegexLiteral, ReservedIdentifier, SemiColon,
+            StringLiteral, TimestampLiteral, True, Underscore,
+        };
 
         let s = match *self {
             Identifier(_) => "Identifier",
@@ -419,7 +439,9 @@ where
 impl<'input> Token<&'input str> {
     /// Returns either a literal, reserved, or generic identifier.
     fn ident(s: &'input str) -> Self {
-        use Token::*;
+        use Token::{
+            Abort, Else, False, Identifier, If, Null, PathField, ReservedIdentifier, True,
+        };
 
         match s {
             "if" => If,
@@ -452,7 +474,7 @@ pub struct RawStringLiteralToken<S>(pub S);
 
 impl StringLiteralToken<&str> {
     /// Takes the string and splits it into segments of literals and templates.
-    /// A templated section is delimited by `{{..}}`. ``{{` can be escaped using
+    /// A templated section is delimited by `{{..}}`. `{{` can be escaped using
     /// `\{{...\}}`.
     pub fn template(&self, span: Span) -> TemplateString {
         let mut segments = Vec::new();
@@ -540,7 +562,10 @@ impl<'input> Iterator for Lexer<'input> {
     type Item = SpannedResult<'input, usize>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        use Token::*;
+        use Token::{
+            Arrow, Bang, Colon, Comma, Dot, Escape, InvalidToken, LBrace, LBracket, LParen, LQuery,
+            Newline, RBrace, RBracket, RParen, RQuery, SemiColon, Underscore,
+        };
 
         loop {
             let start = self.next_index();
@@ -553,7 +578,7 @@ impl<'input> Iterator for Lexer<'input> {
                 Err(err) => return Some(Err(err)),
                 Ok(true) => {
                     // dbg!("LQuery"); // NOTE: uncomment this for debugging
-                    return Some(Ok(self.token2(start, start + 1, LQuery)));
+                    return Some(Ok((start, LQuery, start + 1)));
                 }
                 Ok(false) => (),
             }
@@ -564,7 +589,7 @@ impl<'input> Iterator for Lexer<'input> {
             // represent a physical character, instead it is a boundary marker.
             if let Some(pos) = self.query_end(start) {
                 // dbg!("RQuery"); // NOTE: uncomment this for debugging
-                return Some(Ok(self.token2(pos, pos + 1, RQuery)));
+                return Some(Ok((pos, RQuery, pos + 1)));
             }
 
             // Advance the internal iterator and emit the next token, or loop
@@ -629,7 +654,7 @@ impl<'input> Iterator for Lexer<'input> {
             // queries.
             } else if let Some(end) = self.rquery_indices.pop() {
                 // dbg!("RQuery"); // NOTE: uncomment this for debugging
-                return Some(Ok(self.token2(end, end + 1, RQuery)));
+                return Some(Ok((end, RQuery, end + 1)));
             }
 
             return None;
@@ -665,17 +690,7 @@ impl<'input> Lexer<'input> {
     }
 
     fn token(&mut self, start: usize, token: Token<&'input str>) -> Spanned<'input, usize> {
-        let end = self.next_index();
-        self.token2(start, end, token)
-    }
-
-    fn token2(
-        &mut self,
-        start: usize,
-        end: usize,
-        token: Token<&'input str>,
-    ) -> Spanned<'input, usize> {
-        (start, token, end)
+        (start, token, self.next_index())
     }
 
     fn query_end(&mut self, start: usize) -> Option<usize> {
@@ -1028,7 +1043,7 @@ impl<'input> Lexer<'input> {
     fn numeric_literal_or_identifier(&mut self, start: usize) -> SpannedResult<'input, usize> {
         let (end, int) = self.take_while(start, |ch| is_digit(ch) || ch == '_');
 
-        let negative = self.input.get(start..start + 1) == Some("-");
+        let negative = self.input.get(start..=start) == Some("-");
         match self.peek() {
             Some((_, ch)) if is_ident_continue(ch) && !negative => {
                 self.bump();
@@ -1121,7 +1136,7 @@ impl<'input> Lexer<'input> {
 // -----------------------------------------------------------------------------
 
 impl<'input> Lexer<'input> {
-    pub fn new(input: &'input str) -> Lexer<'input> {
+    pub(crate) fn new(input: &'input str) -> Lexer<'input> {
         Self {
             input,
             chars: input.char_indices().peekable(),
@@ -1154,9 +1169,9 @@ impl<'input> Lexer<'input> {
         while let Some((end, ch)) = self.peek() {
             if terminate(ch) {
                 return (end, self.slice(start, end));
-            } else {
-                self.bump();
             }
+
+            self.bump();
         }
 
         let loc = self.next_index();
@@ -1182,15 +1197,7 @@ impl<'input> Lexer<'input> {
     /// Returns Ok if the next char is a valid escape code.
     fn escape_code(&mut self, start: usize) -> Result<(), Error> {
         match self.bump() {
-            Some((_, '\n')) => Ok(()),
-            Some((_, '\'')) => Ok(()),
-            Some((_, '"')) => Ok(()),
-            Some((_, '\\')) => Ok(()),
-            Some((_, 'n')) => Ok(()),
-            Some((_, 'r')) => Ok(()),
-            Some((_, 't')) => Ok(()),
-            Some((_, '{')) => Ok(()),
-            Some((_, '}')) => Ok(()),
+            Some((_, '\n' | '\'' | '"' | '\\' | 'n' | 'r' | 't' | '{' | '}')) => Ok(()),
             Some((start, ch)) => Err(Error::EscapeChar {
                 start,
                 ch: Some(ch),
@@ -1223,10 +1230,10 @@ fn is_query_start(ch: char) -> bool {
 }
 
 fn is_digit(ch: char) -> bool {
-    ch.is_digit(10)
+    ch.is_ascii_digit()
 }
 
-pub fn is_operator(ch: char) -> bool {
+pub(crate) fn is_operator(ch: char) -> bool {
     matches!(
         ch,
         '!' | '%' | '&' | '*' | '+' | '-' | '/' | '<' | '=' | '>' | '?' | '|'
@@ -1244,7 +1251,7 @@ fn unescape_string_literal(mut s: &str) -> String {
             let whitespace: usize = remaining
                 .chars()
                 .take_while(|c| c.is_whitespace())
-                .map(|c| c.len_utf8())
+                .map(char::len_utf8)
                 .sum();
             s = &s[i + whitespace + 2..];
         } else {
@@ -1274,7 +1281,12 @@ mod test {
     #![allow(clippy::print_stdout)] // tests
 
     use super::*;
-    use crate::lex::Token::*;
+    use crate::lex::Token::{
+        Arrow, Bang, Colon, Comma, Dot, Else, Equals, FloatLiteral, FunctionCall, Identifier, If,
+        IntegerLiteral, LBrace, LBracket, LParen, LQuery, Newline, Operator, PathField, RBrace,
+        RBracket, RParen, RQuery, RawStringLiteral, RegexLiteral, StringLiteral, TimestampLiteral,
+        True,
+    };
 
     fn lexer(input: &str) -> impl Iterator<Item = SpannedResult<'_, usize>> + '_ {
         let mut lexer = Lexer::new(input);

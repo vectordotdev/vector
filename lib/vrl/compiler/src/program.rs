@@ -21,23 +21,29 @@ impl Program {
     ///
     /// Specifically, this is used by the VRL REPL to incrementally compile
     /// a program as each line is compiled.
+    #[must_use]
     pub fn local_env(&self) -> &LocalEnv {
         &self.expressions.local_env
     }
 
     /// Get detailed information about the program, as collected by the VRL
     /// compiler.
+    #[must_use]
     pub fn info(&self) -> &ProgramInfo {
         &self.info
     }
 
     /// Resolve the program to its final [`Value`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the program resulted in a runtime error.
     pub fn resolve(&self, ctx: &mut Context) -> Resolved {
         self.expressions.resolve(ctx)
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProgramInfo {
     /// Returns whether the compiled program can fail at runtime.
     ///
