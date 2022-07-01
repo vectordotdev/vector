@@ -73,7 +73,7 @@ components: sinks: vector: {
 			summary:      true
 			set:          true
 		}
-		traces: false
+		traces: true
 	}
 
 	configuration: {

@@ -6,8 +6,8 @@ use syslog::{Facility, Formatter3164, LogFormat, Severity};
 use crate::{
     codecs::Encoder,
     config::{
-        log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
-        SinkDescription,
+        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig,
+        SinkContext, SinkDescription,
     },
     event::Event,
     internal_events::TemplateRenderingError,
@@ -108,7 +108,7 @@ impl SinkConfig for PapertrailConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(self.encoding.config().input_type())
+        Input::new(self.encoding.config().input_type() & DataType::Log)
     }
 
     fn sink_type(&self) -> &'static str {

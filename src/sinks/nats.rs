@@ -13,9 +13,7 @@ use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::Encoder,
-    config::{
-        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
-    },
+    config::{AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext, SinkDescription},
     event::{Event, EventStatus, Finalizable},
     internal_events::{NatsEventSendError, TemplateRenderingError},
     nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
@@ -120,7 +118,7 @@ impl SinkConfig for NatsSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(self.encoding.config().input_type())
+        Input::new(self.encoding.config().input_type() & DataType::Log)
     }
 
     fn sink_type(&self) -> &'static str {
