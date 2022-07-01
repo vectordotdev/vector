@@ -192,23 +192,7 @@ impl From<serde_json::Value> for Value {
 
 impl From<&serde_json::Value> for Value {
     fn from(json_value: &serde_json::Value) -> Self {
-        match json_value {
-            serde_json::Value::Bool(b) => Self::Boolean(*b),
-            serde_json::Value::Number(n) if n.is_i64() => n.as_i64().unwrap().into(),
-            serde_json::Value::Number(n) if n.is_f64() => {
-                // JSON doesn't support NaN values
-                NotNan::new(n.as_f64().unwrap()).unwrap().into()
-            }
-            serde_json::Value::Number(n) => n.to_string().into(),
-            serde_json::Value::String(s) => Self::Bytes(Bytes::from(s.clone())),
-            serde_json::Value::Object(obj) => Self::Object(
-                obj.into_iter()
-                    .map(|(key, value)| (key.clone(), Self::from(value)))
-                    .collect(),
-            ),
-            serde_json::Value::Array(arr) => Self::Array(arr.iter().map(Self::from).collect()),
-            serde_json::Value::Null => Self::Null,
-        }
+        json_value.clone().into()
     }
 }
 

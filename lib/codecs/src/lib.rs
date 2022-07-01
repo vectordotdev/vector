@@ -6,10 +6,11 @@
 
 pub mod decoding;
 pub mod encoding;
+pub mod gelf;
 pub mod internal_events;
 
 pub use decoding::{
-    gelf_fields, BytesDecoder, BytesDecoderConfig, BytesDeserializer, BytesDeserializerConfig,
+    BytesDecoder, BytesDecoderConfig, BytesDeserializer, BytesDeserializerConfig,
     CharacterDelimitedDecoder, CharacterDelimitedDecoderConfig, GelfDeserializer,
     GelfDeserializerConfig, JsonDeserializer, JsonDeserializerConfig, LengthDelimitedDecoder,
     LengthDelimitedDecoderConfig, NativeDeserializer, NativeDeserializerConfig,
@@ -27,3 +28,4 @@ pub use encoding::{
     NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig, RawMessageSerializer,
     RawMessageSerializerConfig, TextSerializer, TextSerializerConfig,
 };
+pub use gelf::gelf_fields;

@@ -10,7 +10,7 @@ use std::fmt::Debug;
 use bytes::{Bytes, BytesMut};
 pub use error::StreamDecodingError;
 pub use format::{
-    gelf_fields, BoxedDeserializer, BytesDeserializer, BytesDeserializerConfig, GelfDeserializer,
+    BoxedDeserializer, BytesDeserializer, BytesDeserializerConfig, GelfDeserializer,
     GelfDeserializerConfig, JsonDeserializer, JsonDeserializerConfig, NativeDeserializer,
     NativeDeserializerConfig, NativeJsonDeserializer, NativeJsonDeserializerConfig,
 };

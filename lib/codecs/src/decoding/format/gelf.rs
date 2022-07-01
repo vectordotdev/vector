@@ -15,6 +15,7 @@ use vector_core::{
 };
 
 use super::Deserializer;
+use crate::gelf_fields::*;
 
 /// On GELF decoding behavior:
 ///   Graylog has a relaxed decoding. They are much more lenient than the spec would
@@ -23,43 +24,9 @@ use super::Deserializer;
 ///   of vector will still work with the new relaxed decoding.
 
 /// Regex for matching valid field names. Must contain only word chars, periods and dashes.
-static VALID_FIELD_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^_[\w\.\-]*$").unwrap());
-
-/// GELF Message fields. Definitions from https://docs.graylog.org/docs/gelf
-pub mod gelf_fields {
-
-    /// <not a field> The latest version of the GELF specificaiton.
-    pub const GELF_VERSION: &str = "1.1";
-
-    /// (required) GELF spec version
-    pub const VERSION: &str = "version";
-
-    /// (required) The name of the host, source or application that sent this message.
-    pub const HOST: &str = "host";
-
-    /// (required) A short descriptive message.
-    pub const SHORT_MESSAGE: &str = "short_message";
-
-    /// (optional) A long message that can i.e. contain a backtrace
-    pub const FULL_MESSAGE: &str = "full_message";
-
-    /// (optional) Seconds since UNIX epoch with optional decimal places for milliseconds.
-    ///  SHOULD be set by client library. Will be set to the current timestamp (now) by the server if absent.
-    pub const TIMESTAMP: &str = "timestamp";
-
-    /// (optional) The level equal to the standard syslog levels. default is 1 (ALERT).
-    pub const LEVEL: &str = "level";
-
-    /// (optional) (deprecated) Send as additional field instead.
-    pub const FACILITY: &str = "facility";
-
-    /// (optional) (deprecated) The line in a file that caused the error (decimal). Send as additional field instead.
-    pub const LINE: &str = "line";
-
-    /// (optional) (deprecated) The file (with path if you want) that caused the error. Send as additional field instead.
-    pub const FILE: &str = "file";
-}
-pub use gelf_fields::*;
+/// Additional field names must also be prefixed with an `_` , however that is intentionally
+/// omitted from this regex.
+static VALID_FIELD_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[\w\.\-]*$").unwrap());
 
 /// Config used to build a `GelfDeserializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -91,6 +58,8 @@ impl GelfDeserializerConfig {
             // Every field with an underscore (_) prefix will be treated as an additional field.
             // Allowed characters in field names are any word character (letter, number, underscore), dashes and dots.
             // Libraries SHOULD not allow to send id as additional field ( _id). Graylog server nodes omit this field automatically.
+            // Note that although the schema definition indicates all unknown_fields will be bytes,
+            // in fact they can be strings or numbers.
             .unknown_fields(Kind::bytes())
     }
 }
@@ -169,19 +138,26 @@ impl GelfDeserializer {
                 if key == "_id" {
                     continue;
                 }
+                // per GELF spec, Additional field names must be prefixed with an underscore
+                if !key.starts_with('_') {
+                    return Err(format!(
+                        "'{}' field is invalid. \
+                                       Additional field names must be prefixed with an underscore.",
+                        key
+                    )
+                    .into());
+                }
                 // per GELF spec, Additional field names must be characters dashes or dots
                 if !VALID_FIELD_REGEX.is_match(key) {
-                    if key.starts_with('_') {
-                        return Err(format!("'{}' field is invalid. \
-                                           Additional field names must be prefixed with an underscore.", key).into());
-                    } else {
-                        return Err(format!("'{}' field contains invalid characters. Field names may \
-                                           contain only letters, numbers, underscores, dashes and dots.", key).into());
-                    }
+                    return Err(format!("'{}' field contains invalid characters. Field names may \
+                                       contain only letters, numbers, underscores, dashes and dots.", key).into());
                 }
 
-                let vector_val: value::Value = val.into();
-                log.insert(path!(key.as_str()), vector_val);
+                // per GELF spec, Additional field values must be either strings or numbers
+                if val.is_string() || val.is_number() {
+                    let vector_val: value::Value = val.into();
+                    log.insert(path!(key.as_str()), vector_val);
+                }
             }
         }
         Ok(Event::Log(log))

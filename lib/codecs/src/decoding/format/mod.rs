@@ -15,7 +15,7 @@ use std::fmt::Debug;
 
 use ::bytes::Bytes;
 use dyn_clone::DynClone;
-pub use gelf::{gelf_fields, GelfDeserializer, GelfDeserializerConfig};
+pub use gelf::{GelfDeserializer, GelfDeserializerConfig};
 pub use json::{JsonDeserializer, JsonDeserializerConfig};
 pub use native::{NativeDeserializer, NativeDeserializerConfig};
 pub use native_json::{NativeJsonDeserializer, NativeJsonDeserializerConfig};
