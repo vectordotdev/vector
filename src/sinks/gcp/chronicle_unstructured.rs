@@ -1,8 +1,4 @@
 use bytes::Bytes;
-use codecs::{
-    encoding::{Framer, Serializer},
-    CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder,
-};
 use futures_util::{future::BoxFuture, task::Poll};
 use goauth::scopes::Scope;
 use http::{header::HeaderValue, Request, Uri};
@@ -21,7 +17,7 @@ use vector_core::{
 };
 
 use crate::{
-    config::{GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     gcp::{GcpAuthConfig, GcpCredentials},
     http::{HttpClient, HttpError},
     sinks::{
@@ -33,7 +29,7 @@ use crate::{
         util::{
             encoding::{
                 Encoder, EncodingConfig, EncodingConfigWithFramingAdapter, StandardEncodings,
-                StandardEncodingsWithFramingMigrator, Transformer,
+                StandardEncodingsWithFramingMigrator,
             },
             partitioner::KeyPartitioner,
             BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, RequestBuilder,
@@ -74,9 +70,9 @@ impl Region {
     /// Each region has a it's own endpoint.
     fn endpoint(self) -> &'static str {
         match self {
-            Region::Eu => "europe-malachiteingestion-pa.googleapis.com",
-            Region::Us => "malachiteingestion-pa.googleapis.com",
-            Region::Asia => "asia-southeast1-malachiteingestion-pa.googleapis.com",
+            Region::Eu => "https://europe-malachiteingestion-pa.googleapis.com",
+            Region::Us => "https://malachiteingestion-pa.googleapis.com",
+            Region::Asia => "https://asia-southeast1-malachiteingestion-pa.googleapis.com",
         }
     }
 }
@@ -134,23 +130,9 @@ pub fn build_healthcheck(
     base_url: &str,
     creds: Option<GcpCredentials>,
 ) -> crate::Result<Healthcheck> {
-    //let uri = base_url.parse::<Uri>()?;
-    let uri = "https://europe-malachiteingestion-pa.googleapis.com/v2/logtypes".parse::<Uri>()?;
+    let uri = base_url.parse::<Uri>()?;
 
     let healthcheck = async move {
-        //let mut request = http::Request::head(uri).body(Body::empty())?;
-        let mut request = http::Request::get(&uri).body(Body::empty())?;
-
-        if let Some(creds) = creds.as_ref() {
-            creds.apply(&mut request);
-        }
-
-        let not_found_error = GcsHealthcheckError::NotFound.into();
-
-        let response = client.send(request).await?;
-        let res = hyper::body::to_bytes(response.into_body()).await?;
-        dbg!(&res);
-
         let mut request = http::Request::get(&uri).body(Body::empty())?;
 
         if let Some(creds) = creds.as_ref() {
@@ -158,7 +140,7 @@ pub fn build_healthcheck(
         }
 
         let response = client.send(request).await?;
-        healthcheck_response(response, creds, not_found_error)
+        healthcheck_response(response, creds, GcsHealthcheckError::NotFound.into())
     };
 
     Ok(Box::pin(healthcheck))
@@ -182,24 +164,15 @@ impl SinkConfig for GcsChronicleUnstructuredConfig {
                 .await?
         };
 
-        dbg!(&creds);
-
         let tls = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls, cx.proxy())?;
 
-        let endpoint = self.endpoint.clone().unwrap_or_else(|| {
-            let s = format!(
-                "https://{}/v2/unstructuredlogentries:batchCreate",
-                self.region
-                    .unwrap()
-                    // .ok_or_else(|| ChronicleError::RegionOrEndpoint)
-                    .endpoint()
-            );
+        let endpoint = self.endpoint("v2/unstructuredlogentries:batchCreate")?;
 
-            s
-        });
+        // For the healthcheck we see if we can fetch the list of available log types.
+        let healthcheck_endpoint = self.endpoint("v2/logtypes")?;
 
-        let healthcheck = build_healthcheck(client.clone(), &endpoint, creds.clone())?;
+        let healthcheck = build_healthcheck(client.clone(), &healthcheck_endpoint, creds.clone())?;
         let sink = self.build_sink(client, endpoint, creds, cx)?;
 
         Ok((sink, healthcheck))
@@ -251,6 +224,18 @@ impl GcsChronicleUnstructuredConfig {
     fn key_partitioner(&self) -> crate::Result<KeyPartitioner> {
         Ok(KeyPartitioner::new(self.log_type.clone()))
     }
+
+    fn endpoint(&self, path: &str) -> Result<String, ChronicleError> {
+        Ok(format!(
+            "{}/{}",
+            match (&self.endpoint, self.region) {
+                (Some(endpoint), None) => endpoint.trim_end_matches("/"),
+                (None, Some(region)) => region.endpoint(),
+                _ => return Err(ChronicleError::RegionOrEndpoint),
+            },
+            path
+        ))
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -282,12 +267,27 @@ impl Encoder<(String, Vec<Event>)> for ChronicleEncoder {
         input: (String, Vec<Event>),
         writer: &mut dyn io::Write,
     ) -> io::Result<usize> {
-        let (partition_key, mut events) = input;
+        let (partition_key, events) = input;
         let events = events
             .into_iter()
-            .filter_map(|event| {
+            .map(|event| {
                 let log = event.into_log();
-                let value: Option<serde_json::Value> = log.try_into().ok();
+                let message = log.get(log_schema().message_key()).unwrap().to_string();
+
+                let mut value = json!({
+                    "log_text": message,
+                });
+
+                if let Some(ts) = log.get(log_schema().timestamp_key()) {
+                    if let Some(ts) = ts.as_timestamp() {
+                        value.as_object_mut().unwrap().insert(
+                            "ts_rfc3339".to_string(),
+                            ts.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true)
+                                .into(),
+                        );
+                    }
+                }
+
                 value
             })
             .collect::<Vec<_>>();
@@ -297,8 +297,6 @@ impl Encoder<(String, Vec<Event>)> for ChronicleEncoder {
             "log_type": partition_key,
             "entries": events,
         });
-
-        dbg!(&json);
 
         let body = crate::serde::json::to_bytes(&json)?.freeze();
         writer.write(&body)
@@ -407,7 +405,6 @@ impl Service<ChronicleRequest> for ChronicleService {
     }
 
     fn call(&mut self, request: ChronicleRequest) -> Self::Future {
-        dbg!(&self.base_url);
         let mut builder = Request::post(&self.base_url);
         let headers = builder.headers_mut().unwrap();
         headers.insert(
