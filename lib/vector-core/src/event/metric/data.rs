@@ -90,6 +90,12 @@ impl MetricData {
                 (Some(t), None) | (None, Some(t)) => Some(t),
                 (Some(t1), Some(t2)) => Some(t1.max(t2)),
             };
+
+            self.interval = match (self.interval, other.interval) {
+                (None, None) => None,
+                (Some(i), None) | (None, Some(i)) => Some(i),
+                (Some(i1), Some(i2)) => Some(i1 + i2),
+            };
             true
         }
     }

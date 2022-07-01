@@ -324,6 +324,7 @@ pub(crate) fn decode_ddseries_v2(
                             },
                         )
                         .with_timestamp(Some(Utc.timestamp(dd_point.timestamp, 0)))
+                        .with_interval(Some(i as u64))
                         .with_tags(Some(tags.clone()))
                         .with_namespace(namespace)
                     })
