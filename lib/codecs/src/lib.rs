@@ -27,4 +27,4 @@ pub use encoding::{
     NewlineDelimitedEncoderConfig, RawMessageSerializer, RawMessageSerializerConfig,
     TextSerializer, TextSerializerConfig,
 };
-pub use gelf::gelf_fields;
+pub use gelf::{gelf_fields, VALID_FIELD_REGEX};

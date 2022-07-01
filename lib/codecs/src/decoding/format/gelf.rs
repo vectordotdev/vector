@@ -1,8 +1,6 @@
 use bytes::Bytes;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use lookup::path;
-use once_cell::sync::Lazy;
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use std::collections::HashMap;
@@ -53,9 +51,9 @@ impl GelfDeserializerConfig {
             // Every field with an underscore (_) prefix will be treated as an additional field.
             // Allowed characters in field names are any word character (letter, number, underscore), dashes and dots.
             // Libraries SHOULD not allow to send id as additional field ( _id). Graylog server nodes omit this field automatically.
-            // Note that although the schema definition indicates all unknown_fields will be bytes,
-            // in fact they can be strings or numbers.
-            .unknown_fields(Kind::bytes())
+            // Note that although the schema definition indicates unknown_fields will be any type,
+            // in fact they can only be either strings or numbers.
+            .unknown_fields(Kind::any())
     }
 }
 
@@ -153,7 +151,8 @@ impl GelfDeserializer {
                     let vector_val: value::Value = val.into();
                     log.insert(path!(key.as_str()), vector_val);
                 } else {
-                    // TODO use internal event
+                    return Err(format!("'The value type for field {}' is an invalid type. Additional field values \
+                                       should be either strings or numbers.", key).into());
                 }
             }
         }
