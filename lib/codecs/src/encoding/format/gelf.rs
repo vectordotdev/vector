@@ -8,6 +8,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder;
+use value::Value;
 use vector_core::{
     config::{log_schema, DataType},
     event::Event,
@@ -85,6 +86,27 @@ impl GelfSerializer {
         }
     }
 
+    // emits the GelfSerializeFailedInvalidType internal event and returns Err
+    fn emit_invalid_type(
+        &self,
+        field: &str,
+        expected_type: &str,
+        actual_type: &str,
+    ) -> vector_core::Result<()> {
+        vector_core::internal_event::emit(SerializeFailedInvalidType {
+            format_type: FORMAT_TYPE_GELF,
+            message: INVALID_TYPE_STR,
+            field,
+            expected_type,
+            actual_type,
+        });
+        Err(format!(
+            "{}: field: {} type: {} expected_type: {}",
+            INVALID_TYPE_STR, field, actual_type, expected_type
+        )
+        .into())
+    }
+
     /// Validates that the GELF required fields exist in the event.
     fn validate_required_fields(&mut self, log: &LogEvent) -> vector_core::Result<()> {
         // emits the GelfSerializeFailedMissingField internal event and returns Err
@@ -97,9 +119,15 @@ impl GelfSerializer {
             Err(format!("{}: {}", MISSING_FIELD_STR, field).into())
         }
 
+        // add the VERSION if it does not exist
         if !log.contains(VERSION) {
-            emit_missing_field(VERSION)?;
+            self.conformed_log = Some(log.clone());
+            self.conformed_log
+                .as_mut()
+                .unwrap()
+                .insert(VERSION, GELF_VERSION);
         }
+
         if !log.contains(HOST) {
             emit_missing_field(HOST)?;
         }
@@ -108,7 +136,9 @@ impl GelfSerializer {
         if !log.contains(SHORT_MESSAGE) {
             // rename the log_schema().message_key() to SHORT_MESSAGE
             if log.contains(message_key) {
-                self.conformed_log = Some(log.clone());
+                if self.conformed_log.is_none() {
+                    self.conformed_log = Some(log.clone());
+                }
                 self.conformed_log
                     .as_mut()
                     .unwrap()
@@ -120,80 +150,69 @@ impl GelfSerializer {
         Ok(())
     }
 
+    fn validate_additional_field(
+        &mut self,
+        key: &str,
+        value: &Value,
+        log: &LogEvent,
+    ) -> vector_core::Result<()> {
+        // Additional fields must be prefixed with underscores.
+        // Prepending the underscore since vector adds fields such as 'source_type'
+        // which would otherwise throw errors.
+        if !key.is_empty() && !key.starts_with('_') {
+            if self.conformed_log.is_none() {
+                self.conformed_log = Some(log.clone())
+            }
+            self.conformed_log
+                .as_mut()
+                .unwrap()
+                .rename_key(key, &*format!("_{}", &key));
+        }
+
+        // additional fields must be only word chars, dashes and periods.
+        if !VALID_FIELD_REGEX.is_match(key) {
+            vector_core::internal_event::emit(SerializeFailedInvalidFieldName {
+                format_type: FORMAT_TYPE_GELF,
+                message: INVALID_FIELD_NAME_STR,
+                field: key,
+            });
+            return Err(format!("{}: {}", INVALID_FIELD_NAME_STR, key).into());
+        }
+
+        // additional field values must be only strings or numbers
+        if !(value.is_integer() || value.is_float() || value.is_bytes()) {
+            self.emit_invalid_type(key, "string or number", value.kind_str())?;
+        }
+        Ok(())
+    }
+
     /// Validates rules for field names and value types.
     fn validate_field_names_and_values(&mut self, log: &LogEvent) -> vector_core::Result<()> {
-        // emits the GelfSerializeFailedInvalidType internal event and returns Err
-        fn emit_invalid_type(
-            field: &str,
-            expected_type: &str,
-            actual_type: &str,
-        ) -> vector_core::Result<()> {
-            vector_core::internal_event::emit(SerializeFailedInvalidType {
-                format_type: FORMAT_TYPE_GELF,
-                message: INVALID_TYPE_STR,
-                field,
-                expected_type,
-                actual_type,
-            });
-            Err(format!(
-                "{}: field: {} type: {} expected_type: {}",
-                INVALID_TYPE_STR, field, actual_type, expected_type
-            )
-            .into())
-        }
         if let Some(event_data) = log.as_map() {
             for (key, value) in event_data {
-                // validate string values
-                if key == VERSION
-                    || key == HOST
-                    || key == SHORT_MESSAGE
-                    || key == FULL_MESSAGE
-                    || key == FACILITY
-                    || key == FILE
-                {
-                    if !value.is_bytes() {
-                        emit_invalid_type(key, "UTF-8 string", value.kind_str())?;
-                    }
-                }
-                // validate timestamp value
-                else if key == TIMESTAMP {
-                    if !(value.is_timestamp() || value.is_integer()) {
-                        emit_invalid_type(key, "timestamp or integer", value.kind_str())?;
-                    }
-                }
-                // validate integer values
-                else if key == LEVEL {
-                    if !value.is_integer() {
-                        emit_invalid_type(key, "integer", value.kind_str())?;
-                    }
-                }
-                // validate float values
-                else if key == LINE {
-                    if !(value.is_float() || value.is_integer()) {
-                        emit_invalid_type(key, "number", value.kind_str())?;
-                    }
-                } else {
-                    // Additional fields must be prefixed with underscores.
-                    // Prepending the underscore since vector adds fields such as 'source_type'
-                    // which would otherwise throw errors.
-                    if !key.is_empty() && !key.starts_with('_') {
-                        if self.conformed_log.is_none() {
-                            self.conformed_log = Some(log.clone())
+                match key.as_str() {
+                    VERSION | HOST | SHORT_MESSAGE | FULL_MESSAGE | FACILITY | FILE => {
+                        if !value.is_bytes() {
+                            self.emit_invalid_type(key, "UTF-8 string", value.kind_str())?;
                         }
-                        self.conformed_log
-                            .as_mut()
-                            .unwrap()
-                            .rename_key(key.as_str(), &*format!("_{}", &key));
                     }
-
-                    // additional fields must be only word chars, dashes and periods.
-                    if !VALID_FIELD_REGEX.is_match(key) {
-                        vector_core::internal_event::emit(SerializeFailedInvalidFieldName {
-                            format_type: FORMAT_TYPE_GELF,
-                            message: INVALID_FIELD_NAME_STR,
-                            field: key,
-                        });
-                        return Err(format!("{}: {}", INVALID_FIELD_NAME_STR, key).into());
+                    TIMESTAMP => {
+                        if !(value.is_timestamp() || value.is_integer()) {
+                            self.emit_invalid_type(key, "timestamp or integer", value.kind_str())?;
+                        }
+                    }
+                    LEVEL => {
+                        if !value.is_integer() {
+                            self.emit_invalid_type(key, "integer", value.kind_str())?;
+                        }
+                    }
+                    LINE => {
+                        if !(value.is_float() || value.is_integer()) {
+                            self.emit_invalid_type(key, "number", value.kind_str())?;
+                        }
+                    }
+                    _ => {
+                        self.validate_additional_field(key, value, log)?;
                     }
                 }
             }
@@ -346,14 +365,6 @@ mod tests {
 
     #[test]
     fn gelf_serializing_invalid_error() {
-        // no version
-        {
-            let event_fields = btreemap! {
-                HOST => "example.org",
-                SHORT_MESSAGE => "Some message",
-            };
-            do_serialize(false, event_fields);
-        }
         // no host
         {
             let event_fields = btreemap! {
@@ -406,6 +417,26 @@ mod tests {
                 VERSION => "1.1",
                 SHORT_MESSAGE => "Some message",
                 "invalid%field" => "foo",
+            };
+            do_serialize(false, event_fields);
+        }
+        // invalid additional value type - bool
+        {
+            let event_fields = btreemap! {
+                HOST => "example.org",
+                VERSION => "1.1",
+                SHORT_MESSAGE => "Some message",
+                "_foobar" => false,
+            };
+            do_serialize(false, event_fields);
+        }
+        // invalid additional value type - null
+        {
+            let event_fields = btreemap! {
+                HOST => "example.org",
+                VERSION => "1.1",
+                SHORT_MESSAGE => "Some message",
+                "_foobar" => serde_json::Value::Null,
             };
             do_serialize(false, event_fields);
         }
