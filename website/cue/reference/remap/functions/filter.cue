@@ -42,7 +42,7 @@ remap: functions: filter: {
 			}
 			source: #"""
 				filter(array!(.tags)) -> |_index, value| {
-				    # remove any elements that aren't equal to "foo"
+				    # keep any elements that aren't equal to "foo"
 				    value != "foo"
 				}
 				"""#
