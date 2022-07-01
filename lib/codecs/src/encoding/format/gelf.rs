@@ -1,11 +1,9 @@
-use crate::gelf_fields::*;
 use crate::internal_events::{
     codec_format::FORMAT_TYPE_GELF, SerializeFailedInvalidFieldName, SerializeFailedInvalidType,
     SerializeFailedMissingField,
 };
+use crate::{gelf_fields::*, VALID_FIELD_REGEX};
 use bytes::{BufMut, BytesMut};
-use once_cell::sync::Lazy;
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder;
 use value::Value;
@@ -23,9 +21,6 @@ use vector_core::{
 ///   of vector will still work.
 ///   The exception is that if 'Additional fields' are found to be missing an underscore prefix and
 ///   are otherwise valid field names, we prepend the underscore.
-
-/// Regex for matching valid field names. Must contain only word chars, periods and dashes.
-static VALID_FIELD_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[\w\.\-]*$").unwrap());
 
 static MISSING_FIELD_STR: &str = "LogEvent does not contain required field.";
 
