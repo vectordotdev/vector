@@ -4,7 +4,7 @@ use bytes::Bytes;
 use chrono::{DateTime, Duration, Utc};
 use futures::stream;
 use vector_common::encode_logfmt;
-use vector_core::event::{BatchNotifier, BatchStatus, Event};
+use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
 use super::config::{LokiConfig, OutOfOrderAction};
 use crate::{
@@ -56,7 +56,7 @@ fn line_generator(index: usize) -> String {
 }
 
 fn event_generator(index: usize) -> Event {
-    Event::from(line_generator(index))
+    Event::Log(LogEvent::from(line_generator(index)))
 }
 
 #[tokio::test]
@@ -276,7 +276,7 @@ async fn many_tenants() {
     let mut events = lines
         .clone()
         .into_iter()
-        .map(Event::from)
+        .map(|e| Event::Log(LogEvent::from(e)))
         .collect::<Vec<_>>();
 
     for (i, event) in events.iter_mut().enumerate() {
@@ -312,7 +312,7 @@ async fn out_of_order_drop() {
     let mut events = lines
         .clone()
         .into_iter()
-        .map(Event::from)
+        .map(|e| Event::Log(LogEvent::from(e)))
         .collect::<Vec<_>>();
 
     let base = chrono::Utc::now() - Duration::seconds(20);
@@ -341,7 +341,7 @@ async fn out_of_order_accept() {
     let mut events = lines
         .clone()
         .into_iter()
-        .map(Event::from)
+        .map(|e| Event::Log(LogEvent::from(e)))
         .collect::<Vec<_>>();
 
     let base = chrono::Utc::now() - Duration::seconds(20);
@@ -372,7 +372,7 @@ async fn out_of_order_rewrite() {
     let mut events = lines
         .clone()
         .into_iter()
-        .map(Event::from)
+        .map(|e| Event::Log(LogEvent::from(e)))
         .collect::<Vec<_>>();
 
     let base = chrono::Utc::now() - Duration::seconds(20);
@@ -412,7 +412,7 @@ async fn out_of_order_per_partition() {
     let mut events = big_lines
         .into_iter()
         .chain(small_lines)
-        .map(Event::from)
+        .map(|e| Event::Log(LogEvent::from(e)))
         .collect::<Vec<_>>();
 
     let base = chrono::Utc::now() - Duration::seconds(30);

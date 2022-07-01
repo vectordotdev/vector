@@ -782,7 +782,7 @@ mod tests {
 
     #[test]
     fn encodes_event() {
-        let mut event = Event::from("test message");
+        let mut event = Event::Log(LogEvent::from("test message"));
         let log_mut = event.as_mut_log();
         log_mut.insert("service", "test-service");
         log_mut.insert("not_a_reserved_attribute", "value");
@@ -877,7 +877,7 @@ mod tests {
 
     #[test]
     fn generates_valid_id() {
-        let log1 = Event::from("test event 1");
+        let log1 = Event::Log(LogEvent::from("test event 1"));
         let mut writer = Cursor::new(Vec::new());
         let encoding = DatadogArchivesEncoding::new(Default::default());
         let _ = encoding.encode_input(vec![log1], &mut writer);
@@ -892,7 +892,7 @@ mod tests {
         validate_event_id(id1);
 
         // check that id is different for the next event
-        let log2 = Event::from("test event 2");
+        let log2 = Event::Log(LogEvent::from("test event 2"));
         let mut writer = Cursor::new(Vec::new());
         let _ = encoding.encode_input(vec![log2], &mut writer);
         let encoded = writer.into_inner();
@@ -909,7 +909,7 @@ mod tests {
 
     #[test]
     fn generates_date_if_missing() {
-        let log = Event::from("test message");
+        let log = Event::Log(LogEvent::from("test message"));
         let mut writer = Cursor::new(Vec::new());
         let encoding = DatadogArchivesEncoding::new(Default::default());
         let _ = encoding.encode_input(vec![log], &mut writer);
@@ -948,7 +948,7 @@ mod tests {
     #[test]
     fn s3_build_request() {
         let fake_buf = Bytes::new();
-        let mut log = Event::from("test message");
+        let mut log = Event::Log(LogEvent::from("test message"));
         let timestamp = DateTime::parse_from_rfc3339("2021-08-23T18:00:27.879+02:00")
             .expect("invalid test case")
             .with_timezone(&Utc);

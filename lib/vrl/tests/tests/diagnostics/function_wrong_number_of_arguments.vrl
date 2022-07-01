@@ -12,5 +12,6 @@
 #   = see documentation about function arguments at https://vrl.dev/expressions/#arguments
 #   = learn more about error code 106 at https://errors.vrl.dev/106
 #   = see language documentation at https://vrl.dev
+#   = try your code in the VRL REPL, learn more at https://vrl.dev/examples
 
 to_string("foo", "bar")

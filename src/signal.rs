@@ -29,10 +29,10 @@ pub struct SignalHandler {
 }
 
 impl SignalHandler {
-    /// Create a new signal handler. We'll have space for 2 control messages at a time, to
-    /// ensure the channel isn't blocking.
+    /// Create a new signal handler with space for 128 control messages at a time, to
+    /// ensure the channel doesn't overflow and drop signals.
     pub fn new() -> (Self, SignalRx) {
-        let (tx, rx) = broadcast::channel(2);
+        let (tx, rx) = broadcast::channel(128);
         let handler = Self {
             tx,
             shutdown_txs: vec![],

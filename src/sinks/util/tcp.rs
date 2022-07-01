@@ -291,6 +291,9 @@ where
             let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
 
             let mut mapped_input = stream::once(ready(item)).chain(&mut input).map(|event| {
+                drop(event.finalizers);
+                self.acker.ack(1);
+
                 emit!(EventsSent {
                     count: 1,
                     byte_size: event.byte_size,

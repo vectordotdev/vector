@@ -376,7 +376,7 @@ mod tests {
         )
         .sink_map_err(|error| error!(message = "Fatal azure_monitor_logs sink error.", %error));
 
-        let event = Event::from("simple message");
+        let event = Event::Log(LogEvent::from("simple message"));
         run_and_assert_sink_compliance(
             VectorSink::from_event_sink(sink),
             stream::once(ready(event)),

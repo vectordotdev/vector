@@ -1,13 +1,11 @@
-use std::borrow::Cow;
-use std::{convert::TryFrom, fmt};
+use std::{borrow::Cow, convert::TryFrom, fmt};
 
 use diagnostic::{DiagnosticMessage, Label, Note};
 use lookup::{Lookup, LookupBuf, Segment};
 use value::{Kind, Value};
 
-use crate::expression::assignment::ErrorVariant::InvalidParentPathSegment;
 use crate::{
-    expression::{Expr, Resolved},
+    expression::{assignment::ErrorVariant::InvalidParentPathSegment, Expr, Resolved},
     parser::{
         ast::{self, Ident},
         Node,
