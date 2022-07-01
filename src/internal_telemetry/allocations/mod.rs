@@ -47,7 +47,7 @@ fn get_global_collector() -> &'static Collector {
         // doesn't get registered through our own allocation group token registration flow, which is where we would
         // otherwise register group IDs in the page table.
         let collector = Collector::new();
-        collector.register(AllocationGroupId::ROOT);
+        //collector.register(AllocationGroupId::ROOT);
         collector
     })
 }
@@ -120,12 +120,13 @@ impl Collector {
         }
     }
 
+    /*
     fn register(&self, group_id: AllocationGroupId) {
         let local_stats_table = self.statistics.get_or_default();
         local_stats_table.register(group_id.as_usize().get())
     }
 
-    /*fn collect_statistics(&self) -> HashMap<usize, GroupStatisticsSnapshot> {
+    fn collect_statistics(&self) -> HashMap<usize, GroupStatisticsSnapshot> {
         let mut groups = HashMap::new();
 
         for local_groups in self.statistics.iter() {}
@@ -154,7 +155,8 @@ impl Tracker {
 
 impl AllocationTracker for Tracker {
     fn allocated(&self, _addr: usize, size: usize, group_id: AllocationGroupId) {
-        let local_group_stats = self.get_local_group_stats(group_id);
+        let local_group_stats = self.get_local_group_stats(group_id.clone());
+        //println!("tid {:?}: got group stats for {}", std::thread::current().id(), group_id.as_usize().get());
         local_group_stats.track_allocation(size);
     }
 
@@ -198,8 +200,16 @@ pub fn acquire_allocation_group_token(_tags: Vec<(String, String)>) -> Allocatio
     let token =
         AllocationGroupToken::register().expect("failed to register allocation group token");
 
-    let collector = get_global_collector();
-    collector.register(token.id());
+    //let collector = get_global_collector();
+    //collector.register(token.id());
+
+    // BROKEN: currently, we register a token on the thread it's created, which initializes the page it needs, etc
+    // etc... but what we actually need to do is initialize it in all threads, or know that it isn't already initialized
+    // in the current thread and do so... but that implies tracking a lot of per-thread state which might get squicky,
+    // and would mean a runtime check per tracked allocation, which kinda sucks...
+    //
+    // this might mean that we actually want to do at least the `is_initialized`/`initialize` call automatically in
+    // `LazilyAllocatedPage::get` if we can make sure it's super cheap, and then we can make that method much safer
 
     token
 }

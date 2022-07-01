@@ -1,15 +1,19 @@
+// TODO: can we speed up/remove the `is_initialized` check if instead we use `Cell<usize>` to track the highest idx that
+// we've initialized for so far, and store that on the page table, since we have mutable access to it by nature of it
+// being in thread-local storage, and then we get to avoid having to do an atomic load every single `get`?
+
+// TODO: we know that our group ID will never be zero, which means we're just wasting a page for no good reason. we
+// should write a lil helper method that takes a group ID and gives back the usize version, but shifted down by 1, and
+// just make sure to use that for all group ID -> usize translations.
+
 use std::{
     cell::UnsafeCell,
     mem::{self, MaybeUninit},
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::atomic::{AtomicBool, Ordering},
 };
 
 const POINTER_WIDTH: u32 = usize::BITS;
-const PAGE_COUNT: usize = (POINTER_WIDTH + 1) as usize;
-
-const UNINITIALIZED: usize = 0;
-const INITIALIZING: usize = 1;
-const INITIALIZED: usize = 2;
+const PAGE_COUNT: usize = (POINTER_WIDTH - 1) as usize;
 
 /// A lazily-allocated memory page.
 ///
@@ -18,8 +22,9 @@ const INITIALIZED: usize = 2;
 #[derive(Debug)]
 struct LazilyAllocatedPage<T> {
     page_size: usize,
-    state: AtomicUsize,
-    slots: UnsafeCell<MaybeUninit<Box<[T]>>>,
+    initialized: AtomicBool,
+    initialized_fast: UnsafeCell<bool>,
+    data: UnsafeCell<MaybeUninit<Box<[T]>>>,
 }
 
 impl<T> LazilyAllocatedPage<T>
@@ -33,46 +38,44 @@ where
     const fn new(page_size: usize) -> Self {
         Self {
             page_size,
-            state: AtomicUsize::new(UNINITIALIZED),
-            slots: UnsafeCell::new(MaybeUninit::uninit()),
+            initialized: AtomicBool::new(false),
+            initialized_fast: UnsafeCell::new(false),
+            data: UnsafeCell::new(MaybeUninit::uninit()),
         }
     }
 
+    /*
     /// Gets whether or not this page has been initialized yet.
     fn is_initialized(&self) -> bool {
-        self.state.load(Ordering::Acquire) == INITIALIZED
+        self.initialized.load(Ordering::Acquire)
+    }
+    */
+
+    /// Gets whether or not this page has been initialized yet, but quickly.
+    fn is_initialized_fast(&self) -> bool {
+        unsafe { self.initialized_fast.get().read() }
     }
 
-    /// Initializes the page, allocating the necessary underlying storage.
+    /// Initializes the page, allocating the underlying storage.
     fn initialize(&self) {
-        // Try to acquire the right to initialize this page, if it's uninitialized.
-        //
-        // If we lose the race, it's because another caller is currently initializing it, in which case we wait for them
-        // to complete... or because it's already initialize.
-        if self
-            .state
-            .compare_exchange(
-                UNINITIALIZED,
-                INITIALIZING,
-                Ordering::AcqRel,
-                Ordering::Relaxed,
-            )
-            .is_ok()
-        {
+        if !self.initialized.load(Ordering::Acquire) {
             // Allocate the underlying storage for this page.
-            let mut slots = Vec::with_capacity(self.page_size);
-            slots.resize_with(self.page_size, T::default);
+            let mut data = Vec::with_capacity(self.page_size);
+            data.resize_with(self.page_size, T::default);
 
-            // SAFETY: We have exclusive access to `self.slots` if we won the race to set `self.state` to
-            // `INITIALIZING`. Callers could still concurrently call `get_unchecked`, but that method is unsafe
-            // specifically because it's a violation of the API contract to not call `initialize` first before
-            // `get_unchecked`.
-            unsafe { (&mut *self.slots.get()).write(slots.into_boxed_slice()) };
+            // SAFETY: `LazilyAllocatedPage<T>::initialize` is only called by `PageTable<T>::get`, and `PageTable<T>` is
+            // only stored/used in a thread-local fashion. This means that any access to `PageTable<T>::get` is
+            // happening from the same thread that owns it, ensuring that the caller has exclusive access.
+            //
+            // Our usage of `self.initialized` ensures that we can't mistakenly try to initialize the same page again,
+            // but its use is primarily for the synchronization necessary to support concurrent reads via `as_slice`,
+            // not to synchronize mutable access in this method itself.
+            unsafe { (&mut *self.data.get()).write(data.into_boxed_slice()) };
 
-            self.state.store(INITIALIZED, Ordering::Release);
-        } else {
-            // Another caller is initializing this page, so wait for them to finish before we return.
-            while self.state.load(Ordering::Relaxed) != INITIALIZED {}
+            unsafe {
+                self.initialized_fast.get().write(true);
+            }
+            self.initialized.store(true, Ordering::Release);
         }
     }
 
@@ -80,13 +83,10 @@ where
     ///
     /// # Safety
     ///
-    /// It is the callers responsibility to ensure that they have a valid index for this page. This is given by passing
-    /// the regular group ID into `id_to_page`, where the page index and page subindex are given. A given page subindex
-    /// is only valid for the page index it was given with.
-    ///
-    /// Using any other values are instant UB, and will likely cause the process to abort.
+    /// It is the callers responsibility to ensure that they have a valid index for this page. Using a value that
+    /// exceeds `self.page_size` will result in instant UB at best, and a process abort at worst.
     unsafe fn get_unchecked(&self, index: usize) -> &T {
-        (&*self.slots.get()).assume_init_ref().get_unchecked(index)
+        (&*self.data.get()).assume_init_ref().get_unchecked(index)
     }
 
     /*
@@ -96,7 +96,7 @@ where
     fn as_slice(&self) -> &[T] {
         if self.state.load(Ordering::Relaxed) == INITIALIZED {
             // SAFETY: We know that if `self.state` is `INITIALIZED`, then `self.slots` is initialized.
-            unsafe { (&*self.slots.get()).assume_init_ref() }
+            unsafe { (&*self.data.get()).assume_init_ref() }
         } else {
             &[]
         }
@@ -110,9 +110,9 @@ unsafe impl<T> Sync for LazilyAllocatedPage<T> where T: Sync {}
 
 impl<T> Drop for LazilyAllocatedPage<T> {
     fn drop(&mut self) {
-        if *self.state.get_mut() == INITIALIZED {
-            // SAFETY: We know that if `self.state` is `INITIALIZED`, then `self.slots` is initialized.
-            unsafe { (&mut *self.slots.get()).assume_init_drop() }
+        if *self.initialized.get_mut() {
+            // SAFETY: We know that if `self.initialized` is `true`, then `self.data` is initialized.
+            unsafe { (&mut *self.data.get()).assume_init_drop() }
         }
     }
 }
@@ -129,35 +129,17 @@ impl<T> PageTable<T>
 where
     T: Default,
 {
-    /// Visits all initialized indexes.
-    /*pub fn visit<F>(&self, _f: F)
-    where
-        F: Fn(usize, &T),
-    {
-    }*/
-
-    /// Registers the given index.
-    ///
-    /// This ensures that the necessary storage at the given index is allocated and initialized.
-    pub fn register(&self, idx: usize) {
-        let (page_idx, _) = idx_to_page_idxs(idx);
-
-        // SAFETY: `page` can never be a value greater than `PAGE_COUNT`.
-        let page = unsafe { self.pages.get_unchecked(page_idx) };
-        if !page.is_initialized() {
-            page.initialize();
-        }
-    }
-
     /// Gets a reference to the element at the given index.
     ///
     /// # Safety
     ///
-    /// This function assumes that the page where the given index lives has been previously initialized via `register`.
-    /// Otherwise, this call will trigger instant UB, and will likely cause the process to abort.
-    pub unsafe fn get(&self, idx: usize) -> &T {
+    /// The caller must ensure that this method is not called concurrently.
+    pub(crate) unsafe fn get(&self, idx: usize) -> &T {
         let (page_idx, page_subidx) = idx_to_page_idxs(idx);
         let page = self.pages.get_unchecked(page_idx);
+        if !page.is_initialized_fast() {
+            page.initialize();
+        }
         page.get_unchecked(page_subidx)
     }
 }
