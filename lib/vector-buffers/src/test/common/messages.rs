@@ -102,7 +102,10 @@ impl SizedRecord {
     }
 
     fn encoded_len(&self) -> usize {
-        let payload_len: usize = self.0.try_into().expect("`SizedRecord` should never have a payload length greater than `usize`.");
+        let payload_len: usize = self
+            .0
+            .try_into()
+            .expect("`SizedRecord` should never have a payload length greater than `usize`.");
 
         payload_len + mem::size_of_val(&self.0)
     }
