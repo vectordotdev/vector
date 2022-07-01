@@ -64,16 +64,12 @@ impl GelfSerializerConfig {
 /// Serializer that converts an `Event` to bytes using the GELF format.
 /// Spec: https://docs.graylog.org/docs/gelf
 #[derive(Debug, Clone)]
-pub struct GelfSerializer {
-    conformed_log: Option<LogEvent>,
-}
+pub struct GelfSerializer;
 
 impl GelfSerializer {
     /// Creates a new `GelfSerializer`.
     pub fn new() -> Self {
-        GelfSerializer {
-            conformed_log: None,
-        }
+        GelfSerializer
     }
 
     /// Encode event and represent it as JSON value.
@@ -86,7 +82,7 @@ impl GelfSerializer {
         }
     }
 
-    // emits the GelfSerializeFailedInvalidType internal event and returns Err
+    /// Emits the GelfSerializeFailedInvalidType internal event and returns Err.
     fn emit_invalid_type(
         &self,
         field: &str,
@@ -107,8 +103,24 @@ impl GelfSerializer {
         .into())
     }
 
+    /// Creates the clone of input LogEvent if needed and returns mutable
+    fn conformed_log_mut<'a>(
+        &self,
+        log: &LogEvent,
+        conformed_log: &'a mut Option<LogEvent>,
+    ) -> &'a mut LogEvent {
+        if conformed_log.is_none() {
+            *conformed_log = Some(log.clone());
+        }
+        conformed_log.as_mut().unwrap()
+    }
+
     /// Validates that the GELF required fields exist in the event.
-    fn validate_required_fields(&mut self, log: &LogEvent) -> vector_core::Result<()> {
+    fn validate_required_fields(
+        &self,
+        log: &LogEvent,
+        conformed_log: &mut Option<LogEvent>,
+    ) -> vector_core::Result<()> {
         // emits the GelfSerializeFailedMissingField internal event and returns Err
         fn emit_missing_field(field: &str) -> vector_core::Result<()> {
             vector_core::internal_event::emit(SerializeFailedMissingField {
@@ -121,10 +133,7 @@ impl GelfSerializer {
 
         // add the VERSION if it does not exist
         if !log.contains(VERSION) {
-            self.conformed_log = Some(log.clone());
-            self.conformed_log
-                .as_mut()
-                .unwrap()
+            self.conformed_log_mut(log, conformed_log)
                 .insert(VERSION, GELF_VERSION);
         }
 
@@ -136,12 +145,7 @@ impl GelfSerializer {
         if !log.contains(SHORT_MESSAGE) {
             // rename the log_schema().message_key() to SHORT_MESSAGE
             if log.contains(message_key) {
-                if self.conformed_log.is_none() {
-                    self.conformed_log = Some(log.clone());
-                }
-                self.conformed_log
-                    .as_mut()
-                    .unwrap()
+                self.conformed_log_mut(log, conformed_log)
                     .rename_key(message_key, SHORT_MESSAGE);
             } else {
                 emit_missing_field(SHORT_MESSAGE)?;
@@ -150,22 +154,19 @@ impl GelfSerializer {
         Ok(())
     }
 
+    /// Valides rules for additional field names and value types.
     fn validate_additional_field(
-        &mut self,
+        &self,
         key: &str,
         value: &Value,
         log: &LogEvent,
+        conformed_log: &mut Option<LogEvent>,
     ) -> vector_core::Result<()> {
         // Additional fields must be prefixed with underscores.
         // Prepending the underscore since vector adds fields such as 'source_type'
         // which would otherwise throw errors.
         if !key.is_empty() && !key.starts_with('_') {
-            if self.conformed_log.is_none() {
-                self.conformed_log = Some(log.clone())
-            }
-            self.conformed_log
-                .as_mut()
-                .unwrap()
+            self.conformed_log_mut(log, conformed_log)
                 .rename_key(key, &*format!("_{}", &key));
         }
 
@@ -187,7 +188,11 @@ impl GelfSerializer {
     }
 
     /// Validates rules for field names and value types.
-    fn validate_field_names_and_values(&mut self, log: &LogEvent) -> vector_core::Result<()> {
+    fn validate_field_names_and_values(
+        &self,
+        log: &LogEvent,
+        conformed_log: &mut Option<LogEvent>,
+    ) -> vector_core::Result<()> {
         if let Some(event_data) = log.as_map() {
             for (key, value) in event_data {
                 match key.as_str() {
@@ -212,7 +217,7 @@ impl GelfSerializer {
                         }
                     }
                     _ => {
-                        self.validate_additional_field(key, value, log)?;
+                        self.validate_additional_field(key, value, log, conformed_log)?;
                     }
                 }
             }
@@ -221,9 +226,14 @@ impl GelfSerializer {
     }
 
     /// Determine if input log event is in valid GELF format
-    fn validate_event_is_gelf(&mut self, log: &LogEvent) -> vector_core::Result<()> {
-        self.validate_required_fields(log)?;
-        self.validate_field_names_and_values(log)
+    /// Potentially return a copy of the log event that was modified to conform to valid GELF
+    fn to_gelf_event(&self, log: &LogEvent) -> vector_core::Result<Option<LogEvent>> {
+        let mut conformed_log = None;
+
+        self.validate_required_fields(log, &mut conformed_log)?;
+        self.validate_field_names_and_values(log, &mut conformed_log)?;
+
+        Ok(conformed_log)
     }
 }
 
@@ -240,10 +250,7 @@ impl Encoder<Event> for GelfSerializer {
         let log = event.as_log();
         let writer = buffer.writer();
 
-        self.validate_event_is_gelf(log)?;
-
-        // if event was conformed to valid GELF, use that instead
-        if let Some(conformed) = &self.conformed_log {
+        if let Some(conformed) = self.to_gelf_event(log)? {
             serde_json::to_writer(writer, &conformed)?;
         } else {
             serde_json::to_writer(writer, &log)?;
