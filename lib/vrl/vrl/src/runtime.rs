@@ -121,7 +121,6 @@ impl BatchRuntime {
         program: &Program,
         timezone: TimeZone,
     ) -> Vec<RuntimeResult> {
-        let mut invalid_indices = Vec::new();
         let mut invalid_values = Vec::new();
         let (indices, targets) = (0..targets.len())
             .into_iter()
@@ -131,17 +130,21 @@ impl BatchRuntime {
                 match target.clone().borrow().target_get(&self.root_lookup) {
                     Ok(Some(_)) => Some((index, target)),
                     Ok(None) => {
-                        invalid_indices.push(index);
-                        invalid_values.push(Err(Terminate::Error(
-                            "expected target object, got nothing".to_owned().into(),
-                        )));
+                        invalid_values.push((
+                            index,
+                            Err(Terminate::Error(
+                                "expected target object, got nothing".to_owned().into(),
+                            )),
+                        ));
                         None
                     }
                     Err(err) => {
-                        invalid_indices.push(index);
-                        invalid_values.push(Err(Terminate::Error(
-                            format!("error querying target object: {}", err).into(),
-                        )));
+                        invalid_values.push((
+                            index,
+                            Err(Terminate::Error(
+                                format!("error querying target object: {}", err).into(),
+                            )),
+                        ));
                         None
                     }
                 }
@@ -155,30 +158,23 @@ impl BatchRuntime {
         let mut ctx = BatchContext::new(indices, values, targets, states, timezone);
         program.resolve_batch(&mut ctx);
 
-        let (_, resolved_values, _, _, _) = ctx.into_parts();
-        let mut resolved_values = resolved_values
-            .into_iter()
-            .map(|resolved| {
-                resolved.map_err(|err| match err {
-                    #[cfg(feature = "expr-abort")]
-                    ExpressionError::Abort { .. } => Terminate::Abort(err),
-                    err @ ExpressionError::Error { .. } => Terminate::Error(err),
-                })
+        let (indices, resolved_values, _, _, _) = ctx.into_parts();
+        let resolved_values = resolved_values.into_iter().map(|resolved| {
+            resolved.map_err(|err| match err {
+                #[cfg(feature = "expr-abort")]
+                ExpressionError::Abort { .. } => Terminate::Abort(err),
+                err @ ExpressionError::Error { .. } => Terminate::Error(err),
             })
+        });
+
+        let mut result = indices
+            .into_iter()
+            .zip(resolved_values)
+            .chain(invalid_values)
             .collect::<Vec<_>>();
 
-        resolved_values.extend(invalid_values);
+        result.sort_unstable_by(|(a, ..), (b, ..)| b.cmp(a));
 
-        // let mut result = indices
-        //     .into_iter()
-        //     .zip(resolved_values)
-        //     .chain(invalid_values)
-        //     .collect::<Vec<_>>();
-
-        // result.sort_unstable_by(|(a, ..), (b, ..)| b.cmp(a));
-
-        // result.into_iter().map(|(_, resolved)| resolved).collect()
-
-        resolved_values
+        result.into_iter().map(|(_, resolved)| resolved).collect()
     }
 }
