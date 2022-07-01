@@ -202,8 +202,18 @@ impl Definition {
     ///
     /// This method panics if the provided path points to an unknown location in the collection.
     #[must_use]
-    pub fn with_known_meaning(mut self, path: impl Into<LookupBuf>, meaning: &str) -> Self {
+    pub fn with_meaning(mut self, path: impl Into<LookupBuf>, meaning: &str) -> Self {
         let path = path.into();
+
+        // Ensure the path exists in the collection.
+        assert!(
+            self.kind
+                .find_at_path(&mut path.to_lookup())
+                .ok()
+                .flatten()
+                .is_some(),
+            "meaning must point to a valid path"
+        );
 
         self.meaning
             .insert(meaning.to_owned(), MeaningPointer::Valid(path));

@@ -208,7 +208,7 @@ impl TransformConfig for RemapConfig {
                     input_definition.log_namespaces().clone(),
                 );
                 for (id, path) in meaning {
-                    new_type_def = new_type_def.with_known_meaning(path, &id);
+                    new_type_def = new_type_def.with_meaning(path, &id);
                 }
                 new_type_def
             })
