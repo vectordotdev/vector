@@ -13,6 +13,7 @@
 #   = see documentation about if expressions at https://vrl.dev/expressions/#if
 #   = learn more about error code 102 at https://errors.vrl.dev/102
 #   = see language documentation at https://vrl.dev
+#   = try your code in the VRL REPL, learn more at https://vrl.dev/examples
 
 if "nope" {
     true

@@ -32,7 +32,9 @@ use super::{
 use crate::{
     encoding::{AsMetadata, Encodable},
     variants::disk_v2::{
-        io::AsyncFile, reader::decode_record_payload, record::try_as_record_archive,
+        io::AsyncFile,
+        reader::decode_record_payload,
+        record::{try_as_record_archive, RECORD_HEADER_LEN},
     },
     Bufferable,
 };
@@ -67,7 +69,7 @@ where
     ///
     /// The record that was given to write is returned.
     #[snafu(display("data file full or record would exceed max data file size"))]
-    DataFileFull { record: T, serialized_size: usize },
+    DataFileFull { record: T, serialized_len: usize },
 
     /// A record reported that it contained more events than the number of bytes when encoded.
     ///
@@ -143,13 +145,13 @@ impl<T: Bufferable + PartialEq> PartialEq for WriterError<T> {
             (
                 Self::DataFileFull {
                     record: l_record,
-                    serialized_size: l_serialized_size,
+                    serialized_len: l_serialized_len,
                 },
                 Self::DataFileFull {
                     record: r_record,
-                    serialized_size: r_serialized_size,
+                    serialized_len: r_serialized_len,
                 },
-            ) => l_record == r_record && l_serialized_size == r_serialized_size,
+            ) => l_record == r_record && l_serialized_len == r_serialized_len,
             (
                 Self::NonsensicalEventCount {
                     encoded_len: l_encoded_len,
@@ -199,6 +201,22 @@ where
 {
     fn from(source: io::Error) -> Self {
         WriterError::Io { source }
+    }
+}
+
+#[derive(Debug)]
+pub(super) struct WriteToken {
+    event_count: usize,
+    serialized_len: usize,
+}
+
+impl WriteToken {
+    pub fn event_count(&self) -> usize {
+        self.event_count
+    }
+
+    pub fn serialized_len(&self) -> usize {
+        self.serialized_len
     }
 }
 
@@ -367,6 +385,28 @@ where
         max_data_file_size: u64,
         max_record_size: usize,
     ) -> Self {
+        // These should also be getting checked at a higher level, but we're double-checking them here to be absolutely sure.
+        let max_record_size_converted = u64::try_from(max_record_size)
+            .expect("Maximum record size must be less than 2^64 bytes.");
+
+        debug_assert!(
+            max_record_size > RECORD_HEADER_LEN,
+            "maximum record length must be larger than size of record header itself"
+        );
+        debug_assert!(
+            max_data_file_size >= max_record_size_converted,
+            "must always be able to fit at least one record into a data file"
+        );
+
+        // We subtract the length of the record header from our allowe maximum record size, because we have to make sure
+        // that when we go to actually wrap and serialize the encoded record, we're limiting the actual bytes we write
+        // to disk to within `max_record_size`.
+        //
+        // This could lead to us reducing the encode buffer size limit by slightly more than necessary, since
+        // `RECORD_HEADER_LEN` might be overaligned compared to what it would be necessary when we look at the
+        // encoded/serialized record... but that's OK, but it's only going to differ by 8 bytes at most.
+        let max_record_size = max_record_size - RECORD_HEADER_LEN;
+
         Self {
             writer: TrackingBufWriter::with_capacity(write_buffer_size, writer),
             encode_buf: Vec::with_capacity(16_384),
@@ -391,10 +431,9 @@ where
     /// If no bytes have written at all to a data file, then `amount` is allowed to exceed the
     /// limit, otherwise a record would never be able to be written.
     fn can_write(&self, amount: usize) -> bool {
-        let amount = u64::try_from(amount)
-            .expect("Vector does not yet support running on 128-bit architectures.");
-        self.current_data_file_size == 0
-            || self.current_data_file_size + amount as u64 <= self.max_data_file_size
+        let amount = u64::try_from(amount).expect("`amount` should need ever 2^64 bytes.");
+
+        self.current_data_file_size + amount <= self.max_data_file_size
     }
 
     /// Archives a record.
@@ -408,7 +447,9 @@ where
     /// Errors can occur during the encoding or serialization stage.  If an error occurs
     /// during any of these stages, an appropriate error variant will be returned describing the error.
     #[instrument(skip(self, record), level = "trace")]
-    pub fn archive_record(&mut self, id: u64, record: T) -> Result<usize, WriterError<T>> {
+    pub fn archive_record(&mut self, id: u64, record: T) -> Result<WriteToken, WriterError<T>> {
+        let event_count = record.event_count();
+
         self.encode_buf.clear();
         self.ser_buf.clear();
         self.ser_scratch.clear();
@@ -464,31 +505,30 @@ where
             Infallible,
         );
 
-        let serializer_pos = serializer
+        let serialized_len = serializer
             .serialize_value(&wrapped_record)
             .map(|_| serializer.pos())?;
 
         // Sanity check before we do our length math.
-        if serializer_pos <= 8 || self.ser_buf.len() != serializer_pos {
+        if serialized_len <= 8 || self.ser_buf.len() != serialized_len {
             return Err(WriterError::FailedToSerialize {
                 reason: format!(
                     "serializer position invalid for context: pos={} len={}",
-                    serializer_pos,
+                    serialized_len,
                     self.ser_buf.len(),
                 ),
             });
         }
 
-        let archive_buf = self.ser_buf.as_slice();
-        debug_assert_eq!(archive_buf.len(), serializer_pos);
-
         // With the record archived and serialized, do our final check to ensure we can fit this
-        // write.  We always allow at least one write into an empty data file.
-        if !self.can_write(serializer_pos) {
+        // write.  We're doing this earlier than the actual call to flush it because it gives us
+        // a chance to hand back the event so that the caller can roll to a new data file first
+        // before attempting the writer again.
+        if !self.can_write(serialized_len) {
             debug!(
                 current_data_file_size = self.current_data_file_size,
                 max_data_file_size = self.max_data_file_size,
-                archive_on_disk_len = serializer_pos,
+                archive_on_disk_len = serialized_len,
                 "Archived record is too large to fit in remaining free space of current data file."
             );
 
@@ -503,21 +543,24 @@ where
 
             return Err(WriterError::DataFileFull {
                 record,
-                serialized_size: serializer_pos,
+                serialized_len,
             });
         }
 
         // Fix up our length delimiter.
-        let archive_len = serializer_pos - 8;
+        let archive_len = serialized_len - 8;
         let wire_archive_len: u64 = archive_len
             .try_into()
             .expect("archive len should always fit into a u64");
         let archive_len_buf = wire_archive_len.to_be_bytes();
 
-        let length_delimiter_dst = &mut self.ser_buf.as_mut_slice()[0..8];
+        let length_delimiter_dst = &mut self.ser_buf[0..8];
         length_delimiter_dst.copy_from_slice(&archive_len_buf[..]);
 
-        Ok(serializer_pos)
+        Ok(WriteToken {
+            event_count,
+            serialized_len,
+        })
     }
 
     /// Writes a record.
@@ -544,18 +587,96 @@ where
         id: u64,
         record: T,
     ) -> Result<(usize, Option<FlushResult>), WriterError<T>> {
-        let event_count = record.event_count();
-        let serialized_len = self.archive_record(id, record)?;
+        let token = self.archive_record(id, record)?;
+        self.flush_record(token).await
+    }
+
+    /// Flushes the previously-archived record.
+    ///
+    /// If the flush is successful, the number of bytes written to the buffer are returned.
+    /// Additionally, if any internal buffers required an implicit flush, the result of that flush
+    /// operation is returned as well.
+    ///
+    /// As we internally buffers write to the underlying data file, to reduce the number of syscalls
+    /// required to pushed serialized records to the data file, we sometimes will write a record
+    /// which would overflow the internal buffer.  Doing so means we have to first flush the buffer
+    /// before continuing with buffering the current write.  As some invariants are based on knowing
+    /// when a record has actually been written to the data file, we return any information of
+    /// implicit flushes so that the writer can be aware of when data has actually made it to the
+    /// data file or not.
+    #[instrument(skip(self), level = "trace")]
+    pub async fn flush_record(
+        &mut self,
+        token: WriteToken,
+    ) -> Result<(usize, Option<FlushResult>), WriterError<T>> {
+        // Make sure the write token we've been given matches whatever the last call to `archive_record` generated.
+        let event_count = token.event_count();
+        let serialized_len = token.serialized_len();
+        debug_assert_eq!(
+            serialized_len,
+            self.ser_buf.len(),
+            "using write token from non-contiguous archival call"
+        );
+
         let flush_result = self
             .writer
-            .write(event_count, self.ser_buf.as_slice())
+            .write(event_count, &self.ser_buf[..])
             .await
             .context(IoSnafu)?;
 
         // Update our current data file size.
-        self.current_data_file_size += serialized_len as u64;
+        self.current_data_file_size += u64::try_from(serialized_len)
+            .expect("Serialized length of record should never exceed 2^64 bytes.");
 
         Ok((serialized_len, flush_result))
+    }
+
+    /// Recovers an archived record that has not yet been flushed.
+    ///
+    /// In some cases, we must archive a record to see how large the resulting archived record is, and potentially
+    /// recover the original record if it's too large, and so on.
+    ///
+    /// This method allows decoding an archived record that is still sitting in the internal buffers waiting to be
+    /// flushed. Technically, this decodes the original record back from its archived/encoded form, and so this isn't a
+    /// clone but it does mean incurring the cost of decoding directly.
+    ///
+    /// # Errors
+    ///
+    /// If the archived record cannot be deserialized from its archival form, or can't be decoded back to its original
+    /// form `T`, an error variant will be returned describing the error. Notably, the only error we return is
+    /// `InconsistentState`, as being unable to immediately deserialize and decode a record we just serialized and
+    /// encoded implies a fatal, and unrecoverable, error with the buffer implementation as a whole.
+    #[instrument(skip(self), level = "trace")]
+    pub fn recover_archived_record(&mut self, token: WriteToken) -> Result<T, WriterError<T>> {
+        // Make sure the write token we've been given matches whatever the last call to `archive_record` generated.
+        let serialized_len = token.serialized_len();
+        debug_assert_eq!(
+            serialized_len,
+            self.ser_buf.len(),
+            "using write token from non-contiguous archival call"
+        );
+
+        // First, decode the archival wrapper. This means skipping the length delimiter.
+        let wrapped_record = try_as_record_archive(&self.ser_buf[8..]).map_err(|_| {
+            WriterError::InconsistentState {
+                reason: "failed to decode archived record immediately after archiving it"
+                    .to_string(),
+            }
+        })?;
+
+        // Now we can actually decode it as `T`.
+        let record_metadata = T::Metadata::from_u32(wrapped_record.metadata()).ok_or(
+            WriterError::InconsistentState {
+                reason: "failed to decode record metadata immediately after encoding it"
+                    .to_string(),
+            },
+        )?;
+
+        T::decode(record_metadata, wrapped_record.payload()).map_err(|_| {
+            WriterError::InconsistentState {
+                reason: "failed to decode record immediately after encoding it".to_string(),
+            }
+        })
     }
 
     /// Flushes the writer.
@@ -608,7 +729,7 @@ where
 impl<T, FS> Writer<T, FS>
 where
     T: Bufferable,
-    FS: Filesystem + Clone,
+    FS: Filesystem + fmt::Debug + Clone,
     FS::File: Unpin,
 {
     /// Creates a new [`Writer`] attached to the given [`Ledger`].
@@ -645,11 +766,11 @@ where
     }
 
     fn flush_write_state_partial(&mut self, flushed_events: u64, flushed_bytes: u64) {
-        assert!(
+        debug_assert!(
             flushed_events <= self.unflushed_events,
             "tried to flush more events than are currently unflushed"
         );
-        assert!(
+        debug_assert!(
             flushed_bytes <= self.unflushed_bytes,
             "tried to flush more bytes than are currently unflushed"
         );
@@ -664,8 +785,16 @@ where
         self.ledger.track_write(flushed_events, flushed_bytes);
     }
 
-    fn can_write(&mut self) -> bool {
+    fn can_write(&self) -> bool {
         !self.data_file_full && self.data_file_size < self.config.max_data_file_size
+    }
+
+    fn can_write_record(&self, amount: usize) -> bool {
+        let total_buffer_size = self.ledger.get_total_buffer_size() + self.unflushed_bytes;
+        let potential_write_len =
+            u64::try_from(amount).expect("Vector only supports 64-bit architectures.");
+
+        self.can_write() && total_buffer_size + potential_write_len <= self.config.max_buffer_size
     }
 
     #[instrument(skip(self), level = "debug")]
@@ -1031,24 +1160,24 @@ where
     /// If an error occurred while writing the record, an error variant will be returned describing
     /// the error.
     pub async fn try_write_record(&mut self, record: T) -> Result<Option<T>, WriterError<T>> {
-        if self.is_buffer_full() {
-            return Ok(Some(record));
-        }
-
-        self.write_record(record).await.map(|_| None)
+        self.try_write_record_inner(record)
+            .await
+            .map(|result| match result {
+                Ok(_) => None,
+                Err(record) => Some(record),
+            })
     }
 
-    /// Writes a record.
-    ///
-    /// If the record was written successfully, the number of bytes written to the data file will be
-    /// returned.
-    ///
-    /// # Errors
-    ///
-    /// If an error occurred while writing the record, an error variant will be returned describing
-    /// the error.
     #[instrument(skip_all, level = "debug")]
-    pub async fn write_record(&mut self, mut record: T) -> Result<usize, WriterError<T>> {
+    async fn try_write_record_inner(
+        &mut self,
+        mut record: T,
+    ) -> Result<Result<usize, T>, WriterError<T>> {
+        // If the buffer is already full, we definitely can't complete this write.
+        if self.is_buffer_full() {
+            return Ok(Err(record));
+        }
+
         let record_events: NonZeroUsize = record
             .event_count()
             .try_into()
@@ -1057,7 +1186,7 @@ where
         // Grab the next record ID and attempt to write the record.
         let record_id = self.get_next_record_id();
 
-        let (bytes_written, flush_result) = loop {
+        let token = loop {
             // Make sure we have an open data file to write to, which might also be us opening the
             // next data file because our first attempt at writing had to finalize a data file that
             // was already full.
@@ -1067,26 +1196,57 @@ where
                 .writer
                 .as_mut()
                 .expect("writer should exist after `ensure_ready_for_write`");
-            match writer.write_record(record_id, record).await {
-                Ok(result) => break result,
-                Err(WriterError::DataFileFull {
-                    record: old_record,
-                    serialized_size,
-                }) => {
-                    // The data file is full, so we need to roll to the next one before attempting
-                    // the write again.  We also recapture the record for the next write attempt.
-                    self.mark_data_file_full();
-                    record = old_record;
 
-                    debug!(
-                        current_data_file_size = self.data_file_size,
-                        max_data_file_size = self.config.max_data_file_size,
-                        last_attempted_write_size = serialized_size,
-                        "Current data file reached maximum size. Rolling to the next data file."
-                    );
-                }
-                Err(e) => return Err(e),
+            // Archive the record, which if it succeeds in terms of encoding, etc, will give us a token that we can use
+            // to eventually write it to storage. This may fail if the record writer detects it can't fit the archived
+            // record in the current data file, so we handle that separately. All other errors must be handled by the caller.
+            match writer.archive_record(record_id, record) {
+                Ok(token) => break token,
+                Err(we) => match we {
+                    WriterError::DataFileFull {
+                        record: old_record,
+                        serialized_len,
+                    } => {
+                        // The data file is full, so we need to roll to the next one before attempting
+                        // the write again.  We also recapture the record for the next write attempt.
+                        self.mark_data_file_full();
+                        record = old_record;
+
+                        debug!(
+                            current_data_file_size = self.data_file_size,
+                            max_data_file_size = self.config.max_data_file_size,
+                            last_attempted_write_size = serialized_len,
+                            "Current data file reached maximum size. Rolling to the next data file."
+                        );
+
+                        continue;
+                    }
+                    e => return Err(e),
+                },
             }
+        };
+
+        // Now that we know the record was archived successfully -- record wasn't too large, etc -- we actually need
+        // to check if it will fit based on our current buffer size. If not, we recover the record from the writer's
+        // internal buffers, as we haven't yet flushed it, and we return it to the caller.
+        //
+        // Otherwise, we proceed with flushing like we normally would.
+        let can_write_record = self.can_write_record(token.serialized_len());
+        let writer = self
+            .writer
+            .as_mut()
+            .expect("writer should exist after `ensure_ready_for_write`");
+
+        let (bytes_written, flush_result) = if can_write_record {
+            // We always return errors here because flushing the record won't return a recoverable error like
+            // `DataFileFull`, as that gets checked during archiving.
+            writer.flush_record(token).await?
+        } else {
+            // The record would not fit given the current size of the buffer, so we need to recover it from the
+            // writer and hand it back. This looks a little weird because we want to surface deserialize/decoding
+            // errors if we encounter them, but if we recover the record successfully, we're returning
+            // `Ok(Err(record))` to signal that our attempt failed but the record is able to be retried again later.
+            return Ok(Err(writer.recover_archived_record(token)?));
         };
 
         // Track our write since things appear to have succeeded. This only updates our internal
@@ -1113,7 +1273,30 @@ where
             "Wrote record."
         );
 
-        Ok(bytes_written)
+        Ok(Ok(bytes_written))
+    }
+
+    /// Writes a record.
+    ///
+    /// If the record was written successfully, the number of bytes written to the data file will be
+    /// returned.
+    ///
+    /// # Errors
+    ///
+    /// If an error occurred while writing the record, an error variant will be returned describing
+    /// the error.
+    #[instrument(skip_all, level = "debug")]
+    pub async fn write_record(&mut self, mut record: T) -> Result<usize, WriterError<T>> {
+        loop {
+            match self.try_write_record_inner(record).await? {
+                Ok(bytes_written) => return Ok(bytes_written),
+                Err(old_record) => {
+                    record = old_record;
+                    self.ledger.wait_for_reader().await;
+                    continue;
+                }
+            }
+        }
     }
 
     #[instrument(skip(self), level = "debug")]
