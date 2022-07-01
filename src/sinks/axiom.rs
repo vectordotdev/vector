@@ -181,8 +181,6 @@ mod integration_tests {
             .json(&login_payload)
             .send()
             .await
-            .unwrap()
-            .error_for_status()
             .unwrap();
         let session_cookie = if login_res.status() == StatusCode::OK {
             Some(
@@ -217,7 +215,7 @@ mod integration_tests {
             Some(cookie) => cookie,
             None => {
                 // Try to initialize the deployment
-                let res = client
+                client
                     .post(format!("{}/auth/init", url))
                     .json(&auth_init_payload)
                     .send()
@@ -225,7 +223,6 @@ mod integration_tests {
                     .unwrap()
                     .error_for_status()
                     .unwrap();
-                assert_eq!(StatusCode::OK, res.status());
 
                 // Try again to log in and get the session cookie
                 let login_res = client
