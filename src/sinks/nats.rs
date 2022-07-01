@@ -13,7 +13,10 @@ use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::Encoder,
-    config::{AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext, SinkDescription},
+    config::{
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
+        SinkDescription,
+    },
     event::{Event, EventStatus, Finalizable},
     internal_events::{NatsEventSendError, TemplateRenderingError},
     nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},

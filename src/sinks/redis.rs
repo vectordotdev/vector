@@ -17,7 +17,7 @@ use vector_core::ByteSizeOf;
 use crate::{
     codecs::Encoder,
     config::{
-        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
+        self, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
         SinkDescription,
     },
     event::Event,
@@ -163,7 +163,7 @@ impl SinkConfig for RedisSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(self.encoding.config().input_type() & DataType::Log)
+        Input::new(self.encoding.config().input_type() & config::DataType::Log)
     }
 
     fn sink_type(&self) -> &'static str {
