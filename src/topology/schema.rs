@@ -50,11 +50,11 @@ pub fn merged_definition(
     for input in inputs {
         let key = &input.component;
 
-        // Merge the schema if it's a source
+        // Merge the schema if it's a source.
         if let Ok(maybe_output) = config.source_output_for_port(key, &input.port) {
             let source_definition = maybe_output
                 .unwrap_or_else(|| {
-                    panic!(
+                    unreachable!(
                         "source output mis-configured - output for port {:?} missing",
                         &input.port
                     )
@@ -76,24 +76,18 @@ pub fn merged_definition(
         if let Some(inputs) = config.transform_inputs(key) {
             let merged_definition = merged_definition(inputs, config, cache);
 
-            let maybe_transform_definition = config
+            let transform_definition = config
                 .transform_output_for_port(key, &input.port, &merged_definition)
                 .expect("transform must exist - already found inputs")
                 .unwrap_or_else(|| {
-                    panic!(
+                    unreachable!(
                         "transform output mis-configured - output for port {:?} missing",
                         &input.port
                     )
                 })
                 .log_schema_definition
-                .clone();
-
-            let transform_definition = match maybe_transform_definition {
-                Some(transform_definition) => transform_definition,
-                // If we get no match, we need to recursively call this method for the inputs of
-                // the given transform.
-                None => merged_definition,
-            };
+                .clone()
+                .unwrap_or(merged_definition);
 
             if config.schema_enabled() {
                 definition = definition.merge(transform_definition);
