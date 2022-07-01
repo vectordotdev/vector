@@ -18,9 +18,9 @@ use vector_config::configurable_component;
 use super::{
     AddCertToStoreSnafu, AddExtraChainCertSnafu, CaStackPushSnafu, DerExportSnafu,
     FileOpenFailedSnafu, FileReadFailedSnafu, MaybeTls, NewCaStackSnafu, NewStoreBuilderSnafu,
-    ParsePkcs12Snafu, Pkcs12Snafu, PrivateKeyParseSnafu, Result, SetCertificateSnafu,
-    SetPrivateKeySnafu, SetVerifyCertSnafu, TlsError, TlsIdentitySnafu, X509ParseSnafu,
-    SetAlpnProtocolsSnafu,
+    ParsePkcs12Snafu, Pkcs12Snafu, PrivateKeyParseSnafu, Result, SetAlpnProtocolsSnafu,
+    SetCertificateSnafu, SetPrivateKeySnafu, SetVerifyCertSnafu, TlsError, TlsIdentitySnafu,
+    X509ParseSnafu,
 };
 
 const PEM_START_MARKER: &str = "-----BEGIN ";
