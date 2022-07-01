@@ -1,8 +1,6 @@
 use bytes::Bytes;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use lookup::path;
-use once_cell::sync::Lazy;
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use std::collections::HashMap;
@@ -15,18 +13,13 @@ use vector_core::{
 };
 
 use super::Deserializer;
-use crate::gelf_fields::*;
+use crate::{gelf_fields::*, VALID_FIELD_REGEX};
 
 /// On GELF decoding behavior:
 ///   Graylog has a relaxed decoding. They are much more lenient than the spec would
 ///   suggest. We've elected to take a more strict approach to maintain backwards compatability
 ///   in the event that we need to change the behavior to be more relaxed, so that prior versions
 ///   of vector will still work with the new relaxed decoding.
-
-/// Regex for matching valid field names. Must contain only word chars, periods and dashes.
-/// Additional field names must also be prefixed with an `_` , however that is intentionally
-/// omitted from this regex.
-static VALID_FIELD_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[\w\.\-]*$").unwrap());
 
 /// Config used to build a `GelfDeserializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -58,9 +51,9 @@ impl GelfDeserializerConfig {
             // Every field with an underscore (_) prefix will be treated as an additional field.
             // Allowed characters in field names are any word character (letter, number, underscore), dashes and dots.
             // Libraries SHOULD not allow to send id as additional field ( _id). Graylog server nodes omit this field automatically.
-            // Note that although the schema definition indicates all unknown_fields will be bytes,
-            // in fact they can be strings or numbers.
-            .unknown_fields(Kind::bytes())
+            // Note that although the schema definition indicates unknown_fields will be any type,
+            // in fact they can only be either strings or numbers.
+            .unknown_fields(Kind::any())
     }
 }
 
@@ -157,6 +150,9 @@ impl GelfDeserializer {
                 if val.is_string() || val.is_number() {
                     let vector_val: value::Value = val.into();
                     log.insert(path!(key.as_str()), vector_val);
+                } else {
+                    return Err(format!("'The value type for field {}' is an invalid type. Additional field values \
+                                       should be either strings or numbers.", key).into());
                 }
             }
         }
