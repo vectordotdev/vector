@@ -117,12 +117,12 @@ impl ExternalEnv {
             }
 
             // any paths that are a parent of read-only paths also can't be modified
-            if read_only_path.path.starts_with(path) {
+            if read_only_path.path.can_start_with(path) {
                 return true;
             }
 
             if read_only_path.recursive {
-                if path.starts_with(&read_only_path.path) {
+                if path.can_start_with(&read_only_path.path) {
                     return true;
                 }
             } else if path == &read_only_path.path {
@@ -134,18 +134,7 @@ impl ExternalEnv {
 
     /// Adds a path that is considered read only. Assignments to any paths that match
     /// will fail at compile time.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the path contains coalescing.
     pub(crate) fn add_read_only_path(&mut self, path: LookupBuf, recursive: bool, root: PathRoot) {
-        assert!(
-            !path
-                .as_segments()
-                .iter()
-                .any(lookup::SegmentBuf::is_coalesce),
-            "Coalesced paths not supported for read-only paths"
-        );
         self.read_only_paths.push(ReadOnlyPath {
             path,
             recursive,
