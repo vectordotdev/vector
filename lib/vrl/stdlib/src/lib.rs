@@ -70,6 +70,8 @@ mod encrypt;
 mod ends_with;
 #[cfg(feature = "exists")]
 mod exists;
+#[cfg(feature = "filter")]
+mod filter;
 #[cfg(feature = "find")]
 mod find;
 #[cfg(feature = "flatten")]
@@ -343,6 +345,8 @@ pub use encrypt::Encrypt;
 pub use ends_with::EndsWith;
 #[cfg(feature = "exists")]
 pub use exists::Exists;
+#[cfg(feature = "filter")]
+pub use filter::Filter;
 #[cfg(feature = "find")]
 pub use find::Find;
 #[cfg(feature = "flatten")]
@@ -616,6 +620,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(EndsWith),
         #[cfg(feature = "exists")]
         Box::new(Exists),
+        #[cfg(feature = "filter")]
+        Box::new(Filter),
         #[cfg(feature = "find")]
         Box::new(Find),
         #[cfg(feature = "flatten")]
