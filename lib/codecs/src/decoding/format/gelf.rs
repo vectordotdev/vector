@@ -15,18 +15,13 @@ use vector_core::{
 };
 
 use super::Deserializer;
-use crate::gelf_fields::*;
+use crate::{gelf_fields::*, VALID_FIELD_REGEX};
 
 /// On GELF decoding behavior:
 ///   Graylog has a relaxed decoding. They are much more lenient than the spec would
 ///   suggest. We've elected to take a more strict approach to maintain backwards compatability
 ///   in the event that we need to change the behavior to be more relaxed, so that prior versions
 ///   of vector will still work with the new relaxed decoding.
-
-/// Regex for matching valid field names. Must contain only word chars, periods and dashes.
-/// Additional field names must also be prefixed with an `_` , however that is intentionally
-/// omitted from this regex.
-static VALID_FIELD_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[\w\.\-]*$").unwrap());
 
 /// Config used to build a `GelfDeserializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -157,6 +152,8 @@ impl GelfDeserializer {
                 if val.is_string() || val.is_number() {
                     let vector_val: value::Value = val.into();
                     log.insert(path!(key.as_str()), vector_val);
+                } else {
+                    // TODO use internal event
                 }
             }
         }

@@ -36,3 +36,8 @@ pub mod gelf_fields {
 
     // < Every field with an underscore (_) prefix will be treated as an additional field. >
 }
+
+/// Regex for matching valid field names. Must contain only word chars, periods and dashes.
+/// Additional field names must also be prefixed with an `_` , however that is intentionally
+/// omitted from this regex.
+static VALID_FIELD_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[\w\.\-]*$").unwrap());
