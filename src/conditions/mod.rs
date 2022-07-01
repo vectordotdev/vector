@@ -103,6 +103,7 @@ impl Condition {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn check_all(&self, events: EventArray) -> Vec<(bool, Event)> {
         match self {
             Condition::IsLog => events.into_events().map(check_is_log).collect(),
