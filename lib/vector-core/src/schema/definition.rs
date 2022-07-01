@@ -103,7 +103,8 @@ impl Definition {
         log_namespaces: impl Into<BTreeSet<LogNamespace>>,
     ) -> Self {
         Self {
-            event_kind: kind,
+            event_kind,
+            metadata_kind,
             meaning: BTreeMap::default(),
             log_namespaces: log_namespaces.into(),
         }
@@ -133,10 +134,16 @@ impl Definition {
         match (is_legacy, is_vector) {
             (false, false) => Self::empty_with_kind(Kind::any(), Kind::any(), []),
             (true, false) => Self::default_legacy_namespace(),
-            (false, true) => Self::empty_with_kind(Kind::any(), [LogNamespace::Vector]),
-            (true, true) => {
-                Self::empty_with_kind(Kind::any(), [LogNamespace::Legacy, LogNamespace::Vector])
-            }
+            (false, true) => Self::empty_with_kind(
+                Kind::any(),
+                Kind::object(Collection::any()),
+                [LogNamespace::Vector],
+            ),
+            (true, true) => Self::empty_with_kind(
+                Kind::any(),
+                Kind::object(Collection::any()),
+                [LogNamespace::Legacy, LogNamespace::Vector],
+            ),
         }
     }
 
