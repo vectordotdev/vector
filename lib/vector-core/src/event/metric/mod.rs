@@ -97,6 +97,14 @@ impl Metric {
         self
     }
 
+    /// Consumes this metric, returning it with an updated interval.
+    #[inline]
+    #[must_use]
+    pub fn with_interval(mut self, interval: Option<u64>) -> Self {
+        self.data.interval = interval;
+        self
+    }
+
     pub fn add_finalizer(&mut self, finalizer: EventFinalizer) {
         self.metadata.add_finalizer(finalizer);
     }

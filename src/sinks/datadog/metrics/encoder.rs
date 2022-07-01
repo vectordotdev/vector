@@ -435,8 +435,8 @@ fn generate_series_metrics(
         .map(|then| then.elapsed())
         .map(|d| d.as_secs().try_into().unwrap_or(i64::MAX));
 
-    let results = match metric.value() {
-        MetricValue::Counter { value } => vec![DatadogSeriesMetric {
+    let results = match (metric.value(), metric.interval()) {
+        (MetricValue::Counter { value }, None) => vec![DatadogSeriesMetric {
             metric: name,
             r#type: DatadogMetricType::Count,
             interval,
@@ -446,7 +446,17 @@ fn generate_series_metrics(
             source_type_name,
             device,
         }],
-        MetricValue::Set { values } => vec![DatadogSeriesMetric {
+        (MetricValue::Counter { value }, Some(i)) => vec![DatadogSeriesMetric {
+            metric: name,
+            r#type: DatadogMetricType::Rate,
+            interval: Some(i as i64),
+            points: vec![DatadogPoint(ts, (*value) / (i as f64))],
+            tags,
+            host,
+            source_type_name,
+            device,
+        }],
+        (MetricValue::Set { values }, _) => vec![DatadogSeriesMetric {
             metric: name,
             r#type: DatadogMetricType::Gauge,
             interval: None,
@@ -456,7 +466,7 @@ fn generate_series_metrics(
             source_type_name,
             device,
         }],
-        MetricValue::Gauge { value } => vec![DatadogSeriesMetric {
+        (MetricValue::Gauge { value }, _) => vec![DatadogSeriesMetric {
             metric: name,
             r#type: DatadogMetricType::Gauge,
             interval: None,
@@ -466,7 +476,7 @@ fn generate_series_metrics(
             source_type_name,
             device,
         }],
-        value => {
+        (value, _) => {
             return Err(EncoderError::InvalidMetric {
                 expected: "series",
                 metric_value: value.as_name(),

@@ -451,15 +451,17 @@ fn into_vector_metric(
             .points
             .iter()
             .map(|dd_point| {
-                let i = dd_metric.interval.filter(|v| *v != 0).unwrap_or(1) as f64;
+                let i = dd_metric.interval.filter(|v| *v != 0).unwrap_or(1);
                 Metric::new(
                     name.to_string(),
                     MetricKind::Incremental,
                     MetricValue::Counter {
-                        value: dd_point.1 * i,
+                        value: dd_point.1 * (i as f64),
                     },
                 )
                 .with_timestamp(Some(Utc.timestamp(dd_point.0, 0)))
+                // interval is in second in the ddog world, this need to be changed to at least ms
+                .with_interval(Some(i as u64))
                 .with_tags(Some(tags.clone()))
                 .with_namespace(namespace)
             })
