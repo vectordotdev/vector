@@ -87,11 +87,12 @@ impl From<LookupBuf> for MeaningPointer {
 impl Definition {
     /// The most general possible definition. The `Kind` is `any`, and all `log_namespaces` are enabled.
     pub fn any() -> Self {
-        Self::empty_with_kind(
-            Kind::any(),
-            Kind::any(),
-            [LogNamespace::Legacy, LogNamespace::Vector],
-        )
+        Self {
+            event_kind: Kind::any(),
+            metadata_kind: Kind::any(),
+            meaning: BTreeMap::default(),
+            log_namespaces: [LogNamespace::Legacy, LogNamespace::Vector].into(),
+        }
     }
 
     /// Creates an empty definition that is of the kind specified.
@@ -99,12 +100,11 @@ impl Definition {
     /// The `log_namespaces` are used to list the possible namespaces the schema is for.
     pub fn empty_with_kind(
         event_kind: Kind,
-        metadata_kind: Kind,
         log_namespaces: impl Into<BTreeSet<LogNamespace>>,
     ) -> Self {
         Self {
             event_kind,
-            metadata_kind,
+            metadata_kind: Kind::object(Collection::empty()),
             meaning: BTreeMap::default(),
             log_namespaces: log_namespaces.into(),
         }
@@ -113,17 +113,19 @@ impl Definition {
     /// An object with any fields, and the `Legacy` namespace.
     /// This is the default schema for a source that does not explicitely provide one yet
     pub fn default_legacy_namespace() -> Self {
-        Self::empty_with_kind(Kind::any_object(), Kind::any(), [LogNamespace::Legacy])
+        Self::empty_with_kind(Kind::any_object(), [LogNamespace::Legacy])
     }
 
     /// An object without any fields, and the `Legacy` namespace.
     /// This is what most sources use for the legacy namespace.
     pub fn empty_legacy_namespace() -> Self {
-        Self::empty_with_kind(
-            Kind::object(Collection::empty()),
-            Kind::object(Collection::empty()),
-            [LogNamespace::Legacy],
-        )
+        Self::empty_with_kind(Kind::object(Collection::empty()), [LogNamespace::Legacy])
+    }
+
+    /// An object without any fields, and the `Legacy` namespace.
+    /// This is what most sources use for the legacy namespace.
+    pub fn empty_object(namespace: LogNamespace) -> Self {
+        Self::empty_with_kind(Kind::object(Collection::empty()), [namespace])
     }
 
     /// Returns the source schema for a source that produce the listed log namespaces,
@@ -132,18 +134,12 @@ impl Definition {
         let is_legacy = log_namespaces.contains(&LogNamespace::Legacy);
         let is_vector = log_namespaces.contains(&LogNamespace::Vector);
         match (is_legacy, is_vector) {
-            (false, false) => Self::empty_with_kind(Kind::any(), Kind::any(), []),
+            (false, false) => Self::empty_with_kind(Kind::any(), []),
             (true, false) => Self::default_legacy_namespace(),
-            (false, true) => Self::empty_with_kind(
-                Kind::any(),
-                Kind::object(Collection::any()),
-                [LogNamespace::Vector],
-            ),
-            (true, true) => Self::empty_with_kind(
-                Kind::any(),
-                Kind::object(Collection::any()),
-                [LogNamespace::Legacy, LogNamespace::Vector],
-            ),
+            (false, true) => Self::empty_with_kind(Kind::any(), [LogNamespace::Vector]),
+            (true, true) => {
+                Self::empty_with_kind(Kind::any(), [LogNamespace::Legacy, LogNamespace::Vector])
+            }
         }
     }
 
@@ -166,6 +162,53 @@ impl Definition {
         kind: Kind,
         meaning: Option<&str>,
     ) -> Self {
+        let path = path.into();
+        let meaning = meaning.map(ToOwned::to_owned);
+
+        if !path.is_root() {
+            if kind.contains_null() {
+                // field is optional, so don't coerce to an object, but still make sure it _can_ be an object
+                assert!(
+                    self.event_kind.as_object().is_some(),
+                    "Setting a field on a value that cannot be an object"
+                );
+            } else {
+                self.event_kind = self
+                    .event_kind
+                    .into_object()
+                    .expect("required field implies the type can be an object")
+                    .into();
+            }
+        }
+
+        if let Err(err) = self.event_kind.insert_at_path(
+            &path.to_lookup(),
+            kind,
+            insert::Strategy {
+                inner_conflict: insert::InnerConflict::Replace,
+                leaf_conflict: insert::LeafConflict::Replace,
+                coalesced_path: insert::CoalescedPath::Reject,
+            },
+        ) {
+            panic!("Field definition not valid: {:?}", err);
+        }
+
+        if let Some(meaning) = meaning {
+            self.meaning.insert(meaning, MeaningPointer::Valid(path));
+        }
+
+        self
+    }
+
+    /// Add type information for an event field.
+    /// A non-root required field means the root type must be an object, so the type will be automatically
+    /// restricted to an object.
+    ///
+    /// # Panics
+    /// - If the path is not root, and the definition does not allow the type to be an object
+    /// - Provided path has one or more coalesced segments (e.g. `.(foo | bar)`).
+    #[must_use]
+    pub fn with_metadata_field(mut self, path: impl Into<LookupBuf>, kind: Kind) -> Self {
         let path = path.into();
         let meaning = meaning.map(ToOwned::to_owned);
 
