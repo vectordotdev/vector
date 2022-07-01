@@ -9,9 +9,14 @@ use tokio::io::DuplexStream;
 
 use super::{
     io::{AsyncFile, Metadata, ProductionFilesystem, ReadableMemoryMap, WritableMemoryMap},
+    ledger::LEDGER_LEN,
+    record::RECORD_HEADER_LEN,
     Buffer, DiskBufferConfigBuilder, Ledger, Reader, Writer,
 };
-use crate::{buffer_usage_data::BufferUsageHandle, Acker, Bufferable};
+use crate::{
+    buffer_usage_data::BufferUsageHandle, encoding::FixedEncodable,
+    variants::disk_v2::common::align16, Acker, Bufferable,
+};
 
 type FilesystemUnderTest = ProductionFilesystem;
 
@@ -166,6 +171,7 @@ macro_rules! set_data_file_length {
     }};
 }
 
+/// Creates a disk v2 buffer with all default values i.e. maximum buffer size, etc.
 pub(crate) async fn create_default_buffer_v2<P, R>(
     data_dir: P,
 ) -> (
@@ -187,6 +193,7 @@ where
         .expect("should not fail to create buffer")
 }
 
+/// Creates a disk v2 buffer with all default values, but returns a handle to the buffer usage tracker.
 pub(crate) async fn create_default_buffer_v2_with_usage<P, R>(
     data_dir: P,
 ) -> (
@@ -210,9 +217,15 @@ where
     (writer, reader, acker, ledger, usage_handle)
 }
 
-pub(crate) async fn create_buffer_v2_with_max_buffer_size<P, R>(
+/// Creates a disk v2 buffer that is sized such that only a fixed number of data files are allowed.
+///
+/// We do this based on limiting the maximum buffer size, knowing that if the maximum data file size is N, and we want
+/// to limit ourselves to M data files, the maximum buffer size should be N*M. We additionally constrain our maximum
+/// record size to the maximum data file size in order to satisfy the configuration builder.
+pub(crate) async fn create_buffer_v2_with_data_file_count_limit<P, R>(
     data_dir: P,
-    max_buffer_size: u64,
+    max_data_file_size: u64,
+    data_file_count_limit: u64,
 ) -> (
     Writer<R, FilesystemUnderTest>,
     Reader<R, FilesystemUnderTest>,
@@ -223,12 +236,30 @@ where
     P: AsRef<Path>,
     R: Bufferable,
 {
-    // We override `max_buffer_size` directly because otherwise `build` has built-in logic that
-    // ensures it is a minimum size related to the data file size limit, etc.
-    let mut config = DiskBufferConfigBuilder::from_path(data_dir)
+    // We do this here, despite the fact that configuration builder also implicitly does it, because our error message
+    // can be more pointed given that we're running tests, whereas the user-visible error message is just about getting
+    // them to set a valid amount without needing to understand the internals.
+    assert!(
+        data_file_count_limit >= 2,
+        "data file count limit must be at least 2"
+    );
+
+    let max_record_size = usize::try_from(max_data_file_size).unwrap();
+
+    // We also have to compensate for the size of the ledger itself, as the configuration builder pays attention to that
+    // in the context of the configured maximum buffer size.
+    let ledger_len: u64 = LEDGER_LEN.try_into().unwrap();
+    let max_buffer_size = max_data_file_size
+        .checked_mul(data_file_count_limit)
+        .and_then(|n| n.checked_add(ledger_len))
+        .unwrap();
+
+    let config = DiskBufferConfigBuilder::from_path(data_dir)
+        .max_record_size(max_record_size)
+        .max_data_file_size(max_data_file_size)
+        .max_buffer_size(max_buffer_size)
         .build()
         .expect("creating buffer should not fail");
-    config.max_buffer_size = max_buffer_size;
     let usage_handle = BufferUsageHandle::noop();
 
     Buffer::from_config_inner(config, usage_handle)
@@ -236,6 +267,7 @@ where
         .expect("should not fail to create buffer")
 }
 
+/// Creates a disk v2 buffer with the specified maximum record size.
 pub(crate) async fn create_buffer_v2_with_max_record_size<P, R>(
     data_dir: P,
     max_record_size: usize,
@@ -260,6 +292,9 @@ where
         .expect("should not fail to create buffer")
 }
 
+/// Creates a disk v2 buffer with the specified maximum data file size.
+///
+/// We additionally constrain our maximum record size to the maximum data file size in order to satisfy the configuration builder.
 pub(crate) async fn create_buffer_v2_with_max_data_file_size<P, R>(
     data_dir: P,
     max_data_file_size: u64,
@@ -273,8 +308,11 @@ where
     P: AsRef<Path>,
     R: Bufferable,
 {
+    let max_record_size = usize::try_from(max_data_file_size).unwrap();
+
     let config = DiskBufferConfigBuilder::from_path(data_dir)
         .max_data_file_size(max_data_file_size)
+        .max_record_size(max_record_size)
         .build()
         .expect("creating buffer should not fail");
     let usage_handle = BufferUsageHandle::noop();
@@ -284,6 +322,7 @@ where
         .expect("should not fail to create buffer")
 }
 
+/// Creates a disk v2 buffer with the specified write buffer size.
 pub(crate) async fn create_buffer_v2_with_write_buffer_size<P, R>(
     data_dir: P,
     write_buffer_size: usize,
@@ -306,4 +345,25 @@ where
     Buffer::from_config_inner(config, usage_handle)
         .await
         .expect("should not fail to create buffer")
+}
+
+pub(crate) fn get_corrected_max_record_size<T>(payload: &T) -> usize
+where
+    T: FixedEncodable,
+{
+    let payload_len = payload
+        .encoded_size()
+        .expect("All test record types must return a valid encoded size.");
+    let total = RECORD_HEADER_LEN + payload_len;
+
+    align16(total)
+}
+
+pub(crate) fn get_minimum_data_file_size_for_record_payload<T>(payload: &T) -> u64
+where
+    T: FixedEncodable,
+{
+    // This is just the maximum record size, compensating for the record header length.
+    let max_record_size = get_corrected_max_record_size(payload);
+    u64::try_from(max_record_size).unwrap()
 }

@@ -16,9 +16,11 @@ use tokio::runtime::Builder;
 
 use crate::{
     buffer_usage_data::BufferUsageHandle,
+    encoding::FixedEncodable,
     test::common::install_tracing_helpers,
     variants::disk_v2::{
-        common::MAX_FILE_ID, writer::RecordWriter, Buffer, DiskBufferConfig, WriterError,
+        common::MAX_FILE_ID, record::RECORD_HEADER_LEN, writer::RecordWriter, Buffer,
+        DiskBufferConfig, WriterError,
     },
     EventCount,
 };
@@ -530,6 +532,7 @@ struct WriterModel {
     ledger: Arc<LedgerModel>,
     current_file: Option<FileModel>,
     current_file_size: u64,
+    current_file_full: bool,
     state: WriterModelState,
     record_writer: RecordWriter<Cursor<Vec<u8>>, Record>,
 }
@@ -549,6 +552,7 @@ impl WriterModel {
             ledger,
             current_file: None,
             current_file_size: 0,
+            current_file_full: false,
             state: WriterModelState::Idle,
             record_writer,
         };
@@ -565,14 +569,31 @@ impl WriterModel {
         // writing the value anywhere.  `RecordWriter` clears its encoding/serialization buffers on
         // each call to `archive_record` so we don't have to do any pre/post-cleanup to avoid memory
         // growth, etc.
-        self.record_writer
-            .archive_record(1, record)
-            .expect("detached record archiving should not fail") as u64
+        let record_len = record.archived_len();
+
+        match self.record_writer.archive_record(1, record) {
+            Ok(token) => token.serialized_len() as u64,
+            Err(e) => panic!(
+                "unexpected encode error: archived_len={} max_record_size={} error={:?}",
+                record_len,
+                self.ledger.config().max_record_size,
+                e,
+            ),
+        }
+    }
+
+    fn get_current_buffer_size(&self) -> u64 {
+        let unflushed_bytes = self
+            .current_file
+            .as_ref()
+            .map_or(0, FileModel::unflushed_size);
+        self.ledger.get_buffer_size() + unflushed_bytes
     }
 
     fn reset(&mut self) {
         self.current_file = None;
         self.current_file_size = 0;
+        self.current_file_full = false;
     }
 
     fn try_finalize(&mut self) {
@@ -599,17 +620,15 @@ impl WriterModel {
 
     fn check_ready(&mut self) -> bool {
         // If our buffer size is over the maximum buffer size, we have to wait for reader progress:
-        let unflushed_bytes = self
-            .current_file
-            .as_ref()
-            .map_or(0, FileModel::unflushed_size);
-        if self.ledger.get_buffer_size() + unflushed_bytes >= self.ledger.config().max_buffer_size {
+        if self.get_current_buffer_size() >= self.ledger.config().max_buffer_size {
             return false;
         }
 
         // If our current data file is at or above the limit, then flush it out, close it, and set
         // ourselves to open the next one:
-        if self.current_file_size >= self.ledger.config().max_data_file_size {
+        if self.current_file_full
+            || self.current_file_size >= self.ledger.config().max_data_file_size
+        {
             self.flush();
 
             let current_file = self.current_file.as_ref().unwrap();
@@ -673,7 +692,11 @@ impl WriterModel {
             // record can't encode itself due to space limitations, so the differentiation on the
             // front end is more about providing an informative error, but the writer can't really
             // do anything different if they get "failed to encode" vs "record too large".
-            if record.len() > self.ledger.config().max_record_size {
+            let encoded_len = record
+                .encoded_size()
+                .expect("record used in model must provide this");
+            let encoded_len_limit = self.ledger.config().max_record_size - RECORD_HEADER_LEN;
+            if encoded_len > encoded_len_limit {
                 return Progress::WriteError(WriterError::FailedToEncode {
                     source: EncodeError,
                 });
@@ -682,6 +705,20 @@ impl WriterModel {
             // Write the record in the same way that the buffer would, which is the only way we can
             // calculate the true size that record occupies.
             let archived_len = self.get_archived_record_len(record.clone());
+
+            // If this record would cause us to exceed the maximum data file size of the current data file, mark the
+            // current data file full so that we can loop around and open the next one.
+            if self.current_file_size + archived_len > self.ledger.config().max_data_file_size {
+                self.current_file_full = true;
+                continue;
+            }
+
+            // If this record would cause us to exceed our maximum buffer size, then the writer would have to wait for
+            // the reader to make some sort of progress to try actually writing it.
+            if self.get_current_buffer_size() + archived_len > self.ledger.config().max_buffer_size
+            {
+                return Progress::Blocked;
+            }
 
             // Now try to "actually" write it, which may or may not fail depending on if the file is
             // full or not/could hold this record.  We archive the record manually, too, to get its true
@@ -714,7 +751,8 @@ impl WriterModel {
 
             self.state.transition_to_idle();
 
-            return Progress::RecordWritten(archived_len.try_into().unwrap());
+            let written = archived_len.try_into().unwrap();
+            return Progress::RecordWritten(written);
         }
     }
 
@@ -779,7 +817,13 @@ proptest! {
             .expect("should not fail to build runtime");
 
         let _a = install_tracing_helpers();
-        info!("New model.");
+        info!(
+            actions = actions.len(),
+            max_buffer_size = config.max_buffer_size,
+            max_data_file_size = config.max_data_file_size,
+            max_record_size = config.max_record_size,
+            "Starting model.",
+        );
 
         // We generate a new temporary directory and overwrite the data directory in the buffer
         // configuration. This allows us to use a utility that will generate a random directory each
