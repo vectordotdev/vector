@@ -140,8 +140,8 @@ struct Tracker {
 }
 
 impl Tracker {
-    fn get_local_group_stats(&self, group_id: AllocationGroupId) -> &GroupStatistics {
-        let local_stats_table = self.statistics.get_or_default();
+    fn get_local_group_stats(&self, group_id: AllocationGroupId) -> Option<&GroupStatistics> {
+        let local_stats_table = self.statistics.try_get_or_default().ok()?;
 
         // SAFETY: In order for calls to `get` to be safe, the group ID we pass must have been previously registered
         // (via `register`) otherwise we will instantaneously trigger UB. As this method overall can only be called by
@@ -149,15 +149,15 @@ impl Tracker {
         // entered after acquiring a token via `register_allocation_group_token`, which the group ID is derived from.
         //
         // Thus, we cannot be here without the given group ID having already been registered correctly.
-        unsafe { local_stats_table.get(group_id.as_usize().get()) }
+        unsafe { Some(local_stats_table.get(group_id.as_usize().get())) }
     }
 }
 
 impl AllocationTracker for Tracker {
     fn allocated(&self, _addr: usize, size: usize, group_id: AllocationGroupId) {
-        let local_group_stats = self.get_local_group_stats(group_id.clone());
-        //println!("tid {:?}: got group stats for {}", std::thread::current().id(), group_id.as_usize().get());
-        local_group_stats.track_allocation(size);
+        if let Some(local_group_stats) = self.get_local_group_stats(group_id) {
+            local_group_stats.track_allocation(size);
+        }
     }
 
     fn deallocated(
@@ -167,8 +167,9 @@ impl AllocationTracker for Tracker {
         source_group_id: AllocationGroupId,
         _current_group_id: AllocationGroupId,
     ) {
-        let local_group_stats = self.get_local_group_stats(source_group_id);
-        local_group_stats.track_deallocation(size);
+        if let Some(local_group_stats) = self.get_local_group_stats(source_group_id) {
+            local_group_stats.track_deallocation(size);
+        }
     }
 }
 

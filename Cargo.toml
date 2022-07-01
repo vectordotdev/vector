@@ -291,7 +291,7 @@ socket2 = { version = "0.4.4", default-features = false }
 stream-cancel = { version = "0.8.1", default-features = false }
 strip-ansi-escapes = { version = "0.1.1", default-features = false }
 syslog = { version = "6.0.1", default-features = false, optional = true }
-thread_local = { version = "1.1.4", default-features = false, optional = true }
+thread_local = { git = "https://github.com/tobz/thread_local-rs.git", branch = "fallible-accessors", default-features = false, optional = true }
 tikv-jemallocator = { version = "0.5.0", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.6", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 tokio-tungstenite = {version = "0.17.1", default-features = false, features = ["connect"], optional = true}
