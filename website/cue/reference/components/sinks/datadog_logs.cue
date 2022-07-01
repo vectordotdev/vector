@@ -58,17 +58,10 @@ components: sinks: datadog_logs: {
 	support: sinks._datadog.support
 
 	configuration: {
-		default_api_key: {
-			description: "Default Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication), if an event has a key set in its metadata it will prevail over the one set here."
-			required:    true
-			warnings: []
-			type: string: {
-				examples: ["${DATADOG_API_KEY_ENV_VAR}", "ef8d5de700e7989468166c40fc8a0ccd"]
-			}
-		}
-		endpoint: sinks._datadog.configuration.endpoint
-		region:   sinks._datadog.configuration.region
-		site:     sinks._datadog.configuration.site
+		default_api_key: sinks._datadog.configuration.default_api_key
+		endpoint:        sinks._datadog.configuration.endpoint
+		region:          sinks._datadog.configuration.region
+		site:            sinks._datadog.configuration.site
 	}
 
 	input: {
