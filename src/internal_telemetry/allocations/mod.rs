@@ -154,21 +154,28 @@ impl Tracker {
 }
 
 impl AllocationTracker for Tracker {
-    fn allocated(&self, _addr: usize, size: usize, group_id: AllocationGroupId) {
+    fn allocated(
+        &self,
+        _addr: usize,
+        _object_size: usize,
+        wrapped_size: usize,
+        group_id: AllocationGroupId,
+    ) {
         if let Some(local_group_stats) = self.get_local_group_stats(group_id) {
-            local_group_stats.track_allocation(size);
+            local_group_stats.track_allocation(wrapped_size);
         }
     }
 
     fn deallocated(
         &self,
         _addr: usize,
-        size: usize,
+        _object_size: usize,
+        wrapped_size: usize,
         source_group_id: AllocationGroupId,
         _current_group_id: AllocationGroupId,
     ) {
         if let Some(local_group_stats) = self.get_local_group_stats(source_group_id) {
-            local_group_stats.track_deallocation(size);
+            local_group_stats.track_deallocation(wrapped_size);
         }
     }
 }
