@@ -90,7 +90,7 @@ impl FixedEncodable for Message {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct SizedRecord(pub u32);
 
 impl ByteSizeOf for SizedRecord {
@@ -116,7 +116,11 @@ impl FixedEncodable for SizedRecord {
         if buffer.remaining_mut() < self.0 as usize + 4 {
             return Err(io::Error::new(
                 io::ErrorKind::Other,
-                "not enough capacity to encode record",
+                format!(
+                    "not enough capacity to encode record: need {}, only have {}",
+                    self.0 + 4,
+                    buffer.remaining_mut()
+                ),
             ));
         }
 
@@ -132,6 +136,10 @@ impl FixedEncodable for SizedRecord {
         let buf_len = buffer.get_u32();
         buffer.advance(buf_len as usize);
         Ok(SizedRecord(buf_len))
+    }
+
+    fn encoded_size(&self) -> Option<usize> {
+        Some(self.0 as usize + 4)
     }
 }
 

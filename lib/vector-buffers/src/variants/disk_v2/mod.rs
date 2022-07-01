@@ -135,6 +135,7 @@
 //! when they reach the maximum value for the data type. For record IDs, however, this would mean
 //! reaching 2^64, which will take a really, really, really long time.
 
+use core::fmt;
 use std::{
     error::Error,
     marker::PhantomData,
@@ -213,7 +214,7 @@ where
         usage_handle: BufferUsageHandle,
     ) -> Result<(Writer<T, FS>, Reader<T, FS>, Acker, Arc<Ledger<FS>>), BufferError<T>>
     where
-        FS: Filesystem + Clone + 'static,
+        FS: Filesystem + fmt::Debug + Clone + 'static,
         FS::File: Unpin,
     {
         let ledger = Ledger::load_or_create(config, usage_handle)
@@ -257,7 +258,7 @@ where
         usage_handle: BufferUsageHandle,
     ) -> Result<(Writer<T, FS>, Reader<T, FS>, Acker), BufferError<T>>
     where
-        FS: Filesystem + Clone + 'static,
+        FS: Filesystem + fmt::Debug + Clone + 'static,
         FS::File: Unpin,
     {
         let (writer, reader, acker, _) = Self::from_config_inner(config, usage_handle).await?;

@@ -1,5 +1,5 @@
 use std::{
-    fmt, io,
+    fmt, io, mem,
     path::PathBuf,
     sync::atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering},
     time::Instant,
@@ -15,12 +15,14 @@ use tokio::{fs, io::AsyncWriteExt, sync::Notify};
 
 use super::{
     backed_archive::BackedArchive,
-    common::{DiskBufferConfig, MAX_FILE_ID},
+    common::{align16, DiskBufferConfig, MAX_FILE_ID},
     io::{AsyncFile, WritableMemoryMap},
     ser::SerializeError,
     Filesystem,
 };
 use crate::buffer_usage_data::BufferUsageHandle;
+
+pub const LEDGER_LEN: usize = align16(mem::size_of::<ArchivedLedgerState>());
 
 /// Error that occurred during calls to [`Ledger`].
 #[derive(Debug, Snafu)]
@@ -207,6 +209,7 @@ where
     // Buffer configuration.
     config: DiskBufferConfig<FS>,
     // Advisory lock for this buffer directory.
+    #[allow(dead_code)]
     ledger_lock: LockFile,
     // Ledger state.
     state: BackedArchive<FS::MutableMemoryMap, LedgerState>,
@@ -705,21 +708,18 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Ledger")
             .field("config", &self.config)
-            .field("ledger_lock", &self.ledger_lock)
             .field("state", &self.state.get_archive_ref())
             .field(
                 "total_buffer_size",
                 &self.total_buffer_size.load(Ordering::Acquire),
             )
-            .field("reader_notify", &self.reader_notify)
-            .field("writer_notify", &self.writer_notify)
             .field("pending_acks", &self.pending_acks.load(Ordering::Acquire))
             .field(
                 "unacked_reader_file_id_offset",
                 &self.unacked_reader_file_id_offset.load(Ordering::Acquire),
             )
             .field("writer_done", &self.writer_done.load(Ordering::Acquire))
-            .field("last_flush", &self.last_flush)
+            .field("last_flush", &self.last_flush.load())
             .finish()
     }
 }

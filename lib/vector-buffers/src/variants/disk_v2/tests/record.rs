@@ -16,7 +16,7 @@ async fn roundtrip_through_record_writer_and_record_reader() {
     let record = SizedRecord(73);
 
     let (bytes_written, flush_result) = record_writer
-        .write_record(314, record.clone())
+        .write_record(314, record)
         .await
         .expect("write should not fail");
     record_writer.flush().await.expect("flush should not fail");

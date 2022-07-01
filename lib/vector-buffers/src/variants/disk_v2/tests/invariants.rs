@@ -9,7 +9,10 @@ use crate::{
     test::common::{install_tracing_helpers, with_temp_dir, MultiEventRecord, SizedRecord},
     variants::disk_v2::{
         common::{DEFAULT_FLUSH_INTERVAL, MAX_FILE_ID},
-        tests::{create_buffer_v2_with_write_buffer_size, create_default_buffer_v2},
+        tests::{
+            create_buffer_v2_with_write_buffer_size, create_default_buffer_v2,
+            get_corrected_max_record_size, get_minimum_data_file_size_for_record_payload,
+        },
     },
     EventCount,
 };
@@ -128,12 +131,14 @@ async fn file_id_wraps_around_when_max_file_id_hit() {
         let data_dir = dir.to_path_buf();
 
         async move {
-            let record_size: u32 = 100;
+            let record_size = 100;
+            let record = SizedRecord(record_size);
+            let max_data_file_size = get_minimum_data_file_size_for_record_payload(&record);
 
             // Create our buffer with an arbitrarily low max data file size, which will let us
             // quickly run through the file ID range.
             let (mut writer, mut reader, acker, ledger) =
-                create_buffer_v2_with_max_data_file_size(data_dir, u64::from(record_size)).await;
+                create_buffer_v2_with_max_data_file_size(data_dir, max_data_file_size).await;
 
             assert_buffer_is_empty!(ledger);
             assert_reader_writer_v2_file_positions!(ledger, 0, 0);
@@ -152,7 +157,7 @@ async fn file_id_wraps_around_when_max_file_id_hit() {
             while id < target_id {
                 let record = SizedRecord(record_size);
                 let bytes_written = writer
-                    .write_record(record.clone())
+                    .write_record(record)
                     .await
                     .expect("write should not fail");
                 assert_enough_bytes_written!(bytes_written, SizedRecord, record_size);
@@ -205,12 +210,14 @@ async fn writer_stops_when_hitting_file_that_reader_is_still_on() {
         let data_dir = dir.to_path_buf();
 
         async move {
-            let record_size: u32 = 100;
+            let record_size = 100;
+            let record = SizedRecord(record_size);
+            let max_data_file_size = get_minimum_data_file_size_for_record_payload(&record);
 
             // Create our buffer with an arbitrarily low max data file size, which will let us
             // quickly run through the file ID range.
             let (mut writer, mut reader, acker, ledger) =
-                create_buffer_v2_with_max_data_file_size(data_dir, u64::from(record_size)).await;
+                create_buffer_v2_with_max_data_file_size(data_dir, max_data_file_size).await;
 
             assert_buffer_is_empty!(ledger);
             assert_reader_writer_v2_file_positions!(ledger, 0, 0);
@@ -222,7 +229,6 @@ async fn writer_stops_when_hitting_file_that_reader_is_still_on() {
             let mut id = 0;
             let mut total_size = 0;
             while id < file_id_upper {
-                let record = SizedRecord(record_size);
                 let bytes_written = writer
                     .write_record(record)
                     .await
@@ -249,10 +255,7 @@ async fn writer_stops_when_hitting_file_that_reader_is_still_on() {
 
             // Now we should be consuming all data files, and our next write should block trying to
             // open the "first" data file until we do a read.
-            let mut blocked_write = spawn(async {
-                let record = SizedRecord(record_size);
-                writer.write_record(record).await
-            });
+            let mut blocked_write = spawn(writer.write_record(record));
 
             // You might be looking at the assert_pending! calls below and wondering what's
             // happening there.  Essentially, the process of doing a read or write could contain a
@@ -462,6 +465,7 @@ async fn reader_deletes_data_file_around_record_id_wraparound() {
 
             let (mut writer, mut reader, acker, ledger) =
                 create_buffer_v2_with_max_data_file_size(data_dir, 256).await;
+
             let starting_writer_file_id = ledger.get_current_writer_file_id();
             let next_writer_file_id = ledger.get_next_writer_file_id();
 
@@ -610,13 +614,18 @@ async fn writer_waits_for_reader_after_validate_last_write_fails_and_data_file_s
         let data_dir = dir.to_path_buf();
 
         async move {
-            let record_size: u32 = 32;
+            let record_size = 42;
+            let record = SizedRecord(record_size);
+            let corrected_record_size = get_corrected_max_record_size(&record);
+            let max_data_file_size = (corrected_record_size * 2)
+                .try_into()
+                .expect("Value should never exceed `u64::MAX`.");
 
-            // Create our buffer with an arbitrarily low max data file size, which will let us
-            // quickly run through the file ID range.  We want to be able to write at least two
-            // records to each data file, though.
+            // Create our buffer with a low max data file size, which will let us quickly run through
+            // the file ID range. We craft this number to allow for two records per data file.
             let (mut writer, _, _, ledger) =
-                create_buffer_v2_with_max_data_file_size(data_dir.clone(), 172).await;
+                create_buffer_v2_with_max_data_file_size(data_dir.clone(), max_data_file_size)
+                    .await;
 
             assert_buffer_is_empty!(ledger);
             assert_reader_writer_v2_file_positions!(ledger, 0, 0);
@@ -631,9 +640,8 @@ async fn writer_waits_for_reader_after_validate_last_write_fails_and_data_file_s
             let mut writer_file_id = 0;
             while writer_file_id != target_writer_file_id {
                 for _ in 0..2 {
-                    let record = SizedRecord(record_size);
                     bytes_written = writer
-                        .write_record(record.clone())
+                        .write_record(record)
                         .await
                         .expect("write should not fail");
                     assert_enough_bytes_written!(bytes_written, SizedRecord, record_size);
@@ -697,8 +705,7 @@ async fn writer_waits_for_reader_after_validate_last_write_fails_and_data_file_s
                 .finalize();
 
             let (mut writer, mut reader, acker, ledger) =
-                create_buffer_v2_with_max_data_file_size(data_dir, u64::from(record_size * 2))
-                    .await;
+                create_buffer_v2_with_max_data_file_size(data_dir, max_data_file_size).await;
             assert!(mark_to_skip_called.try_assert());
             assert_eq!(next_data_file_id, ledger.get_next_writer_file_id());
             assert!(!waiting_on_reader.try_assert());
@@ -708,7 +715,7 @@ async fn writer_waits_for_reader_after_validate_last_write_fails_and_data_file_s
             // The writer correctly reset/marked itself as needing to skip the current data file,
             // but we need to actually attempt a write to drive the logic where it tries to open up
             // the next data file, so we do that here, expecting it to end up blocked on the reader.
-            let mut blocked_write = spawn(writer.write_record(SizedRecord(record_size)));
+            let mut blocked_write = spawn(writer.write_record(record));
 
             while !waiting_on_reader.try_assert() {
                 assert_pending!(blocked_write.poll());
