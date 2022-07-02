@@ -34,8 +34,8 @@ pub struct OpentelemetryConfig {
     acknowledgements: AcknowledgementsConfig,
     /// If this setting is set to `true` logs, metrics and traces will be sent to different outputs.
     ///
-    /// For a source component named `agent` the received logs, metrics, and traces can then be accessed by specifying
-    /// `agent.logs`, `agent.metrics`, and `agent.traces`, respectively, as the input to another component.
+    /// For a source component named `otel` the received logs, metrics, and traces can then be accessed by specifying
+    /// `otel.logs`, `otel.metrics`, and `otel.traces`, respectively, as the input to another component.
     #[serde(default = "crate::serde::default_false")]
     multiple_outputs: bool,
 }
@@ -142,5 +142,113 @@ async fn handle_batch_status(receiver: Option<BatchStatusReceiver>) -> Result<()
         BatchStatus::Errored => Err(Status::internal("Delivery error")),
         BatchStatus::Rejected => Err(Status::data_loss("Delivery failed")),
         BatchStatus::Delivered => Ok(()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        test_util::{
+            self,
+            components::{assert_source_compliance, SOURCE_TAGS},
+        },
+        SourceSender,
+    };
+    use otel_proto::{
+        Common::{any_value, AnyValue, KeyValue},
+        LogService::logs_service_client::LogsServiceClient,
+        Logs::{LogRecord, ResourceLogs, ScopeLogs},
+        Resource as OtelResource,
+    };
+
+    #[tokio::test]
+    #[allow(deprecated)]
+    async fn receive_message() {
+        assert_source_compliance(&SOURCE_TAGS, async {
+            let addr = test_util::next_addr();
+            let config = format!(r#"address = "{}""#, addr);
+            let source: OpentelemetryConfig = toml::from_str(&config).unwrap();
+
+            let (tx, rx) = SourceSender::new_test();
+            let server = source
+                .build(SourceContext::new_test(tx, None))
+                .await
+                .unwrap();
+            tokio::spawn(server);
+            test_util::wait_for_tcp(addr).await;
+
+            // send request via grpc client
+            let mut client = LogsServiceClient::connect(format!("http://{}", addr))
+                .await
+                .unwrap();
+            let req = Request::new(ExportLogsServiceRequest {
+                resource_logs: vec![ResourceLogs {
+                    resource: Some(OtelResource {
+                        attributes: vec![KeyValue {
+                            key: "res_key".into(),
+                            value: Some(AnyValue {
+                                value: Some(any_value::Value::StringValue("res_val".into())),
+                            }),
+                        }],
+                        dropped_attributes_count: 0,
+                    }),
+                    scope_logs: vec![ScopeLogs {
+                        scope: None,
+                        log_records: vec![LogRecord {
+                            time_unix_nano: 1,
+                            observed_time_unix_nano: 2,
+                            severity_number: 9,
+                            severity_text: "info".into(),
+                            body: Some(AnyValue {
+                                value: Some(any_value::Value::StringValue("log body".into())),
+                            }),
+                            attributes: vec![KeyValue {
+                                key: "attr_key".into(),
+                                value: Some(AnyValue {
+                                    value: Some(any_value::Value::StringValue("attr_val".into())),
+                                }),
+                            }],
+                            dropped_attributes_count: 3,
+                            flags: 4,
+                            // opentelemetry sdk will hex::decode the given trace_id and span_id
+                            trace_id: str_into_hex_bytes("4ac52aadf321c2e531db005df08792f5"),
+                            span_id: str_into_hex_bytes("0b9e4bda2a55530d"),
+                        }],
+                        schema_url: "v1".into(),
+                    }],
+                    instrumentation_library_logs: vec![],
+                    schema_url: "v1".into(),
+                }],
+            });
+            let _ = client.export(req).await;
+            let mut output = test_util::collect_ready(rx).await;
+            // we just send one, so only one output
+            assert_eq!(output.len(), 1);
+            let actual_event = output.pop().unwrap();
+            let expect = r#"
+            {
+            "attributes": {"attr_key": "attr_val"},
+            "resources": {"res_key": "res_val"},
+            "message": "log body",
+            "trace_id": "4ac52aadf321c2e531db005df08792f5",
+            "span_id": "0b9e4bda2a55530d",
+            "severity_number": 9,
+            "severity_text": "info",
+            "flags": 4,
+            "timestamp": 1,
+            "observed_time_unix_nano": 2,
+            "dropped_attributes_count": 3
+            }
+            "#;
+            let expect_json: serde_json::Value = serde_json::from_str(expect).unwrap();
+            let expect_event = Event::try_from(expect_json).unwrap();
+            assert_eq!(actual_event, expect_event);
+        })
+        .await;
+    }
+    fn str_into_hex_bytes(s: &str) -> Vec<u8> {
+        // unwrap is okay in test
+        hex::decode(s).unwrap()
     }
 }
