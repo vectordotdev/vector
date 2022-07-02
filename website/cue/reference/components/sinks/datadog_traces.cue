@@ -64,7 +64,7 @@ components: sinks: datadog_traces: {
 	}
 
 	configuration: {
-		default_api_key: sinks._datadog.configuration.api_key
+		default_api_key: sinks._datadog.configuration.default_api_key
 		endpoint:        sinks._datadog.configuration.endpoint
 		site:            sinks._datadog.configuration.site
 	}

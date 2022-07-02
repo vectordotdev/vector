@@ -154,21 +154,21 @@ metrics = { version = "0.17.1", default-features = false, features = ["std"] }
 metrics-tracing-context = { version = "0.9.0", default-features = false }
 
 # AWS - Official SDK
-aws-config = { version = "0.14.0", default-features = false, features = ["rustls"], optional = true }
-aws-types = { version = "0.14.0", default-features = false, features = ["hardcoded-credentials"], optional = true }
-aws-sdk-s3 = { version = "0.14.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-sqs = { version = "0.14.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-cloudwatch = { version = "0.14.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-cloudwatchlogs = { version = "0.14.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-elasticsearch = {version = "0.14.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-firehose = { version = "0.14.0", default-features = false, features = ["rustls"], optional = true }
-aws-sdk-kinesis = { version = "0.14.0", default-features = false, features = ["rustls"], optional = true }
-aws-sigv4 = { version = "0.14.0", default-features = false, optional = true }
-aws-smithy-async = { version = "0.44.0", default-features = false, optional = true }
-aws-smithy-client = { version = "0.44.0", default-features = false, features = ["client-hyper"], optional = true}
-aws-smithy-http = { version = "0.44.0", default-features = false, features = ["event-stream"], optional = true }
-aws-smithy-http-tower = { version = "0.44.0", default-features = false, optional = true }
-aws-smithy-types = { version = "0.44.0", default-features = false, optional = true }
+aws-config = { version = "0.15.0", default-features = false, features = ["rustls"], optional = true }
+aws-types = { version = "0.15.0", default-features = false, features = ["hardcoded-credentials"], optional = true }
+aws-sdk-s3 = { version = "0.15.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-sqs = { version = "0.15.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-cloudwatch = { version = "0.15.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-cloudwatchlogs = { version = "0.15.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-elasticsearch = {version = "0.15.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-firehose = { version = "0.15.0", default-features = false, features = ["rustls"], optional = true }
+aws-sdk-kinesis = { version = "0.15.0", default-features = false, features = ["rustls"], optional = true }
+aws-sigv4 = { version = "0.15.0", default-features = false, optional = true }
+aws-smithy-async = { version = "0.45.0", default-features = false, optional = true }
+aws-smithy-client = { version = "0.45.0", default-features = false, features = ["client-hyper"], optional = true}
+aws-smithy-http = { version = "0.45.0", default-features = false, features = ["event-stream"], optional = true }
+aws-smithy-http-tower = { version = "0.45.0", default-features = false, optional = true }
+aws-smithy-types = { version = "0.45.0", default-features = false, optional = true }
 
 # Azure
 azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b7171eb40909f7f2805f4622e076f8a6dbbe2d98", default-features = false, features = ["enable_reqwest"], optional = true }
@@ -182,7 +182,7 @@ tower = { version = "0.4.13", default-features = false, features = ["buffer", "l
 serde = { version = "1.0.137", default-features = false, features = ["derive"] }
 serde-toml-merge = { version = "0.3.0", default-features = false }
 serde_bytes = { version = "0.11.6", default-features = false, features = ["std"], optional = true }
-serde_json = { version = "1.0.81", default-features = false, features = ["raw_value"] }
+serde_json = { version = "1.0.82", default-features = false, features = ["raw_value"] }
 serde_with = { version = "1.14.0", default-features = false, features = ["macros"], optional = true }
 serde_yaml = { version = "0.8.24", default-features = false }
 
@@ -284,7 +284,7 @@ redis = { version = "0.21.5", default-features = false, features = ["connection-
 regex = { version = "1.5.6", default-features = false, features = ["std", "perf"] }
 roaring = { version = "0.9.0", default-features = false, optional = true }
 seahash = { version = "4.1.0", default-features = false, optional = true }
-semver = { version = "1.0.10", default-features = false, features = ["serde", "std"], optional = true }
+semver = { version = "1.0.12", default-features = false, features = ["serde", "std"], optional = true }
 smallvec = { version = "1", default-features = false, features = ["union"] }
 snafu = { version = "0.7.1", default-features = false, features = ["futures"] }
 snap = { version = "1.0.5", default-features = false, optional = true }
@@ -308,7 +308,7 @@ warp = { version = "0.3.1", default-features = false }
 heim = { git = "https://github.com/vectordotdev/heim.git", branch="update-nix", default-features = false, features = ["cpu", "disk", "host", "memory", "net"], optional = true }
 
 # make sure to update the external docs when the Lua version changes
-mlua = { version = "0.8.0", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
+mlua = { version = "0.8.1", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 
 [target.'cfg(windows)'.dependencies]
 schannel = "0.1.20"

@@ -1,13 +1,15 @@
 # result:
 #
 # error[E203]: syntax error
-#   ┌─ :1:1
+#   ┌─ :2:1
 #   │
-# 1 │ @timestamp = now()
+# 2 │ @timestamp = now()
 #   │ ^^^^^^^^^^
 #   │ │
 #   │ unexpected syntax token: "PathField"
-#   │ expected one of: "\n", "!", "(", "[", "_", "abort", "false", "float literal", "function call", "identifier", "if", "integer literal", "null", "raw string literal", "regex literal", "string literal", "timestamp literal", "true", "{", "path literal"
+#   │ expected one of: "\n", "!", "(", ")", ";", "[", "]", "_", "abort", "float literal", "function call", "identifier", "integer literal", "raw string literal", "regex literal", "string literal", "timestamp literal", "{", "|", "|", "}", "path literal"
 #   │
 #   = see language documentation at https://vrl.dev
+#   = try your code in the VRL REPL, learn more at https://vrl.dev/examples
+
 @timestamp = now()

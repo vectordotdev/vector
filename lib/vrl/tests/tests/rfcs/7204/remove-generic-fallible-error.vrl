@@ -12,6 +12,7 @@
 #   = see documentation about error handling at https://errors.vrl.dev/#handling
 #   = learn more about error code 100 at https://errors.vrl.dev/100
 #   = see language documentation at https://vrl.dev
+#   = try your code in the VRL REPL, learn more at https://vrl.dev/examples
 #
 # error[E110]: fallible predicate
 #   ┌─ :4:15
@@ -35,6 +36,7 @@
 #   = see documentation about error handling at https://errors.vrl.dev/#handling
 #   = learn more about error code 110 at https://errors.vrl.dev/110
 #   = see language documentation at https://vrl.dev
+#   = try your code in the VRL REPL, learn more at https://vrl.dev/examples
 #
 # error[E100]: unhandled error
 #   ┌─ :8:1
@@ -48,6 +50,7 @@
 #   = see documentation about error handling at https://errors.vrl.dev/#handling
 #   = learn more about error code 100 at https://errors.vrl.dev/100
 #   = see language documentation at https://vrl.dev
+#   = try your code in the VRL REPL, learn more at https://vrl.dev/examples
 #
 # error[E100]: unhandled error
 #    ┌─ :10:5
@@ -61,6 +64,7 @@
 #    = see documentation about error handling at https://errors.vrl.dev/#handling
 #    = learn more about error code 100 at https://errors.vrl.dev/100
 #    = see language documentation at https://vrl.dev
+#    = try your code in the VRL REPL, learn more at https://vrl.dev/examples
 
 to_string(.foo)
 

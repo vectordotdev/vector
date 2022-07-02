@@ -1,6 +1,7 @@
 use bytes::Bytes;
 use serde_json::error::Category;
 use snafu::Snafu;
+use std::sync::Arc;
 use vector_core::event::{EventFinalizers, Finalizable, Metric};
 
 use super::{
@@ -110,6 +111,7 @@ impl From<EncoderError> for RequestBuilderError {
 
 /// Metadata that the `DatadogMetricsRequestBuilder` sends with each request.
 pub struct RequestMetadata {
+    api_key: Option<Arc<str>>,
     endpoint: DatadogMetricsEndpoint,
     batch_size: usize,
     finalizers: EventFinalizers,
@@ -149,7 +151,7 @@ impl DatadogMetricsRequestBuilder {
     }
 }
 
-impl IncrementalRequestBuilder<(DatadogMetricsEndpoint, Vec<Metric>)>
+impl IncrementalRequestBuilder<((Option<Arc<str>>, DatadogMetricsEndpoint), Vec<Metric>)>
     for DatadogMetricsRequestBuilder
 {
     type Metadata = RequestMetadata;
@@ -159,9 +161,11 @@ impl IncrementalRequestBuilder<(DatadogMetricsEndpoint, Vec<Metric>)>
 
     fn encode_events_incremental(
         &mut self,
-        input: (DatadogMetricsEndpoint, Vec<Metric>),
+        input: ((Option<Arc<str>>, DatadogMetricsEndpoint), Vec<Metric>),
     ) -> Vec<Result<(Self::Metadata, Self::Payload), Self::Error>> {
-        let (endpoint, mut metrics) = input;
+        let (tmp, mut metrics) = input;
+        let (api_key, endpoint) = tmp;
+
         let encoder = self.get_encoder(endpoint);
         let mut metric_drain = metrics.drain(..);
 
@@ -207,6 +211,7 @@ impl IncrementalRequestBuilder<(DatadogMetricsEndpoint, Vec<Metric>)>
                     Ok((payload, mut metrics, raw_bytes_written)) => {
                         let finalizers = metrics.take_finalizers();
                         let metadata = RequestMetadata {
+                            api_key: api_key.as_ref().map(Arc::clone),
                             endpoint,
                             batch_size: n,
                             finalizers,
@@ -243,10 +248,20 @@ impl IncrementalRequestBuilder<(DatadogMetricsEndpoint, Vec<Metric>)>
                             while recommended_splits > 1 {
                                 split_idx -= stride;
                                 let chunk = metrics.split_off(split_idx);
-                                results.push(encode_now_or_never(encoder, endpoint, chunk));
+                                results.push(encode_now_or_never(
+                                    encoder,
+                                    api_key.as_ref().map(Arc::clone),
+                                    endpoint,
+                                    chunk,
+                                ));
                                 recommended_splits -= 1;
                             }
-                            results.push(encode_now_or_never(encoder, endpoint, metrics));
+                            results.push(encode_now_or_never(
+                                encoder,
+                                api_key.as_ref().map(Arc::clone),
+                                endpoint,
+                                metrics,
+                            ));
                         }
                         // Not an error we can do anything about, so just forward it on.
                         suberr => results.push(Err(RequestBuilderError::Unexpected {
@@ -267,6 +282,7 @@ impl IncrementalRequestBuilder<(DatadogMetricsEndpoint, Vec<Metric>)>
             .get_uri_for_endpoint(metadata.endpoint);
 
         DatadogMetricsRequest {
+            api_key: metadata.api_key,
             payload,
             uri,
             content_type: metadata.endpoint.content_type(),
@@ -287,6 +303,7 @@ impl IncrementalRequestBuilder<(DatadogMetricsEndpoint, Vec<Metric>)>
 /// the "only try it once" aspect by treating all errors as unrecoverable.
 fn encode_now_or_never(
     encoder: &mut DatadogMetricsEncoder,
+    api_key: Option<Arc<str>>,
     endpoint: DatadogMetricsEndpoint,
     metrics: Vec<Metric>,
 ) -> Result<(RequestMetadata, Bytes), RequestBuilderError> {
@@ -306,6 +323,7 @@ fn encode_now_or_never(
         .map(|(payload, mut processed, raw_bytes_written)| {
             let finalizers = processed.take_finalizers();
             let metadata = RequestMetadata {
+                api_key,
                 endpoint,
                 batch_size: n,
                 finalizers,
