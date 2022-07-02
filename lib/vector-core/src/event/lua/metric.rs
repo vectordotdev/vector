@@ -207,7 +207,7 @@ impl<'a> FromLua<'a> for Metric {
         } else if let Some(aggregated_histogram) =
             table.raw_get::<_, Option<LuaTable>>("aggregated_histogram")?
         {
-            let counts: Vec<u32> = aggregated_histogram.raw_get("counts")?;
+            let counts: Vec<u64> = aggregated_histogram.raw_get("counts")?;
             let buckets: Vec<f64> = aggregated_histogram.raw_get("buckets")?;
             let count = counts.iter().sum();
             MetricValue::AggregatedHistogram {
