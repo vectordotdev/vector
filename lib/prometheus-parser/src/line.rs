@@ -565,17 +565,24 @@ mod test {
         assert_eq!(left, tail);
         assert_eq!(r as u64, u64::MAX);
 
-        // This doesn't pass because we are parsing as f64 so we lose accuracy.
-        // However, according to the Prometheus docs:
-        // https://prometheus.io/docs/instrumenting/exposition_formats/#text-format-details
-        // > value is a float represented as required by Go's ParseFloat() function.
-        // Go's `ParseFloat` will also parse `u64::MAX` and `u64::MAX - 1` as the
-        // same number, so we are in alignment with Prometheus.
+        // This doesn't pass because we are parsing as f64 so we lose precision
+        // once the number is bigger than 2^53 (the mantissa for f64).
         //
         // let input = wrap(&(u64::MAX - 1).to_string());
         // let (left, r) = Metric::parse_value(&input).unwrap();
         // assert_eq!(left, tail);
         // assert_eq!(r as u64, u64::MAX - 1);
+
+        // Precision is maintained up to 2^53
+        let input = wrap(&(2_u64.pow(53)).to_string());
+        let (left, r) = Metric::parse_value(&input).unwrap();
+        assert_eq!(left, tail);
+        assert_eq!(r as u64, 2_u64.pow(53));
+
+        let input = wrap(&(2_u64.pow(53) - 1).to_string());
+        let (left, r) = Metric::parse_value(&input).unwrap();
+        assert_eq!(left, tail);
+        assert_eq!(r as u64, 2_u64.pow(53) - 1);
 
         let input = wrap(&(u32::MAX as u64 + 1).to_string());
         let (left, r) = Metric::parse_value(&input).unwrap();
