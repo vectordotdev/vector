@@ -124,6 +124,13 @@ pub struct FileConfig {
     /// By default, the global `data_dir` option is used. Please make sure the user Vector is running as has write permissions to this directory.
     pub data_dir: Option<PathBuf>,
 
+    /// Enables adding the file offset to each event and sets the name of the log field used.
+    ///
+    /// The value will be the byte offset of the start of the line within the file.
+    ///
+    /// Off by default, the offset is only added to the event if this is set.
+    pub offset_key: Option<String>,
+
     /// Delay between file discovery calls, in milliseconds.
     ///
     /// This controls the interval at which Vector searches for files. Higher value result in greater chances of some short living files being missed between searches, but lower value increases the performance impact of file discovery.
@@ -294,6 +301,7 @@ impl Default for FileConfig {
             },
             ignore_not_found: false,
             host_key: None,
+            offset_key: None,
             data_dir: None,
             glob_minimum_cooldown_ms: 1000, // millis
             message_start_indicator: None,
@@ -422,6 +430,7 @@ pub fn file_source(
     };
 
     let file_key = config.file_key.clone();
+    let offset_key = config.offset_key.clone();
     let host_key = config
         .host_key
         .clone()
@@ -536,7 +545,7 @@ pub fn file_source(
         let mut messages = messages.map(move |line| {
             let _enter = span2.enter();
             let mut event =
-                create_event(line.text, &line.filename, &host_key, &hostname, &file_key);
+                create_event(line.text, &line.filename, &line.offset, &host_key, &hostname, &file_key, &offset_key);
             if let Some(finalizer) = &finalizer {
                 let (batch, receiver) = BatchNotifier::new_with_receiver();
                 event = event.with_batch_notifier(&batch);
@@ -617,20 +626,29 @@ fn wrap_with_line_agg(
 fn create_event(
     line: Bytes,
     file: &str,
+    line_end_offset: &u64,
     host_key: &str,
     hostname: &Option<String>,
     file_key: &Option<String>,
+    offset_key: &Option<String>
 ) -> LogEvent {
+    let line_len = line.len();
+
     emit!(FileEventsReceived {
         count: 1,
         file,
-        byte_size: line.len(),
+        byte_size: line_len,
     });
 
     let mut event = LogEvent::from_bytes_legacy(&line);
 
     // Add source type
     event.insert(log_schema().source_type_key(), Bytes::from("file"));
+
+    if let Some(offset_key) = &offset_key {
+        let line_start_offset: u64 = line_end_offset - line_len as u64 - 1;
+        event.insert(offset_key.as_str(), line_start_offset.to_string());
+    }
 
     if let Some(file_key) = &file_key {
         event.insert(file_key.as_str(), file);
@@ -785,14 +803,18 @@ mod tests {
     fn file_create_event() {
         let line = Bytes::from("hello world");
         let file = "some_file.rs";
+        // Internal offset is indexed from 1
+        let line_end_offset: u64 = 11;
         let host_key = "host".to_string();
         let hostname = Some("Some.Machine".to_string());
         let file_key = Some("file".to_string());
+        let offset_key = Some("offset".to_string());
 
-        let log = create_event(line, file, &host_key, &hostname, &file_key);
+        let log = create_event(line, file, &line_end_offset, &host_key, &hostname, &file_key, &offset_key);
 
         assert_eq!(log["file"], file.into());
         assert_eq!(log["host"], "Some.Machine".into());
+        assert_eq!(log["offset"], "0".into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
         assert_eq!(log[log_schema().source_type_key()], "file".into());
     }
