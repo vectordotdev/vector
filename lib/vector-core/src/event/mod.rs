@@ -351,7 +351,16 @@ impl From<proto::DistributionSample> for metric::Sample {
     }
 }
 
-impl From<metric::Bucket> for proto::HistogramBucket {
+impl From<proto::HistogramBucket> for metric::Bucket {
+    fn from(bucket: proto::HistogramBucket) -> Self {
+        Self {
+            upper_limit: bucket.upper_limit,
+            count: u64::from(bucket.count),
+        }
+    }
+}
+
+impl From<metric::Bucket> for proto::HistogramBucket3 {
     fn from(bucket: metric::Bucket) -> Self {
         Self {
             upper_limit: bucket.upper_limit,
@@ -360,8 +369,8 @@ impl From<metric::Bucket> for proto::HistogramBucket {
     }
 }
 
-impl From<proto::HistogramBucket> for metric::Bucket {
-    fn from(bucket: proto::HistogramBucket) -> Self {
+impl From<proto::HistogramBucket3> for metric::Bucket {
+    fn from(bucket: proto::HistogramBucket3) -> Self {
         Self {
             upper_limit: bucket.upper_limit,
             count: bucket.count,
