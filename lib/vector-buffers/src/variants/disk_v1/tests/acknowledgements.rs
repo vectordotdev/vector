@@ -25,9 +25,9 @@ async fn acking_single_event_advances_delete_offset() {
 
             // Write a simple single-event record and make writer offset moves forward by the
             // expected amount, since the entry key should be increment by event count:
-            let record = SizedRecord(360);
+            let record = SizedRecord::new(360);
             assert_eq!(record.event_count(), 1);
-            writer.send(record).await;
+            writer.send(record.clone()).await;
             writer.flush();
             assert_reader_writer_v1_positions!(reader, writer, 0, record.event_count());
 
@@ -137,72 +137,6 @@ async fn acking_multi_event_advances_delete_offset() {
             drop(staged_read);
 
             assert_reader_v1_delete_position!(reader, record.event_count());
-        }
-    })
-    .await;
-}
-
-#[tokio::test]
-async fn acking_multi_event_advances_delete_offset_incremental() {
-    let _a = install_tracing_helpers();
-    with_temp_dir(|dir| {
-        let data_dir = dir.to_path_buf();
-
-        async move {
-            // Create a regular buffer, no customizations required.
-            let (mut writer, mut reader, acker) = create_default_buffer_v1(data_dir);
-            assert_reader_writer_v1_positions!(reader, writer, 0, 0);
-
-            // Write a simple multi-event record and make writer offset moves forward by the
-            // expected amount, since the entry key should be increment by event count:
-            let record = MultiEventRecord(14);
-            assert_eq!(record.event_count(), 14);
-            writer.send(record).await;
-            writer.flush();
-            assert_reader_writer_v1_positions!(reader, writer, 0, record.event_count());
-
-            // And now read it out which should give us a matching record, while our delete offset
-            // is still lagging behind the read offset since we haven't yet acknowledged the record:
-            let read_record = reader.next().await.expect("read should not fail");
-            assert_reader_writer_v1_positions!(
-                reader,
-                writer,
-                record.event_count(),
-                record.event_count()
-            );
-
-            assert_eq!(record, read_record);
-
-            // Now ack the record by using an amount equal to the record's event count, but do it
-            // incrementally.
-            //
-            // Since the logic to acknowledge records is driven by trying to read, we have to
-            // initiate a read first and then do our checks, but it also has to be fake spawned
-            // since there's nothing else to read and we'd be awaiting forever.
-            //
-            // Additionally -- I know, I know -- we have to advance time to clear the flush
-            // interval, since we only flush after a certain amount of time has elapsed to batch
-            // deletes to the database:
-            assert_reader_v1_delete_position!(reader, 0);
-            assert_eq!(read_record.event_count(), 14);
-
-            // Make sure our increments don't exceed the actual event count for the record:
-            let increments = [4, 7, 2, 1];
-            assert_eq!(read_record.event_count(), increments.iter().sum::<usize>());
-
-            tokio::time::pause();
-
-            // We expect the first three acknowledgements to do nothing, because the record will
-            // still not have been fully acknowledged yet, but the fourth acknowledgement will make
-            // the record eligible for deletion which should be reflected immediately:
-            let expected_delete_pos = [0, 0, 0, record.event_count()];
-            for (increment, expected) in increments.into_iter().zip(expected_delete_pos.into_iter())
-            {
-                acker.ack(increment);
-                drive_reader_to_flush(&mut reader).await;
-
-                assert_reader_v1_delete_position!(reader, expected);
-            }
         }
     })
     .await;

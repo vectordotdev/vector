@@ -2,6 +2,9 @@ use std::{error, fmt, mem};
 
 use bytes::{Buf, BufMut};
 use vector_common::byte_size_of::ByteSizeOf;
+use vector_common::finalization::{
+    AddBatchNotifier, BatchNotifier, EventFinalizer, EventFinalizers,
+};
 
 use crate::{
     encoding::FixedEncodable,
@@ -31,11 +34,12 @@ impl fmt::Display for DecodeError {
 
 impl error::Error for DecodeError {}
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Eq)]
 pub struct Record {
     id: u32,
     size: u32,
     event_count: u32,
+    finalizers: EventFinalizers,
 }
 
 impl Record {
@@ -44,6 +48,7 @@ impl Record {
             id,
             size,
             event_count,
+            finalizers: EventFinalizers::DEFAULT,
         }
     }
 
@@ -76,6 +81,18 @@ impl fmt::Debug for Record {
             .field("encoded_len", &self.encoded_len())
             .field("archived_len", &self.archived_len())
             .finish()
+    }
+}
+
+impl PartialEq for Record {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id && self.size == other.size && self.event_count == other.event_count
+    }
+}
+
+impl AddBatchNotifier for Record {
+    fn add_batch_notifier(&mut self, batch: BatchNotifier) {
+        self.finalizers.add(EventFinalizer::new(batch));
     }
 }
 

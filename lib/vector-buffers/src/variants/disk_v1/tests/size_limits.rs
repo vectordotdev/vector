@@ -27,7 +27,7 @@ async fn ensure_write_offset_valid_after_reload_with_multievent() {
             // haven't exceed our total buffer size limit yet, or the size limit of the data file
             // itself.  We do need this write to be big enough to exceed the total buffer size
             // limit, though.
-            let first_record = SizedRecord(first_write_size);
+            let first_record = SizedRecord::new(first_write_size);
             let first_write_result = writer.try_send(first_record);
             assert_eq!(first_write_result, None);
             writer.flush();
@@ -35,8 +35,8 @@ async fn ensure_write_offset_valid_after_reload_with_multievent() {
             // This write should return immediately because will have exceeded our 100 byte total
             // buffer size limit handily with the first write we did, but since it's a fallible
             // write attempt, it can already tell that the write will not fit anyways:
-            let record = SizedRecord(second_write_size);
-            let second_write_result = writer.try_send(record);
+            let record = SizedRecord::new(second_write_size);
+            let second_write_result = writer.try_send(record.clone());
 
             assert_eq!(second_write_result, Some(record));
         }
