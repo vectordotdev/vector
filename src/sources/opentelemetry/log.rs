@@ -217,7 +217,6 @@ mod tests {
                         }],
                         schema_url: "v1".into(),
                     }],
-                    instrumentation_library_logs: vec![],
                     schema_url: "v1".into(),
                 }],
             });

@@ -1,6 +1,6 @@
 use super::{
-    Common::{any_value::Value as PBValue, InstrumentationScope, KeyValue},
-    Logs::{InstrumentationLibraryLogs, LogRecord, ResourceLogs, ScopeLogs, SeverityNumber},
+    Common::{any_value::Value as PBValue, KeyValue},
+    Logs::{LogRecord, ResourceLogs, SeverityNumber},
     Resource as OtelResource,
 };
 use bytes::Bytes;
@@ -25,36 +25,12 @@ const OBSERVED_TIME_UNIX_NANO_KEY: &str = "observed_time_unix_nano";
 const DROPPED_ATTRIBUTES_COUNT_KEY: &str = "dropped_attributes_count";
 const FLAGS_KEY: &str = "flags";
 
-impl From<InstrumentationLibraryLogs> for ScopeLogs {
-    fn from(v: InstrumentationLibraryLogs) -> Self {
-        Self {
-            scope: v.instrumentation_library.map(|v| InstrumentationScope {
-                name: v.name,
-                version: v.version,
-            }),
-            log_records: v.log_records,
-            schema_url: v.schema_url,
-        }
-    }
-}
-
 impl IntoIterator for ResourceLogs {
     type Item = Event;
     type IntoIter = std::vec::IntoIter<Self::Item>;
-    #[allow(deprecated)]
     fn into_iter(self) -> Self::IntoIter {
         let resource = self.resource;
-        // convert instrumentation_library_logs(deprecated) into scope_logs
-        let scope_logs: Vec<ScopeLogs> = if !self.scope_logs.is_empty() {
-            self.scope_logs
-        } else {
-            self.instrumentation_library_logs
-                .into_iter()
-                .map(ScopeLogs::from)
-                .collect()
-        };
-
-        scope_logs
+        self.scope_logs
             .into_iter()
             .flat_map(|scope_log| scope_log.log_records)
             .map(|log_record| {
@@ -64,7 +40,7 @@ impl IntoIterator for ResourceLogs {
                 }
                 .into()
             })
-            .collect::<Vec<Event>>()
+            .collect::<Vec<Self::Item>>()
             .into_iter()
     }
 }

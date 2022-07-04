@@ -16,6 +16,7 @@ syntax = "proto3";
 
 package opentelemetry.proto.common.v1;
 
+option csharp_namespace = "OpenTelemetry.Proto.Common.V1";
 option java_multiple_files = true;
 option java_package = "io.opentelemetry.proto.common.v1";
 option java_outer_classname = "CommonProto";
@@ -65,23 +66,12 @@ message KeyValue {
   AnyValue value = 2;
 }
 
-// InstrumentationLibrary is a message representing the instrumentation library information
-// such as the fully qualified name and version.
-// InstrumentationLibrary is wire-compatible with InstrumentationScope for binary
-// Protobuf format.
-// This message is deprecated and will be removed on June 15, 2022.
-message InstrumentationLibrary {
-  option deprecated = true;
-
-  // An empty instrumentation library name means the name is unknown.
-  string name = 1;
-  string version = 2;
-}
-
 // InstrumentationScope is a message representing the instrumentation scope information
-// such as the fully qualified name and version.
+// such as the fully qualified name and version. 
 message InstrumentationScope {
   // An empty instrumentation scope name means the name is unknown.
   string name = 1;
   string version = 2;
+  repeated KeyValue attributes = 3;
+  uint32 dropped_attributes_count = 4;
 }
