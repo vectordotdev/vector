@@ -18,7 +18,7 @@ use crate::{
     assert_buffer_size, assert_enough_bytes_written, assert_file_does_not_exist_async,
     assert_file_exists_async, assert_reader_writer_v2_file_positions, await_timeout,
     encoding::{AsMetadata, Encodable},
-    test::common::{install_tracing_helpers, with_temp_dir, SizedRecord, UndecodableRecord},
+    test::{install_tracing_helpers, with_temp_dir, SizedRecord, UndecodableRecord},
     variants::disk_v2::{backed_archive::BackedArchive, record::Record, ReaderError},
     EventCount,
 };

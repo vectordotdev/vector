@@ -1,7 +1,7 @@
 use super::create_default_buffer_v1;
 use crate::{
     assert_reader_writer_v1_positions,
-    test::common::{with_temp_dir, MultiEventRecord},
+    test::{with_temp_dir, MultiEventRecord},
 };
 
 #[tokio::test]

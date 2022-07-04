@@ -5,7 +5,7 @@ use futures::FutureExt;
 use super::{create_default_buffer_v1, create_default_buffer_v1_with_usage};
 use crate::{
     assert_buffer_usage_metrics, assert_reader_writer_v1_positions,
-    test::common::{with_temp_dir, MultiEventRecord, PoisonPillMultiEventRecord, SizedRecord},
+    test::{with_temp_dir, MultiEventRecord, PoisonPillMultiEventRecord, SizedRecord},
     variants::disk_v1::{reader::FLUSH_INTERVAL, tests::drive_reader_to_flush},
     EventCount,
 };

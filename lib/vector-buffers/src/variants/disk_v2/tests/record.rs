@@ -1,7 +1,7 @@
 use std::io::Cursor;
 
 use crate::{
-    test::common::SizedRecord,
+    test::SizedRecord,
     variants::disk_v2::{reader::RecordReader, writer::RecordWriter},
 };
 

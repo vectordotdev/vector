@@ -1,6 +1,6 @@
 use quickcheck::{single_shrinker, Arbitrary, Gen};
 
-use crate::test::common::Message;
+use crate::test::Message;
 
 /// The action that our model interpreter loop will take.
 #[derive(Debug, Clone)]
