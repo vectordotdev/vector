@@ -53,7 +53,7 @@ async fn pending_read_returns_none_when_writer_closed_with_unflushed_write() {
 
             // Write a small record but _don't_ flush it.
             let bytes_written = writer
-                .write_record(SizedRecord(64))
+                .write_record(SizedRecord::new(64))
                 .await
                 .expect("write should not fail");
             assert_enough_bytes_written!(bytes_written, SizedRecord, 64);
@@ -101,7 +101,7 @@ async fn last_record_is_valid_during_load_when_buffer_correctly_flushed_and_stop
             // Create a normal buffer.
             let (mut writer, _, _, ledger) = create_default_buffer_v2(data_dir.clone()).await;
             let bytes_written = writer
-                .write_record(SizedRecord(64))
+                .write_record(SizedRecord::new(64))
                 .await
                 .expect("write should not fail");
             assert_enough_bytes_written!(bytes_written, SizedRecord, 64);
@@ -132,7 +132,7 @@ async fn file_id_wraps_around_when_max_file_id_hit() {
 
         async move {
             let record_size = 100;
-            let record = SizedRecord(record_size);
+            let record = SizedRecord::new(record_size);
             let max_data_file_size = get_minimum_data_file_size_for_record_payload(&record);
 
             // Create our buffer with an arbitrarily low max data file size, which will let us
@@ -155,9 +155,8 @@ async fn file_id_wraps_around_when_max_file_id_hit() {
             let mut reader_file_id = 0;
             let mut writer_file_id = 0;
             while id < target_id {
-                let record = SizedRecord(record_size);
                 let bytes_written = writer
-                    .write_record(record)
+                    .write_record(record.clone())
                     .await
                     .expect("write should not fail");
                 assert_enough_bytes_written!(bytes_written, SizedRecord, record_size);
@@ -165,7 +164,7 @@ async fn file_id_wraps_around_when_max_file_id_hit() {
                 writer.flush().await.expect("flush should not fail");
 
                 let record_read = reader.next().await.expect("read should not fail");
-                assert_eq!(record_read, Some(record));
+                assert_eq!(record_read, Some(record.clone()));
 
                 acker.ack(1);
 
@@ -211,7 +210,7 @@ async fn writer_stops_when_hitting_file_that_reader_is_still_on() {
 
         async move {
             let record_size = 100;
-            let record = SizedRecord(record_size);
+            let record = SizedRecord::new(record_size);
             let max_data_file_size = get_minimum_data_file_size_for_record_payload(&record);
 
             // Create our buffer with an arbitrarily low max data file size, which will let us
@@ -230,7 +229,7 @@ async fn writer_stops_when_hitting_file_that_reader_is_still_on() {
             let mut total_size = 0;
             while id < file_id_upper {
                 let bytes_written = writer
-                    .write_record(record)
+                    .write_record(record.clone())
                     .await
                     .expect("write should not fail");
                 assert_enough_bytes_written!(bytes_written, SizedRecord, record_size);
@@ -285,7 +284,7 @@ async fn writer_stops_when_hitting_file_that_reader_is_still_on() {
             // first data file since we haven't acknowledged the read yet, so the file can't yet be
             // deleted.
             let first_record_read = reader.next().await.expect("read should not fail");
-            assert_eq!(first_record_read, Some(SizedRecord(record_size)));
+            assert_eq!(first_record_read, Some(SizedRecord::new(record_size)));
             assert_buffer_size!(ledger, MAX_FILE_ID, total_size);
             assert_reader_writer_v2_file_positions!(ledger, 0, MAX_FILE_ID - 1);
 
@@ -299,7 +298,7 @@ async fn writer_stops_when_hitting_file_that_reader_is_still_on() {
             assert_pending!(blocked_write.poll());
 
             let second_record_read = reader.next().await.expect("read should not fail");
-            assert_eq!(second_record_read, Some(SizedRecord(record_size)));
+            assert_eq!(second_record_read, Some(SizedRecord::new(record_size)));
             assert_buffer_records!(ledger, MAX_FILE_ID - 1);
             assert_reader_writer_v2_file_positions!(ledger, 1, MAX_FILE_ID - 1);
 
@@ -369,7 +368,7 @@ async fn reader_still_works_when_record_id_wraps_around() {
             let next_record_id = ledger.state().get_next_writer_record_id();
             let first_record_size = 14;
             let first_bytes_written = writer
-                .write_record(SizedRecord(first_record_size))
+                .write_record(SizedRecord::new(first_record_size))
                 .await
                 .expect("write should not fail");
             assert_enough_bytes_written!(first_bytes_written, SizedRecord, first_record_size);
@@ -385,7 +384,7 @@ async fn reader_still_works_when_record_id_wraps_around() {
             let next_record_id = ledger.state().get_next_writer_record_id();
             let second_record_size = 256;
             let second_bytes_written = writer
-                .write_record(SizedRecord(second_record_size))
+                .write_record(SizedRecord::new(second_record_size))
                 .await
                 .expect("write should not fail");
             assert_enough_bytes_written!(second_bytes_written, SizedRecord, second_record_size);
@@ -402,14 +401,17 @@ async fn reader_still_works_when_record_id_wraps_around() {
 
             // Now we should be able to read both records without the reader getting angry.
             let first_record_read = reader.next().await.expect("read should not fail");
-            assert_eq!(first_record_read, Some(SizedRecord(first_record_size)));
+            assert_eq!(first_record_read, Some(SizedRecord::new(first_record_size)));
             assert_eq!(u64::MAX - 1, ledger.state().get_last_reader_record_id());
             assert_buffer_records!(ledger, 2);
 
             acker.ack(1);
 
             let second_record_read = reader.next().await.expect("read should not fail");
-            assert_eq!(second_record_read, Some(SizedRecord(second_record_size)));
+            assert_eq!(
+                second_record_read,
+                Some(SizedRecord::new(second_record_size))
+            );
             assert_eq!(u64::MAX, ledger.state().get_last_reader_record_id());
             assert_buffer_records!(ledger, 1);
 
@@ -474,7 +476,7 @@ async fn reader_deletes_data_file_around_record_id_wraparound() {
             // the wrapping threshold.
             let first_record_size = 64;
             let first_bytes_written = writer
-                .write_record(SizedRecord(first_record_size))
+                .write_record(SizedRecord::new(first_record_size))
                 .await
                 .expect("write should not fail");
             assert_enough_bytes_written!(first_bytes_written, SizedRecord, first_record_size);
@@ -485,7 +487,7 @@ async fn reader_deletes_data_file_around_record_id_wraparound() {
 
             let second_record_size = 66;
             let second_bytes_written = writer
-                .write_record(SizedRecord(second_record_size))
+                .write_record(SizedRecord::new(second_record_size))
                 .await
                 .expect("write should not fail");
             assert_enough_bytes_written!(second_bytes_written, SizedRecord, second_record_size);
@@ -499,7 +501,7 @@ async fn reader_deletes_data_file_around_record_id_wraparound() {
             // file after we read and ack the first two writes.
             let third_record_size = 68;
             let third_bytes_written = writer
-                .write_record(SizedRecord(third_record_size))
+                .write_record(SizedRecord::new(third_record_size))
                 .await
                 .expect("write should not fail");
             assert_enough_bytes_written!(third_bytes_written, SizedRecord, third_record_size);
@@ -511,7 +513,7 @@ async fn reader_deletes_data_file_around_record_id_wraparound() {
             // Our fourth write should fit just fine in the new data file, so no change there:
             let fourth_record_size = 70;
             let fourth_bytes_written = writer
-                .write_record(SizedRecord(fourth_record_size))
+                .write_record(SizedRecord::new(fourth_record_size))
                 .await
                 .expect("write should not fail");
             assert_enough_bytes_written!(fourth_bytes_written, SizedRecord, fourth_record_size);
@@ -532,7 +534,7 @@ async fn reader_deletes_data_file_around_record_id_wraparound() {
                 .finalize();
 
             let first_record_read = reader.next().await.expect("read should not fail");
-            assert_eq!(first_record_read, Some(SizedRecord(first_record_size)));
+            assert_eq!(first_record_read, Some(SizedRecord::new(first_record_size)));
             assert_eq!(u64::MAX - 1, ledger.state().get_last_reader_record_id());
             assert_buffer_records!(ledger, 4);
             assert_reader_writer_v2_file_positions!(ledger, 0, next_writer_file_id);
@@ -541,7 +543,10 @@ async fn reader_deletes_data_file_around_record_id_wraparound() {
             assert!(!deleted_data_file.try_assert());
 
             let second_record_read = reader.next().await.expect("read should not fail");
-            assert_eq!(second_record_read, Some(SizedRecord(second_record_size)));
+            assert_eq!(
+                second_record_read,
+                Some(SizedRecord::new(second_record_size))
+            );
             assert_eq!(u64::MAX, ledger.state().get_last_reader_record_id());
             assert_buffer_records!(ledger, 3);
             assert_reader_writer_v2_file_positions!(ledger, 0, next_writer_file_id);
@@ -552,7 +557,7 @@ async fn reader_deletes_data_file_around_record_id_wraparound() {
             // This read should be where we actually delete the file since we've acknowledged all of
             // the reads from the first data file:
             let third_record_read = reader.next().await.expect("read should not fail");
-            assert_eq!(third_record_read, Some(SizedRecord(third_record_size)));
+            assert_eq!(third_record_read, Some(SizedRecord::new(third_record_size)));
             assert_eq!(0, ledger.state().get_last_reader_record_id());
             assert_buffer_records!(ledger, 2);
             assert_reader_writer_v2_file_positions!(ledger, 1, next_writer_file_id);
@@ -561,7 +566,10 @@ async fn reader_deletes_data_file_around_record_id_wraparound() {
             assert!(deleted_data_file.try_assert());
 
             let fourth_record_read = reader.next().await.expect("read should not fail");
-            assert_eq!(fourth_record_read, Some(SizedRecord(fourth_record_size)));
+            assert_eq!(
+                fourth_record_read,
+                Some(SizedRecord::new(fourth_record_size))
+            );
             assert_eq!(1, ledger.state().get_last_reader_record_id());
             assert_buffer_records!(ledger, 1);
             assert_reader_writer_v2_file_positions!(ledger, 1, next_writer_file_id);
@@ -615,7 +623,7 @@ async fn writer_waits_for_reader_after_validate_last_write_fails_and_data_file_s
 
         async move {
             let record_size = 42;
-            let record = SizedRecord(record_size);
+            let record = SizedRecord::new(record_size);
             let corrected_record_size = get_corrected_max_record_size(&record);
             let max_data_file_size = (corrected_record_size * 2)
                 .try_into()
@@ -641,7 +649,7 @@ async fn writer_waits_for_reader_after_validate_last_write_fails_and_data_file_s
             while writer_file_id != target_writer_file_id {
                 for _ in 0..2 {
                     bytes_written = writer
-                        .write_record(record)
+                        .write_record(record.clone())
                         .await
                         .expect("write should not fail");
                     assert_enough_bytes_written!(bytes_written, SizedRecord, record_size);
@@ -729,13 +737,13 @@ async fn writer_waits_for_reader_after_validate_last_write_fails_and_data_file_s
             // will move forward, which should allow deleting the first data file, aka "next", which
             // is what the writer is waiting on.
             let first_good_read = reader.next().await.expect("read should not fail");
-            assert_eq!(first_good_read, Some(SizedRecord(record_size)));
+            assert_eq!(first_good_read, Some(SizedRecord::new(record_size)));
             acker.ack(1);
             assert_pending!(blocked_write.poll());
             assert_reader_writer_v2_file_positions!(ledger, next_data_file_id, writer_file_id);
 
             let second_good_read = reader.next().await.expect("read should not fail");
-            assert_eq!(second_good_read, Some(SizedRecord(record_size)));
+            assert_eq!(second_good_read, Some(SizedRecord::new(record_size)));
             acker.ack(1);
             assert_reader_writer_v2_file_positions!(ledger, next_data_file_id + 1, writer_file_id);
 

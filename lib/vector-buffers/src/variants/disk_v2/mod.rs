@@ -228,7 +228,9 @@ where
             .await
             .context(WriterSeekFailedSnafu)?;
 
-        let mut reader = Reader::new(Arc::clone(&ledger));
+        let finalizer = Arc::clone(&ledger).spawn_finalizer();
+
+        let mut reader = Reader::new(Arc::clone(&ledger), finalizer);
         reader
             .seek_to_next_record()
             .await

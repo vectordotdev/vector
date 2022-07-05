@@ -346,12 +346,12 @@ impl ReaderModel {
         while self.unconsumed_event_acks > 0 && !self.pending_record_acks.is_empty() {
             let (required_event_acks, record_bytes) =
                 self.pending_record_acks.front().copied().unwrap();
-            if self.unconsumed_event_acks >= required_event_acks {
+            if self.unconsumed_event_acks > 0 {
                 // We have enough unconsumed event acknowledgements to fully acknowledge this
                 // record. Remove it, consume the event acknowledgements, add a record
                 // acknowledgement, and update the buffer size.
                 let _ = self.pending_record_acks.pop_front().unwrap();
-                self.unconsumed_event_acks -= required_event_acks;
+                self.unconsumed_event_acks -= 1;
                 self.unconsumed_record_acks += 1;
 
                 self.ledger.decrement_buffer_size(record_bytes);
@@ -465,7 +465,7 @@ impl ReaderModel {
         // records read vs the number of their events that have been acknowledged, as we only adjust
         // the buffer size when a record has been fully acknowledged, since one record may contain
         // multiple events.
-        self.outstanding_event_acks += event_count;
+        self.outstanding_event_acks += 1;
         self.pending_record_acks
             .push_back((event_count, bytes_read));
 
@@ -474,22 +474,21 @@ impl ReaderModel {
         self.current_file_bytes_read += bytes_read;
     }
 
-    fn acknowledge_reads(&mut self, amount: usize) {
+    fn acknowledge_read(&mut self) {
         // We check to make sure that we're not about to acknowledge more events than we actually
         // have read but have not yet been acknowledged, because that just should be possible.
         assert!(
-            amount <= self.outstanding_event_acks,
-            "invariant violation: {} events unacked, tried to ack {}",
+            self.outstanding_event_acks > 0,
+            "invariant violation: {} events unacked, tried to ack 1",
             self.outstanding_event_acks,
-            amount
         );
 
         // Update the outstanding count of events which have not yet been acknowledged, and also
         // update the total number of acknowledgements we've gotten but have not yet been consumed,
         // as a record may have multiple events and they all need to be acknowledged before we can
         // actually count the record as fully acknowledged and removed from the buffer, etc.
-        self.outstanding_event_acks -= amount;
-        self.unconsumed_event_acks += amount;
+        self.outstanding_event_acks -= 1;
+        self.unconsumed_event_acks += 1;
     }
 }
 
@@ -799,8 +798,8 @@ impl BufferModel {
         self.reader.read_record()
     }
 
-    fn acknowledge_reads(&mut self, amount: usize) {
-        self.reader.acknowledge_reads(amount);
+    fn acknowledge_read(&mut self) {
+        self.reader.acknowledge_read();
     }
 
     fn close_writer(&mut self) {
@@ -874,16 +873,24 @@ proptest! {
             let mut model = BufferModel::from_config(&config);
 
             let usage_handle = BufferUsageHandle::noop();
-            let (writer, reader, acker, ledger) =
+            let (writer, reader, _acker, ledger) =
                 Buffer::<Record>::from_config_inner(config, usage_handle)
                     .await
                     .expect("should not fail to build buffer");
 
-            let mut sequencer = ActionSequencer::new(actions, reader, writer, acker);
+            let mut sequencer = ActionSequencer::new(actions, reader, writer);
 
             let mut closed_writers = false;
 
             loop {
+                // The model runs in a current-thread tokio runtime,
+                // but the acknowledgement handling runs in a
+                // background task. This yields to any such background
+                // task before returning in order to ensure
+                // acknowledgements are fully accounted for before
+                // doing the next operation.
+                tokio::task::yield_now().await;
+
                 // We manully check if the sequencer has any write operations left, either
                 // in-flight or yet-to-be-triggered, and if none are left, we mark the writer
                 // closed.  This allows us to properly inform the model that reads should start
@@ -900,9 +907,9 @@ proptest! {
                 // run against the model.  If it's an action that may be asynchronous/blocked on
                 // progress of another component, we try it later on, which lets us deduplicate some code.
                 if let Some(action) = sequencer.trigger_next_runnable_action() {
-                    if let Action::AcknowledgeRead(amount) = action {
+                    if let Action::AcknowledgeRead = action {
                         // Acknowledgements are based on atomics, so they never wait asynchronously.
-                        model.acknowledge_reads(amount);
+                        model.acknowledge_read();
                     }
                 } else {
                     let mut made_progress = false;
