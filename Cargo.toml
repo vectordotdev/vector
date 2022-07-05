@@ -117,7 +117,7 @@ enrichment = { path = "lib/enrichment" }
 fakedata = { path = "lib/fakedata", optional = true }
 file-source = { path = "lib/file-source", optional = true }
 lookup = { path = "lib/lookup" }
-otel_proto = { path = "lib/opentelemetry", optional = true }
+otel_proto = { path = "lib/opentelemetry", default-features = false, optional = true }
 portpicker = { path = "lib/portpicker" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
