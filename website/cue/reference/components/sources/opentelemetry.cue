@@ -62,7 +62,7 @@ components: sources: opentelemetry: {
 			type: string: {
 				examples: ["0.0.0.0:\(_port)"]
 			}
-		},
+		}
 		multiple_outputs: {
 			common: false
 			description: """
@@ -97,7 +97,7 @@ components: sources: opentelemetry: {
 				attributes: {
 					description: "attributes for each log record"
 					required:    false
-					common: true
+					common:      true
 					type: object: {
 						examples: [{"k1": "v1"}]
 					}
@@ -105,7 +105,7 @@ components: sources: opentelemetry: {
 				resources: {
 					description: "resources for resourceLogs"
 					required:    false
-					common: true
+					common:      true
 					type: object: {
 						examples: [{"k1": "v1"}]
 					}
@@ -113,7 +113,7 @@ components: sources: opentelemetry: {
 				message: {
 					description: "log body"
 					required:    false
-					common: true
+					common:      true
 					type: string: {
 						default: null
 						examples: ["hello world"]
@@ -122,7 +122,7 @@ components: sources: opentelemetry: {
 				trace_id: {
 					description: "trace_id"
 					required:    false
-					common: true
+					common:      true
 					type: string: {
 						default: null
 						examples: ["37e7518fe2e2fcaf22b41c2dac059221"]
@@ -131,7 +131,7 @@ components: sources: opentelemetry: {
 				span_id: {
 					description: "span_id"
 					required:    false
-					common: true
+					common:      true
 					type: string: {
 						default: null
 						examples: ["05abe7510db73b88"]
@@ -140,17 +140,17 @@ components: sources: opentelemetry: {
 				severity_number: {
 					description: "severity_number"
 					required:    false
-					common: true
+					common:      true
 					type: uint: {
 						default: null
-						unit: null
+						unit:    null
 						examples: [9]
 					}
 				}
 				severity_text: {
 					description: "log level"
 					required:    false
-					common: true
+					common:      true
 					type: string: {
 						default: null
 						examples: ["info"]
@@ -162,7 +162,7 @@ components: sources: opentelemetry: {
 					common: true
 					type: uint: {
 						default: null
-						unit: null
+						unit:    null
 					}
 				}
 				timestamp: {
