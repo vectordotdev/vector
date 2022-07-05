@@ -116,7 +116,9 @@ impl GelfDeserializer {
         if let Some(line) = parsed.line {
             log.insert(
                 LINE,
-                value::Value::Float(ordered_float::NotNan::new(line).expect("JSON doesn't allow NaNs")),
+                value::Value::Float(
+                    ordered_float::NotNan::new(line).expect("JSON doesn't allow NaNs"),
+                ),
             );
         }
         if let Some(file) = &parsed.file {
@@ -149,8 +151,19 @@ impl GelfDeserializer {
                     let vector_val: value::Value = val.into();
                     log.insert(path!(key.as_str()), vector_val);
                 } else {
-                    return Err(format!("'The value type for field {}' is an invalid type. Additional field values \
-                                       should be either strings or numbers.", key).into());
+                    let type_ = if val.is_null() {
+                        "null"
+                    } else if val.is_array() {
+                        "array"
+                    } else if val.is_object() {
+                        "object"
+                    } else if val.is_boolean() {
+                        "boolean"
+                    } else {
+                        "unknown"
+                    };
+                    return Err(format!("The value type for field {} is an invalid type ({}). Additional field values \
+                                       should be either strings or numbers.", key, type_).into());
                 }
             }
         }
