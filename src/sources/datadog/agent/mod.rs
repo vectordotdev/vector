@@ -226,7 +226,13 @@ impl SourceConfig for DatadogAgentConfig {
             LogNamespace::Vector => self
                 .decoding
                 .schema_definition(log_namespace)
-                .with_metadata_field("message", Kind::bytes()),
+                .with_metadata_field("message", Kind::bytes())
+                .with_metadata_field("status", Kind::bytes())
+                .with_metadata_field("timestamp", Kind::timestamp())
+                .with_metadata_field("hostname", Kind::bytes())
+                .with_metadata_field("service", Kind::bytes())
+                .with_metadata_field("ddsource", Kind::bytes())
+                .with_metadata_field("ddtags", Kind::bytes()),
         };
 
         if self.multiple_outputs {

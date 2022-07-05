@@ -224,7 +224,6 @@ impl TransformConfig for RemapConfig {
         let mut dropped_definition =
             Definition::empty_with_kind(Kind::never(), input_definition.log_namespaces().clone());
 
-        // The vector namespace appends the dropped fields to the "event metadata", which doesn't yet have a schema
         if input_definition
             .log_namespaces()
             .contains(&LogNamespace::Legacy)
@@ -240,6 +239,21 @@ impl TransformConfig for RemapConfig {
                 ])),
                 Some("metadata"),
             ));
+        }
+
+        if input_definition
+            .log_namespaces()
+            .contains(&LogNamespace::Vector)
+        {
+            dropped_definition = dropped_definition.merge(
+                input_definition
+                    .clone()
+                    .with_metadata_field("reason", Kind::bytes())
+                    .with_metadata_field("message", Kind::bytes())
+                    .with_metadata_field("component_id", Kind::bytes())
+                    .with_metadata_field("component_type", Kind::bytes())
+                    .with_metadata_field("component_kind", Kind::bytes()),
+            );
         }
 
         let default_output =
