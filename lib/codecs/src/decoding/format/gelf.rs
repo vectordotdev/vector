@@ -151,16 +151,13 @@ impl GelfDeserializer {
                     let vector_val: value::Value = val.into();
                     log.insert(path!(key.as_str()), vector_val);
                 } else {
-                    let type_ = if val.is_null() {
-                        "null"
-                    } else if val.is_array() {
-                        "array"
-                    } else if val.is_object() {
-                        "object"
-                    } else if val.is_boolean() {
-                        "boolean"
-                    } else {
-                        "unknown"
+                    let type_ = match val {
+                        serde_json::Value::Null => "null",
+                        serde_json::Value::Bool(_) => "boolean",
+                        serde_json::Value::Number(_) => "number",
+                        serde_json::Value::String(_) => "string",
+                        serde_json::Value::Array(_) => "array",
+                        serde_json::Value::Object(_) => "object",
                     };
                     return Err(format!("The value type for field {} is an invalid type ({}). Additional field values \
                                        should be either strings or numbers.", key, type_).into());
