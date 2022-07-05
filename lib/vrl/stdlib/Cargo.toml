@@ -90,6 +90,7 @@ default = [
     "encrypt",
     "ends_with",
     "exists",
+    "filter",
     "find",
     "flatten",
     "float",
@@ -225,6 +226,7 @@ encode_percent = ["dep:percent-encoding"]
 encrypt = ["cryptography", "random_bytes", "decrypt"]
 ends_with = []
 exists = []
+filter = []
 find = ["dep:regex"]
 find_table_row = []
 flatten = []
