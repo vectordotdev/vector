@@ -51,9 +51,7 @@ impl GelfDeserializerConfig {
             // Every field with an underscore (_) prefix will be treated as an additional field.
             // Allowed characters in field names are any word character (letter, number, underscore), dashes and dots.
             // Libraries SHOULD not allow to send id as additional field ( _id). Graylog server nodes omit this field automatically.
-            // Note that although the schema definition indicates unknown_fields will be any type,
-            // in fact they can only be either strings or numbers.
-            .unknown_fields(Kind::any())
+            .unknown_fields(Kind::bytes().or_integer().or_float())
     }
 }
 
