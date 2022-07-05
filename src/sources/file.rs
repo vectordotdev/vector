@@ -544,8 +544,15 @@ pub fn file_source(
         let span2 = span.clone();
         let mut messages = messages.map(move |line| {
             let _enter = span2.enter();
-            let mut event =
-                create_event(line.text, &line.filename, &line.offset, &host_key, &hostname, &file_key, &offset_key);
+            let mut event = create_event(
+                line.text,
+                &line.filename,
+                &line.offset,
+                &host_key,
+                &hostname,
+                &file_key,
+                &offset_key,
+            );
             if let Some(finalizer) = &finalizer {
                 let (batch, receiver) = BatchNotifier::new_with_receiver();
                 event = event.with_batch_notifier(&batch);
@@ -630,7 +637,7 @@ fn create_event(
     host_key: &str,
     hostname: &Option<String>,
     file_key: &Option<String>,
-    offset_key: &Option<String>
+    offset_key: &Option<String>,
 ) -> LogEvent {
     let line_len = line.len();
 
@@ -810,7 +817,15 @@ mod tests {
         let file_key = Some("file".to_string());
         let offset_key = Some("offset".to_string());
 
-        let log = create_event(line, file, &line_end_offset, &host_key, &hostname, &file_key, &offset_key);
+        let log = create_event(
+            line,
+            file,
+            &line_end_offset,
+            &host_key,
+            &hostname,
+            &file_key,
+            &offset_key,
+        );
 
         assert_eq!(log["file"], file.into());
         assert_eq!(log["host"], "Some.Machine".into());
