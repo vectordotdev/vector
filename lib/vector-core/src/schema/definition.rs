@@ -208,7 +208,7 @@ impl Definition {
         // Ensure the path exists in the collection.
         assert!(
             self.kind
-                .find_at_path(&mut path.to_lookup())
+                .find_at_path(&path.to_lookup())
                 .ok()
                 .flatten()
                 .is_some(),
