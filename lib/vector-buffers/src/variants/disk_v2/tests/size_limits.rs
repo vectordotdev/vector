@@ -11,7 +11,7 @@ use super::{
 use crate::{
     assert_buffer_is_empty, assert_buffer_records, assert_buffer_size, assert_enough_bytes_written,
     assert_reader_writer_v2_file_positions,
-    test::common::{install_tracing_helpers, with_temp_dir, SizedRecord},
+    test::{install_tracing_helpers, with_temp_dir, SizedRecord},
     variants::disk_v2::{
         common::align16,
         tests::{get_corrected_max_record_size, get_minimum_data_file_size_for_record_payload},

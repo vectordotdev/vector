@@ -4,7 +4,7 @@ use tokio_test::{assert_pending, assert_ready, task::spawn};
 
 use crate::{
     buffer_usage_data::BufferUsageHandle,
-    test::common::with_temp_dir,
+    test::with_temp_dir,
     variants::disk_v2::{
         acknowledgements::create_disk_v2_acker, ledger::Ledger, DiskBufferConfigBuilder,
     },

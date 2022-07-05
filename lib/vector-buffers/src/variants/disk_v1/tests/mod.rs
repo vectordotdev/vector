@@ -5,7 +5,7 @@ use tracing::{Metadata, Span};
 
 use super::{open, Reader, Writer};
 use crate::{
-    buffer_usage_data::BufferUsageHandle, test::common::install_tracing_helpers,
+    buffer_usage_data::BufferUsageHandle, test::install_tracing_helpers,
     variants::disk_v1::reader::FLUSH_INTERVAL, Acker, Bufferable,
 };
 
