@@ -48,16 +48,12 @@ async fn apex_test() {
         mock_apex_api_token(),
     );
 
-    println!("address is {}", mock_apex_address());
-
     let (config, cx) = load_sink::<ApexSinkConfig>(&config).unwrap();
     let (sink, _) = config.build(cx).await.unwrap();
 
-    println!("built sink");
-
     let (batch, mut receiver) = BatchNotifier::new_with_receiver();
     let (_lines, events) = generate_events_with_stream(event_generator, 10, Some(batch));
-    println!("Starting up sink compliance");
+
     run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
     assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 }
