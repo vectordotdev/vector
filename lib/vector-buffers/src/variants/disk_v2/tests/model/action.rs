@@ -1,5 +1,3 @@
-use std::{cmp, collections::VecDeque};
-
 use proptest::{
     arbitrary::any,
     collection::{vec as arb_vec, SizeRange},
@@ -9,7 +7,6 @@ use proptest::{
 };
 
 use super::record::Record;
-use crate::EventCount;
 
 /// Input action for the model/system under test.
 ///
@@ -22,7 +19,7 @@ pub enum Action {
     WriteRecord(Record),
     FlushWrites,
     ReadRecord,
-    AcknowledgeRead(usize),
+    AcknowledgeRead,
 }
 
 prop_compose! {
@@ -37,7 +34,7 @@ fn arb_action() -> impl Strategy<Value = Action> {
     prop_oneof![
         3 => Just(Action::FlushWrites),
         5 => Just(Action::ReadRecord),
-        4 => arb_ack_amount(32).prop_map(Action::AcknowledgeRead),
+        4 => Just(Action::AcknowledgeRead),
         5 => any::<(u32, u16, u8, u8)>().prop_map(|(id, base_size, size_offset, event_count)| {
             let size = u32::from(base_size) + u32::from(size_offset);
             let event_count = event_count % 7;
@@ -62,31 +59,27 @@ where
 /// action sequence where there is no read is not valid and never will be.  There is no reason to
 /// test such a sequence.
 pub fn sanitize_raw_actions(actions: Vec<Action>) -> Vec<Action> {
-    let mut unread_event_counts = VecDeque::new();
-    let mut unacked_events = 0;
+    let mut unread_event_count: usize = 0;
+    let mut unacked_events: usize = 0;
 
     actions
         .into_iter()
         .filter_map(|a| match a {
             Action::WriteRecord(record) => {
-                unread_event_counts.push_back(record.event_count());
+                unread_event_count += 1;
                 Some(Action::WriteRecord(record))
             }
             Action::ReadRecord => {
-                if let Some(event_count) = unread_event_counts.pop_front() {
-                    unacked_events += event_count;
+                if unread_event_count > 0 {
+                    unread_event_count -= 1;
+                    unacked_events += 1;
                 }
                 Some(Action::ReadRecord)
             }
-            Action::AcknowledgeRead(raw_ack_amount) => {
-                if unacked_events == 0 {
-                    None
-                } else {
-                    let capped_ack_amount = cmp::min(unacked_events, raw_ack_amount);
-                    unacked_events -= capped_ack_amount;
-                    Some(Action::AcknowledgeRead(capped_ack_amount))
-                }
-            }
+            Action::AcknowledgeRead => (unacked_events > 0).then(|| {
+                unacked_events -= 1;
+                Action::AcknowledgeRead
+            }),
             Action::FlushWrites => Some(Action::FlushWrites),
         })
         .collect::<Vec<_>>()

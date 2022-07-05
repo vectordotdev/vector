@@ -362,7 +362,10 @@ fn get_type_and_fields(
                         )
                     })
                     .collect::<HashMap<_, _>>();
-                fields.insert("count".to_owned(), Field::UnsignedInt(ddsketch.count()));
+                fields.insert(
+                    "count".to_owned(),
+                    Field::UnsignedInt(u64::from(ddsketch.count())),
+                );
                 fields.insert(
                     "min".to_owned(),
                     Field::Float(ddsketch.min().unwrap_or(f64::MAX)),

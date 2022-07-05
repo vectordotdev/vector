@@ -2,6 +2,7 @@ use std::{
     fmt, io, mem,
     path::PathBuf,
     sync::atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering},
+    sync::Arc,
     time::Instant,
 };
 
@@ -9,9 +10,11 @@ use bytecheck::CheckBytes;
 use bytes::BytesMut;
 use crossbeam_utils::atomic::AtomicCell;
 use fslock::LockFile;
+use futures::StreamExt;
 use rkyv::{with::Atomic, Archive, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::{fs, io::AsyncWriteExt, sync::Notify};
+use vector_common::{finalizer::OrderedFinalizer, shutdown::ShutdownSignal};
 
 use super::{
     backed_archive::BackedArchive,
@@ -542,7 +545,7 @@ where
 
 impl<FS> Ledger<FS>
 where
-    FS: Filesystem,
+    FS: Filesystem + 'static,
     FS::File: Unpin,
 {
     /// Loads or creates a ledger for the given [`DiskBufferConfig`].
@@ -698,6 +701,18 @@ where
         self.increment_total_buffer_size(total_buffer_size);
 
         Ok(())
+    }
+
+    #[must_use]
+    pub(super) fn spawn_finalizer(self: Arc<Self>) -> OrderedFinalizer<u64> {
+        let (finalizer, mut stream) = OrderedFinalizer::new(ShutdownSignal::noop());
+        tokio::spawn(async move {
+            while let Some((_status, amount)) = stream.next().await {
+                self.increment_pending_acks(amount);
+                self.notify_reader_waiters();
+            }
+        });
+        finalizer
     }
 }
 
