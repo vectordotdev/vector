@@ -92,4 +92,8 @@ impl Urls {
     pub fn expression_docs_url(expr: &str) -> String {
         format!("{}/expressions/{}", VRL_DOCS_ROOT_URL, expr)
     }
+
+    fn example_docs() -> String {
+        format!("{}/examples", VRL_DOCS_ROOT_URL)
+    }
 }

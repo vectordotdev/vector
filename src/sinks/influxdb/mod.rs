@@ -19,7 +19,9 @@ pub(in crate::sinks) enum Field {
     /// float
     Float(f64),
     /// unsigned integer
-    UnsignedInt(u32),
+    /// Influx can support 64 bit integers if compiled with a flag, see:
+    /// https://github.com/influxdata/influxdb/issues/7801#issuecomment-466801839
+    UnsignedInt(u64),
     /// integer
     Int(i64),
     /// boolean

@@ -21,6 +21,7 @@ components: sinks: socket: {
 				enabled: true
 				codec: {
 					enabled: true
+					framing: true
 					enum: ["json", "text"]
 				}
 			}

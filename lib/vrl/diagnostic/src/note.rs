@@ -11,6 +11,7 @@ pub enum Note {
     SeeErrorDocs,
     SeeCodeDocs(usize),
     SeeLangDocs,
+    SeeRepl,
 
     #[doc(hidden)]
     SeeDocs(String, String),
@@ -37,7 +38,7 @@ impl fmt::Display for Note {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use Note::{
             Basic, CoerceValue, Example, Hint, SeeCodeDocs, SeeDocs, SeeErrorDocs, SeeFunctionDocs,
-            SeeLangDocs, UserErrorMessage,
+            SeeLangDocs, SeeRepl, UserErrorMessage,
         };
 
         match self {
@@ -63,6 +64,11 @@ impl fmt::Display for Note {
                 let url = Urls::vrl_root_url();
 
                 write!(f, "see language documentation at {}", url)
+            }
+            SeeRepl => {
+                let url = Urls::example_docs();
+
+                write!(f, "try your code in the VRL REPL, learn more at {}", url)
             }
             SeeCodeDocs(code) => {
                 let url = Urls::error_code_url(*code);

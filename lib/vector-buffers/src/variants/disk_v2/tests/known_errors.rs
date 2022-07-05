@@ -11,6 +11,7 @@ use tokio::{
 };
 use tracing::Instrument;
 use vector_common::byte_size_of::ByteSizeOf;
+use vector_common::finalization::{AddBatchNotifier, BatchNotifier};
 
 use super::{create_buffer_v2_with_max_data_file_size, create_default_buffer_v2};
 use crate::{
@@ -33,7 +34,7 @@ async fn reader_throws_error_when_record_length_delimiter_is_zero() {
 
             // Write a normal `SizedRecord` record.
             let bytes_written = writer
-                .write_record(SizedRecord(64))
+                .write_record(SizedRecord::new(64))
                 .await
                 .expect("write should not fail");
             writer.flush().await.expect("flush should not fail");
@@ -125,12 +126,12 @@ async fn reader_throws_error_when_finished_file_has_truncated_record_data() {
             // file rollover.
             let first_record_size = 32;
             let first_bytes_written = writer
-                .write_record(SizedRecord(first_record_size))
+                .write_record(SizedRecord::new(first_record_size))
                 .await
                 .expect("write should not fail");
             let second_record_size = 33;
             let second_bytes_written = writer
-                .write_record(SizedRecord(second_record_size))
+                .write_record(SizedRecord::new(second_record_size))
                 .await
                 .expect("write should not fail");
             writer.flush().await.expect("flush should not fail");
@@ -146,7 +147,7 @@ async fn reader_throws_error_when_finished_file_has_truncated_record_data() {
             // Do our third write, which should land in a new data file.
             let third_record_size = 34;
             let third_bytes_written = writer
-                .write_record(SizedRecord(third_record_size))
+                .write_record(SizedRecord::new(third_record_size))
                 .await
                 .expect("write should not fail");
             writer.flush().await.expect("flush should not fail");
@@ -199,7 +200,7 @@ async fn reader_throws_error_when_finished_file_has_truncated_record_data() {
             assert_reader_writer_v2_file_positions!(ledger, 0, 1);
 
             let first_read = await_timeout!(reader.next(), 2).expect("read should not fail");
-            assert_eq!(first_read, Some(SizedRecord(first_record_size)));
+            assert_eq!(first_read, Some(SizedRecord::new(first_record_size)));
             assert_reader_writer_v2_file_positions!(ledger, 0, 1);
             acker.ack(1);
 
@@ -208,7 +209,7 @@ async fn reader_throws_error_when_finished_file_has_truncated_record_data() {
             assert_reader_writer_v2_file_positions!(ledger, 1, 1);
 
             let third_read = await_timeout!(reader.next(), 2).expect("read should not fail");
-            assert_eq!(third_read, Some(SizedRecord(third_record_size)));
+            assert_eq!(third_read, Some(SizedRecord::new(third_record_size)));
             assert_reader_writer_v2_file_positions!(ledger, 1, 1);
             acker.ack(1);
 
@@ -242,12 +243,12 @@ async fn reader_throws_error_when_record_has_scrambled_archive_data() {
             // two records, and only scramble the first... which will let the reader be the one to
             // discover the error.
             let first_bytes_written = writer
-                .write_record(SizedRecord(64))
+                .write_record(SizedRecord::new(64))
                 .await
                 .expect("should not fail to write");
             writer.flush().await.expect("flush should not fail");
             let second_bytes_written = writer
-                .write_record(SizedRecord(65))
+                .write_record(SizedRecord::new(65))
                 .await
                 .expect("should not fail to write");
             writer.flush().await.expect("flush should not fail");
@@ -358,7 +359,7 @@ async fn writer_detects_when_last_record_has_scrambled_archive_data() {
             // buffer... but it should trigger a call to `reset`, which we _can_ observe with
             // tracing assertions.
             let bytes_written = writer
-                .write_record(SizedRecord(64))
+                .write_record(SizedRecord::new(64))
                 .await
                 .expect("write should not fail");
             writer.flush().await.expect("flush should not fail");
@@ -416,7 +417,7 @@ async fn writer_detects_when_last_record_has_scrambled_archive_data() {
 
             // Do a simple write to ensure it opens the next data file.
             let _bytes_written = writer
-                .write_record(SizedRecord(64))
+                .write_record(SizedRecord::new(64))
                 .await
                 .expect("write should not fail");
             writer.flush().await.expect("flush should not fail");
@@ -456,7 +457,7 @@ async fn writer_detects_when_last_record_has_invalid_checksum() {
             // buffer... but it should trigger a call to `reset`, which we _can_ observe with
             // tracing assertions.
             let bytes_written = writer
-                .write_record(SizedRecord(13))
+                .write_record(SizedRecord::new(13))
                 .await
                 .expect("write should not fail");
             writer.flush().await.expect("flush should not fail");
@@ -526,7 +527,7 @@ async fn writer_detects_when_last_record_has_invalid_checksum() {
 
             // Do a simple write to ensure it opens the next data file.
             let _bytes_written = writer
-                .write_record(SizedRecord(64))
+                .write_record(SizedRecord::new(64))
                 .await
                 .expect("write should not fail");
             writer.flush().await.expect("flush should not fail");
@@ -562,7 +563,7 @@ async fn writer_detects_when_last_record_wasnt_flushed() {
 
             // Write a regular record so something is in the data file.
             let bytes_written = writer
-                .write_record(SizedRecord(64))
+                .write_record(SizedRecord::new(64))
                 .await
                 .expect("write should not fail");
             assert_enough_bytes_written!(bytes_written, SizedRecord, 64);
@@ -599,7 +600,7 @@ async fn writer_detects_when_last_record_wasnt_flushed() {
 
             // Do a simple write to ensure it opens the next data file.
             let _bytes_written = writer
-                .write_record(SizedRecord(64))
+                .write_record(SizedRecord::new(64))
                 .await
                 .expect("write should not fail");
             writer.flush().await.expect("flush should not fail");
@@ -637,7 +638,7 @@ async fn writer_detects_when_last_record_was_flushed_but_id_wasnt_incremented() 
 
             // Write a regular record so something is in the data file.
             let bytes_written = writer
-                .write_record(SizedRecord(64))
+                .write_record(SizedRecord::new(64))
                 .await
                 .expect("write should not fail");
             assert_enough_bytes_written!(bytes_written, SizedRecord, 64);
@@ -724,6 +725,12 @@ async fn reader_throws_error_when_record_is_undecodable_via_metadata() {
         fn decode<B: Buf>(_: Self::Metadata, mut buffer: B) -> Result<Self, Self::DecodeError> {
             let b = buffer.get_u8();
             Ok(ControllableRecord(b))
+        }
+    }
+
+    impl AddBatchNotifier for ControllableRecord {
+        fn add_batch_notifier(&mut self, batch: BatchNotifier) {
+            drop(batch); // We never check acknowledgements for this type
         }
     }
 

@@ -1,4 +1,4 @@
-use std::ptr::addr_of;
+use std::{mem, ptr::addr_of};
 
 use bytecheck::{CheckBytes, ErrorBox, StructCheckError};
 use crc32fast::Hasher;
@@ -8,7 +8,12 @@ use rkyv::{
     Archive, Archived, Serialize,
 };
 
-use super::ser::{try_as_archive, DeserializeError};
+use super::{
+    common::align16,
+    ser::{try_as_archive, DeserializeError},
+};
+
+pub const RECORD_HEADER_LEN: usize = align16(mem::size_of::<ArchivedRecord<'_>>() + 8);
 
 /// Result of checking if a buffer contained a valid record.
 pub enum RecordStatus {
