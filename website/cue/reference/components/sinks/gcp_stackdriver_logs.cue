@@ -64,6 +64,7 @@ components: sinks: gcp_stackdriver_logs: {
 	}
 
 	configuration: {
+		api_key: configuration._gcp_api_key
 		billing_account_id: {
 			common: false
 			description: """

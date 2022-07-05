@@ -9,6 +9,7 @@ use std::{
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use vector_common::EventDataEq;
+use vector_config::configurable_component;
 #[cfg(feature = "vrl")]
 use vrl_lib::prelude::VrlValueConvert;
 
@@ -257,7 +258,10 @@ impl Metric {
             Handle::Histogram(histogram) => {
                 let buckets: Vec<Bucket> = histogram
                     .buckets()
-                    .map(|(upper_limit, count)| Bucket { upper_limit, count })
+                    .map(|(upper_limit, count)| Bucket {
+                        upper_limit,
+                        count: count.into(),
+                    })
                     .collect();
 
                 MetricValue::AggregatedHistogram {
@@ -415,13 +419,23 @@ impl Finalizable for Metric {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, PartialOrd, Serialize)]
+/// Metric kind.
+///
+/// Metrics can be either absolute of incremental. Absolute metrics represent a sort of "last write wins" scenario,
+/// where the latest absolute value seen is meant to be the actual metric value.  In constrast, and perhaps intuitively,
+/// incremental metrics are meant to be additive, such that we don't know what total value of the metric is, but we know
+/// that we'll be adding or subtracting the given value from it.
+///
+/// Generally speaking, most metrics storage systems deal with incremental updates. A notable exception is Prometheus,
+/// which deals with, and expects, absolute values from clients.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd)]
 #[serde(rename_all = "snake_case")]
-/// A metric may be an incremental value, updating the previous value of
-/// the metric, or absolute, which sets the reference for future
-/// increments.
 pub enum MetricKind {
+    /// Incremental metric.
     Incremental,
+
+    /// Absolute metric.
     Absolute,
 }
 
@@ -488,7 +502,7 @@ pub(crate) fn zip_samples(
 #[inline]
 pub(crate) fn zip_buckets(
     limits: impl IntoIterator<Item = f64>,
-    counts: impl IntoIterator<Item = u32>,
+    counts: impl IntoIterator<Item = u64>,
 ) -> Vec<Bucket> {
     limits
         .into_iter()
@@ -536,21 +550,23 @@ fn write_word(fmt: &mut Formatter<'_>, word: &str) -> Result<(), fmt::Error> {
     }
 }
 
-pub fn samples_to_buckets(samples: &[Sample], buckets: &[f64]) -> (Vec<Bucket>, u32, f64) {
+pub fn samples_to_buckets(samples: &[Sample], buckets: &[f64]) -> (Vec<Bucket>, u64, f64) {
     let mut counts = vec![0; buckets.len()];
     let mut sum = 0.0;
     let mut count = 0;
     for sample in samples {
+        let rate = u64::from(sample.rate);
+
         if let Some((i, _)) = buckets
             .iter()
             .enumerate()
             .find(|&(_, b)| *b >= sample.value)
         {
-            counts[i] += sample.rate;
+            counts[i] += rate;
         }
 
         sum += sample.value * f64::from(sample.rate);
-        count += sample.rate;
+        count += rate;
     }
 
     let buckets = buckets

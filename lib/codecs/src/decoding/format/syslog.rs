@@ -1,12 +1,15 @@
 use bytes::Bytes;
 use chrono::{DateTime, Datelike, Utc};
+use lookup::path;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
+use std::collections::BTreeMap;
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
-use value::Kind;
+use value::{kind::Collection, Kind};
+
 use vector_core::{
     config::{log_schema, DataType},
-    event::{Event, Value},
+    event::{Event, LogEvent, Value},
     schema,
 };
 
@@ -47,8 +50,8 @@ impl SyslogDeserializerConfig {
             .optional_field("msgid", Kind::bytes(), None)
             .optional_field("procid", Kind::integer().or_bytes(), None)
             // "structured data" in a syslog message can be stored in any field, but will always be
-            // a string.
-            .unknown_fields(Kind::bytes())
+            // a map of string -> string.
+            .unknown_fields(Kind::object(Collection::from_unknown(Kind::bytes())))
     }
 }
 
@@ -62,7 +65,7 @@ impl Deserializer for SyslogDeserializer {
         let line = std::str::from_utf8(&bytes)?;
         let line = line.trim();
         let parsed = syslog_loose::parse_message_with_year_exact(line, resolve_year)?;
-        let mut event = Event::from(parsed.msg);
+        let mut event = LogEvent::from(parsed.msg).into();
 
         insert_fields_from_syslog(&mut event, parsed);
 
@@ -122,9 +125,10 @@ fn insert_fields_from_syslog(event: &mut Event, parsed: Message<&str>) {
     }
 
     for element in parsed.structured_data.into_iter() {
+        let mut sdata: BTreeMap<String, Value> = BTreeMap::new();
         for (name, value) in element.params() {
-            let key = format!("{}.{}", element.id, name);
-            log.insert(key.as_str(), value);
+            sdata.insert(name.to_string(), value.into());
         }
+        log.insert(path!(element.id), sdata);
     }
 }

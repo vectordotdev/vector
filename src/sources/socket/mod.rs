@@ -287,7 +287,7 @@ mod test {
         config::{
             log_schema, ComponentKey, GlobalOptions, SinkContext, SourceConfig, SourceContext,
         },
-        event::Event,
+        event::{Event, LogEvent},
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
         sinks::util::tcp::TcpSinkConfig,
         test_util::{
@@ -571,9 +571,7 @@ mod test {
             let (sink, _healthcheck) = sink_config.build(cx, Default::default(), encoder).unwrap();
 
             tokio::spawn(async move {
-                let input = stream::repeat(())
-                    .map(move |_| Event::new_empty_log().into())
-                    .boxed();
+                let input = stream::repeat_with(|| LogEvent::default().into()).boxed();
                 sink.run(input).await.unwrap();
             });
 

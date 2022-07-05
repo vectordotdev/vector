@@ -1,10 +1,30 @@
-#![deny(warnings)]
-#![deny(clippy::all)]
-#![deny(unreachable_pub)]
-#![deny(unused_allocation)]
-#![deny(unused_extern_crates)]
-#![deny(unused_assignments)]
-#![deny(unused_comparisons)]
+#![deny(
+    warnings,
+    clippy::all,
+    clippy::pedantic,
+    unreachable_pub,
+    unused_allocation,
+    unused_extern_crates,
+    unused_assignments,
+    unused_comparisons
+)]
+#![allow(
+    clippy::cast_possible_truncation, // allowed in initial deny commit
+    clippy::cast_precision_loss, // allowed in initial deny commit
+    clippy::cast_sign_loss, // allowed in initial deny commit
+    clippy::default_trait_access, // allowed in initial deny commit
+    clippy::doc_markdown, // allowed in initial deny commit
+    clippy::inefficient_to_string, // allowed in initial deny commit
+    clippy::match_bool, // allowed in initial deny commit
+    clippy::match_same_arms, // allowed in initial deny commit
+    clippy::needless_pass_by_value, // allowed in initial deny commit
+    clippy::semicolon_if_nothing_returned,  // allowed in initial deny commit
+    clippy::similar_names, // allowed in initial deny commit
+    clippy::single_match_else, // allowed in initial deny commit
+    clippy::struct_excessive_bools,  // allowed in initial deny commit
+    clippy::too_many_lines, // allowed in initial deny commit
+    clippy::trivially_copy_pass_by_ref, // allowed in initial deny commit
+)]
 
 mod util;
 
@@ -551,6 +571,7 @@ pub use crate::md5::Md5;
 #[cfg(feature = "sha1")]
 pub use crate::sha1::Sha1;
 
+#[must_use]
 pub fn all() -> Vec<Box<dyn vrl::Function>> {
     vec![
         #[cfg(feature = "append")]

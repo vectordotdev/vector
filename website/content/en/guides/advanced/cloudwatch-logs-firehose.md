@@ -575,7 +575,7 @@ context:
 * `log_group` the log_group of the log event
 * `log_stream` the log_stream of the log event
 * `owner` the AWS account ID of the owner of the log event
-* `subcription_filters` the filters that matched to send the event
+* `subscription_filters` the filters that matched to send the event
 * `timestamp` is overwritten with the timestamp from the log event
 
 This is pretty good, but, our original events are also JSON and the `.id`,

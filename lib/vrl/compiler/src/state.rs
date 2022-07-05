@@ -43,7 +43,7 @@ impl LocalEnv {
     }
 
     /// Merges two local envs together. This is useful in cases such as if statements
-    /// where different LocalEnv's can be created, and the result is decided at runtime.
+    /// where different `LocalEnv`'s can be created, and the result is decided at runtime.
     /// The compile-time type must be the union of the options.
     pub(crate) fn merge(mut self, other: Self) -> Self {
         for (ident, other_details) in other.bindings {
@@ -68,7 +68,7 @@ pub struct ExternalEnv {
 }
 
 // temporary until paths can point to metadata
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum PathRoot {
     Event,
     Metadata,
@@ -90,6 +90,7 @@ impl Default for ExternalEnv {
 impl ExternalEnv {
     /// Creates a new external environment that starts with an initial given
     /// [`Kind`].
+    #[must_use]
     pub fn new_with_kind(kind: Kind) -> Self {
         Self {
             target: Details {
@@ -116,12 +117,12 @@ impl ExternalEnv {
             }
 
             // any paths that are a parent of read-only paths also can't be modified
-            if read_only_path.path.starts_with(path) {
+            if read_only_path.path.can_start_with(path) {
                 return true;
             }
 
             if read_only_path.recursive {
-                if path.starts_with(&read_only_path.path) {
+                if path.can_start_with(&read_only_path.path) {
                     return true;
                 }
             } else if path == &read_only_path.path {
@@ -133,14 +134,7 @@ impl ExternalEnv {
 
     /// Adds a path that is considered read only. Assignments to any paths that match
     /// will fail at compile time.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the path contains coalescing.
     pub(crate) fn add_read_only_path(&mut self, path: LookupBuf, recursive: bool, root: PathRoot) {
-        if path.as_segments().iter().any(|x| x.is_coalesce()) {
-            panic!("Coalesced paths not supported for read-only paths");
-        }
         self.read_only_paths.push(ReadOnlyPath {
             path,
             recursive,
@@ -207,6 +201,7 @@ pub struct Runtime {
 }
 
 impl Runtime {
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.variables.is_empty()
     }
@@ -215,6 +210,7 @@ impl Runtime {
         self.variables.clear();
     }
 
+    #[must_use]
     pub fn variable(&self, ident: &Ident) -> Option<&Value> {
         self.variables.get(ident)
     }

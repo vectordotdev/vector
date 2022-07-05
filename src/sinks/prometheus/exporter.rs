@@ -75,6 +75,8 @@ pub struct PrometheusExporterConfig {
     #[serde(default = "default_flush_period_secs")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     pub flush_period_secs: Duration,
+    #[serde(default)]
+    pub suppress_timestamp: bool,
 }
 
 impl Default for PrometheusExporterConfig {
@@ -87,6 +89,7 @@ impl Default for PrometheusExporterConfig {
             quantiles: super::default_summary_quantiles(),
             distributions_as_summaries: default_distributions_as_summaries(),
             flush_period_secs: default_flush_period_secs(),
+            suppress_timestamp: default_suppress_timestamp(),
         }
     }
 }
@@ -103,6 +106,10 @@ const fn default_distributions_as_summaries() -> bool {
 
 const fn default_flush_period_secs() -> Duration {
     Duration::from_secs(60)
+}
+
+const fn default_suppress_timestamp() -> bool {
+    false
 }
 
 inventory::submit! {
@@ -494,6 +501,12 @@ impl StreamSink<Event> for PrometheusExporter {
             // Now process the metric we got.
             let metric = event.into_metric();
             if let Some(normalized) = normalizer.normalize(metric) {
+                let normalized = if self.config.suppress_timestamp {
+                    normalized.with_timestamp(None)
+                } else {
+                    normalized
+                };
+
                 // We have a normalized metric, in absolute form.  If we're already aware of this
                 // metric, update its expiration deadline, otherwise, start tracking it.
                 let mut metrics = self.metrics.write().unwrap();
@@ -565,7 +578,7 @@ mod tests {
         let event2 = Event::from(event2.into_metric().with_timestamp(Some(timestamp2)));
         let events = vec![event1, event2];
 
-        let body = export_and_fetch(None, events).await;
+        let body = export_and_fetch(None, events, false).await;
         let timestamp = timestamp2.timestamp_millis();
         assert_eq!(
             body,
@@ -581,9 +594,31 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn suppress_timestamp() {
+        let timestamp = Utc::now();
+        let (name, event) = create_metric_gauge(None, 123.4);
+        let event = Event::from(event.into_metric().with_timestamp(Some(timestamp)));
+        let events = vec![event];
+
+        let body = export_and_fetch(None, events, true).await;
+        assert_eq!(
+            body,
+            format!(
+                indoc! {r#"
+                    # HELP {name} {name}
+                    # TYPE {name} gauge
+                    {name}{{some_tag="some_value"}} 123.4
+                "#},
+                name = name,
+            )
+        );
+    }
+
     async fn export_and_fetch(
         tls_config: Option<TlsEnableableConfig>,
         events: Vec<Event>,
+        suppress_timestamp: bool,
     ) -> String {
         trace_init();
 
@@ -594,6 +629,7 @@ mod tests {
         let config = PrometheusExporterConfig {
             address,
             tls: tls_config,
+            suppress_timestamp,
             ..Default::default()
         };
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -638,7 +674,7 @@ mod tests {
         let (name2, event2) = tests::create_metric_set(None, vec!["0", "1", "2"]);
         let events = vec![event1, event2];
 
-        let body = export_and_fetch(tls_config, events).await;
+        let body = export_and_fetch(tls_config, events, false).await;
 
         assert!(body.contains(&format!(
             indoc! {r#"

@@ -1,0 +1,1 @@
+{"metric":{"name":"c","tags":{"_":"s"},"kind":"incremental","distribution":{"samples":[{"value":533696.0,"rate":3418539822},{"value":702272.0,"rate":2263324832},{"value":82368.0,"rate":424453509}],"statistic":"summary"}}}

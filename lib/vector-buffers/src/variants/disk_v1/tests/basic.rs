@@ -24,7 +24,7 @@ async fn basic_read_write_loop() {
                 .into_iter()
                 .cycle()
                 .take(2000)
-                .map(SizedRecord)
+                .map(SizedRecord::new)
                 .collect::<Vec<_>>();
             let input_items = expected_items.clone();
             let expected_position = expected_items
