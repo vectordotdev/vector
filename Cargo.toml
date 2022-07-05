@@ -573,6 +573,7 @@ sinks-logs = [
   "sinks-aws_kinesis_streams",
   "sinks-aws_s3",
   "sinks-aws_sqs",
+  "sinks-axiom",
   "sinks-azure_blob",
   "sinks-azure_monitor_logs",
   "sinks-blackhole",
@@ -625,6 +626,7 @@ sinks-aws_kinesis_firehose = ["aws-core", "dep:aws-sdk-firehose"]
 sinks-aws_kinesis_streams = ["aws-core", "dep:aws-sdk-kinesis"]
 sinks-aws_s3 = ["dep:base64", "dep:md-5", "aws-core", "dep:aws-sdk-s3"]
 sinks-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
+sinks-axiom = ["sinks-elasticsearch"]
 sinks-azure_blob = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage", "dep:azure_storage_blobs"]
 sinks-azure_monitor_logs = []
 sinks-blackhole = []
@@ -679,6 +681,7 @@ nightly = []
 # Testing-related features
 all-integration-tests = [
   "aws-integration-tests",
+  "axiom-integration-tests",
   "azure-integration-tests",
   "clickhouse-integration-tests",
   "datadog-agent-integration-tests",
@@ -731,6 +734,7 @@ aws-kinesis-firehose-integration-tests = ["sinks-aws_kinesis_firehose", "dep:aws
 aws-kinesis-streams-integration-tests = ["sinks-aws_kinesis_streams"]
 aws-s3-integration-tests = ["sinks-aws_s3", "sources-aws_s3"]
 aws-sqs-integration-tests = ["sinks-aws_sqs", "sources-aws_sqs"]
+axiom-integration-tests = ["sinks-axiom"]
 azure-blob-integration-tests = ["sinks-azure_blob"]
 clickhouse-integration-tests = ["sinks-clickhouse"]
 datadog-agent-integration-tests = ["sources-datadog_agent"]

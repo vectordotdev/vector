@@ -181,6 +181,7 @@ scopes:
   - aws_kinesis_streams sink # Anything `aws_kinesis_streams` sink related
   - aws_s3 sink # Anything `aws_s3` sink related
   - aws_sqs sink # Anything `aws_sqs` sink related
+  - axiom sink # Anything `axiom` sink related
   - azure_blob sink # Anything `azure_blob` sink related
   - azure_monitor_logs sink # Anything `azure_monitor_logs` sink related
   - blackhole sink # Anything `blackhole` sink related

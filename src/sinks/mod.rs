@@ -15,6 +15,8 @@ pub mod aws_kinesis_streams;
 pub mod aws_s3;
 #[cfg(feature = "sinks-aws_sqs")]
 pub mod aws_sqs;
+#[cfg(feature = "sinks-axiom")]
+pub mod axiom;
 #[cfg(feature = "sinks-azure_blob")]
 pub mod azure_blob;
 #[cfg(any(feature = "sinks-azure_blob", feature = "sinks-datadog_archives"))]
