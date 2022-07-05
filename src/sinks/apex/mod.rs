@@ -50,7 +50,7 @@ struct ApexDefaultBatchSettings;
 
 impl SinkBatchSettings for ApexDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = None;
-    const MAX_BYTES: Option<usize> = Some(100_000);
+    const MAX_BYTES: Option<usize> = None;
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
