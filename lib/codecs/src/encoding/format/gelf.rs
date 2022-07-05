@@ -1,7 +1,3 @@
-use crate::internal_events::{
-    codec_format::FORMAT_TYPE_GELF, SerializeFailedInvalidFieldName, SerializeFailedInvalidType,
-    SerializeFailedMissingField,
-};
 use crate::{gelf_fields::*, VALID_FIELD_REGEX};
 use bytes::{BufMut, BytesMut};
 use serde::{Deserialize, Serialize};
@@ -77,20 +73,13 @@ impl GelfSerializer {
         }
     }
 
-    /// Emits the GelfSerializeFailedInvalidType internal event and returns Err.
-    fn emit_invalid_type(
+    /// Returns Error for invalid type
+    fn err_invalid_type(
         &self,
         field: &str,
         expected_type: &str,
         actual_type: &str,
     ) -> vector_core::Result<()> {
-        vector_core::internal_event::emit(SerializeFailedInvalidType {
-            format_type: FORMAT_TYPE_GELF,
-            message: INVALID_TYPE_STR,
-            field,
-            expected_type,
-            actual_type,
-        });
         Err(format!(
             "{}: field: {} type: {} expected_type: {}",
             INVALID_TYPE_STR, field, actual_type, expected_type
@@ -116,13 +105,8 @@ impl GelfSerializer {
         log: &LogEvent,
         conformed_log: &mut Option<LogEvent>,
     ) -> vector_core::Result<()> {
-        // emits the GelfSerializeFailedMissingField internal event and returns Err
-        fn emit_missing_field(field: &str) -> vector_core::Result<()> {
-            vector_core::internal_event::emit(SerializeFailedMissingField {
-                format_type: FORMAT_TYPE_GELF,
-                message: MISSING_FIELD_STR,
-                field,
-            });
+        // returns Error for missing field
+        fn err_missing_field(field: &str) -> vector_core::Result<()> {
             Err(format!("{}: {}", MISSING_FIELD_STR, field).into())
         }
 
@@ -133,7 +117,7 @@ impl GelfSerializer {
         }
 
         if !log.contains(HOST) {
-            emit_missing_field(HOST)?;
+            err_missing_field(HOST)?;
         }
 
         let message_key = log_schema().message_key();
@@ -143,7 +127,7 @@ impl GelfSerializer {
                 self.conformed_log_mut(log, conformed_log)
                     .rename_key(message_key, SHORT_MESSAGE);
             } else {
-                emit_missing_field(SHORT_MESSAGE)?;
+                err_missing_field(SHORT_MESSAGE)?;
             }
         }
         Ok(())
@@ -167,17 +151,12 @@ impl GelfSerializer {
 
         // additional fields must be only word chars, dashes and periods.
         if !VALID_FIELD_REGEX.is_match(key) {
-            vector_core::internal_event::emit(SerializeFailedInvalidFieldName {
-                format_type: FORMAT_TYPE_GELF,
-                message: INVALID_FIELD_NAME_STR,
-                field: key,
-            });
             return Err(format!("{}: {}", INVALID_FIELD_NAME_STR, key).into());
         }
 
         // additional field values must be only strings or numbers
         if !(value.is_integer() || value.is_float() || value.is_bytes()) {
-            self.emit_invalid_type(key, "string or number", value.kind_str())?;
+            self.err_invalid_type(key, "string or number", value.kind_str())?;
         }
         Ok(())
     }
@@ -193,22 +172,22 @@ impl GelfSerializer {
                 match key.as_str() {
                     VERSION | HOST | SHORT_MESSAGE | FULL_MESSAGE | FACILITY | FILE => {
                         if !value.is_bytes() {
-                            self.emit_invalid_type(key, "UTF-8 string", value.kind_str())?;
+                            self.err_invalid_type(key, "UTF-8 string", value.kind_str())?;
                         }
                     }
                     TIMESTAMP => {
                         if !(value.is_timestamp() || value.is_integer()) {
-                            self.emit_invalid_type(key, "timestamp or integer", value.kind_str())?;
+                            self.err_invalid_type(key, "timestamp or integer", value.kind_str())?;
                         }
                     }
                     LEVEL => {
                         if !value.is_integer() {
-                            self.emit_invalid_type(key, "integer", value.kind_str())?;
+                            self.err_invalid_type(key, "integer", value.kind_str())?;
                         }
                     }
                     LINE => {
                         if !(value.is_float() || value.is_integer()) {
-                            self.emit_invalid_type(key, "number", value.kind_str())?;
+                            self.err_invalid_type(key, "number", value.kind_str())?;
                         }
                     }
                     _ => {
