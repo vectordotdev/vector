@@ -209,7 +209,7 @@ impl DatadogArchivesSinkConfig {
                 let azure_config = self
                     .azure_blob
                     .as_ref()
-                    .expect("azire blob config wasn't provided");
+                    .expect("azure blob config wasn't provided");
                 let client = azure_common::config::build_client(
                     Some(azure_config.connection_string.clone()),
                     None,
