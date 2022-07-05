@@ -581,7 +581,13 @@ impl AgentDDSketch {
         self.insert_key_counts(key_counts);
     }
 
-    pub fn insert_interpolate_buckets(&mut self, mut buckets: Vec<Bucket>) {
+    /// ## Errors
+    ///
+    /// Returns an error if a bucket size is greater that `u32::MAX`.
+    pub fn insert_interpolate_buckets(
+        &mut self,
+        mut buckets: Vec<Bucket>,
+    ) -> Result<(), &'static str> {
         // Buckets need to be sorted from lowest to highest so that we can properly calculate the
         // rolling lower/upper bounds.
         buckets.sort_by(|a, b| {
@@ -592,6 +598,13 @@ impl AgentDDSketch {
         });
 
         let mut lower = f64::NEG_INFINITY;
+
+        if buckets
+            .iter()
+            .any(|bucket| bucket.count > u64::from(u32::MAX))
+        {
+            return Err("bucket size greater than u32::MAX");
+        }
 
         for bucket in buckets {
             let mut upper = bucket.upper_limit;
@@ -605,9 +618,13 @@ impl AgentDDSketch {
             // generally enforced at the source level by converting from cumulative buckets, or
             // enforced by the internal structures that hold bucketed data i.e. Vector's internal
             // `Histogram` data structure used for collecting histograms from `metrics`.
-            self.insert_interpolate_bucket(lower, upper, bucket.count);
+            let count = u32::try_from(bucket.count).expect("count range has already been checked.");
+
+            self.insert_interpolate_bucket(lower, upper, count);
             lower = bucket.upper_limit;
         }
+
+        Ok(())
     }
 
     /// Adds a bin directly into the sketch.
@@ -734,7 +751,11 @@ impl AgentDDSketch {
     /// a distribution or aggregated histogram -- then the metric is passed back unmodified.  All
     /// existing metadata -- series name, tags, timestamp, etc -- is left unmodified, even if the
     /// metric is converted to a sketch internally.
-    pub fn transform_to_sketch(mut metric: Metric) -> Metric {
+    ///
+    /// ## Errors
+    ///
+    /// Returns an error if a bucket size is greater that `u32::MAX`.
+    pub fn transform_to_sketch(mut metric: Metric) -> Result<Metric, &'static str> {
         let sketch = match metric.data_mut().value_mut() {
             MetricValue::Distribution { samples, .. } => {
                 let mut sketch = AgentDDSketch::with_agent_defaults();
@@ -746,7 +767,7 @@ impl AgentDDSketch {
             MetricValue::AggregatedHistogram { buckets, .. } => {
                 let delta_buckets = mem::take(buckets);
                 let mut sketch = AgentDDSketch::with_agent_defaults();
-                sketch.insert_interpolate_buckets(delta_buckets);
+                sketch.insert_interpolate_buckets(delta_buckets)?;
                 Some(sketch)
             }
             // We can't convert from any other metric value.
@@ -755,9 +776,9 @@ impl AgentDDSketch {
 
         match sketch {
             // Metric was not able to be converted to a sketch, so pass it back.
-            None => metric,
+            None => Ok(metric),
             // Metric was able to be converted to a sketch, so adjust the value.
-            Some(sketch) => metric.with_value(sketch.into()),
+            Some(sketch) => Ok(metric.with_value(sketch.into())),
         }
     }
 }
@@ -1046,6 +1067,7 @@ fn round_to_even(v: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::{round_to_even, AgentDDSketch, Config, AGENT_DEFAULT_EPS, MAX_KEY};
+    use crate::event::metric::Bucket;
 
     const FLOATING_POINT_ACCEPTABLE_ERROR: f64 = 1.0e-10;
 
@@ -1152,6 +1174,34 @@ mod tests {
         assert_eq!(start, min);
         assert!(median.abs() < FLOATING_POINT_ACCEPTABLE_ERROR);
         assert!((end - max).abs() < FLOATING_POINT_ACCEPTABLE_ERROR);
+    }
+
+    #[test]
+    fn test_out_of_range_buckets_error() {
+        let mut sketch = AgentDDSketch::with_agent_defaults();
+
+        let buckets = vec![
+            Bucket {
+                upper_limit: 5.4,
+                count: 32,
+            },
+            Bucket {
+                upper_limit: 5.8,
+                count: u64::from(u32::MAX) + 1,
+            },
+            Bucket {
+                upper_limit: 9.2,
+                count: 320,
+            },
+        ];
+
+        assert_eq!(
+            Err("bucket size greater than u32::MAX"),
+            sketch.insert_interpolate_buckets(buckets)
+        );
+
+        // Assert the sketch remains unchanged.
+        assert_eq!(sketch, AgentDDSketch::with_agent_defaults());
     }
 
     #[test]

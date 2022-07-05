@@ -191,12 +191,12 @@ impl Arbitrary for MetricValue {
             },
             4 => MetricValue::AggregatedHistogram {
                 buckets: Vec::arbitrary(g),
-                count: u32::arbitrary(g),
+                count: u64::arbitrary(g),
                 sum: f64::arbitrary(g) % MAX_F64_SIZE,
             },
             5 => MetricValue::AggregatedSummary {
                 quantiles: Vec::arbitrary(g),
-                count: u32::arbitrary(g),
+                count: u64::arbitrary(g),
                 sum: f64::arbitrary(g) % MAX_F64_SIZE,
             },
             6 => {
@@ -425,7 +425,7 @@ impl Arbitrary for Bucket {
     fn arbitrary(g: &mut Gen) -> Self {
         Bucket {
             upper_limit: f64::arbitrary(g) % MAX_F64_SIZE,
-            count: u32::arbitrary(g),
+            count: u64::arbitrary(g),
         }
     }
 

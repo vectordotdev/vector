@@ -21,7 +21,7 @@ use crate::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
     },
     event::Event,
-    gcp::{GcpAuthConfig, GcpCredentials, Scope},
+    gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
     http::HttpClient,
     serde::json::to_string,
     sinks::{
@@ -132,10 +132,7 @@ impl GenerateConfig for GcsSinkConfig {
 #[typetag::serde(name = "gcp_cloud_storage")]
 impl SinkConfig for GcsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let creds = self
-            .auth
-            .make_credentials(Scope::DevStorageReadWrite)
-            .await?;
+        let auth = self.auth.build(Scope::DevStorageReadWrite).await?;
         let base_url = format!("{}{}/", BASE_URL, self.bucket);
         let tls = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls, cx.proxy())?;
@@ -143,9 +140,9 @@ impl SinkConfig for GcsSinkConfig {
             self.bucket.clone(),
             client.clone(),
             base_url.clone(),
-            creds.clone(),
+            auth.clone(),
         )?;
-        let sink = self.build_sink(client, base_url, creds, cx)?;
+        let sink = self.build_sink(client, base_url, auth, cx)?;
 
         Ok((sink, healthcheck))
     }
@@ -168,7 +165,7 @@ impl GcsSinkConfig {
         &self,
         client: HttpClient,
         base_url: String,
-        creds: Option<GcpCredentials>,
+        auth: GcpAuthenticator,
         cx: SinkContext,
     ) -> crate::Result<VectorSink> {
         let request = self.request.unwrap_with(&TowerRequestConfig {
@@ -182,7 +179,7 @@ impl GcsSinkConfig {
 
         let svc = ServiceBuilder::new()
             .settings(request, GcsRetryLogic)
-            .service(GcsService::new(client, base_url, creds));
+            .service(GcsService::new(client, base_url, auth));
 
         let request_settings = RequestSettings::new(self)?;
 
@@ -282,11 +279,13 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
 impl RequestSettings {
     fn new(config: &GcsSinkConfig) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
-        let (framer, serializer) = config.encoding.encoding();
+        let (framer, serializer) = config.encoding.encoding()?;
         let framer = match (framer, &serializer) {
             (Some(framer), _) => framer,
             (None, Serializer::Json(_)) => CharacterDelimitedEncoder::new(b',').into(),
-            (None, Serializer::Native(_)) => LengthDelimitedEncoder::new().into(),
+            (None, Serializer::Avro(_) | Serializer::Native(_)) => {
+                LengthDelimitedEncoder::new().into()
+            }
             (
                 None,
                 Serializer::Logfmt(_)
@@ -353,6 +352,7 @@ mod tests {
     use futures_util::{future::ready, stream};
     use vector_core::partition::Partitioner;
 
+    use crate::event::LogEvent;
     use crate::test_util::{
         components::{run_and_assert_sink_compliance, SINK_TAGS},
         http::{always_200_response, spawn_blackhole_http_server},
@@ -377,10 +377,15 @@ mod tests {
 
         let config = default_config(StandardEncodings::Json);
         let sink = config
-            .build_sink(client, mock_endpoint.to_string(), None, context)
+            .build_sink(
+                client,
+                mock_endpoint.to_string(),
+                GcpAuthenticator::None,
+                context,
+            )
             .expect("failed to build sink");
 
-        let event = Event::from("simple message");
+        let event = Event::Log(LogEvent::from("simple message"));
         run_and_assert_sink_compliance(sink, stream::once(ready(event)), &SINK_TAGS).await;
     }
 
@@ -389,8 +394,8 @@ mod tests {
         crate::test_util::trace_init();
 
         let message = "hello world".to_string();
-        let mut event = Event::from(message);
-        event.as_mut_log().insert("key", "value");
+        let mut event = LogEvent::from(message);
+        event.insert("key", "value");
 
         let sink_config = GcsSinkConfig {
             key_prefix: Some("key: {{ key }}".into()),
@@ -399,7 +404,7 @@ mod tests {
         let key = sink_config
             .key_partitioner()
             .unwrap()
-            .partition(&event)
+            .partition(&Event::Log(event))
             .expect("key wasn't provided");
 
         assert_eq!(key, "key: value");
@@ -410,7 +415,6 @@ mod tests {
     }
 
     fn build_request(extension: Option<&str>, uuid: bool, compression: Compression) -> GcsRequest {
-        let log = Event::new_empty_log();
         let sink_config = GcsSinkConfig {
             key_prefix: Some("key/".into()),
             filename_time_format: Some("date".into()),
@@ -419,6 +423,7 @@ mod tests {
             compression,
             ..default_config(StandardEncodings::Ndjson)
         };
+        let log = LogEvent::default().into();
         let key = sink_config
             .key_partitioner()
             .unwrap()

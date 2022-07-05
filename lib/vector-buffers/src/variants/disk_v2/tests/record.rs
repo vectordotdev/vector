@@ -13,7 +13,7 @@ async fn roundtrip_through_record_writer_and_record_reader() {
     let mut record_writer = RecordWriter::new(writer_io, 0, 16_384, u64::MAX, 2048);
     let mut record_reader = RecordReader::new(reader_io);
 
-    let record = SizedRecord(73);
+    let record = SizedRecord::new(73);
 
     let (bytes_written, flush_result) = record_writer
         .write_record(314, record.clone())

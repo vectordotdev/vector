@@ -1,6 +1,8 @@
 use std::{error, fmt, num::NonZeroUsize};
 
 use bytes::{Buf, BufMut};
+use vector_common::byte_size_of::ByteSizeOf;
+use vector_common::finalization::{AddBatchNotifier, BatchNotifier};
 
 use super::builder::TopologyBuilder;
 use crate::{
@@ -10,8 +12,35 @@ use crate::{
     Bufferable, EventCount, WhenFull,
 };
 
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(crate) struct Sample(pub u64);
+
+impl From<u64> for Sample {
+    fn from(v: u64) -> Self {
+        Self(v)
+    }
+}
+
+impl From<Sample> for u64 {
+    fn from(s: Sample) -> Self {
+        s.0
+    }
+}
+
+impl AddBatchNotifier for Sample {
+    fn add_batch_notifier(&mut self, batch: BatchNotifier) {
+        drop(batch); // We never check acknowledgements for this type
+    }
+}
+
+impl ByteSizeOf for Sample {
+    fn allocated_bytes(&self) -> usize {
+        0
+    }
+}
+
 // Silly implementation of `Encodable` to fulfill `Bufferable` for our test buffer code.
-impl FixedEncodable for u64 {
+impl FixedEncodable for Sample {
     type EncodeError = BasicError;
     type DecodeError = BasicError;
 
@@ -20,23 +49,23 @@ impl FixedEncodable for u64 {
         B: BufMut,
         Self: Sized,
     {
-        buffer.put_u64(self);
+        buffer.put_u64(self.0);
         Ok(())
     }
 
-    fn decode<B>(mut buffer: B) -> Result<u64, Self::DecodeError>
+    fn decode<B>(mut buffer: B) -> Result<Self, Self::DecodeError>
     where
         B: Buf,
     {
         if buffer.remaining() >= 8 {
-            Ok(buffer.get_u64())
+            Ok(Self(buffer.get_u64()))
         } else {
             Err(BasicError("need 8 bytes minimum".to_string()))
         }
     }
 }
 
-impl EventCount for u64 {
+impl EventCount for Sample {
     fn event_count(&self) -> usize {
         1
     }
@@ -58,11 +87,15 @@ impl error::Error for BasicError {}
 /// If `mode` is set to `WhenFull::Overflow`, then the buffer will be set to overflow mode, with
 /// another in-memory channel buffer being used as the overflow buffer.  The overflow buffer will
 /// also use the same capacity as the outer buffer.
-pub async fn build_buffer(
+pub(crate) async fn build_buffer(
     capacity: usize,
     mode: WhenFull,
     overflow_mode: Option<WhenFull>,
-) -> (BufferSender<u64>, BufferReceiver<u64>, BufferUsageHandle) {
+) -> (
+    BufferSender<Sample>,
+    BufferReceiver<Sample>,
+    BufferUsageHandle,
+) {
     let handle = BufferUsageHandle::noop();
     let (tx, rx) = match mode {
         WhenFull::Overflow => {

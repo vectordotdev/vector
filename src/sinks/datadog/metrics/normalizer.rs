@@ -22,11 +22,11 @@ impl MetricNormalize for DatadogMetricsNormalizer {
             MetricValue::Distribution { .. } => state
                 .make_incremental(metric)
                 .filter(|metric| !metric.value().is_empty())
-                .map(AgentDDSketch::transform_to_sketch),
+                .and_then(|metric| AgentDDSketch::transform_to_sketch(metric).ok()),
             MetricValue::AggregatedHistogram { .. } => state
                 .make_incremental(metric)
                 .filter(|metric| !metric.value().is_empty())
-                .map(AgentDDSketch::transform_to_sketch),
+                .and_then(|metric| AgentDDSketch::transform_to_sketch(metric).ok()),
             // Sketches cannot be subtracted from one another, so we treat them as implicitly
             // incremental, and just update the metric type.
             MetricValue::Sketch { .. } => Some(metric.into_incremental()),
@@ -51,7 +51,7 @@ mod tests {
     use super::DatadogMetricsNormalizer;
     use crate::sinks::util::buffer::metrics::{MetricNormalize, MetricSet};
 
-    fn buckets_from_samples(values: &[f64]) -> (Vec<Bucket>, f64, u32) {
+    fn buckets_from_samples(values: &[f64]) -> (Vec<Bucket>, f64, u64) {
         // Generate buckets, and general statistics, for an input set of data.  We only use this in
         // tests, and so we have some semi-realistic buckets here, but mainly we use them for testing,
         // not for most accurately/efficiently representing the input samples.
@@ -492,9 +492,13 @@ mod tests {
 
         let expected_sketches = vec![
             None,
-            Some(AgentDDSketch::transform_to_sketch(
-                get_aggregated_histogram(sketch_samples, MetricKind::Incremental),
-            )),
+            Some(
+                AgentDDSketch::transform_to_sketch(get_aggregated_histogram(
+                    sketch_samples,
+                    MetricKind::Incremental,
+                ))
+                .unwrap(),
+            ),
         ];
 
         run_comparisons(agg_histograms, expected_sketches);
@@ -513,12 +517,20 @@ mod tests {
         ];
 
         let expected_sketches = vec![
-            Some(AgentDDSketch::transform_to_sketch(
-                get_aggregated_histogram(sketch1_samples, MetricKind::Incremental),
-            )),
-            Some(AgentDDSketch::transform_to_sketch(
-                get_aggregated_histogram(sketch2_samples, MetricKind::Incremental),
-            )),
+            Some(
+                AgentDDSketch::transform_to_sketch(get_aggregated_histogram(
+                    sketch1_samples,
+                    MetricKind::Incremental,
+                ))
+                .unwrap(),
+            ),
+            Some(
+                AgentDDSketch::transform_to_sketch(get_aggregated_histogram(
+                    sketch2_samples,
+                    MetricKind::Incremental,
+                ))
+                .unwrap(),
+            ),
         ];
 
         run_comparisons(agg_histograms, expected_sketches);
@@ -545,19 +557,35 @@ mod tests {
         ];
 
         let expected_sketches = vec![
-            Some(AgentDDSketch::transform_to_sketch(
-                get_aggregated_histogram(sketch1_samples, MetricKind::Incremental),
-            )),
+            Some(
+                AgentDDSketch::transform_to_sketch(get_aggregated_histogram(
+                    sketch1_samples,
+                    MetricKind::Incremental,
+                ))
+                .unwrap(),
+            ),
             None,
-            Some(AgentDDSketch::transform_to_sketch(
-                get_aggregated_histogram(sketch3_samples, MetricKind::Incremental),
-            )),
-            Some(AgentDDSketch::transform_to_sketch(
-                get_aggregated_histogram(sketch4_samples, MetricKind::Incremental),
-            )),
-            Some(AgentDDSketch::transform_to_sketch(
-                get_aggregated_histogram(sketch5_samples, MetricKind::Incremental),
-            )),
+            Some(
+                AgentDDSketch::transform_to_sketch(get_aggregated_histogram(
+                    sketch3_samples,
+                    MetricKind::Incremental,
+                ))
+                .unwrap(),
+            ),
+            Some(
+                AgentDDSketch::transform_to_sketch(get_aggregated_histogram(
+                    sketch4_samples,
+                    MetricKind::Incremental,
+                ))
+                .unwrap(),
+            ),
+            Some(
+                AgentDDSketch::transform_to_sketch(get_aggregated_histogram(
+                    sketch5_samples,
+                    MetricKind::Incremental,
+                ))
+                .unwrap(),
+            ),
         ];
 
         run_comparisons(agg_histograms, expected_sketches);

@@ -6,7 +6,6 @@ mod files;
 mod http;
 mod lua;
 mod metrics_snapshot;
-mod regex;
 mod template;
 
 criterion_main!(
@@ -16,6 +15,5 @@ criterion_main!(
     http::benches,
     lua::benches,
     metrics_snapshot::benches,
-    regex::benches,
     template::benches,
 );

@@ -587,7 +587,7 @@ mod tests {
     use futures::task::Poll;
 
     use super::*;
-    use crate::test_util::trace_init;
+    use crate::{event::LogEvent, test_util::trace_init};
 
     #[test]
     fn test_generate_config() {
@@ -601,7 +601,7 @@ mod tests {
         let data_stream = Some(STDOUT.to_string());
         let pid = Some(8888_u32);
 
-        let mut event = Bytes::from("hello world").into();
+        let mut event = LogEvent::from("hello world").into();
         handle_event(&config, &hostname, &data_stream, pid, &mut event);
         let log = event.as_log();
 
@@ -621,7 +621,7 @@ mod tests {
         let data_stream = Some(STDOUT.to_string());
         let pid = Some(8888_u32);
 
-        let mut event = Bytes::from("hello world").into();
+        let mut event = LogEvent::from("hello world").into();
         handle_event(&config, &hostname, &data_stream, pid, &mut event);
         let log = event.as_log();
 

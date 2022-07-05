@@ -32,8 +32,8 @@ components: sinks: http: {
 				enabled: true
 				codec: {
 					enabled: true
-					batched: true
-					enum: ["json", "ndjson", "text"]
+					framing: true
+					enum: ["json", "text"]
 				}
 			}
 			proxy: enabled: true

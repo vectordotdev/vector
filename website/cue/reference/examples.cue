@@ -66,7 +66,7 @@ config_examples: [#ConfigExample, ...#ConfigExample] & [
 			bucket = "k8s-logs"
 			region = "us-east-1"
 			compression = "gzip"
-			encoding.codec = "ndjson"
+			encoding.codec = "json"
 			"""#
 	},
 	{

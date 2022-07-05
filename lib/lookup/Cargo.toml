@@ -16,7 +16,7 @@ quickcheck = { version = "1.0.3", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.3.5", features = ["html_reports", "async_tokio"] }
-serde_json = { version = "1.0.81", features = ["raw_value"] }
+serde_json = { version = "1.0.82", features = ["raw_value"] }
 tracing = { version = "0.1", default-features = false, features = ["attributes"] }
 quickcheck = { version = "1.0.3" }
 

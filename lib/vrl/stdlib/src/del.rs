@@ -181,17 +181,18 @@ impl Expression for DelFn {
         // FIXME(Jean): This should also delete non-external queries, as `del(foo.bar)` is
         // supported.
         if self.query.is_external() {
-            match self.query.delete_type_def(external) {
-                Err(value::kind::remove::Error::RootPath)
-                | Err(value::kind::remove::Error::CoalescedPath)
-                | Err(value::kind::remove::Error::NegativeIndexPath) => {
-                    // This function is (currently) infallible, so we ignore any errors here.
-                    //
-                    // see: https://github.com/vectordotdev/vector/issues/11264
-                }
-                Ok(_) => {}
+            if let Err(
+                value::kind::remove::Error::RootPath
+                | value::kind::remove::Error::CoalescedPath
+                | value::kind::remove::Error::NegativeIndexPath,
+            ) = self.query.delete_type_def(external)
+            {
+                // This function is (currently) infallible, so we ignore any errors here.
+                //
+                // see: https://github.com/vectordotdev/vector/issues/11264
             }
         }
+
         Ok(())
     }
 }
