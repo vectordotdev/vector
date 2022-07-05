@@ -11,4 +11,4 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 set -x
 
 cargo install --locked cargo-deny
-cargo deny --all-features check advisories licenses sources
+cargo deny --all-features check all
