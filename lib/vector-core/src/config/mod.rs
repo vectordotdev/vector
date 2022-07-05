@@ -209,9 +209,9 @@ impl Default for LogNamespace {
 }
 
 impl LogNamespace {
-    /// Vector: This is added to "event metadata", nested under the source name
+    /// Vector: This is added to "event metadata", nested under the source name.
     ///
-    /// Legacy: This is stored on the event root, only if a field with that name doesn't already exist
+    /// Legacy: This is stored on the event root, only if a field with that name doesn't already exist.
     pub fn insert_source_metadata<'a>(
         &self,
         source_name: &'a str,
@@ -232,9 +232,9 @@ impl LogNamespace {
     }
 
     /// Vector: This is added to the "event metadata", nested under the name "vector". This data
-    /// will be marked as read-only in VRL
+    /// will be marked as read-only in VRL.
     ///
-    /// Legacy: This is stored on the event root, only if a field with that name doesn't already exist
+    /// Legacy: This is stored on the event root, only if a field with that name doesn't already exist.
     pub fn insert_vector_metadata<'a>(
         &self,
         log: &mut LogEvent,

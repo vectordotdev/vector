@@ -98,7 +98,7 @@ impl Definition {
     }
 
     /// An object with any fields, and the `Legacy` namespace.
-    /// This is the default schema for a source that does not explicitely provide one yet
+    /// This is the default schema for a source that does not explicitely provide one yet.
     pub fn default_legacy_namespace() -> Self {
         Self::empty_with_kind(Kind::any_object(), [LogNamespace::Legacy])
     }
@@ -134,7 +134,7 @@ impl Definition {
     /// restricted to an object.
     ///
     /// # Panics
-    /// - If the path is not root, and the definition does not allow the type to be an object
+    /// - If the path is not root, and the definition does not allow the type to be an object.
     /// - Provided path has one or more coalesced segments (e.g. `.(foo | bar)`).
     #[must_use]
     pub fn with_field(
@@ -162,7 +162,7 @@ impl Definition {
             }
         }
 
-        if let Err(err) = self.kind.insert_at_path(
+        self.kind.insert_at_path(
             &path.to_lookup(),
             kind,
             insert::Strategy {
@@ -170,9 +170,7 @@ impl Definition {
                 leaf_conflict: insert::LeafConflict::Replace,
                 coalesced_path: insert::CoalescedPath::Reject,
             },
-        ) {
-            panic!("Field definition not valid: {:?}", err);
-        }
+        ).expect("Field definition not valid");
 
         if let Some(meaning) = meaning {
             self.meaning.insert(meaning, MeaningPointer::Valid(path));

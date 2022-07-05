@@ -11,7 +11,7 @@ pub struct DecodingConfig {
     framing: FramingConfig,
     /// The decoding config.
     decoding: DeserializerConfig,
-    /// The namespace used when decoding
+    /// The namespace used when decoding.
     log_namespace: LogNamespace,
 }
 

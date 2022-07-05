@@ -42,7 +42,7 @@ impl Decoder {
         }
     }
 
-    /// Sets the path prefix where all deserialized data will be placed
+    /// Sets the path prefix where all deserialized data will be placed.
     pub const fn with_log_namespace(mut self, log_namespace: LogNamespace) -> Self {
         self.log_namespace = log_namespace;
         self
