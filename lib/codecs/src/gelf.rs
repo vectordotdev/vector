@@ -42,5 +42,5 @@ pub mod gelf_fields {
 
 /// Regex for matching valid field names. Must contain only word chars, periods and dashes.
 /// Additional field names must also be prefixed with an `_` , however that is intentionally
-/// omitted from this regex.
+/// omitted from this regex to be checked separately to create a specific error message.
 pub static VALID_FIELD_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[\w\.\-]*$").unwrap());

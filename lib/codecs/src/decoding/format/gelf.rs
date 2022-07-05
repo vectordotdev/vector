@@ -116,7 +116,7 @@ impl GelfDeserializer {
         if let Some(line) = parsed.line {
             log.insert(
                 LINE,
-                value::Value::Float(ordered_float::NotNan::new(line).unwrap()),
+                value::Value::Float(ordered_float::NotNan::new(line).expect("JSON doesn't allow NaNs")),
             );
         }
         if let Some(file) = &parsed.file {
