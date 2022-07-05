@@ -357,18 +357,6 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
 
 impl RequestSettings {
     fn new(config: &GcsChronicleUnstructuredConfig) -> crate::Result<Self> {
-        /*let transformer = config.encoding.transformer();
-        let (framer, serializer) = config.encoding.clone().encoding();
-        let framer = match (framer, &serializer) {
-            (Some(framer), _) => framer,
-            (None, Serializer::Json(_)) => CharacterDelimitedEncoder::new(b',').into(),
-            (None, Serializer::Native(_)) => LengthDelimitedEncoder::new().into(),
-            (None, Serializer::NativeJson(_) | Serializer::RawMessage(_)) => {
-                NewlineDelimitedEncoder::new().into()
-            }
-        };*/
-        //let encoder = ChronicleEncoder; // Encoder::<Framer>::new(framer, serializer);
-
         Ok(Self {
             compression: config.compression,
             encoder: ChronicleEncoder {
@@ -407,6 +395,10 @@ impl Service<ChronicleRequest> for ChronicleService {
     fn call(&mut self, request: ChronicleRequest) -> Self::Future {
         let mut builder = Request::post(&self.base_url);
         let headers = builder.headers_mut().unwrap();
+        headers.insert(
+            "content-type",
+            HeaderValue::from_str("application/json").unwrap(),
+        );
         headers.insert(
             "content-length",
             HeaderValue::from_str(&request.body.len().to_string()).unwrap(),
