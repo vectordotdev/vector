@@ -127,7 +127,7 @@ impl Expression for FilterFn {
     fn type_def(&self, ctx: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         let mut type_def = self.value.type_def(ctx);
 
-        // erase any type information from the array or object, as we can't know
+        // Erase any type information from the array or object, as we can't know
         // which elements are removed at runtime.
         if type_def.contains_array() {
             type_def.kind_mut().add_array(Collection::any());
