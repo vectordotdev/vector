@@ -223,7 +223,10 @@ impl SourceConfig for DatadogAgentConfig {
                     }
                 }
             }
-            LogNamespace::Vector => self.decoding.schema_definition(log_namespace).with_,
+            LogNamespace::Vector => self
+                .decoding
+                .schema_definition(log_namespace)
+                .with_metadata_field("message", Kind::bytes()),
         };
 
         if self.multiple_outputs {

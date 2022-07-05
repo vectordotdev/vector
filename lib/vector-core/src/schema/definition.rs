@@ -210,7 +210,6 @@ impl Definition {
     #[must_use]
     pub fn with_metadata_field(mut self, path: impl Into<LookupBuf>, kind: Kind) -> Self {
         let path = path.into();
-        let meaning = meaning.map(ToOwned::to_owned);
 
         if !path.is_root() {
             if kind.contains_null() {
@@ -228,7 +227,7 @@ impl Definition {
             }
         }
 
-        if let Err(err) = self.event_kind.insert_at_path(
+        if let Err(err) = self.metadata_kind.insert_at_path(
             &path.to_lookup(),
             kind,
             insert::Strategy {
@@ -238,10 +237,6 @@ impl Definition {
             },
         ) {
             panic!("Field definition not valid: {:?}", err);
-        }
-
-        if let Some(meaning) = meaning {
-            self.meaning.insert(meaning, MeaningPointer::Valid(path));
         }
 
         self
