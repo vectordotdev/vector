@@ -1207,14 +1207,13 @@ dependencies = [
 
 [[package]]
 name = "bollard"
-version = "0.12.0"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b1d4b9e55620571c2200f4be87db2a9a69e2a107fc7d206a6accad58c3536cb"
+checksum = "d82e7850583ead5f8bbef247e2a3c37a19bd576e8420cd262a6711921827e1e5"
 dependencies = [
  "base64",
  "bollard-stubs",
  "bytes 1.1.0",
- "chrono",
  "dirs-next",
  "futures-core",
  "futures-util",
@@ -1227,7 +1226,7 @@ dependencies = [
  "pin-project-lite",
  "rustls 0.20.4",
  "rustls-native-certs 0.6.2",
- "rustls-pemfile 0.3.0",
+ "rustls-pemfile 1.0.0",
  "serde",
  "serde_derive",
  "serde_json",
@@ -1243,11 +1242,10 @@ dependencies = [
 
 [[package]]
 name = "bollard-stubs"
-version = "1.42.0-rc.0"
+version = "1.42.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4295240332c78d04291f3ac857a281d5534a8e036f3dfcdaa294b22c0d424427"
+checksum = "ed59b5c00048f48d7af971b71f800fdf23e858844a6f9e4d32ca72e9399e7864"
 dependencies = [
- "chrono",
  "serde",
  "serde_with",
 ]
