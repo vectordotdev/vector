@@ -5,10 +5,10 @@ set -euo pipefail
 #
 # SUMMARY
 #
-#   Checks the advisories for crate dependencies
+#   Checks the advisories licenses and sources for crate dependencies
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 set -x
 
 cargo install --locked cargo-deny
-cargo deny --all-features --log-level warn check advisories && cargo deny --all-features --log-level warn check licenses
+cargo deny --all-features check advisories licenses sources
