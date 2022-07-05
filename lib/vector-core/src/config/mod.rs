@@ -192,6 +192,8 @@ pub enum LogNamespace {
     Legacy,
 }
 
+/// The user-facing config for log namespace is a bool (enabling or disabling the "Log Namespacing" feature).
+/// Internally, this is converted to a enum.
 impl From<bool> for LogNamespace {
     fn from(x: bool) -> Self {
         if x {
