@@ -159,7 +159,7 @@ components: sources: opentelemetry: {
 				flags: {
 					description: "trace flags defined in W3C Trace Context specification"
 					required:    false
-					common: true
+					common:      true
 					type: uint: {
 						default: null
 						unit:    null
