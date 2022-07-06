@@ -221,6 +221,7 @@ impl SourceConfig for DatadogAgentConfig {
                     DeserializerConfig::NativeJson => {
                         self.decoding.schema_definition(log_namespace)
                     }
+                    DeserializerConfig::Gelf => self.decoding.schema_definition(log_namespace),
                 }
             }
             LogNamespace::Vector => self.decoding.schema_definition(log_namespace),

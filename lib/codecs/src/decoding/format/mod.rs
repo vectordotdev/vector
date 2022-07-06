@@ -4,6 +4,7 @@
 #![deny(missing_docs)]
 
 mod bytes;
+mod gelf;
 mod json;
 mod native;
 mod native_json;
@@ -12,6 +13,7 @@ mod syslog;
 
 use ::bytes::Bytes;
 use dyn_clone::DynClone;
+pub use gelf::{GelfDeserializer, GelfDeserializerConfig};
 pub use json::{JsonDeserializer, JsonDeserializerConfig};
 pub use native::{NativeDeserializer, NativeDeserializerConfig};
 pub use native_json::{NativeJsonDeserializer, NativeJsonDeserializerConfig};

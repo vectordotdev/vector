@@ -332,7 +332,7 @@ test-enterprise: ## Runs enterprise related behavioral tests
 
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
-test-integration: test-integration-aws test-integration-azure test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
+test-integration: test-integration-aws test-integration-axiom test-integration-azure test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
 test-integration: test-integration-azure test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
 test-integration: test-integration-eventstoredb test-integration-fluent test-integration-gcp test-integration-humio test-integration-influxdb
 test-integration: test-integration-kafka test-integration-logstash test-integration-loki test-integration-mongodb test-integration-nats
@@ -433,7 +433,7 @@ check: ## Run prerequisite code checks
 check-all: ## Check everything
 check-all: check-fmt check-clippy check-style check-docs
 check-all: check-version check-examples check-component-features
-check-all: check-scripts
+check-all: check-scripts check-deny
 
 .PHONY: check-component-features
 check-component-features: ## Check that all component features are setup properly
@@ -470,6 +470,10 @@ check-examples: ## Check that the config/examples files are valid
 .PHONY: check-scripts
 check-scripts: ## Check that scipts do not have common mistakes
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-scripts.sh
+
+.PHONY: check-deny
+check-deny: ## Check advisories licenses and sources for crate dependencies
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-deny.sh
 
 check-events: ## Check that events satisfy patterns set in https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-events
