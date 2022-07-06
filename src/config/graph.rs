@@ -37,7 +37,7 @@ impl Graph {
         transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
         expansions: &IndexMap<String, Vec<String>>,
-        schema: &schema::Options,
+        schema: schema::Options,
     ) -> Result<Self, Vec<String>> {
         Self::new_inner(sources, transforms, sinks, expansions, false, schema)
     }
@@ -47,7 +47,7 @@ impl Graph {
         transforms: &IndexMap<ComponentKey, TransformOuter<String>>,
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
         expansions: &IndexMap<String, Vec<String>>,
-        schema: &schema::Options,
+        schema: schema::Options,
     ) -> Self {
         Self::new_inner(sources, transforms, sinks, expansions, true, schema)
             .expect("errors ignored")
@@ -59,7 +59,7 @@ impl Graph {
         sinks: &IndexMap<ComponentKey, SinkOuter<String>>,
         expansions: &IndexMap<String, Vec<String>>,
         ignore_errors: bool,
-        schema: &schema::Options,
+        schema: schema::Options,
     ) -> Result<Self, Vec<String>> {
         let mut graph = Graph::default();
         let mut errors = Vec::new();

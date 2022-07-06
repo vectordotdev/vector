@@ -449,7 +449,7 @@ mod tests {
                             Kind::integer().or_bytes().or_timestamp(),
                             Some("foo bar"),
                         )
-                        .with_known_meaning("foo", "baz qux"),
+                        .with_meaning("foo", "baz qux"),
                 },
             ),
         ]) {

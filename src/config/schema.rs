@@ -13,8 +13,8 @@ pub struct Options {
 }
 
 impl Options {
-    /// Gets the value of the globally configured log namespace, or the default if it wasn't set
-    pub fn log_namespace(&self) -> LogNamespace {
+    /// Gets the value of the globally configured log namespace, or the default if it wasn't set.
+    pub fn log_namespace(self) -> LogNamespace {
         self.log_namespace
             .map_or(LogNamespace::Legacy, |use_vector_namespace| {
                 use_vector_namespace.into()

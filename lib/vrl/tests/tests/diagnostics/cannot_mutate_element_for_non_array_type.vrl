@@ -15,6 +15,7 @@
 #   =
 #   = see documentation about error handling at https://errors.vrl.dev/#handling
 #   = see language documentation at https://vrl.dev
+#   = try your code in the VRL REPL, learn more at https://vrl.dev/examples
 #
 # error[E642]: parent path segment rejects this mutation
 #    ┌─ :11:4
@@ -31,6 +32,7 @@
 #    =
 #    = see documentation about error handling at https://errors.vrl.dev/#handling
 #    = see language documentation at https://vrl.dev
+#    = try your code in the VRL REPL, learn more at https://vrl.dev/examples
 
 foo = "foo"
 foo[0] = []

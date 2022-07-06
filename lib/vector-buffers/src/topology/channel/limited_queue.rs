@@ -254,7 +254,10 @@ mod tests {
     use tokio_test::{assert_pending, assert_ready, task::spawn};
 
     use super::limited;
-    use crate::{test::common::MultiEventRecord, topology::channel::limited_queue::SendError};
+    use crate::{
+        test::common::MultiEventRecord, topology::channel::limited_queue::SendError,
+        topology::test_util::Sample,
+    };
 
     #[tokio::test]
     async fn send_receive() {
@@ -262,7 +265,7 @@ mod tests {
 
         assert_eq!(2, tx.available_capacity());
 
-        let msg = 42;
+        let msg = Sample(42);
 
         // Create our send and receive futures.
         let mut send = spawn(async { tx.send(msg).await });
@@ -290,8 +293,8 @@ mod tests {
 
         assert_eq!(1, tx.available_capacity());
 
-        let msg1 = 42;
-        let msg2 = 43;
+        let msg1 = Sample(42);
+        let msg2 = Sample(43);
 
         // Create our send and receive futures.
         let mut send1 = spawn(async { tx.send(msg1).await });
@@ -440,7 +443,7 @@ mod tests {
         assert_eq!(1, tx.available_capacity());
 
         let tx2 = tx.clone();
-        let msg = 42;
+        let msg = Sample(42);
 
         // Create our send and receive futures.
         let mut send = spawn(async { tx.send(msg).await });
@@ -477,7 +480,7 @@ mod tests {
 
     #[test]
     fn receiver_returns_none_once_empty_when_last_sender_drops() {
-        let (tx, mut rx) = limited::<u64>(1);
+        let (tx, mut rx) = limited::<Sample>(1);
 
         assert_eq!(1, tx.available_capacity());
 

@@ -86,10 +86,7 @@ components: sinks: [Name=string]: {
 					}
 					max_size: {
 						description: """
-							The maximum size of the buffer on the disk. Must be at least 128 megabytes (134217728 bytes).
-
-							Note that during normal disk buffer operation, the disk buffer can create one additional 128
-							megabyte block so the minimum disk space required is actually 256 megabytes.
+							The maximum size of the buffer on the disk. Must be at least 256 megabytes (268435456 bytes).
 							"""
 						required:      true
 						relevant_when: "type = \"disk\""
@@ -187,35 +184,16 @@ components: sinks: [Name=string]: {
 								required:    true
 								type: string: {
 									examples: features.send.encoding.codec.enum
-									let batched = features.send.encoding.codec.batched
 									enum: {
 										for codec in features.send.encoding.codec.enum {
 											if codec == "text" {
-												if batched {
-													text: "Newline delimited list of messages generated from the message key from each event."
-												}
-												if !batched {
-													text: "The message field from the event."
-												}
+												text: "The message field from the event."
 											}
 											if codec == "logfmt" {
-												if batched {
-													logfmt: "Newline delimited list of events encoded by [logfmt](\(urls.logfmt))."
-												}
-												if !batched {
-													logfmt: "[logfmt](\(urls.logfmt)) encoded event."
-												}
+												logfmt: "[logfmt](\(urls.logfmt)) encoded event."
 											}
 											if codec == "json" {
-												if batched {
-													json: "Array of JSON encoded events, each element representing one event."
-												}
-												if !batched {
-													json: "JSON encoded event."
-												}
-											}
-											if codec == "ndjson" {
-												ndjson: "Newline delimited list of JSON encoded events."
+												json: "JSON encoded event."
 											}
 											if codec == "avro" {
 												avro: "Avro encoded event with a given schema."
@@ -226,6 +204,31 @@ components: sinks: [Name=string]: {
 							}
 						}
 						options: {
+							if features.send.encoding.codec.enabled {
+								for codec in features.send.encoding.codec.enum {
+									if codec == "avro" {
+										avro: {
+											description:   "Options for the `avro` codec."
+											required:      true
+											relevant_when: "codec = `avro`"
+											type: object: options: {
+												schema: {
+													description: "The Avro schema declaration."
+													required:    true
+													type: string: {
+														examples: [
+															"""
+															["{ "type": "record", "name": "log", "fields": [{ "name": "message", "type": "string" }] }"]
+															""",
+														]
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+
 							except_fields: {
 								common:      false
 								description: "Prevent the sink from encoding the specified fields."
@@ -261,6 +264,46 @@ components: sinks: [Name=string]: {
 									enum: {
 										rfc3339: "Formats as a RFC3339 string"
 										unix:    "Formats as a unix timestamp"
+									}
+								}
+							}
+						}
+					}
+				}
+
+				if features.send.encoding.codec.enabled {
+					if features.send.encoding.codec.framing {
+						framing: {
+							common:      false
+							description: "Configures in which way events encoded as byte frames should be separated in a payload."
+							required:    false
+							type: object: options: {
+								method: {
+									description: "The framing method."
+									required:    false
+									common:      true
+									type: string: {
+										default: "A suitable default is chosen depending on the sink type and the selected codec."
+										enum: {
+											bytes:               "Byte frames are concatenated."
+											character_delimited: "Byte frames are delimited by a chosen character."
+											length_delimited:    "Byte frames are encoded by adding a length header."
+											newline_delimited:   "Byte frames are delimited by a newline character."
+										}
+									}
+								}
+								character_delimited: {
+									description:   "Options for `character_delimited` framing."
+									required:      true
+									relevant_when: "method = `character_delimited`"
+									type: object: options: {
+										delimiter: {
+											description: "The character used to separate frames."
+											required:    true
+											type: ascii_char: {
+												examples: ["\n", "\t"]
+											}
+										}
 									}
 								}
 							}

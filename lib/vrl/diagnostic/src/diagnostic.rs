@@ -140,6 +140,7 @@ impl From<Diagnostic> for diagnostic::Diagnostic<()> {
         }
 
         notes.push(Note::SeeLangDocs);
+        notes.push(Note::SeeRepl);
 
         diagnostic::Diagnostic {
             severity: diag.severity.into(),

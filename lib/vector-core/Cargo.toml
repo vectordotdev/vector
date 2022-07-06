@@ -27,7 +27,7 @@ lookup = { path = "../lookup", features = ["arbitrary"] }
 metrics = { version = "0.17.1", default-features = false, features = ["std"]}
 metrics-tracing-context = { version = "0.9.0", default-features = false }
 metrics-util = { version = "0.10.2", default-features = false, features = ["std"] }
-mlua = { version = "0.8.0", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
+mlua = { version = "0.8.1", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 no-proxy = { version  = "0.3.2", default-features = false, features = ["serialize"] }
 once_cell = { version = "1.12", default-features = false }
 ordered-float = { version = "3.0.0", default-features = false }
@@ -36,7 +36,7 @@ prost = { version = "0.10.4", default-features = false, features = ["std"] }
 prost-types = { version = "0.10.1", default-features = false }
 regex = { version = "1.5.6", default-features = false, features = ["std", "perf"] }
 serde = { version = "1.0.137", default-features = false, features = ["derive", "rc"] }
-serde_json = { version = "1.0.81", default-features = false }
+serde_json = { version = "1.0.82", default-features = false }
 snafu = { version = "0.7.1", default-features = false }
 tokio = { version = "1.19.2", default-features = false }
 tokio-stream = { version = "0.1", default-features = false, features = ["time"], optional = true }

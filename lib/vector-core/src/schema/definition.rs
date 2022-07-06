@@ -111,7 +111,7 @@ impl Definition {
     }
 
     /// An object with any fields, and the `Legacy` namespace.
-    /// This is the default schema for a source that does not explicitely provide one yet
+    /// This is the default schema for a source that does not explicitely provide one yet.
     pub fn default_legacy_namespace() -> Self {
         Self::empty_with_kind(Kind::any_object(), [LogNamespace::Legacy])
     }
@@ -153,7 +153,7 @@ impl Definition {
     /// restricted to an object.
     ///
     /// # Panics
-    /// - If the path is not root, and the definition does not allow the type to be an object
+    /// - If the path is not root, and the definition does not allow the type to be an object.
     /// - Provided path has one or more coalesced segments (e.g. `.(foo | bar)`).
     #[must_use]
     pub fn with_field(
@@ -180,18 +180,17 @@ impl Definition {
                     .into();
             }
         }
-
-        if let Err(err) = self.event_kind.insert_at_path(
-            &path.to_lookup(),
-            kind,
-            insert::Strategy {
-                inner_conflict: insert::InnerConflict::Replace,
-                leaf_conflict: insert::LeafConflict::Replace,
-                coalesced_path: insert::CoalescedPath::Reject,
-            },
-        ) {
-            panic!("Field definition not valid: {:?}", err);
-        }
+        self.event_kind
+            .insert_at_path(
+                &path.to_lookup(),
+                kind,
+                insert::Strategy {
+                    inner_conflict: insert::InnerConflict::Replace,
+                    leaf_conflict: insert::LeafConflict::Replace,
+                    coalesced_path: insert::CoalescedPath::Reject,
+                },
+            )
+            .expect("Field definition not valid");
 
         if let Some(meaning) = meaning {
             self.meaning.insert(meaning, MeaningPointer::Valid(path));
@@ -263,8 +262,18 @@ impl Definition {
     ///
     /// This method panics if the provided path points to an unknown location in the collection.
     #[must_use]
-    pub fn with_known_meaning(mut self, path: impl Into<LookupBuf>, meaning: &str) -> Self {
+    pub fn with_meaning(mut self, path: impl Into<LookupBuf>, meaning: &str) -> Self {
         let path = path.into();
+
+        // Ensure the path exists in the collection.
+        assert!(
+            self.event_kind
+                .find_at_path(&path.to_lookup())
+                .ok()
+                .flatten()
+                .is_some(),
+            "meaning must point to a valid path"
+        );
 
         self.meaning
             .insert(meaning.to_owned(), MeaningPointer::Valid(path));
