@@ -23,7 +23,7 @@ components: sinks: apex: {
 				max_events:   null
 				timeout_secs: 1.0
 			}
-            compression: {
+			compression: {
 				enabled: false
 			}
 			encoding: {
@@ -75,7 +75,7 @@ components: sinks: apex: {
 				examples: ["my-project"]
 			}
 		}
-        api_token: {
+		api_token: {
 			description: "The api token to use to authenticate with Apex."
 			required:    true
 			type: string: {
