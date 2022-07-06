@@ -43,19 +43,15 @@ where
 {
     /// Produce a finalizer set along with the output stream of
     /// received acknowledged batch identifiers.
-    pub fn new(shutdown: ShutdownSignal) -> (Self, impl Stream<Item = (BatchStatus, T)>) {
+    #[must_use]
+    pub fn new(shutdown: ShutdownSignal) -> (Self, BoxStream<'static, (BatchStatus, T)>) {
         let (todo_tx, todo_rx) = mpsc::unbounded_channel();
         (
             Self {
                 sender: Some(todo_tx),
                 _phantom: PhantomData::default(),
             },
-            FinalizerStream {
-                shutdown,
-                new_entries: todo_rx,
-                status_receivers: S::default(),
-                is_shutdown: false,
-            },
+            finalizer_stream(shutdown, todo_rx, S::default()).boxed(),
         )
     }
 
@@ -70,7 +66,7 @@ where
     ) -> (Option<Self>, BoxStream<'static, (BatchStatus, T)>) {
         if maybe {
             let (finalizer, stream) = Self::new(shutdown);
-            (Some(finalizer), stream.boxed())
+            (Some(finalizer), stream)
         } else {
             (None, EmptyStream::default().boxed())
         }
@@ -85,61 +81,49 @@ where
     }
 }
 
-#[pin_project::pin_project]
-#[derive(Debug)]
-struct FinalizerStream<T, S> {
-    shutdown: ShutdownSignal,
-    new_entries: UnboundedReceiver<(BatchStatusReceiver, T)>,
-    status_receivers: S,
-    is_shutdown: bool,
-}
-
-impl<T, S> Stream for FinalizerStream<T, S>
+fn finalizer_stream<T, S>(
+    mut shutdown: ShutdownSignal,
+    mut new_entries: UnboundedReceiver<(BatchStatusReceiver, T)>,
+    mut status_receivers: S,
+) -> impl Stream<Item = (BatchStatus, T)>
 where
     S: FuturesSet<FinalizerFuture<T>> + Unpin,
     T: Debug,
 {
-    type Item = (BatchStatus, T);
-
-    fn poll_next(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let this = self.project();
-        if !*this.is_shutdown {
-            if this.shutdown.poll_unpin(ctx).is_ready() {
-                *this.is_shutdown = true;
-            }
-            // Only poll for new entries until shutdown is flagged.
-            // Loop over all the ready new entries at once.
-            loop {
-                match this.new_entries.poll_recv(ctx) {
-                    Poll::Pending => break,
-                    Poll::Ready(Some((receiver, entry))) => {
-                        let entry = Some(entry);
-                        this.status_receivers
-                            .push(FinalizerFuture { receiver, entry });
+    async_stream::stream! {
+        loop {
+            tokio::select! {
+                biased;
+                _ = &mut shutdown => break,
+                // Only poll for new entries until shutdown is flagged.
+                new_entry = new_entries.recv() => match new_entry {
+                    Some((receiver, entry)) => {
+                        status_receivers.push(FinalizerFuture {
+                            receiver,
+                            entry: Some(entry),
+                        });
                     }
-                    // The sender went away before shutdown, count it as a shutdown too.
-                    Poll::Ready(None) => {
-                        *this.is_shutdown = true;
-                        break;
-                    }
-                }
+                    // The new entry sender went away before shutdown, count it as a shutdown too.
+                    None => break,
+                },
+                finished = status_receivers.next(), if !status_receivers.is_empty() => match finished {
+                    Some((status, entry)) => yield (status, entry),
+                    // The `is_empty` guard above prevents this from being reachable.
+                    None => unreachable!(),
+                },
             }
         }
 
-        match this.status_receivers.poll_next_unpin(ctx) {
-            Poll::Pending => Poll::Pending,
-            // The futures set report `None` ready when there are no
-            // entries present, but we want it to report pending
-            // instead.
-            Poll::Ready(None) => {
-                if *this.is_shutdown {
-                    Poll::Ready(None)
-                } else {
-                    Poll::Pending
-                }
-            }
-            Poll::Ready(Some((status, entry))) => Poll::Ready(Some((status, entry))),
+        // We've either seen a shutdown signal or the new entry sender
+        // was closed. Wait for the last statuses to come in before
+        // indicating we are done.
+        while let Some((status, entry)) = status_receivers.next().await {
+            yield (status, entry);
         }
+
+        // Hold on to the shutdown signal until here to prevent
+        // notification of completion before this stream is done.
+        drop(shutdown);
     }
 }
 
