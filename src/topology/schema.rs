@@ -50,7 +50,8 @@ pub fn merged_definition(
     for input in inputs {
         let key = &input.component;
 
-        // Merge the schema if it's a source.
+        // If the input is a source, the output is merged into the top-level schema.
+        // Not all sources contain a schema yet, in which case they use a default.
         if let Ok(maybe_output) = config.source_output_for_port(key, &input.port) {
             let source_definition = maybe_output
                 .unwrap_or_else(|| {
@@ -61,6 +62,8 @@ pub fn merged_definition(
                 })
                 .log_schema_definition
                 .clone()
+                // Schemas must be implemented for components that support the "Vector" namespace, so since
+                // one doesn't exist here, we can assume it's using the default "legacy" namespace schema definition
                 .unwrap_or_else(Definition::default_legacy_namespace);
 
             if config.schema_enabled() {
@@ -71,8 +74,9 @@ pub fn merged_definition(
                 ));
             }
         }
-
-        // Merge the schema if it's a transform
+        // If the input is a transform, the output is merged into the top-level schema
+        // Not all transforms contain a schema yet. If that's the case, it's assumed
+        // that the transform doesn't modify the event schema, so it is passed through as-is (recursively)
         if let Some(inputs) = config.transform_inputs(key) {
             let merged_definition = merged_definition(inputs, config, cache);
 
@@ -92,20 +96,14 @@ pub fn merged_definition(
             if config.schema_enabled() {
                 definition = definition.merge(transform_definition);
             } else {
+                // Schemas must be implemented for components that support the "Vector" namespace, so since
+                // one doesn't exist here, we can assume it's using the default "legacy" namespace schema definit
                 definition = definition.merge(Definition::default_for_namespace(
                     transform_definition.log_namespaces(),
                 ));
             }
         }
     }
-
-    cache.insert(
-        (config.schema_enabled(), inputs.to_vec()),
-        definition.clone(),
-    );
-
-    definition
-}
 
 /// Get a list of definitions from individual pipelines feeding into a component.
 ///
