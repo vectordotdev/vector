@@ -51,9 +51,7 @@ impl GelfDeserializerConfig {
             // Every field with an underscore (_) prefix will be treated as an additional field.
             // Allowed characters in field names are any word character (letter, number, underscore), dashes and dots.
             // Libraries SHOULD not allow to send id as additional field ( _id). Graylog server nodes omit this field automatically.
-            // Note that although the schema definition indicates unknown_fields will be any type,
-            // in fact they can only be either strings or numbers.
-            .unknown_fields(Kind::any())
+            .unknown_fields(Kind::bytes().or_integer().or_float())
     }
 }
 
@@ -118,7 +116,9 @@ impl GelfDeserializer {
         if let Some(line) = parsed.line {
             log.insert(
                 LINE,
-                value::Value::Float(ordered_float::NotNan::new(line).unwrap()),
+                value::Value::Float(
+                    ordered_float::NotNan::new(line).expect("JSON doesn't allow NaNs"),
+                ),
             );
         }
         if let Some(file) = &parsed.file {
@@ -151,8 +151,16 @@ impl GelfDeserializer {
                     let vector_val: value::Value = val.into();
                     log.insert(path!(key.as_str()), vector_val);
                 } else {
-                    return Err(format!("'The value type for field {}' is an invalid type. Additional field values \
-                                       should be either strings or numbers.", key).into());
+                    let type_ = match val {
+                        serde_json::Value::Null => "null",
+                        serde_json::Value::Bool(_) => "boolean",
+                        serde_json::Value::Number(_) => "number",
+                        serde_json::Value::String(_) => "string",
+                        serde_json::Value::Array(_) => "array",
+                        serde_json::Value::Object(_) => "object",
+                    };
+                    return Err(format!("The value type for field {} is an invalid type ({}). Additional field values \
+                                       should be either strings or numbers.", key, type_).into());
                 }
             }
         }

@@ -8,8 +8,11 @@ use futures::{stream, Stream};
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 use vector_buffers::EventCount;
+use vector_common::finalization::{AddBatchNotifier, BatchNotifier};
 
-use super::{Event, EventDataEq, EventMutRef, EventRef, LogEvent, Metric, TraceEvent};
+use super::{
+    Event, EventDataEq, EventFinalizer, EventMutRef, EventRef, LogEvent, Metric, TraceEvent,
+};
 use crate::ByteSizeOf;
 
 /// The type alias for an array of `LogEvent` elements.
@@ -211,6 +214,22 @@ impl From<LogArray> for EventArray {
 impl From<MetricArray> for EventArray {
     fn from(array: MetricArray) -> Self {
         Self::Metrics(array)
+    }
+}
+
+impl AddBatchNotifier for EventArray {
+    fn add_batch_notifier(&mut self, batch: BatchNotifier) {
+        match self {
+            Self::Logs(array) => array
+                .iter_mut()
+                .for_each(|item| item.add_finalizer(EventFinalizer::new(batch.clone()))),
+            Self::Metrics(array) => array
+                .iter_mut()
+                .for_each(|item| item.add_finalizer(EventFinalizer::new(batch.clone()))),
+            Self::Traces(array) => array
+                .iter_mut()
+                .for_each(|item| item.add_finalizer(EventFinalizer::new(batch.clone()))),
+        }
     }
 }
 
