@@ -51,7 +51,7 @@ impl SyslogDeserializerConfig {
                     .optional_field("appname", Kind::bytes(), None)
                     .optional_field("msgid", Kind::bytes(), None)
                     .optional_field("procid", Kind::integer().or_bytes(), None)
-                    // "structured data" is placed at the root. It will always be a map strings
+                    // "structured data" is placed at the root. It will always be a map of strings
                     .unknown_fields(Kind::object(Collection::from_unknown(Kind::bytes())))
             }
             LogNamespace::Vector => {

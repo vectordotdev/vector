@@ -52,7 +52,7 @@ impl BytesDeserializerConfig {
 /// further decoding has been specified.
 #[derive(Debug, Clone)]
 pub struct BytesDeserializer {
-    // Only used with the "Legacy" namespace
+    // Only used with the "Legacy" namespace. The "Vector" namespace decodes the data at the root of the event.
     log_schema_message_key: &'static str,
 }
 
