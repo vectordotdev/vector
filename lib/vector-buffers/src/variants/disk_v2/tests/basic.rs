@@ -7,7 +7,7 @@ use tracing::Instrument;
 use super::create_default_buffer_v2;
 use crate::{
     assert_buffer_is_empty, assert_buffer_records,
-    test::common::{install_tracing_helpers, with_temp_dir, MultiEventRecord, SizedRecord},
+    test::{install_tracing_helpers, with_temp_dir, MultiEventRecord, SizedRecord},
     variants::disk_v2::{tests::create_default_buffer_v2_with_usage, writer::RecordWriter},
     EventCount,
 };

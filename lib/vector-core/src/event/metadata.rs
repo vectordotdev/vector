@@ -96,7 +96,7 @@ impl Default for EventMetadata {
 }
 
 fn default_schema_definition() -> Arc<schema::Definition> {
-    Arc::new(schema::Definition::empty_with_kind(
+    Arc::new(schema::Definition::new(
         Kind::any(),
         [LogNamespace::Legacy, LogNamespace::Vector],
     ))

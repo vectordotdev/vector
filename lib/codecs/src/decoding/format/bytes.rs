@@ -40,10 +40,8 @@ impl BytesDeserializerConfig {
                 Kind::bytes(),
                 Some("message"),
             ),
-            LogNamespace::Vector => {
-                schema::Definition::empty_with_kind(Kind::bytes(), [log_namespace])
-                    .with_meaning(LookupBuf::root(), "message")
-            }
+            LogNamespace::Vector => schema::Definition::new(Kind::bytes(), [log_namespace])
+                .with_meaning(LookupBuf::root(), "message"),
         }
     }
 }
@@ -54,7 +52,7 @@ impl BytesDeserializerConfig {
 /// further decoding has been specified.
 #[derive(Debug, Clone)]
 pub struct BytesDeserializer {
-    // Only used with the "Legacy" namespace
+    // Only used with the "Legacy" namespace. The "Vector" namespace decodes the data at the root of the event.
     log_schema_message_key: &'static str,
 }
 

@@ -12,10 +12,12 @@ use snafu::{ResultExt, Snafu};
 use value::Kind;
 use vector_common::TimeZone;
 use vector_config::configurable_component;
+use vector_core::compile_vrl;
 use vector_core::config::LogNamespace;
 use vector_core::schema::Definition;
 
 use vector_vrl_functions::set_semantic_meaning::MeaningList;
+use vrl::state::LocalEnv;
 use vrl::{
     diagnostic::{Formatter, Note},
     prelude::{DiagnosticMessage, ExpressionError},
@@ -139,7 +141,7 @@ impl RemapConfig {
         state.set_external_context(enrichment_tables);
         state.set_external_context(MeaningList::default());
 
-        vrl::compile_with_external(&source, &functions, &mut state)
+        compile_vrl(&source, &functions, &mut state, LocalEnv::default())
             .map_err(|diagnostics| {
                 Formatter::new(&source, diagnostics)
                     .colored()
@@ -205,7 +207,7 @@ impl TransformConfig for RemapConfig {
                     .expect("context exists")
                     .0;
 
-                let mut new_type_def = Definition::empty_with_kind(
+                let mut new_type_def = Definition::new(
                     state.target_kind().clone(),
                     input_definition.log_namespaces().clone(),
                 );
@@ -215,8 +217,8 @@ impl TransformConfig for RemapConfig {
                 new_type_def
             })
             .unwrap_or_else(|_| {
-                Definition::empty_with_kind(
-                    // a program that fails to compile will "never" return a value
+                Definition::new(
+                    // The program failed to compile, so it can "never" return a value
                     Kind::never(),
                     input_definition.log_namespaces().clone(),
                 )
@@ -225,7 +227,7 @@ impl TransformConfig for RemapConfig {
         // When a message is dropped and re-routed, we keep the original event, but also annotate
         // it with additional metadata.
         let mut dropped_definition =
-            Definition::empty_with_kind(Kind::never(), input_definition.log_namespaces().clone());
+            Definition::new(Kind::never(), input_definition.log_namespaces().clone());
 
         if input_definition
             .log_namespaces()

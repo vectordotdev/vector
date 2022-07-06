@@ -6,7 +6,7 @@ use super::create_buffer_v2_with_max_data_file_size;
 use crate::{
     assert_buffer_is_empty, assert_buffer_records, assert_buffer_size, assert_enough_bytes_written,
     assert_reader_writer_v2_file_positions, await_timeout, set_data_file_length,
-    test::common::{install_tracing_helpers, with_temp_dir, MultiEventRecord, SizedRecord},
+    test::{install_tracing_helpers, with_temp_dir, MultiEventRecord, SizedRecord},
     variants::disk_v2::{
         common::{DEFAULT_FLUSH_INTERVAL, MAX_FILE_ID},
         tests::{

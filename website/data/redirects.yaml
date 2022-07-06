@@ -9,6 +9,7 @@ sinks:
 - aws_kinesis_firehose
 - aws_kinesis_streams
 - aws_s3
+- axiom
 - azure_monitor_logs
 - clickhouse
 - datadog_logs

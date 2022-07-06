@@ -72,6 +72,11 @@ impl TypeDef {
         &self.kind
     }
 
+    #[must_use]
+    pub fn kind_mut(&mut self) -> &mut Kind {
+        &mut self.kind
+    }
+
     pub fn at_path(&self, path: &Lookup<'_>) -> TypeDef {
         let fallible = self.fallible;
 
@@ -97,7 +102,9 @@ impl TypeDef {
                     coalesced_path: CoalescedPath::Reject,
                 },
             )
-            .unwrap_or(self.kind);
+            // An unsupported nested was used, so nothing can be assumed about the type any more
+            // This can be removed once "nest_at_path" supports all paths
+            .unwrap_or(Kind::any());
 
         Self { fallible, kind }
     }

@@ -1,6 +1,7 @@
 use crate::{get_metadata_key, MetadataKey};
 use ::value::Value;
 use vrl::prelude::*;
+use vrl::state::{ExternalEnv, LocalEnv};
 
 fn remove_metadata_field(
     ctx: &mut Context,
@@ -76,4 +77,46 @@ impl Expression for RemoveMetadataFieldFn {
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::null().infallible()
     }
+
+    fn update_state(
+        &mut self,
+        _local: &mut LocalEnv,
+        external: &mut ExternalEnv,
+    ) -> std::result::Result<(), ExpressionError> {
+        external.metadata_kind().remove_at_path(
+            &self.path.to_lookup(),
+            remove::Strategy {
+                coalesced_path: remove::CoalescedPath::Reject,
+            },
+        )
+        let result = type_def.remove_at_path(
+            &self.path.to_lookup(),
+            remove::Strategy {
+                coalesced_path: remove::CoalescedPath::Reject,
+            },
+        );
+
+        external.update_target(Details { type_def, value });
+
+        result
+    }
 }
+
+/*
+
+       // FIXME(Jean): This should also delete non-external queries, as `del(foo.bar)` is
+       // supported.
+       if self.query.is_external() {
+           if let Err(
+               value::kind::remove::Error::RootPath
+               | value::kind::remove::Error::CoalescedPath
+               | value::kind::remove::Error::NegativeIndexPath,
+           ) = self.query.delete_type_def(external)
+           {
+               // This function is (currently) infallible, so we ignore any errors here.
+               //
+               // see: https://github.com/vectordotdev/vector/issues/11264
+           }
+       }
+
+*/

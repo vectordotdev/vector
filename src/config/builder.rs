@@ -324,7 +324,10 @@ impl ConfigBuilder {
             && with.schema.log_namespace.is_some()
             && self.schema.log_namespace != with.schema.log_namespace
         {
-            errors.push("conflicting values for 'log_namespace' found".to_owned());
+            errors.push(
+                format!("conflicting values for 'log_namespace' found. Both {:?} and {:?} used in the same component",
+                                self.schema.log_namespace(), with.schema.log_namespace())
+            );
         }
 
         self.schema.log_namespace = self.schema.log_namespace.or(with.schema.log_namespace);

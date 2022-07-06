@@ -9,8 +9,10 @@ use std::{
 
 use ::value::Value;
 use clap::Parser;
+use lookup::LookupBuf;
 use value::Secrets;
 use vector_common::TimeZone;
+use vrl::state::ExternalEnv;
 use vrl::{diagnostic::Formatter, state, Program, Runtime, Target, VrlRuntime};
 
 #[cfg(feature = "repl")]
@@ -121,9 +123,17 @@ fn run(opts: &Opts) -> Result<(), Error> {
     } else {
         let objects = opts.read_into_objects()?;
         let source = opts.read_program()?;
-        let (program, warnings) = vrl::compile(&source, &stdlib::all()).map_err(|diagnostics| {
-            Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
-        })?;
+
+        let mut external = ExternalEnv::default();
+        // The CLI should be moved out of the "vrl" module, and then it can use the `vector-core::compile_vrl` function which includes this automatically
+        external.set_read_only_metadata_path(LookupBuf::from("vector"), true);
+
+        let (program, warnings) =
+            vrl::compile_with_external(&source, &stdlib::all(), &mut external).map_err(
+                |diagnostics| {
+                    Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
+                },
+            )?;
 
         #[allow(clippy::print_stderr)]
         if opts.print_warnings {

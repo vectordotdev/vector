@@ -1,6 +1,6 @@
 use crate::{
     assert_reader_writer_v1_positions,
-    test::common::{with_temp_dir, SizedRecord},
+    test::{with_temp_dir, SizedRecord},
     variants::disk_v1::tests::create_default_buffer_v1_with_max_buffer_size,
 };
 
