@@ -547,7 +547,7 @@ pub fn file_source(
             let mut event = create_event(
                 line.text,
                 &line.filename,
-                &line.offset,
+                line.offset,
                 &host_key,
                 &hostname,
                 &file_key,
@@ -633,7 +633,7 @@ fn wrap_with_line_agg(
 fn create_event(
     line: Bytes,
     file: &str,
-    line_end_offset: &u64,
+    line_end_offset: u64,
     host_key: &str,
     hostname: &Option<String>,
     file_key: &Option<String>,
@@ -810,8 +810,12 @@ mod tests {
     fn file_create_event() {
         let line = Bytes::from("hello world");
         let file = "some_file.rs";
-        // Internal offset is indexed from 1
-        let line_end_offset: u64 = 11;
+
+        // Internal offset is the end of the line including the newline char,
+        // whereas the `line` variable contains the line with the newline stripped.
+        // So 11 characters in `line` -> internal offset is 12 including the newline.
+        let line_end_offset: u64 = 12;
+
         let host_key = "host".to_string();
         let hostname = Some("Some.Machine".to_string());
         let file_key = Some("file".to_string());
@@ -820,7 +824,7 @@ mod tests {
         let log = create_event(
             line,
             file,
-            &line_end_offset,
+            line_end_offset,
             &host_key,
             &hostname,
             &file_key,
