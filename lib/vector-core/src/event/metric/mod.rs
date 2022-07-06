@@ -258,7 +258,10 @@ impl Metric {
             Handle::Histogram(histogram) => {
                 let buckets: Vec<Bucket> = histogram
                     .buckets()
-                    .map(|(upper_limit, count)| Bucket { upper_limit, count })
+                    .map(|(upper_limit, count)| Bucket {
+                        upper_limit,
+                        count: count.into(),
+                    })
                     .collect();
 
                 MetricValue::AggregatedHistogram {
@@ -499,7 +502,7 @@ pub(crate) fn zip_samples(
 #[inline]
 pub(crate) fn zip_buckets(
     limits: impl IntoIterator<Item = f64>,
-    counts: impl IntoIterator<Item = u32>,
+    counts: impl IntoIterator<Item = u64>,
 ) -> Vec<Bucket> {
     limits
         .into_iter()
@@ -547,21 +550,23 @@ fn write_word(fmt: &mut Formatter<'_>, word: &str) -> Result<(), fmt::Error> {
     }
 }
 
-pub fn samples_to_buckets(samples: &[Sample], buckets: &[f64]) -> (Vec<Bucket>, u32, f64) {
+pub fn samples_to_buckets(samples: &[Sample], buckets: &[f64]) -> (Vec<Bucket>, u64, f64) {
     let mut counts = vec![0; buckets.len()];
     let mut sum = 0.0;
     let mut count = 0;
     for sample in samples {
+        let rate = u64::from(sample.rate);
+
         if let Some((i, _)) = buckets
             .iter()
             .enumerate()
             .find(|&(_, b)| *b >= sample.value)
         {
-            counts[i] += sample.rate;
+            counts[i] += rate;
         }
 
         sum += sample.value * f64::from(sample.rate);
-        count += sample.rate;
+        count += rate;
     }
 
     let buckets = buckets

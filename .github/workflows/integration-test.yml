@@ -57,6 +57,7 @@ jobs:
         include:
           - test: 'apex'
           - test: 'aws'
+          - test: 'axiom'
           - test: 'azure'
           - test: 'clickhouse'
           - test: 'datadog-agent'

@@ -30,6 +30,7 @@ pub type UnorderedFinalizer<T> = FinalizerSet<T, FuturesUnordered<FinalizerFutur
 /// stream of acknowledgements that comes out, extracting just the
 /// identifier and sending that into the returned stream. The type `T`
 /// is the source-specific data associated with each entry.
+#[derive(Debug)]
 pub struct FinalizerSet<T, S> {
     sender: Option<UnboundedSender<(BatchStatusReceiver, T)>>,
     _phantom: PhantomData<S>,

@@ -204,6 +204,7 @@ impl SourceConfig for DatadogAgentConfig {
 
             DeserializerConfig::Native => self.decoding.schema_definition(),
             DeserializerConfig::NativeJson => self.decoding.schema_definition(),
+            DeserializerConfig::Gelf => self.decoding.schema_definition(),
         };
 
         if self.multiple_outputs {

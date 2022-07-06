@@ -48,6 +48,9 @@ impl ByteSizeOf for EventFinalizers {
 }
 
 impl EventFinalizers {
+    /// Default empty finalizer set for use in `const` contexts.
+    pub const DEFAULT: Self = Self(Vec::new());
+
     /// Creates a new `EventFinalizers` based on the given event finalizer.
     #[must_use]
     pub fn new(finalizer: EventFinalizer) -> Self {
