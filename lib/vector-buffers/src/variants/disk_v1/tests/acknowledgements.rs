@@ -4,7 +4,7 @@ use tracing::Instrument;
 use super::create_default_buffer_v1;
 use crate::{
     assert_reader_v1_delete_position, assert_reader_writer_v1_positions,
-    test::common::{
+    test::{
         install_tracing_helpers, with_temp_dir, MultiEventRecord, PoisonPillMultiEventRecord,
         SizedRecord,
     },
