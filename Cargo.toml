@@ -171,10 +171,24 @@ aws-smithy-http-tower = { version = "0.49.0", default-features = false, optional
 aws-smithy-types = { version = "0.49.0", default-features = false, optional = true }
 
 # Azure
-azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b7171eb40909f7f2805f4622e076f8a6dbbe2d98", default-features = false, features = ["enable_reqwest"], optional = true }
-azure_identity = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b7171eb40909f7f2805f4622e076f8a6dbbe2d98", default-features = false, features = ["enable_reqwest"], optional = true }
-azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b7171eb40909f7f2805f4622e076f8a6dbbe2d98", default-features = false, optional = true }
-azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b7171eb40909f7f2805f4622e076f8a6dbbe2d98", default-features = false, optional = true }
+azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, features = ["enable_reqwest"], optional = true }
+azure_identity = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, features = ["enable_reqwest"], optional = true }
+azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, optional = true }
+azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, optional = true }
+
+# fix for:
+#error: failed to select a version for `time`.
+#    ... required by package `azure_core v0.5.0 (https://github.com/Azure/azure-sdk-for-rust.git?rev=b4544d4920fa3064eb921340054cd9cc130b7664#b4544d49)`
+#    ... which satisfies git dependency `azure_core` of package `azure_identity v0.6.0 (https://github.com/Azure/azure-sdk-for-rust.git?rev=b4544d4920fa3064eb921340054cd9cc130b7664#b4544d49)`
+#    ... which satisfies git dependency `azure_identity` of package `vector v0.25.0 (/home/u112324/git/vector)`
+#versions that meet the requirements `^0.3.10` are: 0.3.14, 0.3.13, 0.3.12, 0.3.11, 0.3.10
+#
+#all possible versions conflict with previously selected packages.
+#
+#  previously selected package `time v0.3.9`
+#    ... which satisfies dependency `time = "^0.3.4"` (locked to 0.3.9) of package `aws-config v0.49.0`
+#    ... which satisfies dependency `aws-config = "^0.49.0"` (locked to 0.49.0) of package `vector v0.25.0 (/home/u112324/git/vector)`
+time = { version = "0.3.10" }
 
 # Tower
 tower = { version = "0.4.13", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
@@ -332,10 +346,10 @@ tonic-build = { version = "0.8", default-features = false, features = ["transpor
 [dev-dependencies]
 approx = "0.5.1"
 assert_cmd = { version = "2.0.4", default-features = false }
-azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b7171eb40909f7f2805f4622e076f8a6dbbe2d98", default-features = false, features = ["enable_reqwest", "azurite_workaround"] }
-azure_identity = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b7171eb40909f7f2805f4622e076f8a6dbbe2d98", default-features = false, features = ["enable_reqwest"] }
-azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b7171eb40909f7f2805f4622e076f8a6dbbe2d98", default-features = false, features = ["azurite_workaround"] }
-azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b7171eb40909f7f2805f4622e076f8a6dbbe2d98", default-features = false, features = ["azurite_workaround"] }
+azure_core = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, features = ["enable_reqwest"] }
+azure_identity = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false, features = ["enable_reqwest"] }
+azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false }
+azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b4544d4920fa3064eb921340054cd9cc130b7664", default-features = false }
 base64 = "0.13.0"
 criterion = { version = "0.4.0", features = ["html_reports", "async_tokio"] }
 libc = "0.2.133"

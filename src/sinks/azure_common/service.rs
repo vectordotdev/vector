@@ -39,7 +39,7 @@ impl Service<AzureBlobRequest> for AzureBlobService {
         Box::pin(async move {
             let client = this
                 .client
-                .as_blob_client(request.metadata.partition_key.as_str());
+                .blob_client(request.metadata.partition_key.as_str());
             let byte_size = request.blob_data.len();
             let blob = client
                 .put_block_blob(request.blob_data)
@@ -50,9 +50,10 @@ impl Service<AzureBlobRequest> for AzureBlobService {
             };
 
             let result = blob
-                .execute()
+                .into_future()
                 .instrument(info_span!("request").or_current())
-                .await;
+                .await
+                .map_err(|err| err.into());
 
             result.map(|inner| AzureBlobResponse {
                 inner,
