@@ -1,8 +1,10 @@
-use crate::{field, LookSegment, Segment};
+use std::fmt::{Display, Formatter};
+
 use inherent::inherent;
 #[cfg(any(test, feature = "arbitrary"))]
 use quickcheck::{Arbitrary, Gen};
-use std::fmt::{Display, Formatter};
+
+use crate::{field, LookSegment, Segment};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub struct FieldBuf {
@@ -62,7 +64,7 @@ impl Arbitrary for FieldBuf {
         let name = (0..len)
             .map(|_| chars[usize::arbitrary(g) % chars.len()])
             .collect::<String>()
-            .replace(r#"""#, r#"\""#);
+            .replace('"', r#"\""#);
         FieldBuf::from(name)
     }
 
@@ -72,7 +74,7 @@ impl Arbitrary for FieldBuf {
                 .shrink()
                 .filter(|name| !name.is_empty())
                 .map(|name| {
-                    let name = name.replace(r#"""#, r#"/""#);
+                    let name = name.replace('"', r#"/""#);
                     FieldBuf::from(name)
                 }),
         )
@@ -87,9 +89,32 @@ impl Arbitrary for FieldBuf {
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub enum SegmentBuf {
     Field(FieldBuf),
-    Index(isize), // Indexes can be negative.
+    Index(isize),
+    // Indexes can be negative.
     // Coalesces hold multiple possible fields.
     Coalesce(Vec<FieldBuf>),
+}
+
+impl SegmentBuf {
+    /// Returns true if the segments could possibly be equal. This is different than
+    /// the `Eq` implementation for coalesced segments in that it returns true if they intersect
+    /// in any way
+    pub fn can_equal(&self, other: &Self) -> bool {
+        match (self, other) {
+            (a @ Self::Index(_), b) | (a, b @ Self::Index(_)) => a == b,
+            (Self::Field(a), Self::Field(b)) => a == b,
+            (Self::Field(field), Self::Coalesce(coalesce))
+            | (Self::Coalesce(coalesce), Self::Field(field)) => coalesce.contains(field),
+            (Self::Coalesce(a), Self::Coalesce(b)) => {
+                for field in a {
+                    if b.contains(field) {
+                        return true;
+                    }
+                }
+                false
+            }
+        }
+    }
 }
 
 #[cfg(any(test, feature = "arbitrary"))]

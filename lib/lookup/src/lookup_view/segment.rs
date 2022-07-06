@@ -1,6 +1,8 @@
-use crate::{field, FieldBuf, LookSegment, SegmentBuf};
-use inherent::inherent;
 use std::fmt::{Display, Formatter};
+
+use inherent::inherent;
+
+use crate::{field, FieldBuf, LookSegment, SegmentBuf};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub struct Field<'a> {

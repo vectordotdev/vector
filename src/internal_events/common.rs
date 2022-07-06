@@ -1,89 +1,44 @@
-// ## skip check-events ##
+use std::time::Instant;
 
-use metrics::counter;
+use metrics::{counter, histogram};
 use vector_core::internal_event::InternalEvent;
+pub use vector_core::internal_event::{EventsReceived, OldEventsReceived};
+
+use super::prelude::{error_stage, error_type};
 
 #[derive(Debug)]
-pub struct EventsReceived {
-    pub count: usize,
+pub struct BytesReceived<'a> {
     pub byte_size: usize,
+    pub protocol: &'a str,
 }
 
-impl InternalEvent for EventsReceived {
-    fn emit_logs(&self) {
-        trace!(message = "Events received.", count = %self.count, byte_size = %self.byte_size);
-    }
-
-    fn emit_metrics(&self) {
-        counter!("component_received_events_total", self.count as u64);
-        counter!("events_in_total", self.count as u64);
-        counter!(
-            "component_received_event_bytes_total",
-            self.byte_size as u64
-        );
+impl<'a> InternalEvent for BytesReceived<'a> {
+    fn emit(self) {
+        trace!(message = "Bytes received.", byte_size = %self.byte_size, protocol = %self.protocol);
+        counter!("component_received_bytes_total", self.byte_size as u64, "protocol" => self.protocol.to_string());
     }
 }
 
 #[derive(Debug)]
-pub struct HttpClientBytesReceived<'a> {
+pub struct EndpointBytesReceived<'a> {
     pub byte_size: usize,
     pub protocol: &'a str,
     pub endpoint: &'a str,
 }
 
-impl InternalEvent for HttpClientBytesReceived<'_> {
-    fn emit_logs(&self) {
+impl InternalEvent for EndpointBytesReceived<'_> {
+    fn emit(self) {
         trace!(
             message = "Bytes received.",
             byte_size = %self.byte_size,
             protocol = %self.protocol,
             endpoint = %self.endpoint,
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_received_bytes_total", self.byte_size as u64,
             "protocol" => self.protocol.to_owned(),
             "endpoint" => self.endpoint.to_owned(),
         );
-    }
-}
-
-#[derive(Debug)]
-pub struct EventsSent {
-    pub count: usize,
-    pub byte_size: usize,
-}
-
-impl InternalEvent for EventsSent {
-    fn emit_logs(&self) {
-        trace!(message = "Events sent.", count = %self.count, byte_size = %self.byte_size);
-    }
-
-    fn emit_metrics(&self) {
-        if self.count > 0 {
-            // events_out_total is emitted by `Acker`
-            counter!("component_sent_events_total", self.count as u64);
-            counter!("component_sent_event_bytes_total", self.byte_size as u64);
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct BytesSent<'a> {
-    pub byte_size: usize,
-    pub protocol: &'a str,
-}
-
-impl<'a> InternalEvent for BytesSent<'a> {
-    fn emit_logs(&self) {
-        trace!(message = "Bytes sent.", byte_size = %self.byte_size, protocol = %self.protocol);
-    }
-
-    fn emit_metrics(&self) {
-        counter!("component_sent_bytes_total", self.byte_size as u64,
-                 "protocol" => self.protocol.to_string());
     }
 }
 
@@ -95,20 +50,77 @@ pub struct EndpointBytesSent<'a> {
 }
 
 impl<'a> InternalEvent for EndpointBytesSent<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         trace!(
             message = "Bytes sent.",
             byte_size = %self.byte_size,
             protocol = %self.protocol,
             endpoint = %self.endpoint
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!(
             "component_sent_bytes_total", self.byte_size as u64,
             "protocol" => self.protocol.to_string(),
             "endpoint" => self.endpoint.to_string()
         );
+    }
+}
+
+const STREAM_CLOSED: &str = "stream_closed";
+
+#[derive(Debug)]
+pub struct StreamClosedError {
+    pub error: crate::source_sender::ClosedError,
+    pub count: usize,
+}
+
+impl InternalEvent for StreamClosedError {
+    fn emit(self) {
+        error!(
+            message = "Failed to forward event(s), downstream is closed.",
+            error_code = STREAM_CLOSED,
+            error_type = error_type::WRITER_FAILED,
+            stage = error_stage::SENDING,
+            count = %self.count,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => STREAM_CLOSED,
+            "error_type" => error_type::WRITER_FAILED,
+            "stage" => error_stage::SENDING,
+        );
+        counter!(
+            "component_discarded_events_total", self.count as u64,
+            "error_code" => STREAM_CLOSED,
+            "error_type" => error_type::WRITER_FAILED,
+            "stage" => error_stage::SENDING,
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct RequestCompleted {
+    pub start: Instant,
+    pub end: Instant,
+}
+
+impl InternalEvent for RequestCompleted {
+    fn emit(self) {
+        debug!(message = "Request completed.");
+        counter!("requests_completed_total", 1);
+        histogram!("request_duration_seconds", self.end - self.start);
+    }
+}
+
+#[derive(Debug)]
+pub struct CollectionCompleted {
+    pub start: Instant,
+    pub end: Instant,
+}
+
+impl InternalEvent for CollectionCompleted {
+    fn emit(self) {
+        debug!(message = "Collection completed.");
+        counter!("collect_completed_total", 1);
+        histogram!("collect_duration_seconds", self.end - self.start);
     }
 }

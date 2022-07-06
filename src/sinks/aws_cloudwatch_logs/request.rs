@@ -1,18 +1,25 @@
-use super::CloudwatchError;
-use futures::{future::BoxFuture, ready, FutureExt};
-use rusoto_core::{RusotoError, RusotoResult};
-use rusoto_logs::{
-    CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupError, CreateLogGroupRequest,
-    CreateLogStreamError, CreateLogStreamRequest, DescribeLogStreamsError,
-    DescribeLogStreamsRequest, DescribeLogStreamsResponse, InputLogEvent, PutLogEventsError,
-    PutLogEventsRequest, PutLogEventsResponse,
-};
 use std::{
     future::Future,
     pin::Pin,
     task::{Context, Poll},
 };
+
+use aws_sdk_cloudwatchlogs::error::{
+    CreateLogGroupError, CreateLogGroupErrorKind, CreateLogStreamError, CreateLogStreamErrorKind,
+    DescribeLogStreamsError, DescribeLogStreamsErrorKind, PutLogEventsError,
+};
+use aws_sdk_cloudwatchlogs::operation::PutLogEvents;
+
+use aws_sdk_cloudwatchlogs::model::InputLogEvent;
+use aws_sdk_cloudwatchlogs::output::{DescribeLogStreamsOutput, PutLogEventsOutput};
+use aws_sdk_cloudwatchlogs::types::SdkError;
+use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
+use aws_smithy_http::operation::{Operation, Request};
+use futures::{future::BoxFuture, ready, FutureExt};
+use indexmap::IndexMap;
 use tokio::sync::oneshot;
+
+use crate::sinks::aws_cloudwatch_logs::service::{CloudwatchError, SmithyClient};
 
 pub struct CloudwatchFuture {
     client: Client,
@@ -24,24 +31,33 @@ pub struct CloudwatchFuture {
 }
 
 struct Client {
-    client: CloudWatchLogsClient,
+    client: CloudwatchLogsClient,
+    // we store a separate smithy_client to set request headers for PutLogEvents since the regular
+    // client cannot set headers
+    //
+    // https://github.com/awslabs/aws-sdk-rust/issues/537
+    smithy_client: SmithyClient,
     stream_name: String,
     group_name: String,
+    headers: IndexMap<String, String>,
 }
 
-type ClientResult<T, E> = BoxFuture<'static, RusotoResult<T, E>>;
+type ClientResult<T, E> = BoxFuture<'static, Result<T, SdkError<E>>>;
 
 enum State {
     CreateGroup(ClientResult<(), CreateLogGroupError>),
     CreateStream(ClientResult<(), CreateLogStreamError>),
-    DescribeStream(ClientResult<DescribeLogStreamsResponse, DescribeLogStreamsError>),
-    Put(ClientResult<PutLogEventsResponse, PutLogEventsError>),
+    DescribeStream(ClientResult<DescribeLogStreamsOutput, DescribeLogStreamsError>),
+    Put(ClientResult<PutLogEventsOutput, PutLogEventsError>),
 }
 
 impl CloudwatchFuture {
     /// Panics if events.is_empty()
-    pub fn new(
-        client: CloudWatchLogsClient,
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn new(
+        client: CloudwatchLogsClient,
+        smithy_client: SmithyClient,
+        headers: IndexMap<String, String>,
         stream_name: String,
         group_name: String,
         create_missing_group: bool,
@@ -52,8 +68,10 @@ impl CloudwatchFuture {
     ) -> Self {
         let client = Client {
             client,
+            smithy_client,
             stream_name,
             group_name,
+            headers,
         };
 
         let state = if let Some(token) = token {
@@ -82,15 +100,22 @@ impl Future for CloudwatchFuture {
                 State::DescribeStream(fut) => {
                     let response = match ready!(fut.poll_unpin(cx)) {
                         Ok(response) => response,
-                        Err(RusotoError::Service(DescribeLogStreamsError::ResourceNotFound(_)))
-                            if self.create_missing_group =>
-                        {
-                            info!("Log group provided does not exist; creating a new one.");
+                        Err(err) => {
+                            if let SdkError::ServiceError { err, raw: _ } = &err {
+                                if let DescribeLogStreamsErrorKind::ResourceNotFoundException(_) =
+                                    err.kind
+                                {
+                                    if self.create_missing_group {
+                                        info!("Log group provided does not exist; creating a new one.");
 
-                            self.state = State::CreateGroup(self.client.create_log_group());
-                            continue;
+                                        self.state =
+                                            State::CreateGroup(self.client.create_log_group());
+                                        continue;
+                                    }
+                                }
+                            }
+                            return Poll::Ready(Err(CloudwatchError::Describe(err)));
                         }
-                        Err(err) => return Poll::Ready(Err(CloudwatchError::Describe(err))),
                     };
 
                     if let Some(stream) = response
@@ -121,10 +146,20 @@ impl Future for CloudwatchFuture {
                 State::CreateGroup(fut) => {
                     match ready!(fut.poll_unpin(cx)) {
                         Ok(_) => {}
-                        Err(RusotoError::Service(CreateLogGroupError::ResourceAlreadyExists(
-                            _,
-                        ))) => {}
-                        Err(err) => return Poll::Ready(Err(CloudwatchError::CreateGroup(err))),
+                        Err(err) => {
+                            let resource_already_exists = match &err {
+                                SdkError::ServiceError { err, raw: _ } => match err.kind {
+                                    CreateLogGroupErrorKind::ResourceAlreadyExistsException(_) => {
+                                        true
+                                    }
+                                    _ => false,
+                                },
+                                _ => false,
+                            };
+                            if !resource_already_exists {
+                                return Poll::Ready(Err(CloudwatchError::CreateGroup(err)));
+                            }
+                        }
                     };
 
                     info!(message = "Group created.", name = %self.client.group_name);
@@ -138,10 +173,20 @@ impl Future for CloudwatchFuture {
                 State::CreateStream(fut) => {
                     match ready!(fut.poll_unpin(cx)) {
                         Ok(_) => {}
-                        Err(RusotoError::Service(CreateLogStreamError::ResourceAlreadyExists(
-                            _,
-                        ))) => {}
-                        Err(err) => return Poll::Ready(Err(CloudwatchError::CreateStream(err))),
+                        Err(err) => {
+                            let resource_already_exists = match &err {
+                                SdkError::ServiceError { err, raw: _ } => match err.kind {
+                                    CreateLogStreamErrorKind::ResourceAlreadyExistsException(_) => {
+                                        true
+                                    }
+                                    _ => false,
+                                },
+                                _ => false,
+                            };
+                            if !resource_already_exists {
+                                return Poll::Ready(Err(CloudwatchError::CreateStream(err)));
+                            }
+                        }
                     };
 
                     info!(message = "Stream created.", name = %self.client.stream_name);
@@ -180,49 +225,94 @@ impl Client {
         &self,
         sequence_token: Option<String>,
         log_events: Vec<InputLogEvent>,
-    ) -> ClientResult<PutLogEventsResponse, PutLogEventsError> {
-        let request = PutLogEventsRequest {
-            log_events,
-            sequence_token,
-            log_group_name: self.group_name.clone(),
-            log_stream_name: self.stream_name.clone(),
-        };
+    ) -> ClientResult<PutLogEventsOutput, PutLogEventsError> {
+        let client = std::sync::Arc::clone(&self.smithy_client);
+        let cw_client = self.client.clone();
+        let group_name = self.group_name.clone();
+        let stream_name = self.stream_name.clone();
+        let headers = self.headers.clone();
+        Box::pin(async move {
+            // #12760 this is a relatively convoluted way of changing the headers of a request
+            // about to be sent. https://github.com/awslabs/aws-sdk-rust/issues/537 should
+            // eventually make this better.
+            let op = PutLogEvents::builder()
+                .set_log_events(Some(log_events))
+                .set_sequence_token(sequence_token)
+                .log_group_name(group_name)
+                .log_stream_name(stream_name)
+                .build()
+                .map_err(|err| aws_smithy_http::result::SdkError::ConstructionFailure(err.into()))?
+                .make_operation(cw_client.conf())
+                .await
+                .map_err(|err| {
+                    aws_smithy_http::result::SdkError::ConstructionFailure(err.into())
+                })?;
 
-        let client = self.client.clone();
-        Box::pin(async move { client.put_log_events(request).await })
+            let (req, parts) = op.into_request_response();
+            let (mut body, props) = req.into_parts();
+            for (header, value) in headers.iter() {
+                let owned_header = header.clone();
+                let owned_value = value.clone();
+                body.headers_mut().insert(
+                    http::header::HeaderName::from_bytes(owned_header.as_bytes()).map_err(
+                        |err| aws_smithy_http::result::SdkError::ConstructionFailure(err.into()),
+                    )?,
+                    http::HeaderValue::from_str(owned_value.as_str()).map_err(|err| {
+                        aws_smithy_http::result::SdkError::ConstructionFailure(err.into())
+                    })?,
+                );
+            }
+            client
+                .call(Operation::from_parts(
+                    Request::from_parts(body, props),
+                    parts,
+                ))
+                .await
+        })
     }
 
     pub fn describe_stream(
         &self,
-    ) -> ClientResult<DescribeLogStreamsResponse, DescribeLogStreamsError> {
-        let request = DescribeLogStreamsRequest {
-            limit: Some(1),
-            log_group_name: self.group_name.clone(),
-            log_stream_name_prefix: Some(self.stream_name.clone()),
-            ..Default::default()
-        };
-
+    ) -> ClientResult<DescribeLogStreamsOutput, DescribeLogStreamsError> {
         let client = self.client.clone();
-        Box::pin(async move { client.describe_log_streams(request).await })
+        let group_name = self.group_name.clone();
+        let stream_name = self.stream_name.clone();
+        Box::pin(async move {
+            client
+                .describe_log_streams()
+                .limit(1)
+                .log_group_name(group_name)
+                .log_stream_name_prefix(stream_name)
+                .send()
+                .await
+        })
     }
 
     pub fn create_log_group(&self) -> ClientResult<(), CreateLogGroupError> {
-        let request = CreateLogGroupRequest {
-            log_group_name: self.group_name.clone(),
-            ..Default::default()
-        };
-
         let client = self.client.clone();
-        Box::pin(async move { client.create_log_group(request).await })
+        let group_name = self.group_name.clone();
+        Box::pin(async move {
+            client
+                .create_log_group()
+                .log_group_name(group_name)
+                .send()
+                .await?;
+            Ok(())
+        })
     }
 
     pub fn create_log_stream(&self) -> ClientResult<(), CreateLogStreamError> {
-        let request = CreateLogStreamRequest {
-            log_group_name: self.group_name.clone(),
-            log_stream_name: self.stream_name.clone(),
-        };
-
         let client = self.client.clone();
-        Box::pin(async move { client.create_log_stream(request).await })
+        let group_name = self.group_name.clone();
+        let stream_name = self.stream_name.clone();
+        Box::pin(async move {
+            client
+                .create_log_stream()
+                .log_group_name(group_name)
+                .log_stream_name(stream_name)
+                .send()
+                .await?;
+            Ok(())
+        })
     }
 }

@@ -128,9 +128,9 @@ do so.
   code less clear to reason about. While this is undoubtedly a powerful feature
   to have, the cons do not outweigh the pro's.
 
-[#5507]: https://github.com/timberio/vector/issues/5507
-[#4517]: https://github.com/timberio/vector/issues/4517#issuecomment-754160338
-[#8717]: https://github.com/timberio/vector/pull/8717
+[#5507]: https://github.com/vectordotdev/vector/issues/5507
+[#4517]: https://github.com/vectordotdev/vector/issues/4517#issuecomment-754160338
+[#8717]: https://github.com/vectordotdev/vector/pull/8717
 [#9001]: https://github.com/vectordotdev/vector/pull/9001#discussion_r701830595
 
 ## Conventions

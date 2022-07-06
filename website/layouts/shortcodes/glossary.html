@@ -6,7 +6,7 @@
       {{ partial "heading.html" (dict "text" .term) }}
     </span>
 
-    <div class="mt-3 prose dark:prose-dark">
+    <div class="mt-3 prose dark:prose-dark max-w-none">
       {{ .description | markdownify }}
     </div>
   </div>

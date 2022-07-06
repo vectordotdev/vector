@@ -1,15 +1,19 @@
-use crate::config::{EnrichmentTableConfig, EnrichmentTableDescription};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fs,
+    hash::Hasher,
+    path::PathBuf,
+    time::SystemTime,
+};
+
 use bytes::Bytes;
 use enrichment::{Case, Condition, IndexHandle, Table};
 use serde::{Deserialize, Serialize};
-use shared::{conversion::Conversion, datetime::TimeZone};
-use std::collections::{BTreeMap, HashMap};
-use std::fs;
-use std::hash::Hasher;
-use std::path::PathBuf;
-use std::time::SystemTime;
 use tracing::trace;
-use vrl::Value;
+use value::Value;
+use vector_common::{conversion::Conversion, datetime::TimeZone};
+
+use crate::config::{EnrichmentTableConfig, EnrichmentTableDescription};
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -167,13 +171,7 @@ impl EnrichmentTableConfig for FileConfig {
     ) -> crate::Result<Box<dyn Table + Send + Sync>> {
         let (headers, data, modified) = self.load_file(globals.timezone)?;
 
-        Ok(Box::new(File::new(
-            self.clone(),
-            globals.timezone,
-            modified,
-            data,
-            headers,
-        )))
+        Ok(Box::new(File::new(self.clone(), modified, data, headers)))
     }
 }
 
@@ -186,7 +184,6 @@ impl_generate_config_from_default!(FileConfig);
 #[derive(Clone)]
 pub struct File {
     config: FileConfig,
-    timezone: TimeZone,
     last_modified: SystemTime,
     data: Vec<Vec<Value>>,
     headers: Vec<String>,
@@ -200,14 +197,12 @@ pub struct File {
 impl File {
     pub fn new(
         config: FileConfig,
-        timezone: TimeZone,
         last_modified: SystemTime,
         data: Vec<Vec<Value>>,
         headers: Vec<String>,
     ) -> Self {
         Self {
             config,
-            timezone,
             last_modified,
             data,
             headers,
@@ -525,9 +520,9 @@ impl std::fmt::Debug for File {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::TimeZone;
-    use shared::btreemap;
+
+    use super::*;
 
     #[test]
     fn parse_column() {
@@ -614,7 +609,6 @@ mod tests {
     fn finds_row() {
         let file = File::new(
             Default::default(),
-            shared::TimeZone::Local,
             SystemTime::now(),
             vec![
                 vec!["zip".into(), "zup".into()],
@@ -629,10 +623,10 @@ mod tests {
         };
 
         assert_eq!(
-            Ok(btreemap! {
-                "field1" => "zirp",
-                "field2" => "zurp",
-            }),
+            Ok(BTreeMap::from([
+                (String::from("field1"), Value::from("zirp")),
+                (String::from("field2"), Value::from("zurp")),
+            ])),
             file.find_table_row(Case::Sensitive, &[condition], None, None)
         );
     }
@@ -641,7 +635,6 @@ mod tests {
     fn duplicate_indexes() {
         let mut file = File::new(
             Default::default(),
-            shared::datetime::TimeZone::Local,
             SystemTime::now(),
             Vec::new(),
             vec![
@@ -662,7 +655,6 @@ mod tests {
     fn errors_on_missing_columns() {
         let mut file = File::new(
             Default::default(),
-            shared::datetime::TimeZone::Local,
             SystemTime::now(),
             Vec::new(),
             vec![
@@ -683,7 +675,6 @@ mod tests {
     fn finds_row_with_index() {
         let mut file = File::new(
             Default::default(),
-            shared::datetime::TimeZone::Local,
             SystemTime::now(),
             vec![
                 vec!["zip".into(), "zup".into()],
@@ -700,10 +691,10 @@ mod tests {
         };
 
         assert_eq!(
-            Ok(btreemap! {
-                "field1" => "zirp",
-                "field2" => "zurp",
-            }),
+            Ok(BTreeMap::from([
+                (String::from("field1"), Value::from("zirp")),
+                (String::from("field2"), Value::from("zurp")),
+            ])),
             file.find_table_row(Case::Sensitive, &[condition], None, Some(handle))
         );
     }
@@ -712,7 +703,6 @@ mod tests {
     fn finds_rows_with_index_case_sensitive() {
         let mut file = File::new(
             Default::default(),
-            shared::datetime::TimeZone::Local,
             SystemTime::now(),
             vec![
                 vec!["zip".into(), "zup".into()],
@@ -726,14 +716,14 @@ mod tests {
 
         assert_eq!(
             Ok(vec![
-                btreemap! {
-                    "field1" => "zip",
-                    "field2" => "zup",
-                },
-                btreemap! {
-                    "field1" => "zip",
-                    "field2" => "zoop",
-                }
+                BTreeMap::from([
+                    (String::from("field1"), Value::from("zip")),
+                    (String::from("field2"), Value::from("zup")),
+                ]),
+                BTreeMap::from([
+                    (String::from("field1"), Value::from("zip")),
+                    (String::from("field2"), Value::from("zoop")),
+                ]),
             ]),
             file.find_table_rows(
                 Case::Sensitive,
@@ -764,7 +754,6 @@ mod tests {
     fn selects_columns() {
         let mut file = File::new(
             Default::default(),
-            shared::datetime::TimeZone::Local,
             SystemTime::now(),
             vec![
                 vec!["zip".into(), "zup".into(), "zoop".into()],
@@ -787,14 +776,14 @@ mod tests {
 
         assert_eq!(
             Ok(vec![
-                btreemap! {
-                    "field1" => "zip",
-                    "field3" => "zoop",
-                },
-                btreemap! {
-                    "field1" => "zip",
-                    "field3" => "zibble",
-                }
+                BTreeMap::from([
+                    (String::from("field1"), Value::from("zip")),
+                    (String::from("field3"), Value::from("zoop")),
+                ]),
+                BTreeMap::from([
+                    (String::from("field1"), Value::from("zip")),
+                    (String::from("field3"), Value::from("zibble")),
+                ]),
             ]),
             file.find_table_rows(
                 Case::Sensitive,
@@ -809,7 +798,6 @@ mod tests {
     fn finds_rows_with_index_case_insensitive() {
         let mut file = File::new(
             Default::default(),
-            shared::datetime::TimeZone::Local,
             SystemTime::now(),
             vec![
                 vec!["zip".into(), "zup".into()],
@@ -823,14 +811,14 @@ mod tests {
 
         assert_eq!(
             Ok(vec![
-                btreemap! {
-                    "field1" => "zip",
-                    "field2" => "zup",
-                },
-                btreemap! {
-                    "field1" => "zip",
-                    "field2" => "zoop",
-                }
+                BTreeMap::from([
+                    (String::from("field1"), Value::from("zip")),
+                    (String::from("field2"), Value::from("zup")),
+                ]),
+                BTreeMap::from([
+                    (String::from("field1"), Value::from("zip")),
+                    (String::from("field2"), Value::from("zoop")),
+                ]),
             ]),
             file.find_table_rows(
                 Case::Insensitive,
@@ -845,14 +833,14 @@ mod tests {
 
         assert_eq!(
             Ok(vec![
-                btreemap! {
-                    "field1" => "zip",
-                    "field2" => "zup",
-                },
-                btreemap! {
-                    "field1" => "zip",
-                    "field2" => "zoop",
-                }
+                BTreeMap::from([
+                    (String::from("field1"), Value::from("zip")),
+                    (String::from("field2"), Value::from("zup")),
+                ]),
+                BTreeMap::from([
+                    (String::from("field1"), Value::from("zip")),
+                    (String::from("field2"), Value::from("zoop")),
+                ]),
             ]),
             file.find_table_rows(
                 Case::Insensitive,
@@ -870,7 +858,6 @@ mod tests {
     fn finds_row_with_dates() {
         let mut file = File::new(
             Default::default(),
-            shared::datetime::TimeZone::Local,
             SystemTime::now(),
             vec![
                 vec![
@@ -900,10 +887,13 @@ mod tests {
         ];
 
         assert_eq!(
-            Ok(btreemap! {
-                "field1" => "zip",
-                "field2" => Value::Timestamp(chrono::Utc.ymd(2016, 12, 7).and_hms(0, 0, 0)),
-            }),
+            Ok(BTreeMap::from([
+                (String::from("field1"), Value::from("zip")),
+                (
+                    String::from("field2"),
+                    Value::Timestamp(chrono::Utc.ymd(2016, 12, 7).and_hms(0, 0, 0))
+                )
+            ])),
             file.find_table_row(Case::Sensitive, &conditions, None, Some(handle))
         );
     }
@@ -912,7 +902,6 @@ mod tests {
     fn doesnt_find_row() {
         let file = File::new(
             Default::default(),
-            shared::datetime::TimeZone::Local,
             SystemTime::now(),
             vec![
                 vec!["zip".into(), "zup".into()],
@@ -936,7 +925,6 @@ mod tests {
     fn doesnt_find_row_with_index() {
         let mut file = File::new(
             Default::default(),
-            shared::datetime::TimeZone::Local,
             SystemTime::now(),
             vec![
                 vec!["zip".into(), "zup".into()],

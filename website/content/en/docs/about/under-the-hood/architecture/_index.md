@@ -13,6 +13,7 @@ This section covers the various models that combine to form Vector's architectur
 {{< jump "/docs/about/under-the-hood/architecture/data-model" >}}
 {{< jump "/docs/about/under-the-hood/architecture/pipeline-model" >}}
 {{< jump "/docs/about/under-the-hood/architecture/concurrency-model" >}}
+{{< jump "/docs/about/under-the-hood/architecture/end-to-end-acknowledgements" >}}
 {{< jump "/docs/about/under-the-hood/architecture/runtime-model" >}}
 
 [data_model]: /docs/about/under-the-hood/architecture/data-model

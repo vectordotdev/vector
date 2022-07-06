@@ -1,5 +1,6 @@
-use super::{all_fields, Value};
 use std::collections::BTreeMap;
+
+use super::{all_fields, Value};
 
 /// Iterates over all paths in form `a.b[0].c[1]` in alphabetical order.
 /// It is implemented as a wrapper around `all_fields` to reduce code
@@ -10,9 +11,9 @@ pub fn keys(fields: &BTreeMap<String, Value>) -> impl Iterator<Item = String> + 
 
 #[cfg(test)]
 mod test {
-    use super::super::test::fields_from_json;
-    use super::*;
     use serde_json::json;
+
+    use super::{super::test::fields_from_json, *};
 
     #[test]
     fn keys_simple() {

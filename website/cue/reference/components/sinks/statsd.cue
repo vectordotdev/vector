@@ -6,8 +6,8 @@ components: sinks: statsd: {
 	classes: sinks.socket.classes
 
 	features: {
-		buffer:      sinks.socket.features.buffer
-		healthcheck: sinks.socket.features.healthcheck
+		acknowledgements: sinks.socket.features.acknowledgements
+		healthcheck:      sinks.socket.features.healthcheck
 		send: {
 			compression: sinks.socket.features.send.compression
 			encoding: enabled: false
@@ -43,10 +43,37 @@ components: sinks: statsd: {
 			set:          true
 			summary:      false
 		}
+		traces: false
 	}
 
-	configuration: sinks.socket.configuration & {
-		"type": "type": string: enum: statsd: "The type of this component."
+	configuration: {
+		address: {
+			description:   "The address to connect to. The address _must_ include a port."
+			relevant_when: "mode = `tcp` or `udp`"
+			required:      true
+			type: string: {
+				examples: ["92.12.333.224:5000"]
+			}
+		}
+		mode: {
+			description: "The type of socket to use."
+			required:    true
+			type: string: {
+				enum: {
+					tcp:  "TCP socket"
+					udp:  "UDP socket"
+					unix: "Unix domain socket"
+				}
+			}
+		}
+		path: {
+			description:   "The unix socket path. This should be the absolute path."
+			relevant_when: "mode = `unix`"
+			required:      true
+			type: string: {
+				examples: ["/path/to/socket"]
+			}
+		}
 		default_namespace: {
 			common: true
 			description: """
@@ -54,11 +81,9 @@ components: sinks: statsd: {
 				A namespace will be prefixed to a metric's name.
 				"""
 			required: false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["service"]
-				syntax: "literal"
 			}
 		}
 	}

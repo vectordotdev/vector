@@ -1,10 +1,12 @@
+use std::fmt::Debug;
+
+use lookup::lookup_v2::OwnedPath;
+use serde::{Deserialize, Serialize};
+
 use crate::{
-    event::PathComponent,
     serde::skip_serializing_if_default,
     sinks::util::encoding::{EncodingConfiguration, TimestampFormat},
 };
-use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
 
 /// A structure to wrap sink encodings and enforce field privacy.
 ///
@@ -20,14 +22,25 @@ pub struct EncodingConfigFixed<E: Default + PartialEq> {
     pub(crate) schema: Option<String>,
     /// Keep only the following fields of the message. (Items mutually exclusive with `except_fields`)
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
-    // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-    pub(crate) only_fields: Option<Vec<Vec<PathComponent<'static>>>>,
+    pub(crate) only_fields: Option<Vec<OwnedPath>>,
     /// Remove the following fields of the message. (Items mutually exclusive with `only_fields`)
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     pub(crate) except_fields: Option<Vec<String>>,
     /// Format for outgoing timestamps.
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     pub(crate) timestamp_format: Option<TimestampFormat>,
+}
+
+impl<E: Default + PartialEq> EncodingConfigFixed<E> {
+    pub fn map<F: Default + PartialEq>(self) -> EncodingConfigFixed<F> {
+        EncodingConfigFixed {
+            codec: F::default(),
+            schema: self.schema,
+            only_fields: self.only_fields,
+            except_fields: self.except_fields,
+            timestamp_format: self.timestamp_format,
+        }
+    }
 }
 
 impl<E: Default + PartialEq> EncodingConfiguration for EncodingConfigFixed<E> {
@@ -41,8 +54,7 @@ impl<E: Default + PartialEq> EncodingConfiguration for EncodingConfigFixed<E> {
         &self.schema
     }
 
-    // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-    fn only_fields(&self) -> &Option<Vec<Vec<PathComponent<'static>>>> {
+    fn only_fields(&self) -> &Option<Vec<OwnedPath>> {
         &self.only_fields
     }
 

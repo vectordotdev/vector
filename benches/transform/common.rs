@@ -1,40 +1,13 @@
 //! A common suite of structs, functions et al that are useful for the
 //! benchmarking of vector transforms.
-use futures::task::noop_waker;
-use futures::Stream;
-use std::num::NonZeroUsize;
-use std::pin::Pin;
-use std::task::{Context, Poll};
-use vector::conditions::Condition;
-use vector::event::Event;
+use std::{
+    num::NonZeroUsize,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
-// == Conditions ==
-
-// ==== AlwaysPass ====
-
-#[derive(Debug, Clone)]
-/// A struct that will always pass its check `Event`s.
-pub struct AlwaysPass;
-
-impl Condition for AlwaysPass {
-    #[inline]
-    fn check(&self, _event: &Event) -> bool {
-        true
-    }
-}
-
-// ==== AlwaysFail ====
-
-#[derive(Debug, Clone)]
-/// A struct that will always fail its check `Event`s.
-pub struct AlwaysFail;
-
-impl Condition for AlwaysFail {
-    #[inline]
-    fn check(&self, _event: &Event) -> bool {
-        false
-    }
-}
+use futures::{task::noop_waker, Stream};
+use vector::event::{Event, LogEvent};
 
 // == Streams ==
 
@@ -65,7 +38,7 @@ impl FixedLogStream {
         let mut events = Vec::with_capacity(total.get());
         let mut cycle = 0;
         for _ in 0..total.get() {
-            events.push(Event::from(format!("event{}", cycle)));
+            events.push(Event::Log(LogEvent::from(format!("event{}", cycle))));
             cycle = (cycle + 1) % cycle_size;
         }
         Self::new_from_vec(events)

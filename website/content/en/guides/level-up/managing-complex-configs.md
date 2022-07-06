@@ -35,11 +35,11 @@ mitigate this with the `generate` subcommand, which can be used to generate the
 boilerplate for you. The command expects a list of components, where it then
 creates a config with all of those components connected in a linear chain.
 
-For example, if we wished to create a chain of three transforms; `json_parser`,
-`add_fields`, and `remove_fields`, we can run:
+For example, if we wished to create a chain of three transforms; `remap`, `filter`,
+and `reduce`, we can run:
 
 ```bash
-vector generate /json_parser,add_fields,remove_fields > vector.toml
+vector generate /remap,filter,reduce > vector.toml
 # Find out more with `vector generate --help`
 ```
 
@@ -49,17 +49,17 @@ with an `inputs` field that specifies the component before it:
 ```toml title="vector.toml"
 [transforms.transform0]
   inputs = [ "somewhere" ]
-  type = "json_parser"
+  type = "remap"
   # etc ...
 
 [transforms.transform1]
   inputs = [ "transform0" ]
-  type = "add_fields"
+  type = "filter"
   # etc ...
 
 [transforms.transform2]
   inputs = [ "transform1" ]
-  type = "remove_fields"
+  type = "reduce"
   # etc ...
 ```
 
@@ -69,7 +69,7 @@ your editor to give them better IDs, e.g. `s/transform2/scrub_emails/g`.
 
 ## Testing Configs
 
-Test driven Configurationn is a paradigm we just made up, so there's still time
+Test driven Configuration is a paradigm we just made up, so there's still time
 for you to adopt it _before_ it's cool. Vector supports complementing your
 configs with [unit tests][guides.unit-testing], and as it turns out
 they're also pretty useful during the building stage.
@@ -147,8 +147,10 @@ output in order to turn it into a regression test:
   [[tests.outputs]]
     extract_from = "foo"
     [[tests.outputs.conditions]]
-      type = "check_fields"
-      "message.equals" = "Sorry, I'm busy this week Cecil"
+      type = "vrl"
+      source = """
+        assert_eq!(.message, "Sorry, I'm busy this week Cecil")
+      """
 
   # And we add a new output without conditions for inspecting
   # a new transform
@@ -178,6 +180,70 @@ vector -c ./configs/foo.toml ./configs/bar.toml
 
 If you have a large chain of components it's a good idea to break them out into
 individual files, each with its own unit tests.
+
+## Splitting Configs
+
+If your components start to be used in multiple configuration files, having a
+dedicated place to define them can become interesting.
+
+With Vector you can define a component configuration inside a component type folder.
+
+Let's take an example with the following configuration file:
+
+```toml title="vector.toml"
+[sources.syslog]
+type = "syslog"
+address = "0.0.0.0:514"
+max_length = 42000
+mode = "tcp"
+
+[transforms.change_fields]
+type = "remap"
+inputs = ["syslog"]
+source = """
+.new_field = "some value"
+"""
+
+[sinks.stdout]
+type = "console"
+inputs = ["change_fields"]
+target = "stdout"
+encoding.codec = "json"
+```
+
+We can extract the `syslog` source in the file `/etc/vector/sources/syslog.toml`
+
+```toml title="syslog.toml"
+type = "syslog"
+address = "0.0.0.0:514"
+max_length = 42000
+mode = "tcp"
+```
+
+The `change_fields` transform in the file `/etc/vector/transforms/change_fields.toml`
+
+```toml title="change_fields.toml"
+type = "remap"
+inputs = ["syslog"]
+source = """
+.new_field = "some value"
+"""
+```
+
+And the `stdout` sink in the file `/etc/vector/sinks/stdout.toml`
+
+```toml title="stdout.toml"
+type = "console"
+inputs = ["change_fields"]
+target = "stdout"
+```
+
+And for Vector to look for the configuration in the component type related folders,
+you need to start it using the `--config-dir` argument as follows.
+
+```bash
+vector --config-dir /etc/vector
+```
 
 ## Updating Configs
 

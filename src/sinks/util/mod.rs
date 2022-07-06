@@ -5,6 +5,10 @@ pub mod builder;
 pub mod compressor;
 pub mod encoding;
 pub mod http;
+pub mod metadata;
+pub mod normalizer;
+pub mod partitioner;
+pub mod processed_event;
 pub mod request_builder;
 pub mod retries;
 pub mod service;
@@ -19,27 +23,35 @@ pub mod udp;
 pub mod unix;
 pub mod uri;
 
-use crate::event::{Event, EventFinalizers};
-use bytes::Bytes;
-use encoding::{EncodingConfig, EncodingConfiguration};
-use serde::{Deserialize, Serialize};
-use snafu::Snafu;
 use std::borrow::Cow;
 
-pub use batch::{Batch, BatchConfig, BatchSettings, BatchSize, PushResult};
-pub use buffer::json::{BoxedRawValue, JsonArrayBuffer};
-pub use buffer::partition::Partition;
-pub use buffer::vec::{EncodedLength, VecBuffer};
-pub use buffer::{Buffer, Compression, PartitionBuffer, PartitionInnerBuffer};
+pub use batch::{
+    Batch, BatchConfig, BatchSettings, BatchSize, BulkSizeBasedDefaultBatchSettings, Merged,
+    NoDefaultsBatchSettings, PushResult, RealtimeEventBasedDefaultBatchSettings,
+    RealtimeSizeBasedDefaultBatchSettings, SinkBatchSettings, Unmerged,
+};
+pub use buffer::{
+    json::{BoxedRawValue, JsonArrayBuffer},
+    partition::Partition,
+    vec::{EncodedLength, VecBuffer},
+    Buffer, Compression, PartitionBuffer, PartitionInnerBuffer,
+};
 pub use builder::SinkBuilderExt;
+use bytes::Bytes;
 pub use compressor::Compressor;
-pub use request_builder::RequestBuilder;
+use encoding::{EncodingConfig, EncodingConfiguration};
+pub use normalizer::Normalizer;
+pub use request_builder::{IncrementalRequestBuilder, RequestBuilder};
+use serde::{Deserialize, Serialize};
 pub use service::{
     Concurrency, ServiceBuilderExt, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,
     TowerRequestLayer, TowerRequestSettings,
 };
 pub use sink::{BatchSink, PartitionBatchSink, StreamSink};
+use snafu::Snafu;
 pub use uri::UriSerde;
+
+use crate::event::{Event, EventFinalizers};
 
 #[derive(Debug, Snafu)]
 enum SinkBuildError {
@@ -117,7 +129,7 @@ pub fn encode_log(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Opti
         Encoding::Text => {
             let bytes = log
                 .get(crate::config::log_schema().message_key())
-                .map(|v| v.as_bytes().to_vec())
+                .map(|v| v.coerce_to_bytes().to_vec())
                 .unwrap_or_default();
             Ok(bytes)
         }
@@ -151,11 +163,5 @@ pub trait ElementCount {
 impl<T> ElementCount for Vec<T> {
     fn element_count(&self) -> usize {
         self.len()
-    }
-}
-
-impl ElementCount for serde_json::Value {
-    fn element_count(&self) -> usize {
-        1
     }
 }

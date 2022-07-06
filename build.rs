@@ -97,14 +97,14 @@ fn main() {
     // Always rerun if the build script itself changes.
     println!("cargo:rerun-if-changed=build.rs");
 
-    #[cfg(any(
-        feature = "sources-vector",
-        feature = "sources-dnstap",
-        feature = "sinks-vector"
-    ))]
+    #[cfg(feature = "protobuf-build")]
     {
-        println!("cargo:rerun-if-changed=proto/vector.proto");
+        println!("cargo:rerun-if-changed=proto/dd_trace.proto");
         println!("cargo:rerun-if-changed=proto/dnstap.proto");
+        println!("cargo:rerun-if-changed=proto/ddsketch_full.proto");
+        println!("cargo:rerun-if-changed=proto/dd_metric.proto");
+        println!("cargo:rerun-if-changed=proto/google/pubsub/v1/pubsub.proto");
+        println!("cargo:rerun-if-changed=proto/vector.proto");
 
         let mut prost_build = prost_build::Config::new();
         prost_build.btree_map(&["."]);
@@ -114,8 +114,12 @@ fn main() {
                 prost_build,
                 &[
                     "lib/vector-core/proto/event.proto",
-                    "proto/vector.proto",
                     "proto/dnstap.proto",
+                    "proto/ddsketch_full.proto",
+                    "proto/dd_metric.proto",
+                    "proto/dd_trace.proto",
+                    "proto/google/pubsub/v1/pubsub.proto",
+                    "proto/vector.proto",
                 ],
                 &["proto/", "lib/vector-core/proto/"],
             )
@@ -140,6 +144,12 @@ fn main() {
         .expect("Cargo-provided environment variables should always exist!");
     let target_arch = tracker
         .get_env_var("CARGO_CFG_TARGET_ARCH")
+        .expect("Cargo-provided environment variables should always exist!");
+    let target_os = tracker
+        .get_env_var("CARGO_CFG_TARGET_OS")
+        .expect("Cargo-provided environment variables should always exist!");
+    let target_vendor = tracker
+        .get_env_var("CARGO_CFG_TARGET_VENDOR")
         .expect("Cargo-provided environment variables should always exist!");
     let debug = tracker
         .get_env_var("DEBUG")
@@ -168,6 +178,16 @@ fn main() {
         "TARGET_ARCH",
         "The target architecture being compiled for. (e.g. x86_64)",
         target_arch,
+    );
+    constants.add_required_constant(
+        "TARGET_OS",
+        "The target OS being compiled for. (e.g. macos)",
+        target_os,
+    );
+    constants.add_required_constant(
+        "TARGET_VENDOR",
+        "The target vendor being compiled for. (e.g. apple)",
+        target_vendor,
     );
     constants.add_required_constant("DEBUG", "Level of debug info for Vector.", debug);
     constants.add_optional_constant(

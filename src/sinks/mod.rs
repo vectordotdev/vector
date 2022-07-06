@@ -15,8 +15,12 @@ pub mod aws_kinesis_streams;
 pub mod aws_s3;
 #[cfg(feature = "sinks-aws_sqs")]
 pub mod aws_sqs;
+#[cfg(feature = "sinks-axiom")]
+pub mod axiom;
 #[cfg(feature = "sinks-azure_blob")]
 pub mod azure_blob;
+#[cfg(any(feature = "sinks-azure_blob", feature = "sinks-datadog_archives"))]
+pub mod azure_common;
 #[cfg(feature = "sinks-azure_monitor_logs")]
 pub mod azure_monitor_logs;
 #[cfg(feature = "sinks-blackhole")]
@@ -25,7 +29,12 @@ pub mod blackhole;
 pub mod clickhouse;
 #[cfg(feature = "sinks-console")]
 pub mod console;
-#[cfg(feature = "sinks-datadog")]
+#[cfg(any(
+    feature = "sinks-datadog_events",
+    feature = "sinks-datadog_logs",
+    feature = "sinks-datadog_metrics",
+    feature = "sinks-datadog_traces"
+))]
 pub mod datadog;
 #[cfg(feature = "sinks-datadog_archives")]
 pub mod datadog_archives;
@@ -35,6 +44,8 @@ pub mod elasticsearch;
 pub mod file;
 #[cfg(feature = "sinks-gcp")]
 pub mod gcp;
+#[cfg(any(feature = "sinks-gcp"))]
+pub mod gcs_common;
 #[cfg(feature = "sinks-honeycomb")]
 pub mod honeycomb;
 #[cfg(feature = "sinks-http")]
@@ -43,7 +54,7 @@ pub mod http;
 pub mod humio;
 #[cfg(any(feature = "sinks-influxdb", feature = "prometheus-integration-tests"))]
 pub mod influxdb;
-#[cfg(all(feature = "sinks-kafka", feature = "rdkafka"))]
+#[cfg(feature = "sinks-kafka")]
 pub mod kafka;
 #[cfg(feature = "sinks-logdna")]
 pub mod logdna;
@@ -51,6 +62,8 @@ pub mod logdna;
 pub mod loki;
 #[cfg(feature = "sinks-nats")]
 pub mod nats;
+#[cfg(feature = "sinks-new_relic")]
+pub mod new_relic;
 #[cfg(feature = "sinks-new_relic_logs")]
 pub mod new_relic_logs;
 #[cfg(feature = "sinks-papertrail")]
@@ -61,7 +74,10 @@ pub mod prometheus;
 pub mod pulsar;
 #[cfg(feature = "sinks-redis")]
 pub mod redis;
-#[cfg(any(feature = "sinks-aws_s3", feature = "sinks-datadog_archives"))]
+#[cfg(all(
+    any(feature = "sinks-aws_s3", feature = "sinks-datadog_archives"),
+    feature = "aws-core"
+))]
 pub mod s3_common;
 #[cfg(feature = "sinks-sematext")]
 pub mod sematext;
@@ -73,6 +89,8 @@ pub mod splunk_hec;
 pub mod statsd;
 #[cfg(feature = "sinks-vector")]
 pub mod vector;
+#[cfg(feature = "sinks-websocket")]
+pub mod websocket;
 
 pub use vector_core::sink::VectorSink;
 

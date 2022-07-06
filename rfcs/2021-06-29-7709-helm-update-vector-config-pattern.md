@@ -134,7 +134,7 @@ today does not mention how to configure any of the default components.
 - Reduces the templating logic for the entire configuration file to an `if/else` statement and a one-liner to template the provided configuration (if needed)
 - By passing the `customConfig` through a `tpl` function users can more easily generate parts of their configuration from other values (ports, volumes, etc)
 - Matches the [Datadog Agent configuration](https://github.com/DataDog/helm-charts/blob/master/charts/datadog/values.yaml#L1023-L1048)
-- Easier to support [#7902](https://github.com/timberio/vector/issues/7902) since they can all be toggled off by providing a `customConfig`
+- Easier to support [#7902](https://github.com/vectordotdev/vector/issues/7902) since they can all be toggled off by providing a `customConfig`
 
 ## Drawbacks
 

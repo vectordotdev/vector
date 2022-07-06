@@ -1,9 +1,14 @@
 use std::io;
 
+use codecs::{
+    encoding::{FramingConfig, SerializerConfig},
+    JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
+};
 use serde::{Deserialize, Serialize};
-use vector_core::{config::log_schema, event::Event};
+use vector_core::config::log_schema;
+use vector_core::event::{Event, LogEvent, TraceEvent};
 
-use super::Encoder;
+use super::{Encoder, EncodingConfigMigrator, EncodingConfigWithFramingMigrator};
 
 static DEFAULT_TEXT_ENCODER: StandardTextEncoding = StandardTextEncoding;
 static DEFAULT_JSON_ENCODER: StandardJsonEncoding = StandardJsonEncoding;
@@ -23,6 +28,16 @@ pub enum StandardEncodings {
     Text,
     Json,
     Ndjson,
+}
+
+impl StandardEncodings {
+    pub const fn content_type(&self) -> &str {
+        match self {
+            StandardEncodings::Text => "text/plain",
+            StandardEncodings::Json => "application/json",
+            StandardEncodings::Ndjson => "application/x-ndjson",
+        }
+    }
 }
 
 impl StandardEncodings {
@@ -143,22 +158,76 @@ impl Encoder<Vec<Event>> for StandardEncodings {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Migrate the legacy `StandardEncodings` to the new `SerializerConfig` based
+/// encoding system.
+pub struct StandardEncodingsMigrator;
+
+impl EncodingConfigMigrator for StandardEncodingsMigrator {
+    type Codec = StandardEncodings;
+
+    fn migrate(codec: &Self::Codec) -> SerializerConfig {
+        match codec {
+            StandardEncodings::Text => TextSerializerConfig::new().into(),
+            StandardEncodings::Json | StandardEncodings::Ndjson => {
+                JsonSerializerConfig::new().into()
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Migrate the legacy `StandardEncodings` to the new `FramingConfig`/
+/// `SerializerConfig` based encoding system.
+pub struct StandardEncodingsWithFramingMigrator;
+
+impl EncodingConfigWithFramingMigrator for StandardEncodingsWithFramingMigrator {
+    type Codec = StandardEncodings;
+
+    fn migrate(codec: &Self::Codec) -> (Option<FramingConfig>, SerializerConfig) {
+        match codec {
+            StandardEncodings::Text => (None, TextSerializerConfig::new().into()),
+            StandardEncodings::Json => (None, JsonSerializerConfig::new().into()),
+            StandardEncodings::Ndjson => (
+                Some(NewlineDelimitedEncoderConfig::new().into()),
+                JsonSerializerConfig::new().into(),
+            ),
+        }
+    }
+}
+
 /// Standard implementation for encoding events as JSON.
 ///
 /// All event types will be serialized to JSON, without pretty printing.  Uses
 /// [`serde_json::to_writer`] under the hood, so all caveats mentioned therein apply here.
+#[derive(PartialEq, Debug, Default)]
 pub struct StandardJsonEncoding;
 
 impl Encoder<Event> for StandardJsonEncoding {
     fn encode_input(&self, event: Event, writer: &mut dyn io::Write) -> io::Result<usize> {
         match event {
-            Event::Log(log) => as_tracked_write(writer, &log, |writer, item| {
-                serde_json::to_writer(writer, item)
-            }),
+            Event::Log(log) => self.encode_input(log, writer),
             Event::Metric(metric) => as_tracked_write(writer, &metric, |writer, item| {
                 serde_json::to_writer(writer, item)
             }),
+            Event::Trace(trace) => self.encode_input(trace, writer),
         }
+    }
+}
+
+impl Encoder<LogEvent> for StandardJsonEncoding {
+    fn encode_input(&self, log: LogEvent, writer: &mut dyn io::Write) -> io::Result<usize> {
+        as_tracked_write(writer, &log, |writer, item| {
+            serde_json::to_writer(writer, item)
+        })
+    }
+}
+
+impl Encoder<TraceEvent> for StandardJsonEncoding {
+    fn encode_input(&self, trace: TraceEvent, writer: &mut dyn io::Write) -> io::Result<usize> {
+        as_tracked_write(writer, &trace, |writer, item| {
+            serde_json::to_writer(writer, item)
+        })
     }
 }
 
@@ -177,7 +246,7 @@ impl Encoder<Event> for StandardTextEncoding {
             Event::Log(log) => {
                 let message = log
                     .get(log_schema().message_key())
-                    .map(|v| v.as_bytes())
+                    .map(|v| v.coerce_to_bytes())
                     .unwrap_or_default();
                 writer.write_all(&message[..]).map(|()| message.len())
             }
@@ -185,11 +254,12 @@ impl Encoder<Event> for StandardTextEncoding {
                 let message = metric.to_string().into_bytes();
                 writer.write_all(&message).map(|()| message.len())
             }
+            Event::Trace(_) => panic!("standard text encoding cannot be used for traces"),
         }
     }
 }
 
-fn as_tracked_write<F, I, E>(inner: &mut dyn io::Write, input: I, f: F) -> io::Result<usize>
+pub fn as_tracked_write<F, I, E>(inner: &mut dyn io::Write, input: I, f: F) -> io::Result<usize>
 where
     F: FnOnce(&mut dyn io::Write, I) -> Result<(), E>,
     E: Into<io::Error> + 'static,
@@ -201,6 +271,7 @@ where
 
     impl<'inner> io::Write for Tracked<'inner> {
         fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            #[allow(clippy::disallowed_methods)] // We pass on the result of `write` to the caller.
             let n = self.inner.write(buf)?;
             self.count += n;
             Ok(n)
@@ -223,7 +294,7 @@ mod tests {
     use chrono::{SecondsFormat, Utc};
     use vector_core::{
         config::log_schema,
-        event::{Event, Metric, MetricKind, MetricValue},
+        event::{Event, LogEvent, Metric, MetricKind, MetricValue},
     };
 
     use super::StandardEncodings;
@@ -246,9 +317,9 @@ mod tests {
         let encoding = StandardEncodings::Text;
 
         let message = "log event";
-        let event = Event::from(message.to_string());
+        let event = LogEvent::from(message);
 
-        let result = encode_event(event, encoding).expect("should not have failed");
+        let result = encode_event(event.into(), encoding).expect("should not have failed");
         let encoded = std::str::from_utf8(&result).expect("result should be valid UTF-8");
 
         let expected = message;
@@ -260,10 +331,10 @@ mod tests {
         let encoding = StandardEncodings::Text;
 
         let message1 = "log event 1";
-        let event1 = Event::from(message1.to_string());
+        let event1 = Event::Log(LogEvent::from(message1));
 
         let message2 = "log event 2";
-        let event2 = Event::from(message2.to_string());
+        let event2 = Event::Log(LogEvent::from(message2));
 
         let result = encode_events(vec![event1, event2], encoding).expect("should not have failed");
         let encoded = std::str::from_utf8(&result).expect("result should be valid UTF-8");
@@ -322,10 +393,10 @@ mod tests {
         let encoding = StandardEncodings::Json;
 
         let message = "log event";
-        let mut event = Event::from(message.to_string());
-        event.as_mut_log().insert(ts_key, now);
+        let mut event = LogEvent::from(message);
+        event.insert(ts_key, now);
 
-        let result = encode_event(event, encoding).expect("should not have failed");
+        let result = encode_event(event.into(), encoding).expect("should not have failed");
         let encoded = std::str::from_utf8(&result).expect("result should be valid UTF-8");
 
         // We have to hard-code the transformation of the timestamp here, as `chrono::DateTime`
@@ -348,14 +419,15 @@ mod tests {
         let encoding = StandardEncodings::Json;
 
         let message1 = "log event1";
-        let mut event1 = Event::from(message1.to_string());
-        event1.as_mut_log().insert(ts_key, now);
+        let mut event1 = LogEvent::from(message1);
+        event1.insert(ts_key, now);
 
         let message2 = "log event2";
-        let mut event2 = Event::from(message2.to_string());
-        event2.as_mut_log().insert(ts_key, now);
+        let mut event2 = LogEvent::from(message2);
+        event2.insert(ts_key, now);
 
-        let result = encode_events(vec![event1, event2], encoding).expect("should not have failed");
+        let result = encode_events(vec![event1.into(), event2.into()], encoding)
+            .expect("should not have failed");
         let encoded = std::str::from_utf8(&result).expect("result should be valid UTF-8");
 
         // We have to hard-code the transformation of the timestamp here, as `chrono::DateTime`
@@ -431,10 +503,10 @@ mod tests {
         let encoding = StandardEncodings::Ndjson;
 
         let message = "log event";
-        let mut event = Event::from(message.to_string());
-        event.as_mut_log().insert(ts_key, now);
+        let mut event = LogEvent::from(message);
+        event.insert(ts_key, now);
 
-        let result = encode_event(event, encoding).expect("should not have failed");
+        let result = encode_event(event.into(), encoding).expect("should not have failed");
         let encoded = std::str::from_utf8(&result).expect("result should be valid UTF-8");
 
         // We have to hard-code the transformation of the timestamp here, as `chrono::DateTime`
@@ -457,14 +529,15 @@ mod tests {
         let encoding = StandardEncodings::Ndjson;
 
         let message1 = "log event1";
-        let mut event1 = Event::from(message1.to_string());
-        event1.as_mut_log().insert(ts_key, now);
+        let mut event1 = LogEvent::from(message1);
+        event1.insert(ts_key, now);
 
         let message2 = "log event2";
-        let mut event2 = Event::from(message2.to_string());
-        event2.as_mut_log().insert(ts_key, now);
+        let mut event2 = LogEvent::from(message2);
+        event2.insert(ts_key, now);
 
-        let result = encode_events(vec![event1, event2], encoding).expect("should not have failed");
+        let result = encode_events(vec![event1.into(), event2.into()], encoding)
+            .expect("should not have failed");
         let encoded = std::str::from_utf8(&result).expect("result should be valid UTF-8");
 
         // We have to hard-code the transformation of the timestamp here, as `chrono::DateTime`

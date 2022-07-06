@@ -13,14 +13,14 @@ components: sinks: influxdb_logs: {
 	}
 
 	features: {
-		buffer: enabled:      true
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {
 				enabled:      true
 				common:       false
-				max_bytes:    1049000
-				timeout_secs: 1
+				max_bytes:    1_000_000
+				timeout_secs: 1.0
 			}
 			compression: enabled: false
 			encoding: {
@@ -37,30 +37,44 @@ components: sinks: influxdb_logs: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
 	}
 
 	configuration: sinks._influxdb.configuration & {
-		namespace: {
-			description: "A prefix that will be added to all logs names."
+		measurement: {
+			description: "The influxdb measurement name that will be written to."
 			groups: ["v1", "v2"]
 			required: true
-			warnings: []
 			type: string: {
+				examples: ["vector-logs"]
+			}
+		}
+		namespace: {
+			description: """
+				`{namespace}.vector` will be encoded as the destination infuxdb measurement.
+				"""
+			groups: ["v1", "v2"]
+			required: false
+			common:   true
+			warnings: ["Deprecated, please use `measurement` instead."]
+			type: string: {
+				default: null
 				examples: ["service"]
-				syntax: "literal"
+			}
+		}
+		tags: {
+			required:    false
+			common:      false
+			description: "The set of fields that will be attached to each LineProtocol as tags. Note: If the set of tag values has high cardinality this also increase cardinality in InfluxDB."
+			groups: ["v1", "v2"]
+			type: array: {
+				default: null
+				items: type: string: {
+					examples: ["field1", "parent.child_field"]
+					syntax: "field_path"
+				}
 			}
 		}
 	}
@@ -68,6 +82,7 @@ components: sinks: influxdb_logs: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	how_it_works: {
@@ -109,7 +124,7 @@ components: sinks: influxdb_logs: {
 						Will be mapped to Influx's line protocol:
 
 						```influxdb_line_protocol
-						ns.vector,host=my.host.com,metric_type=logs custom_field="custom_value",message="<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar" 1572642947000000000
+						vector-logs,host=my.host.com,metric_type=logs custom_field="custom_value",message="<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar" 1572642947000000000
 						```
 						"""
 				},

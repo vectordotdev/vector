@@ -35,7 +35,7 @@ One paragraph description of the change.
 ### Implementation
 
 - Explain your change as if you were presenting it to the Vector team.
-- When possible, demonstrate with psuedo code not text.
+- When possible, demonstrate with pseudo code not text.
 - Be specific. Be opinionated. Avoid ambiguity.
 
 ## Rationale

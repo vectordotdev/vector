@@ -1,13 +1,13 @@
-use crate::config::{SinkDescription, SourceDescription, TransformDescription};
+use clap::Parser;
 use serde::Serialize;
-use std::collections::HashSet;
-use structopt::StructOpt;
 
-#[derive(StructOpt, Debug)]
-#[structopt(rename_all = "kebab-case")]
+use crate::config::{SinkDescription, SourceDescription, TransformDescription};
+
+#[derive(Parser, Debug)]
+#[clap(rename_all = "kebab-case")]
 pub struct Opts {
     /// Format the list in an encoding scheme.
-    #[structopt(long, default_value = "text", possible_values = &["text", "json", "avro"])]
+    #[clap(long, default_value = "text", possible_values = &["text", "json", "avro"])]
     format: Format,
 }
 
@@ -42,16 +42,11 @@ pub struct EncodedList {
 }
 
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
-    let mut sources = SourceDescription::types();
-    let mut transforms = TransformDescription::types();
-    let mut sinks = SinkDescription::types();
+    let sources = SourceDescription::types();
+    let transforms = TransformDescription::types();
+    let sinks = SinkDescription::types();
 
-    // Remove deprecated components from list
-    let deprecated = deprecated_components();
-    sources.retain(|name| !deprecated.contains(name));
-    transforms.retain(|name| !deprecated.contains(name));
-    sinks.retain(|name| !deprecated.contains(name));
-
+    #[allow(clippy::print_stdout)]
     match opts.format {
         Format::Text => {
             println!("Sources:");
@@ -88,9 +83,4 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     }
 
     exitcode::OK
-}
-
-/// Returns names of all deprecated components.
-fn deprecated_components() -> HashSet<&'static str> {
-    vec!["field_filter"].into_iter().collect()
 }

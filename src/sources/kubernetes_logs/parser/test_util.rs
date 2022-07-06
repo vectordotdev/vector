@@ -1,17 +1,18 @@
 #![cfg(test)]
 
-use crate::{
-    event::{Event, LogEvent},
-    transforms::Transform,
-};
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
+
+use crate::{
+    event::{Event, LogEvent},
+    transforms::{OutputBuffer, Transform},
+};
 
 /// Build a log event for test purposes.
 ///
 /// The implementation is shared, and therefore consistent across all
 /// the parsers.
-pub fn make_log_event(message: &str, timestamp: &str, stream: &str, is_partial: bool) -> LogEvent {
+pub fn make_log_event(message: &str, timestamp: &str, stream: &str, is_partial: bool) -> Event {
     let mut log = LogEvent::default();
 
     log.insert("message", message);
@@ -26,7 +27,8 @@ pub fn make_log_event(message: &str, timestamp: &str, stream: &str, is_partial: 
     if is_partial {
         log.insert("_partial", true);
     }
-    log
+
+    Event::Log(log)
 }
 
 /// Build a log event for test purposes.
@@ -34,12 +36,12 @@ pub fn make_log_event(message: &str, timestamp: &str, stream: &str, is_partial: 
 ///
 /// The implementation is shared, and therefore consistent across all
 /// the parsers.
-pub fn make_log_event_with_byte_message(
+pub(crate) fn make_log_event_with_byte_message(
     message: Bytes,
     timestamp: &str,
     stream: &str,
     is_partial: bool,
-) -> LogEvent {
+) -> Event {
     let mut log = LogEvent::default();
 
     log.insert("message", message);
@@ -54,13 +56,14 @@ pub fn make_log_event_with_byte_message(
     if is_partial {
         log.insert("_partial", true);
     }
-    log
+
+    Event::Log(log)
 }
 
 /// Shared logic for testing parsers.
 ///
 /// Takes a parser builder and a list of test cases.
-pub fn test_parser<B, L, S>(builder: B, loader: L, cases: Vec<(S, Vec<LogEvent>)>)
+pub fn test_parser<B, L, S>(builder: B, loader: L, cases: Vec<(S, Vec<Event>)>)
 where
     B: Fn() -> Transform,
     L: Fn(S) -> Event,
@@ -70,11 +73,11 @@ where
         let mut parser = (builder)();
         let parser = parser.as_function();
 
-        let mut output = Vec::new();
+        let mut output = OutputBuffer::default();
         parser.transform(&mut output, input);
 
-        let expected = expected.into_iter().map(Event::Log).collect::<Vec<_>>();
+        let actual = output.into_events().collect::<Vec<_>>();
 
-        shared::assert_event_data_eq!(expected, output, "expected left, actual right");
+        vector_common::assert_event_data_eq!(expected, actual, "expected left, actual right");
     }
 }

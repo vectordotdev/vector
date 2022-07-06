@@ -1,30 +1,60 @@
-use super::parser;
-use crate::{
-    config::{self, GenerateConfig, SourceConfig, SourceContext, SourceDescription},
-    event::Event,
-    internal_events::PrometheusRemoteWriteParseError,
-    sources::{
-        self,
-        util::{decode, ErrorMessage, HttpSource, HttpSourceAuthConfig},
-    },
-    tls::TlsConfig,
-};
+use std::{collections::HashMap, net::SocketAddr};
+
 use bytes::Bytes;
 use prometheus_parser::proto;
 use prost::Message;
-use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, net::SocketAddr};
+use vector_config::configurable_component;
 use warp::http::{HeaderMap, StatusCode};
+
+use super::parser;
+use crate::{
+    config::{
+        self, AcknowledgementsConfig, GenerateConfig, Output, SourceConfig, SourceContext,
+        SourceDescription,
+    },
+    event::Event,
+    internal_events::PrometheusRemoteWriteParseError,
+    serde::bool_or_struct,
+    sources::{
+        self,
+        http::HttpMethod,
+        util::{decode, ErrorMessage, HttpSource, HttpSourceAuthConfig},
+    },
+    tls::TlsEnableableConfig,
+};
 
 const SOURCE_NAME: &str = "prometheus_remote_write";
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-struct PrometheusRemoteWriteConfig {
+/// Configuration for the `prometheus_remote_write` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
+pub struct PrometheusRemoteWriteConfig {
+    /// The address to accept connections on.
+    ///
+    /// The address _must_ include a port.
     address: SocketAddr,
 
-    tls: Option<TlsConfig>,
+    #[configurable(derived)]
+    tls: Option<TlsEnableableConfig>,
 
+    #[configurable(derived)]
     auth: Option<HttpSourceAuthConfig>,
+
+    #[configurable(derived)]
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    acknowledgements: AcknowledgementsConfig,
+}
+
+impl PrometheusRemoteWriteConfig {
+    #[cfg(test)]
+    pub fn from_address(address: SocketAddr) -> Self {
+        Self {
+            address,
+            tls: None,
+            auth: None,
+            acknowledgements: false.into(),
+        }
+    }
 }
 
 inventory::submit! {
@@ -37,6 +67,7 @@ impl GenerateConfig for PrometheusRemoteWriteConfig {
             address: "127.0.0.1:9090".parse().unwrap(),
             tls: None,
             auth: None,
+            acknowledgements: AcknowledgementsConfig::default(),
         })
         .unwrap()
     }
@@ -47,15 +78,28 @@ impl GenerateConfig for PrometheusRemoteWriteConfig {
 impl SourceConfig for PrometheusRemoteWriteConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let source = RemoteWriteSource;
-        source.run(self.address, "", true, &self.tls, &self.auth, cx)
+        source.run(
+            self.address,
+            "",
+            HttpMethod::Post,
+            true,
+            &self.tls,
+            &self.auth,
+            cx,
+            self.acknowledgements,
+        )
     }
 
-    fn output_type(&self) -> crate::config::DataType {
-        config::DataType::Metric
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(config::DataType::Metric)]
     }
 
     fn source_type(&self) -> &'static str {
         SOURCE_NAME
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
     }
 }
 
@@ -65,7 +109,7 @@ struct RemoteWriteSource;
 impl RemoteWriteSource {
     fn decode_body(&self, body: Bytes) -> Result<Vec<Event>, ErrorMessage> {
         let request = proto::WriteRequest::decode(body).map_err(|error| {
-            emit!(&PrometheusRemoteWriteParseError {
+            emit!(PrometheusRemoteWriteParseError {
                 error: error.clone()
             });
             ErrorMessage::new(
@@ -95,7 +139,7 @@ impl HttpSource for RemoteWriteSource {
         if header_map
             .get("Content-Encoding")
             .map(|header| header.as_ref())
-            != Some(b"snappy")
+            != Some(&b"snappy"[..])
         {
             body = decode(&Some("snappy".to_string()), body)?;
         }
@@ -106,20 +150,23 @@ impl HttpSource for RemoteWriteSource {
 
 #[cfg(test)]
 mod test {
+    use chrono::{SubsecRound as _, Utc};
+    use vector_core::event::{EventStatus, Metric, MetricKind, MetricValue};
+
     use super::*;
     use crate::{
         config::{SinkConfig, SinkContext},
         sinks::prometheus::remote_write::RemoteWriteConfig,
-        test_util::{self, components},
+        test_util::{
+            self,
+            components::{assert_source_compliance, HTTP_PUSH_SOURCE_TAGS},
+        },
         tls::MaybeTlsSettings,
-        Pipeline,
+        SourceSender,
     };
-    use chrono::{SubsecRound as _, Utc};
-    use futures::stream;
-    use vector_core::event::{EventStatus, Metric, MetricKind, MetricValue};
 
     #[test]
-    fn genreate_config() {
+    fn generate_config() {
         crate::test_util::test_generate_config::<PrometheusRemoteWriteConfig>();
     }
 
@@ -130,52 +177,57 @@ mod test {
 
     #[tokio::test]
     async fn receives_metrics_over_https() {
-        receives_metrics(Some(TlsConfig::test_config())).await;
+        receives_metrics(Some(TlsEnableableConfig::test_config())).await;
     }
 
-    async fn receives_metrics(tls: Option<TlsConfig>) {
-        components::init_test();
-        let address = test_util::next_addr();
-        let (tx, rx) = Pipeline::new_test_finalize(EventStatus::Delivered);
+    async fn receives_metrics(tls: Option<TlsEnableableConfig>) {
+        assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let address = test_util::next_addr();
+            let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
 
-        let proto = MaybeTlsSettings::from_config(&tls, true)
-            .unwrap()
-            .http_protocol_name();
-        let source = PrometheusRemoteWriteConfig {
-            address,
-            auth: None,
-            tls: tls.clone(),
-        };
-        let source = source.build(SourceContext::new_test(tx)).await.unwrap();
-        tokio::spawn(source);
+            let proto = MaybeTlsSettings::from_config(&tls, true)
+                .unwrap()
+                .http_protocol_name();
+            let source = PrometheusRemoteWriteConfig {
+                address,
+                auth: None,
+                tls: tls.clone(),
+                acknowledgements: AcknowledgementsConfig::default(),
+            };
+            let source = source
+                .build(SourceContext::new_test(tx, None))
+                .await
+                .unwrap();
+            tokio::spawn(source);
 
-        let sink = RemoteWriteConfig {
-            endpoint: format!("{}://localhost:{}/", proto, address.port()),
-            tls: tls.map(|tls| tls.options),
-            ..Default::default()
-        };
-        let (sink, _) = sink
-            .build(SinkContext::new_test())
-            .await
-            .expect("Error building config.");
+            let sink = RemoteWriteConfig {
+                endpoint: format!("{}://localhost:{}/", proto, address.port()),
+                tls: tls.map(|tls| tls.options),
+                ..Default::default()
+            };
+            let (sink, _) = sink
+                .build(SinkContext::new_test())
+                .await
+                .expect("Error building config.");
 
-        let events = make_events();
-        let events_copy = events.clone();
-        let mut output = test_util::spawn_collect_ready(
-            async move {
-                sink.run(stream::iter(events_copy)).await.unwrap();
-            },
-            rx,
-            1,
-        )
+            let events = make_events();
+            let events_copy = events.clone();
+            let mut output = test_util::spawn_collect_ready(
+                async move {
+                    sink.run_events(events_copy).await.unwrap();
+                },
+                rx,
+                1,
+            )
+            .await;
+
+            // The MetricBuffer used by the sink may reorder the metrics, so
+            // put them back into order before comparing.
+            output.sort_unstable_by_key(|event| event.as_metric().name().to_owned());
+
+            vector_common::assert_event_data_eq!(events, output);
+        })
         .await;
-        components::SOURCE_TESTS.assert(&["http_path"]);
-
-        // The MetricBuffer used by the sink may reorder the metrics, so
-        // put them back into order before comparing.
-        output.sort_unstable_by_key(|event| event.as_metric().name().to_owned());
-
-        shared::assert_event_data_eq!(events, output);
     }
 
     fn make_events() -> Vec<Event> {
@@ -223,30 +275,37 @@ mod test {
 
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
 mod integration_tests {
-    use super::*;
-    use crate::{test_util, test_util::components, Pipeline};
     use tokio::time::Duration;
 
-    const PROMETHEUS_RECEIVE_ADDRESS: &str = "127.0.0.1:9093";
+    use super::*;
+    use crate::test_util::components::{run_and_assert_source_compliance, HTTP_PUSH_SOURCE_TAGS};
+
+    fn source_receive_address() -> String {
+        std::env::var("SOURCE_RECEIVE_ADDRESS").unwrap_or_else(|_| "127.0.0.1:9102".into())
+    }
 
     #[tokio::test]
     async fn receive_something() {
-        components::init_test();
+        // TODO: This test depends on the single instance of Prometheus that we spin up for
+        // integration tests both scraping an endpoint and then also remote writing that stuff to
+        // this remote write source.  This makes sense from a "test the actual behavior" standpoint
+        // but it feels a little fragile.
+        //
+        // It could be nice to split up the Prometheus integration tests in the future, or
+        // maybe there's a way to do a one-shot remote write from Prometheus? Not sure.
         let config = PrometheusRemoteWriteConfig {
-            address: PROMETHEUS_RECEIVE_ADDRESS.parse().unwrap(),
+            address: source_receive_address().parse().unwrap(),
             auth: None,
             tls: None,
+            acknowledgements: AcknowledgementsConfig::default(),
         };
 
-        let (tx, rx) = Pipeline::new_test();
-        let source = config.build(SourceContext::new_test(tx)).await.unwrap();
-
-        tokio::spawn(source);
-
-        tokio::time::sleep(Duration::from_secs(2)).await;
-
-        let events = test_util::collect_ready(rx).await;
-        components::SOURCE_TESTS.assert(&["http_path"]);
+        let events = run_and_assert_source_compliance(
+            config,
+            Duration::from_secs(5),
+            &HTTP_PUSH_SOURCE_TAGS,
+        )
+        .await;
         assert!(!events.is_empty());
     }
 }

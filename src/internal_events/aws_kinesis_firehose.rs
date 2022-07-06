@@ -1,22 +1,8 @@
-// ## skip check-events ##
-
-use crate::sources::aws_kinesis_firehose::Compression;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-#[derive(Debug)]
-pub struct AwsKinesisFirehoseEventsReceived {
-    pub count: usize,
-    pub byte_size: usize,
-}
-
-impl InternalEvent for AwsKinesisFirehoseEventsReceived {
-    fn emit_metrics(&self) {
-        counter!("component_received_events_total", self.count as u64);
-        counter!("events_in_total", self.count as u64);
-        counter!("processed_bytes_total", self.byte_size as u64);
-    }
-}
+use super::prelude::{error_stage, error_type, http_error_code, io_error_code};
+use crate::sources::aws_kinesis_firehose::Compression;
 
 #[derive(Debug)]
 pub struct AwsKinesisFirehoseRequestReceived<'a> {
@@ -25,36 +11,52 @@ pub struct AwsKinesisFirehoseRequestReceived<'a> {
 }
 
 impl<'a> InternalEvent for AwsKinesisFirehoseRequestReceived<'a> {
-    fn emit_logs(&self) {
-        info!(
+    fn emit(self) {
+        debug!(
             message = "Handling AWS Kinesis Firehose request.",
             request_id = %self.request_id.unwrap_or_default(),
             source_arn = %self.source_arn.unwrap_or_default(),
             internal_log_rate_secs = 10
         );
-    }
-
-    fn emit_metrics(&self) {
         counter!("requests_received_total", 1);
     }
 }
 
 #[derive(Debug)]
 pub struct AwsKinesisFirehoseRequestError<'a> {
-    pub request_id: Option<&'a str>,
-    pub error: &'a str,
+    request_id: Option<&'a str>,
+    error_code: String,
+    error: &'a str,
+}
+
+impl<'a> AwsKinesisFirehoseRequestError<'a> {
+    pub fn new(code: hyper::StatusCode, error: &'a str, request_id: Option<&'a str>) -> Self {
+        Self {
+            error_code: http_error_code(code.as_u16()),
+            error,
+            request_id,
+        }
+    }
 }
 
 impl<'a> InternalEvent for AwsKinesisFirehoseRequestError<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
             message = "Error occurred while handling request.",
             error = ?self.error,
-            internal_log_rate_secs = 10
+            stage = error_stage::RECEIVING,
+            error_type = error_type::REQUEST_FAILED,
+            error_code = %self.error_code,
+            internal_log_rate_secs = 10,
+            request_id = %self.request_id.unwrap_or(""),
         );
-    }
-
-    fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "stage" => error_stage::RECEIVING,
+            "error_type" => error_type::REQUEST_FAILED,
+            "error_code" => self.error_code,
+        );
+        // deprecated
         counter!("request_read_errors_total", 1);
     }
 }
@@ -66,15 +68,23 @@ pub struct AwsKinesisFirehoseAutomaticRecordDecodeError {
 }
 
 impl InternalEvent for AwsKinesisFirehoseAutomaticRecordDecodeError {
-    fn emit_logs(&self) {
-        warn!(
-            message = %format!("Detected record as {} but failed to decode so passing along data as-is.", self.compression),
+    fn emit(self) {
+        error!(
+            message = "Detected record failed to decode so passing along data as-is.",
             error = ?self.error,
-            internal_log_rate_secs = 10
+            stage = error_stage::PROCESSING,
+            error_type = error_type::PARSER_FAILED,
+            error_code = %io_error_code(&self.error),
+            internal_log_rate_secs = 10,
+            compression = %self.compression,
         );
-    }
-
-    fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "stage" => error_stage::PROCESSING,
+            "error_type" => error_type::PARSER_FAILED,
+            "error_code" => io_error_code(&self.error),
+        );
+        // deprecated
         counter!("request_automatic_decode_errors_total", 1);
     }
 }

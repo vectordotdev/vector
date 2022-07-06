@@ -6,7 +6,7 @@ weight: 2
 tags: ["admin", "logs", "metrics"]
 ---
 
-Although Vector is primarily used to handle observability data from from a wide variety of sources, we also strive to
+Although Vector is primarily used to handle observability data from a wide variety of sources, we also strive to
 make Vector highly observable itself. To that end, Vector provides two [sources], [`internal_logs`][internal_logs] and
 [`internal_metrics`][internal_metrics], that you can use to handle logs and metrics produced by Vector just like you
 would logs and metrics from any other source.
@@ -19,7 +19,7 @@ shows you how to use them in your Vector topology.
 *Which* logs Vector pipes through the `internal_logs` source is determined by the [log level](#levels), which defaults
 to `info`.
 
-In addition to the `internal_logs` source, Vector also writes its logs to [`stderr`][], which can be captured by
+In addition to the `internal_logs` source, Vector also writes its logs to [`stderr`][stderr], which can be captured by
 Kubernetes, SystemD, or however you are running Vector.
 
 ### Accessing logs
@@ -34,6 +34,7 @@ type = "internal_logs"
 [sinks.console]
 type = "console"
 inputs = ["vector_logs"]
+encoding.codec = "text"
 ```
 
 ### Using Vector logs
@@ -68,7 +69,7 @@ table = "vector-log-data"
 #### Levels
 
 Vector logs at the `info` level by default. You can set a different level when [starting] up your instance using either
-command-line flags or the `LOG` environment variable. The table below details these options:
+command-line flags or the `VECTOR_LOG` environment variable. The table below details these options:
 
 Method | Description
 :------|:-----------
@@ -77,18 +78,28 @@ Method | Description
 `-q` flag | Raises the log level to `warn`
 `-qq` flag | Raises the log level to `error`
 `-qqq` flag | Disables logging
-`LOG=<level>` environment variable | Set the log level. Must be one of `trace`, `debug`, `info`, `warn`, `error`, `off`.
+`VECTOR_LOG=<level>` environment variable | Set the log level. Must be one of `trace`, `debug`, `info`, `warn`, `error`, `off`.
 
 #### Stack traces
 
 You can enable full error backtraces by setting the `RUST_BACKTRACE=full` environment variable. More on this in the
-[Troubleshooting guide][troubleshooting]. You can
+[Troubleshooting guide][troubleshooting].
 
 ## Metrics
 
 You can monitor metrics produced by Vector using the [`internal_metrics`][internal_metrics] source. As with Vector's
 [internal logs](#using-vector-logs), you can configure an `internal_metrics` source and use the piped-in metrics
-however you wish. Here's an example configuration that
+however you wish. Here's an example configuration that delivers Vector's metrics to a Prometheus remote write endpoint.
+
+```toml
+[sources.vector_metrics]
+type = "internal_metrics"
+
+[sinks.prometheus]
+type = ["prometheus_remote_write"]
+endpoint = ["https://localhost:8087/"]
+inputs = ["vector_metrics"]
+```
 
 ### Metrics catalogue
 
@@ -120,7 +131,7 @@ IO and disrupting the service. The trade-off is that repetitive logs aren't logg
 [internal_metrics]: /docs/reference/configuration/sources/internal_metrics
 [journald]: https://www.freedesktop.org/software/systemd/man/systemd-journald.service.html
 [journald_source]: /docs/reference/configuration/sources/journald
-[output]: /docs/reference/configuration/sources/internal_metrics/#output
+[output]: /docs/reference/configuration/sources/internal_metrics/#output-data
 [remap]: /docs/reference/configuration/transforms/remap
 [rfc_2064]: https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 [sinks]: /sinks

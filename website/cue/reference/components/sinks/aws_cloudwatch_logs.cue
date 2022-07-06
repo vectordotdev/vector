@@ -13,7 +13,7 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 	}
 
 	features: {
-		buffer: enabled:      true
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {
@@ -21,7 +21,7 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 				common:       false
 				max_bytes:    1048576
 				max_events:   10000
-				timeout_secs: 1
+				timeout_secs: 1.0
 			}
 			compression: {
 				enabled: true
@@ -39,9 +39,14 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 			proxy: enabled: true
 			request: {
 				enabled: true
-				headers: false
+				headers: true
 			}
-			tls: enabled: false
+			tls: {
+				enabled:                true
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        false
+			}
 			to: {
 				service: services.aws_cloudwatch_logs
 
@@ -61,19 +66,9 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
-		warnings: []
 		notices: []
+		warnings: []
 	}
 
 	configuration: {
@@ -110,6 +105,7 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	permissions: iam: [

@@ -1,3 +1,12 @@
+use async_stream::stream;
+use bytes::Buf;
+use futures::Stream;
+use hyper::Body;
+use indexmap::IndexMap;
+use serde::{Deserialize, Serialize};
+use tokio::time;
+use url::Url;
+
 use super::Result;
 use crate::{
     config::{
@@ -7,16 +16,8 @@ use crate::{
     },
     http::HttpClient,
     signal,
-    tls::{TlsOptions, TlsSettings},
+    tls::{TlsConfig, TlsSettings},
 };
-use async_stream::stream;
-use bytes::Buf;
-use futures::Stream;
-use hyper::Body;
-use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
-use tokio::time;
-use url::Url;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct RequestConfig {
@@ -34,12 +35,12 @@ impl Default for RequestConfig {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
-pub struct HttpConfig {
+pub(crate) struct HttpConfig {
     url: Option<Url>,
     request: RequestConfig,
     poll_interval_secs: u64,
     #[serde(flatten)]
-    tls_options: Option<TlsOptions>,
+    tls_options: Option<TlsConfig>,
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
@@ -62,7 +63,7 @@ impl Default for HttpConfig {
 /// Makes an HTTP request to the provided endpoint, returning the String body.
 async fn http_request(
     url: &Url,
-    tls_options: &Option<TlsOptions>,
+    tls_options: &Option<TlsConfig>,
     headers: &IndexMap<String, String>,
     proxy: &ProxyConfig,
 ) -> std::result::Result<bytes::Bytes, &'static str> {
@@ -115,7 +116,7 @@ async fn http_request(
 /// Calls `http_request`, serializing the result to a `ConfigBuilder`.
 async fn http_request_to_config_builder(
     url: &Url,
-    tls_options: &Option<TlsOptions>,
+    tls_options: &Option<TlsConfig>,
     headers: &IndexMap<String, String>,
     proxy: &ProxyConfig,
 ) -> Result {
@@ -123,7 +124,8 @@ async fn http_request_to_config_builder(
         .await
         .map_err(|e| vec![e.to_owned()])?;
 
-    let (config_builder, warnings) = config::load(config_str.chunk(), None)?;
+    let (config_builder, warnings) =
+        config::load(config_str.chunk(), crate::config::format::Format::Toml)?;
 
     for warning in warnings.into_iter() {
         warn!("{}", warning);
@@ -136,7 +138,7 @@ async fn http_request_to_config_builder(
 fn poll_http(
     poll_interval_secs: u64,
     url: Url,
-    tls_options: Option<TlsOptions>,
+    tls_options: Option<TlsConfig>,
     headers: IndexMap<String, String>,
     proxy: ProxyConfig,
 ) -> impl Stream<Item = signal::SignalTo> {
@@ -149,7 +151,7 @@ fn poll_http(
 
             match http_request_to_config_builder(&url, &tls_options, &headers, &proxy).await {
                 Ok(config_builder) => yield signal::SignalTo::ReloadFromConfigBuilder(config_builder),
-                Err(_) => return,
+                Err(_) => {},
             };
 
             info!(

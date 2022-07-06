@@ -13,6 +13,7 @@ components: sources: prometheus_remote_write: {
 	}
 
 	features: {
+		acknowledgements: true
 		multiline: enabled: false
 		receive: {
 			from: {
@@ -31,7 +32,6 @@ components: sources: prometheus_remote_write: {
 			}
 			tls: {
 				enabled:                true
-				can_enable:             true
 				can_verify_certificate: true
 				enabled_default:        false
 			}
@@ -39,16 +39,6 @@ components: sources: prometheus_remote_write: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -59,13 +49,12 @@ components: sources: prometheus_remote_write: {
 	}
 
 	configuration: {
-		acknowledgements: configuration._acknowledgements
+		acknowledgements: configuration._source_acknowledgements
 		address: {
 			description: "The address to accept connections on. The address _must_ include a port."
 			required:    true
 			type: string: {
 				examples: ["0.0.0.0:9090"]
-				syntax: "literal"
 			}
 		}
 		auth: configuration._http_basic_auth

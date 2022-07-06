@@ -1,20 +1,21 @@
-use futures::{future::BoxFuture, FutureExt};
-use hyper::client::connect::dns::Name;
-use snafu::ResultExt;
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs},
     task::{Context, Poll},
 };
+
+use futures::{future::BoxFuture, FutureExt};
+use hyper::client::connect::dns::Name;
+use snafu::ResultExt;
 use tokio::task::spawn_blocking;
 use tower::Service;
 
 pub struct LookupIp(std::vec::IntoIter<SocketAddr>);
 
 #[derive(Debug, Clone, Copy)]
-pub struct Resolver;
+pub(super) struct Resolver;
 
 impl Resolver {
-    pub async fn lookup_ip(self, name: String) -> Result<LookupIp, DnsError> {
+    pub(crate) async fn lookup_ip(self, name: String) -> Result<LookupIp, DnsError> {
         // We need to add port with the name so that `to_socket_addrs`
         // resolves it properly. We will be discarding the port afterwards.
         //
@@ -40,9 +41,9 @@ impl Resolver {
                 (name_ref, dummy_port).to_socket_addrs()
             })
             .await
-            .context(JoinError)?
+            .context(JoinSnafu)?
             .map(LookupIp)
-            .context(UnableLookup)
+            .context(UnableLookupSnafu)
         }
     }
 }

@@ -5,7 +5,7 @@ use vector_core::internal_event::InternalEvent;
 pub struct AggregateEventRecorded;
 
 impl InternalEvent for AggregateEventRecorded {
-    fn emit_metrics(&self) {
+    fn emit(self) {
         counter!("aggregate_events_recorded_total", 1);
     }
 }
@@ -14,7 +14,7 @@ impl InternalEvent for AggregateEventRecorded {
 pub struct AggregateFlushed;
 
 impl InternalEvent for AggregateFlushed {
-    fn emit_metrics(&self) {
+    fn emit(self) {
         counter!("aggregate_flushes_total", 1);
     }
 }
@@ -23,7 +23,7 @@ impl InternalEvent for AggregateFlushed {
 pub struct AggregateUpdateFailed;
 
 impl InternalEvent for AggregateUpdateFailed {
-    fn emit_metrics(&self) {
+    fn emit(self) {
         counter!("aggregate_failed_updates", 1);
     }
 }

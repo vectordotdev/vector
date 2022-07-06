@@ -1,7 +1,3 @@
-use crate::buffers::{Acker, EventStream};
-use crate::config::{ComponentKey, ComponentScope};
-use futures::{future::BoxFuture, FutureExt};
-use pin_project::pin_project;
 use std::{
     fmt,
     future::Future,
@@ -9,17 +5,25 @@ use std::{
     task::{Context, Poll},
 };
 
-pub enum TaskOutput {
+use futures::{future::BoxFuture, FutureExt};
+use pin_project::pin_project;
+use vector_buffers::topology::channel::BufferReceiverStream;
+use vector_core::{buffers::Acker, event::EventArray};
+
+use crate::{config::ComponentKey, utilization::Utilization};
+
+#[allow(clippy::large_enum_variant)]
+pub(crate) enum TaskOutput {
     Source,
     Transform,
     /// Buffer of sink
-    Sink(Pin<EventStream>, Acker),
+    Sink(Utilization<BufferReceiverStream<EventArray>>, Acker),
     Healthcheck,
 }
 
 /// High level topology task.
 #[pin_project]
-pub struct Task {
+pub(crate) struct Task {
     #[pin]
     inner: BoxFuture<'static, Result<TaskOutput, ()>>,
     key: ComponentKey,
@@ -39,16 +43,8 @@ impl Task {
         }
     }
 
-    pub const fn key(&self) -> &ComponentKey {
-        &self.key
-    }
-
     pub fn id(&self) -> &str {
         self.key.id()
-    }
-
-    pub const fn scope(&self) -> &ComponentScope {
-        self.key.scope()
     }
 
     pub fn typetag(&self) -> &str {
@@ -69,7 +65,6 @@ impl fmt::Debug for Task {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Task")
             .field("id", &self.key.id().to_string())
-            .field("scope", &self.scope().to_string())
             .field("typetag", &self.typetag)
             .finish()
     }

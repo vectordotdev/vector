@@ -1,18 +1,18 @@
-use crate::{
-    buffers::Acker,
-    internal_events::{SocketEventsSent, SocketMode},
-};
-use bytes::Bytes;
-use futures::{ready, Sink};
-use pin_project::{pin_project, pinned_drop};
 use std::{
     io::{Error as IoError, ErrorKind},
     marker::Unpin,
     pin::Pin,
     task::{Context, Poll},
 };
+
+use bytes::Bytes;
+use futures::{ready, Sink};
+use pin_project::{pin_project, pinned_drop};
 use tokio::io::AsyncWrite;
 use tokio_util::codec::{BytesCodec, FramedWrite};
+use vector_buffers::Acker;
+
+use crate::internal_events::{SocketEventsSent, SocketMode};
 
 const MAX_PENDING_ITEMS: usize = 1_000;
 
@@ -67,7 +67,7 @@ where
         if self.events_total > 0 {
             self.acker.ack(self.events_total);
 
-            emit!(&SocketEventsSent {
+            emit!(SocketEventsSent {
                 mode: self.socket_mode,
                 count: self.events_total as u64,
                 byte_size: self.bytes_total,
@@ -102,7 +102,8 @@ where
             }
         }
 
-        self.project().inner.poll_ready(cx)
+        let inner = self.project().inner;
+        <FramedWrite<T, BytesCodec> as Sink<Bytes>>::poll_ready(inner, cx)
     }
 
     fn start_send(self: Pin<&mut Self>, item: Bytes) -> Result<(), Self::Error> {
@@ -126,13 +127,19 @@ where
             ShutdownCheck::Alive => {}
         }
 
-        let result = ready!(self.as_mut().project().inner.poll_flush(cx));
+        let inner = self.as_mut().project().inner;
+        let result = ready!(<FramedWrite<T, BytesCodec> as Sink<Bytes>>::poll_flush(
+            inner, cx
+        ));
         self.as_mut().get_mut().ack();
         Poll::Ready(result)
     }
 
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        let result = ready!(self.as_mut().project().inner.poll_close(cx));
+        let inner = self.as_mut().project().inner;
+        let result = ready!(<FramedWrite<T, BytesCodec> as Sink<Bytes>>::poll_close(
+            inner, cx
+        ));
         self.as_mut().get_mut().ack();
         Poll::Ready(result)
     }

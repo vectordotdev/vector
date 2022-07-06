@@ -1,19 +1,27 @@
-use super::{filter_result, FilterList, HostMetrics};
-use crate::event::metric::Metric;
 use chrono::Utc;
 use futures::{stream, StreamExt};
 use heim::units::information::byte;
 #[cfg(not(target_os = "windows"))]
 use heim::units::ratio::ratio;
-use serde::{Deserialize, Serialize};
-use shared::btreemap;
+use vector_common::btreemap;
+use vector_config::configurable_component;
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub(super) struct FilesystemConfig {
+use super::{filter_result, FilterList, HostMetrics};
+use crate::event::metric::Metric;
+
+/// Options for the “filesystem” metrics collector.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
+pub struct FilesystemConfig {
+    /// Lists of device name patterns to include or exclude.
     #[serde(default)]
     devices: FilterList,
+
+    /// Lists of filesystem name patterns to include or exclude.
     #[serde(default)]
     filesystems: FilterList,
+
+    /// Lists of mount point path patterns to include or exclude.
     #[serde(default)]
     mountpoints: FilterList,
 }
@@ -123,9 +131,13 @@ impl HostMetrics {
 
 #[cfg(test)]
 mod tests {
-    use super::super::tests::{all_gauges, assert_filtered_metrics, count_name, count_tag};
-    use super::super::{HostMetrics, HostMetricsConfig};
-    use super::FilesystemConfig;
+    use super::{
+        super::{
+            tests::{all_gauges, assert_filtered_metrics, count_name, count_tag},
+            HostMetrics, HostMetricsConfig,
+        },
+        FilesystemConfig,
+    };
 
     #[cfg(not(target_os = "windows"))]
     #[tokio::test]

@@ -1,21 +1,17 @@
 # Reviewing
 
-<!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
-
-1. [Checklist](#checklist)
-1. [Expectations](#expectations)
-1. [Backward Compatibility](#backward-compatibility)
-1. [Code Of Conduct](#code-of-conduct)
-1. [Dependencies](#dependencies)
-1. [Documentation](#documentation)
-1. [Performance Testing](#performance-testing)
-1. [Single Concern](#single-concern)
-1. [Readability](#readability)
-1. [Safe Code](#safe-code)
-1. [Security](#security)
-1. [Testing](#testing)
-
-<!-- /MarkdownTOC -->
+- [Checklist](#checklist)
+- [Expectations](#expectations)
+- [Backward Compatibility](#backward-compatibility)
+- [Code Of Conduct](#code-of-conduct)
+- [Dependencies](#dependencies)
+- [Documentation](#documentation)
+- [Performance Testing](#performance-testing)
+- [Single Concern](#single-concern)
+- [Readability](#readability)
+- [Safe Code](#safe-code)
+- [Security](#security)
+- [Testing](#testing)
 
 ## Checklist
 
@@ -31,7 +27,7 @@ should be used for all pull requests:
 - [ ] Is backward compatibility broken? If so, can it be avoided or deprecated? (see [Backwards compatibility](#backwards-compatibility))
 - [ ] Have dependencies changed? (see [Dependencies](#dependencies))
 - [ ] Has the code been explicitly reviewed for security issues? Dependencies included. (see [Security](#security))
-- [ ] Is there a risk of performance regressions? If so, have run the [Vector test harness](https://github.com/timberio/vector-test-harness)? (see [Performance Testing](#performance-testing))
+- [ ] Is there a risk of performance regressions? If so, have run the [Vector test harness](https://github.com/vectordotdev/vector-test-harness)? (see [Performance Testing](#performance-testing))
 - [ ] Should documentation be adjusted to reflect any of these changes? (see [Documentation](#documentation))
 
 ## Expectations
@@ -74,7 +70,7 @@ documentation, nor should they be merged with "TODOs" opened for documentation.
 Vector currently offers 2 methods for performance testing:
 
 1. Internal benchmarks located in the [`/benches` folder](benches).
-2. A full end-to-end [test harness](https://github.com/timberio/vector-test-harness)
+2. A full end-to-end [test harness](https://github.com/vectordotdev/vector-test-harness)
    for complex integration and performance testing.
 
 ## Single Concern

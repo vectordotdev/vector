@@ -1,7 +1,8 @@
 use std::path::Path;
 
-use crate::temp_file::TempFile;
 use log::info;
+
+use crate::temp_file::TempFile;
 
 #[derive(Debug)]
 pub struct HelmValuesFile(TempFile);

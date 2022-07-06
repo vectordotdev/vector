@@ -1,17 +1,8 @@
-use getset::{Getters, Setters};
-use once_cell::sync::OnceCell;
+use once_cell::sync::{Lazy, OnceCell};
 use serde::{Deserialize, Serialize};
 
 static LOG_SCHEMA: OnceCell<LogSchema> = OnceCell::new();
-
-lazy_static::lazy_static! {
-    static ref LOG_SCHEMA_DEFAULT: LogSchema = LogSchema {
-        message_key: String::from("message"),
-        timestamp_key: String::from("timestamp"),
-        host_key: String::from("host"),
-        source_type_key: String::from("source_type"),
-    };
-}
+static LOG_SCHEMA_DEFAULT: Lazy<LogSchema> = Lazy::new(LogSchema::default);
 
 /// Loads Log Schema from configurations and sets global schema. Once this is
 /// done, configurations can be correctly loaded using configured log schema
@@ -29,9 +20,10 @@ where
     F: FnOnce() -> Result<LogSchema, Vec<String>>,
 {
     let log_schema = builder()?;
-    if LOG_SCHEMA.set(log_schema).is_err() && deny_if_set {
-        panic!("Couldn't set schema");
-    }
+    assert!(
+        !(LOG_SCHEMA.set(log_schema).is_err() && deny_if_set),
+        "Couldn't set schema"
+    );
 
     Ok(())
 }
@@ -42,7 +34,7 @@ pub fn log_schema() -> &'static LogSchema {
     LOG_SCHEMA.get().unwrap_or(&LOG_SCHEMA_DEFAULT)
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Getters, Setters)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(default)]
 pub struct LogSchema {
     #[serde(default = "LogSchema::default_message_key")]
@@ -53,6 +45,8 @@ pub struct LogSchema {
     host_key: String,
     #[serde(default = "LogSchema::default_source_type_key")]
     source_type_key: String,
+    #[serde(default = "LogSchema::default_metadata_key")]
+    metadata_key: String,
 }
 
 impl Default for LogSchema {
@@ -62,6 +56,7 @@ impl Default for LogSchema {
             timestamp_key: Self::default_timestamp_key(),
             host_key: Self::default_host_key(),
             source_type_key: Self::default_source_type_key(),
+            metadata_key: Self::default_metadata_key(),
         }
     }
 }
@@ -70,14 +65,21 @@ impl LogSchema {
     fn default_message_key() -> String {
         String::from("message")
     }
+
     fn default_timestamp_key() -> String {
         String::from("timestamp")
     }
+
     fn default_host_key() -> String {
         String::from("host")
     }
+
     fn default_source_type_key() -> String {
         String::from("source_type")
+    }
+
+    fn default_metadata_key() -> String {
+        String::from("metadata")
     }
 
     pub fn message_key(&self) -> &str {
@@ -96,17 +98,28 @@ impl LogSchema {
         &self.source_type_key
     }
 
+    pub fn metadata_key(&self) -> &str {
+        &self.metadata_key
+    }
+
     pub fn set_message_key(&mut self, v: String) {
         self.message_key = v;
     }
+
     pub fn set_timestamp_key(&mut self, v: String) {
         self.timestamp_key = v;
     }
+
     pub fn set_host_key(&mut self, v: String) {
         self.host_key = v;
     }
+
     pub fn set_source_type_key(&mut self, v: String) {
         self.source_type_key = v;
+    }
+
+    pub fn set_metadata_key(&mut self, v: String) {
+        self.metadata_key = v;
     }
 
     /// Merge two `LogSchema` instances together.
@@ -140,6 +153,20 @@ impl LogSchema {
                 errors.push("conflicting values for 'log_schema.timestamp_key' found".to_owned());
             } else {
                 self.set_timestamp_key(other.timestamp_key().to_string());
+            }
+            if self.source_type_key() != LOG_SCHEMA_DEFAULT.source_type_key()
+                && self.source_type_key() != other.source_type_key()
+            {
+                errors.push("conflicting values for 'log_schema.source_type_key' found".to_owned());
+            } else {
+                self.set_source_type_key(other.source_type_key().to_string());
+            }
+            if self.metadata_key() != LOG_SCHEMA_DEFAULT.metadata_key()
+                && self.metadata_key() != other.metadata_key()
+            {
+                errors.push("conflicting values for 'log_schema.metadata_key' found".to_owned());
+            } else {
+                self.set_metadata_key(other.metadata_key().to_string());
             }
         }
 

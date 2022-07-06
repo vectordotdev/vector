@@ -15,10 +15,11 @@ components: sources: socket: {
 	}
 
 	features: {
+		acknowledgements: false
 		multiline: enabled: false
 		codecs: {
 			enabled:         true
-			default_framing: "`newline_delimited` for TCP and Unix stream, `bytes` for UDP and Unix datagram"
+			default_framing: "`newline_delimited` for TCP and Unix stream modes when using codecs other than `native` (which defaults to `length_delimited`), `bytes` for UDP and Unix datagram modes"
 		}
 		receive: {
 			from: {
@@ -37,7 +38,6 @@ components: sources: socket: {
 			keepalive: enabled: true
 			tls: {
 				enabled:                true
-				can_enable:             true
 				can_verify_certificate: true
 				enabled_default:        false
 			}
@@ -45,16 +45,6 @@ components: sources: socket: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -69,31 +59,37 @@ components: sources: socket: {
 			description:   "The address to listen for connections on, or `systemd#N` to use the Nth socket passed by systemd socket activation. If an address is used it _must_ include a port."
 			relevant_when: "mode = `tcp` or `udp`"
 			required:      true
-			warnings: []
 			type: string: {
 				examples: ["0.0.0.0:\(_port)", "systemd", "systemd#3"]
-				syntax: "literal"
 			}
 		}
 		host_key: {
 			category:    "Context"
 			common:      false
 			description: """
-				The key name added to each event representing the current host. This can also be globally set via the
+				The key name added to each event representing the peer host. This can also be globally set via the
 				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
 				"""
 			required:    false
-			warnings: []
 			type: string: {
 				default: "host"
-				syntax:  "literal"
+			}
+		}
+		port_key: {
+			category: "Context"
+			common:   true
+			description: """
+				The key name added to each event representing the peer source port. If empty, this context is not added.
+				"""
+			required: false
+			type: string: {
+				default: null
 			}
 		}
 		max_length: {
 			common:      true
 			description: "The maximum buffer size of incoming messages. Messages larger than this are truncated."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 102400
 				unit:    "bytes"
@@ -102,7 +98,6 @@ components: sources: socket: {
 		mode: {
 			description: "The type of socket to use."
 			required:    true
-			warnings: []
 			type: string: {
 				enum: {
 					tcp:           "TCP socket."
@@ -110,17 +105,30 @@ components: sources: socket: {
 					unix_datagram: "Unix domain datagram socket."
 					unix_stream:   "Unix domain stream socket."
 				}
-				syntax: "literal"
 			}
 		}
 		path: {
 			description:   "The unix socket path. *This should be an absolute path*."
 			relevant_when: "mode = `unix_datagram` or `unix_stream`"
 			required:      true
-			warnings: []
 			type: string: {
 				examples: ["/path/to/socket"]
-				syntax: "literal"
+			}
+		}
+		socket_file_mode: {
+			common: false
+			description: """
+				Unix file mode bits to be applied to the unix socket file
+				as its designated file permissions.
+				Note that the file mode value can be specified in any numeric format
+				supported by your configuration language, but it is most intuitive to use an octal number.
+				"""
+			relevant_when: "mode = `unix_datagram` or `unix_stream`"
+			required:      false
+			type: uint: {
+				default: null
+				unit:    null
+				examples: [0o777, 0o600, 508]
 			}
 		}
 		shutdown_timeout_secs: {
@@ -128,10 +136,19 @@ components: sources: socket: {
 			description:   "The timeout before a connection is forcefully closed during shutdown."
 			relevant_when: "mode = `tcp`"
 			required:      false
-			warnings: []
 			type: uint: {
 				default: 30
 				unit:    "seconds"
+			}
+		}
+		connection_limit: {
+			common:        false
+			description:   "The max number of TCP connections that will be processed."
+			relevant_when: "mode = `tcp`"
+			required:      false
+			type: uint: {
+				default: null
+				unit:    "concurrency"
 			}
 		}
 	}
@@ -139,9 +156,26 @@ components: sources: socket: {
 	output: logs: line: {
 		description: "A single socket event."
 		fields: {
-			host:      fields._local_host
+			host: {
+				description: "The peer host IP address."
+				required:    true
+				type: string: {
+					examples: ["129.21.31.122"]
+				}
+			}
 			message:   fields._raw_line
 			timestamp: fields._current_timestamp
+			port: {
+				description: "The peer source port."
+				required:    false
+				common:      true
+				type: uint: {
+					default: null
+					unit:    null
+					examples: [2838]
+				}
+			}
+			client_metadata: fields._client_metadata
 		}
 	}
 
@@ -164,15 +198,18 @@ components: sources: socket: {
 	]
 
 	telemetry: metrics: {
-		events_in_total:                  components.sources.internal_metrics.output.metrics.events_in_total
-		connection_errors_total:          components.sources.internal_metrics.output.metrics.connection_errors_total
-		connection_failed_total:          components.sources.internal_metrics.output.metrics.connection_failed_total
-		connection_established_total:     components.sources.internal_metrics.output.metrics.connection_established_total
-		connection_failed_total:          components.sources.internal_metrics.output.metrics.connection_failed_total
-		connection_send_errors_total:     components.sources.internal_metrics.output.metrics.connection_send_errors_total
-		connection_send_ack_errors_total: components.sources.internal_metrics.output.metrics.connection_send_ack_errors_total
-		connection_shutdown_total:        components.sources.internal_metrics.output.metrics.connection_shutdown_total
-		component_received_bytes_total:   components.sources.internal_metrics.output.metrics.component_received_bytes_total
-		component_received_events_total:  components.sources.internal_metrics.output.metrics.component_received_events_total
+		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
+		connection_errors_total:              components.sources.internal_metrics.output.metrics.connection_errors_total
+		connection_failed_total:              components.sources.internal_metrics.output.metrics.connection_failed_total
+		connection_established_total:         components.sources.internal_metrics.output.metrics.connection_established_total
+		connection_failed_total:              components.sources.internal_metrics.output.metrics.connection_failed_total
+		connection_send_errors_total:         components.sources.internal_metrics.output.metrics.connection_send_errors_total
+		connection_send_ack_errors_total:     components.sources.internal_metrics.output.metrics.connection_send_ack_errors_total
+		connection_shutdown_total:            components.sources.internal_metrics.output.metrics.connection_shutdown_total
+		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
+		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
+		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
+		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
+		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
 	}
 }

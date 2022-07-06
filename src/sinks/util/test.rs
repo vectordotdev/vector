@@ -1,7 +1,5 @@
-use crate::{
-    config::{SinkConfig, SinkContext},
-    Error,
-};
+use std::net::SocketAddr;
+
 use bytes::Bytes;
 use futures::{channel::mpsc, FutureExt, SinkExt, TryFutureExt};
 use hyper::{
@@ -10,8 +8,12 @@ use hyper::{
     Body, Request, Response, Server, StatusCode,
 };
 use serde::Deserialize;
-use std::net::SocketAddr;
 use stream_cancel::{Trigger, Tripwire};
+
+use crate::{
+    config::{SinkConfig, SinkContext},
+    Error,
+};
 
 pub fn load_sink<T>(config: &str) -> crate::Result<(T, SinkContext)>
 where
@@ -58,7 +60,7 @@ pub fn build_test_server_generic<B>(
     impl std::future::Future<Output = Result<(), ()>>,
 )
 where
-    B: HttpBody + Send + Sync + 'static,
+    B: HttpBody + Send + 'static,
     <B as HttpBody>::Data: Send + Sync,
     <B as HttpBody>::Error: snafu::Error + Send + Sync,
 {
@@ -90,7 +92,7 @@ where
     let (trigger, tripwire) = Tripwire::new();
     let server = Server::bind(&addr)
         .serve(service)
-        .with_graceful_shutdown(tripwire.then(crate::stream::tripwire_handler))
+        .with_graceful_shutdown(tripwire.then(crate::shutdown::tripwire_handler))
         .map_err(|error| panic!("Server error: {}", error));
 
     (rx, trigger, server)

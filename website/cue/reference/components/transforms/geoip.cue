@@ -26,16 +26,6 @@ components: transforms: geoip: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -46,12 +36,11 @@ components: transforms: geoip: {
 			description: """
 				Path to the [MaxMind GeoIP2](\(urls.maxmind_geoip2)) or [GeoLite2 binary city
 				database](\(urls.maxmind_geolite2_city)) file (`GeoLite2-City.mmdb`). Other
-				databases, such as the the country database, are not supported.
+				databases, such as the country database, are not supported.
 				"""
 			required:    true
 			type: string: {
 				examples: ["/path/to/GeoLite2-City.mmdb", "/path/to/GeoLite2-ISP.mmdb"]
-				syntax: "literal"
 			}
 		}
 		source: {
@@ -59,17 +48,24 @@ components: transforms: geoip: {
 			required:    true
 			type: string: {
 				examples: ["ip_address", "x-forwarded-for", "parent.child", "array[0]"]
-				syntax: "literal"
 			}
 		}
 		target: {
 			common:      true
-			description: "The default field to insert the resulting GeoIP data into. See [output](#output) for more info."
+			description: "The default field to insert the resulting GeoIP data into. See [output](#output-data) for more info."
 			required:    false
 			type: string: {
 				default: "geoip"
 				examples: ["geoip", "parent.child"]
-				syntax: "literal"
+			}
+		}
+		locale: {
+			description: "The locale to use to lookup the country name and region name for the city database. See [Locations Files](https://dev.maxmind.com/geoip/docs/databases/city-and-country?lang=en)"
+			required:    false
+			common:      false
+			type: string: {
+				default: "en"
+				examples: ["de", "en", "es", "fr", "ja", "pt-BR", "ru", "zh-CN"]
 			}
 		}
 	}
@@ -77,6 +73,7 @@ components: transforms: geoip: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	how_it_works: {
@@ -131,8 +128,8 @@ components: transforms: geoip: {
 							required:    false
 							common:      false
 							type: uint: {
-								unit:    null
 								default: null
+								unit:    null
 								examples: [701, 721]
 							}
 							groups: ["ASN", "ISP"]
@@ -152,7 +149,6 @@ components: transforms: geoip: {
 									"MCI Communications Services, Inc. d/b/a Verizon Business",
 									"DoD Network Information Center",
 								]
-								syntax: "literal"
 							}
 							groups: ["ASN", "ISP"]
 						}
@@ -163,7 +159,6 @@ components: transforms: geoip: {
 							required:    true
 							type: string: {
 								examples: ["New York", "Brooklyn", "Chicago"]
-								syntax: "literal"
 							}
 							groups: ["City"]
 						}
@@ -183,7 +178,6 @@ components: transforms: geoip: {
 									OC: "Oceania"
 									SA: "South America"
 								}
-								syntax: "literal"
 							}
 							groups: ["City"]
 						}
@@ -195,7 +189,49 @@ components: transforms: geoip: {
 							required:    true
 							type: string: {
 								examples: ["US", "US-PR", "FR", "FR-BL", "GB", "A1", "A2"]
-								syntax: "literal"
+							}
+							groups: ["City"]
+						}
+						country_name: {
+							description: """
+								The country name associated with the IP address. Is looked up using
+								the configured locale.
+								"""
+							required: true
+							type: string: {
+								examples: ["United States", "United Kingdom"]
+							}
+							groups: ["City"]
+						}
+						region_code: {
+							description: """
+								The [ISO 3166-2 region code](\(urls.iso3166_2)) associated with
+								the IP address.
+								"""
+							required:    true
+							type: string: {
+								examples: ["WBK"]
+							}
+							groups: ["City"]
+						}
+						region_name: {
+							description: """
+								The region name associated with the IP address. Is looked up using
+								the configured locale.
+								"""
+							required: true
+							type: string: {
+								examples: ["West Berkshire"]
+							}
+							groups: ["City"]
+						}
+						metro_code: {
+							description: """
+								The metro code of the location if the location is in the US.
+								"""
+							required: true
+							type: string: {
+								examples: ["501"]
 							}
 							groups: ["City"]
 						}
@@ -210,7 +246,6 @@ components: transforms: geoip: {
 							type: string: {
 								default: null
 								examples: ["Verizon Business"]
-								syntax: "literal"
 							}
 							groups: ["ISP"]
 						}
@@ -219,7 +254,6 @@ components: transforms: geoip: {
 							required:    true
 							type: string: {
 								examples: ["51.75"]
-								syntax: "literal"
 							}
 							groups: ["City"]
 						}
@@ -228,7 +262,6 @@ components: transforms: geoip: {
 							required:    true
 							type: string: {
 								examples: ["-1.25"]
-								syntax: "literal"
 							}
 							groups: ["City"]
 						}
@@ -243,7 +276,6 @@ components: transforms: geoip: {
 							type: string: {
 								default: null
 								examples: ["Verizon Business"]
-								syntax: "literal"
 							}
 							groups: ["ISP"]
 						}
@@ -254,7 +286,6 @@ components: transforms: geoip: {
 							required:    true
 							type: string: {
 								examples: ["07094", "10010", "OX1"]
-								syntax: "literal"
 							}
 							groups: ["City"]
 						}
@@ -267,7 +298,6 @@ components: transforms: geoip: {
 							required:    true
 							type: string: {
 								examples: ["America/New_York", "Asia/Atyrau", "Europe/London"]
-								syntax: "literal"
 							}
 							groups: ["City"]
 						}

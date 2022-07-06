@@ -26,7 +26,7 @@ observe how their webserver's are performing.
 ## Internal Proposal
 
 I expect to largely copy the existing [prometheus
-source](https://github.com/timberio/vector/blob/61e806d01d4cc6d2a527b52aa9388d4547f1ebc2/src/sources/prometheus/mod.rs)
+source](https://github.com/vectordotdev/vector/blob/61e806d01d4cc6d2a527b52aa9388d4547f1ebc2/src/sources/prometheus/mod.rs)
 and modify it to parse the output of the Nginx stub status page which looks like:
 
 ```text

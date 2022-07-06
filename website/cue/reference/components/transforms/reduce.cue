@@ -20,16 +20,6 @@ components: transforms: reduce: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -43,20 +33,17 @@ components: transforms: reduce: {
 				for an event, the current transaction is immediately flushed with this event.
 				"""
 			required: false
-			warnings: []
 			type: string: {
 				default: null
 				examples: [
 					#".status_code != 200 && !includes(["info", "debug"], .severity)"#,
 				]
-				syntax: "literal"
 			}
 		}
 		expire_after_ms: {
 			common:      false
 			description: "A maximum period of time to wait after the last event is received before a combined event should be considered complete."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 30000
 				unit:    "milliseconds"
@@ -66,22 +53,27 @@ components: transforms: reduce: {
 			common:      false
 			description: "Controls the frequency that Vector checks for (and flushes) expired events."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 1000
 				unit:    "milliseconds"
 			}
 		}
 		group_by: {
-			common:      true
-			description: "An ordered list of fields by which to group events. Each group is combined independently, allowing you to keep independent events separate. When no fields are specified, all events will be combined in a single group. Events missing a specified field will be combined in their own group."
-			required:    false
-			warnings: []
+			common: true
+			description: """
+				An ordered list of fields by which to group events. Each group with matching values for the specified
+				keys is reduced independently, allowing you to keep independent event streams separate.
+
+				For example, if `group_by = ["host", "region"]`, then all incoming events that have the same host and
+				region will be grouped together before being reduced.
+
+				When no fields are specified, all events will be combined in a single group.
+				"""
+			required: false
 			type: array: {
 				default: []
 				items: type: string: {
 					examples: ["request_id", "user_id", "transaction_id"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -102,7 +94,6 @@ components: transforms: reduce: {
 				3. Numeric values are summed.
 				"""
 			required: false
-			warnings: []
 			type: object: {
 				examples: [
 					{
@@ -116,7 +107,6 @@ components: transforms: reduce: {
 					"*": {
 						description: "The custom merge strategy to use for a field."
 						required:    true
-						warnings: []
 						type: string: {
 							enum: {
 								array:          "Each value is appended to an array."
@@ -124,6 +114,7 @@ components: transforms: reduce: {
 								shortest_array: "Retains the shortest array seen"
 								concat:         "Concatenate each string value (delimited with a space)."
 								concat_newline: "Concatenate each string value (delimited with a newline)."
+								concat_raw:     "Concatenate each string value (without any delimiter)."
 								discard:        "Discard all but the first value found."
 								retain:         "Discard all but the last value found. Works as a coalesce by not retaining null."
 								sum:            "Sum all numeric values."
@@ -131,7 +122,6 @@ components: transforms: reduce: {
 								min:            "The minimum of all numeric values."
 								flat_unique:    "Create a flattened array of all the unique values."
 							}
-							syntax: "literal"
 						}
 					}
 				}
@@ -144,20 +134,14 @@ components: transforms: reduce: {
 				for an event, the previous transaction is flushed (without this event) and a new transaction is started.
 				"""
 			required: false
-			warnings: []
-			type: string: {
-				default: null
-				examples: [
-					#".status_code != 200 && !includes(["info", "debug"], .severity)"#,
-				]
-				syntax: "literal"
-			}
+			type: condition: {}
 		}
 	}
 
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	examples: [
@@ -216,7 +200,7 @@ components: transforms: reduce: {
 				merge_strategies: {
 					message: "concat_newline"
 				}
-				starts_when: #"match(.message, /^[^\s]/)"#
+				starts_when: #"match(string!(.message), r'^[^\s]')"#
 			}
 
 			output: [

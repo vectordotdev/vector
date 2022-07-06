@@ -19,7 +19,6 @@ components: sources: docker_logs: {
 			type: string: {
 				default: null
 				examples: ["unix:///var/run/docker.sock"]
-				syntax: "literal"
 			}
 		}
 
@@ -34,7 +33,6 @@ components: sources: docker_logs: {
 			type: string: {
 				default: null
 				examples: ["certs/"]
-				syntax: "literal"
 			}
 		}
 
@@ -43,12 +41,12 @@ components: sources: docker_logs: {
 			type: string: {
 				default: null
 				examples: ["certs/"]
-				syntax: "literal"
 			}
 		}
 	}
 
 	features: {
+		acknowledgements: false
 		collect: {
 			checkpoint: enabled: false
 			from: {
@@ -71,17 +69,6 @@ components: sources: docker_logs: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-			"x86_64-apple-darwin":            true
-		}
-
 		requirements: []
 		warnings: [
 			"""
@@ -113,7 +100,7 @@ components: sources: docker_logs: {
 			common: true
 			description: """
 				The Docker host to connect to. Use an HTTPS URL to enable TLS encryption.
-				If absent, Vector will try to use `DOCKER_HOST` enviroment variable.
+				If absent, Vector will try to use `DOCKER_HOST` environment variable.
 				If `DOCKER_HOST` is also absent, Vector will use default Docker local socket
 				(`/var/run/docker.sock` on Unix platforms, `//./pipe/docker_engine` on Windows).
 				"""
@@ -128,7 +115,6 @@ components: sources: docker_logs: {
 					"/var/run/docker.sock",
 					"//./pipe/docker_engine",
 				]
-				syntax: "literal"
 			}
 		}
 		tls: {
@@ -145,28 +131,22 @@ components: sources: docker_logs: {
 					ca_file: {
 						description: "Path to CA certificate file."
 						required:    true
-						warnings: []
 						type: string: {
 							examples: ["certs/ca.pem"]
-							syntax: "literal"
 						}
 					}
 					crt_file: {
 						description: "Path to TLS certificate file."
 						required:    true
-						warnings: []
 						type: string: {
 							examples: ["certs/cert.pem"]
-							syntax: "literal"
 						}
 					}
 					key_file: {
 						description: "Path to TLS key file."
 						required:    true
-						warnings: []
 						type: string: {
 							examples: ["certs/key.pem"]
-							syntax: "literal"
 						}
 					}
 				}
@@ -196,7 +176,6 @@ components: sources: docker_logs: {
 				default: null
 				items: type: string: {
 					examples: ["exclude_", "exclude_me_0", "ad08cc418cf9"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -215,7 +194,6 @@ components: sources: docker_logs: {
 				default: null
 				items: type: string: {
 					examples: ["include_", "include_me_0", "ad08cc418cf9"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -231,7 +209,6 @@ components: sources: docker_logs: {
 				default: null
 				items: type: string: {
 					examples: ["com.example.vendor=Timber Inc.", "com.example.name=Vector"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -246,7 +223,6 @@ components: sources: docker_logs: {
 				default: null
 				items: type: string: {
 					examples: ["httpd", "redis"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -272,7 +248,6 @@ components: sources: docker_logs: {
 			warnings: []
 			type: string: {
 				default: "host"
-				syntax:  "literal"
 			}
 		}
 	}
@@ -291,7 +266,6 @@ components: sources: docker_logs: {
 					required:    true
 					type: string: {
 						examples: ["9b6247364a03", "715ebfcee040"]
-						syntax: "literal"
 					}
 				}
 				container_name: {
@@ -299,7 +273,6 @@ components: sources: docker_logs: {
 					required:    true
 					type: string: {
 						examples: ["evil_ptolemy", "nostalgic_stallman"]
-						syntax: "literal"
 					}
 				}
 				image: {
@@ -307,7 +280,6 @@ components: sources: docker_logs: {
 					required:    true
 					type: string: {
 						examples: ["ubuntu:latest", "busybox", "timberio/vector:latest-alpine"]
-						syntax: "literal"
 					}
 				}
 				message: {
@@ -315,7 +287,6 @@ components: sources: docker_logs: {
 					required:    true
 					type: string: {
 						examples: ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
-						syntax: "literal"
 					}
 				}
 				stream: {
@@ -326,7 +297,6 @@ components: sources: docker_logs: {
 							stdout: "The STDOUT stream"
 							stderr: "The STDERR stream"
 						}
-						syntax: "literal"
 					}
 				}
 				timestamp: {
@@ -340,7 +310,6 @@ components: sources: docker_logs: {
 					required:    true
 					type: string: {
 						examples: ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
-						syntax: "literal"
 					}
 				}
 			}
@@ -402,6 +371,10 @@ components: sources: docker_logs: {
 		logging_driver_errors_total:           components.sources.internal_metrics.output.metrics.logging_driver_errors_total
 		processed_bytes_total:                 components.sources.internal_metrics.output.metrics.processed_bytes_total
 		processed_events_total:                components.sources.internal_metrics.output.metrics.processed_events_total
+		component_discarded_events_total:      components.sources.internal_metrics.output.metrics.component_discarded_events_total
+		component_errors_total:                components.sources.internal_metrics.output.metrics.component_errors_total
+		component_received_bytes_total:        components.sources.internal_metrics.output.metrics.component_received_bytes_total
 		component_received_events_total:       components.sources.internal_metrics.output.metrics.component_received_events_total
+		component_received_event_bytes_total:  components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 	}
 }

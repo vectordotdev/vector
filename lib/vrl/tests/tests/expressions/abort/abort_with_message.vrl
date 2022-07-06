@@ -1,0 +1,5 @@
+# result: { "foo": true }
+
+.foo = true
+abort "a custom abort message"
+.bar = false

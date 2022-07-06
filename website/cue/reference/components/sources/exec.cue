@@ -13,10 +13,11 @@ components: sources: exec: {
 	}
 
 	features: {
+		acknowledgements: false
 		multiline: enabled: false
 		codecs: {
 			enabled:         true
-			default_framing: "newline_delimited"
+			default_framing: "`newline_delimited` for codecs other than `native`, which defaults to `length_delimited`"
 		}
 		receive: {
 			from: {
@@ -28,16 +29,6 @@ components: sources: exec: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -56,7 +47,6 @@ components: sources: exec: {
 					scheduled: "Scheduled exec mechanism."
 					streaming: "Streaming exec mechanism."
 				}
-				syntax: "literal"
 			}
 		}
 		command: {
@@ -64,30 +54,18 @@ components: sources: exec: {
 			description: "The command to be run, plus any arguments required."
 			type: array: {
 				examples: [["echo", "Hello World!"], ["ls", "-la"]]
-				items: type: string: {
-					syntax: "literal"
-				}
+				items: type: string: {}
 			}
 		}
 		working_directory: {
 			common:      false
 			required:    false
 			description: "The directory in which to run the command."
-			warnings: []
-			type: string: {
-				default: null
-				syntax:  "literal"
-			}
+			type: string: default: null
 		}
 		include_stderr: {
 			common:      false
 			description: "Include the output of stderr when generating events."
-			required:    false
-			type: bool: default: true
-		}
-		event_per_line: {
-			common:      false
-			description: "Determine if events should be generated per line or buffered and output as a single event when script execution finishes."
 			required:    false
 			type: bool: default: true
 		}
@@ -104,7 +82,6 @@ components: sources: exec: {
 			common:      true
 			description: "The scheduled options."
 			required:    false
-			warnings: []
 			type: object: {
 				examples: []
 				options: {
@@ -125,7 +102,6 @@ components: sources: exec: {
 			common:      true
 			description: "The streaming options."
 			required:    false
-			warnings: []
 			type: object: {
 				examples: []
 				options: {
@@ -141,7 +117,6 @@ components: sources: exec: {
 						description:   "The interval in seconds between restarting streaming commands if needed."
 						relevant_when: "mode = `streaming`"
 						required:      false
-						warnings: []
 						type: uint: {
 							default: 5
 							unit:    "seconds"
@@ -163,9 +138,8 @@ components: sources: exec: {
 				description: "The data stream from which the event originated."
 				required:    false
 				type: string: {
-					examples: ["stdout", "stderr"]
 					default: null
-					syntax:  "literal"
+					examples: ["stdout", "stderr"]
 				}
 			}
 			pid: {
@@ -182,7 +156,6 @@ components: sources: exec: {
 				type: array: {
 					items: type: string: {
 						examples: ["echo", "Hello World!", "ls", "-la"]
-						syntax: "literal"
 					}
 				}
 			}
@@ -217,12 +190,15 @@ components: sources: exec: {
 	}
 
 	telemetry: metrics: {
-		command_executed_total:             components.sources.internal_metrics.output.metrics.command_executed_total
-		command_execution_duration_seconds: components.sources.internal_metrics.output.metrics.command_execution_duration_seconds
-		events_in_total:                    components.sources.internal_metrics.output.metrics.events_in_total
-		processed_bytes_total:              components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:             components.sources.internal_metrics.output.metrics.processed_events_total
-		processing_errors_total:            components.sources.internal_metrics.output.metrics.processing_errors_total
-		component_received_events_total:    components.sources.internal_metrics.output.metrics.component_received_events_total
+		command_executed_total:               components.sources.internal_metrics.output.metrics.command_executed_total
+		command_execution_duration_seconds:   components.sources.internal_metrics.output.metrics.command_execution_duration_seconds
+		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
+		processed_bytes_total:                components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:               components.sources.internal_metrics.output.metrics.processed_events_total
+		processing_errors_total:              components.sources.internal_metrics.output.metrics.processing_errors_total
+		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
+		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
+		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
+		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 	}
 }

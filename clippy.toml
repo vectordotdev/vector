@@ -2,4 +2,6 @@ cognitive-complexity-threshold = 75
 
 # for `disallowed_method`:
 # https://rust-lang.github.io/rust-clippy/master/index.html#disallowed_method
-disallowed-methods = []
+disallowed-methods = [
+  { path = "std::io::Write::write", reason = "This doesn't handle short writes, use `write_all` instead." },
+]

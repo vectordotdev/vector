@@ -46,7 +46,6 @@ components: sources: [Name=string]: {
 								halt_before:      "All consecutive lines not matching this pattern are included in the group. This is useful where a log line contains a marker indicating that it begins a new message."
 								halt_with:        "All consecutive lines, up to and including the first line matching this pattern, are included in the group. This is useful where a log line ends with a termination marker, such as a semicolon."
 							}
-							syntax: "literal"
 						}
 					}
 					start_pattern: {
@@ -91,7 +90,6 @@ components: sources: [Name=string]: {
 									newline_delimited:   "Byte frames which are delimited by a newline character."
 									octet_counting:      "Byte frames according to the [octet counting](\(urls.rfc_6587_3_4_1)) format."
 								}
-								syntax: "literal"
 							}
 						}
 						character_delimited: {
@@ -102,9 +100,8 @@ components: sources: [Name=string]: {
 								delimiter: {
 									description: "The character used to separate frames."
 									required:    true
-									type: string: {
+									type: ascii_char: {
 										examples: ["\n", "\t"]
-										syntax: "literal"
 									}
 								}
 								max_length: {
@@ -169,11 +166,12 @@ components: sources: [Name=string]: {
 							type: string: {
 								default: "bytes"
 								enum: {
-									bytes:  "Events containing the byte frame as-is."
-									json:   "Events being parsed from a JSON string."
-									syslog: "Events being parsed from a Syslog message."
+									bytes:       "Events containing the byte frame as-is."
+									json:        "Events being parsed from a JSON string."
+									syslog:      "Events being parsed from a Syslog message."
+									native:      "Events being parsed from Vector's [native protobuf format](\(urls.native_proto_schema)) ([EXPERIMENTAL](/highlights/2022-03-31-native-event-codecs))."
+									native_json: "Events being parsed from Vector's [native JSON format](\(urls.native_json_schema)) ([EXPERIMENTAL](/highlights/2022-03-31-native-event-codecs))."
 								}
-								syntax: "literal"
 							}
 						}
 					}
@@ -195,7 +193,6 @@ components: sources: [Name=string]: {
 							type: string: {
 								default: null
 								examples: ["utf-16le", "utf-16be"]
-								syntax: "literal"
 							}
 						}
 					}
@@ -213,8 +210,7 @@ components: sources: [Name=string]: {
 			if features.collect.tls != _|_ {
 				if features.collect.tls.enabled {
 					tls: configuration._tls_connect & {_args: {
-						can_enable:             features.collect.tls.can_enable
-						can_verify_certificate: features.collect.tls.can_enable
+						can_verify_certificate: features.collect.tls.can_verify_certificate
 						can_verify_hostname:    features.collect.tls.can_verify_hostname
 						enabled_default:        features.collect.tls.enabled_default
 					}}
@@ -263,8 +259,7 @@ components: sources: [Name=string]: {
 
 			if features.receive.tls.enabled {
 				tls: configuration._tls_accept & {_args: {
-					can_enable:             features.receive.tls.can_enable
-					can_verify_certificate: features.receive.tls.can_enable
+					can_verify_certificate: features.receive.tls.can_verify_certificate
 					enabled_default:        features.receive.tls.enabled_default
 				}}
 			}
@@ -285,7 +280,6 @@ components: sources: [Name=string]: {
 					required:    true
 					type: string: {
 						examples: [_values.local_host]
-						syntax: "literal"
 					}
 				}
 
@@ -294,7 +288,25 @@ components: sources: [Name=string]: {
 					required:    true
 					type: string: {
 						examples: ["2019-02-13T19:48:34+00:00 [info] Started GET \"/\" for 127.0.0.1"]
-						syntax: "literal"
+					}
+				}
+
+				_client_metadata: {
+					common:      false
+					description: "Client TLS metadata."
+					required:    false
+					type: object: {
+						options: {
+							subject: {
+								common:      true
+								description: "The subject from the client TLS certificate. Only added if `tls.client_metadata_key` is set. Key name depends on configured `client_metadata_key`"
+								required:    false
+								type: string: {
+									default: null
+									examples: [ "CN=localhost,OU=Vector,O=Datadog,L=New York,ST=New York,C=US"]
+								}
+							}
+						}
 					}
 				}
 			}

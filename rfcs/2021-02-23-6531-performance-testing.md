@@ -37,7 +37,7 @@ terms of more code coverage and by reducing their time to report in results. As
 wall-clock benchmarks to instruction count based methods, but this RFC makes no
 comment on that other than to mention it as a future possibility. This RFC also
 proposes that we continue our use of
-[vector-test-harness](https://github.com/timberio/vector-test-harness/),
+[vector-test-harness](https://github.com/vectordotdev/vector-test-harness/),
 expanding that project to run sustained "nightly" performance stress tests for
 representative workloads.
 
@@ -72,7 +72,7 @@ characteristics challenging and we have to put in real effort to do so.
 
 ### Regression from Increased Instrumentation
 
-PR: https://github.com/timberio/vector/pull/4765
+PR: https://github.com/vectordotdev/vector/pull/4765
 
 Tracing instrumentation was added to `LogEvent` at all log levels, incurring
 trace overhead even when trace logs were flagged off. This change made it out
@@ -80,18 +80,18 @@ into the world before being detected.
 
 ### musl libc Release Builds
 
-PR: https://github.com/timberio/vector/issues/2030
+PR: https://github.com/vectordotdev/vector/issues/2030
 
 Introduction of [musl libc](https://musl.libc.org/) regressed performance on
 tcp-to-tcp benchmark from 0.7.0 to 0.8.0 in double digit percentages. This was
-caught by the [test-harness](https://github.com/timberio/vector-test-harness/)
+caught by the [test-harness](https://github.com/vectordotdev/vector-test-harness/)
 as the PR documents but only after the releases were cut since test-harness was
 not running regularly.
 
 ### `metrics` Crate Upgrade Regresses Benchmarks
 
-Issue: https://github.com/timberio/vector/issues/6412
-PR: https://github.com/timberio/vector/pull/6217#issuecomment-766435360
+Issue: https://github.com/vectordotdev/vector/issues/6412
+PR: https://github.com/vectordotdev/vector/pull/6217#issuecomment-766435360
 
 Upgrading the `metrics` crate to `v0.13.1` regresses our criterion benchmarks by
 20%. Our criterion benchmarks acted as a stop on this change making it into a
@@ -99,9 +99,9 @@ release but do not necessarily guide the work on repairing the issue.
 
 ### Channel Implementation Regresses Topology Throughput
 
-Issue: https://github.com/timberio/vector/issues/6043
+Issue: https://github.com/vectordotdev/vector/issues/6043
 
-PR [5868](https://github.com/timberio/vector/pull/5868) introduced a change that
+PR [5868](https://github.com/vectordotdev/vector/pull/5868) introduced a change that
 modified the buffer internals to use tokio-0.2's channel implementation. This
 regressed test-harness benchmarks and showed mixed results in criterion
 benches. For especially sensitive areas of the project -- like the topology --
@@ -109,8 +109,8 @@ we will absolutely have to rely on a battery of complementary approaches.
 
 ### Lua Transform Leaked Memory
 
-Issue: https://github.com/timberio/vector/issues/1496
-PR: https://github.com/timberio/vector/pull/1990
+Issue: https://github.com/vectordotdev/vector/issues/1496
+PR: https://github.com/vectordotdev/vector/pull/1990
 
 User reports that 0.6.0 steadily consumes memory resources in their deployment,
 indicating a classic leak pattern in their monitoring. Once user provided their
@@ -123,7 +123,7 @@ As of this writing there are two broad approaches for performance testing work
 in the Vector project. They are:
 
 * criterion benchmarks
-* [vector-test-harness](https://github.com/timberio/vector-test-harness/)
+* [vector-test-harness](https://github.com/vectordotdev/vector-test-harness/)
 
 ### Criterion
 
@@ -162,20 +162,20 @@ writing.
 
 ### test-harness
 
-The [vector-test-harness](https://github.com/timberio/vector-test-harness/) is a
+The [vector-test-harness](https://github.com/vectordotdev/vector-test-harness/) is a
 "black-box" performance and correctness testing approach. Performance tests
 serve two roles: indicating whether Vector has suffered regressions for given
 workloads and comparing Vector to competitor products. The later role feeds our
 product documentation.  Let's consider the [disk
-buffer](https://github.com/timberio/vector-test-harness/tree/master/cases/disk_buffer_performance)
+buffer](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/disk_buffer_performance)
 performance test. This test is meant to probe the performance characteristic of
 the "disk buffer", the disk backed variant of Vector's
-[`buffers`](https://github.com/timberio/vector/blob/2ac861e09f99036145749ee8af7a7e0d7aa945c6/src/buffers/mod.rs). The
-[README](https://github.com/timberio/vector-test-harness/tree/master/cases/disk_buffer_performance)
+[`buffers`](https://github.com/vectordotdev/vector/blob/2ac861e09f99036145749ee8af7a7e0d7aa945c6/src/buffers/mod.rs). The
+[README](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/disk_buffer_performance)
 for the test describes the high-level approach: generate as much data as
 possible in 60 seconds and observe the results of the test on average IO
 throughput, CPU consumption and so forth. The test-harness uses
-[ansible](https://github.com/timberio/vector-test-harness/tree/master/cases/disk_buffer_performance/ansible)
+[ansible](https://github.com/vectordotdev/vector-test-harness/tree/master/cases/disk_buffer_performance/ansible)
 to set up and execute every variant to be tested. System operation during the
 execution is recorded with [dstat](http://dag.wiee.rs/home-made/dstat/) and only
 one iteration of each test is made. Tests are made on AWS spot instance c5.large
@@ -186,7 +186,7 @@ to make the results quite noisy. Spot instances suffer no performance penalty
 compared to reserved capacity but the c5.large may not be representative of the
 machines Vector is deployed to. Only a single build of Vector is run here as
 well. Consider that the
-[0.11.1](https://github.com/timberio/vector/releases/tag/v0.11.1) supports
+[0.11.1](https://github.com/vectordotdev/vector/releases/tag/v0.11.1) supports
 aarch64, armv7, x86_64, arm64, armhf, etc plus a cross product on some of
 these platforms with different libc implementations. The test-harness executes
 on Ubuntu, meaning tests are limited to Debian packaged Vector releases. The
@@ -317,7 +317,7 @@ feature to examine a config and make suggestions or point out easily detected
 issues, a disk buffer being configured to use a read-only filesystem, say.
 
 Note that the work described here is also reflected in [Issue
-4660](https://github.com/timberio/vector/issues/4660). We should also consider
+4660](https://github.com/vectordotdev/vector/issues/4660). We should also consider
 that the interface -- a sub-command -- is not the mechanism and leave open the
 possibility for multiple interfaces to the same diagnostic information.
 
@@ -671,7 +671,7 @@ the line somewhere.
 
 ### Pursue `diagnostic` Command
 
-We describe in [Issue 4660](https://github.com/timberio/vector/issues/4660) the
+We describe in [Issue 4660](https://github.com/vectordotdev/vector/issues/4660) the
 desire to pursue a diagnostic command for Vector. There are two, complementary
 themes for such a tool and we will pursue them both. The ordering of these
 themes will be what provides the most efficacy for our problems at hand.

@@ -1,7 +1,8 @@
 #![allow(clippy::upper_case_acronyms)]
 
-use crate::BoxedSubscription;
 use graphql_client::GraphQLQuery;
+
+use crate::BoxedSubscription;
 
 /// Shorthand for a Chrono datetime, set to UTC.
 type DateTime = chrono::DateTime<chrono::Utc>;
@@ -22,6 +23,7 @@ pub struct OutputEventsByComponentIdPatternsSubscription;
 pub enum TapEncodingFormat {
     Json,
     Yaml,
+    Logfmt,
 }
 
 /// String -> TapEncodingFormat, typically for parsing user input.
@@ -32,6 +34,7 @@ impl std::str::FromStr for TapEncodingFormat {
         match s {
             "json" => Ok(Self::Json),
             "yaml" => Ok(Self::Yaml),
+            "logfmt" => Ok(Self::Logfmt),
             _ => Err("Invalid encoding format".to_string()),
         }
     }
@@ -45,17 +48,7 @@ impl From<TapEncodingFormat>
         match encoding {
             TapEncodingFormat::Json => Self::JSON,
             TapEncodingFormat::Yaml => Self::YAML,
-        }
-    }
-}
-
-impl output_events_by_component_id_patterns_subscription::OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns {
-    pub fn as_log(
-        &self,
-    ) -> Option<&output_events_by_component_id_patterns_subscription::OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatternsOnLog>{
-        match self {
-            output_events_by_component_id_patterns_subscription::OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns::Log(ev) => Some(ev),
-            _ => None,
+            TapEncodingFormat::Logfmt => Self::LOGFMT,
         }
     }
 }
@@ -64,7 +57,8 @@ pub trait TapSubscriptionExt {
     /// Executes an output events subscription.
     fn output_events_by_component_id_patterns_subscription(
         &self,
-        component_patterns: Vec<String>,
+        outputs_patterns: Vec<String>,
+        inputs_patterns: Vec<String>,
         encoding: TapEncodingFormat,
         limit: i64,
         interval: i64,
@@ -75,14 +69,16 @@ impl TapSubscriptionExt for crate::SubscriptionClient {
     /// Executes an output events subscription.
     fn output_events_by_component_id_patterns_subscription(
         &self,
-        patterns: Vec<String>,
+        outputs_patterns: Vec<String>,
+        inputs_patterns: Vec<String>,
         encoding: TapEncodingFormat,
         limit: i64,
         interval: i64,
     ) -> BoxedSubscription<OutputEventsByComponentIdPatternsSubscription> {
         let request_body = OutputEventsByComponentIdPatternsSubscription::build_query(
             output_events_by_component_id_patterns_subscription::Variables {
-                patterns,
+                outputs_patterns,
+                inputs_patterns: Some(inputs_patterns),
                 limit,
                 interval,
                 encoding: encoding.into(),

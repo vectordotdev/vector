@@ -1,0 +1,79 @@
+/* Marketo Forms */
+form.mktoForm.flex.flex-col *
+    font-weight: 400 !important
+    font-size: 1rem !important
+    line-height: 1.5rem !important
+    color: rgb(63, 63, 70)
+
+.dark form.mktoForm.flex.flex-col *
+    color: rgb(212, 212, 216)
+
+form.mktoForm.flex.flex-col .mktoErrorMsg
+    color: rgb(212, 212, 216)
+
+form.mktoForm.flex.flex-col .mktoFormCol
+    width: 100% !important
+    margin-bottom: 12px !important
+
+form.mktoForm.flex.flex-col .mktoGutter,
+form.mktoForm.flex.flex-col .mktoOffset,
+form.mktoForm.flex.flex-col .mktoAsterix
+    display: none
+
+form.mktoForm.flex.flex-col .mktoFieldWrap
+    display: flex
+    flex-direction: column
+    width: 100%
+
+form.mktoForm.flex.flex-col label.mktoLabel
+    width: 100% !important
+    display: block
+
+form.mktoForm.flex.flex-col input.mktoField,
+form.mktoForm.flex.flex-col select.mktoField
+    width: 100% !important
+    border-width: 1px
+    border-color: rgb(63, 63, 70)
+    border-radius: 0.375rem
+    height: 2.25rem
+
+form.mktoForm.flex.flex-col .mktoFormCol .mktoHtmlText
+    width: 100% !important
+
+form.mktoForm.flex.flex-col .mktoFormCol .mktoHtmlText span
+    font-size: 0.85rem !important
+    line-height: 1.25rem !important
+
+.dark form.mktoForm.flex.flex-col .mktoFormCol .mktoHtmlText span,
+.dark form.mktoForm.flex.flex-col .mktoFormCol .mktoHtmlText span a
+    color: rgb(212, 212, 216) !important
+
+form.mktoForm.flex.flex-col .mktoButtonRow span.mktoButtonWrap
+    display: block
+    width: 100%
+    margin: 0 !important
+
+form.mktoForm.flex.flex-col .mktoButtonRow button.mktoButton
+    display: flex !important
+    padding-top: 0.5rem
+    padding-bottom: 0.5rem
+    color: rgb(25, 25, 39)
+    background-color: rgb(228, 228, 231)
+    justify-content: center
+    align-items: center
+    width: 100%
+    border-width: 1px
+    border-color: rgb(25, 25, 39)
+    border-radius: 0.25rem
+    user-select: none
+
+    &:hover
+        color: rgb(25, 25, 39)
+        border-color: rgb(25, 25, 39)
+        background-color: rgb(40, 217, 242)
+
+    @media (min-width: 768px)
+        padding-left: 2.5rem
+        padding-right: 2.5rem
+        width: max-content
+        margin: auto

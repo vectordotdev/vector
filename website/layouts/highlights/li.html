@@ -36,7 +36,7 @@
             {{ range .Params.authors }}
             {{ $name := (index (where site.Data.docs.authors ".handle" "eq" .) 0).name }}
             {{ $link := printf "https://github.com/%s" . }}
-            <a href="{{ $link }}" class="text-md font-bold tracking-tight text-gray-700 hover:text-secondary dark:text-gray-200 dark:hover:text-primary" target="_blank">
+            <a href="{{ $link }}" class="text-md font-bold tracking-tight text-gray-700 hover:text-secondary dark:text-gray-200 dark:hover:text-primary" rel="noopener" target="_blank">
               {{ $name }}
             </a>
             {{ end }}

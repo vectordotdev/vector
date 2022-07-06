@@ -11,14 +11,17 @@ include = ["sample.log"]
 start_at_beginning = true
 
 # Structure and parse the data
-[transforms.regex_parser]
+[transforms.remap]
 inputs = ["file"]
-type = "regex_parser"
-patterns = ['^(?P<host>[\w\.]+) - (?P<user>[\w-]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$']
+type = "remap"
+drop_on_error = false
+source = '''
+. |= parse_apache_log!(string!(.message), "common")
+'''
 
 # Transform into metrics
 [transforms.log_to_metric]
-inputs = ["regex_parser"]
+inputs = ["remap"]
 type = "log_to_metric"
 
 [[transforms.log_to_metric.metrics]]
@@ -34,7 +37,7 @@ type = "console"
 encoding = "json"
 
 [sinks.console_logs]
-inputs = ["regex_parser"]
+inputs = ["remap"]
 type = "console"
 encoding = "json"
 

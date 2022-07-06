@@ -1,31 +1,41 @@
-use super::collector::{self, MetricCollector as _};
-use crate::{
-    config::{self, SinkConfig, SinkDescription},
-    event::{Event, Metric},
-    http::{Auth, HttpClient},
-    internal_events::TemplateRenderingFailed,
-    sinks::{
-        self,
-        util::{
-            batch::{BatchConfig, BatchSettings},
-            buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
-            http::HttpRetryLogic,
-            EncodedEvent, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
-            TowerRequestConfig,
-        },
-    },
-    template::Template,
-    tls::{TlsOptions, TlsSettings},
-};
+use std::task;
+
 use bytes::{Bytes, BytesMut};
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
 use http::Uri;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::task;
-use tower::ServiceBuilder;
 use vector_core::ByteSizeOf;
+
+use super::collector::{self, MetricCollector as _};
+use crate::{
+    config::{self, AcknowledgementsConfig, Input, SinkConfig, SinkDescription},
+    event::{Event, Metric},
+    http::{Auth, HttpClient},
+    internal_events::TemplateRenderingError,
+    sinks::{
+        self,
+        util::{
+            batch::BatchConfig,
+            buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
+            http::HttpRetryLogic,
+            EncodedEvent, PartitionBuffer, PartitionInnerBuffer, SinkBatchSettings,
+            TowerRequestConfig,
+        },
+    },
+    template::Template,
+    tls::{TlsConfig, TlsSettings},
+};
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct PrometheusRemoteWriteDefaultBatchSettings;
+
+impl SinkBatchSettings for PrometheusRemoteWriteDefaultBatchSettings {
+    const MAX_EVENTS: Option<usize> = Some(1_000);
+    const MAX_BYTES: Option<usize> = None;
+    const TIMEOUT_SECS: f64 = 1.0;
+}
 
 #[derive(Debug, Snafu)]
 enum Errors {
@@ -46,14 +56,14 @@ pub struct RemoteWriteConfig {
     pub quantiles: Vec<f64>,
 
     #[serde(default)]
-    pub batch: BatchConfig,
+    pub batch: BatchConfig<PrometheusRemoteWriteDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
 
     #[serde(default)]
     pub tenant_id: Option<Template>,
 
-    pub tls: Option<TlsOptions>,
+    pub tls: Option<TlsConfig>,
 
     pub auth: Option<Auth>,
 }
@@ -71,13 +81,10 @@ impl SinkConfig for RemoteWriteConfig {
         &self,
         cx: config::SinkContext,
     ) -> crate::Result<(sinks::VectorSink, sinks::Healthcheck)> {
-        let endpoint = self.endpoint.parse::<Uri>().context(sinks::UriParseError)?;
+        let endpoint = self.endpoint.parse::<Uri>().context(sinks::UriParseSnafu)?;
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let batch = BatchSettings::default()
-            .events(1_000)
-            .timeout(1)
-            .parse_config(self.batch)?;
-        let request = self.request.unwrap_with(&TowerRequestConfig::default());
+        let batch = self.batch.into_batch_settings()?;
+        let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
         let buckets = self.buckets.clone();
         let quantiles = self.quantiles.clone();
 
@@ -96,20 +103,19 @@ impl SinkConfig for RemoteWriteConfig {
         };
 
         let sink = {
-            let service = request.service(HttpRetryLogic, service);
-            let service = ServiceBuilder::new().service(service);
             let buffer = PartitionBuffer::new(MetricsBuffer::new(batch.size));
             let mut normalizer = MetricNormalizer::<PrometheusMetricNormalize>::default();
 
-            PartitionBatchSink::new(service, buffer, batch.timeout, cx.acker())
+            request_settings
+                .partition_sink(HttpRetryLogic, service, buffer, batch.timeout, cx.acker())
                 .with_flat_map(move |event: Event| {
                     let byte_size = event.size_of();
-                    stream::iter(normalizer.apply(event).map(|event| {
+                    stream::iter(normalizer.normalize(event.into_metric()).map(|event| {
                         let tenant_id = tenant_id.as_ref().and_then(|template| {
                             template
                                 .render_string(&event)
                                 .map_err(|error| {
-                                    emit!(&TemplateRenderingFailed {
+                                    emit!(TemplateRenderingError {
                                         error,
                                         field: Some("tenant_id"),
                                         drop_event: false,
@@ -129,15 +135,19 @@ impl SinkConfig for RemoteWriteConfig {
                 )
         };
 
-        Ok((sinks::VectorSink::Sink(Box::new(sink)), healthcheck))
+        Ok((sinks::VectorSink::from_event_sink(sink), healthcheck))
     }
 
-    fn input_type(&self) -> config::DataType {
-        config::DataType::Metric
+    fn input(&self) -> Input {
+        Input::metric()
     }
 
     fn sink_type(&self) -> &'static str {
         "prometheus_remote_write"
+    }
+
+    fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
+        None
     }
 }
 
@@ -158,10 +168,12 @@ async fn healthcheck(endpoint: Uri, client: HttpClient) -> crate::Result<()> {
         other => Err(sinks::HealthcheckError::UnexpectedStatus { status: other }.into()),
     }
 }
+
+#[derive(Default)]
 pub struct PrometheusMetricNormalize;
 
 impl MetricNormalize for PrometheusMetricNormalize {
-    fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+    fn normalize(&mut self, state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         state.make_absolute(metric)
     }
 }
@@ -184,7 +196,6 @@ impl RemoteWriteService {
                 self.default_namespace.as_deref(),
                 &self.buckets,
                 &self.quantiles,
-                false,
                 &metric,
             );
         }
@@ -241,6 +252,11 @@ fn snap_block(data: Bytes) -> Vec<u8> {
 
 #[cfg(test)]
 mod tests {
+    use futures::StreamExt;
+    use http::HeaderMap;
+    use indoc::indoc;
+    use prometheus_parser::proto;
+
     use super::*;
     use crate::{
         config::SinkContext,
@@ -248,10 +264,6 @@ mod tests {
         sinks::util::test::build_test_server,
         test_util,
     };
-    use futures::StreamExt;
-    use http::HeaderMap;
-    use indoc::indoc;
-    use prometheus_parser::proto;
 
     #[test]
     fn generate_config() {
@@ -387,7 +399,7 @@ mod tests {
         let cx = SinkContext::new_test();
 
         let (sink, _) = config.build(cx).await.unwrap();
-        sink.run(stream::iter(events)).await.unwrap();
+        sink.run_events(events).await.unwrap();
 
         drop(trigger);
 
@@ -441,18 +453,17 @@ mod tests {
 
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
 mod integration_tests {
-    use super::tests::*;
-    use super::*;
+    use std::{collections::HashMap, ops::Range};
+
+    use serde_json::Value;
+
+    use super::{tests::*, *};
     use crate::{
         config::{SinkConfig, SinkContext},
-        event::metric::MetricValue,
-        event::Event,
+        event::{metric::MetricValue, Event},
         sinks::influxdb::test_util::{cleanup_v1, format_timestamp, onboarding_v1, query_v1},
-        tls::{self, TlsOptions},
+        tls::{self, TlsConfig},
     };
-    use futures::stream;
-    use serde_json::Value;
-    use std::{collections::HashMap, ops::Range};
 
     const HTTP_URL: &str = "http://localhost:8086";
     const HTTPS_URL: &str = "https://localhost:8087";
@@ -476,7 +487,7 @@ mod integration_tests {
 
         let config = RemoteWriteConfig {
             endpoint: format!("{}/api/v1/prom/write?db={}", url, database),
-            tls: Some(TlsOptions {
+            tls: Some(TlsConfig {
                 ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
                 ..Default::default()
             }),
@@ -485,7 +496,7 @@ mod integration_tests {
         let events = create_events(0..5, |n| n * 11.0);
 
         let (sink, _) = config.build(cx).await.expect("error building config");
-        sink.run(stream::iter(events.clone())).await.unwrap();
+        sink.run_events(events.clone()).await.unwrap();
 
         let result = query(url, &format!("show series on {}", database)).await;
 

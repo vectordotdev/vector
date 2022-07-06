@@ -1,20 +1,26 @@
-use super::Value;
-use serde::{Serialize, Serializer};
 use std::{
     collections::{btree_map, BTreeMap},
     iter, slice,
 };
 
+use serde::{Serialize, Serializer};
+
+use super::Value;
+
 /// Iterates over all paths in form `a.b[0].c[1]` in alphabetical order
 /// and their corresponding values.
-pub fn all_fields(
-    fields: &BTreeMap<String, Value>,
-) -> impl Iterator<Item = (String, &Value)> + Serialize {
+pub fn all_fields(fields: &BTreeMap<String, Value>) -> FieldsIter {
     FieldsIter::new(fields)
+}
+
+/// An iterator with a single "message" element
+pub fn all_fields_non_object_root(value: &Value) -> FieldsIter {
+    FieldsIter::non_object(value)
 }
 
 #[derive(Clone)]
 enum LeafIter<'a> {
+    Root(&'a Value),
     Map(btree_map::Iter<'a, String, Value>),
     Array(iter::Enumerate<slice::Iter<'a, Value>>),
 }
@@ -29,7 +35,7 @@ enum PathComponent<'a> {
 ///
 /// If a key maps to an empty collection, the key and the empty collection will be returned.
 #[derive(Clone)]
-struct FieldsIter<'a> {
+pub struct FieldsIter<'a> {
     /// Stack of iterators used for the depth-first traversal.
     stack: Vec<LeafIter<'a>>,
     /// Path components from the root up to the top of the stack.
@@ -44,9 +50,18 @@ impl<'a> FieldsIter<'a> {
         }
     }
 
+    /// This is for backwards compatibility. An event where the root is not an object
+    /// will be treated as an object with a single "message" key
+    fn non_object(value: &'a Value) -> FieldsIter<'a> {
+        FieldsIter {
+            stack: vec![LeafIter::Root(value)],
+            path: vec![],
+        }
+    }
+
     fn push(&mut self, value: &'a Value, component: PathComponent<'a>) -> Option<&'a Value> {
         match value {
-            Value::Map(map) if !map.is_empty() => {
+            Value::Object(map) if !map.is_empty() => {
                 self.stack.push(LeafIter::Map(map.iter()));
                 self.path.push(component);
                 None
@@ -73,7 +88,7 @@ impl<'a> FieldsIter<'a> {
                 None => return res,
                 Some(PathComponent::Key(key)) => {
                     if key.contains('.') {
-                        res.push_str(&key.replace(".", "\\."));
+                        res.push_str(&key.replace('.', "\\."));
                     } else {
                         res.push_str(key);
                     }
@@ -113,6 +128,9 @@ impl<'a> Iterator for FieldsIter<'a> {
                         }
                     }
                 },
+                Some(LeafIter::Root(value)) => {
+                    return Some(("message".to_owned(), value));
+                }
             };
         }
     }
@@ -129,10 +147,10 @@ impl<'a> Serialize for FieldsIter<'a> {
 
 #[cfg(test)]
 mod test {
-    use super::super::test::fields_from_json;
-    use super::*;
     use pretty_assertions::assert_eq;
     use serde_json::json;
+
+    use super::{super::test::fields_from_json, *};
 
     #[test]
     fn keys_simple() {
@@ -178,7 +196,7 @@ mod test {
             ("a.array[3][0]", Value::Integer(2)),
             ("a.b.c", Value::Integer(5)),
             ("a\\.b\\.c", Value::Integer(6)),
-            ("d", Value::Map(BTreeMap::new())),
+            ("d", Value::Object(BTreeMap::new())),
             ("e", Value::Array(Vec::new())),
         ]
         .into_iter()

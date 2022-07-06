@@ -10,7 +10,8 @@ pub Lookup: Lookup<'input> = {
       l.push_front(s);
       l
     }
-  }
+  },
+  "." => Lookup::root(),
 }
 
 PathSegment: Segment<'input> = {

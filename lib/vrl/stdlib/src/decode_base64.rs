@@ -1,6 +1,28 @@
-use crate::util::Base64Charset;
 use std::str::FromStr;
+
+use ::value::Value;
 use vrl::prelude::*;
+
+use crate::util::Base64Charset;
+
+fn decode_base64(charset: Option<Value>, value: Value) -> Resolved {
+    let charset = charset
+        .map(Value::try_bytes)
+        .transpose()?
+        .map(|c| Base64Charset::from_str(&String::from_utf8_lossy(&c)))
+        .transpose()?
+        .unwrap_or_default();
+    let config = match charset {
+        Base64Charset::Standard => base64::STANDARD,
+        Base64Charset::UrlSafe => base64::URL_SAFE,
+    };
+    let value = value.try_bytes()?;
+
+    match base64::decode_config(value, config) {
+        Ok(s) => Ok(Value::from(Bytes::from(s))),
+        Err(_) => Err("unable to decode value to base64".into()),
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct DecodeBase64;
@@ -27,8 +49,8 @@ impl Function for DecodeBase64 {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -54,35 +76,16 @@ struct DecodeBase64Fn {
 
 impl Expression for DecodeBase64Fn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?.try_bytes()?;
+        let value = self.value.resolve(ctx)?;
+        let charset = self.charset.as_ref().map(|c| c.resolve(ctx)).transpose()?;
 
-        let charset = self
-            .charset
-            .as_ref()
-            .map(|c| {
-                c.resolve(ctx)
-                    .and_then(|v| Value::try_bytes(v).map_err(Into::into))
-            })
-            .transpose()?
-            .map(|c| Base64Charset::from_str(&String::from_utf8_lossy(&c)))
-            .transpose()?
-            .unwrap_or_default();
-
-        let config = match charset {
-            Base64Charset::Standard => base64::STANDARD,
-            Base64Charset::UrlSafe => base64::URL_SAFE,
-        };
-
-        match base64::decode_config(value, config) {
-            Ok(s) => Ok(Value::from(s)),
-            Err(_) => Err("unable to decode value to base64".into()),
-        }
+        decode_base64(charset, value)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         // Always fallible due to the possibility of decoding errors that VRL can't detect in
         // advance: https://docs.rs/base64/0.13.0/base64/enum.DecodeError.html
-        TypeDef::new().bytes().fallible()
+        TypeDef::bytes().fallible()
     }
 }
 
@@ -96,31 +99,31 @@ mod test {
         with_defaults {
             args: func_args![value: value!("c29tZSs9c3RyaW5nL3ZhbHVl")],
             want: Ok(value!("some+=string/value")),
-            tdef: TypeDef::new().bytes().fallible(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         with_standard_charset {
             args: func_args![value: value!("c29tZSs9c3RyaW5nL3ZhbHVl"), charset: value!["standard"]],
             want: Ok(value!("some+=string/value")),
-            tdef: TypeDef::new().bytes().fallible(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         with_urlsafe_charset {
             args: func_args![value: value!("c29tZSs9c3RyaW5nL3ZhbHVl"), charset: value!("url_safe")],
             want: Ok(value!("some+=string/value")),
-            tdef: TypeDef::new().bytes().fallible(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         empty_string_standard_charset {
             args: func_args![value: value!(""), charset: value!("standard")],
             want: Ok(value!("")),
-            tdef: TypeDef::new().bytes().fallible(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         empty_string_urlsafe_charset {
             args: func_args![value: value!(""), charset: value!("url_safe")],
             want: Ok(value!("")),
-            tdef: TypeDef::new().bytes().fallible(),
+            tdef: TypeDef::bytes().fallible(),
         }
     ];
 }

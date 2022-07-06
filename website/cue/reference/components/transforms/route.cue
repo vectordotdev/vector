@@ -22,16 +22,6 @@ components: transforms: route: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -40,11 +30,13 @@ components: transforms: route: {
 	configuration: {
 		route: {
 			description: """
-				A table of route identifiers to logical conditions representing the filter of the route. Each route
-				can then be referenced as an input by other components with the name `<transform_name>.<route_id>`.
+				A table of route identifiers to logical conditions representing the filter of the route. Each route can
+				then be referenced as an input by other components with the name `<transform_name>.<route_id>`. If an
+				event doesn't match any route, it will be sent to the `<transform_name>._unmatched` output. Note,
+				`_unmatched` is a reserved output name and cannot be used as a route name. `_default` is also reserved
+				for future use.
 				"""
 			required: true
-			warnings: []
 			type: object: {
 				options: {
 					"*": {
@@ -53,13 +45,7 @@ components: transforms: route: {
 							condition will be included in this route.
 							"""
 						required: true
-						warnings: []
-						type: string: {
-							examples: [
-								#".status_code != 200 && !includes(["info", "debug"], .severity)"#,
-							]
-							syntax: "remap_boolean_expression"
-						}
+						type: condition: {}
 					}
 				}
 			}
@@ -76,6 +62,7 @@ components: transforms: route: {
 			set:          true
 			summary:      true
 		}
+		traces: true
 	}
 
 	examples: [
@@ -127,7 +114,10 @@ components: transforms: route: {
 		},
 	]
 
-	telemetry: metrics: {
-		events_discarded_total: components.sources.internal_metrics.output.metrics.events_discarded_total
-	}
+	outputs: [
+		{
+			name:        "<route_id>"
+			description: "Each route can be referenced as an input by other components with the name `<transform_name>.<route_id>`."
+		},
+	]
 }

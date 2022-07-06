@@ -1,38 +1,51 @@
-// ## skip check-events ##
-
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-#[derive(Debug)]
-pub struct JournaldEventReceived {
-    pub byte_size: usize,
-}
-
-impl InternalEvent for JournaldEventReceived {
-    fn emit_logs(&self) {
-        trace!(message = "Received line.", byte_size = %self.byte_size);
-    }
-
-    fn emit_metrics(&self) {
-        counter!("component_received_events_total", 1);
-        counter!("events_in_total", 1);
-        counter!("processed_bytes_total", self.byte_size as u64);
-    }
-}
+use super::prelude::{error_stage, error_type};
 
 #[derive(Debug)]
-pub struct JournaldInvalidRecord {
+pub struct JournaldInvalidRecordError {
     pub error: serde_json::Error,
     pub text: String,
 }
 
-impl InternalEvent for JournaldInvalidRecord {
-    fn emit_logs(&self) {
-        error!(message = "Invalid record from journald, discarding.", error = ?self.error, text = %self.text);
+impl InternalEvent for JournaldInvalidRecordError {
+    fn emit(self) {
+        error!(
+            message = "Invalid record from journald, discarding.",
+            error = ?self.error,
+            text = %self.text,
+            stage = error_stage::PROCESSING,
+            error_type = error_type::PARSER_FAILED,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "stage" => error_stage::PROCESSING,
+            "error_type" => error_type::PARSER_FAILED,
+        );
+        counter!("invalid_record_total", 1); // deprecated
+        counter!("invalid_record_bytes_total", self.text.len() as u64); // deprecated
     }
+}
 
-    fn emit_metrics(&self) {
-        counter!("invalid_record_total", 1);
-        counter!("invalid_record_bytes_total", self.text.len() as u64);
+pub struct JournaldNegativeAcknowledgmentError<'a> {
+    pub cursor: &'a str,
+}
+
+impl InternalEvent for JournaldNegativeAcknowledgmentError<'_> {
+    fn emit(self) {
+        error!(
+            message = "Event received a negative acknowledgment, journal has been stopped.",
+            error_code = "negative_acknowledgement",
+            error_type = error_type::ACKNOWLEDGMENT_FAILED,
+            stage = error_stage::SENDING,
+            cursor = self.cursor,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "negative_acknowledgment",
+            "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
+            "stage" => error_stage::SENDING,
+        );
     }
 }

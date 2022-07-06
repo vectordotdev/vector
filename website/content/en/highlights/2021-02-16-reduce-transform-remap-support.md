@@ -42,7 +42,7 @@ system (`check_fields`) and the new system (`remap`):
 
  # Using remap
 +starts_when.type = "remap"
-+starts_when.source = 'match(.message, /^\\w.*/) && .severity == "info"'
++starts_when.source = 'match(string!(.message), r'^\\w.*') && .severity == "info"'
 ```
 
 [reduce]: /docs/reference/configuration/transforms/reduce

@@ -1,5 +1,6 @@
-use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, SocketAddr};
+
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Copy, Clone)]
 #[serde(default, deny_unknown_fields)]

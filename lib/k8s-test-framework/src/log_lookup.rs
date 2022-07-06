@@ -1,8 +1,10 @@
 //! Perform a log lookup.
 
-use super::{Reader, Result};
 use std::process::Stdio;
+
 use tokio::process::Command;
+
+use super::{Reader, Result};
 
 /// Initiate a log lookup (`kubectl log`) with the specified `kubectl_command`
 /// for the specified `resource` at the specified `namespace`.

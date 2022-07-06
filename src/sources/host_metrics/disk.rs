@@ -1,13 +1,17 @@
-use super::{filter_result, FilterList, HostMetrics};
-use crate::event::metric::Metric;
 use chrono::Utc;
 use futures::{stream, StreamExt};
 use heim::units::information::byte;
-use serde::{Deserialize, Serialize};
-use shared::btreemap;
+use vector_common::btreemap;
+use vector_config::configurable_component;
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub(super) struct DiskConfig {
+use super::{filter_result, FilterList, HostMetrics};
+use crate::event::metric::Metric;
+
+/// Options for the “disk” metrics collector.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
+pub struct DiskConfig {
+    /// Lists of device name patterns to include or exclude.
     #[serde(default)]
     devices: FilterList,
 }
@@ -77,9 +81,13 @@ impl HostMetrics {
 
 #[cfg(test)]
 mod tests {
-    use super::super::tests::{all_counters, assert_filtered_metrics, count_name, count_tag};
-    use super::super::{HostMetrics, HostMetricsConfig};
-    use super::DiskConfig;
+    use super::{
+        super::{
+            tests::{all_counters, assert_filtered_metrics, count_name, count_tag},
+            HostMetrics, HostMetricsConfig,
+        },
+        DiskConfig,
+    };
 
     #[tokio::test]
     async fn generates_disk_metrics() {

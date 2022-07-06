@@ -1,18 +1,24 @@
+mod ddsketch;
 mod handle;
 mod label_filter;
 mod recorder;
 
 use std::sync::Arc;
 
-use crate::event::Metric;
-pub use crate::metrics::handle::{Counter, Handle};
-use crate::metrics::label_filter::VectorLabelFilter;
-use crate::metrics::recorder::VectorRecorder;
 use metrics::Key;
 use metrics_tracing_context::TracingContextLayer;
 use metrics_util::{layers::Layer, Generational, NotTracked};
 use once_cell::sync::OnceCell;
 use snafu::Snafu;
+
+pub use crate::metrics::{
+    ddsketch::{AgentDDSketch, BinMap, Config},
+    handle::{Counter, Handle},
+};
+use crate::{
+    event::Metric,
+    metrics::{label_filter::VectorLabelFilter, recorder::VectorRecorder},
+};
 
 pub(self) type Registry = metrics_util::Registry<Key, Handle, NotTracked<Handle>>;
 
@@ -127,7 +133,7 @@ impl Controller {
 
     /// Take a snapshot of all gathered metrics and expose them as metric
     /// [`Event`](crate::event::Event)s.
-    pub fn capture_metrics(&self) -> impl Iterator<Item = Metric> {
+    pub fn capture_metrics(&self) -> Vec<Metric> {
         let mut metrics: Vec<Metric> = Vec::new();
         self.recorder.with_registry(|registry| {
             registry.visit(|_kind, (key, handle)| {
@@ -135,19 +141,32 @@ impl Controller {
             });
         });
 
-        // Add alias `events_processed_total` for `events_out_total`.
+        // Add aliases for deprecated metrics
         for i in 0..metrics.len() {
             let metric = &metrics[i];
-            if metric.name() == "events_out_total" {
-                let alias = metric.clone().with_name("processed_events_total");
-                metrics.push(alias);
+            match metric.name() {
+                "component_sent_events_total" => {
+                    let alias = metric.clone().with_name("processed_events_total");
+                    metrics.push(alias);
+                }
+                "component_sent_bytes_total" if metric.tag_matches("component_kind", "sink") => {
+                    let alias = metric.clone().with_name("processed_bytes_total");
+                    metrics.push(alias);
+                }
+                "component_received_bytes_total"
+                    if metric.tag_matches("component_kind", "source") =>
+                {
+                    let alias = metric.clone().with_name("processed_bytes_total");
+                    metrics.push(alias);
+                }
+                _ => {}
             }
         }
 
         let handle = Handle::Counter(Arc::new(Counter::with_count(metrics.len() as u64 + 1)));
         metrics.push(Metric::from_metric_kv(&CARDINALITY_KEY, &handle));
 
-        metrics.into_iter()
+        metrics
     }
 }
 
@@ -193,4 +212,32 @@ macro_rules! update_counter {
             }
         }
     }};
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn prepare_metrics(cardinality: usize) -> &'static Controller {
+        let _ = init_test();
+        let controller = Controller::get().unwrap();
+        controller.reset();
+
+        for idx in 0..cardinality {
+            metrics::counter!("test", 1, "idx" => idx.to_string());
+        }
+
+        assert_eq!(controller.capture_metrics().len(), cardinality + 1);
+
+        controller
+    }
+
+    #[test]
+    fn cardinality_matches() {
+        for cardinality in &[0, 1, 10, 100, 1000, 10000] {
+            let controller = prepare_metrics(*cardinality);
+            let list = controller.capture_metrics();
+            assert_eq!(list.len(), cardinality + 1);
+        }
+    }
 }

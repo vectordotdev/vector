@@ -38,8 +38,8 @@ impl Function for IsTimestamp {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -58,15 +58,16 @@ impl Expression for IsTimestampFn {
         self.value.resolve(ctx).map(|v| value!(v.is_timestamp()))
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().boolean()
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        TypeDef::boolean().infallible()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::{DateTime, Utc};
+
+    use super::*;
 
     test_function![
         is_timestamp => IsTimestamp;
@@ -76,13 +77,13 @@ mod tests {
                 .unwrap()
                 .with_timezone(&Utc))],
             want: Ok(value!(true)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
 
         integer {
             args: func_args![value: value!(1789)],
             want: Ok(value!(false)),
-            tdef: TypeDef::new().infallible().boolean(),
+            tdef: TypeDef::boolean().infallible(),
         }
     ];
 }

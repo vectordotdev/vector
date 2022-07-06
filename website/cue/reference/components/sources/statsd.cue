@@ -15,6 +15,7 @@ components: sources: statsd: {
 	}
 
 	features: {
+		acknowledgements: false
 		multiline: enabled: false
 		receive: {
 			from: {
@@ -35,21 +36,15 @@ components: sources: statsd: {
 				relevant_when: "mode = `tcp` or mode = `udp`"
 			}
 			keepalive: enabled: true
-			tls: enabled:       false
+			tls: {
+				enabled:                true
+				can_verify_certificate: true
+				enabled_default:        false
+			}
 		}
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -64,33 +59,27 @@ components: sources: statsd: {
 			description:   "The address to listen for connections on, or `systemd#N` to use the Nth socket passed by systemd socket activation. If an address is used it _must_ include a port."
 			relevant_when: "mode = `tcp` or `udp`"
 			required:      true
-			warnings: []
 			type: string: {
 				examples: ["0.0.0.0:\(_port)", "systemd", "systemd#3"]
-				syntax: "literal"
 			}
 		}
 		mode: {
 			description: "The type of socket to use."
 			required:    true
-			warnings: []
 			type: string: {
 				enum: {
 					tcp:  "TCP Socket."
 					udp:  "UDP Socket."
 					unix: "Unix Domain Socket."
 				}
-				syntax: "literal"
 			}
 		}
 		path: {
 			description:   "The unix socket path. *This should be an absolute path*."
 			relevant_when: "mode = `unix`"
 			required:      true
-			warnings: []
 			type: string: {
 				examples: ["/path/to/socket"]
-				syntax: "literal"
 			}
 		}
 		shutdown_timeout_secs: {
@@ -98,10 +87,19 @@ components: sources: statsd: {
 			description:   "The timeout before a connection is forcefully closed during shutdown."
 			relevant_when: "mode = `tcp`"
 			required:      false
-			warnings: []
 			type: uint: {
 				default: 30
 				unit:    "seconds"
+			}
+		}
+		connection_limit: {
+			common:        false
+			description:   "The max number of TCP connections that will be processed."
+			relevant_when: "mode = `tcp`"
+			required:      false
+			type: uint: {
+				default: null
+				unit:    "concurrency"
 			}
 		}
 
@@ -129,12 +127,16 @@ components: sources: statsd: {
 	}
 
 	telemetry: metrics: {
-		events_in_total:                 components.sources.internal_metrics.output.metrics.events_in_total
-		connection_errors_total:         components.sources.internal_metrics.output.metrics.connection_errors_total
-		invalid_record_total:            components.sources.internal_metrics.output.metrics.invalid_record_total
-		invalid_record_bytes_total:      components.sources.internal_metrics.output.metrics.invalid_record_bytes_total
-		processed_bytes_total:           components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:          components.sources.internal_metrics.output.metrics.processed_events_total
-		component_received_events_total: components.sources.internal_metrics.output.metrics.component_received_events_total
+		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
+		connection_errors_total:              components.sources.internal_metrics.output.metrics.connection_errors_total
+		invalid_record_total:                 components.sources.internal_metrics.output.metrics.invalid_record_total
+		invalid_record_bytes_total:           components.sources.internal_metrics.output.metrics.invalid_record_bytes_total
+		processed_bytes_total:                components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:               components.sources.internal_metrics.output.metrics.processed_events_total
+		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
+		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
+		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
+		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
+		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 	}
 }

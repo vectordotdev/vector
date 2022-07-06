@@ -1,13 +1,15 @@
-use super::config::ConfigBuilder;
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::broadcast;
 use tokio_stream::{Stream, StreamExt};
 
-pub type ShutdownTx = broadcast::Sender<()>;
-pub type SignalTx = mpsc::Sender<SignalTo>;
-pub type SignalRx = mpsc::Receiver<SignalTo>;
+use super::config::ConfigBuilder;
 
-#[derive(Debug)]
+pub type ShutdownTx = broadcast::Sender<()>;
+pub type SignalTx = broadcast::Sender<SignalTo>;
+pub type SignalRx = broadcast::Receiver<SignalTo>;
+
+#[derive(Debug, Clone)]
 /// Control messages used by Vector to drive topology and shutdown events.
+#[allow(clippy::large_enum_variant)] // discovered during Rust upgrade to 1.57; just allowing for now since we did previously
 pub enum SignalTo {
     /// Signal to reload config from a string.
     ReloadFromConfigBuilder(ConfigBuilder),
@@ -27,10 +29,10 @@ pub struct SignalHandler {
 }
 
 impl SignalHandler {
-    /// Create a new signal handler. We'll have space for 2 control messages at a time, to
-    /// ensure the channel isn't blocking.
+    /// Create a new signal handler with space for 128 control messages at a time, to
+    /// ensure the channel doesn't overflow and drop signals.
     pub fn new() -> (Self, SignalRx) {
-        let (tx, rx) = mpsc::channel(2);
+        let (tx, rx) = broadcast::channel(128);
         let handler = Self {
             tx,
             shutdown_txs: vec![],
@@ -42,6 +44,11 @@ impl SignalHandler {
     /// Clones the transmitter.
     pub fn clone_tx(&self) -> SignalTx {
         self.tx.clone()
+    }
+
+    /// Subscribe to the stream, and return a new receiver.
+    pub fn subscribe(&self) -> SignalRx {
+        self.tx.subscribe()
     }
 
     /// Takes a stream who's elements are convertible to `SignalTo`, and spawns a permanent
@@ -57,7 +64,7 @@ impl SignalHandler {
             tokio::pin!(stream);
 
             while let Some(value) = stream.next().await {
-                if tx.send(value.into()).await.is_err() {
+                if tx.send(value.into()).is_err() {
                     error!(message = "Couldn't send signal.");
                     break;
                 }
@@ -66,7 +73,7 @@ impl SignalHandler {
     }
 
     /// Takes a stream, sending to the underlying signal receiver. Returns a broadcast tx
-    /// channel which can be used by the caller to either subscribe to cancelation, or trigger
+    /// channel which can be used by the caller to either subscribe to cancellation, or trigger
     /// it. Useful for providers that may need to do both.
     pub fn add<T, S>(&mut self, stream: S)
     where
@@ -87,7 +94,7 @@ impl SignalHandler {
 
                     _ = shutdown_rx.recv() => break,
                     Some(value) = stream.next() => {
-                        if tx.send(value.into()).await.is_err() {
+                        if tx.send(value.into()).is_err() {
                             error!(message = "Couldn't send signal.");
                             break;
                         }
@@ -135,7 +142,7 @@ pub fn os_signals() -> impl Stream<Item = SignalTo> {
 
 /// Signals from OS/user.
 #[cfg(windows)]
-pub fn os_signals() -> impl Stream<Item = SignalTo> {
+pub(crate) fn os_signals() -> impl Stream<Item = SignalTo> {
     use futures::future::FutureExt;
 
     async_stream::stream! {

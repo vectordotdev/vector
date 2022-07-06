@@ -18,6 +18,7 @@ components: sources: aws_ecs_metrics: {
 	}
 
 	features: {
+		acknowledgements: false
 		collect: {
 			checkpoint: enabled: false
 			from: {
@@ -40,16 +41,6 @@ components: sources: aws_ecs_metrics: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -72,7 +63,6 @@ components: sources: aws_ecs_metrics: {
 			required: false
 			type: string: {
 				default: "${ECS_CONTAINER_METADATA_URI_V4}"
-				syntax:  "literal"
 			}
 		}
 		namespace: {
@@ -81,7 +71,6 @@ components: sources: aws_ecs_metrics: {
 			required:    false
 			type: string: {
 				default: "awsecs"
-				syntax:  "literal"
 			}
 		}
 		scrape_interval_secs: {
@@ -107,7 +96,6 @@ components: sources: aws_ecs_metrics: {
 					v3: "When the v4 check fails but the environment variable `ECS_CONTAINER_METADATA_URI` is defined."
 					v2: "When the v4 and v3 checks fail."
 				}
-				syntax: "literal"
 			}
 		}
 	}
@@ -244,14 +232,20 @@ components: sources: aws_ecs_metrics: {
 	}
 
 	telemetry: metrics: {
-		events_in_total:                 components.sources.internal_metrics.output.metrics.events_in_total
-		http_error_response_total:       components.sources.internal_metrics.output.metrics.http_error_response_total
-		http_request_errors_total:       components.sources.internal_metrics.output.metrics.http_request_errors_total
-		parse_errors_total:              components.sources.internal_metrics.output.metrics.parse_errors_total
-		processed_bytes_total:           components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:          components.sources.internal_metrics.output.metrics.processed_events_total
-		component_received_events_total: components.sources.internal_metrics.output.metrics.component_received_events_total
-		requests_completed_total:        components.sources.internal_metrics.output.metrics.requests_completed_total
-		request_duration_seconds:        components.sources.internal_metrics.output.metrics.request_duration_seconds
+		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
+		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
+		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
+		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
+		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
+		component_sent_events_total:          components.sources.internal_metrics.output.metrics.component_sent_events_total
+		component_sent_event_bytes_total:     components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
+		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
+		http_error_response_total:            components.sources.internal_metrics.output.metrics.http_error_response_total
+		http_request_errors_total:            components.sources.internal_metrics.output.metrics.http_request_errors_total
+		parse_errors_total:                   components.sources.internal_metrics.output.metrics.parse_errors_total
+		processed_bytes_total:                components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:               components.sources.internal_metrics.output.metrics.processed_events_total
+		requests_completed_total:             components.sources.internal_metrics.output.metrics.requests_completed_total
+		request_duration_seconds:             components.sources.internal_metrics.output.metrics.request_duration_seconds
 	}
 }

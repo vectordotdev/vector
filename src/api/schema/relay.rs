@@ -1,3 +1,5 @@
+use std::convert::Infallible;
+
 use async_graphql::{
     connection::{self, Connection, CursorType, Edge, EmptyFields},
     Result, SimpleObject,
@@ -123,7 +125,7 @@ pub async fn query<T, I: ExactSizeIterator<Item = T>>(
     p: Params,
     default_page_size: usize,
 ) -> ConnectionResult<T> {
-    connection::query::<Base64Cursor, T, ConnectionFields, _, _, _>(
+    connection::query::<Base64Cursor, T, ConnectionFields, _, _, _, Infallible>(
         p.after,
         p.before,
         p.first,

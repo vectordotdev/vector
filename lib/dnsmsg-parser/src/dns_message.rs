@@ -1,3 +1,5 @@
+use trust_dns_proto::op::ResponseCode;
+
 pub(super) const RTYPE_MB: u16 = 7;
 pub(super) const RTYPE_MG: u16 = 8;
 pub(super) const RTYPE_MR: u16 = 9;
@@ -36,7 +38,7 @@ pub struct DnsQueryMessage {
 pub struct QueryHeader {
     pub id: u16,
     pub opcode: u8,
-    pub rcode: u8,
+    pub rcode: ResponseCode,
     pub qr: u8,
     pub aa: bool,
     pub tc: bool,
@@ -65,7 +67,7 @@ pub struct DnsUpdateMessage {
 pub struct UpdateHeader {
     pub id: u16,
     pub opcode: u8,
-    pub rcode: u8,
+    pub rcode: ResponseCode,
     pub qr: u8,
     pub zone_count: u16,
     pub prerequisite_count: u16,

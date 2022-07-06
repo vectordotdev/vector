@@ -1,38 +1,58 @@
+use std::{future::ready, pin::Pin};
+
+use bytes::Bytes;
+use futures::{Stream, StreamExt};
+use lru::LruCache;
+use vector_config::configurable_component;
+
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
+        log_schema, DataType, GenerateConfig, Input, Output, TransformConfig, TransformContext,
         TransformDescription,
     },
     event::{Event, Value},
     internal_events::DedupeEventDiscarded,
+    schema,
     transforms::{TaskTransform, Transform},
 };
-use bytes::Bytes;
-use futures::{Stream, StreamExt};
-use lru::LruCache;
-use serde::{Deserialize, Serialize};
-use std::{future::ready, pin::Pin};
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for controlling what fields to match against.
+///
+/// When no field matching configuration is specified, events are matched using the `timestamp`, `host`, and `message`
+/// fields from an event. The specific field names used will be those set in the global [`log
+/// schema`](https://vector.dev/docs/reference/configuration/global-options/#log_schema) configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub enum FieldMatchConfig {
+    /// Matches events using only the specified fields.
     #[serde(rename = "match")]
-    MatchFields(Vec<String>),
+    MatchFields(#[configurable(transparent)] Vec<String>),
+
+    /// Matches events using all fields except for the ignored ones.
     #[serde(rename = "ignore")]
-    IgnoreFields(Vec<String>),
+    IgnoreFields(#[configurable(transparent)] Vec<String>),
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Caching configuration for deduplication.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct CacheConfig {
+    /// Number of events to cache and use for comparing incoming events to previously seen events.
     pub num_events: usize,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `dedupe` transform.
+#[configurable_component(transform)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct DedupeConfig {
+    #[configurable(derived)]
     #[serde(default)]
     pub fields: Option<FieldMatchConfig>,
+
+    #[configurable(derived)]
     #[serde(default = "default_cache_config")]
     pub cache: CacheConfig,
 }
@@ -81,15 +101,15 @@ impl GenerateConfig for DedupeConfig {
 #[typetag::serde(name = "dedupe")]
 impl TransformConfig for DedupeConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::task(Dedupe::new(self.clone())))
+        Ok(Transform::event_task(Dedupe::new(self.clone())))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input(&self) -> Input {
+        Input::log()
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn transform_type(&self) -> &'static str {
@@ -136,9 +156,10 @@ const fn type_id_for_value(val: &Value) -> TypeId {
         Value::Integer(_) => 2,
         Value::Float(_) => 3,
         Value::Boolean(_) => 4,
-        Value::Map(_) => 5,
+        Value::Object(_) => 5,
         Value::Array(_) => 6,
         Value::Null => 7,
+        Value::Regex(_) => 8,
     }
 }
 
@@ -155,7 +176,7 @@ impl Dedupe {
     fn transform_one(&mut self, event: Event) -> Option<Event> {
         let cache_entry = build_cache_entry(&event, &self.fields);
         if self.cache.put(cache_entry, true).is_some() {
-            emit!(&DedupeEventDiscarded { event });
+            emit!(DedupeEventDiscarded { event });
             None
         } else {
             Some(event)
@@ -171,8 +192,8 @@ fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
         FieldMatchConfig::MatchFields(fields) => {
             let mut entry = Vec::new();
             for field_name in fields.iter() {
-                if let Some(value) = event.as_log().get(&field_name) {
-                    entry.push(Some((type_id_for_value(value), value.as_bytes())));
+                if let Some(value) = event.as_log().get(field_name.as_str()) {
+                    entry.push(Some((type_id_for_value(value), value.coerce_to_bytes())));
                 } else {
                     entry.push(None);
                 }
@@ -182,9 +203,15 @@ fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
         FieldMatchConfig::IgnoreFields(fields) => {
             let mut entry = Vec::new();
 
-            for (field_name, value) in event.as_log().all_fields() {
-                if !fields.contains(&field_name) {
-                    entry.push((field_name, type_id_for_value(value), value.as_bytes()));
+            if let Some(all_fields) = event.as_log().all_fields() {
+                for (field_name, value) in all_fields {
+                    if !fields.contains(&field_name) {
+                        entry.push((
+                            field_name,
+                            type_id_for_value(value),
+                            value.coerce_to_bytes(),
+                        ));
+                    }
                 }
             }
 
@@ -193,7 +220,7 @@ fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
     }
 }
 
-impl TaskTransform for Dedupe {
+impl TaskTransform<Event> for Dedupe {
     fn transform(
         self: Box<Self>,
         task: Pin<Box<dyn Stream<Item = Event> + Send>>,
@@ -208,10 +235,13 @@ impl TaskTransform for Dedupe {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::transforms::dedupe::{CacheConfig, DedupeConfig, FieldMatchConfig};
-    use crate::{event::Event, event::Value};
     use std::collections::BTreeMap;
+
+    use super::*;
+    use crate::{
+        event::{Event, LogEvent, Value},
+        transforms::dedupe::{CacheConfig, DedupeConfig, FieldMatchConfig},
+    };
 
     #[test]
     fn generate_config() {
@@ -249,17 +279,17 @@ mod tests {
     }
 
     fn basic(mut transform: Dedupe) {
-        let mut event1 = Event::from("message");
+        let mut event1 = Event::Log(LogEvent::from("message"));
         event1.as_mut_log().insert("matched", "some value");
         event1.as_mut_log().insert("unmatched", "another value");
 
         // Test that unmatched field isn't considered
-        let mut event2 = Event::from("message");
+        let mut event2 = Event::Log(LogEvent::from("message"));
         event2.as_mut_log().insert("matched", "some value2");
         event2.as_mut_log().insert("unmatched", "another value");
 
         // Test that matched field is considered
-        let mut event3 = Event::from("message");
+        let mut event3 = Event::Log(LogEvent::from("message"));
         event3.as_mut_log().insert("matched", "some value");
         event3.as_mut_log().insert("unmatched", "another value2");
 
@@ -289,10 +319,10 @@ mod tests {
     }
 
     fn field_name_matters(mut transform: Dedupe) {
-        let mut event1 = Event::from("message");
+        let mut event1 = Event::Log(LogEvent::from("message"));
         event1.as_mut_log().insert("matched1", "some value");
 
-        let mut event2 = Event::from("message");
+        let mut event2 = Event::Log(LogEvent::from("message"));
         event2.as_mut_log().insert("matched2", "some value");
 
         // First event should always be passed through as-is.
@@ -321,12 +351,12 @@ mod tests {
     /// way, even if the order of the matched fields is different between the
     /// two.
     fn field_order_irrelevant(mut transform: Dedupe) {
-        let mut event1 = Event::from("message");
+        let mut event1 = Event::Log(LogEvent::from("message"));
         event1.as_mut_log().insert("matched1", "value1");
         event1.as_mut_log().insert("matched2", "value2");
 
         // Add fields in opposite order
-        let mut event2 = Event::from("message");
+        let mut event2 = Event::Log(LogEvent::from("message"));
         event2.as_mut_log().insert("matched2", "value2");
         event2.as_mut_log().insert("matched1", "value1");
 
@@ -355,10 +385,10 @@ mod tests {
 
     /// Test the eviction behavior of the underlying LruCache
     fn age_out(mut transform: Dedupe) {
-        let mut event1 = Event::from("message");
+        let mut event1 = Event::Log(LogEvent::from("message"));
         event1.as_mut_log().insert("matched", "some value");
 
-        let mut event2 = Event::from("message");
+        let mut event2 = Event::Log(LogEvent::from("message"));
         event2.as_mut_log().insert("matched", "some value2");
 
         // First event should always be passed through as-is.
@@ -392,10 +422,10 @@ mod tests {
     /// different types but the same string representation aren't considered
     /// duplicates.
     fn type_matching(mut transform: Dedupe) {
-        let mut event1 = Event::from("message");
+        let mut event1 = Event::Log(LogEvent::from("message"));
         event1.as_mut_log().insert("matched", "123");
 
-        let mut event2 = Event::from("message");
+        let mut event2 = Event::Log(LogEvent::from("message"));
         event2.as_mut_log().insert("matched", 123);
 
         // First event should always be passed through as-is.
@@ -426,12 +456,12 @@ mod tests {
     fn type_matching_nested_objects(mut transform: Dedupe) {
         let mut map1: BTreeMap<String, Value> = BTreeMap::new();
         map1.insert("key".into(), "123".into());
-        let mut event1 = Event::from("message");
+        let mut event1 = Event::Log(LogEvent::from("message"));
         event1.as_mut_log().insert("matched", map1);
 
         let mut map2: BTreeMap<String, Value> = BTreeMap::new();
         map2.insert("key".into(), 123.into());
-        let mut event2 = Event::from("message");
+        let mut event2 = Event::Log(LogEvent::from("message"));
         event2.as_mut_log().insert("matched", map2);
 
         // First event should always be passed through as-is.
@@ -458,10 +488,10 @@ mod tests {
 
     /// Test an explicit null vs a field being missing are treated as different.
     fn ignore_vs_missing(mut transform: Dedupe) {
-        let mut event1 = Event::from("message");
+        let mut event1 = Event::Log(LogEvent::from("message"));
         event1.as_mut_log().insert("matched", Value::Null);
 
-        let event2 = Event::from("message");
+        let event2 = Event::Log(LogEvent::from("message"));
 
         // First event should always be passed through as-is.
         let new_event = transform.transform_one(event1.clone()).unwrap();

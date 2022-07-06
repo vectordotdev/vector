@@ -1,46 +1,36 @@
-// ## skip check-events ##
-
-use crate::template::TemplateParseError;
-use metrics::counter;
 use std::num::ParseFloatError;
+
+use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-pub struct LogToMetricFieldNull<'a> {
+use super::prelude::{error_stage, error_type};
+use crate::template::TemplateParseError;
+
+pub struct LogToMetricFieldNullError<'a> {
     pub field: &'a str,
 }
 
-impl<'a> InternalEvent for LogToMetricFieldNull<'a> {
-    fn emit_logs(&self) {
-        warn!(
-            message = "Field is null.",
+impl<'a> InternalEvent for LogToMetricFieldNullError<'a> {
+    fn emit(self) {
+        error!(
+            message = "Unable to convert null field.",
+            error_code = "field_null",
+            error_type = error_type::CONDITION_FAILED,
+            stage = error_stage::PROCESSING,
             null_field = %self.field,
             internal_log_rate_secs = 30
         );
-    }
-
-    fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1,
-                 "error_type" => "field_null",
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "field_null",
+            "error_type" => error_type::CONDITION_FAILED,
+            "stage" => error_stage::PROCESSING,
+            "null_field" => self.field.to_string(),
         );
-    }
-}
-
-pub struct LogToMetricFieldNotFound<'a> {
-    pub field: &'a str,
-}
-
-impl<'a> InternalEvent for LogToMetricFieldNotFound<'a> {
-    fn emit_logs(&self) {
-        warn!(
-            message = "Field not found.",
-            missing_field = %self.field,
-            internal_log_rate_secs = 30
-        );
-    }
-
-    fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1,
-                 "error_type" => "field_not_found",
+        // deprecated
+        counter!(
+            "processing_errors_total", 1,
+            "error_type" => "field_null",
         );
     }
 }
@@ -51,18 +41,27 @@ pub struct LogToMetricParseFloatError<'a> {
 }
 
 impl<'a> InternalEvent for LogToMetricParseFloatError<'a> {
-    fn emit_logs(&self) {
-        warn!(
+    fn emit(self) {
+        error!(
             message = "Failed to parse field as float.",
+            error = ?self.error,
             field = %self.field,
-            error = %self.error,
+            error_code = "failed_parsing_float",
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::PROCESSING,
             internal_log_rate_secs = 30
         );
-    }
-
-    fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1,
-                 "error_type" => "parse_error",
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "failed_parsing_float",
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::PROCESSING,
+            "field" => self.field.to_string(),
+        );
+        // deprecated
+        counter!(
+            "processing_errors_total", 1,
+            "error_type" => "parse_error",
         );
     }
 }
@@ -72,13 +71,25 @@ pub struct LogToMetricTemplateParseError {
 }
 
 impl InternalEvent for LogToMetricTemplateParseError {
-    fn emit_logs(&self) {
-        warn!(message = "Failed to parse template.", error = ?self.error, internal_log_rate_secs = 30);
-    }
-
-    fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1,
-                 "error_type" => "template_error",
+    fn emit(self) {
+        error!(
+            message = "Failed to parse template.",
+            error = ?self.error,
+            error_code = "failed_parsing_template",
+            error_type = error_type::TEMPLATE_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_secs = 30,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "failed_parsing_template",
+            "error_type" => error_type::TEMPLATE_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
+        // deprecated
+        counter!(
+            "processing_errors_total", 1,
+            "error_type" => "template_error",
         );
     }
 }

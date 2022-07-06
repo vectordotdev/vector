@@ -1,5 +1,6 @@
-use crate::parse_syslog::ParseSyslogFn;
 use vrl::prelude::*;
+
+use crate::parse_syslog::ParseSyslogFn;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseLinuxAuthorization;
@@ -27,15 +28,15 @@ impl Function for ParseLinuxAuthorization {
                 "hostname": "localhost",
                 "message": "Accepted publickey for eng from 10.1.1.1 port 8888 ssh2: RSA SHA256:foobar",
                 "procid": 1111,
-                "timestamp": "2021-03-23T01:49:58Z"
+                "timestamp": "2022-03-23T01:49:58Z"
             }"#}),
         }]
     }
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");

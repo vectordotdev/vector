@@ -1,11 +1,14 @@
-use crate::*;
 use std::{fs, io::Read, path::Path};
+
+use once_cell::sync::Lazy;
 use tracing::trace;
+
+use crate::*;
 
 const SUFFICIENTLY_COMPLEX: &str = r#"regular."quoted"."quoted but spaces"."quoted.but.periods".lookup[0].00numericstart.nested_lookup[0][0]"#;
 
-lazy_static::lazy_static! {
-    static ref SUFFICIENTLY_DECOMPOSED: [Segment<'static>; 10] = [
+static SUFFICIENTLY_DECOMPOSED: Lazy<[Segment<'static>; 10]> = Lazy::new(|| {
+    [
         Segment::from(r#"regular"#),
         Segment::from(r#""quoted""#),
         Segment::from(r#""quoted but spaces""#),
@@ -16,8 +19,8 @@ lazy_static::lazy_static! {
         Segment::from(r#"nested_lookup"#),
         Segment::from(0),
         Segment::from(0),
-    ];
-}
+    ]
+});
 
 #[test]
 fn field_is_quoted() {

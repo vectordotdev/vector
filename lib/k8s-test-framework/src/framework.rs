@@ -24,6 +24,7 @@ impl Framework {
         &self,
         namespace: &str,
         helm_chart: &str,
+        release_name: &str,
         helm_repo: &str,
         config: vector::Config<'_>,
     ) -> Result<up_down::Manager<vector::CommandBuilder>> {
@@ -32,6 +33,7 @@ impl Framework {
             self.interface.deploy_chart_command.as_str(),
             namespace,
             helm_chart,
+            release_name,
             config,
             Some(env),
         )?;
@@ -164,6 +166,11 @@ impl Framework {
     /// Gets the name of the pod implementing the service on the given node.
     async fn get_pod_on_node(&self, namespace: &str, node: &str, service: &str) -> Result<String> {
         pod::get_pod_on_node(&self.interface.kubectl_command, namespace, node, service).await
+    }
+
+    /// Sets a label on all nodes.
+    pub async fn label_nodes(&self, label: &str) -> Result<String> {
+        pod::label_nodes(&self.interface.kubectl_command, label).await
     }
 
     /// Return the Vector pod that is deployed on the same node as the given pod. We want to make

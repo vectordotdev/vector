@@ -13,7 +13,7 @@ components: sinks: socket: {
 	}
 
 	features: {
-		buffer: enabled:      true
+		acknowledgements: false
 		healthcheck: enabled: true
 		send: {
 			compression: enabled: false
@@ -21,6 +21,7 @@ components: sinks: socket: {
 				enabled: true
 				codec: {
 					enabled: true
+					framing: true
 					enum: ["json", "text"]
 				}
 			}
@@ -32,7 +33,6 @@ components: sinks: socket: {
 			request: enabled:   false
 			tls: {
 				enabled:                true
-				can_enable:             true
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        false
@@ -52,16 +52,6 @@ components: sinks: socket: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -72,33 +62,27 @@ components: sinks: socket: {
 			description:   "The address to connect to. The address _must_ include a port."
 			relevant_when: "mode = `tcp` or `udp`"
 			required:      true
-			warnings: []
 			type: string: {
 				examples: ["92.12.333.224:5000"]
-				syntax: "literal"
 			}
 		}
 		mode: {
 			description: "The type of socket to use."
 			required:    true
-			warnings: []
 			type: string: {
 				enum: {
 					tcp:  "TCP socket"
 					udp:  "UDP socket"
 					unix: "Unix domain socket"
 				}
-				syntax: "literal"
 			}
 		}
 		path: {
 			description:   "The unix socket path. This should be the absolute path."
 			relevant_when: "mode = `unix`"
 			required:      true
-			warnings: []
 			type: string: {
 				examples: ["/path/to/socket"]
-				syntax: "literal"
 			}
 		}
 	}
@@ -106,6 +90,7 @@ components: sinks: socket: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	telemetry: metrics: {

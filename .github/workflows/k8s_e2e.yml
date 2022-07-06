@@ -23,6 +23,14 @@ on:
       - "distribution/**"
   pull_request:
 
+concurrency:
+  # For pull requests, cancel running workflows, for master, run all
+  #
+  # `github.event.number` exists for pull requests, otherwise fall back to SHA
+  # for master
+  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
+  cancel-in-progress: true
+
 env:
   AUTOINSTALL: true
   AWS_ACCESS_KEY_ID: "dummy"
@@ -32,24 +40,14 @@ env:
   RUST_TEST_THREADS: 1
   TEST_LOG: vector=debug
   VERBOSE: true
+  DISABLE_MOLD: true
   CI: true
   PROFILE: debug
 
 jobs:
-  cancel-previous:
-    name: Cancel redundant jobs
-    runs-on: ubuntu-20.04
-    timeout-minutes: 3
-    if: github.ref != 'refs/heads/master'
-    steps:
-      - uses: styfle/cancel-workflow-action@0.9.1
-        with:
-          access_token: ${{ secrets.GITHUB_TOKEN }}
-          all_but_latest: true # can cancel workflows scheduled later
-
   build-x86_64-unknown-linux-gnu:
     name: Build - x86_64-unknown-linux-gnu
-    runs-on: ubuntu-20.04
+    runs-on: [linux, test-runner]
     if: |
       !github.event.pull_request
         || contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e tests enable')
@@ -58,10 +56,11 @@ jobs:
     env:
       CARGO_PROFILE_RELEASE_OPT_LEVEL: 0
       CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 256
+      CARGO_INCREMENTAL: 0
     steps:
-      - uses: actions/checkout@v2.3.5
+      - uses: actions/checkout@v3
       - run: make ci-sweep
-      - uses: actions/cache@v2.1.6
+      - uses: actions/cache@v3
         with:
           path: |
             ~/.cargo/registry
@@ -70,9 +69,8 @@ jobs:
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
       - run: make package-deb-x86_64-unknown-linux-gnu
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           name: e2e-test-deb-package
           path: target/artifacts/*
@@ -85,7 +83,7 @@ jobs:
   # See https://github.community/t/feature-request-and-use-case-example-to-allow-matrix-in-if-s/126067
   compute-k8s-test-plan:
     name: Compute K8s test plan
-    runs-on: ubuntu-20.04
+    runs-on: [linux, test-runner]
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     if: |
@@ -93,25 +91,31 @@ jobs:
         || contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e tests enable')
         || contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e all targets')
     steps:
-      - uses: actions/github-script@v5
+      - uses: actions/github-script@v6
         id: set-matrix
         with:
           script: |
             // Parameters.
             const minikube_version = [
-              "v1.21.0",
+              "v1.24.0",
             ]
+
+            // Aim to test against oldest supported k8s cloud-provider versions
+            // https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html
+            // https://cloud.google.com/kubernetes-engine/docs/release-notes
+            // https://docs.microsoft.com/en-us/azure/aks/supported-kubernetes-versions?tabs=azure-cli#aks-kubernetes-release-calendar
             const kubernetes_version = [
-              { version: "v1.19.2", is_essential: true },
-              { version: "v1.18.9" },
-              { version: "v1.17.12" },
-              { version: "v1.16.15" },
-              { version: "v1.15.12" },
+              { version: "v1.23.3", is_essential: true },
+              { version: "v1.22.5", is_essential: true },
+              { version: "v1.21.8", is_essential: true },
+              { version: "v1.20.14", is_essential: true },
+              { version: "v1.19.8" },
             ]
             const container_runtime = [
               "docker",
               "containerd",
-              "crio",
+              // https://github.com/kubernetes/minikube/issues/12928
+              // "crio",
             ]
             const ci_condition_label = 'ci-condition: k8s e2e all targets'
 
@@ -139,7 +143,7 @@ jobs:
 
   test-e2e-kubernetes:
     name: K8s ${{ matrix.kubernetes_version.version }} / ${{ matrix.container_runtime }} (${{ matrix.kubernetes_version.role }})
-    runs-on: ubuntu-20.04
+    runs-on: [linux, test-runner]
     needs:
       - build-x86_64-unknown-linux-gnu
       - compute-k8s-test-plan
@@ -148,8 +152,8 @@ jobs:
       fail-fast: false
     steps:
       - name: Checkout
-        uses: actions/checkout@v2.3.5
-      - uses: actions/download-artifact@v2
+        uses: actions/checkout@v3
+      - uses: actions/download-artifact@v3
         with:
           name: e2e-test-deb-package
           path: target/artifacts
@@ -159,17 +163,16 @@ jobs:
           KUBERNETES_VERSION: ${{ matrix.kubernetes_version.version }}
           MINIKUBE_VERSION: ${{ matrix.minikube_version }}
           CONTAINER_RUNTIME: ${{ matrix.container_runtime }}
-      - run: make slim-builds
       - run: make test-e2e-kubernetes
         env:
           USE_MINIKUBE_CACHE: "true"
           SKIP_PACKAGE_DEB: "true"
+          CARGO_INCREMENTAL: 0
 
   master-failure:
     name: master-failure
     if: failure() && github.ref == 'refs/heads/master'
     needs:
-      - cancel-previous
       - build-x86_64-unknown-linux-gnu
       - compute-k8s-test-plan
       - test-e2e-kubernetes

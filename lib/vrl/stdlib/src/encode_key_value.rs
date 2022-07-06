@@ -1,6 +1,35 @@
-use shared::encode_key_value;
 use std::result::Result;
+
+use ::value::Value;
+use vector_common::encode_key_value;
 use vrl::prelude::*;
+
+/// Also used by `encode_logfmt`.
+pub(crate) fn encode_key_value(
+    fields: Option<Value>,
+    value: Value,
+    key_value_delimiter: Value,
+    field_delimiter: Value,
+    flatten_boolean: Value,
+) -> Result<Value, ExpressionError> {
+    let fields = match fields {
+        None => Ok(vec![]),
+        Some(fields) => resolve_fields(fields),
+    }?;
+    let object = value.try_object()?;
+    let key_value_delimiter = key_value_delimiter.try_bytes_utf8_lossy()?;
+    let field_delimiter = field_delimiter.try_bytes_utf8_lossy()?;
+    let flatten_boolean = flatten_boolean.try_boolean()?;
+    Ok(encode_key_value::to_string(
+        &object,
+        &fields[..],
+        &key_value_delimiter,
+        &field_delimiter,
+        flatten_boolean,
+    )
+    .expect("Should always succeed.")
+    .into())
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct EncodeKeyValue;
@@ -42,8 +71,8 @@ impl Function for EncodeKeyValue {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -115,45 +144,34 @@ fn resolve_fields(fields: Value) -> Result<Vec<String>, ExpressionError> {
 impl Expression for EncodeKeyValueFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let fields = match &self.fields {
-            None => Ok(vec![]),
-            Some(expr) => {
-                let fields = expr.resolve(ctx)?;
-                resolve_fields(fields)
-            }
-        }?;
+        let fields = self
+            .fields
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
+        let key_value_delimiter = self.key_value_delimiter.resolve(ctx)?;
+        let field_delimiter = self.field_delimiter.resolve(ctx)?;
+        let flatten_boolean = self.flatten_boolean.resolve(ctx)?;
 
-        let object = value.try_object()?;
-
-        let value = self.key_value_delimiter.resolve(ctx)?;
-        let key_value_delimiter = value.try_bytes_utf8_lossy()?;
-
-        let value = self.field_delimiter.resolve(ctx)?;
-        let field_delimiter = value.try_bytes_utf8_lossy()?;
-        let flatten_boolean = self.flatten_boolean.resolve(ctx)?.try_boolean()?;
-
-        Ok(encode_key_value::to_string(
-            object,
-            &fields[..],
-            &key_value_delimiter,
-            &field_delimiter,
+        encode_key_value(
+            fields,
+            value,
+            key_value_delimiter,
+            field_delimiter,
             flatten_boolean,
         )
-        .expect("Should always succeed.")
-        .into())
     }
 
-    fn type_def(&self, _state: &state::Compiler) -> TypeDef {
-        TypeDef::new()
-            .bytes()
-            .with_fallibility(self.fields.is_some())
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        TypeDef::bytes().with_fallibility(self.fields.is_some())
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use vector_common::btreemap;
+
     use super::*;
-    use shared::btreemap;
 
     test_function![
         encode_key_value  => EncodeKeyValue;
@@ -165,7 +183,7 @@ mod tests {
                 }
             ],
             want: Ok("lvl=info"),
-            tdef: TypeDef::new().bytes().infallible(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         multiple_elements {
@@ -176,7 +194,7 @@ mod tests {
                 }
             ],
             want: Ok("log_id=12345 lvl=info"),
-            tdef: TypeDef::new().bytes().infallible(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         string_with_spaces {
@@ -186,7 +204,17 @@ mod tests {
                     "msg" => "This is a log message"
                 }],
             want: Ok(r#"lvl=info msg="This is a log message""#),
-            tdef: TypeDef::new().bytes().infallible(),
+            tdef: TypeDef::bytes().infallible(),
+        }
+
+        string_with_quotes {
+            args: func_args![value:
+                btreemap! {
+                    "lvl" => "info",
+                    "msg" => "{\"key\":\"value\"}"
+                }],
+            want: Ok(r#"lvl=info msg="{\"key\":\"value\"}""#),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         flatten_boolean {
@@ -200,7 +228,7 @@ mod tests {
                 flatten_boolean: value!(true)
             ],
             want: Ok(r#"beta lvl=info msg="This is a log message""#),
-            tdef: TypeDef::new().bytes().infallible(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         dont_flatten_boolean {
@@ -214,7 +242,7 @@ mod tests {
                 flatten_boolean: value!(false)
             ],
             want: Ok(r#"beta=true lvl=info msg="This is a log message" prod=false"#),
-            tdef: TypeDef::new().bytes().infallible(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         flatten_boolean_with_custom_delimiters {
@@ -229,7 +257,7 @@ mod tests {
                 flatten_boolean: value!(true)
             ],
             want: Ok(r#"tag_a:val_a,tag_b:val_b,tag_c"#),
-            tdef: TypeDef::new().bytes().infallible(),
+            tdef: TypeDef::bytes().infallible(),
         }
         string_with_characters_to_escape {
             args: func_args![value:
@@ -240,7 +268,7 @@ mod tests {
                     "space key" => "foo"
                 }],
             want: Ok(r#"another_field="some\\nfield\\and things" lvl=info msg="payload: {\"code\": 200}\\n" "space key"=foo"#),
-            tdef: TypeDef::new().bytes().infallible(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         nested_fields {
@@ -262,7 +290,7 @@ mod tests {
                     "event" => "log"
                 }],
                 want: Ok("agent.id=1234 agent.name=vector event=log log.file.path=encode_key_value.rs network.ip.0=127 network.ip.1=0 network.ip.2=0 network.ip.3=1 network.proto=tcp"),
-                tdef: TypeDef::new().bytes().infallible(),
+                tdef: TypeDef::bytes().infallible(),
         }
 
         fields_ordering {
@@ -275,7 +303,7 @@ mod tests {
                 fields_ordering: value!(["lvl", "msg"])
             ],
             want: Ok(r#"lvl=info msg="This is a log message" log_id=12345"#),
-            tdef: TypeDef::new().bytes().fallible(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         nested_fields_ordering {
@@ -294,7 +322,7 @@ mod tests {
                 fields_ordering:  value!(["event", "log.file.path", "agent.name"])
             ],
             want: Ok("event=log log.file.path=encode_key_value.rs agent.name=vector"),
-            tdef: TypeDef::new().bytes().fallible(),
+            tdef: TypeDef::bytes().fallible(),
         }
 
         fields_ordering_invalid_field_type {
@@ -308,10 +336,10 @@ mod tests {
             ],
             want: Err(format!(r"invalid field value type at index 1: {}",
                     value::Error::Expected {
-                        got: Kind::Integer,
-                        expected: Kind::Bytes
+                        got: Kind::integer(),
+                        expected: Kind::bytes()
                     })),
-            tdef: TypeDef::new().bytes().fallible(),
+            tdef: TypeDef::bytes().fallible(),
         }
     ];
 }

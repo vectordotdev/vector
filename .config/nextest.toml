@@ -1,0 +1,18 @@
+[profile.default]
+# "retries" defines the number of times a test should be retried. If set to a
+# non-zero value, tests that succeed on a subsequent attempt will be marked as
+# non-flaky.
+retries = 3
+
+# shows all test statuses in output
+status-level = "all"
+
+# output failures as soon as they happen and at the end of the test run
+failure-output = "immediate-final"
+
+# don't cancel the test run on the first failure
+fail-fast = false
+
+[profile.default.junit]
+# output test results at target/nextest/default/junit.xml
+path = "junit.xml"

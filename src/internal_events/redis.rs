@@ -1,59 +1,73 @@
-// ## skip check-events ##
-
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-#[derive(Debug)]
-pub struct RedisReceiveEventFailed {
-    pub error: redis::RedisError,
-}
-
-impl InternalEvent for RedisReceiveEventFailed {
-    fn emit_logs(&self) {
-        error!(
-            message = "Failed to read message.",
-            error = %self.error,
-            rate_limit_secs = 30,
-        );
-    }
-
-    fn emit_metrics(&self) {
-        counter!("receive_event_errors_total", 1);
-    }
-}
+use super::prelude::{error_stage, error_type};
 
 #[derive(Debug)]
-pub struct RedisEventSent {
-    pub count: usize,
-    pub byte_size: usize,
+pub struct RedisSendEventError<'a> {
+    error: &'a redis::RedisError,
+    error_code: String,
 }
 
-impl InternalEvent for RedisEventSent {
-    fn emit_logs(&self) {
-        trace!(message = "Processed one event.", rate_limit_secs = 10);
+#[cfg(feature = "sinks-redis")]
+impl<'a> RedisSendEventError<'a> {
+    pub fn new(error: &'a redis::RedisError) -> Self {
+        Self {
+            error,
+            error_code: error.code().unwrap_or("UNKNOWN").to_string(),
+        }
     }
-
-    fn emit_metrics(&self) {
-        counter!("processed_events_total", self.count as u64);
-        counter!("processed_bytes_total", self.byte_size as u64);
-    }
 }
 
-#[derive(Debug)]
-pub struct RedisSendEventFailed {
-    pub error: String,
-}
-
-impl InternalEvent for RedisSendEventFailed {
-    fn emit_logs(&self) {
+impl<'a> InternalEvent for RedisSendEventError<'a> {
+    fn emit(self) {
         error!(
             message = "Failed to send message.",
             error = %self.error,
-            rate_limit_secs = 30,
+            error_code = %self.error_code,
+            error_type = error_type::WRITER_FAILED,
+            stage = error_stage::SENDING,
+            rate_limit_secs = 10,
         );
-    }
-
-    fn emit_metrics(&self) {
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => self.error_code,
+            "error_type" => error_type::WRITER_FAILED,
+            "stage" => error_stage::SENDING,
+        );
+        // deprecated
         counter!("send_errors_total", 1);
+    }
+}
+
+#[derive(Debug)]
+pub struct RedisReceiveEventError {
+    error: redis::RedisError,
+    error_code: String,
+}
+
+impl From<redis::RedisError> for RedisReceiveEventError {
+    fn from(error: redis::RedisError) -> Self {
+        let error_code = error.code().unwrap_or("UNKNOWN").to_string();
+        Self { error, error_code }
+    }
+}
+
+impl InternalEvent for RedisReceiveEventError {
+    fn emit(self) {
+        error!(
+            message = "Failed to read message.",
+            error = %self.error,
+            error_code = %self.error_code,
+            error_type = error_type::READER_FAILED,
+            stage = error_stage::SENDING,
+            rate_limit_secs = 10,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => self.error_code,
+            "error_type" => error_type::READER_FAILED,
+            "stage" => error_stage::RECEIVING,
+        );
     }
 }

@@ -1,20 +1,20 @@
-use crate::{
-    config::{Config, DataType, SourceConfig, SourceContext},
-    sinks::blackhole::BlackholeConfig,
-    sources::stdin::StdinConfig,
-    sources::Source,
-    test_util::{start_topology, trace_init},
-    transforms::json_parser::JsonParserConfig,
-    Error,
-};
+use std::sync::Arc;
+
 use futures::{future, FutureExt};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use stream_cancel::{Trigger, Tripwire};
 use tokio::sync::Mutex;
 
+use crate::{
+    config::{Config, DataType, Output, SourceConfig, SourceContext},
+    sinks::blackhole::BlackholeConfig,
+    sources::{stdin::StdinConfig, Source},
+    test_util::{mock::transforms::BasicTransformConfig, start_topology, trace_init},
+    Error,
+};
+
 #[derive(Debug, Deserialize, Serialize)]
-pub struct MockSourceConfig {
+struct MockSourceConfig {
     #[serde(skip)]
     tripwire: Arc<Mutex<Option<Tripwire>>>,
 }
@@ -44,7 +44,7 @@ impl SourceConfig for MockSourceConfig {
                 tripwire
                     .clone()
                     .unwrap()
-                    .then(crate::stream::tripwire_handler)
+                    .then(crate::shutdown::tripwire_handler)
                     .boxed(),
             )
             .map(|_| std::mem::drop(out))
@@ -52,12 +52,16 @@ impl SourceConfig for MockSourceConfig {
         ))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Log)]
     }
 
     fn source_type(&self) -> &'static str {
         "mock"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 
@@ -69,10 +73,7 @@ async fn closed_source() {
     old_config.add_transform(
         "trans",
         &["in"],
-        JsonParserConfig {
-            drop_field: true,
-            ..JsonParserConfig::default()
-        },
+        BasicTransformConfig::new("a".to_string(), 0.0),
     );
     old_config.add_sink(
         "out1",
@@ -80,6 +81,7 @@ async fn closed_source() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
         },
     );
     old_config.add_sink(
@@ -88,6 +90,7 @@ async fn closed_source() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
         },
     );
 
@@ -97,10 +100,7 @@ async fn closed_source() {
     new_config.add_transform(
         "trans",
         &["in"],
-        JsonParserConfig {
-            drop_field: false,
-            ..JsonParserConfig::default()
-        },
+        BasicTransformConfig::new("a".to_string(), 0.0),
     );
     new_config.add_sink(
         "out1",
@@ -108,6 +108,7 @@ async fn closed_source() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
         },
     );
 
@@ -132,10 +133,7 @@ async fn remove_sink() {
     old_config.add_transform(
         "trans",
         &["in"],
-        JsonParserConfig {
-            drop_field: true,
-            ..JsonParserConfig::default()
-        },
+        BasicTransformConfig::new("a".to_string(), 0.0),
     );
     old_config.add_sink(
         "out1",
@@ -143,6 +141,7 @@ async fn remove_sink() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
         },
     );
     old_config.add_sink(
@@ -151,6 +150,7 @@ async fn remove_sink() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
         },
     );
 
@@ -159,10 +159,7 @@ async fn remove_sink() {
     new_config.add_transform(
         "trans",
         &["in"],
-        JsonParserConfig {
-            drop_field: false,
-            ..JsonParserConfig::default()
-        },
+        BasicTransformConfig::new("b".to_string(), 0.0),
     );
     new_config.add_sink(
         "out1",
@@ -170,6 +167,7 @@ async fn remove_sink() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
         },
     );
 
@@ -189,18 +187,12 @@ async fn remove_transform() {
     old_config.add_transform(
         "trans1",
         &["in"],
-        JsonParserConfig {
-            drop_field: true,
-            ..JsonParserConfig::default()
-        },
+        BasicTransformConfig::new("a".to_string(), 0.0),
     );
     old_config.add_transform(
         "trans2",
         &["trans1"],
-        JsonParserConfig {
-            drop_field: true,
-            ..JsonParserConfig::default()
-        },
+        BasicTransformConfig::new("a".to_string(), 0.0),
     );
     old_config.add_sink(
         "out1",
@@ -208,6 +200,7 @@ async fn remove_transform() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
         },
     );
     old_config.add_sink(
@@ -216,6 +209,7 @@ async fn remove_transform() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
         },
     );
 
@@ -224,10 +218,7 @@ async fn remove_transform() {
     new_config.add_transform(
         "trans1",
         &["in"],
-        JsonParserConfig {
-            drop_field: false,
-            ..JsonParserConfig::default()
-        },
+        BasicTransformConfig::new("b".to_string(), 0.0),
     );
     new_config.add_sink(
         "out1",
@@ -235,6 +226,55 @@ async fn remove_transform() {
         BlackholeConfig {
             print_interval_secs: 10,
             rate: None,
+            acknowledgements: Default::default(),
+        },
+    );
+
+    let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
+    assert!(topology
+        .reload_config_and_respawn(new_config.build().unwrap())
+        .await
+        .unwrap());
+}
+
+#[tokio::test]
+async fn replace_transform() {
+    trace_init();
+
+    // Create a simple source/transform/sink topology:
+    let mut old_config = Config::builder();
+    old_config.add_source("in", StdinConfig::default());
+    old_config.add_transform(
+        "trans1",
+        &["in"],
+        BasicTransformConfig::new("a".to_string(), 0.0),
+    );
+    old_config.add_sink(
+        "out1",
+        &["trans1"],
+        BlackholeConfig {
+            print_interval_secs: 10,
+            rate: None,
+            acknowledgements: Default::default(),
+        },
+    );
+
+    // Now create the same simple source/transform/sink topology, but change the transform so it has
+    // to be rebuilt:
+    let mut new_config = Config::builder();
+    new_config.add_source("in", StdinConfig::default());
+    new_config.add_transform(
+        "trans1",
+        &["in"],
+        BasicTransformConfig::new("b".to_string(), 0.0),
+    );
+    new_config.add_sink(
+        "out1",
+        &["trans1"],
+        BlackholeConfig {
+            print_interval_secs: 10,
+            rate: None,
+            acknowledgements: Default::default(),
         },
     );
 

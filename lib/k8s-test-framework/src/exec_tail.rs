@@ -1,8 +1,10 @@
 //! Perform a log lookup.
 
-use super::{Reader, Result};
 use std::process::Stdio;
+
 use tokio::process::Command;
+
+use super::{Reader, Result};
 
 /// Exec a `tail` command reading the specified `file` within a `Container`
 /// in a `Pod` of a specified `resource` at the specified `namespace` via the

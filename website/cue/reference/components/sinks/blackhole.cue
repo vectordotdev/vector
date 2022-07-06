@@ -13,7 +13,7 @@ components: sinks: blackhole: {
 	}
 
 	features: {
-		buffer: enabled:      false
+		acknowledgements: true
 		healthcheck: enabled: false
 		send: {
 			compression: enabled: false
@@ -24,16 +24,6 @@ components: sinks: blackhole: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -42,9 +32,8 @@ components: sinks: blackhole: {
 	configuration: {
 		print_interval_secs: {
 			common:      false
-			description: "The number of seconds between reporting a summary of activity."
+			description: "The number of seconds between reporting a summary of activity. Set to `0` to disable reporting."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 1
 				examples: [10]
@@ -55,7 +44,6 @@ components: sinks: blackhole: {
 			common:      false
 			description: "Rates the amount of events that the sink can consume per second."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: null
 				examples: [1000]
@@ -67,6 +55,7 @@ components: sinks: blackhole: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	telemetry: metrics: {

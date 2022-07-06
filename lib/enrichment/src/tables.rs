@@ -29,12 +29,16 @@
 //! implements `vrl:EnrichmentTableSearch` through with the enrichment tables
 //! can be searched.
 
-use crate::Case;
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::{Arc, Mutex},
+};
+
+use arc_swap::ArcSwap;
+use value::Value;
 
 use super::{Condition, IndexHandle, Table};
-use arc_swap::ArcSwap;
-use std::collections::{BTreeMap, HashMap};
-use std::sync::{Arc, Mutex};
+use crate::Case;
 
 /// A hashmap of name => implementation of an enrichment table.
 type TableMap = HashMap<String, Box<dyn Table + Send + Sync>>;
@@ -201,7 +205,7 @@ impl TableSearch {
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
         index: Option<IndexHandle>,
-    ) -> Result<BTreeMap<String, vrl_core::Value>, String> {
+    ) -> Result<BTreeMap<String, Value>, String> {
         let tables = self.0.load();
         if let Some(ref tables) = **tables {
             match tables.get(table) {
@@ -223,7 +227,7 @@ impl TableSearch {
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
         index: Option<IndexHandle>,
-    ) -> Result<Vec<BTreeMap<String, vrl_core::Value>>, String> {
+    ) -> Result<Vec<BTreeMap<String, Value>>, String> {
         let tables = self.0.load();
         if let Some(ref tables) = **tables {
             match tables.get(table) {
@@ -268,10 +272,10 @@ fn fmt_enrichment_table(
 
 #[cfg(test)]
 mod tests {
+    use value::Value;
+
     use super::*;
     use crate::test_util::DummyEnrichmentTable;
-    use shared::btreemap;
-    use vrl_core::Value;
 
     #[test]
     fn tables_loaded() {
@@ -354,9 +358,7 @@ mod tests {
         registry.finish_load();
 
         assert_eq!(
-            Ok(btreemap! {
-                "field" => "result"
-            }),
+            Ok(BTreeMap::from([("field".into(), Value::from("result"))])),
             tables_search.find_table_row(
                 "dummy1",
                 Case::Sensitive,

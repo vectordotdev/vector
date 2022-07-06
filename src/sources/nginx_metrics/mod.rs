@@ -1,24 +1,26 @@
-use crate::{
-    config::{DataType, SourceConfig, SourceContext, SourceDescription},
-    event::metric::{Metric, MetricKind, MetricValue},
-    event::Event,
-    http::{Auth, HttpClient},
-    internal_events::{
-        NginxMetricsCollectCompleted, NginxMetricsEventsReceived, NginxMetricsRequestError,
-        NginxMetricsStubStatusParseError,
-    },
-    tls::{TlsOptions, TlsSettings},
-};
+use std::{collections::BTreeMap, convert::TryFrom, time::Instant};
+
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{future::join_all, stream, SinkExt, StreamExt, TryFutureExt};
+use futures::{future::join_all, StreamExt, TryFutureExt};
 use http::{Request, StatusCode};
 use hyper::{body::to_bytes as body_to_bytes, Body, Uri};
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::{collections::BTreeMap, convert::TryFrom, time::Instant};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+use vector_config::configurable_component;
+use vector_core::ByteSizeOf;
+
+use crate::{
+    config::{DataType, Output, SourceConfig, SourceContext, SourceDescription},
+    event::metric::{Metric, MetricKind, MetricValue},
+    http::{Auth, HttpClient},
+    internal_events::{
+        CollectionCompleted, EndpointBytesReceived, NginxMetricsEventsReceived,
+        NginxMetricsRequestError, NginxMetricsStubStatusParseError, StreamClosedError,
+    },
+    tls::{TlsConfig, TlsSettings},
+};
 
 pub mod parser;
 use parser::NginxStubStatus;
@@ -51,19 +53,37 @@ enum NginxError {
     InvalidResponseStatus { status: StatusCode },
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default)]
+/// Configuration for the `nginx_metrics` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
-struct NginxMetricsConfig {
+pub struct NginxMetricsConfig {
+    /// A list of NGINX instances to scrape.
+    ///
+    /// Each endpoint must be a valid HTTP/HTTPS URI pointing to an NGINX instance that has the
+    /// `ngx_http_stub_status_module` module enabled.
     endpoints: Vec<String>,
+
+    /// The interval between scrapes, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
+
+    /// Overrides the default namespace for the metrics emitted by the source.
+    ///
+    /// If set to an empty string, no namespace is added to the metrics.
+    ///
+    /// By default, `nginx` is used.
     #[serde(default = "default_namespace")]
     namespace: String,
-    tls: Option<TlsOptions>,
+
+    #[configurable(derived)]
+    tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
     auth: Option<Auth>,
 }
 
-pub const fn default_scrape_interval_secs() -> u64 {
+pub(super) const fn default_scrape_interval_secs() -> u64 {
     15
 }
 
@@ -80,7 +100,7 @@ impl_generate_config_from_default!(NginxMetricsConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "nginx_metrics")]
 impl SourceConfig for NginxMetricsConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+    async fn build(&self, mut cx: SourceContext) -> crate::Result<super::Source> {
         let tls = TlsSettings::from_options(&self.tls)?;
         let http_client = HttpClient::new(tls, &cx.proxy)?;
 
@@ -95,10 +115,6 @@ impl SourceConfig for NginxMetricsConfig {
             )?);
         }
 
-        let mut out = cx
-            .out
-            .sink_map_err(|error| error!(message = "Error sending mongodb metrics.", %error));
-
         let duration = time::Duration::from_secs(self.scrape_interval_secs);
         let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
@@ -106,29 +122,34 @@ impl SourceConfig for NginxMetricsConfig {
             while interval.next().await.is_some() {
                 let start = Instant::now();
                 let metrics = join_all(sources.iter().map(|nginx| nginx.collect())).await;
-                emit!(&NginxMetricsCollectCompleted {
+                let count = metrics.len();
+                emit!(CollectionCompleted {
                     start,
                     end: Instant::now()
                 });
 
-                let mut stream = stream::iter(metrics)
-                    .map(stream::iter)
-                    .flatten()
-                    .map(Event::Metric)
-                    .map(Ok);
-                out.send_all(&mut stream).await?;
+                let metrics = metrics.into_iter().flatten();
+
+                if let Err(error) = cx.out.send_batch(metrics).await {
+                    emit!(StreamClosedError { error, count });
+                    return Err(());
+                }
             }
 
             Ok(())
         }))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Metric
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(DataType::Metric)]
     }
 
     fn source_type(&self) -> &'static str {
         "nginx_metrics"
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 
@@ -162,7 +183,7 @@ impl NginxMetrics {
     }
 
     fn get_endpoint_host(endpoint: &str) -> crate::Result<String> {
-        let uri: Uri = endpoint.parse().context(HostInvalidUri)?;
+        let uri: Uri = endpoint.parse().context(HostInvalidUriSnafu)?;
         Ok(match (uri.host().unwrap_or(""), uri.port()) {
             (host, None) => host.to_owned(),
             (host, Some(port)) => format!("{}:{}", host, port),
@@ -175,11 +196,14 @@ impl NginxMetrics {
             Err(()) => (0.0, vec![]),
         };
 
+        let byte_size = metrics.size_of();
+
         metrics.push(self.create_metric("up", gauge!(up_value)));
 
-        emit!(&NginxMetricsEventsReceived {
+        emit!(NginxMetricsEventsReceived {
             count: metrics.len(),
-            uri: &self.endpoint
+            byte_size,
+            endpoint: &self.endpoint
         });
 
         metrics
@@ -187,15 +211,20 @@ impl NginxMetrics {
 
     async fn collect_metrics(&self) -> Result<Vec<Metric>, ()> {
         let response = self.get_nginx_response().await.map_err(|error| {
-            emit!(&NginxMetricsRequestError {
+            emit!(NginxMetricsRequestError {
                 error,
                 endpoint: &self.endpoint,
             })
         })?;
+        emit!(EndpointBytesReceived {
+            byte_size: response.len(),
+            protocol: "http",
+            endpoint: &self.endpoint,
+        });
 
         let status = NginxStubStatus::try_from(String::from_utf8_lossy(&response).as_ref())
             .map_err(|error| {
-                emit!(&NginxMetricsStubStatusParseError {
+                emit!(NginxMetricsStubStatusParseError {
                     error,
                     endpoint: &self.endpoint,
                 })
@@ -247,61 +276,57 @@ mod tests {
 #[cfg(all(test, feature = "nginx-integration-tests"))]
 mod integration_tests {
     use super::*;
-    use crate::{config::ProxyConfig, test_util::trace_init, Pipeline};
+    use crate::{
+        config::ProxyConfig,
+        test_util::components::{run_and_assert_source_compliance_advanced, HTTP_PULL_SOURCE_TAGS},
+    };
+    use tokio::time::Duration;
 
-    async fn test_nginx(endpoint: &'static str, auth: Option<Auth>, proxy: ProxyConfig) {
-        trace_init();
+    fn nginx_proxy_address() -> String {
+        std::env::var("NGINX_PROXY_ADDRESS").unwrap_or_else(|_| "http://nginx-proxy:8000".into())
+    }
 
-        let (sender, mut recv) = Pipeline::new_test();
+    fn nginx_address() -> String {
+        std::env::var("NGINX_ADDRESS").unwrap_or_else(|_| "http://localhost:8000".into())
+    }
 
-        let mut ctx = SourceContext::new_test(sender);
-        ctx.proxy = proxy;
+    fn squid_address() -> String {
+        std::env::var("SQUID_ADDRESS").unwrap_or_else(|_| "http://localhost:3128".into())
+    }
 
-        tokio::spawn(async move {
-            NginxMetricsConfig {
-                endpoints: vec![endpoint.to_owned()],
-                scrape_interval_secs: 15,
-                namespace: "vector_nginx".to_owned(),
-                tls: None,
-                auth,
-            }
-            .build(ctx)
-            .await
-            .unwrap()
-            .await
-            .unwrap()
-        });
+    async fn test_nginx(endpoint: String, auth: Option<Auth>, proxy: ProxyConfig) {
+        let config = NginxMetricsConfig {
+            endpoints: vec![endpoint],
+            scrape_interval_secs: 15,
+            namespace: "vector_nginx".to_owned(),
+            tls: None,
+            auth,
+        };
 
-        let event = time::timeout(time::Duration::from_secs(3), recv.next())
-            .await
-            .expect("fetch metrics timeout")
-            .expect("failed to get metrics from a stream");
-        let mut events = vec![event];
-        loop {
-            match time::timeout(time::Duration::from_millis(10), recv.next()).await {
-                Ok(Some(event)) => events.push(event),
-                Ok(None) => break,
-                Err(_) => break,
-            }
-        }
-
+        let events = run_and_assert_source_compliance_advanced(
+            config,
+            move |context: &mut SourceContext| {
+                context.proxy = proxy;
+            },
+            Some(Duration::from_secs(3)),
+            None,
+            &HTTP_PULL_SOURCE_TAGS,
+        )
+        .await;
         assert_eq!(events.len(), 8);
     }
 
     #[tokio::test]
     async fn test_stub_status() {
-        test_nginx(
-            "http://localhost:8010/basic_status",
-            None,
-            ProxyConfig::default(),
-        )
-        .await
+        let url = format!("{}/basic_status", nginx_address());
+        test_nginx(url, None, ProxyConfig::default()).await
     }
 
     #[tokio::test]
     async fn test_stub_status_auth() {
+        let url = format!("{}/basic_status_auth", nginx_address());
         test_nginx(
-            "http://localhost:8010/basic_status_auth",
+            url,
             Some(Auth::Basic {
                 user: "vector".to_owned(),
                 password: "vector".to_owned(),
@@ -315,11 +340,12 @@ mod integration_tests {
     // It is the only test of its kind
     #[tokio::test]
     async fn test_stub_status_with_proxy() {
+        let url = format!("{}/basic_status", nginx_proxy_address());
         test_nginx(
-            "http://vector_nginx:8000/basic_status",
+            url,
             None,
             ProxyConfig {
-                http: Some("http://localhost:3128".into()),
+                http: Some(squid_address()),
                 ..Default::default()
             },
         )

@@ -14,6 +14,7 @@ components: sources: prometheus_scrape: {
 	}
 
 	features: {
+		acknowledgements: false
 		collect: {
 			checkpoint: enabled: false
 			from: {
@@ -32,7 +33,6 @@ components: sources: prometheus_scrape: {
 			proxy: enabled: true
 			tls: {
 				enabled:                true
-				can_enable:             false
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        false
@@ -42,16 +42,6 @@ components: sources: prometheus_scrape: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -65,11 +55,10 @@ components: sources: prometheus_scrape: {
 		endpoints: {
 			description: "Endpoints to scrape metrics from."
 			required:    true
-			warnings: ["You must explicitly add the path to your endpoints. Vector will _not_ automatically add `/metics`."]
+			warnings: ["You must explicitly add the path to your endpoints. Vector will _not_ automatically add `/metrics`."]
 			type: array: {
 				items: type: string: {
 					examples: ["http://localhost:9090/metrics"]
-					syntax: "literal"
 				}
 			}
 		}
@@ -77,7 +66,6 @@ components: sources: prometheus_scrape: {
 			common:      true
 			description: "The interval between scrapes, in seconds."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 15
 				unit:    "seconds"
@@ -90,10 +78,8 @@ components: sources: prometheus_scrape: {
 				The tag name added to each event representing the scraped instance's host:port.
 				"""
 			required: false
-			warnings: []
 			type: string: {
 				default: null
-				syntax:  "literal"
 				examples: ["instance"]
 			}
 		}
@@ -104,10 +90,8 @@ components: sources: prometheus_scrape: {
 				The tag name added to each event representing the scraped instance's endpoint.
 				"""
 			required: false
-			warnings: []
 			type: string: {
 				default: null
-				syntax:  "literal"
 				examples: ["endpoint"]
 			}
 		}
@@ -121,9 +105,42 @@ components: sources: prometheus_scrape: {
 				configuration.
 				"""
 			required: false
-			warnings: []
 			type: bool: {
 				default: false
+			}
+		}
+		query: {
+			common: false
+			description: """
+				Custom parameters for the scrape request query string.
+				One or more values for the same parameter key can be provided.
+				The parameters provided in this option are appended to any parameters manually provided in the `endpoints` option.
+				This option is especially useful when scraping the `/federate` endpoint.
+				"""
+			required: false
+			type: object: {
+				examples: [{"match[]": [#"{job="somejob"}"#, #"{__name__=~"job:.*"}"#]}]
+				options: {
+					"*": {
+						common:      false
+						description: "Any query key"
+						required:    false
+						type: array: {
+							default: null
+							examples: [[
+								#"{job="somejob"}"#,
+								#"{__name__=~"job:.*"}"#,
+							]]
+							items: type: string: {
+								examples: [
+									#"{job="somejob"}"#,
+									#"{__name__=~"job:.*"}"#,
+								]
+								syntax: "literal"
+							}
+						}
+					}
+				}
 			}
 		}
 		auth: configuration._http_auth & {_args: {
@@ -161,14 +178,18 @@ components: sources: prometheus_scrape: {
 	}
 
 	telemetry: metrics: {
-		events_in_total:                 components.sources.internal_metrics.output.metrics.events_in_total
-		http_error_response_total:       components.sources.internal_metrics.output.metrics.http_error_response_total
-		http_request_errors_total:       components.sources.internal_metrics.output.metrics.http_request_errors_total
-		parse_errors_total:              components.sources.internal_metrics.output.metrics.parse_errors_total
-		processed_bytes_total:           components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:          components.sources.internal_metrics.output.metrics.processed_events_total
-		component_received_events_total: components.sources.internal_metrics.output.metrics.component_received_events_total
-		requests_completed_total:        components.sources.internal_metrics.output.metrics.requests_completed_total
-		request_duration_seconds:        components.sources.internal_metrics.output.metrics.request_duration_seconds
+		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
+		http_error_response_total:            components.sources.internal_metrics.output.metrics.http_error_response_total
+		http_request_errors_total:            components.sources.internal_metrics.output.metrics.http_request_errors_total
+		parse_errors_total:                   components.sources.internal_metrics.output.metrics.parse_errors_total
+		processed_bytes_total:                components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:               components.sources.internal_metrics.output.metrics.processed_events_total
+		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
+		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
+		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
+		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
+		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
+		requests_completed_total:             components.sources.internal_metrics.output.metrics.requests_completed_total
+		request_duration_seconds:             components.sources.internal_metrics.output.metrics.request_duration_seconds
 	}
 }

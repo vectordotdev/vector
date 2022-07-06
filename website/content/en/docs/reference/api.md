@@ -22,7 +22,6 @@ Vector chose [GraphQL] for its API because GraphQL is self-documenting and type 
 
 ### Playground
 
-Vector's GraphQL API ships with a built-in playground that allows you to explore the available commands and manually run queries against the API. This can be accessed at the `/playground` path. We also offer a [public playground][playground] that you can explore without hosting your own Vector instance.
+Vector's GraphQL API ships with a built-in playground that allows you to explore the available commands and manually run queries against the API. This can be accessed at the `/playground` path.
 
 [graphql]: https://graphql.org
-[playground]: https://playground.vector.dev:8686/playground

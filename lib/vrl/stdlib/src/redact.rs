@@ -1,20 +1,24 @@
-use lazy_static::lazy_static;
-use std::borrow::Cow;
-use std::convert::{TryFrom, TryInto};
-use std::str::FromStr;
+use std::{
+    borrow::Cow,
+    convert::{TryFrom, TryInto},
+    str::FromStr,
+};
+
+use ::value::Value;
+use once_cell::sync::Lazy;
 use vrl::prelude::*;
 
-lazy_static! {
-    // https://www.oreilly.com/library/view/regular-expressions-cookbook/9781449327453/ch04s12.html
-    // (converted to non-lookaround version given `regex` does not support lookarounds)
-    // See also: https://www.ssa.gov/history/ssn/geocard.html
-    static ref US_SOCIAL_SECURITY_NUMBER : regex::Regex = regex::Regex::new(
+// https://www.oreilly.com/library/view/regular-expressions-cookbook/9781449327453/ch04s12.html
+// (converted to non-lookaround version given `regex` does not support lookarounds)
+// See also: https://www.ssa.gov/history/ssn/geocard.html
+static US_SOCIAL_SECURITY_NUMBER: Lazy<regex::Regex> = Lazy::new(|| {
+    regex::Regex::new(
     r#"(?x)                                                               # Ignore whitespace and comments in the regex expression.
     (?:00[1-9]|0[1-9][0-9]|[1-578][0-9]{2}|6[0-57-9][0-9]|66[0-57-9])-    # Area number: 001-899 except 666
     (?:0[1-9]|[1-9]0|[1-9][1-9])-                                         # Group number: 01-99
     (?:000[1-9]|00[1-9]0|0[1-9]00|[1-9]000|[1-9]{4})                      # Serial number: 0001-9999
-    "#).unwrap();
-}
+    "#).unwrap()
+});
 
 #[derive(Clone, Copy, Debug)]
 pub struct Redact;
@@ -56,8 +60,8 @@ impl Function for Redact {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -92,6 +96,45 @@ impl Function for Redact {
             filters,
             redactor,
         }))
+    }
+
+    fn compile_argument(
+        &self,
+        _args: &[(&'static str, Option<FunctionArgument>)],
+        _ctx: &mut FunctionCompileContext,
+        name: &str,
+        expr: Option<&expression::Expr>,
+    ) -> CompiledArgument {
+        match (name, expr) {
+            ("filters", Some(expr)) => {
+                let filters = expr.as_value().ok_or_else(|| {
+                    vrl::function::Error::ExpectedStaticExpression {
+                        keyword: "filters",
+                        expr: expr.clone(),
+                    }
+                })?;
+                let filters = filters
+                    .try_array()
+                    .map_err(|_| vrl::function::Error::ExpectedStaticExpression {
+                        keyword: "filters",
+                        expr: expr.clone(),
+                    })?
+                    .into_iter()
+                    .map(|value| {
+                        value.clone().try_into().map_err(|error| {
+                            vrl::function::Error::InvalidArgument {
+                                keyword: "filters",
+                                value,
+                                error,
+                            }
+                        })
+                    })
+                    .collect::<std::result::Result<Vec<Filter>, vrl::function::Error>>()?;
+
+                Ok(Some(Box::new(filters) as _))
+            }
+            _ => Ok(None),
+        }
     }
 }
 
@@ -134,11 +177,13 @@ fn redact(value: Value, filters: &[Filter], redactor: &Redactor) -> Value {
 impl Expression for RedactFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
+        let filters = &self.filters;
+        let redactor = &self.redactor;
 
-        Ok(redact(value, &self.filters, &self.redactor))
+        Ok(redact(value, filters, redactor))
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         self.value.type_def(state).infallible()
     }
 }
@@ -166,7 +211,7 @@ impl TryFrom<Value> for Filter {
             Value::Object(object) => {
                 let r#type = match object
                     .get("type")
-                    .ok_or("filters specified as objects must have type paramater")?
+                    .ok_or("filters specified as objects must have type parameter")?
                 {
                     Value::Bytes(bytes) => Ok(bytes.clone()),
                     _ => Err("type key in filters must be a string"),
@@ -238,7 +283,7 @@ enum Redactor {
 
 impl Redactor {
     fn pattern(&self) -> &str {
-        use Redactor::*;
+        use Redactor::Full;
 
         match self {
             Full => "[REDACTED]",
@@ -256,7 +301,7 @@ impl FromStr for Redactor {
     type Err = &'static str;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        use Redactor::*;
+        use Redactor::Full;
 
         match s {
             "full" => Ok(Full),
@@ -267,8 +312,9 @@ impl FromStr for Redactor {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use regex::Regex;
+
+    use super::*;
 
     test_function![
         redact => Redact;
@@ -279,7 +325,7 @@ mod test {
                  filters: vec![Regex::new(r"\d+").unwrap()],
              ],
              want: Ok("hello [REDACTED] world"),
-             tdef: TypeDef::new().infallible().bytes(),
+             tdef: TypeDef::bytes().infallible(),
         }
 
         patterns {
@@ -293,7 +339,7 @@ mod test {
                  ],
              ],
              want: Ok("hello [REDACTED] world"),
-             tdef: TypeDef::new().infallible().bytes(),
+             tdef: TypeDef::bytes().infallible(),
         }
 
         us_social_security_number{
@@ -302,7 +348,7 @@ mod test {
                  filters: vec!["us_social_security_number"],
              ],
              want: Ok("hello [REDACTED] world"),
-             tdef: TypeDef::new().infallible().bytes(),
+             tdef: TypeDef::bytes().infallible(),
         }
 
         invalid_filter {
@@ -311,7 +357,7 @@ mod test {
                  filters: vec!["not a filter"],
              ],
              want: Err("invalid argument"),
-             tdef: TypeDef::new().infallible().bytes(),
+             tdef: TypeDef::bytes().infallible(),
         }
 
         missing_patterns {
@@ -324,7 +370,7 @@ mod test {
                  ],
              ],
              want: Err("invalid argument"),
-             tdef: TypeDef::new().infallible().bytes(),
+             tdef: TypeDef::bytes().infallible(),
         }
     ];
 }

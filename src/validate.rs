@@ -1,71 +1,72 @@
+use std::{collections::HashMap, fmt, fs::remove_dir_all, path::PathBuf};
+
+use clap::Parser;
+use colored::*;
+use exitcode::ExitCode;
+
 use crate::{
     config::{self, Config, ConfigDiff},
     topology::{self, builder::Pieces},
 };
-use colored::*;
-use exitcode::ExitCode;
-use std::collections::HashMap;
-use std::{fmt, fs::remove_dir_all, path::PathBuf};
-use structopt::StructOpt;
 
 const TEMPORARY_DIRECTORY: &str = "validate_tmp";
 
-#[derive(StructOpt, Debug)]
-#[structopt(rename_all = "kebab-case")]
+#[derive(Parser, Debug)]
+#[clap(rename_all = "kebab-case")]
 pub struct Opts {
     /// Disables environment checks. That includes component checks and health checks.
-    #[structopt(long)]
-    no_environment: bool,
+    #[clap(long)]
+    pub no_environment: bool,
 
     /// Fail validation on warnings that are probably a mistake in the configuration
     /// or are recommended to be fixed.
-    #[structopt(short, long)]
-    deny_warnings: bool,
+    #[clap(short, long)]
+    pub deny_warnings: bool,
 
     /// Vector config files in TOML format to validate.
-    #[structopt(
+    #[clap(
         name = "config-toml",
         long,
         env = "VECTOR_CONFIG_TOML",
-        use_delimiter(true)
+        use_value_delimiter(true)
     )]
-    paths_toml: Vec<PathBuf>,
+    pub paths_toml: Vec<PathBuf>,
 
     /// Vector config files in JSON format to validate.
-    #[structopt(
+    #[clap(
         name = "config-json",
         long,
         env = "VECTOR_CONFIG_JSON",
-        use_delimiter(true)
+        use_value_delimiter(true)
     )]
-    paths_json: Vec<PathBuf>,
+    pub paths_json: Vec<PathBuf>,
 
     /// Vector config files in YAML format to validate.
-    #[structopt(
+    #[clap(
         name = "config-yaml",
         long,
         env = "VECTOR_CONFIG_YAML",
-        use_delimiter(true)
+        use_value_delimiter(true)
     )]
-    paths_yaml: Vec<PathBuf>,
+    pub paths_yaml: Vec<PathBuf>,
 
     /// Any number of Vector config files to validate.
     /// Format is detected from the file name.
     /// If none are specified the default config path `/etc/vector/vector.toml`
     /// will be targeted.
-    #[structopt(env = "VECTOR_CONFIG", use_delimiter(true))]
-    paths: Vec<PathBuf>,
+    #[clap(env = "VECTOR_CONFIG", use_value_delimiter(true))]
+    pub paths: Vec<PathBuf>,
 
     /// Read configuration from files in one or more directories.
     /// File format is detected from the file name.
     ///
     /// Files not ending in .toml, .json, .yaml, or .yml will be ignored.
-    #[structopt(
+    #[clap(
         name = "config-dir",
-        short = "C",
+        short = 'C',
         long,
         env = "VECTOR_CONFIG_DIR",
-        use_delimiter(true)
+        use_value_delimiter(true)
     )]
     pub config_dirs: Vec<PathBuf>,
 }
@@ -116,7 +117,7 @@ pub async fn validate(opts: &Opts, color: bool) -> ExitCode {
     }
 }
 
-fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
+pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
     // Prepare paths
     let paths = opts.paths_with_formats();
     let paths = if let Some(paths) = config::process_paths(&paths) {
@@ -221,8 +222,7 @@ async fn validate_healthchecks(
         match tokio::spawn(healthcheck).await {
             Ok(Ok(_)) => {
                 if config
-                    .sinks
-                    .get(&id)
+                    .sink(&id)
                     .expect("Sink not present")
                     .healthcheck()
                     .enabled
@@ -257,7 +257,7 @@ fn create_tmp_directory(config: &mut Config, fmt: &mut Formatter) -> Option<Path
             Some(path)
         }
         Err(error) => {
-            fmt.error(format!("{}", error));
+            fmt.error(error.to_string());
             None
         }
     }
@@ -269,7 +269,7 @@ fn remove_tmp_directory(path: PathBuf) {
     }
 }
 
-struct Formatter {
+pub struct Formatter {
     /// Width of largest printed line
     max_line_width: usize,
     /// Can empty line be printed
@@ -282,22 +282,22 @@ struct Formatter {
 }
 
 impl Formatter {
-    fn new(color: bool) -> Self {
+    pub fn new(color: bool) -> Self {
         Self {
             max_line_width: 0,
             print_space: false,
             error_intro: if color {
-                format!("{}", "x".red())
+                "x".red().to_string()
             } else {
                 "x".to_owned()
             },
             warning_intro: if color {
-                format!("{}", "~".yellow())
+                "~".yellow().to_string()
             } else {
                 "~".to_owned()
             },
             success_intro: if color {
-                format!("{}", "√".green())
+                "√".green().to_string()
             } else {
                 "√".to_owned()
             },
@@ -307,19 +307,28 @@ impl Formatter {
 
     /// Final confirmation that validation process was successful.
     fn validated(&self) {
-        println!("{:-^width$}", "", width = self.max_line_width);
+        #[allow(clippy::print_stdout)]
+        {
+            println!("{:-^width$}", "", width = self.max_line_width);
+        }
         if self.color {
             // Coloring needs to be used directly so that print
             // infrastructure correctly determines length of the
             // "Validated". Otherwise, ansi escape coloring is
             // calculated into the length.
-            println!(
-                "{:>width$}",
-                "Validated".green(),
-                width = self.max_line_width
-            );
+            #[allow(clippy::print_stdout)]
+            {
+                println!(
+                    "{:>width$}",
+                    "Validated".green(),
+                    width = self.max_line_width
+                );
+            }
         } else {
-            println!("{:>width$}", "Validated", width = self.max_line_width)
+            #[allow(clippy::print_stdout)]
+            {
+                println!("{:>width$}", "Validated", width = self.max_line_width)
+            }
         }
     }
 
@@ -379,7 +388,10 @@ impl Formatter {
     fn space(&mut self) {
         if self.print_space {
             self.print_space = false;
-            println!();
+            #[allow(clippy::print_stdout)]
+            {
+                println!();
+            }
         }
     }
 
@@ -396,6 +408,9 @@ impl Formatter {
             .unwrap_or(0);
         self.max_line_width = width.max(self.max_line_width);
         self.print_space = true;
-        print!("{}", print.as_ref())
+        #[allow(clippy::print_stdout)]
+        {
+            print!("{}", print.as_ref())
+        }
     }
 }

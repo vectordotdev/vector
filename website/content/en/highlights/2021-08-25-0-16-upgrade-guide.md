@@ -25,7 +25,7 @@ We cover them below to help you upgrade quickly:
 ### Component name field renamed to ID {#name-to-id}
 
 Historically we've referred to the component ID field as `name` in some places, `id` in others. We've decided to
-standardize on `ID` as we feel this is more closer to the intention of the field: an unchanging identifier for
+standardize on `ID` as we feel this is closer to the intention of the field: an unchanging identifier for
 components.
 
 For example, with the component config:
@@ -40,7 +40,7 @@ source = ""
 The `parse_nginx` part of the config is now only referred to as `ID` in the documentation.
 
 We have preserved compatibility with existing usages of `component_name` for the `internal_metrics` sources by keeping
-`component_name` and adding `component_id` as a new tag. Howover, wwe recommend switching usages over to `component_id`
+`component_name` and adding `component_id` as a new tag. However, we recommend switching usages over to `component_id`
 as we will be removing `component_name` in the future: if you were grouping by this tag in your metrics queries, or
 referring to it in a `remap` or `lua` transform, you should update it to refer to `component_id`.
 
@@ -52,7 +52,7 @@ over simply `Id` as `Id` has special semantics within the GraphQL ecosystem and 
 In previous versions of vector it was possible to configure the Datadog logs
 sink to send in 'text' or 'json' encoding. While the logs ingest API does accept
 text format the native format for that API is json. Sending text comes with
-limitations and is only useful for backward compatability with older clients.
+limitations and is only useful for backward compatibility with older clients.
 
 We no longer allow you to set the encoding of the payloads in the Datadog logs
 sink. For instance, if your configuration looks like so:

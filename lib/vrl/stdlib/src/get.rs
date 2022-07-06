@@ -1,5 +1,42 @@
+use ::value::Value;
 use lookup_lib::{LookupBuf, SegmentBuf};
 use vrl::prelude::*;
+
+fn get(value: Value, path: Value) -> Resolved {
+    let path = match path {
+        Value::Array(path) => {
+            let mut get = LookupBuf::root();
+
+            for segment in path {
+                let segment = match segment {
+                    Value::Bytes(field) => {
+                        SegmentBuf::Field(String::from_utf8_lossy(&field).into_owned().into())
+                    }
+                    Value::Integer(index) => SegmentBuf::Index(index as isize),
+                    value => {
+                        return Err(format!(
+                            r#"path segment must be either string or integer, not {}"#,
+                            value.kind()
+                        )
+                        .into())
+                    }
+                };
+
+                get.push_back(segment)
+            }
+
+            get
+        }
+        value => {
+            return Err(value::Error::Expected {
+                got: value.kind(),
+                expected: Kind::array(Collection::any()),
+            }
+            .into())
+        }
+    };
+    Ok(value.get_by_path(&path).cloned().unwrap_or(Value::Null))
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Get;
@@ -81,7 +118,7 @@ impl Function for Get {
                 title: "invalid segment type",
                 source: r#"get!(value: {"foo": { "bar": [92, 42] }}, path: ["foo", true])"#,
                 result: Err(
-                    r#"function call error for "get" at (0:62): path segment must be either "string" or "integer", not "boolean""#,
+                    r#"function call error for "get" at (0:62): path segment must be either string or integer, not boolean"#,
                 ),
             },
         ]
@@ -89,8 +126,8 @@ impl Function for Get {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -101,51 +138,21 @@ impl Function for Get {
 }
 
 #[derive(Debug, Clone)]
-pub struct GetFn {
+pub(crate) struct GetFn {
     value: Box<dyn Expression>,
     path: Box<dyn Expression>,
 }
 
 impl Expression for GetFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let path = match self.path.resolve(ctx)? {
-            Value::Array(path) => {
-                let mut get = LookupBuf::root();
+        let path = self.path.resolve(ctx)?;
+        let value = self.value.resolve(ctx)?;
 
-                for segment in path {
-                    let segment = match segment {
-                        Value::Bytes(field) => {
-                            SegmentBuf::Field(String::from_utf8_lossy(&field).into_owned().into())
-                        }
-                        Value::Integer(index) => SegmentBuf::Index(index as isize),
-                        value => {
-                            return Err(format!(
-                                r#"path segment must be either "string" or "integer", not {}"#,
-                                value.kind()
-                            )
-                            .into())
-                        }
-                    };
-
-                    get.push_back(segment)
-                }
-
-                get
-            }
-            value => {
-                return Err(value::Error::Expected {
-                    got: value.kind(),
-                    expected: Kind::Array,
-                }
-                .into())
-            }
-        };
-
-        Ok(self.value.resolve(ctx)?.get(&path)?.unwrap_or(Value::Null))
+        get(value, path)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().unknown()
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        TypeDef::any().fallible()
     }
 }
 
@@ -159,7 +166,7 @@ mod tests {
         any {
             args: func_args![value: value!([42]), path: value!([0])],
             want: Ok(42),
-            tdef: TypeDef::new().fallible(),
+            tdef: TypeDef::any().fallible(),
         }
     ];
 }

@@ -13,10 +13,11 @@ components: sources: stdin: {
 	}
 
 	features: {
+		acknowledgements: false
 		multiline: enabled: false
 		codecs: {
 			enabled:         true
-			default_framing: "newline_delimited"
+			default_framing: "`newline_delimited` for codecs other than `native`, which defaults to `length_delimited`"
 		}
 		receive: {
 			from: {
@@ -29,16 +30,6 @@ components: sources: stdin: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -57,17 +48,14 @@ components: sources: stdin: {
 				[global `host_key` option](\(urls.vector_configuration)/global-options#log_schema.host_key).
 				"""
 			required:    false
-			warnings: []
 			type: string: {
 				default: "host"
-				syntax:  "literal"
 			}
 		}
 		max_length: {
 			common:      false
 			description: "The maximum bytes size of a message before rest of it will be discarded."
 			required:    false
-			warnings: []
 			type: uint: {
 				default: 102400
 				unit:    "bytes"
@@ -110,10 +98,14 @@ components: sources: stdin: {
 	}
 
 	telemetry: metrics: {
-		events_in_total:                 components.sources.internal_metrics.output.metrics.events_in_total
-		processed_bytes_total:           components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:          components.sources.internal_metrics.output.metrics.processed_events_total
-		component_received_events_total: components.sources.internal_metrics.output.metrics.component_received_events_total
-		stdin_reads_failed_total:        components.sources.internal_metrics.output.metrics.stdin_reads_failed_total
+		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total
+		processed_bytes_total:                components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:               components.sources.internal_metrics.output.metrics.processed_events_total
+		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
+		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
+		component_received_bytes_total:       components.sources.internal_metrics.output.metrics.component_received_bytes_total
+		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
+		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
+		stdin_reads_failed_total:             components.sources.internal_metrics.output.metrics.stdin_reads_failed_total
 	}
 }

@@ -1,6 +1,27 @@
-use crate::log_util;
 use std::collections::BTreeMap;
+
+use ::value::Value;
 use vrl::prelude::*;
+
+use crate::log_util;
+
+fn parse_common_log(bytes: Value, timestamp_format: Option<Value>, ctx: &Context) -> Resolved {
+    let message = bytes.try_bytes_utf8_lossy()?;
+    let timestamp_format = match timestamp_format {
+        None => "%d/%b/%Y:%T %z".to_owned(),
+        Some(timestamp_format) => timestamp_format.try_bytes_utf8_lossy()?.to_string(),
+    };
+    let captures = log_util::REGEX_APACHE_COMMON_LOG
+        .captures(&message)
+        .ok_or("failed parsing common log line")?;
+    log_util::log_fields(
+        &log_util::REGEX_APACHE_COMMON_LOG,
+        &captures,
+        &timestamp_format,
+        ctx.timezone(),
+    )
+    .map_err(Into::into)
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseCommonLog;
@@ -27,8 +48,8 @@ impl Function for ParseCommonLog {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -71,53 +92,41 @@ struct ParseCommonLogFn {
 impl Expression for ParseCommonLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
-        let message = bytes.try_bytes_utf8_lossy()?;
-        let timestamp_format = match &self.timestamp_format {
-            None => "%d/%b/%Y:%T %z".to_owned(),
-            Some(timestamp_format) => timestamp_format
-                .resolve(ctx)?
-                .try_bytes_utf8_lossy()?
-                .to_string(),
-        };
+        let timestamp_format = self
+            .timestamp_format
+            .as_ref()
+            .map(|expr| expr.resolve(ctx))
+            .transpose()?;
 
-        let captures = log_util::REGEX_APACHE_COMMON_LOG
-            .captures(&message)
-            .ok_or("failed parsing common log line")?;
-
-        log_util::log_fields(
-            &log_util::REGEX_APACHE_COMMON_LOG,
-            &captures,
-            &timestamp_format,
-            ctx.timezone(),
-        )
-        .map_err(Into::into)
+        parse_common_log(bytes, timestamp_format, ctx)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().object(type_def())
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        TypeDef::object(inner_kind()).fallible()
     }
 }
 
-fn type_def() -> BTreeMap<&'static str, TypeDef> {
-    map! {
-        "host": Kind::Bytes | Kind::Null,
-        "identity": Kind::Bytes | Kind::Null,
-        "user": Kind::Bytes | Kind::Null,
-        "timestamp": Kind::Timestamp | Kind::Null,
-        "message": Kind::Bytes | Kind::Null,
-        "method": Kind::Bytes | Kind::Null,
-        "path": Kind::Bytes | Kind::Null,
-        "protocol": Kind::Bytes | Kind::Null,
-        "status": Kind::Integer | Kind::Null,
-        "size": Kind::Integer | Kind::Null,
-    }
+fn inner_kind() -> BTreeMap<Field, Kind> {
+    BTreeMap::from([
+        (Field::from("host"), Kind::bytes() | Kind::null()),
+        (Field::from("identity"), Kind::bytes() | Kind::null()),
+        (Field::from("user"), Kind::bytes() | Kind::null()),
+        (Field::from("timestamp"), Kind::timestamp() | Kind::null()),
+        (Field::from("message"), Kind::bytes() | Kind::null()),
+        (Field::from("method"), Kind::bytes() | Kind::null()),
+        (Field::from("path"), Kind::bytes() | Kind::null()),
+        (Field::from("protocol"), Kind::bytes() | Kind::null()),
+        (Field::from("status"), Kind::integer() | Kind::null()),
+        (Field::from("size"), Kind::integer() | Kind::null()),
+    ])
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::prelude::*;
-    use shared::btreemap;
+    use vector_common::btreemap;
+
+    use super::*;
 
     test_function![
         parse_common_log => ParseCommonLog;
@@ -136,19 +145,19 @@ mod tests {
                 "status" => 200,
                 "size" => 2326,
             }),
-            tdef: TypeDef::new().fallible().object(type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         log_line_valid_empty {
             args: func_args![value: "- - - - - - -"],
-            want: Ok(btreemap! {}),
-            tdef: TypeDef::new().fallible().object(type_def()),
+            want: Ok(BTreeMap::new()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         log_line_valid_empty_variant {
             args: func_args![value: r#"- - - [-] "-" - -"#],
-            want: Ok(btreemap! {}),
-            tdef: TypeDef::new().fallible().object(type_def()),
+            want: Ok(BTreeMap::new()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         log_line_valid_with_timestamp_format {
@@ -158,19 +167,19 @@ mod tests {
             want: Ok(btreemap! {
                 "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2000-10-10T20:55:36Z").unwrap().into()),
             }),
-            tdef: TypeDef::new().fallible().object(type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         log_line_invalid {
             args: func_args![value: r#"not a common log line"#],
             want: Err("failed parsing common log line"),
-            tdef: TypeDef::new().fallible().object(type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
 
         log_line_invalid_timestamp {
             args: func_args![value: r#"- - - [1234] - - -"#],
             want: Err("failed parsing timestamp 1234 using format %d/%b/%Y:%T %z: input contains invalid characters"),
-            tdef: TypeDef::new().fallible().object(type_def()),
+            tdef: TypeDef::object(inner_kind()).fallible(),
         }
     ];
 }

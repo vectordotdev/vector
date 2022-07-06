@@ -1,5 +1,12 @@
+use ::value::Value;
 use bytes::Bytes;
 use vrl::prelude::*;
+
+fn uuid_v4() -> Value {
+    let mut buf = [0; 36];
+    let uuid = uuid::Uuid::new_v4().hyphenated().encode_lower(&mut buf);
+    Bytes::copy_from_slice(uuid.as_bytes()).into()
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct UuidV4;
@@ -19,8 +26,8 @@ impl Function for UuidV4 {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         _: ArgumentList,
     ) -> Compiled {
         Ok(Box::new(UuidV4Fn))
@@ -32,31 +39,32 @@ struct UuidV4Fn;
 
 impl Expression for UuidV4Fn {
     fn resolve(&self, _: &mut Context) -> Resolved {
-        let mut buf = [0; 36];
-        let uuid = uuid::Uuid::new_v4().to_hyphenated().encode_lower(&mut buf);
-
-        Ok(Bytes::copy_from_slice(uuid.as_bytes()).into())
+        Ok(uuid_v4())
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().bytes()
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        TypeDef::bytes().infallible()
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
+    use ::value::Value;
+    use vector_common::TimeZone;
+
     use super::*;
-    use shared::TimeZone;
 
     test_type_def![default {
         expr: |_| { UuidV4Fn },
-        want: TypeDef::new().infallible().bytes(),
+        want: TypeDef::bytes().infallible(),
     }];
 
     #[test]
     fn uuid_v4() {
         let mut state = vrl::state::Runtime::default();
-        let mut object: Value = map![].into();
+        let mut object: Value = Value::Object(BTreeMap::new());
         let tz = TimeZone::default();
         let mut ctx = Context::new(&mut object, &mut state, &tz);
         let value = UuidV4Fn.resolve(&mut ctx).unwrap();

@@ -1,3 +1,6 @@
+use std::{iter::FromIterator, str::FromStr};
+
+use ::value::Value;
 use nom::{
     self,
     branch::alt,
@@ -9,8 +12,28 @@ use nom::{
     sequence::{delimited, preceded, terminated, tuple},
     IResult,
 };
-use std::{iter::FromIterator, str::FromStr};
 use vrl::prelude::*;
+
+pub(crate) fn parse_key_value(
+    bytes: Value,
+    key_value_delimiter: Value,
+    field_delimiter: Value,
+    standalone_key: Value,
+    whitespace: Whitespace,
+) -> Resolved {
+    let bytes = bytes.try_bytes_utf8_lossy()?;
+    let key_value_delimiter = key_value_delimiter.try_bytes_utf8_lossy()?;
+    let field_delimiter = field_delimiter.try_bytes_utf8_lossy()?;
+    let standalone_key = standalone_key.try_boolean()?;
+    let values = parse(
+        &bytes,
+        &key_value_delimiter,
+        &field_delimiter,
+        whitespace,
+        standalone_key,
+    )?;
+    Ok(Value::from_iter(values))
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseKeyValue;
@@ -79,8 +102,8 @@ impl Function for ParseKeyValue {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
@@ -113,17 +136,43 @@ impl Function for ParseKeyValue {
             standalone_key,
         }))
     }
+
+    fn compile_argument(
+        &self,
+        _args: &[(&'static str, Option<FunctionArgument>)],
+        _ctx: &mut FunctionCompileContext,
+        name: &str,
+        expr: Option<&expression::Expr>,
+    ) -> CompiledArgument {
+        match (name, expr) {
+            ("whitespace", Some(expr)) => match expr.as_value() {
+                None => Ok(None),
+                Some(value) => Ok(Some(
+                    Whitespace::from_str(
+                        &value.try_bytes_utf8_lossy().expect("whitespace not bytes"),
+                    )
+                    .map(|whitespace| Box::new(whitespace) as Box<dyn std::any::Any + Send + Sync>)
+                    .map_err(|_| vrl::function::Error::InvalidEnumVariant {
+                        keyword: "whitespace",
+                        value,
+                        variants: Whitespace::all_value(),
+                    })?,
+                )),
+            },
+            _ => Ok(None),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Whitespace {
+pub(crate) enum Whitespace {
     Strict,
     Lenient,
 }
 
 impl Whitespace {
     fn all_value() -> Vec<Value> {
-        use Whitespace::*;
+        use Whitespace::{Lenient, Strict};
 
         vec![Strict, Lenient]
             .into_iter()
@@ -132,7 +181,7 @@ impl Whitespace {
     }
 
     const fn as_str(self) -> &'static str {
-        use Whitespace::*;
+        use Whitespace::{Lenient, Strict};
 
         match self {
             Strict => "strict",
@@ -151,7 +200,7 @@ impl FromStr for Whitespace {
     type Err = &'static str;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        use Whitespace::*;
+        use Whitespace::{Lenient, Strict};
 
         match s {
             "strict" => Ok(Strict),
@@ -172,32 +221,23 @@ pub(crate) struct ParseKeyValueFn {
 
 impl Expression for ParseKeyValueFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?;
-        let bytes = value.try_bytes_utf8_lossy()?;
+        let bytes = self.value.resolve(ctx)?;
+        let key_value_delimiter = self.key_value_delimiter.resolve(ctx)?;
+        let field_delimiter = self.field_delimiter.resolve(ctx)?;
+        let standalone_key = self.standalone_key.resolve(ctx)?;
+        let whitespace = self.whitespace;
 
-        let value = self.key_value_delimiter.resolve(ctx)?;
-        let key_value_delimiter = value.try_bytes_utf8_lossy()?;
-
-        let value = self.field_delimiter.resolve(ctx)?;
-        let field_delimiter = value.try_bytes_utf8_lossy()?;
-
-        let standalone_key = self.standalone_key.resolve(ctx)?.try_boolean()?;
-
-        let values = parse(
-            &bytes,
-            &key_value_delimiter,
-            &field_delimiter,
-            self.whitespace,
+        parse_key_value(
+            bytes,
+            key_value_delimiter,
+            field_delimiter,
             standalone_key,
-        )?;
-
-        Ok(Value::from_iter(values))
+            whitespace,
+        )
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().object::<(), Kind>(map! {
-            (): Kind::all()
-        })
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        TypeDef::object(Collection::any()).fallible()
     }
 }
 
@@ -220,7 +260,7 @@ fn parse<'a>(
             // Create a descriptive error message if possible.
             nom::error::convert_error(input, e)
         }
-        _ => format!("{}", e),
+        nom::Err::Incomplete(_) => e.to_string(),
     })?;
 
     if rest.trim().is_empty() {
@@ -240,7 +280,7 @@ fn parse_line<'a>(
 ) -> IResult<&'a str, Vec<(String, Value)>, VerboseError<&'a str>> {
     separated_list1(
         parse_field_delimiter(field_delimiter),
-        parse_key_value(
+        parse_key_value_(
             key_value_delimiter,
             field_delimiter,
             whitespace,
@@ -249,9 +289,9 @@ fn parse_line<'a>(
     )(input)
 }
 
-/// Parses the field_delimiter between the key/value pairs.
-/// If the field_delimiter is a space, we parse as many as we can,
-/// If it is not a space eat any whitespace before our field_delimiter as well as the field_delimiter.
+/// Parses the `field_delimiter` between the key/value pairs.
+/// If the `field_delimiter` is a space, we parse as many as we can,
+/// If it is not a space eat any whitespace before our `field_delimiter` as well as the `field_delimiter`.
 fn parse_field_delimiter<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     field_delimiter: &'a str,
 ) -> impl Fn(&'a str) -> IResult<&'a str, &'a str, E> {
@@ -267,7 +307,7 @@ fn parse_field_delimiter<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
 /// Parse a single `key=value` tuple.
 /// Always accepts `key=`
 /// Accept standalone `key` if `standalone_key` is `true`
-fn parse_key_value<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
+fn parse_key_value_<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     key_value_delimiter: &'a str,
     field_delimiter: &'a str,
     whitespace: Whitespace,
@@ -281,7 +321,7 @@ fn parse_key_value<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
                         space0,
                         parse_key(key_value_delimiter, field_delimiter, standalone_key),
                     ),
-                    many_m_n(!standalone_key as usize, 1, tag(key_value_delimiter)),
+                    many_m_n(usize::from(!standalone_key), 1, tag(key_value_delimiter)),
                     parse_value(field_delimiter),
                 ))(input),
                 Whitespace::Lenient => tuple((
@@ -290,7 +330,7 @@ fn parse_key_value<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
                         parse_key(key_value_delimiter, field_delimiter, standalone_key),
                     ),
                     many_m_n(
-                        !standalone_key as usize,
+                        usize::from(!standalone_key),
                         1,
                         delimited(space0, tag(key_value_delimiter), space0),
                     ),
@@ -349,12 +389,12 @@ fn parse_delimited<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     }
 }
 
-/// An undelimited value is all the text until our field_delimiter, or if it is the last value in the line,
+/// An undelimited value is all the text until our `field_delimiter`, or if it is the last value in the line,
 /// just take the rest of the string.
 fn parse_undelimited<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     field_delimiter: &'a str,
 ) -> impl Fn(&'a str) -> IResult<&'a str, &'a str, E> {
-    move |input| map(alt((take_until(field_delimiter), rest)), |s: &str| s.trim())(input)
+    move |input| map(alt((take_until(field_delimiter), rest)), str::trim)(input)
 }
 
 /// Parses the value.
@@ -362,7 +402,7 @@ fn parse_undelimited<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
 ///
 /// 1. Parse as a delimited field - currently the delimiter is hardcoded to a `"`.
 /// 2. If it does not start with one of the trim values, it is not a delimited field and we parse up to
-///    the next field_delimiter or the eof.
+///    the next `field_delimiter` or the eof.
 ///
 fn parse_value<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     field_delimiter: &'a str,
@@ -379,7 +419,7 @@ fn parse_value<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
 }
 
 /// Parses the key.
-/// Overall parsing strategies are the same as parse_value, but we don't need to convert the result to a `Value`.
+/// Overall parsing strategies are the same as `parse_value`, but we don't need to convert the result to a `Value`.
 /// Standalone key are handled here so a quoted standalone key that contains a delimiter will be dealt with correctly.
 fn parse_key<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     key_value_delimiter: &'a str,
@@ -451,12 +491,14 @@ mod test {
     fn test_parse_key_value() {
         assert_eq!(
             Ok(("", ("ook".to_string(), "pook".into()))),
-            parse_key_value::<VerboseError<&str>>("=", " ", Whitespace::Lenient, false)("ook=pook")
+            parse_key_value_::<VerboseError<&str>>("=", " ", Whitespace::Lenient, false)(
+                "ook=pook"
+            )
         );
 
         assert_eq!(
             Ok(("", ("key".to_string(), "".into()))),
-            parse_key_value::<VerboseError<&str>>("=", " ", Whitespace::Strict, false)("key=")
+            parse_key_value_::<VerboseError<&str>>("=", " ", Whitespace::Strict, false)("key=")
         );
     }
 
@@ -658,9 +700,7 @@ mod test {
                              bytes: "13",
                              tls_version: "tls1.1",
                              protocol: "http"})),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all()
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         logfmt {
@@ -672,12 +712,10 @@ mod test {
                              tag: "stopping_fetchers",
                              id: "ConsumerFetcherManager-1382721708341",
                              module: "kafka.consumer.ConsumerFetcherManager"})),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all()
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
-        // From https://github.com/timberio/vector/issues/5347
+        // From https://github.com/vectordotdev/vector/issues/5347
         real_case {
             args: func_args! [
                 value: r#"SerialNum=100018002000001906146520 GenTime="2019-10-24 14:25:03" SrcIP=10.10.254.2 DstIP=10.10.254.7 Protocol=UDP SrcPort=137 DstPort=137 PolicyID=3 Action=PERMIT Content="Session Backout""#
@@ -692,9 +730,7 @@ mod test {
                              PolicyID: "3",
                              Action: "PERMIT",
                              Content: "Session Backout"})),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all()
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         strict {
@@ -705,9 +741,7 @@ mod test {
             want: Ok(value!({foo: "",
                              bar: "",
                              tar: "data"})),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all()
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         spaces {
@@ -717,9 +751,7 @@ mod test {
             ],
             want: Ok(value!({"zork one": r#"zoog\"zink\"zork"#,
                              nonk: "nink"})),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all()
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         delimited {
@@ -730,9 +762,7 @@ mod test {
             ],
             want: Ok(value!({"zork one": r#"zoog\"zink\"zork"#,
                              nonk: "nink"})),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all()
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         delimited_with_spaces {
@@ -743,9 +773,7 @@ mod test {
             ],
             want: Ok(value!({"zork one": r#"zoog\"zink\"zork"#,
                              nonk: "nink"})),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all()
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         multiple_chars {
@@ -756,9 +784,7 @@ mod test {
             ],
             want: Ok(value!({"zork one": r#"zoog\"zink\"zork"#,
                              nonk: "nink"})),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all()
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         error {
@@ -769,9 +795,7 @@ mod test {
                 accept_standalone_key: false,
             ],
             want: Err("0: at line 1, in Tag:\nI am not a valid line.\n                      ^\n\n1: at line 1, in ManyMN:\nI am not a valid line.\n                      ^\n\n"),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all()
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         // The following case demonstrates a scenario that could potentially be considered an
@@ -786,9 +810,7 @@ mod test {
             ],
             want: Ok(value!({zork: r#"zoog"#,
                              nonk: "nink norgle: noog"})),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all()
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         // If the value field is delimited and we miss the separator,
@@ -801,9 +823,7 @@ mod test {
             ],
             want: Ok(value!({zork: "zoog",
                              nonk: r#""nink" norgle: noog"#})),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all()
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         multi_line_with_quotes {
@@ -814,9 +834,7 @@ mod test {
             ],
             want: Ok(value!({"To": "tom",
                              "test": "\"tom\" test"})),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all()
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
         multi_line_with_quotes_spaces {
@@ -827,9 +845,7 @@ mod test {
             ],
             want: Ok(value!({"To": "tom",
                              "test": "tom test"})),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
-                (): Kind::all()
-            }),
+            tdef: TypeDef::object(Collection::any()).fallible(),
         }
     ];
 }

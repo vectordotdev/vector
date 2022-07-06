@@ -1,6 +1,24 @@
+use ::value::Value;
+use percent_encoding::{utf8_percent_encode, AsciiSet};
 use vrl::prelude::*;
 
-use percent_encoding::{utf8_percent_encode, AsciiSet};
+fn encode_percent(value: Value, ascii_set: &Bytes) -> Resolved {
+    let string = value.try_bytes_utf8_lossy()?;
+    let ascii_set = match ascii_set.as_ref() {
+        b"NON_ALPHANUMERIC" => percent_encoding::NON_ALPHANUMERIC,
+        b"CONTROLS" => percent_encoding::CONTROLS,
+        b"FRAGMENT" => FRAGMENT,
+        b"QUERY" => QUERY,
+        b"SPECIAL" => SPECIAL,
+        b"PATH" => PATH,
+        b"USERINFO" => USERINFO,
+        b"COMPONENT" => COMPONENT,
+        b"WWW_FORM_URLENCODED" => WWW_FORM_URLENCODED,
+        _ => unreachable!("enum invariant"),
+    };
+
+    Ok(utf8_percent_encode(&string, ascii_set).to_string().into())
+}
 
 /// https://url.spec.whatwg.org/#fragment-percent-encode-set
 const FRAGMENT: &AsciiSet = &percent_encoding::CONTROLS
@@ -47,6 +65,20 @@ const WWW_FORM_URLENCODED: &AsciiSet =
 #[derive(Clone, Copy, Debug)]
 pub struct EncodePercent;
 
+fn ascii_sets() -> Vec<Value> {
+    vec![
+        value!("NON_ALPHANUMERIC"),
+        value!("CONTROLS"),
+        value!("FRAGMENT"),
+        value!("QUERY"),
+        value!("SPECIAL"),
+        value!("PATH"),
+        value!("USERINFO"),
+        value!("COMPONENT"),
+        value!("WWW_FORM_URLENCODED"),
+    ]
+}
+
 impl Function for EncodePercent {
     fn identifier(&self) -> &'static str {
         "encode_percent"
@@ -69,24 +101,13 @@ impl Function for EncodePercent {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
-        let ascii_sets = vec![
-            value!("NON_ALPHANUMERIC"),
-            value!("CONTROLS"),
-            value!("FRAGMENT"),
-            value!("QUERY"),
-            value!("SPECIAL"),
-            value!("PATH"),
-            value!("USERINFO"),
-            value!("COMPONENT"),
-            value!("WWW_FORM_URLENCODED"),
-        ];
         let value = arguments.required("value");
         let ascii_set = arguments
-            .optional_enum("ascii_set", &ascii_sets)?
+            .optional_enum("ascii_set", &ascii_sets())?
             .unwrap_or_else(|| value!("NON_ALPHANUMERIC"))
             .try_bytes()
             .expect("ascii_set not bytes");
@@ -108,6 +129,26 @@ impl Function for EncodePercent {
             },
         ]
     }
+
+    fn compile_argument(
+        &self,
+        _args: &[(&'static str, Option<FunctionArgument>)],
+        _ctx: &mut FunctionCompileContext,
+        name: &str,
+        expr: Option<&expression::Expr>,
+    ) -> CompiledArgument {
+        match (name, expr) {
+            ("ascii_set", Some(expr)) => {
+                let set = expr
+                    .as_enum("ascii_set", ascii_sets())?
+                    .try_bytes()
+                    .expect("ascii set not bytes");
+                Ok(Some(Box::new(set) as _))
+            }
+            ("ascii_set", None) => Ok(Some(Box::new(Bytes::from("NON_ALPHANUMERIC")) as _)),
+            _ => Ok(None),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -119,27 +160,11 @@ struct EncodePercentFn {
 impl Expression for EncodePercentFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-
-        let string = value.try_bytes_utf8_lossy()?;
-
-        let ascii_set = match self.ascii_set.as_ref() {
-            b"NON_ALPHANUMERIC" => percent_encoding::NON_ALPHANUMERIC,
-            b"CONTROLS" => percent_encoding::CONTROLS,
-            b"FRAGMENT" => FRAGMENT,
-            b"QUERY" => QUERY,
-            b"SPECIAL" => SPECIAL,
-            b"PATH" => PATH,
-            b"USERINFO" => USERINFO,
-            b"COMPONENT" => COMPONENT,
-            b"WWW_FORM_URLENCODED" => WWW_FORM_URLENCODED,
-            _ => unreachable!("enum invariant"),
-        };
-
-        Ok(utf8_percent_encode(&string, ascii_set).to_string().into())
+        encode_percent(value, &self.ascii_set)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.value.type_def(state).infallible().bytes()
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        TypeDef::bytes()
     }
 }
 
@@ -153,55 +178,55 @@ mod tests {
         default {
             args: func_args![value: r#"foo bar?"#],
             want: Ok(r#"foo%20bar%3F"#),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         controls {
             args: func_args![value: r#"foo bar"#, ascii_set: "CONTROLS"],
             want: Ok(r#"foo %14bar"#),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         fragment {
             args: func_args![value: r#"foo <>" `bar"#, ascii_set: "FRAGMENT"],
             want: Ok(r#"foo%20%3C%3E%22%20%60bar"#),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         query {
             args: func_args![value: r#"foo #"<>bar"#, ascii_set: "QUERY"],
             want: Ok(r#"foo%20%23%22%3C%3Ebar"#),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         special {
             args: func_args![value: r#"foo #"<>'bar"#, ascii_set: "SPECIAL"],
             want: Ok(r#"foo%20%23%22%3C%3E%27bar"#),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         path {
             args: func_args![value: r#"foo #"<>?`{}bar"#, ascii_set: "PATH"],
             want: Ok(r#"foo%20%23%22%3C%3E%3F%60%7B%7Dbar"#),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         userinfo {
             args: func_args![value: r#"foo #"<>?`{}/:;=@[\]^|bar"#, ascii_set: "USERINFO"],
             want: Ok(r#"foo%20%23%22%3C%3E%3F%60%7B%7D%2F%3A%3B%3D%40%5B%5C%5D%5E%7Cbar"#),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         component {
             args: func_args![value: r#"foo #"<>?`{}/:;=@[\]^|$%&+,bar"#, ascii_set: "COMPONENT"],
             want: Ok(r#"foo%20%23%22%3C%3E%3F%60%7B%7D%2F%3A%3B%3D%40%5B%5C%5D%5E%7C%24%25%26%2B%2Cbar"#),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
 
         www_form_urlencoded {
             args: func_args![value: r#"foo #"<>?`{}/:;=@[\]^|$%&+,!'()~bar"#, ascii_set: "WWW_FORM_URLENCODED"],
             want: Ok(r#"foo%20%23%22%3C%3E%3F%60%7B%7D%2F%3A%3B%3D%40%5B%5C%5D%5E%7C%24%25%26%2B%2C%21%27%28%29%7Ebar"#),
-            tdef: TypeDef::new().infallible().bytes(),
+            tdef: TypeDef::bytes().infallible(),
         }
     ];
 }

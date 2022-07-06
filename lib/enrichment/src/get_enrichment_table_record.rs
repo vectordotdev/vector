@@ -1,9 +1,53 @@
+use std::collections::BTreeMap;
+
+use value::{kind::Collection, Kind, Value};
+use vrl::{
+    function::{
+        ArgumentList, Compiled, CompiledArgument, Example, FunctionCompileContext, Parameter,
+    },
+    prelude::{
+        expression, DiagnosticMessage, FunctionArgument, Resolved, Result, TypeDef, VrlValueConvert,
+    },
+    state,
+    value::kind,
+    Context, Expression, Function,
+};
+
 use crate::{
-    vrl_util::{self, add_index, evaluate_condition},
+    vrl_util::{self, add_index, evaluate_condition, index_from_args},
     Case, Condition, IndexHandle, TableRegistry, TableSearch,
 };
-use std::collections::BTreeMap;
-use vrl_core::prelude::*;
+
+fn get_enrichment_table_record(
+    select: Option<Value>,
+    enrichment_tables: &TableSearch,
+    table: &str,
+    case_sensitive: Case,
+    condition: &[Condition],
+    index: Option<IndexHandle>,
+) -> Resolved {
+    let select = select
+        .map(|array| match array {
+            Value::Array(arr) => arr
+                .iter()
+                .map(|value| Ok(value.try_bytes_utf8_lossy()?.to_string()))
+                .collect::<std::result::Result<Vec<_>, _>>(),
+            value => Err(vrl::value::Error::Expected {
+                got: value.kind(),
+                expected: Kind::array(Collection::any()),
+            }),
+        })
+        .transpose()?;
+    let data = enrichment_tables.find_table_row(
+        table,
+        case_sensitive,
+        condition,
+        select.as_ref().map(|select| select.as_ref()),
+        index,
+    )?;
+
+    Ok(Value::Object(data))
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct GetEnrichmentTableRecord;
@@ -47,13 +91,13 @@ impl Function for GetEnrichmentTableRecord {
 
     fn compile(
         &self,
-        state: &state::Compiler,
-        _info: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
-        let registry = state
-            .get_external_context::<TableRegistry>()
-            .ok_or(Box::new(vrl_util::Error::TablesNotLoaded) as Box<dyn DiagnosticError>)?;
+        let registry = ctx
+            .get_external_context_mut::<TableRegistry>()
+            .ok_or(Box::new(vrl_util::Error::TablesNotLoaded) as Box<dyn DiagnosticMessage>)?;
 
         let tables = registry
             .table_ids()
@@ -72,7 +116,8 @@ impl Function for GetEnrichmentTableRecord {
 
         let case_sensitive = arguments
             .optional_literal("case_sensitive")?
-            .map(|literal| literal.to_value().try_boolean())
+            .and_then(|literal| literal.as_value())
+            .map(|value| value.try_boolean())
             .transpose()
             .expect("case_sensitive should be boolean") // This will have been caught by the type checker.
             .map(|case_sensitive| {
@@ -84,14 +129,53 @@ impl Function for GetEnrichmentTableRecord {
             })
             .unwrap_or(Case::Sensitive);
 
+        let index = Some(
+            add_index(registry, &table, case_sensitive, &condition)
+                .map_err(|err| Box::new(err) as Box<_>)?,
+        );
+
         Ok(Box::new(GetEnrichmentTableRecordFn {
             table,
             condition,
-            index: None,
+            index,
             select,
             case_sensitive,
             enrichment_tables: registry.as_readonly(),
         }))
+    }
+
+    fn compile_argument(
+        &self,
+        args: &[(&'static str, Option<FunctionArgument>)],
+        ctx: &mut FunctionCompileContext,
+        name: &str,
+        expr: Option<&expression::Expr>,
+    ) -> CompiledArgument {
+        match (name, expr) {
+            ("table", Some(expr)) => {
+                let registry =
+                    ctx.get_external_context_mut::<TableRegistry>()
+                        .ok_or(Box::new(vrl_util::Error::TablesNotLoaded)
+                            as Box<dyn DiagnosticMessage>)?;
+
+                let tables = registry
+                    .table_ids()
+                    .into_iter()
+                    .map(Value::from)
+                    .collect::<Vec<_>>();
+
+                let table = expr
+                    .as_enum("table", tables)?
+                    .try_bytes_utf8_lossy()
+                    .expect("table is not bytes")
+                    .into_owned();
+
+                let record = index_from_args(table, registry, args)?;
+
+                Ok(Some(Box::new(record) as _))
+            }
+            _ => Ok(None),
+        }
     }
 }
 
@@ -110,74 +194,56 @@ impl Expression for GetEnrichmentTableRecordFn {
         let condition = self
             .condition
             .iter()
-            .map(|(key, value)| evaluate_condition(ctx, key, value))
+            .map(|(key, value)| {
+                let value = value.resolve(ctx)?;
+                evaluate_condition(key, value)
+            })
             .collect::<Result<Vec<Condition>>>()?;
 
         let select = self
             .select
             .as_ref()
-            .map(|array| match array.resolve(ctx)? {
-                Value::Array(arr) => arr
-                    .iter()
-                    .map(|value| Ok(value.try_bytes_utf8_lossy()?.to_string()))
-                    .collect::<std::result::Result<Vec<_>, _>>(),
-                value => Err(value::Error::Expected {
-                    got: value.kind(),
-                    expected: Kind::Array,
-                }),
-            })
+            .map(|array| array.resolve(ctx))
             .transpose()?;
 
-        let data = self.enrichment_tables.find_table_row(
-            &self.table,
-            self.case_sensitive,
+        let table = &self.table;
+        let case_sensitive = self.case_sensitive;
+        let index = self.index;
+        let enrichment_tables = &self.enrichment_tables;
+
+        get_enrichment_table_record(
+            select,
+            enrichment_tables,
+            table,
+            case_sensitive,
             &condition,
-            select.as_ref().map(|select| select.as_ref()),
-            self.index,
-        )?;
-
-        Ok(Value::Object(data))
+            index,
+        )
     }
 
-    fn update_state(
-        &mut self,
-        state: &mut state::Compiler,
-    ) -> std::result::Result<(), ExpressionError> {
-        self.index = Some(add_index(
-            state,
-            &self.table,
-            self.case_sensitive,
-            &self.condition,
-        )?);
-
-        Ok(())
-    }
-
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new()
-            .fallible()
-            .add_object::<(), Kind>(map! { (): Kind::all() })
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        TypeDef::object(Collection::any()).fallible()
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use value::Secrets;
+    use vector_common::TimeZone;
+    use vrl::TargetValue;
+
     use super::*;
-    use crate::test_util::{
-        get_table_registry, get_table_registry_with_tables, DummyEnrichmentTable,
-    };
-    use chrono::{TimeZone as _, Utc};
-    use shared::{btreemap, TimeZone};
-    use std::sync::{Arc, Mutex};
+    use crate::test_util::get_table_registry;
 
     #[test]
     fn find_table_row() {
         let registry = get_table_registry();
         let func = GetEnrichmentTableRecordFn {
             table: "dummy1".to_string(),
-            condition: btreemap! {
-                "field" =>  expression::Literal::from("value"),
-            },
+            condition: BTreeMap::from([(
+                "field".into(),
+                expression::Literal::from("value").into(),
+            )]),
             index: Some(IndexHandle(999)),
             select: None,
             case_sensitive: Case::Sensitive,
@@ -185,69 +251,19 @@ mod tests {
         };
 
         let tz = TimeZone::default();
-        let mut object: Value = BTreeMap::new().into();
-        let mut runtime_state = vrl_core::state::Runtime::default();
-        let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
+        let object: Value = BTreeMap::new().into();
+        let mut target = TargetValue {
+            value: object,
+            metadata: vrl::value!({}),
+            secrets: Secrets::new(),
+        };
+        let mut runtime_state = vrl::state::Runtime::default();
+        let mut ctx = Context::new(&mut target, &mut runtime_state, &tz);
 
         registry.finish_load();
 
         let got = func.resolve(&mut ctx);
 
-        assert_eq!(Ok(value! ({ "field": "result" })), got);
-    }
-
-    #[test]
-    fn add_indexes() {
-        let registry = get_table_registry();
-
-        let mut func = GetEnrichmentTableRecordFn {
-            table: "dummy1".to_string(),
-            condition: btreemap! {
-                "field" =>  expression::Literal::from("value"),
-            },
-            index: None,
-            select: None,
-            case_sensitive: Case::Sensitive,
-            enrichment_tables: registry.as_readonly(),
-        };
-
-        let mut compiler = state::Compiler::new();
-        compiler.set_external_context(Some(Box::new(registry)));
-
-        assert_eq!(Ok(()), func.update_state(&mut compiler));
-        assert_eq!(Some(IndexHandle(0)), func.index);
-    }
-
-    #[test]
-    fn add_indexes_with_dates() {
-        let indexes = Arc::new(Mutex::new(Vec::new()));
-        let dummy = DummyEnrichmentTable::new_with_index(indexes.clone());
-
-        let registry = get_table_registry_with_tables(vec![("dummy1".to_string(), dummy)]);
-
-        let mut func = GetEnrichmentTableRecordFn {
-            table: "dummy1".to_string(),
-            condition: btreemap! {
-                "field1" =>  expression::Literal::from("value"),
-                "field2" => expression::Container::new(expression::Variant::Object(btreemap! {
-                    "from" => expression::Literal::from(Utc.ymd(2015, 5,15).and_hms(0,0,0)),
-                    "to" => expression::Literal::from(Utc.ymd(2015, 6,15).and_hms(0,0,0))
-                }.into()))
-            },
-            index: None,
-            select: None,
-            case_sensitive: Case::Sensitive,
-            enrichment_tables: registry.as_readonly(),
-        };
-
-        let mut compiler = state::Compiler::new();
-        compiler.set_external_context(Some(Box::new(registry)));
-
-        assert_eq!(Ok(()), func.update_state(&mut compiler));
-        assert_eq!(Some(IndexHandle(0)), func.index);
-
-        // Ensure only the exact match has been added as an index.
-        let indexes = indexes.lock().unwrap();
-        assert_eq!(vec![vec!["field1".to_string()]], *indexes);
+        assert_eq!(Ok(vrl::value! ({ "field": "result" })), got);
     }
 }

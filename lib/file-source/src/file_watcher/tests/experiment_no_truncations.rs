@@ -1,10 +1,12 @@
-use crate::file_watcher::tests::*;
-use crate::file_watcher::FileWatcher;
-use crate::ReadFrom;
+use std::{fs, io::Write};
+
 use bytes::Bytes;
 use quickcheck::{QuickCheck, TestResult};
-use std::fs;
-use std::io::Write;
+
+use crate::{
+    file_watcher::{tests::*, FileWatcher},
+    ReadFrom,
+};
 
 // Interpret all FWActions, excluding truncation
 //
@@ -40,8 +42,8 @@ fn experiment_no_truncations(actions: Vec<FileWatcherAction>) {
             FileWatcherAction::Exit => break,
             FileWatcherAction::WriteLine(ref s) => {
                 fwfiles[0].write_line(s);
-                assert!(fp.write(s.as_bytes()).is_ok());
-                assert!(fp.write(b"\n").is_ok());
+                assert!(fp.write_all(s.as_bytes()).is_ok());
+                assert!(fp.write_all(b"\n").is_ok());
                 assert!(fp.flush().is_ok());
             }
             FileWatcherAction::RotateFile => {

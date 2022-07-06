@@ -1,0 +1,20 @@
+{{ define "title" }}
+Support Services | {{ site.Title }}
+{{ end }}
+
+{{ define "main" }}
+{{ $form := .Params.marketo_form }}
+
+<div class="relative max-w-3xl lg:max-w-7xl px-6 lg:px-8 mx-auto">
+    <div class="my-16">
+        {{ partial "hero.html" . }}
+    </div>
+
+    {{ partial "form-on-page.html" (dict "form" (dict "form_id" $form.form_id "form_title" $form.form_title
+    "form_thankyou" $form.form_thankyou)) }}
+
+    <p class="dark:text-gray-200 md:text-lg text-gray-500 prose dark:prose-dark pb-16 mt-5">
+        For general support questions or to join our Discord group please review our <a href="/community">contact us and FAQ page</a>.
+    </p>
+</div>
+{{ end }}

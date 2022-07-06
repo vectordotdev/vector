@@ -2,64 +2,70 @@
 
 #![deny(missing_docs)]
 
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    hash::Hash,
+    pin::Pin,
+    task::{Context, Poll},
+    time::Duration,
+};
+
 use bytes::{Bytes, BytesMut};
 use futures::{Stream, StreamExt};
 use pin_project::pin_project;
 use regex::bytes::Regex;
-use serde::{Deserialize, Serialize};
-use std::collections::{hash_map::Entry, HashMap};
-use std::hash::Hash;
-use std::time::Duration;
-use std::{
-    pin::Pin,
-    task::{Context, Poll},
-};
 use tokio_util::time::delay_queue::{DelayQueue, Key};
+use vector_config::configurable_component;
 
-/// The mode of operation of the line aggregator.
-#[derive(Debug, Hash, Clone, Copy, PartialEq, Deserialize, Serialize)]
+/// Mode of operation of the line aggregator.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Hash, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum Mode {
     /// All consecutive lines matching this pattern are included in the group.
-    /// The first line (the line that matched the start pattern) does not need
-    /// to match the `ContinueThrough` pattern.
-    /// This is useful in cases such as a Java stack trace, where some indicator
-    /// in the line (such as leading whitespace) indicates that it is an
-    /// extension of the proceeding line.
+    ///
+    /// The first line (the line that matched the start pattern) does not need to match the `ContinueThrough` pattern.
+    ///
+    /// This is useful in cases such as a Java stack trace, where some indicator in the line (such as leading
+    /// whitespace) indicates that it is an extension of the proceeding line.
     ContinueThrough,
 
-    /// All consecutive lines matching this pattern, plus one additional line,
-    /// are included in the group.
-    /// This is useful in cases where a log message ends with a continuation
-    /// marker, such as a backslash, indicating that the following line is part
-    /// of the same message.
+    /// All consecutive lines matching this pattern, plus one additional line, are included in the group.
+    ///
+    /// This is useful in cases where a log message ends with a continuation marker, such as a backslash, indicating
+    /// that the following line is part of the same message.
     ContinuePast,
 
-    /// All consecutive lines not matching this pattern are included in the
-    /// group.
-    /// This is useful where a log line contains a marker indicating that it
-    /// begins a new message.
+    /// All consecutive lines not matching this pattern are included in the group.
+    ///
+    /// This is useful where a log line contains a marker indicating that it begins a new message.
     HaltBefore,
 
-    /// All consecutive lines, up to and including the first line matching this
-    /// pattern, are included in the group.
-    /// This is useful where a log line ends with a termination marker, such as
-    /// a semicolon.
+    /// All consecutive lines, up to and including the first line matching this pattern, are included in the group.
+    ///
+    /// This is useful where a log line ends with a termination marker, such as a semicolon.
     HaltWith,
 }
 
-/// Configuration parameters of the line aggregator.
-#[derive(Debug, Clone)]
+/// Configuration of multi-line aggregation.
+#[derive(Clone, Debug)]
 pub struct Config {
-    /// Start pattern to look for as a beginning of the message.
+    /// Regular expression pattern that is used to match the start of a new message.
     pub start_pattern: Regex,
-    /// Condition pattern to look for. Exact behavior is configured via `mode`.
+
+    /// Regular expression pattern that is used to determine whether or not more lines should be read.
+    ///
+    /// This setting must be configured in conjunction with `mode`.
     pub condition_pattern: Regex,
-    /// Mode of operation, specifies how the condition pattern is interpreted.
+
+    /// Aggregation mode.
+    ///
+    /// This setting must be configured in conjunction with `condition_pattern`.
     pub mode: Mode,
-    /// The maximum time to wait for the continuation. Once this timeout is
-    /// reached, the buffered message is guaranteed to be flushed, even if
-    /// incomplete.
+
+    /// The maximum amount of time to wait for the next additional line, in milliseconds.
+    ///
+    /// Once this timeout is reached, the buffered message is guaranteed to be flushed, even if incomplete.
     pub timeout: Duration,
 }
 
@@ -139,7 +145,7 @@ where
 {
     /// Create a new `LineAgg` using the specified `inner` stream and
     /// preconfigured `logic`.
-    pub fn new(inner: T, logic: Logic<K, C>) -> Self {
+    pub const fn new(inner: T, logic: Logic<K, C>) -> Self {
         Self {
             inner,
             logic,
@@ -156,7 +162,7 @@ where
 {
     /// `K` - file name, or other line source,
     /// `Bytes` - the line data,
-    /// `C` - the context related the the line data.
+    /// `C` - the context related to the line data.
     type Item = (K, Bytes, C);
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -210,8 +216,7 @@ where
                 Poll::Pending => {
                     // We didn't get any lines from `inner`, so we just give
                     // a line from keys that have hit their timeout.
-                    while let Poll::Ready(Some(Ok(expired_key))) =
-                        this.logic.timeouts.poll_expired(cx)
+                    while let Poll::Ready(Some(expired_key)) = this.logic.timeouts.poll_expired(cx)
                     {
                         let key = expired_key.into_inner();
                         if let Some((_, aggregate)) = this.logic.buffers.remove(&key) {
@@ -387,10 +392,11 @@ impl<C> Aggregate<C> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use bytes::Bytes;
     use futures::SinkExt;
     use pretty_assertions::assert_eq;
+
+    use super::*;
 
     #[tokio::test]
     async fn mode_continue_through_1() {
@@ -560,7 +566,7 @@ mod tests {
         run_and_assert(&lines, config, &expected).await;
     }
 
-    /// https://github.com/timberio/vector/issues/3237
+    /// https://github.com/vectordotdev/vector/issues/3237
     #[tokio::test]
     async fn two_lines_emit_with_continue_through() {
         let lines = vec![
@@ -673,7 +679,7 @@ mod tests {
     async fn timeout_resets_on_new_line() {
         // Tests if multiline aggregation updates
         // it's timeout every time it get's a new line.
-        // To test this we are emmiting a single large
+        // To test this we are emitting a single large
         // multiline but drip feeding it into the aggreagator
         // with 1ms delay.
 

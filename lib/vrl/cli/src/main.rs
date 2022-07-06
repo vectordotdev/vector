@@ -1,8 +1,8 @@
 extern crate vrl_cli;
 
-use structopt::StructOpt;
+use clap::Parser;
 use vrl_cli::{cmd::cmd, Opts};
 
 fn main() {
-    std::process::exit(cmd(&Opts::from_args()));
+    std::process::exit(cmd(&Opts::parse()));
 }

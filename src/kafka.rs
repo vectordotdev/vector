@@ -1,9 +1,11 @@
-use crate::internal_events::KafkaStatisticsReceived;
-use crate::tls::TlsOptions;
+use std::path::{Path, PathBuf};
+
 use rdkafka::{consumer::ConsumerContext, ClientConfig, ClientContext, Statistics};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::path::{Path, PathBuf};
+use vector_config::configurable_component;
+
+use crate::{internal_events::KafkaStatisticsReceived, tls::TlsEnableableConfig};
 
 #[derive(Debug, Snafu)]
 enum KafkaError {
@@ -14,7 +16,7 @@ enum KafkaError {
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
 #[serde(rename_all = "lowercase")]
-pub enum KafkaCompression {
+pub(crate) enum KafkaCompression {
     #[derivative(Default)]
     None,
     Gzip,
@@ -23,29 +25,44 @@ pub enum KafkaCompression {
     Zstd,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct KafkaAuthConfig {
-    pub sasl: Option<KafkaSaslConfig>,
-    pub tls: Option<KafkaTlsConfig>,
+/// Kafka authentication configuration.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
+pub(crate) struct KafkaAuthConfig {
+    #[configurable(derived)]
+    pub(crate) sasl: Option<KafkaSaslConfig>,
+
+    #[configurable(derived)]
+    pub(crate) tls: Option<TlsEnableableConfig>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct KafkaSaslConfig {
-    pub enabled: Option<bool>,
-    pub username: Option<String>,
-    pub password: Option<String>,
-    pub mechanism: Option<String>,
-}
+/// Configuration for SASL authentication when interacting with Kafka.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
+pub(crate) struct KafkaSaslConfig {
+    /// Enables SASL authentication.
+    ///
+    /// Only `PLAIN` and `SCRAM`-based mechanisms are supported when configuring SASL authentication via `sasl.*`. For
+    /// other mechanisms, `librdkafka_options.*` must be used directly to configure other `librdkafka`-specific values
+    /// i.e. `sasl.kerberos.*` and so on.
+    ///
+    /// See the [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for details.
+    ///
+    /// SASL authentication is not supported on Windows.
+    pub(crate) enabled: Option<bool>,
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct KafkaTlsConfig {
-    pub enabled: Option<bool>,
-    #[serde(flatten)]
-    pub options: TlsOptions,
+    /// The SASL username.
+    pub(crate) username: Option<String>,
+
+    /// The SASL password.
+    pub(crate) password: Option<String>,
+
+    /// The SASL mechanism to use.
+    pub(crate) mechanism: Option<String>,
 }
 
 impl KafkaAuthConfig {
-    pub fn apply(&self, client: &mut ClientConfig) -> crate::Result<()> {
+    pub(crate) fn apply(&self, client: &mut ClientConfig) -> crate::Result<()> {
         let sasl_enabled = self.sasl.as_ref().and_then(|s| s.enabled).unwrap_or(false);
         let tls_enabled = self.tls.as_ref().and_then(|s| s.enabled).unwrap_or(false);
 
@@ -95,11 +112,11 @@ fn pathbuf_to_string(path: &Path) -> crate::Result<&str> {
         .ok_or_else(|| KafkaError::InvalidPath { path: path.into() }.into())
 }
 
-pub struct KafkaStatisticsContext;
+pub(crate) struct KafkaStatisticsContext;
 
 impl ClientContext for KafkaStatisticsContext {
     fn stats(&self, statistics: Statistics) {
-        emit!(&KafkaStatisticsReceived {
+        emit!(KafkaStatisticsReceived {
             statistics: &statistics
         });
     }

@@ -21,6 +21,7 @@ components: sources: heroku_logs: {
 	}
 
 	features: {
+		acknowledgements: true
 		multiline: enabled: false
 		codecs: {
 			enabled:         true
@@ -44,7 +45,6 @@ components: sources: heroku_logs: {
 
 			tls: {
 				enabled:                true
-				can_enable:             true
 				can_verify_certificate: true
 				enabled_default:        false
 			}
@@ -52,16 +52,6 @@ components: sources: heroku_logs: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -72,7 +62,7 @@ components: sources: heroku_logs: {
 	}
 
 	configuration: {
-		acknowledgements: configuration._acknowledgements
+		acknowledgements: configuration._source_acknowledgements
 		address:          sources.http.configuration.address
 		auth:             sources.http.configuration.auth
 		query_parameters: sources.http.configuration.query_parameters
@@ -86,7 +76,6 @@ components: sources: heroku_logs: {
 				required:    true
 				type: string: {
 					examples: ["erlang"]
-					syntax: "literal"
 				}
 			}
 			host: fields._local_host
@@ -95,7 +84,6 @@ components: sources: heroku_logs: {
 				required:    true
 				type: string: {
 					examples: ["Hi from erlang"]
-					syntax: "literal"
 				}
 			}
 			proc_id: {
@@ -103,7 +91,6 @@ components: sources: heroku_logs: {
 				required:    true
 				type: string: {
 					examples: ["console"]
-					syntax: "literal"
 				}
 			}
 			timestamp: fields._current_timestamp

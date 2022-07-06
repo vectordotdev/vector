@@ -1,45 +1,72 @@
-use crate::{
-    codecs::{self, DecodingConfig, FramingConfig, ParserConfig},
-    config::{
-        log_schema, DataType, GenerateConfig, SourceConfig, SourceContext, SourceDescription,
-    },
-    event::Event,
-    internal_events::NatsEventsReceived,
-    serde::{default_decoding, default_framing_message_based},
-    shutdown::ShutdownSignal,
-    sources::util::TcpError,
-    Pipeline,
-};
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{pin_mut, stream, SinkExt, Stream, StreamExt};
-use serde::{Deserialize, Serialize};
-use snafu::Snafu;
+use codecs::decoding::{DeserializerConfig, FramingConfig, StreamDecodingError};
+use futures::{pin_mut, stream, Stream, StreamExt};
+use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
+use vector_config::configurable_component;
+use vector_core::ByteSizeOf;
+
+use crate::{
+    codecs::{Decoder, DecodingConfig},
+    config::{log_schema, GenerateConfig, Output, SourceConfig, SourceContext, SourceDescription},
+    event::Event,
+    internal_events::{BytesReceived, OldEventsReceived, StreamClosedError},
+    nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
+    serde::{default_decoding, default_framing_message_based},
+    shutdown::ShutdownSignal,
+    tls::TlsEnableableConfig,
+    SourceSender,
+};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
-    #[snafu(display("Could not create Nats subscriber: {}", source))]
-    NatsCreateError { source: std::io::Error },
-    #[snafu(display("Could not subscribe to Nats topics: {}", source))]
-    NatsSubscribeError { source: std::io::Error },
+    #[snafu(display("NATS Config Error: {}", source))]
+    Config { source: NatsConfigError },
+    #[snafu(display("NATS Connect Error: {}", source))]
+    Connect { source: std::io::Error },
+    #[snafu(display("NATS Subscribe Error: {}", source))]
+    Subscribe { source: std::io::Error },
 }
 
-#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
+/// Configuration for the `nats` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub struct NatsSourceConfig {
+    /// The NATS URL to connect to.
+    ///
+    /// The URL must take the form of `nats://server:port`.
     url: String,
+
+    /// A name assigned to the NATS connection.
     #[serde(alias = "name")]
     connection_name: String,
+
+    /// The NATS subject to publish messages to.
+    // TODO: We will eventually be able to add metadata on a per-field basis, such that we can add metadata for marking
+    // this field as being capable of using Vector's templating syntax.
     subject: String,
+
+    /// NATS Queue Group to join.
     queue: Option<String>,
+
+    #[configurable(derived)]
+    tls: Option<TlsEnableableConfig>,
+
+    #[configurable(derived)]
+    auth: Option<NatsAuthConfig>,
+
+    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
-    framing: Box<dyn FramingConfig>,
+    framing: FramingConfig,
+
+    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
-    decoding: Box<dyn ParserConfig>,
+    decoding: DeserializerConfig,
 }
 
 inventory::submit! {
@@ -63,7 +90,7 @@ impl GenerateConfig for NatsSourceConfig {
 impl SourceConfig for NatsSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let (connection, subscription) = create_subscription(self).await?;
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
+        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
 
         Ok(Box::pin(nats_source(
             connection,
@@ -74,43 +101,37 @@ impl SourceConfig for NatsSourceConfig {
         )))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(self.decoding.output_type())]
     }
 
     fn source_type(&self) -> &'static str {
         "nats"
     }
+
+    fn can_acknowledge(&self) -> bool {
+        false
+    }
 }
 
 impl NatsSourceConfig {
-    fn to_nats_options(&self) -> async_nats::Options {
-        // Set reconnect_buffer_size on the nats client to 0 bytes so that the
-        // client doesn't buffer internally (to avoid message loss).
-        async_nats::Options::new()
-            .with_name(&self.connection_name)
-            .reconnect_buffer_size(0)
-    }
-
-    async fn connect(&self) -> crate::Result<async_nats::Connection> {
-        self.to_nats_options()
-            .connect(&self.url)
-            .await
-            .map_err(|e| e.into())
+    async fn connect(&self) -> Result<nats::asynk::Connection, BuildError> {
+        let options: nats::asynk::Options = self.try_into().context(ConfigSnafu)?;
+        options.connect(&self.url).await.context(ConnectSnafu)
     }
 }
 
-impl From<NatsSourceConfig> for async_nats::Options {
-    fn from(config: NatsSourceConfig) -> Self {
-        async_nats::Options::new()
-            .with_name(&config.connection_name)
-            .reconnect_buffer_size(0)
+impl std::convert::TryFrom<&NatsSourceConfig> for nats::asynk::Options {
+    type Error = NatsConfigError;
+
+    fn try_from(config: &NatsSourceConfig) -> Result<Self, Self::Error> {
+        from_tls_auth_config(&config.connection_name, &config.auth, &config.tls)
     }
 }
 
 fn get_subscription_stream(
-    subscription: async_nats::Subscription,
-) -> impl Stream<Item = async_nats::Message> {
+    subscription: nats::asynk::Subscription,
+) -> impl Stream<Item = nats::asynk::Message> {
     stream::unfold(subscription, |subscription| async move {
         subscription.next().await.map(|msg| (msg, subscription))
     })
@@ -118,41 +139,45 @@ fn get_subscription_stream(
 
 async fn nats_source(
     // Take ownership of the connection so it doesn't get dropped.
-    _connection: async_nats::Connection,
-    subscription: async_nats::Subscription,
-    decoder: codecs::Decoder,
+    _connection: nats::asynk::Connection,
+    subscription: nats::asynk::Subscription,
+    decoder: Decoder,
     shutdown: ShutdownSignal,
-    mut out: Pipeline,
+    mut out: SourceSender,
 ) -> Result<(), ()> {
     let stream = get_subscription_stream(subscription).take_until(shutdown);
     pin_mut!(stream);
     while let Some(msg) = stream.next().await {
+        emit!(BytesReceived {
+            byte_size: msg.data.len(),
+            protocol: "tcp",
+        });
         let mut stream = FramedRead::new(msg.data.as_ref(), decoder.clone());
         while let Some(next) = stream.next().await {
             match next {
-                Ok((events, byte_size)) => {
-                    emit!(&NatsEventsReceived {
-                        byte_size,
-                        count: events.len()
+                Ok((events, _byte_size)) => {
+                    let count = events.len();
+                    emit!(OldEventsReceived {
+                        byte_size: events.size_of(),
+                        count
                     });
 
                     let now = Utc::now();
 
-                    for mut event in events {
+                    let events = events.into_iter().map(|mut event| {
                         if let Event::Log(ref mut log) = event {
                             log.try_insert(log_schema().source_type_key(), Bytes::from("nats"));
                             log.try_insert(log_schema().timestamp_key(), now);
                         }
+                        event
+                    });
 
-                        out.send(event)
-                            .await
-                            .map_err(|error: crate::pipeline::ClosedError| {
-                                error!(message = "Error sending to sink.", %error);
-                            })?;
-                    }
+                    out.send_batch(events).await.map_err(|error| {
+                        emit!(StreamClosedError { error, count });
+                    })?;
                 }
                 Err(error) => {
-                    // Error is logged by `crate::codecs::Decoder`, no further
+                    // Error is logged by `crate::codecs`, no further
                     // handling is needed here.
                     if !error.can_continue() {
                         break;
@@ -166,7 +191,7 @@ async fn nats_source(
 
 async fn create_subscription(
     config: &NatsSourceConfig,
-) -> crate::Result<(async_nats::Connection, async_nats::Subscription)> {
+) -> Result<(nats::asynk::Connection, nats::asynk::Subscription), BuildError> {
     let nc = config.connect().await?;
 
     let subscription = match &config.queue {
@@ -174,13 +199,15 @@ async fn create_subscription(
         Some(queue) => nc.queue_subscribe(&config.subject, queue).await,
     };
 
-    let subscription = subscription?;
+    let subscription = subscription.context(SubscribeSnafu)?;
 
     Ok((nc, subscription))
 }
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::print_stdout)] //tests
+
     use super::*;
 
     #[test]
@@ -192,35 +219,428 @@ mod tests {
 #[cfg(feature = "nats-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
+    #![allow(clippy::print_stdout)] //tests
+
     use super::*;
-    use crate::test_util::{collect_n, random_string};
+    use crate::nats::{NatsAuthCredentialsFile, NatsAuthNKey, NatsAuthToken, NatsAuthUserPassword};
+    use crate::test_util::{
+        collect_n,
+        components::{assert_source_compliance, SOURCE_TAGS},
+        random_string,
+    };
+    use crate::tls::TlsConfig;
+
+    async fn publish_and_check(conf: NatsSourceConfig) -> Result<(), BuildError> {
+        let subject = conf.subject.clone();
+        let (nc, sub) = create_subscription(&conf).await?;
+        let nc_pub = nc.clone();
+        let msg = "my message";
+
+        let events = assert_source_compliance(&SOURCE_TAGS, async move {
+            let (tx, rx) = SourceSender::new_test();
+            let decoder = DecodingConfig::new(conf.framing.clone(), conf.decoding.clone()).build();
+            tokio::spawn(nats_source(nc, sub, decoder, ShutdownSignal::noop(), tx));
+            nc_pub.publish(&subject, msg).await.unwrap();
+
+            collect_n(rx, 1).await
+        })
+        .await;
+
+        println!("Received event  {:?}", events[0].as_log());
+        assert_eq!(events[0].as_log()[log_schema().message_key()], msg.into());
+        Ok(())
+    }
 
     #[tokio::test]
-    async fn nats_happy() {
+    async fn nats_no_auth() {
         let subject = format!("test-{}", random_string(10));
+        let url =
+            std::env::var("NATS_ADDRESS").unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSourceConfig {
             connection_name: "".to_owned(),
             subject: subject.clone(),
-            url: "nats://127.0.0.1:4222".to_owned(),
+            url,
             queue: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
+            tls: None,
+            auth: None,
         };
 
-        let (nc, sub) = create_subscription(&conf).await.unwrap();
-        let nc_pub = nc.clone();
+        let r = publish_and_check(conf).await;
+        assert!(
+            r.is_ok(),
+            "publish_and_check failed, expected Ok(()), got: {:?}",
+            r
+        );
+    }
 
-        let (tx, rx) = Pipeline::new_test();
-        let decoder = DecodingConfig::new(conf.framing.clone(), conf.decoding.clone())
-            .build()
-            .unwrap();
-        tokio::spawn(nats_source(nc, sub, decoder, ShutdownSignal::noop(), tx));
-        let msg = "my message";
-        nc_pub.publish(&subject, msg).await.unwrap();
+    #[tokio::test]
+    async fn nats_userpass_auth_valid() {
+        let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_USERPASS_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
-        let events = collect_n(rx, 1).await;
-        println!("Received event  {:?}", events[0].as_log());
-        assert_eq!(events[0].as_log()[log_schema().message_key()], msg.into());
+        let conf = NatsSourceConfig {
+            connection_name: "".to_owned(),
+            subject: subject.clone(),
+            url,
+            queue: None,
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
+            tls: None,
+            auth: Some(NatsAuthConfig::UserPassword {
+                user_password: NatsAuthUserPassword {
+                    user: "natsuser".into(),
+                    password: "natspass".into(),
+                },
+            }),
+        };
+
+        let r = publish_and_check(conf).await;
+        assert!(
+            r.is_ok(),
+            "publish_and_check failed, expected Ok(()), got: {:?}",
+            r
+        );
+    }
+
+    #[tokio::test]
+    async fn nats_userpass_auth_invalid() {
+        let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_USERPASS_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
+
+        let conf = NatsSourceConfig {
+            connection_name: "".to_owned(),
+            subject: subject.clone(),
+            url,
+            queue: None,
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
+            tls: None,
+            auth: Some(NatsAuthConfig::UserPassword {
+                user_password: NatsAuthUserPassword {
+                    user: "natsuser".into(),
+                    password: "wrongpass".into(),
+                },
+            }),
+        };
+
+        let r = publish_and_check(conf).await;
+        assert!(
+            matches!(r, Err(BuildError::Connect { .. })),
+            "publish_and_check failed, expected BuildError::Connect, got: {:?}",
+            r
+        );
+    }
+
+    #[tokio::test]
+    async fn nats_token_auth_valid() {
+        let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_TOKEN_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
+
+        let conf = NatsSourceConfig {
+            connection_name: "".to_owned(),
+            subject: subject.clone(),
+            url,
+            queue: None,
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
+            tls: None,
+            auth: Some(NatsAuthConfig::Token {
+                token: NatsAuthToken {
+                    value: "secret".into(),
+                },
+            }),
+        };
+
+        let r = publish_and_check(conf).await;
+        assert!(
+            r.is_ok(),
+            "publish_and_check failed, expected Ok(()), got: {:?}",
+            r
+        );
+    }
+
+    #[tokio::test]
+    async fn nats_token_auth_invalid() {
+        let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_TOKEN_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
+
+        let conf = NatsSourceConfig {
+            connection_name: "".to_owned(),
+            subject: subject.clone(),
+            url,
+            queue: None,
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
+            tls: None,
+            auth: Some(NatsAuthConfig::Token {
+                token: NatsAuthToken {
+                    value: "wrongsecret".into(),
+                },
+            }),
+        };
+
+        let r = publish_and_check(conf).await;
+        assert!(
+            matches!(r, Err(BuildError::Connect { .. })),
+            "publish_and_check failed, expected BuildError::Connect, got: {:?}",
+            r
+        );
+    }
+
+    #[tokio::test]
+    async fn nats_nkey_auth_valid() {
+        let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_NKEY_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
+
+        let conf = NatsSourceConfig {
+            connection_name: "".to_owned(),
+            subject: subject.clone(),
+            url,
+            queue: None,
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
+            tls: None,
+            auth: Some(NatsAuthConfig::Nkey {
+                nkey: NatsAuthNKey {
+                    nkey: "UD345ZYSUJQD7PNCTWQPINYSO3VH4JBSADBSYUZOBT666DRASFRAWAWT".into(),
+                    seed: "SUANIRXEZUROTXNFN3TJYMT27K7ZZVMD46FRIHF6KXKS4KGNVBS57YAFGY".into(),
+                },
+            }),
+        };
+
+        let r = publish_and_check(conf).await;
+        assert!(
+            r.is_ok(),
+            "publish_and_check failed, expected Ok(()), got: {:?}",
+            r
+        );
+    }
+
+    #[tokio::test]
+    async fn nats_nkey_auth_invalid() {
+        let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_NKEY_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
+
+        let conf = NatsSourceConfig {
+            connection_name: "".to_owned(),
+            subject: subject.clone(),
+            url,
+            queue: None,
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
+            tls: None,
+            auth: Some(NatsAuthConfig::Nkey {
+                nkey: NatsAuthNKey {
+                    nkey: "UAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".into(),
+                    seed: "SBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB".into(),
+                },
+            }),
+        };
+
+        let r = publish_and_check(conf).await;
+        assert!(
+            matches!(r, Err(BuildError::Config { .. })),
+            "publish_and_check failed, expected BuildError::Config, got: {:?}",
+            r
+        );
+    }
+
+    #[tokio::test]
+    async fn nats_tls_valid() {
+        let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_TLS_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
+
+        let conf = NatsSourceConfig {
+            connection_name: "".to_owned(),
+            subject: subject.clone(),
+            url,
+            queue: None,
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
+            tls: Some(TlsEnableableConfig {
+                enabled: Some(true),
+                options: TlsConfig {
+                    ca_file: Some("tests/data/nats/rootCA.pem".into()),
+                    ..Default::default()
+                },
+            }),
+            auth: None,
+        };
+
+        let r = publish_and_check(conf).await;
+        assert!(
+            r.is_ok(),
+            "publish_and_check failed, expected Ok(()), got: {:?}",
+            r
+        );
+    }
+
+    #[tokio::test]
+    async fn nats_tls_invalid() {
+        let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_TLS_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
+
+        let conf = NatsSourceConfig {
+            connection_name: "".to_owned(),
+            subject: subject.clone(),
+            url,
+            queue: None,
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
+            tls: None,
+            auth: None,
+        };
+
+        let r = publish_and_check(conf).await;
+        assert!(
+            matches!(r, Err(BuildError::Connect { .. })),
+            "publish_and_check failed, expected BuildError::Connect, got: {:?}",
+            r
+        );
+    }
+
+    #[tokio::test]
+    async fn nats_tls_client_cert_valid() {
+        let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_TLS_CLIENT_CERT_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
+
+        let conf = NatsSourceConfig {
+            connection_name: "".to_owned(),
+            subject: subject.clone(),
+            url,
+            queue: None,
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
+            tls: Some(TlsEnableableConfig {
+                enabled: Some(true),
+                options: TlsConfig {
+                    ca_file: Some("tests/data/nats/rootCA.pem".into()),
+                    crt_file: Some("tests/data/nats/nats-client.pem".into()),
+                    key_file: Some("tests/data/nats/nats-client.key".into()),
+                    ..Default::default()
+                },
+            }),
+            auth: None,
+        };
+
+        let r = publish_and_check(conf).await;
+        assert!(
+            r.is_ok(),
+            "publish_and_check failed, expected Ok(()), got: {:?}",
+            r
+        );
+    }
+
+    #[tokio::test]
+    async fn nats_tls_client_cert_invalid() {
+        let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_TLS_CLIENT_CERT_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
+
+        let conf = NatsSourceConfig {
+            connection_name: "".to_owned(),
+            subject: subject.clone(),
+            url,
+            queue: None,
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
+            tls: Some(TlsEnableableConfig {
+                enabled: Some(true),
+                options: TlsConfig {
+                    ca_file: Some("tests/data/nats/rootCA.pem".into()),
+                    ..Default::default()
+                },
+            }),
+            auth: None,
+        };
+
+        let r = publish_and_check(conf).await;
+        assert!(
+            matches!(r, Err(BuildError::Connect { .. })),
+            "publish_and_check failed, expected BuildError::Connect, got: {:?}",
+            r
+        );
+    }
+
+    #[tokio::test]
+    async fn nats_tls_jwt_auth_valid() {
+        let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_JWT_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
+
+        let conf = NatsSourceConfig {
+            connection_name: "".to_owned(),
+            subject: subject.clone(),
+            url,
+            queue: None,
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
+            tls: Some(TlsEnableableConfig {
+                enabled: Some(true),
+                options: TlsConfig {
+                    ca_file: Some("tests/data/nats/rootCA.pem".into()),
+                    ..Default::default()
+                },
+            }),
+            auth: Some(NatsAuthConfig::CredentialsFile {
+                credentials_file: NatsAuthCredentialsFile {
+                    path: "tests/data/nats/nats.creds".into(),
+                },
+            }),
+        };
+
+        let r = publish_and_check(conf).await;
+        assert!(
+            r.is_ok(),
+            "publish_and_check failed, expected Ok(()), got: {:?}",
+            r
+        );
+    }
+
+    #[tokio::test]
+    async fn nats_tls_jwt_auth_invalid() {
+        let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_JWT_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
+
+        let conf = NatsSourceConfig {
+            connection_name: "".to_owned(),
+            subject: subject.clone(),
+            url,
+            queue: None,
+            framing: default_framing_message_based(),
+            decoding: default_decoding(),
+            tls: Some(TlsEnableableConfig {
+                enabled: Some(true),
+                options: TlsConfig {
+                    ca_file: Some("tests/data/nats/rootCA.pem".into()),
+                    ..Default::default()
+                },
+            }),
+            auth: Some(NatsAuthConfig::CredentialsFile {
+                credentials_file: NatsAuthCredentialsFile {
+                    path: "tests/data/nats/nats-bad.creds".into(),
+                },
+            }),
+        };
+
+        let r = publish_and_check(conf).await;
+        assert!(
+            matches!(r, Err(BuildError::Connect { .. })),
+            "publish_and_check failed, expected BuildError::Connect, got: {:?}",
+            r
+        );
     }
 }

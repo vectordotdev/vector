@@ -13,14 +13,14 @@ components: sinks: http: {
 	}
 
 	features: {
-		buffer: enabled:      true
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {
 				enabled:      true
 				common:       true
-				max_bytes:    10485760
-				timeout_secs: 1
+				max_bytes:    10_000_000
+				timeout_secs: 1.0
 			}
 			compression: {
 				enabled: true
@@ -32,8 +32,8 @@ components: sinks: http: {
 				enabled: true
 				codec: {
 					enabled: true
-					batched: true
-					enum: ["json", "ndjson", "text"]
+					framing: true
+					enum: ["json", "text"]
 				}
 			}
 			proxy: enabled: true
@@ -43,7 +43,6 @@ components: sinks: http: {
 			}
 			tls: {
 				enabled:                true
-				can_enable:             false
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        false
@@ -68,16 +67,6 @@ components: sinks: http: {
 	}
 
 	support: {
-		targets: {
-			"aarch64-unknown-linux-gnu":      true
-			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  true
-			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
-			"x86_64-pc-windows-msv":          true
-			"x86_64-unknown-linux-gnu":       true
-			"x86_64-unknown-linux-musl":      true
-		}
 		requirements: []
 		warnings: []
 		notices: []
@@ -94,10 +83,8 @@ components: sinks: http: {
 				but can also include the port, path, and any other valid part of a URI.
 				"""
 			required: true
-			warnings: []
 			type: string: {
 				examples: ["https://10.22.212.22:9000/endpoint"]
-				syntax: "literal"
 			}
 		}
 		healthcheck: type: object: options: uri: {
@@ -107,11 +94,9 @@ components: sinks: http: {
 				but can also include the port, path, and any other valid part of a URI.
 				"""
 			required: false
-			warnings: []
 			type: string: {
 				default: null
 				examples: ["https://10.22.212.22:9000/health"]
-				syntax: "literal"
 			}
 		}
 	}
@@ -119,6 +104,7 @@ components: sinks: http: {
 	input: {
 		logs:    true
 		metrics: null
+		traces:  false
 	}
 
 	telemetry: metrics: {

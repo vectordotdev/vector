@@ -1,14 +1,17 @@
-use crate::{
-    config::{self, DataType, CONFIG_PATHS},
-    event::Event,
-    internal_events::{LuaBuildError, LuaGcTriggered},
-    transforms::Transform,
-};
-use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
 use std::path::PathBuf;
+
+use snafu::{ResultExt, Snafu};
+use vector_config::configurable_component;
 pub use vector_core::event::lua;
 use vector_core::transform::runtime_transform::{RuntimeTransform, Timer};
+
+use crate::{
+    config::{self, DataType, Input, Output, CONFIG_PATHS},
+    event::Event,
+    internal_events::{LuaBuildError, LuaGcTriggered},
+    schema,
+    transforms::Transform,
+};
 
 #[derive(Debug, Snafu)]
 pub enum BuildError {
@@ -39,15 +42,30 @@ pub enum BuildError {
     RuntimeErrorGc { source: mlua::Error },
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the version two of the `lua` transform.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct LuaConfig {
+    /// The Lua program to initialize the transform with.
+    ///
+    /// The program can be used to to import external dependencies, as well as define the functions used for the various
+    /// lifecycle hooks. However, it's not strictly required, as the lifecycle hooks can be configured directly with
+    /// inline Lua source for each respective hook.
+    source: Option<String>,
+
+    /// A list of directories to search when loading a Lua file via the `require` function.
+    ///
+    /// If not specified, the modules are looked up in the directories of Vector’s configs.
     #[serde(default = "default_config_paths")]
     search_dirs: Vec<PathBuf>,
+
+    #[configurable(derived)]
     hooks: HooksConfig,
+
+    /// A list of timers which should be configured and executed periodically.
     #[serde(default)]
     timers: Vec<TimerConfig>,
-    source: Option<String>,
 }
 
 fn default_config_paths() -> Vec<PathBuf> {
@@ -67,16 +85,52 @@ fn default_config_paths() -> Vec<PathBuf> {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Lifecycle hooks.
+///
+/// These hooks can be set to perform additional processing during the lifecycle of the transform.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(deny_unknown_fields)]
 struct HooksConfig {
+    /// A function which is called when the first event comes, before calling `hooks.process`.
+    ///
+    /// It can produce new events using the `emit` function.
+    ///
+    /// This can either be inline Lua that defines a closure to use, or the name of the Lua function to call. In both
+    /// cases, the closure/function takes a single parameter, `emit`, which is a reference to a function for emitting events.
     init: Option<String>,
+
+    /// A function which is called for each incoming event.
+    ///
+    /// It can produce new events using the `emit` function.
+    ///
+    /// This can either be inline Lua that defines a closure to use, or the name of the Lua function to call. In both
+    /// cases, the closure/function takes two parameters. The first parameter, `event`, is the event being processed,
+    /// while the second parameter, `emit`, is a reference to a function for emitting events.
     process: String,
+
+    /// A function which is called when Vector is stopped.
+    ///
+    /// It can produce new events using the `emit` function.
+    ///
+    /// This can either be inline Lua that defines a closure to use, or the name of the Lua function to call. In both
+    /// cases, the closure/function takes a single parameter, `emit`, which is a reference to a function for emitting events.
     shutdown: Option<String>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// A Lua timer.
+#[configurable_component]
+#[derive(Clone, Debug)]
 struct TimerConfig {
+    /// The interval to execute the handler, in seconds.
     interval_seconds: u64,
+
+    /// The handler function which is called when the timer ticks.
+    ///
+    /// It can produce new events using the `emit` function.
+    ///
+    /// This can either be inline Lua that defines a closure to use, or the name of the Lua function to call. In both
+    /// cases, the closure/function takes a single parameter, `emit`, which is a reference to a function for emitting events.
     handler: String,
 }
 
@@ -88,15 +142,15 @@ struct TimerConfig {
 // be exposed to users.
 impl LuaConfig {
     pub fn build(&self) -> crate::Result<Transform> {
-        Lua::new(self).map(Transform::task)
+        Lua::new(self).map(Transform::event_task)
     }
 
-    pub const fn input_type(&self) -> DataType {
-        DataType::Any
+    pub fn input(&self) -> Input {
+        Input::new(DataType::Metric | DataType::Log)
     }
 
-    pub const fn output_type(&self) -> DataType {
-        DataType::Any
+    pub fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
+        vec![Output::default(DataType::Metric | DataType::Log)]
     }
 
     pub const fn transform_type(&self) -> &'static str {
@@ -155,30 +209,30 @@ impl Lua {
         }
 
         if let Some(source) = &config.source {
-            lua.load(source).eval().context(InvalidSource)?;
+            lua.load(source).eval().context(InvalidSourceSnafu)?;
         }
 
         let hook_init_code = config.hooks.init.as_ref();
         let hook_init = hook_init_code
             .map(|code| make_registry_value(&lua, code))
             .transpose()
-            .context(InvalidHooksInit)?;
+            .context(InvalidHooksInitSnafu)?;
 
         let hook_process =
-            make_registry_value(&lua, &config.hooks.process).context(InvalidHooksProcess)?;
+            make_registry_value(&lua, &config.hooks.process).context(InvalidHooksProcessSnafu)?;
 
         let hook_shutdown_code = config.hooks.shutdown.as_ref();
         let hook_shutdown = hook_shutdown_code
             .map(|code| make_registry_value(&lua, code))
             .transpose()
-            .context(InvalidHooksShutdown)?;
+            .context(InvalidHooksShutdownSnafu)?;
 
         for (id, timer) in config.timers.iter().enumerate() {
             let handler_key = lua
                 .load(&timer.handler)
                 .eval::<mlua::Function>()
                 .and_then(|f| lua.create_registry_value(f))
-                .context(InvalidTimerHandler)?;
+                .context(InvalidTimerHandlerSnafu)?;
 
             let timer = Timer {
                 id: id as u32,
@@ -225,13 +279,13 @@ impl Lua {
     fn attempt_gc(&mut self) {
         self.invocations_after_gc += 1;
         if self.invocations_after_gc % GC_INTERVAL == 0 {
-            emit!(&LuaGcTriggered {
+            emit!(LuaGcTriggered {
                 used_memory: self.lua.used_memory()
             });
             let _ = self
                 .lua
                 .gc_collect()
-                .context(RuntimeErrorGc)
+                .context(RuntimeErrorGcSnafu)
                 .map_err(|error| error!(%error, rate_limit = 30));
             self.invocations_after_gc = 0;
         }
@@ -263,8 +317,8 @@ impl RuntimeTransform for Lua {
                 lua.registry_value::<mlua::Function>(&self.hook_process)?
                     .call((event, wrap_emit_fn(scope, emit_fn)?))
             })
-            .context(RuntimeErrorHooksProcess)
-            .map_err(|e| emit!(&LuaBuildError { error: e }));
+            .context(RuntimeErrorHooksProcessSnafu)
+            .map_err(|e| emit!(LuaBuildError { error: e }));
 
         self.attempt_gc();
     }
@@ -283,7 +337,7 @@ impl RuntimeTransform for Lua {
                     None => Ok(()),
                 }
             })
-            .context(RuntimeErrorHooksInit)
+            .context(RuntimeErrorHooksInitSnafu)
             .map_err(|error| error!(%error, rate_limit = 30));
 
         self.attempt_gc();
@@ -303,7 +357,7 @@ impl RuntimeTransform for Lua {
                     None => Ok(()),
                 }
             })
-            .context(RuntimeErrorHooksShutdown)
+            .context(RuntimeErrorHooksShutdownSnafu)
             .map_err(|error| error!(%error, rate_limit = 30));
 
         self.attempt_gc();
@@ -320,7 +374,7 @@ impl RuntimeTransform for Lua {
                 lua.registry_value::<mlua::Function>(handler_key)?
                     .call(wrap_emit_fn(scope, emit_fn)?)
             })
-            .context(RuntimeErrorTimerHandler)
+            .context(RuntimeErrorTimerHandlerSnafu)
             .map_err(|error| error!(%error, rate_limit = 30));
 
         self.attempt_gc();
@@ -341,16 +395,17 @@ fn format_error(error: &mlua::Error) -> String {
 
 #[cfg(test)]
 mod tests {
+    use futures::{stream, StreamExt};
+
     use super::*;
     use crate::{
         event::{
             metric::{Metric, MetricKind, MetricValue},
-            Event, Value,
+            Event, LogEvent, Value,
         },
         test_util::trace_init,
         transforms::TaskTransform,
     };
-    use futures::{stream, StreamExt};
 
     fn from_config(config: &str) -> crate::Result<Box<Lua>> {
         Lua::new(&toml::from_str(config).unwrap()).map(Box::new)
@@ -371,7 +426,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::from("program me");
+        let event = Event::Log(LogEvent::from("program me"));
         let in_stream = Box::pin(stream::iter(vec![event]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
@@ -396,7 +451,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::from("Hello, my name is Bob.");
+        let event = Event::Log(LogEvent::from("Hello, my name is Bob."));
         let in_stream = Box::pin(stream::iter(vec![event]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
@@ -420,10 +475,10 @@ mod tests {
         )
         .unwrap();
 
-        let mut event = Event::new_empty_log();
-        event.as_mut_log().insert("name", "Bob");
+        let mut event = LogEvent::default();
+        event.insert("name", "Bob");
 
-        let in_stream = Box::pin(stream::iter(vec![event]));
+        let in_stream = Box::pin(stream::iter(vec![event.into()]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
 
@@ -445,7 +500,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::new_empty_log();
+        let event = LogEvent::default().into();
         let in_stream = Box::pin(stream::iter(vec![event]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await;
@@ -469,9 +524,9 @@ mod tests {
         )
         .unwrap();
 
-        let mut event = Event::new_empty_log();
-        event.as_mut_log().insert("host", "127.0.0.1");
-        let input = Box::pin(stream::iter(vec![event]));
+        let mut event = LogEvent::default();
+        event.insert("host", "127.0.0.1");
+        let input = Box::pin(stream::iter(vec![event.into()]));
         let output = transform.transform(input);
         let out = output.collect::<Vec<_>>().await;
 
@@ -498,7 +553,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::new_empty_log();
+        let event = LogEvent::default().into();
 
         let in_stream = Box::pin(stream::iter(vec![event]));
         let mut out_stream = transform.transform(in_stream);
@@ -523,7 +578,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::new_empty_log();
+        let event = LogEvent::default().into();
         let in_stream = Box::pin(stream::iter(vec![event]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
@@ -547,12 +602,12 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::new_empty_log();
+        let event = LogEvent::default().into();
         let in_stream = Box::pin(stream::iter(vec![event]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
 
-        assert_eq!(output.as_log()["number"], Value::Float(3.14159));
+        assert_eq!(output.as_log()["number"], Value::from(3.14159));
         Ok(())
     }
 
@@ -571,7 +626,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::new_empty_log();
+        let event = LogEvent::default().into();
         let in_stream = Box::pin(stream::iter(vec![event]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
@@ -595,7 +650,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::new_empty_log();
+        let event = LogEvent::default().into();
         let in_stream = Box::pin(stream::iter(vec![event]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
@@ -620,7 +675,7 @@ mod tests {
         .unwrap();
 
         let err = transform
-            .process_single(Event::new_empty_log())
+            .process_single(LogEvent::default().into())
             .unwrap_err();
         let err = format_error(&err);
         assert!(
@@ -646,7 +701,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::new_empty_log();
+        let event = LogEvent::default().into();
         let in_stream = Box::pin(stream::iter(vec![event]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
@@ -669,7 +724,7 @@ mod tests {
         .unwrap();
 
         let err = transform
-            .process_single(Event::new_empty_log())
+            .process_single(LogEvent::default().into())
             .unwrap_err();
         let err = format_error(&err);
         assert!(err.contains("this is an error"), "{}", err);
@@ -698,8 +753,7 @@ mod tests {
 
     #[tokio::test]
     async fn lua_load_file() -> crate::Result<()> {
-        use std::fs::File;
-        use std::io::Write;
+        use std::{fs::File, io::Write};
         trace_init();
 
         let dir = tempfile::tempdir().unwrap();
@@ -733,12 +787,12 @@ mod tests {
         );
         let transform = from_config(&config).unwrap();
 
-        let event = Event::new_empty_log();
+        let event = LogEvent::default().into();
         let in_stream = Box::pin(stream::iter(vec![event]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
 
-        assert_eq!(output.as_log()["new field"], "new value".into());
+        assert_eq!(output.as_log()["\"new field\""], "new value".into());
         Ok(())
     }
 
@@ -759,11 +813,11 @@ mod tests {
         )
         .unwrap();
 
-        let mut event = Event::new_empty_log();
-        event.as_mut_log().insert("name", "Bob");
-        event.as_mut_log().insert("friend", "Alice");
+        let mut event = LogEvent::default();
+        event.insert("name", "Bob");
+        event.insert("friend", "Alice");
 
-        let in_stream = Box::pin(stream::iter(vec![event]));
+        let in_stream = Box::pin(stream::iter(vec![event.into()]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
 
@@ -822,7 +876,7 @@ mod tests {
 
         let n: usize = 10;
 
-        let events = (0..n).map(|i| Event::from(format!("program me {}", i)));
+        let events = (0..n).map(|i| Event::Log(LogEvent::from(format!("program me {}", i))));
 
         let in_stream = Box::pin(stream::iter(events));
         let out_stream = transform.transform(in_stream);

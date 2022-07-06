@@ -1,20 +1,23 @@
-use crate::Error;
-use futures::FutureExt;
 use std::{
+    borrow::Cow,
     cmp,
     future::Future,
     pin::Pin,
     task::{Context, Poll},
     time::Duration,
 };
+
+use futures::FutureExt;
 use tokio::time::{sleep, Sleep};
 use tower::{retry::Policy, timeout::error::Elapsed};
 
+use crate::Error;
+
 pub enum RetryAction {
     /// Indicate that this request should be retried with a reason
-    Retry(String),
+    Retry(Cow<'static, str>),
     /// Indicate that this request should not be retried with a reason
-    DontRetry(String),
+    DontRetry(Cow<'static, str>),
     /// Indicate that this request should not be retried but the request was successful
     Successful,
 }
@@ -46,7 +49,7 @@ pub struct RetryPolicyFuture<L: RetryLogic> {
 }
 
 impl<L: RetryLogic> FixedRetryPolicy<L> {
-    pub fn new(
+    pub const fn new(
         remaining_attempts: usize,
         initial_backoff: Duration,
         max_duration: Duration,
@@ -73,7 +76,7 @@ impl<L: RetryLogic> FixedRetryPolicy<L> {
         }
     }
 
-    fn backoff(&self) -> Duration {
+    const fn backoff(&self) -> Duration {
         self.current_duration
     }
 
@@ -256,13 +259,15 @@ impl Iterator for ExponentialBackoff {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::test_util::trace_init;
     use std::{fmt, time::Duration};
+
     use tokio::time;
     use tokio_test::{assert_pending, assert_ready_err, assert_ready_ok, task};
     use tower::retry::RetryLayer;
     use tower_test::{assert_request_eq, mock};
+
+    use super::*;
+    use crate::test_util::trace_init;
 
     #[tokio::test]
     async fn service_error_retry() {

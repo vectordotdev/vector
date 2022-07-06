@@ -1,17 +1,3 @@
-use crate::paths_provider::PathsProvider;
-use crate::{
-    checkpointer::{Checkpointer, CheckpointsView},
-    file_watcher::FileWatcher,
-    fingerprinter::{FileFingerprint, Fingerprinter},
-    FileSourceInternalEvents, ReadFrom,
-};
-use bytes::Bytes;
-use chrono::{DateTime, Utc};
-use futures::{
-    future::{select, Either, FutureExt},
-    stream, Future, Sink, SinkExt,
-};
-use indexmap::IndexMap;
 use std::{
     cmp,
     collections::{BTreeMap, HashSet},
@@ -20,8 +6,24 @@ use std::{
     sync::Arc,
     time::{self, Duration},
 };
+
+use bytes::Bytes;
+use chrono::{DateTime, Utc};
+use futures::{
+    future::{select, Either},
+    Future, Sink, SinkExt,
+};
+use indexmap::IndexMap;
 use tokio::time::sleep;
 use tracing::{debug, error, info, trace};
+
+use crate::{
+    checkpointer::{Checkpointer, CheckpointsView},
+    file_watcher::FileWatcher,
+    fingerprinter::{FileFingerprint, Fingerprinter},
+    paths_provider::PathsProvider,
+    FileSourceInternalEvents, ReadFrom,
+};
 
 /// `FileServer` is a Source which cooperatively schedules reads over files,
 /// converting the lines of said files into `LogLine` structures. As
@@ -70,17 +72,23 @@ where
     PP: PathsProvider,
     E: FileSourceInternalEvents,
 {
-    pub fn run<C, S>(
+    // The first `shutdown_data` signal here is to stop this file
+    // server from outputting new data; the second
+    // `shutdown_checkpointer` is for finishing the background
+    // checkpoint writer task, which has to wait for all
+    // acknowledgements to be completed.
+    pub fn run<C, S1, S2>(
         self,
         mut chans: C,
-        shutdown: S,
+        mut shutdown_data: S1,
+        shutdown_checkpointer: S2,
         mut checkpointer: Checkpointer,
     ) -> Result<Shutdown, <C as Sink<Vec<Line>>>::Error>
     where
         C: Sink<Vec<Line>> + Unpin,
         <C as Sink<Vec<Line>>>::Error: std::error::Error,
-        S: Future + Unpin + Send + 'static,
-        <S as Future>::Output: Clone + Send + Sync,
+        S1: Future + Unpin + Send + 'static,
+        S2: Future + Unpin + Send + 'static,
     {
         let mut fingerprint_buffer = Vec::new();
 
@@ -129,36 +137,12 @@ where
         let mut stats = TimingStats::default();
 
         // Spawn the checkpoint writer task
-        //
-        // We have to do a lot of cloning here to convince the compiler that we
-        // aren't going to get away with anything, but none of it should have
-        // any perf impact.
-        let mut shutdown = shutdown.shared();
-        let mut shutdown2 = shutdown.clone();
-        let emitter = self.emitter.clone();
-        let checkpointer = Arc::new(checkpointer);
-        let sleep_duration = self.glob_minimum_cooldown;
-        let checkpoint_task_handle = self.handle.spawn(async move {
-            loop {
-                let sleep = sleep(sleep_duration);
-                tokio::select! {
-                    _ = &mut shutdown2 => return checkpointer,
-                    _ = sleep => {},
-                }
-
-                let emitter = emitter.clone();
-                let checkpointer = Arc::clone(&checkpointer);
-                tokio::task::spawn_blocking(move || {
-                    let start = time::Instant::now();
-                    match checkpointer.write_checkpoints() {
-                        Ok(count) => emitter.emit_file_checkpointed(count, start.elapsed()),
-                        Err(error) => emitter.emit_file_checkpoint_write_error(error),
-                    }
-                })
-                .await
-                .ok();
-            }
-        });
+        let checkpoint_task_handle = self.handle.spawn(checkpoint_writer(
+            checkpointer,
+            self.glob_minimum_cooldown,
+            shutdown_checkpointer,
+            self.emitter.clone(),
+        ));
 
         // Alright friends, how does this work?
         //
@@ -206,34 +190,32 @@ where
                                     message = "Continue watching file.",
                                     path = ?path,
                                 );
-                            } else {
+                            } else if !was_found_this_cycle {
                                 // matches a file with a different path
-                                if !was_found_this_cycle {
-                                    info!(
-                                        message = "Watched file has been renamed.",
-                                        path = ?path,
-                                        old_path = ?watcher.path
-                                    );
-                                    watcher.update_path(path).ok(); // ok if this fails: might fix next cycle
-                                } else {
-                                    info!(
-                                        message = "More than one file has the same fingerprint.",
-                                        path = ?path,
-                                        old_path = ?watcher.path
-                                    );
-                                    let (old_path, new_path) = (&watcher.path, &path);
-                                    if let (Ok(old_modified_time), Ok(new_modified_time)) = (
-                                        fs::metadata(&old_path).and_then(|m| m.modified()),
-                                        fs::metadata(&new_path).and_then(|m| m.modified()),
-                                    ) {
-                                        if old_modified_time < new_modified_time {
-                                            info!(
-                                                message = "Switching to watch most recently modified file.",
-                                                new_modified_time = ?new_modified_time,
-                                                old_modified_time = ?old_modified_time,
-                                            );
-                                            watcher.update_path(path).ok(); // ok if this fails: might fix next cycle
-                                        }
+                                info!(
+                                    message = "Watched file has been renamed.",
+                                    path = ?path,
+                                    old_path = ?watcher.path
+                                );
+                                watcher.update_path(path).ok(); // ok if this fails: might fix next cycle
+                            } else {
+                                info!(
+                                    message = "More than one file has the same fingerprint.",
+                                    path = ?path,
+                                    old_path = ?watcher.path
+                                );
+                                let (old_path, new_path) = (&watcher.path, &path);
+                                if let (Ok(old_modified_time), Ok(new_modified_time)) = (
+                                    fs::metadata(&old_path).and_then(|m| m.modified()),
+                                    fs::metadata(&new_path).and_then(|m| m.modified()),
+                                ) {
+                                    if old_modified_time < new_modified_time {
+                                        info!(
+                                            message = "Switching to watch most recently modified file.",
+                                            new_modified_time = ?new_modified_time,
+                                            old_modified_time = ?old_modified_time,
+                                        );
+                                        watcher.update_path(path).ok(); // ok if this fails: might fix next cycle
                                     }
                                 }
                             }
@@ -324,8 +306,7 @@ where
 
             let start = time::Instant::now();
             let to_send = std::mem::take(&mut lines);
-            let mut stream = stream::once(futures::future::ok(to_send));
-            let result = self.handle.block_on(chans.send_all(&mut stream));
+            let result = self.handle.block_on(chans.send(to_send));
             match result {
                 Ok(()) => {}
                 Err(error) => {
@@ -358,7 +339,7 @@ where
                 }
             };
             futures::pin_mut!(sleep);
-            match self.handle.block_on(select(shutdown, sleep)) {
+            match self.handle.block_on(select(shutdown_data, sleep)) {
                 Either::Left((_, _)) => {
                     let checkpointer = self
                         .handle
@@ -369,7 +350,7 @@ where
                     }
                     return Ok(Shutdown);
                 }
-                Either::Right((_, future)) => shutdown = future,
+                Either::Right((_, future)) => shutdown_data = future,
             }
             stats.record("sleeping", start.elapsed());
         }
@@ -399,7 +380,7 @@ where
         // checkpoint was only loaded for new files when Vector was started up, but the
         // `kubernetes_logs` source returns the files well after start-up, once it has populated
         // them from the k8s metadata, so we now just always use the checkpoints unless opted out.
-        // https://github.com/timberio/vector/issues/7139
+        // https://github.com/vectordotdev/vector/issues/7139
         let read_from = if !self.ignore_checkpoints {
             checkpoints
                 .get(file_id)
@@ -428,6 +409,35 @@ where
             Err(error) => self.emitter.emit_file_watch_error(&path, error),
         };
     }
+}
+
+async fn checkpoint_writer(
+    checkpointer: Checkpointer,
+    sleep_duration: Duration,
+    mut shutdown: impl Future + Unpin,
+    emitter: impl FileSourceInternalEvents,
+) -> Arc<Checkpointer> {
+    let checkpointer = Arc::new(checkpointer);
+    loop {
+        let sleep = sleep(sleep_duration);
+        tokio::select! {
+            _ = &mut shutdown => break,
+            _ = sleep => {},
+        }
+
+        let emitter = emitter.clone();
+        let checkpointer = Arc::clone(&checkpointer);
+        tokio::task::spawn_blocking(move || {
+            let start = time::Instant::now();
+            match checkpointer.write_checkpoints() {
+                Ok(count) => emitter.emit_file_checkpointed(count, start.elapsed()),
+                Err(error) => emitter.emit_file_checkpoint_write_error(error),
+            }
+        })
+        .await
+        .ok();
+    }
+    checkpointer
 }
 
 /// A sentinel type to signal that file server was gracefully shut down.

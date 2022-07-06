@@ -1,0 +1,8 @@
+heartbeat.monitors:
+- type: http
+  schedule: '@every 1s'
+  urls:
+    - https://google.com
+
+output.logstash:
+  hosts: ['runner:8080']

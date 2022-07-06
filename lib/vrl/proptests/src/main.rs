@@ -1,5 +1,7 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
+#![allow(clippy::print_stderr)] // test framework
+#![allow(clippy::print_stdout)] // test framework
 use diagnostic::Span;
 use lookup::{FieldBuf, LookupBuf, SegmentBuf};
 use ordered_float::NotNan;
@@ -77,7 +79,7 @@ prop_compose! {
 
 prop_compose! {
     fn string_literal()(val in "[^\"\\\\\\)\\}]*") -> Literal {
-        Literal::String(val.replace("\\", "\\\\").replace("\"", "\\\""))
+        Literal::RawString(val.replace('\\', "\\\\").replace('\'', "\\\'"))
     }
 }
 
@@ -142,7 +144,8 @@ prop_compose! {
             arguments: params.into_iter().map(|p| node(FunctionArgument {
                 ident: None,
                 expr: node(Expr::Variable(node(p)))
-            })).collect()
+            })).collect(),
+            closure: None,
         }
     }
 }
@@ -260,6 +263,7 @@ fn expr() -> impl Strategy<Value = Expr> {
                                 })
                             })
                             .collect(),
+                        closure: None,
                     }))
                 }
             ),
@@ -275,22 +279,22 @@ proptest! {
     #[test]
     fn expr_parses(expr in expr()) {
         let expr = program(expr);
-        let source = format!("{}", expr);
+        let source = expr.to_string();
         let program = parser::parse(source.clone()).unwrap();
 
-        assert_eq!(format!("{}", program),
-                   format!("{}", expr),
+        assert_eq!(program.to_string(),
+                   expr.to_string(),
                    "{}", source);
     }
 
     #[test]
     fn if_parses(expr in if_statement()) {
         let expr = program(expr);
-        let source = format!("{}", expr);
+        let source = expr.to_string();
         let program = parser::parse(source.clone()).unwrap();
 
-        assert_eq!(format!("{}", program),
-                   format!("{}", expr),
+        assert_eq!(program.to_string(),
+                   expr.to_string(),
                    "{}", source);
     }
 }

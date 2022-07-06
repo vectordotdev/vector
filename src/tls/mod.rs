@@ -1,12 +1,14 @@
-use crate::tcp::{self, TcpKeepaliveConfig};
+use std::{fmt::Debug, net::SocketAddr, path::PathBuf, time::Duration};
+
 use openssl::{
     error::ErrorStack,
     ssl::{ConnectConfiguration, SslConnector, SslConnectorBuilder, SslMethod},
 };
 use snafu::{ResultExt, Snafu};
-use std::{fmt::Debug, net::SocketAddr, path::PathBuf, time::Duration};
 use tokio::net::TcpStream;
 use tokio_openssl::SslStream;
+
+use crate::tcp::{self, TcpKeepaliveConfig};
 
 #[cfg(feature = "sources-utils-tls")]
 mod incoming;
@@ -15,11 +17,17 @@ mod outgoing;
 mod settings;
 
 #[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]
-pub(crate) use incoming::{MaybeTlsIncomingStream, MaybeTlsListener};
+pub(crate) use incoming::{CertificateMetadata, MaybeTlsIncomingStream, MaybeTlsListener};
 pub(crate) use maybe_tls::MaybeTls;
-pub use settings::{MaybeTlsSettings, TlsConfig, TlsOptions, TlsSettings};
+#[cfg(all(test, feature = "kafka-integration-tests"))]
+pub use settings::TEST_PEM_INTERMEDIATE_CA_PATH;
+pub use settings::{
+    MaybeTlsSettings, TlsConfig, TlsEnableableConfig, TlsSettings, TlsSourceConfig,
+};
 #[cfg(test)]
 pub use settings::{TEST_PEM_CA_PATH, TEST_PEM_CRT_PATH, TEST_PEM_KEY_PATH};
+#[cfg(all(test, feature = "sources-socket"))]
+pub use settings::{TEST_PEM_CLIENT_CRT_PATH, TEST_PEM_CLIENT_KEY_PATH};
 
 pub type Result<T> = std::result::Result<T, TlsError>;
 
@@ -163,7 +171,7 @@ impl MaybeTlsStream<TcpStream> {
 }
 
 pub(crate) fn tls_connector_builder(settings: &MaybeTlsSettings) -> Result<SslConnectorBuilder> {
-    let mut builder = SslConnector::builder(SslMethod::tls()).context(TlsBuildConnector)?;
+    let mut builder = SslConnector::builder(SslMethod::tls()).context(TlsBuildConnectorSnafu)?;
     if let Some(settings) = settings.tls() {
         settings.apply_context(&mut builder)?;
     }
@@ -178,7 +186,7 @@ fn tls_connector(settings: &MaybeTlsSettings) -> Result<ConnectConfiguration> {
     let configure = tls_connector_builder(settings)?
         .build()
         .configure()
-        .context(TlsBuildConnector)?
+        .context(TlsBuildConnectorSnafu)?
         .verify_hostname(verify_hostname);
     Ok(configure)
 }

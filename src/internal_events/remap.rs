@@ -1,7 +1,7 @@
-// ## skip check-events ##
-
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
+
+use super::prelude::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct RemapMappingError {
@@ -12,23 +12,34 @@ pub struct RemapMappingError {
 }
 
 impl InternalEvent for RemapMappingError {
-    fn emit_logs(&self) {
+    fn emit(self) {
         let message = if self.event_dropped {
             "Mapping failed with event; discarding event."
         } else {
             "Mapping failed with event."
         };
 
-        warn!(
+        error!(
             message,
             error = ?self.error,
-            internal_log_rate_secs = 30
-        )
-    }
-
-    fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1,
-                 "error_type" => "failed_mapping");
+            error_type = error_type::CONVERSION_FAILED,
+            stage = error_stage::PROCESSING,
+            internal_log_rate_secs = 10,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_type" => error_type::CONVERSION_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
+        if self.event_dropped {
+            counter!(
+                "component_discarded_events_total", 1,
+                "error_type" => error_type::CONVERSION_FAILED,
+                "stage" => error_stage::PROCESSING,
+            );
+        }
+        // deprecated
+        counter!("processing_errors_total", 1);
     }
 }
 
@@ -40,13 +51,21 @@ pub struct RemapMappingAbort {
 }
 
 impl InternalEvent for RemapMappingAbort {
-    fn emit_logs(&self) {
+    fn emit(self) {
         let message = if self.event_dropped {
             "Event mapping aborted; discarding event."
         } else {
             "Event mapping aborted."
         };
 
-        debug!(message, internal_log_rate_secs = 30)
+        debug!(message, internal_log_rate_secs = 30);
+
+        if self.event_dropped {
+            counter!(
+                "component_discarded_events_total", 1,
+                "error_type" => error_type::CONVERSION_FAILED,
+                "stage" => error_stage::PROCESSING,
+            );
+        }
     }
 }

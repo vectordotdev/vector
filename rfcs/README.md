@@ -2,53 +2,48 @@
 
 Vector uses the RFC process to formalize discussion around _substantial_ changes to Vector.
 
-<!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
-
-1. [Goals](#goals)
-1. [Logical boundary](#logical-boundary)
-1. [Tenets of good RFCs](#tenets-of-good-rfcs)
-   1. [Use good technical grammar](#use-good-technical-grammar)
-   1. [Keep the scope small](#keep-the-scope-small)
-   1. [Be opinionated and propose a single solution](#be-opinionated-and-propose-a-single-solution)
-1. [Process](#process)
-   1. [Before creating an RFC](#before-creating-an-rfc)
-   1. [Creating an RFC](#creating-an-rfc)
-   1. [Getting an RFC accepted](#getting-an-rfc-accepted)
-   1. [Implementing an RFC](#implementing-an-rfc)
-1. [FAQ](#faq)
-   1. [What if I'm unsure about the solution?](#what-if-im-unsure-about-the-solution)
-   1. [What if I need to investigate and feel out solutions?](#what-if-i-need-to-investigate-and-feel-out-solutions)
-   1. [How long should it take to obtain consensus?](#how-long-should-it-take-to-obtain-consensus)
-
-<!-- /MarkdownTOC -->
-
+- [Goals](#goals)
+- [Logical boundary](#logical-boundary)
+- [Tenets of good RFCs](#tenets-of-good-rfcs)
+  - [Use good technical grammar](#use-good-technical-grammar)
+  - [Keep the scope small](#keep-the-scope-small)
+  - [Be opinionated and propose a single solution](#be-opinionated-and-propose-a-single-solution)
+- [Process](#process)
+  - [Before creating an RFC](#before-creating-an-rfc)
+  - [Creating an RFC](#creating-an-rfc)
+  - [Getting an RFC accepted](#getting-an-rfc-accepted)
+  - [Implementing an RFC](#implementing-an-rfc)
+- [FAQ](#faq)
+  - [What if I'm unsure about the solution?](#what-if-im-unsure-about-the-solution)
+  - [What if I need to investigate and feel out solutions?](#what-if-i-need-to-investigate-and-feel-out-solutions)
+  - [How long should it take to obtain consensus?](#how-long-should-it-take-to-obtain-consensus)
 
 ## Goals
 
-* Properly spec and plan features to prevent re-work
-* Formalize discussion to optimize everyone's time
-* Obtain consensus upfront, before implementation time is invested
-* Incorporate project-wide context and leverage our shared brain
-* Share responsibility for the outcome of the change
-* Benefit posterity and facilitate new Vector team member onboarding
+- Properly spec and plan features to prevent re-work
+- Formalize discussion to optimize everyone's time
+- Obtain consensus upfront, before implementation time is invested
+- Incorporate project-wide context and leverage our shared brain
+- Share responsibility for the outcome of the change
+- Benefit posterity and facilitate new Vector team member onboarding
 
 ## Logical boundary
 
 Examples of changes that require a RFC:
 
-* An architectural change
-* A data model change
-* A new component that introduces new behavior
-* Removing a feature
-* Complicated tech-debt projects
-* A substantial user-visible change
-* A change that is questionably outside of the scope of Vector
+- An architectural change
+- A data model change
+- A new component that introduces new behavior
+- Removing a feature
+- Complicated tech-debt projects
+- A substantial user-visible change
+- A change that is questionably outside of the scope of Vector
 
 Examples of changes that do not require a RFC:
 
-* Reorganizing code that otherwise does not change its functional behavior
-* Quantitative improvements. Such as performance improvements
-* Simple improvements to existing features
+- Reorganizing code that otherwise does not change its functional behavior
+- Quantitative improvements. Such as performance improvements
+- Simple improvements to existing features
 
 ## Tenets of good RFCs
 
@@ -66,7 +61,7 @@ Examples of changes that do not require a RFC:
 
 Use the "Scope" section to address out of scope concerns, like future improvements. This signals to the Vector team
 that you are aware of these concerns but have explicitly chosen to defer them. This not only helps to keep the RFC
-discussion focused, but also the implementation, resultin in a quicker overall delivery time.
+discussion focused, but also the implementation, resulting in a quicker overall delivery time.
 
 ### Be opinionated and propose a single solution
 
@@ -81,20 +76,20 @@ more info navigating your solution.
 
 ### Before creating an RFC
 
-1. Search Github for [previous issues](https://github.com/timberio/vector/issues) and
-   [RFCs](https://github.com/timberio/vector/tree/master/rfcs) on this topic.
-1. If an RFC issue does not exist, [open one](https://github.com/timberio/vector/issues/new/choose).
+1. Search Github for [previous issues](https://github.com/vectordotdev/vector/issues) and
+   [RFCs](https://github.com/vectordotdev/vector/tree/master/rfcs) on this topic.
+1. If an RFC issue does not exist, [open one](https://github.com/vectordotdev/vector/issues/new/choose).
 1. Use the issue to obtain consensus that an RFC is necessary.
-   * The change might be quickly rejected.
-   * The change might be on our long term roadmap and get deferred.
-   * The change might be blocked by other work.
+   - The change might be quickly rejected.
+   - The change might be on our long term roadmap and get deferred.
+   - The change might be blocked by other work.
 
 ### Creating an RFC
 
 1. Create a new branch
 1. Copy the [`rfcs/_YYYY-MM-DD-issue#-title.md`](rfcs/_YYYY-MM-DD-issue%23-title.md) template with the appropriate
    name. Be sure to use the issue number you created above. (e.g., `rfcs/2020-02-10-445-internal-observability.md`)
-1. Fill in your RFC, pay attention the bullets and guidelines. Do not ommit any sections.
+1. Fill in your RFC, pay attention the bullets and guidelines. Do not omit any sections.
 1. Work with the Vector team to land on a confident solution. Allocate time for code-level spikes if necessary.
 1. Submit your RFC as a pull request and tag reviewers for approval.
 
@@ -120,7 +115,7 @@ demonstrating intent over conceptual discussions.
 
 ### What if I need to investigate and feel out solutions?
 
-This is expected. RFCs are the time to discuss with the Vector team and experiement with code-level spikes. It is not
+This is expected. RFCs are the time to discuss with the Vector team and experiment with code-level spikes. It is not
 uncommon for RFCs to span one or two sprints, but they should not take longer than two sprints. Generally, if an RFC
 takes two sprints it involves many cross cutting concerns that result in incremental RFCs.
 

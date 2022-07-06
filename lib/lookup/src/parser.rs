@@ -1,5 +1,6 @@
-use crate::Lookup;
 use lalrpop_util::lalrpop_mod;
+
+use crate::Lookup;
 
 lalrpop_mod!(
     #[allow(clippy::all)]
@@ -11,5 +12,5 @@ lalrpop_mod!(
 pub fn parse_lookup(s: &str) -> Result<Lookup, String> {
     path::LookupParser::new()
         .parse(s)
-        .map_err(|err| format!("{}", err))
+        .map_err(|err| err.to_string())
 }

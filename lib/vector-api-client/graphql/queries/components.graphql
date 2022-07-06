@@ -6,6 +6,12 @@ query ComponentsQuery($first: Int!) {
                 componentId
                 componentType
                 ... on Source {
+                    outputs {
+                        outputId
+                        sentEventsTotal {
+                            sentEventsTotal
+                        }
+                    }
                     metrics {
                         __typename
                         processedEventsTotal {
@@ -23,6 +29,12 @@ query ComponentsQuery($first: Int!) {
                     }
                 }
                 ... on Transform {
+                    outputs {
+                        outputId
+                        sentEventsTotal {
+                            sentEventsTotal
+                        }
+                    }
                     metrics {
                         __typename
                         processedEventsTotal {

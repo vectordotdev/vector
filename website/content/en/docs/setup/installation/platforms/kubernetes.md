@@ -5,7 +5,8 @@ weight: 2
 ---
 
 {{< requirement title="Minimum Kubernetes version" >}}
-Vector must be installed on Kubernetes version **1.15** or higher.
+Vector must be installed on Kubernetes version **1.15** or higher. Vector is
+tested with Kubernetes versions **1.19** or higher.
 {{< /requirement >}}
 
 [Kubernetes], also known as **k8s**, is an open source container orchestration system for automating application deployment, scaling, and management. This page covers installing and managing Vector on the Kubernetes platform.
@@ -20,18 +21,14 @@ You can install Vector on Kubernetes using either [Helm](#helm) or [kubectl](#ku
 
 ### kubectl
 
-[kubectl] is the Kubernetes command-line tool. You can use it as an alternative to [Helm](#helm) to install Vector on Kubernetes The instructions below are for installing Vector in the [agent] role.
+[kubectl] is the Kubernetes command-line tool. You can use it as an alternative to [Helm](#helm) to install Vector on Kubernetes The instructions below are for installing Vector in the [Agent] and [Aggregator] roles.
 
-{{< warning title="Aggregator role in public beta" >}}
-Support for the [aggregator] role is currently in public beta. We're seeking beta testers! If deploying the aggregator, please [join our chat][chat] and let us know how it went.
-
+[agent]: /docs/setup/deployment/roles/#agent
 [aggregator]: /docs/setup/deployment/roles/#aggregator
-[chat]: https://chat.vector.dev
-{{< /warning >}}
 
 #### Agent
 
-The [agent] role is designed to collect all log data on each Kubernetes [Node]. Vector runs as a [DaemonSet] and tails logs for the entire Pod, automatically enriching those logs with Kubernetes metadata via the [Kubernetes API][k8s_api]. Collection is handled automatically and it intended for you to adjust your pipeline as necessary using Vector's [sources], [transforms], and [sinks].
+The Vector [Agent] lets you collect data from your [sources] and then deliver it to a variety of destinations with [sinks].
 
 ##### Define Vector's namespace
 
@@ -41,58 +38,36 @@ We recommend running Vector in its own Kubernetes namespace. In the instructions
 kubectl create namespace --dry-run=client -o yaml vector > namespace.yaml
 ```
 
-##### Prepare kustomization
+##### Prepare your kustomization file
+
+This example configuration file deploys Vector as an Agent, the full default configuration can be found [here](https://github.com/vectordotdev/helm-charts/blob/develop/charts/vector/templates/configmap.yaml). For more information about configuration options, see the [configuration] docs page.
 
 ```shell
 cat <<-'KUSTOMIZATION' > kustomization.yaml
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
 # Override the namespace of all of the resources we manage.
 namespace: vector
 
 bases:
   # Include Vector recommended base (from git).
-  - github.com/vectordotdev/vector/distribution/kubernetes/vector-agent?ref=v{{< version >}}
+  - github.com/vectordotdev/vector/distribution/kubernetes/vector-agent
 
 images:
-  # Override the Vector image to avoid use of the sliding tag.
+  # Override the Vector image to pin the version used.
   - name: timberio/vector
     newName: timberio/vector
-    newTag: {{< version >}}-debian
+    newTag: {{< version >}}-distroless-libc
 
 resources:
-  # A namespace to keep the resources at.
+  # The namespace previously created to keep the resources in.
   - namespace.yaml
-
-configMapGenerator:
-  # Provide a custom `ConfigMap` for Vector.
-  - name: vector-agent-config
-    files:
-      - vector.toml
-
-generatorOptions:
-  # We don't want a suffix for the `ConfigMap` name.
-  disableNameSuffixHash: true
 KUSTOMIZATION
 ```
 
-##### Configure Vector
-
-```shell
-cat <<-'VECTORCFG' > vector.toml
-# The Vector Kubernetes integration automatically defines a
-# kubernetes_logs source that is made available to you.
-# You do not need to define a log source.
-[sinks.stdout]
-# Adjust as necessary. By default we use the console sink
-# to print all data. This allows you to see Vector working.
-# /docs/reference/sinks/
-type = "console"
-inputs = ["kubernetes_logs"]
-target = "stdout"
-encoding = "json"
-VECTORCFG
-```
-
-##### Verify the configuration
+##### Verify your kustomization file
 
 ```shell
 kubectl kustomize
@@ -107,7 +82,7 @@ kubectl apply -k .
 ##### Tail Vector logs
 
 ```shell
-"kubectl logs -n vector daemonset/vector-agent"
+kubectl logs -n vector daemonset/vector
 ```
 
 #### Aggregator
@@ -122,73 +97,36 @@ We recommend running Vector in its own Kubernetes namespace. In the instructions
 kubectl create namespace --dry-run=client -o yaml vector > namespace.yaml
 ```
 
-##### Prepare kustomization
+##### Prepare your kustomization file
+
+This example configuration deploys Vector as an Aggregator, the full configuration can be found [here](https://github.com/vectordotdev/helm-charts/blob/develop/charts/vector/templates/configmap.yaml). For more information about configuration options, see the [Configuration] docs page.
 
 ```shell
 cat <<-'KUSTOMIZATION' > kustomization.yaml
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
 # Override the namespace of all of the resources we manage.
 namespace: vector
 
 bases:
   # Include Vector recommended base (from git).
-  - github.com/vectordotdev/vector/distribution/kubernetes/vector-aggregator?ref=v{{< version >}}
+  - github.com/vectordotdev/vector/distribution/kubernetes/vector-aggregator
 
 images:
-  # Override the Vector image to avoid use of the sliding tag.
+  # Override the Vector image to pin the version used.
   - name: timberio/vector
     newName: timberio/vector
-    newTag: {{< version >}}-debian
+    newTag: {{< version >}}-distroless-libc
 
 resources:
-  # A namespace to keep the resources at.
+  # The namespace previously created to keep the resources in.
   - namespace.yaml
-
-configMapGenerator:
-  # Provide a custom `ConfigMap` for Vector.
-  - name: vector-aggregator-config
-    files:
-      - vector.toml
-
-generatorOptions:
-  # We don't want a suffix for the `ConfigMap` name.
-  disableNameSuffixHash: true
 KUSTOMIZATION
 ```
 
-##### Configure Vector
-
-```shell
-cat <<-'VECTORCFG' > vector.toml
-# The Vector Aggregator chart defines a
-# vector source that is made available to you.
-# You do not need to define a log source.
-[transforms.remap]
-# Adjust as necessary. This remap transform parses a JSON
-# formatted log message, emitting a log if the contents are
-# not valid JSON
-# /docs/reference/transforms/
-type = "remap"
-inputs = ["vector"]
-source = '''
-  structured, err = parse_json(.message)
-  if err != null {
-    log("Unable to parse JSON: " + err, level: "error")
-  } else {
-    . = merge(., object!(structured))
-  }
-'''
-[sinks.stdout]
-# Adjust as necessary. By default we use the console sink
-# to print all data. This allows you to see Vector working.
-# /docs/reference/sinks/
-type = "console"
-inputs = ["kubernetes_logs"]
-target = "stdout"
-encoding = "json"
-VECTORCFG
-```
-
-##### Verify the configuration
+##### Verify your kustomization file
 
 ```shell
 kubectl kustomize
@@ -203,7 +141,7 @@ kubectl apply -k .
 ##### Tail Vector logs
 
 ```shell
-"kubectl logs -n vector statefulset/vector-aggregator"
+"kubectl logs -n vector statefulset/vector"
 ```
 
 ## Deployment
@@ -244,6 +182,7 @@ Vector provides rich filtering options for Kubernetes log collection:
 * The `exclude_paths_glob_patterns` option enables you to exclude Kubernetes log files by filename and path.
 * The `extra_field_selector` option specifies the field selector to filter Pods with, to be used in addition to the built-in `Node` filter.
 * The `extra_label_selector` option specifies the label selector filter Pods with, to be used in addition to the built-in [`vector.dev/exclude` filter][exclude_filter].
+* The `extra_namespace_label_selector` option specifies the label selector filter Namespaces with, to be used in addition to the built-in [`vector.dev/exclude` filter][exclude_filter].
 
 ### Kubernetes API access control
 
@@ -285,7 +224,7 @@ We recommend the resource limits listed below when running Vector on Kubernetes.
 
 #### Agent resource limits
 
-If you deploy Vector as an [agent] (collecting data for each of your Kubernetes [Nodes][node]), we recommend the following limits:
+If you deploy Vector as an [Agent] (collecting data for each of your Kubernetes [Nodes][node]), we recommend the following limits:
 
 ```yaml
 resources:
@@ -309,7 +248,7 @@ The [`kubernetes_logs`][kubernetes_logs] component is stateless, which means tha
 
 #### Agent state management
 
-For the [agent] role, Vector stores its state in the host-mapped directory with a static path. If it's redeployed, it's able to continue from where it was interrupted.
+For the [Agent] role, Vector stores its state in the host-mapped directory with a static path. If it's redeployed, it's able to continue from where it was interrupted.
 
 ### Testing and reliability
 
@@ -326,7 +265,7 @@ Vector is tested extensively against Kubernetes. In addition to Kubernetes being
 [kubernetes]: https://kubernetes.io
 [kubernetes_logs]: /docs/reference/configuration/sources/kubernetes_logs
 [kubernetes_logs_config]: /docs/reference/configuration/sources/kubernetes_logs/#configuration
-[kubernetes_logs_output]: /docs/reference/configuration/sources/kubernetes_logs#output
+[kubernetes_logs_output]: /docs/reference/configuration/sources/kubernetes_logs#output-data
 [kustomize]: https://kustomize.io
 [node]: https://kubernetes.io/docs/concepts/architecture/nodes
 [reduce]: /docs/reference/configuration/transforms/reduce

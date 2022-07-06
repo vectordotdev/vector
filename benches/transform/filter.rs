@@ -1,25 +1,25 @@
-use crate::common::AlwaysFail;
-use crate::common::AlwaysPass;
+use std::time::Duration;
+
 use criterion::{
     criterion_group, measurement::WallTime, BatchSize, BenchmarkGroup, Criterion, SamplingMode,
     Throughput,
 };
-use std::time::Duration;
-use vector::conditions::Condition;
-use vector::transforms::filter::Filter;
-use vector::transforms::FunctionTransform;
+use vector::{
+    conditions::Condition,
+    transforms::{filter::Filter, FunctionTransform, OutputBuffer},
+};
 use vector_core::event::{Event, LogEvent};
 
 #[derive(Debug)]
 struct Payload {
     filter: Filter,
-    output: Vec<Event>,
+    output: OutputBuffer,
     events: Vec<Event>,
 }
 
-fn setup(total_events: usize, condition: Box<dyn Condition>) -> Payload {
+fn setup(total_events: usize, condition: Condition) -> Payload {
     let filter = Filter::new(condition);
-    let output = Vec::with_capacity(total_events);
+    let output = OutputBuffer::from(Vec::with_capacity(total_events));
     let events = vec![Event::Log(LogEvent::default()); total_events];
     Payload {
         filter,
@@ -43,8 +43,8 @@ fn measurement(payload: Payload) {
 ///
 /// This benchmark examines the `transform` of `Filter`, demonstrating that its
 /// performance is bounded entirely by that of the `Condition`. The two cases
-/// below, `always_pass` and `always_fail` use `common::AlwaysPass` and
-/// `common::AlwaysFail` as the interior condition of the filter.
+/// below, `always_pass` and `always_fail` use `Condition::AlwaysPass` and
+/// `Condition::AlwaysFail` as the interior condition of the filter.
 ///
 fn filter(c: &mut Criterion) {
     let mut group: BenchmarkGroup<WallTime> =
@@ -55,14 +55,14 @@ fn filter(c: &mut Criterion) {
     group.throughput(Throughput::Elements(total_events as u64));
     group.bench_function("transform/always_fail", |b| {
         b.iter_batched(
-            || setup(total_events, Box::new(AlwaysFail)),
+            || setup(total_events, Condition::AlwaysFail),
             measurement,
             BatchSize::SmallInput,
         )
     });
     group.bench_function("transform/always_pass", |b| {
         b.iter_batched(
-            || setup(total_events, Box::new(AlwaysPass)),
+            || setup(total_events, Condition::AlwaysPass),
             measurement,
             BatchSize::SmallInput,
         )

@@ -14,7 +14,7 @@ ROOT=$(git rev-parse --show-toplevel)
 CUE="${ROOT}/website/scripts/cue.sh"
 
 read-all-docs() {
-  ${CUE} list | sort | xargs cat -A
+  ${CUE} list | sort | xargs cat -et
 }
 
 (

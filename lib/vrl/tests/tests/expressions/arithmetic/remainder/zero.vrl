@@ -1,0 +1,4 @@
+# result: 0
+# object: { "zero": 0 }
+
+x = 43 % int!(.zero) ?? 0

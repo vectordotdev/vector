@@ -1,8 +1,9 @@
+use async_graphql::Object;
+
 use crate::{
     api::schema::metrics::{self, MetricsFilter},
     event::Metric,
 };
-use async_graphql::Object;
 
 #[derive(Debug, Clone)]
 pub struct GenericTransformMetrics(Vec<Metric>);

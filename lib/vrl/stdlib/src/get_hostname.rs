@@ -1,5 +1,12 @@
 use vrl::prelude::*;
 
+fn get_hostname() -> Resolved {
+    Ok(hostname::get()
+        .map_err(|error| format!("failed to get hostname: {}", error))?
+        .to_string_lossy()
+        .into())
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct GetHostname;
 
@@ -10,8 +17,8 @@ impl Function for GetHostname {
 
     fn compile(
         &self,
-        _state: &state::Compiler,
-        _ctx: &FunctionCompileContext,
+        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        _ctx: &mut FunctionCompileContext,
         _: ArgumentList,
     ) -> Compiled {
         Ok(Box::new(GetHostnameFn))
@@ -31,13 +38,10 @@ struct GetHostnameFn;
 
 impl Expression for GetHostnameFn {
     fn resolve(&self, _: &mut Context) -> Resolved {
-        Ok(hostname::get()
-            .map_err(|error| format!("failed to get hostname: {}", error))?
-            .to_string_lossy()
-            .into())
+        get_hostname()
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().bytes()
+    fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
+        TypeDef::bytes().fallible()
     }
 }

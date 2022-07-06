@@ -1,42 +1,37 @@
-// ## skip check-events ##
+use std::net::AddrParseError;
 
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
+use super::prelude::{error_stage, error_type};
+
 #[derive(Debug)]
 pub struct GeoipIpAddressParseError<'a> {
+    pub(crate) error: AddrParseError,
     pub address: &'a str,
 }
 
 impl<'a> InternalEvent for GeoipIpAddressParseError<'a> {
-    fn emit_logs(&self) {
+    fn emit(self) {
         error!(
-            message = "IP Address not parsed correctly.",
+            message = %format!("IP Address not parsed correctly: {:?}", self.error),
+            error_code = "invalid_ip_address",
+            error_type = error_type::PARSER_FAILED,
+            stage = error_stage::PROCESSING,
             address = %self.address,
             internal_log_rate_secs = 30
         );
-    }
-
-    fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1, "error_type" => "type_ip_address_parse_error");
-    }
-}
-
-#[derive(Debug)]
-pub struct GeoipFieldDoesNotExist<'a> {
-    pub field: &'a str,
-}
-
-impl<'a> InternalEvent for GeoipFieldDoesNotExist<'a> {
-    fn emit_logs(&self) {
-        error!(
-            message = "Field does not exist.",
-            field = %self.field,
-            internal_log_rate_secs = 30
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "invalid_ip_address",
+            "error_type" => error_type::PARSER_FAILED,
+            "stage" => error_stage::PROCESSING,
+            "address" => self.address.to_string(),
         );
-    }
-
-    fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1, "error_type" => "type_field_does_not_exist");
+        // deprecated
+        counter!(
+            "processing_errors_total", 1,
+            "error_type" => "type_ip_address_parse_error",
+        );
     }
 }

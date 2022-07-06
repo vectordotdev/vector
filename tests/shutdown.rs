@@ -1,11 +1,5 @@
 #![cfg(feature = "shutdown-tests")]
 
-use assert_cmd::prelude::*;
-use nix::{
-    sys::signal::{kill, Signal},
-    unistd::Pid,
-};
-use serde_json::{json, Value};
 use std::{
     fs::read_dir,
     io::Write,
@@ -15,6 +9,14 @@ use std::{
     thread::sleep,
     time::{Duration, Instant},
 };
+
+use assert_cmd::prelude::*;
+use nix::{
+    sys::signal::{kill, Signal},
+    unistd::Pid,
+};
+use pretty_assertions::assert_eq;
+use serde_json::{json, Value};
 use vector::test_util::{next_addr, temp_file};
 
 mod support;
@@ -88,7 +90,7 @@ fn vector_with(config_path: PathBuf, address: SocketAddr, quiet: bool) -> Comman
         .arg(if quiet { "--quiet" } else { "-v" })
         .env("VECTOR_DATA_DIR", create_directory())
         .env("VECTOR_TEST_UNIX_PATH", temp_file())
-        .env("VECTOR_TEST_ADDRESS", format!("{}", address));
+        .env("VECTOR_TEST_ADDRESS", address.to_string());
 
     cmd
 }
@@ -211,7 +213,7 @@ fn configuration_path_recomputed() {
         dir.join("conf1.toml"),
         &source_config(
             r#"
-        type = "generator"
+        type = "demo_logs"
         format = "shuffle"
         interval = 1.0 # optional, no default
         lines = ["foo", "bar"]"#,
@@ -312,10 +314,10 @@ fn timely_shutdown_file() {
 }
 
 #[test]
-fn timely_shutdown_generator() {
+fn timely_shutdown_demo_logs() {
     test_timely_shutdown(source_vector(
         r#"
-    type = "generator"
+    type = "demo_logs"
     format = "shuffle"
     interval = 1.0 # optional, no default
     lines = ["foo", "bar"]"#,
@@ -553,7 +555,7 @@ fn timely_reload_shutdown() {
     );
 
     let mut cmd = vector_with(path.clone(), next_addr(), false);
-    cmd.arg("-w true");
+    cmd.arg("-w");
 
     test_timely_shutdown_with_sub(cmd, |vector| {
         overwrite_file(
@@ -577,4 +579,56 @@ fn timely_reload_shutdown() {
             "Vector exited too early on reload."
         );
     });
+}
+
+#[tokio::test]
+async fn health_503_during_shutdown() {
+    use std::process::Command;
+
+    let mut cmd = Command::cargo_bin("vector").unwrap();
+
+    cmd.arg("--quiet")
+        .arg("-c")
+        .arg(create_file(
+            r#"
+            [api]
+              enabled = true
+              address = "127.0.0.1:8686"
+
+            [sources.source]
+              type = "demo_logs"
+              format = "json"
+              interval = 0
+
+            [sinks.sink]
+              type = "blackhole"
+              inputs = ["source"]
+              rate = 1
+            "#,
+        ))
+        .env("VECTOR_DATA_DIR", create_directory());
+
+    let mut vector = cmd
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+
+    // Give vector time to start.
+    sleep(STARTUP_TIME);
+
+    // Check if vector is still running
+    assert_eq!(None, vector.try_wait().unwrap(), "Vector exited too early.");
+
+    // Signal shutdown
+    kill(Pid::from_raw(vector.id() as i32), Signal::SIGTERM).unwrap();
+
+    // Give vector time to begin shutting down.
+    sleep(Duration::from_secs(1));
+
+    let response = reqwest::get("http://127.0.0.1:8686/health").await.unwrap();
+
+    assert_eq!(response.status(), http::StatusCode::SERVICE_UNAVAILABLE);
+
+    kill(Pid::from_raw(vector.id() as i32), Signal::SIGKILL).unwrap();
 }

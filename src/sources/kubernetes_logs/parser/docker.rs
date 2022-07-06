@@ -1,18 +1,20 @@
-use crate::{
-    config::log_schema,
-    event::{self, Event, LogEvent, Value},
-    internal_events::KubernetesLogsDockerFormatParseFailed,
-    transforms::FunctionTransform,
-};
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use serde_json::Value as JsonValue;
 use snafu::{OptionExt, ResultExt, Snafu};
 
+use crate::{
+    config::log_schema,
+    event::{self, Event, LogEvent, Value},
+    internal_events::KubernetesLogsDockerFormatParseError,
+    transforms::{FunctionTransform, OutputBuffer},
+};
+use lookup::path;
+
 pub const TIME: &str = "time";
 pub const LOG: &str = "log";
 
-/// Parser for the docker log format.
+/// Parser for the Docker log format.
 ///
 /// Expects logs to arrive in a JSONLines format with the fields names and
 /// contents specific to the implementation of the Docker `json` log driver.
@@ -22,14 +24,14 @@ pub const LOG: &str = "log";
 pub struct Docker;
 
 impl FunctionTransform for Docker {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut OutputBuffer, mut event: Event) {
         let log = event.as_mut_log();
         if let Err(err) = parse_json(log) {
-            emit!(&KubernetesLogsDockerFormatParseFailed { error: &err });
+            emit!(KubernetesLogsDockerFormatParseError { error: &err });
             return;
         }
         if let Err(err) = normalize_event(log) {
-            emit!(&KubernetesLogsDockerFormatParseFailed { error: &err });
+            emit!(KubernetesLogsDockerFormatParseError { error: &err });
             return;
         }
         output.push(event);
@@ -50,7 +52,7 @@ fn parse_json(log: &mut LogEvent) -> Result<(), ParsingError> {
     match serde_json::from_slice(bytes.as_ref()) {
         Ok(JsonValue::Object(object)) => {
             for (key, value) in object {
-                log.insert_flat(key, value);
+                log.insert(path!(&key), value);
             }
             Ok(())
         }
@@ -66,17 +68,17 @@ const DOCKER_MESSAGE_SPLIT_THRESHOLD: usize = 16 * 1024; // 16 Kib
 
 fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
     // Parse and rename timestamp.
-    let time = log.remove(&*TIME).context(TimeFieldMissing)?;
+    let time = log.remove(&*TIME).context(TimeFieldMissingSnafu)?;
     let time = match time {
         Value::Bytes(val) => val,
         _ => return Err(NormalizationError::TimeValueUnexpectedType),
     };
     let time = DateTime::parse_from_rfc3339(String::from_utf8_lossy(time.as_ref()).as_ref())
-        .context(TimeParsing)?;
+        .context(TimeParsingSnafu)?;
     log.insert(log_schema().timestamp_key(), time.with_timezone(&Utc));
 
     // Parse message, remove trailing newline and detect if it's partial.
-    let message = log.remove(&*LOG).context(LogFieldMissing)?;
+    let message = log.remove(&*LOG).context(LogFieldMissingSnafu)?;
     let mut message = match message {
         Value::Bytes(val) => val,
         _ => return Err(NormalizationError::LogValueUnexpectedType),
@@ -145,7 +147,7 @@ pub mod tests {
     }
 
     /// Shared test cases.
-    pub fn cases() -> Vec<(String, Vec<LogEvent>)> {
+    pub fn cases() -> Vec<(String, Vec<Event>)> {
         vec![
             (
                 r#"{"log": "The actual log line\n", "stream": "stderr", "time": "2016-10-05T00:00:30.082640485Z"}"#.into(),
@@ -204,7 +206,11 @@ pub mod tests {
     fn test_parsing() {
         trace_init();
 
-        test_util::test_parser(|| Transform::function(Docker), Event::from, cases());
+        test_util::test_parser(
+            || Transform::function(Docker),
+            |s| Event::Log(LogEvent::from(s)),
+            cases(),
+        );
     }
 
     #[test]
@@ -237,9 +243,9 @@ pub mod tests {
         ];
 
         for message in cases {
-            let input = Event::from(message);
-            let mut output = Vec::new();
-            Docker.transform(&mut output, input);
+            let input = LogEvent::from(message);
+            let mut output = OutputBuffer::default();
+            Docker.transform(&mut output, input.into());
             assert!(output.is_empty(), "Expected no events: {:?}", output);
         }
     }

@@ -1,0 +1,27 @@
+# https://splunk.github.io/docker-splunk/ADVANCED.html#using-defaultyml
+splunk:
+  hec:
+    ssl: False
+  conf:
+    - key: inputs
+      # https://docs.splunk.com/Documentation/Splunk/latest/Admin/Inputsconf
+      value:
+        directory: /opt/splunk/etc/system/local
+        content:
+          http://ack-token:
+            token: ack-token
+            useACK: true
+    - key: indexes
+      # https://docs.splunk.com/Documentation/Splunk/latest/Admin/Indexesconf
+      value: 
+        directory: /opt/splunk/etc/system/local
+        content: 
+          custom_index: 
+            homePath: $SPLUNK_DB/custom_index/db
+            coldPath: $SPLUNK_DB/custom_index/colddb
+            thawedPath: $SPLUNK_DB/custom_index/thaweddb
+          testmetrics:
+            homePath: $SPLUNK_DB/testmetrics/db
+            coldPath: $SPLUNK_DB/testmetrics/colddb
+            thawedPath: $SPLUNK_DB/testmetrics/thaweddb
+            datatype: metric

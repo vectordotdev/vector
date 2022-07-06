@@ -1,15 +1,30 @@
 package metadata
 
-import (
-	"list"
-)
-
 components: sinks: [Name=string]: {
 	kind: "sink"
 
 	features: _
 
 	configuration: {
+		if features.acknowledgements {
+			acknowledgements: {
+				common: true
+				description: """
+					Controls how acknowledgements are handled by this sink. When enabled, all connected sources that support end-to-end acknowledgements will wait for the destination of this sink to acknowledge receipt of events before providing acknowledgement to the sending source. These settings override the global `acknowledgement` settings.
+					"""
+				required: false
+				type: object: options: {
+					enabled: {
+						common:      true
+						description: "Controls if all connected sources will wait for this sink to deliver the events before acknowledging receipt."
+						warnings: ["We recommend enabling this option to avoid loss of data, as destination sinks may otherwise reject events after the source acknowledges their successful receipt."]
+						required: false
+						type: bool: default: false
+					}
+				}
+			}
+		}
+
 		if features.send != _|_ && features.send.batch != _|_ {
 			if features.send.batch.enabled {
 				batch: {
@@ -19,37 +34,31 @@ components: sinks: [Name=string]: {
 					type: object: {
 						examples: []
 						options: {
-							if features.send.batch.max_bytes != _|_ {
-								max_bytes: {
-									common:      true
-									description: "The maximum size of a batch, in bytes, before it is flushed."
-									required:    false
-									type: uint: {
-										default: features.send.batch.max_bytes
-										unit:    "bytes"
-									}
+							max_bytes: {
+								common:      true
+								description: "The maximum size of a batch, in bytes, before it is flushed."
+								required:    false
+								type: uint: {
+									default: features.send.batch.max_bytes | *null
+									unit:    "bytes"
 								}
 							}
-							if features.send.batch.max_events != _|_ {
-								max_events: {
-									common:      true
-									description: "The maximum size of a batch, in events, before it is flushed."
-									required:    false
-									type: uint: {
-										default: features.send.batch.max_events
-										unit:    "events"
-									}
+							max_events: {
+								common:      true
+								description: "The maximum size of a batch, in events, before it is flushed."
+								required:    false
+								type: uint: {
+									default: features.send.batch.max_events | *null
+									unit:    "events"
 								}
 							}
-							if features.send.batch.timeout_secs != null {
-								timeout_secs: {
-									common:      true
-									description: "The maximum age of a batch before it is flushed."
-									required:    false
-									type: uint: {
-										default: features.send.batch.timeout_secs
-										unit:    "seconds"
-									}
+							timeout_secs: {
+								common:      true
+								description: "The maximum age of a batch before it is flushed."
+								required:    false
+								type: float: {
+									default: features.send.batch.timeout_secs
+									unit:    "seconds"
 								}
 							}
 						}
@@ -58,63 +67,61 @@ components: sinks: [Name=string]: {
 			}
 		}
 
-		if features.buffer.enabled {
-			buffer: {
-				common:      false
-				description: "Configures the sink specific buffer behavior."
-				required:    false
-				type: object: {
-					examples: []
-					options: {
-						max_events: {
-							common:        true
-							description:   "The maximum number of [events](\(urls.vector_data_model)) allowed in the buffer."
-							required:      false
-							relevant_when: "type = \"memory\""
-							type: uint: {
-								default: 500
-								unit:    "events"
-							}
+		buffer: {
+			common:      false
+			description: "Configures the sink specific buffer behavior."
+			required:    false
+			type: object: {
+				examples: []
+				options: {
+					max_events: {
+						common:        true
+						description:   "The maximum number of [events](\(urls.vector_data_model)) allowed in the buffer."
+						required:      false
+						relevant_when: "type = \"memory\""
+						type: uint: {
+							default: 500
+							unit:    "events"
 						}
-						max_size: {
-							description:   "The maximum size of the buffer on the disk."
-							required:      true
-							relevant_when: "type = \"disk\""
-							type: uint: {
-								examples: [104900000]
-								unit: "bytes"
-							}
+					}
+					max_size: {
+						description: """
+							The maximum size of the buffer on the disk. Must be at least 256 megabytes (268435456 bytes).
+							"""
+						required:      true
+						relevant_when: "type = \"disk\""
+						type: uint: {
+							examples: [104900000]
+							unit: "bytes"
 						}
-						type: {
-							common:      true
-							description: "The buffer's type and storage mechanism."
-							required:    false
-							type: string: {
-								default: "memory"
-								enum: {
-									memory: "Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully."
-									disk: """
+					}
+					type: {
+						common:      true
+						description: "The buffer's type and storage mechanism."
+						required:    false
+						type: string: {
+							default: "memory"
+							enum: {
+								memory: "Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully."
+								disk: """
 									Stores the sink's buffer on disk. This is less performant, but durable.
 									Data will not be lost between restarts.
 									Will also hold data in memory to enhance performance.
 									WARNING: This may stall the sink if disk performance isn't on par with the throughput.
 									For comparison, AWS gp2 volumes are usually too slow for common cases.
 									"""
-								}
-								syntax: "literal"
 							}
 						}
-						when_full: {
-							common:      false
-							description: "The behavior when the buffer becomes full."
-							required:    false
-							type: string: {
-								default: "block"
-								enum: {
-									block:       "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."
-									drop_newest: "Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."
-								}
-								syntax: "literal"
+					}
+					when_full: {
+						common:      false
+						description: "The behavior when the buffer becomes full."
+						required:    false
+						type: string: {
+							default: "block"
+							enum: {
+								block:       "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."
+								drop_newest: "Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."
 							}
 						}
 					}
@@ -136,15 +143,24 @@ components: sinks: [Name=string]: {
 					type: string: {
 						default: features.send.compression.default
 						enum: {
-							if list.Contains(features.send.compression.algorithms, "none") {
-								none:   "No compression."
-								syntax: "literal"
-							}
-							if list.Contains(features.send.compression.algorithms, "gzip") {
-								gzip: "[Gzip](\(urls.gzip)) standard DEFLATE compression."
+							for algo in features.send.compression.algorithms {
+								if algo == "none" {
+									none: "No compression."
+								}
+								if algo == "gzip" {
+									gzip: "[Gzip](\(urls.gzip)) standard DEFLATE compression."
+								}
+								if algo == "snappy" {
+									snappy: "[Snappy](\(urls.snappy)) compression."
+								}
+								if algo == "lz4" {
+									lz4: "[lz4](\(urls.lz4)) compression."
+								}
+								if algo == "zstd" {
+									zstd: "[zstd](\(urls.zstd)) compression."
+								}
 							}
 						}
-						syntax: "literal"
 					}
 				}
 			}
@@ -153,90 +169,143 @@ components: sinks: [Name=string]: {
 		if features.send != _|_ {
 			if features.send.encoding.enabled {
 				encoding: {
-					description: "Configures the encoding specific sink behavior."
-					required:    false
-					common:      true
-					type: object: options: {
+					description: """
+						Configures the encoding specific sink behavior.
+
+						Note: When data in `encoding` is malformed, currently only a very generic error "data did not match any variant of untagged enum EncodingConfig" is reported. Follow this [issue](\(urls.vector_encoding_config_improve_error_message)) to track progress on improving these error messages.
+						"""
+					required:    features.send.encoding.codec.enabled
+					if !features.send.encoding.codec.enabled {common: true}
+					type: object: {
 						if features.send.encoding.codec.enabled {
-							codec: {
+							examples: [{codec: "json"}]
+							options: codec: {
 								description: "The encoding codec used to serialize the events before outputting."
 								required:    true
 								type: string: {
 									examples: features.send.encoding.codec.enum
-									let batched = features.send.encoding.codec.batched
 									enum: {
 										for codec in features.send.encoding.codec.enum {
 											if codec == "text" {
-												if batched {
-													text: "Newline delimited list of messages generated from the message key from each event."
-												}
-												if !batched {
-													text: "The message field from the event."
-												}
+												text: "The message field from the event."
 											}
 											if codec == "logfmt" {
-												if batched {
-													logfmt: "Newline delimited list of events encoded by [logfmt]\(urls.logfmt)."
-												}
-												if !batched {
-													logfmt: "[logfmt]\(urls.logfmt) encoded event."
-												}
+												logfmt: "[logfmt](\(urls.logfmt)) encoded event."
 											}
 											if codec == "json" {
-												if batched {
-													json: "Array of JSON encoded events, each element representing one event."
-												}
-												if !batched {
-													json: "JSON encoded event."
-												}
+												json: "JSON encoded event."
 											}
-											if codec == "ndjson" {
-												ndjson: "Newline delimited list of JSON encoded events."
+											if codec == "avro" {
+												avro: "Avro encoded event with a given schema."
 											}
 										}
 									}
-									syntax: "literal"
 								}
 							}
 						}
+						options: {
+							if features.send.encoding.codec.enabled {
+								for codec in features.send.encoding.codec.enum {
+									if codec == "avro" {
+										avro: {
+											description:   "Options for the `avro` codec."
+											required:      true
+											relevant_when: "codec = `avro`"
+											type: object: options: {
+												schema: {
+													description: "The Avro schema declaration."
+													required:    true
+													type: string: {
+														examples: [
+															"""
+															["{ "type": "record", "name": "log", "fields": [{ "name": "message", "type": "string" }] }"]
+															""",
+														]
+													}
+												}
+											}
+										}
+									}
+								}
+							}
 
-						except_fields: {
-							common:      false
-							description: "Prevent the sink from encoding the specified fields."
-							required:    false
-							type: array: {
-								default: null
-								items: type: string: {
-									examples: ["message", "parent.child"]
-									syntax: "field_path"
+							except_fields: {
+								common:      false
+								description: "Prevent the sink from encoding the specified fields."
+								required:    false
+								type: array: {
+									default: null
+									items: type: string: {
+										examples: ["message", "parent.child"]
+										syntax: "field_path"
+									}
+								}
+							}
+
+							only_fields: {
+								common:      false
+								description: "Makes the sink encode only the specified fields."
+								required:    false
+								type: array: {
+									default: null
+									items: type: string: {
+										examples: ["message", "parent.child"]
+										syntax: "field_path"
+									}
+								}
+							}
+
+							timestamp_format: {
+								common:      false
+								description: "How to format event timestamps."
+								required:    false
+								type: string: {
+									default: "rfc3339"
+									enum: {
+										rfc3339: "Formats as a RFC3339 string"
+										unix:    "Formats as a unix timestamp"
+									}
 								}
 							}
 						}
+					}
+				}
 
-						only_fields: {
+				if features.send.encoding.codec.enabled {
+					if features.send.encoding.codec.framing {
+						framing: {
 							common:      false
-							description: "Makes the sink encode only the specified fields."
+							description: "Configures in which way events encoded as byte frames should be separated in a payload."
 							required:    false
-							type: array: {
-								default: null
-								items: type: string: {
-									examples: ["message", "parent.child"]
-									syntax: "field_path"
+							type: object: options: {
+								method: {
+									description: "The framing method."
+									required:    false
+									common:      true
+									type: string: {
+										default: "A suitable default is chosen depending on the sink type and the selected codec."
+										enum: {
+											bytes:               "Byte frames are concatenated."
+											character_delimited: "Byte frames are delimited by a chosen character."
+											length_delimited:    "Byte frames are encoded by adding a length header."
+											newline_delimited:   "Byte frames are delimited by a newline character."
+										}
+									}
 								}
-							}
-						}
-
-						timestamp_format: {
-							common:      false
-							description: "How to format event timestamps."
-							required:    false
-							type: string: {
-								default: "rfc3339"
-								enum: {
-									rfc3339: "Formats as a RFC3339 string"
-									unix:    "Formats as a unix timestamp"
+								character_delimited: {
+									description:   "Options for `character_delimited` framing."
+									required:      true
+									relevant_when: "method = `character_delimited`"
+									type: object: options: {
+										delimiter: {
+											description: "The character used to separate frames."
+											required:    true
+											type: ascii_char: {
+												examples: ["\n", "\t"]
+											}
+										}
+									}
 								}
-								syntax: "literal"
 							}
 						}
 					}
@@ -305,8 +374,8 @@ components: sinks: [Name=string]: {
 										rtt_deviation_scale: {
 											common: false
 											description: """
-                                                When calculating the past RTT average, we also compute a secondary "deviation" value that indicates how variable those values are. We use that deviation when comparing the past RTT average to the current measurements, so we can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to an appropriate range. Valid values are greater than or equal to 0, and we expect reasonable values to range from 1.0 to 3.0. Larger values cause the algorithm to ignore larger increases in the RTT.
-                                            """
+											When calculating the past RTT average, we also compute a secondary "deviation" value that indicates how variable those values are. We use that deviation when comparing the past RTT average to the current measurements, so we can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to an appropriate range. Valid values are greater than or equal to 0, and we expect reasonable values to range from 1.0 to 3.0. Larger values cause the algorithm to ignore larger increases in the RTT.
+											"""
 											required: false
 											type: float: default: 2.0
 										}
@@ -387,7 +456,6 @@ components: sinks: [Name=string]: {
 									common:      false
 									description: "Options for custom headers."
 									required:    false
-									warnings: []
 									type: object: {
 										examples: [
 											{
@@ -446,10 +514,18 @@ components: sinks: [Name=string]: {
 
 			if features.send.tls.enabled {
 				tls: configuration._tls_connect & {_args: {
-					can_enable:             features.send.tls.can_enable
-					can_verify_certificate: features.send.tls.can_enable
+					can_verify_certificate: features.send.tls.can_verify_certificate
 					can_verify_hostname:    features.send.tls.can_verify_hostname
 					enabled_default:        features.send.tls.enabled_default
+				}}
+			}
+		}
+
+		if features.exposes != _|_ {
+			if features.exposes.tls.enabled {
+				tls: configuration._tls_accept & {_args: {
+					can_verify_certificate: features.exposes.tls.can_verify_certificate
+					enabled_default:        features.exposes.tls.enabled_default
 				}}
 			}
 		}
@@ -552,7 +628,7 @@ components: sinks: [Name=string]: {
 		if features.send != _|_ {
 			if features.send.request.enabled {
 				rate_limits: {
-					title: "Rate limits & adapative concurrency"
+					title: "Rate limits & adaptive concurrency"
 					body:  null
 					sub_sections: [
 						{
@@ -627,6 +703,7 @@ components: sinks: [Name=string]: {
 	}
 
 	telemetry: metrics: {
+		component_received_events_count:      components.sources.internal_metrics.output.metrics.component_received_events_count
 		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
 		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 		events_in_total:                      components.sources.internal_metrics.output.metrics.events_in_total

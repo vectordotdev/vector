@@ -1,26 +1,43 @@
-use super::{filter_result_sync, FilterList, HostMetrics};
-use crate::event::metric::Metric;
+use std::{
+    io::{self, Read},
+    num::ParseIntError,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
+
 use chrono::{DateTime, Utc};
 use futures::future::BoxFuture;
-use serde::{Deserialize, Serialize};
-use shared::btreemap;
 use snafu::{ResultExt, Snafu};
-use std::io::{self, Read};
-use std::num::ParseIntError;
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
-use tokio::fs::{self, File};
-use tokio::io::AsyncReadExt;
+use tokio::{
+    fs::{self, File},
+    io::AsyncReadExt,
+};
+use vector_common::btreemap;
+use vector_config::configurable_component;
+
+use super::{filter_result_sync, FilterList, HostMetrics};
+use crate::event::metric::Metric;
 
 const MICROSECONDS: f64 = 1.0 / 1_000_000.0;
 
-#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
+/// Options for the “cgroups” (controller groups) metrics collector.
+///
+/// This collector is only available on Linux systems, and only supports either version 2 or hybrid cgroups.
+#[configurable_component]
+#[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(default)]
-pub(super) struct CGroupsConfig {
+pub(crate) struct CGroupsConfig {
+    /// The number of levels of the cgroups hierarchy for which to report metrics.
+    ///
+    /// A value of `1` means just the root or named cgroup.
     #[derivative(Default(value = "100"))]
     levels: usize,
+
+    /// The base cgroup name to provide metrics for.
     pub(super) base: Option<PathBuf>,
+
+    /// Lists of group name patterns to include or exclude.
     groups: FilterList,
 }
 
@@ -244,12 +261,12 @@ impl CGroup {
         let filename = self.make_path(filename);
         File::open(&filename)
             .await
-            .with_context(|| Opening {
+            .with_context(|_| OpeningSnafu {
                 filename: filename.clone(),
             })?
             .read_to_string(buffer)
             .await
-            .with_context(|| Reading {
+            .with_context(|_| ReadingSnafu {
                 filename: filename.clone(),
             })?;
         Ok(filename)
@@ -261,7 +278,10 @@ impl CGroup {
         buffer: &mut String,
     ) -> CGroupsResult<T> {
         let filename = self.open_read(filename, buffer).await?;
-        buffer.trim().parse().with_context(|| Parsing { filename })
+        buffer
+            .trim()
+            .parse()
+            .with_context(|_| ParsingSnafu { filename })
     }
 
     async fn load_memory_current(&self, buffer: &mut String) -> CGroupsResult<u64> {
@@ -292,11 +312,11 @@ impl CGroup {
 fn load_controllers(filename: &Path) -> CGroupsResult<Vec<String>> {
     let mut buffer = String::new();
     std::fs::File::open(&filename)
-        .with_context(|| Opening {
+        .with_context(|_| OpeningSnafu {
             filename: filename.to_path_buf(),
         })?
         .read_to_string(&mut buffer)
-        .with_context(|| Reading {
+        .with_context(|_| ReadingSnafu {
             filename: filename.to_path_buf(),
         })?;
     Ok(buffer.trim().split(' ').map(Into::into).collect())
@@ -381,11 +401,17 @@ fn join_name(base_name: &Path, filename: impl AsRef<Path>) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
-    use super::super::tests::{count_name, count_tag};
-    use super::super::{HostMetrics, HostMetricsConfig};
-    use super::{join_name, join_path};
-    use pretty_assertions::assert_eq;
     use std::path::{Path, PathBuf};
+
+    use pretty_assertions::assert_eq;
+
+    use super::{
+        super::{
+            tests::{count_name, count_tag},
+            HostMetrics, HostMetricsConfig,
+        },
+        join_name, join_path,
+    };
 
     #[test]
     fn joins_names_and_paths() {

@@ -21,11 +21,11 @@
 //!
 //! ### [`EncodingConfigWithDefault<E>`]
 //!
-//! This configuration type is practically identical to [`EncodingConfigWithDefault<E>`], except it
-//! will use the `Default` implementation of `E` to create the codec if a value isn't specified in
-//! the configuration when deserialized.  Similarly, it won't write the codec during serialization
-//! if it's already the default value.  This is good when there's an obvious default codec to use,
-//! but you still want to provide the ability to change it.
+//! This configuration type is practically identical to [`EncodingConfig<E>`], except it will use
+//! the `Default` implementation of `E` to create the codec if a value isn't specified in the
+//! configuration when deserialized.  Similarly, it won't write the codec during serialization if
+//! it's already the default value.  This is good when there's an obvious default codec to use, but
+//! you still want to provide the ability to change it.
 //!
 //! ### [`EncodingConfigFixed<E>`]
 //!
@@ -57,34 +57,94 @@
 //! distinct types! Having [`EncodingConfigWithDefault`] is a relatively straightforward way to
 //! accomplish this without a bunch of magic.  [`EncodingConfigFixed`] goes a step further and
 //! provides a way to force a codec, disallowing an override from being specified.
+mod adapter;
 mod codec;
-pub use codec::{StandardEncodings, StandardJsonEncoding, StandardTextEncoding};
 mod config;
-pub use config::EncodingConfig;
 mod fixed;
-pub use fixed::EncodingConfigFixed;
 mod with_default;
 
+use std::{fmt::Debug, io};
+
+pub use adapter::{
+    EncodingConfigAdapter, EncodingConfigMigrator, EncodingConfigWithFramingAdapter,
+    EncodingConfigWithFramingMigrator, Transformer,
+};
+use bytes::BytesMut;
+pub use codec::{
+    as_tracked_write, StandardEncodings, StandardEncodingsMigrator,
+    StandardEncodingsWithFramingMigrator, StandardJsonEncoding, StandardTextEncoding,
+};
+use codecs::encoding::Framer;
+pub use config::EncodingConfig;
+pub use fixed::EncodingConfigFixed;
+use lookup::lookup_v2::{parse_path, OwnedPath};
+use lookup::path;
+use serde::{Deserialize, Serialize};
+use tokio_util::codec::Encoder as _;
 pub use with_default::EncodingConfigWithDefault;
 
 use crate::{
-    event::{Event, PathComponent, PathIter, Value},
+    event::{Event, LogEvent, MaybeAsLogMut, Value},
     Result,
 };
-use serde::{Deserialize, Serialize};
-use std::{fmt::Debug, io, sync::Arc};
 
 pub trait Encoder<T> {
     /// Encodes the input into the provided writer.
+    ///
+    /// # Errors
+    ///
+    /// If an I/O error is encountered while encoding the input, an error variant will be returned.
     fn encode_input(&self, input: T, writer: &mut dyn io::Write) -> io::Result<usize>;
 }
 
-impl<E, T> Encoder<T> for Arc<E>
-where
-    E: Encoder<T>,
-{
-    fn encode_input(&self, input: T, writer: &mut dyn io::Write) -> io::Result<usize> {
-        (**self).encode_input(input, writer)
+impl Encoder<Vec<Event>> for (Transformer, crate::codecs::Encoder<Framer>) {
+    fn encode_input(
+        &self,
+        mut events: Vec<Event>,
+        writer: &mut dyn io::Write,
+    ) -> io::Result<usize> {
+        let mut encoder = self.1.clone();
+        let mut bytes_written = 0;
+        let batch_prefix = encoder.batch_prefix();
+        writer.write_all(batch_prefix)?;
+        bytes_written += batch_prefix.len();
+        if let Some(last) = events.pop() {
+            for mut event in events {
+                self.0.transform(&mut event);
+                let mut bytes = BytesMut::new();
+                encoder
+                    .encode(event, &mut bytes)
+                    .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+                writer.write_all(&bytes)?;
+                bytes_written += bytes.len();
+            }
+            let mut event = last;
+            self.0.transform(&mut event);
+            let mut bytes = BytesMut::new();
+            encoder
+                .serialize(event, &mut bytes)
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+            writer.write_all(&bytes)?;
+            bytes_written += bytes.len();
+        }
+        let batch_suffix = encoder.batch_suffix();
+        writer.write_all(batch_suffix)?;
+        bytes_written += batch_suffix.len();
+
+        Ok(bytes_written)
+    }
+}
+
+impl Encoder<Event> for (Transformer, crate::codecs::Encoder<()>) {
+    fn encode_input(&self, mut event: Event, writer: &mut dyn io::Write) -> io::Result<usize> {
+        let mut encoder = self.1.clone();
+        self.0.transform(&mut event);
+        let mut bytes = BytesMut::new();
+        encoder
+            .serialize(event, &mut bytes)
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+        writer.write_all(&bytes)?;
+        Ok(bytes.len())
     }
 }
 
@@ -95,75 +155,69 @@ pub trait EncodingConfiguration {
 
     fn codec(&self) -> &Self::Codec;
     fn schema(&self) -> &Option<String>;
-    // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-    fn only_fields(&self) -> &Option<Vec<Vec<PathComponent>>>;
+    fn only_fields(&self) -> &Option<Vec<OwnedPath>>;
     fn except_fields(&self) -> &Option<Vec<String>>;
     fn timestamp_format(&self) -> &Option<TimestampFormat>;
 
-    fn apply_only_fields(&self, event: &mut Event) {
+    fn apply_only_fields(&self, log: &mut LogEvent) {
         if let Some(only_fields) = &self.only_fields() {
-            match event {
-                Event::Log(log_event) => {
-                    let mut to_remove = log_event
-                        .keys()
-                        .filter(|field| {
-                            let field_path = PathIter::new(field).collect::<Vec<_>>();
-                            !only_fields.iter().any(|only| {
-                                // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-                                field_path.starts_with(&only[..])
-                            })
-                        })
-                        .collect::<Vec<_>>();
+            let mut to_remove = match log.keys() {
+                Some(keys) => keys
+                    .filter(|field| {
+                        let field_path = parse_path(field);
+                        !only_fields
+                            .iter()
+                            .any(|only| field_path.segments.starts_with(&only.segments[..]))
+                    })
+                    .collect::<Vec<_>>(),
+                None => vec![],
+            };
 
-                    // reverse sort so that we delete array elements at the end first rather than
-                    // the start so that any `nulls` at the end are dropped and empty arrays are
-                    // pruned
-                    to_remove.sort_by(|a, b| b.cmp(a));
+            // reverse sort so that we delete array elements at the end first rather than
+            // the start so that any `nulls` at the end are dropped and empty arrays are
+            // pruned
+            to_remove.sort_by(|a, b| b.cmp(a));
 
-                    for removal in to_remove {
-                        log_event.remove_prune(removal, true);
-                    }
-                }
-                Event::Metric(_) => {
-                    // Metrics don't get affected by this one!
-                }
+            for removal in to_remove {
+                log.remove_prune(removal.as_str(), true);
             }
         }
     }
-    fn apply_except_fields(&self, event: &mut Event) {
+    fn apply_except_fields(&self, log: &mut LogEvent) {
         if let Some(except_fields) = &self.except_fields() {
-            match event {
-                Event::Log(log_event) => {
-                    for field in except_fields {
-                        log_event.remove(field);
-                    }
-                }
-                Event::Metric(_) => (), // Metrics don't get affected by this one!
+            for field in except_fields {
+                log.remove(field.as_str());
             }
         }
     }
-    fn apply_timestamp_format(&self, event: &mut Event) {
+    fn apply_timestamp_format(&self, log: &mut LogEvent) {
         if let Some(timestamp_format) = &self.timestamp_format() {
-            match event {
-                Event::Log(log_event) => {
-                    match timestamp_format {
-                        TimestampFormat::Unix => {
-                            let mut unix_timestamps = Vec::new();
-                            for (k, v) in log_event.all_fields() {
-                                if let Value::Timestamp(ts) = v {
-                                    unix_timestamps
-                                        .push((k.clone(), Value::Integer(ts.timestamp())));
-                                }
-                            }
-                            for (k, v) in unix_timestamps {
-                                log_event.insert(k, v);
+            match timestamp_format {
+                TimestampFormat::Unix => {
+                    if log.value().is_object() {
+                        let mut unix_timestamps = Vec::new();
+                        for (k, v) in log.all_fields().expect("must be an object") {
+                            if let Value::Timestamp(ts) = v {
+                                unix_timestamps.push((k.clone(), Value::Integer(ts.timestamp())));
                             }
                         }
-                        // RFC3339 is the default serialization of a timestamp.
-                        TimestampFormat::Rfc3339 => (),
+                        for (k, v) in unix_timestamps {
+                            log.insert(k.as_str(), v);
+                        }
+                    } else {
+                        // root is not an object
+                        let timestamp = if let Value::Timestamp(ts) = log.value() {
+                            Some(ts.timestamp())
+                        } else {
+                            None
+                        };
+                        if let Some(ts) = timestamp {
+                            log.insert(path!(), Value::Integer(ts));
+                        }
                     }
                 }
-                Event::Metric(_) => (), // Metrics don't get affected by this one!
+                // RFC3339 is the default serialization of a timestamp.
+                TimestampFormat::Rfc3339 => (),
             }
         }
     }
@@ -174,53 +228,99 @@ pub trait EncodingConfiguration {
     ///
     /// For example, this checks if `except_fields` and `only_fields` items are mutually exclusive.
     fn validate(&self) -> Result<()> {
-        if let (Some(only_fields), Some(except_fields)) =
-            (&self.only_fields(), &self.except_fields())
-        {
-            if except_fields.iter().any(|f| {
-                let path_iter = PathIter::new(f).collect::<Vec<_>>();
-                only_fields.iter().any(|v| v == &path_iter)
-            }) {
-                return Err(
-                    "`except_fields` and `only_fields` should be mutually exclusive.".into(),
-                );
-            }
-        }
-        Ok(())
+        validate_fields(
+            self.only_fields().as_deref(),
+            self.except_fields().as_deref(),
+        )
     }
 
     /// Apply the EncodingConfig rules to the provided event.
     ///
     /// Currently, this is idempotent.
-    fn apply_rules(&self, event: &mut Event) {
-        // Ordering in here should not matter.
-        self.apply_except_fields(event);
-        self.apply_only_fields(event);
-        self.apply_timestamp_format(event);
-    }
-}
-
-impl<E> Encoder<Event> for E
-where
-    E: EncodingConfiguration,
-    E::Codec: Encoder<Event>,
-{
-    fn encode_input(&self, mut input: Event, writer: &mut dyn io::Write) -> io::Result<usize> {
-        self.apply_rules(&mut input);
-        self.codec().encode_input(input, writer)
-    }
-}
-
-impl<E> Encoder<Vec<Event>> for E
-where
-    E: EncodingConfiguration,
-    E::Codec: Encoder<Vec<Event>>,
-{
-    fn encode_input(&self, mut input: Vec<Event>, writer: &mut dyn io::Write) -> io::Result<usize> {
-        for event in input.iter_mut() {
-            self.apply_rules(event);
+    fn apply_rules<T>(&self, event: &mut T)
+    where
+        T: MaybeAsLogMut,
+    {
+        // No rules are currently applied to metrics
+        if let Some(log) = event.maybe_as_log_mut() {
+            // Ordering in here should not matter.
+            self.apply_except_fields(log);
+            self.apply_only_fields(log);
+            self.apply_timestamp_format(log);
         }
+    }
+}
 
+/// Check if `except_fields` and `only_fields` items are mutually exclusive.
+///
+/// If an error is returned, the entire encoding configuration should be considered inoperable.
+pub fn validate_fields(
+    only_fields: Option<&[OwnedPath]>,
+    except_fields: Option<&[String]>,
+) -> Result<()> {
+    if let (Some(only_fields), Some(except_fields)) = (only_fields, except_fields) {
+        if except_fields.iter().any(|f| {
+            let path_iter = parse_path(f);
+            only_fields.iter().any(|v| v == &path_iter)
+        }) {
+            return Err("`except_fields` and `only_fields` should be mutually exclusive.".into());
+        }
+    }
+    Ok(())
+}
+
+// These types of traits will likely move into some kind of event container once the
+// event layout is refactored, but trying it out here for now.
+// Ideally this would return an iterator, but that's not the easiest thing to make generic
+pub trait VisitLogMut {
+    fn visit_logs_mut<F>(&mut self, func: F)
+    where
+        F: Fn(&mut LogEvent);
+}
+
+impl<T> VisitLogMut for Vec<T>
+where
+    T: VisitLogMut,
+{
+    fn visit_logs_mut<F>(&mut self, func: F)
+    where
+        F: Fn(&mut LogEvent),
+    {
+        for item in self {
+            item.visit_logs_mut(&func);
+        }
+    }
+}
+
+impl VisitLogMut for Event {
+    fn visit_logs_mut<F>(&mut self, func: F)
+    where
+        F: Fn(&mut LogEvent),
+    {
+        if let Event::Log(log_event) = self {
+            func(log_event)
+        }
+    }
+}
+impl VisitLogMut for LogEvent {
+    fn visit_logs_mut<F>(&mut self, func: F)
+    where
+        F: Fn(&mut LogEvent),
+    {
+        func(self);
+    }
+}
+
+impl<E, T> Encoder<T> for E
+where
+    E: EncodingConfiguration,
+    E::Codec: Encoder<T>,
+    T: VisitLogMut,
+{
+    fn encode_input(&self, mut input: T, writer: &mut dyn io::Write) -> io::Result<usize> {
+        input.visit_logs_mut(|log| {
+            self.apply_rules(log);
+        });
         self.codec().encode_input(input, writer)
     }
 }
@@ -234,28 +334,30 @@ pub enum TimestampFormat {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::config::log_schema;
+    use std::collections::BTreeMap;
+
+    use codecs::{
+        CharacterDelimitedEncoder, JsonSerializer, NewlineDelimitedEncoder, TextSerializer,
+    };
     use indoc::indoc;
-    use shared::btreemap;
+
+    use super::*;
+    use crate::{config::log_schema, sinks::util::encoding::Transformer};
 
     #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
     enum TestEncoding {
         Snoot,
         Boop,
     }
+
     #[derive(Deserialize, Serialize, Debug)]
     #[serde(deny_unknown_fields)]
     struct TestConfig {
         encoding: EncodingConfig<TestEncoding>,
     }
 
-    // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-    fn as_path_components(a: &str) -> Vec<PathComponent> {
-        PathIter::new(a).collect()
-    }
-
     const TOML_SIMPLE_STRING: &str = r#"encoding = "Snoot""#;
+
     #[test]
     fn config_string() {
         let config: TestConfig = toml::from_str(TOML_SIMPLE_STRING).unwrap();
@@ -268,16 +370,14 @@ mod tests {
         encoding.except_fields = ["Doop"]
         encoding.only_fields = ["Boop"]
     "#};
+
     #[test]
     fn config_struct() {
         let config: TestConfig = toml::from_str(TOML_SIMPLE_STRUCT).unwrap();
         config.encoding.validate().unwrap();
         assert_eq!(config.encoding.codec, TestEncoding::Snoot);
         assert_eq!(config.encoding.except_fields, Some(vec!["Doop".into()]));
-        assert_eq!(
-            config.encoding.only_fields,
-            Some(vec![as_path_components("Boop")])
-        );
+        assert_eq!(config.encoding.only_fields, Some(vec![parse_path("Boop")]));
     }
 
     const TOML_EXCLUSIVITY_VIOLATION: &str = indoc! {r#"
@@ -285,6 +385,7 @@ mod tests {
         encoding.except_fields = ["Doop"]
         encoding.only_fields = ["Doop"]
     "#};
+
     #[test]
     fn exclusivity_violation() {
         let config: std::result::Result<TestConfig, _> = toml::from_str(TOML_EXCLUSIVITY_VIOLATION);
@@ -295,13 +396,13 @@ mod tests {
         encoding.codec = "Snoot"
         encoding.except_fields = ["a.b.c", "b", "c[0].y", "d\\.z", "e"]
     "#};
+
     #[test]
     fn test_except() {
         let config: TestConfig = toml::from_str(TOML_EXCEPT_FIELD).unwrap();
         config.encoding.validate().unwrap();
-        let mut event = Event::new_empty_log();
+        let mut log = LogEvent::default();
         {
-            let log = event.as_mut_log();
             log.insert("a", 1);
             log.insert("a.b", 1);
             log.insert("a.b.c", 1);
@@ -314,6 +415,7 @@ mod tests {
             log.insert("e.a", 1);
             log.insert("e.b", 1);
         }
+        let mut event = Event::from(log);
         config.encoding.apply_rules(&mut event);
         assert!(!event.as_mut_log().contains("a.b.c"));
         assert!(!event.as_mut_log().contains("b"));
@@ -330,13 +432,13 @@ mod tests {
         encoding.codec = "Snoot"
         encoding.only_fields = ["a.b.c", "b", "c[0].y", "g\\.z"]
     "#};
+
     #[test]
     fn test_only() {
         let config: TestConfig = toml::from_str(TOML_ONLY_FIELD).unwrap();
         config.encoding.validate().unwrap();
-        let mut event = Event::new_empty_log();
+        let mut log = LogEvent::default();
         {
-            let log = event.as_mut_log();
             log.insert("a", 1);
             log.insert("a.b", 1);
             log.insert("a.b.c", 1);
@@ -349,17 +451,18 @@ mod tests {
             log.insert("d.z", 1);
             log.insert("e[0]", 1);
             log.insert("e[1]", 1);
-            log.insert("f\\.z", 1);
-            log.insert("g\\.z", 1);
-            log.insert("h", btreemap! {});
+            log.insert("\"f.z\"", 1);
+            log.insert("\"g.z\"", 1);
+            log.insert("h", BTreeMap::new());
             log.insert("i", Vec::<Value>::new());
         }
+        let mut event = Event::from(log);
         config.encoding.apply_rules(&mut event);
         assert!(event.as_mut_log().contains("a.b.c"));
         assert!(event.as_mut_log().contains("b"));
         assert!(event.as_mut_log().contains("b[1].x"));
         assert!(event.as_mut_log().contains("c[0].y"));
-        assert!(event.as_mut_log().contains("g\\.z"));
+        assert!(event.as_mut_log().contains("\"g.z\""));
 
         assert!(!event.as_mut_log().contains("a.b.d"));
         assert!(!event.as_mut_log().contains("c[0].x"));
@@ -374,11 +477,12 @@ mod tests {
         encoding.codec = "Snoot"
         encoding.timestamp_format = "unix"
     "#};
+
     #[test]
     fn test_timestamp() {
         let config: TestConfig = toml::from_str(TOML_TIMESTAMP_FORMAT).unwrap();
         config.encoding.validate().unwrap();
-        let mut event = Event::from("Demo");
+        let mut event = Event::Log(LogEvent::from("Demo"));
         let timestamp = event
             .as_mut_log()
             .get(log_schema().timestamp_key())
@@ -409,5 +513,209 @@ mod tests {
                 e
             ),
         }
+    }
+
+    #[test]
+    fn test_encode_batch_json_empty() {
+        let encoding = (
+            Transformer::default(),
+            crate::codecs::Encoder::<Framer>::new(
+                CharacterDelimitedEncoder::new(b',').into(),
+                JsonSerializer::new().into(),
+            ),
+        );
+
+        let mut writer = Vec::new();
+        let written = encoding.encode_input(vec![], &mut writer).unwrap();
+        assert_eq!(written, 2);
+
+        assert_eq!(String::from_utf8(writer).unwrap(), "[]");
+    }
+
+    #[test]
+    fn test_encode_batch_json_single() {
+        let encoding = (
+            Transformer::default(),
+            crate::codecs::Encoder::<Framer>::new(
+                CharacterDelimitedEncoder::new(b',').into(),
+                JsonSerializer::new().into(),
+            ),
+        );
+
+        let mut writer = Vec::new();
+        let written = encoding
+            .encode_input(
+                vec![Event::Log(LogEvent::from(BTreeMap::from([(
+                    String::from("key"),
+                    Value::from("value"),
+                )])))],
+                &mut writer,
+            )
+            .unwrap();
+        assert_eq!(written, 17);
+
+        assert_eq!(String::from_utf8(writer).unwrap(), r#"[{"key":"value"}]"#);
+    }
+
+    #[test]
+    fn test_encode_batch_json_multiple() {
+        let encoding = (
+            Transformer::default(),
+            crate::codecs::Encoder::<Framer>::new(
+                CharacterDelimitedEncoder::new(b',').into(),
+                JsonSerializer::new().into(),
+            ),
+        );
+
+        let mut writer = Vec::new();
+        let written = encoding
+            .encode_input(
+                vec![
+                    Event::Log(LogEvent::from(BTreeMap::from([(
+                        String::from("key"),
+                        Value::from("value1"),
+                    )]))),
+                    Event::Log(LogEvent::from(BTreeMap::from([(
+                        String::from("key"),
+                        Value::from("value2"),
+                    )]))),
+                    Event::Log(LogEvent::from(BTreeMap::from([(
+                        String::from("key"),
+                        Value::from("value3"),
+                    )]))),
+                ],
+                &mut writer,
+            )
+            .unwrap();
+        assert_eq!(written, 52);
+
+        assert_eq!(
+            String::from_utf8(writer).unwrap(),
+            r#"[{"key":"value1"},{"key":"value2"},{"key":"value3"}]"#
+        );
+    }
+
+    #[test]
+    fn test_encode_batch_ndjson_empty() {
+        let encoding = (
+            Transformer::default(),
+            crate::codecs::Encoder::<Framer>::new(
+                NewlineDelimitedEncoder::new().into(),
+                JsonSerializer::new().into(),
+            ),
+        );
+
+        let mut writer = Vec::new();
+        let written = encoding.encode_input(vec![], &mut writer).unwrap();
+        assert_eq!(written, 0);
+
+        assert_eq!(String::from_utf8(writer).unwrap(), "");
+    }
+
+    #[test]
+    fn test_encode_batch_ndjson_single() {
+        let encoding = (
+            Transformer::default(),
+            crate::codecs::Encoder::<Framer>::new(
+                NewlineDelimitedEncoder::new().into(),
+                JsonSerializer::new().into(),
+            ),
+        );
+
+        let mut writer = Vec::new();
+        let written = encoding
+            .encode_input(
+                vec![Event::Log(LogEvent::from(BTreeMap::from([(
+                    String::from("key"),
+                    Value::from("value"),
+                )])))],
+                &mut writer,
+            )
+            .unwrap();
+        assert_eq!(written, 15);
+
+        assert_eq!(String::from_utf8(writer).unwrap(), r#"{"key":"value"}"#);
+    }
+
+    #[test]
+    fn test_encode_batch_ndjson_multiple() {
+        let encoding = (
+            Transformer::default(),
+            crate::codecs::Encoder::<Framer>::new(
+                NewlineDelimitedEncoder::new().into(),
+                JsonSerializer::new().into(),
+            ),
+        );
+
+        let mut writer = Vec::new();
+        let written = encoding
+            .encode_input(
+                vec![
+                    Event::Log(LogEvent::from(BTreeMap::from([(
+                        String::from("key"),
+                        Value::from("value1"),
+                    )]))),
+                    Event::Log(LogEvent::from(BTreeMap::from([(
+                        String::from("key"),
+                        Value::from("value2"),
+                    )]))),
+                    Event::Log(LogEvent::from(BTreeMap::from([(
+                        String::from("key"),
+                        Value::from("value3"),
+                    )]))),
+                ],
+                &mut writer,
+            )
+            .unwrap();
+        assert_eq!(written, 50);
+
+        assert_eq!(
+            String::from_utf8(writer).unwrap(),
+            "{\"key\":\"value1\"}\n{\"key\":\"value2\"}\n{\"key\":\"value3\"}"
+        );
+    }
+
+    #[test]
+    fn test_encode_event_json() {
+        let encoding = (
+            Transformer::default(),
+            crate::codecs::Encoder::<()>::new(JsonSerializer::new().into()),
+        );
+
+        let mut writer = Vec::new();
+        let written = encoding
+            .encode_input(
+                Event::Log(LogEvent::from(BTreeMap::from([(
+                    String::from("key"),
+                    Value::from("value"),
+                )]))),
+                &mut writer,
+            )
+            .unwrap();
+        assert_eq!(written, 15);
+
+        assert_eq!(String::from_utf8(writer).unwrap(), r#"{"key":"value"}"#);
+    }
+
+    #[test]
+    fn test_encode_event_text() {
+        let encoding = (
+            Transformer::default(),
+            crate::codecs::Encoder::<()>::new(TextSerializer::new().into()),
+        );
+
+        let mut writer = Vec::new();
+        let written = encoding
+            .encode_input(
+                Event::Log(LogEvent::from(BTreeMap::from([(
+                    String::from("message"),
+                    Value::from("value"),
+                )]))),
+                &mut writer,
+            )
+            .unwrap();
+        assert_eq!(written, 5);
+
+        assert_eq!(String::from_utf8(writer).unwrap(), r#"value"#);
     }
 }

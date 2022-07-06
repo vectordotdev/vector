@@ -34,7 +34,6 @@ is_kubectl_context_kind() {
   return 1
 }
 
-
 # Whether to use `minikube cache` to pass image to the k8s cluster.
 # After we build vector docker image, instead of pushing to the remote repo,
 # we'll be using `minikube cache` to make image available to the cluster.
@@ -88,9 +87,6 @@ if [[ -z "${CONTAINER_IMAGE:-}" ]]; then
   TEST_RUN_ID="${TEST_RUN_ID:-"$(date +%s)-$(random-string)"}"
 
   if [[ "${QUICK_BUILD:-"false"}" == "true" ]]; then
-    # Build in debug mode.
-    cargo build
-
     # Prepare test image parameters.
     VERSION_TAG="test-$TEST_RUN_ID"
 
@@ -98,8 +94,7 @@ if [[ -z "${CONTAINER_IMAGE:-}" ]]; then
     CONTAINER_IMAGE="$CONTAINER_IMAGE_REPO:$VERSION_TAG-debug"
 
     # Build docker image.
-    scripts/skaffold-dockerignore.sh
-    docker build --tag "$CONTAINER_IMAGE" -f skaffold/docker/Dockerfile target/debug
+    docker build --build-arg RUST_VERSION="${RUST_VERSION}" --tag "$CONTAINER_IMAGE" -f tilt/Dockerfile .
   else
     # Package a .deb file to build a docker container, unless skipped.
     if [[ -z "${SKIP_PACKAGE_DEB:-}" ]]; then

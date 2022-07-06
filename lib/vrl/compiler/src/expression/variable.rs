@@ -1,24 +1,29 @@
-use crate::expression::{levenstein, Resolved};
-use crate::parser::ast::Ident;
-use crate::{Context, Expression, Span, State, TypeDef, Value};
-
-use diagnostic::{DiagnosticError, Label};
 use std::fmt;
 
-#[derive(Debug, Clone, PartialEq)]
+use diagnostic::{DiagnosticMessage, Label};
+use value::Value;
+
+use crate::{
+    expression::{levenstein, Resolved},
+    parser::ast::Ident,
+    state::{ExternalEnv, LocalEnv},
+    Context, Expression, Span, TypeDef,
+};
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Variable {
     ident: Ident,
     value: Option<Value>,
 }
 
 impl Variable {
-    pub(crate) fn new(span: Span, ident: Ident, state: &State) -> Result<Self, Error> {
-        let value = match state.variable(&ident) {
+    pub(crate) fn new(span: Span, ident: Ident, local: &LocalEnv) -> Result<Self, Error> {
+        let value = match local.variable(&ident) {
             Some(variable) => variable.value.as_ref().cloned(),
             None => {
-                let idents = state
+                let idents = local
                     .variable_idents()
-                    .map(|s| s.to_owned())
+                    .map(std::clone::Clone::clone)
                     .collect::<Vec<_>>();
 
                 return Err(Error::undefined(ident, span, idents));
@@ -35,10 +40,6 @@ impl Variable {
     pub fn value(&self) -> Option<&Value> {
         self.value.as_ref()
     }
-
-    pub fn noop(ident: Ident) -> Self {
-        Self { ident, value: None }
-    }
 }
 
 impl Expression for Variable {
@@ -50,12 +51,11 @@ impl Expression for Variable {
             .unwrap_or(Value::Null))
     }
 
-    fn type_def(&self, state: &State) -> TypeDef {
-        state
+    fn type_def(&self, (local, _): (&LocalEnv, &ExternalEnv)) -> TypeDef {
+        local
             .variable(&self.ident)
             .cloned()
-            .map(|d| d.type_def)
-            .unwrap_or_else(|| TypeDef::new().null().infallible())
+            .map_or_else(|| TypeDef::null().infallible(), |d| d.type_def)
     }
 }
 
@@ -66,7 +66,7 @@ impl fmt::Display for Variable {
 }
 
 #[derive(Debug)]
-pub struct Error {
+pub(crate) struct Error {
     variant: ErrorVariant,
     ident: Ident,
     span: Span,
@@ -83,7 +83,7 @@ impl Error {
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum ErrorVariant {
+pub(crate) enum ErrorVariant {
     #[error("call to undefined variable")]
     Undefined { idents: Vec<Ident> },
 }
@@ -100,9 +100,9 @@ impl std::error::Error for Error {
     }
 }
 
-impl DiagnosticError for Error {
+impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
-        use ErrorVariant::*;
+        use ErrorVariant::Undefined;
 
         match &self.variant {
             Undefined { .. } => 701,
@@ -110,7 +110,7 @@ impl DiagnosticError for Error {
     }
 
     fn labels(&self) -> Vec<Label> {
-        use ErrorVariant::*;
+        use ErrorVariant::Undefined;
 
         match &self.variant {
             Undefined { idents } => {
