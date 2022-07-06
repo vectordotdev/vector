@@ -103,7 +103,7 @@ impl Definition {
         Self::new(Kind::any_object(), [LogNamespace::Legacy])
     }
 
-    /// An object with any fields, and the `Legacy` namespace.
+    /// An object with no fields, and the `Legacy` namespace.
     /// This is what most sources use for the legacy namespace.
     pub fn empty_legacy_namespace() -> Self {
         Self::new(Kind::object(Collection::empty()), [LogNamespace::Legacy])
@@ -118,7 +118,7 @@ impl Definition {
             (false, false) => Self::new(Kind::any(), []),
             (true, false) => Self::default_legacy_namespace(),
             (false, true) => Self::new(Kind::any(), [LogNamespace::Vector]),
-            (true, true) => Self::new(Kind::any(), [LogNamespace::Legacy, LogNamespace::Vector]),
+            (true, true) => Self::any(),
         }
     }
 
