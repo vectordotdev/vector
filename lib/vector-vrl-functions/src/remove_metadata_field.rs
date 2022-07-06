@@ -1,4 +1,5 @@
 use crate::{get_metadata_key, MetadataKey};
+use ::value::kind::remove;
 use ::value::Value;
 use vrl::prelude::*;
 use vrl::state::{ExternalEnv, LocalEnv};
@@ -83,40 +84,26 @@ impl Expression for RemoveMetadataFieldFn {
         _local: &mut LocalEnv,
         external: &mut ExternalEnv,
     ) -> std::result::Result<(), ExpressionError> {
-        external.metadata_kind().remove_at_path(
-            &self.path.to_lookup(),
-            remove::Strategy {
-                coalesced_path: remove::CoalescedPath::Reject,
-            },
-        )
-        let result = type_def.remove_at_path(
-            &self.path.to_lookup(),
-            remove::Strategy {
-                coalesced_path: remove::CoalescedPath::Reject,
-            },
-        );
+        if let MetadataKey::Query(query) = &self.key {
+            let mut new_kind = external.metadata_kind().clone();
 
-        external.update_target(Details { type_def, value });
+            let result = new_kind.remove_at_path(
+                &query.path().to_lookup(),
+                remove::Strategy {
+                    coalesced_path: remove::CoalescedPath::Reject,
+                },
+            );
 
-        result
+            match result {
+                Ok(_) => external.update_metadata(new_kind),
+                Err(_) => {
+                    // This isn't ideal, but "remove_at_path" doesn't support
+                    // the path used, so no assumptions can be made about the resulting type
+                    // see: https://github.com/vectordotdev/vector/issues/13460
+                    external.update_metadata(Kind::any())
+                }
+            }
+        }
+        Ok(())
     }
 }
-
-/*
-
-       // FIXME(Jean): This should also delete non-external queries, as `del(foo.bar)` is
-       // supported.
-       if self.query.is_external() {
-           if let Err(
-               value::kind::remove::Error::RootPath
-               | value::kind::remove::Error::CoalescedPath
-               | value::kind::remove::Error::NegativeIndexPath,
-           ) = self.query.delete_type_def(external)
-           {
-               // This function is (currently) infallible, so we ignore any errors here.
-               //
-               // see: https://github.com/vectordotdev/vector/issues/11264
-           }
-       }
-
-*/
