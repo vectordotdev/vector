@@ -41,7 +41,7 @@ impl Function for GetMetadataField {
 
     fn compile(
         &self,
-        (local, external): (&mut state::LocalEnv, &mut state::ExternalEnv),
+        (_local, external): (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
@@ -53,6 +53,7 @@ impl Function for GetMetadataField {
                 .find_at_path(&query.path().to_lookup())
                 .ok()
                 .flatten()
+                .map(|x| x.into_owned())
                 .unwrap_or_else(|| Kind::any()),
         };
         Ok(Box::new(GetMetadataFieldFn { key, kind }))

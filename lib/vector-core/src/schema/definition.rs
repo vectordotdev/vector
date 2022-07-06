@@ -337,6 +337,10 @@ impl Definition {
     pub fn event_kind(&self) -> &Kind {
         &self.event_kind
     }
+
+    pub fn metadata_kind(&self) -> &Kind {
+        &self.metadata_kind
+    }
 }
 
 #[cfg(test)]
