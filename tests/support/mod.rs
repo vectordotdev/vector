@@ -385,7 +385,7 @@ enum HealthcheckError {
 #[async_trait]
 #[typetag::serialize(name = "mock")]
 impl SinkConfig for MockSinkConfig {
-    async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
+    async fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
         // If this sink is set to not be healthy, just send the healthcheck error immediately over
         // the oneshot.. otherwise, pass the sender to the sink so it can send it only once it has
         // started running, so that tests can request the topology be healthy before proceeding.
