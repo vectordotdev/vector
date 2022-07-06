@@ -1,7 +1,8 @@
-use super::prelude::{error_stage, error_type};
 use http::Response;
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
+
+use super::prelude::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct ElasticsearchResponseError<'a> {

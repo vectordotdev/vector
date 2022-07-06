@@ -11,17 +11,17 @@ use mongodb::{
     options::ClientOptions,
     Client,
 };
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
     config::{self, Output, SourceConfig, SourceContext, SourceDescription},
     event::metric::{Metric, MetricKind, MetricValue},
     internal_events::{
-        BytesReceived, MongoDbMetricsBsonParseError, MongoDbMetricsCollectCompleted,
+        CollectionCompleted, EndpointBytesReceived, MongoDbMetricsBsonParseError,
         MongoDbMetricsEventsReceived, MongoDbMetricsRequestError, StreamClosedError,
     },
 };
@@ -72,12 +72,25 @@ enum CollectError {
     Bson(bson::de::Error),
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default)]
+/// Configuration for the `mongodb_metrics` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
-struct MongoDbMetricsConfig {
+pub struct MongoDbMetricsConfig {
+    /// A list of MongoDB instances to scrape.
+    ///
+    /// Each endpoint must be in the [Connection String URI Format](https://www.mongodb.com/docs/manual/reference/connection-string/).
     endpoints: Vec<String>,
+
+    /// The interval between scrapes, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
+
+    /// Overrides the default namespace for the metrics emitted by the source.
+    ///
+    /// If set to an empty string, no namespace is added to the metrics.
+    ///
+    /// By default, `mongodb` is used.
     #[serde(default = "default_namespace")]
     namespace: String,
 }
@@ -125,7 +138,7 @@ impl SourceConfig for MongoDbMetricsConfig {
                 let start = Instant::now();
                 let metrics = join_all(sources.iter().map(|mongodb| mongodb.collect())).await;
                 let count = metrics.len();
-                emit!(MongoDbMetricsCollectCompleted {
+                emit!(CollectionCompleted {
                     start,
                     end: Instant::now()
                 });
@@ -259,7 +272,7 @@ impl MongoDbMetrics {
         emit!(MongoDbMetricsEventsReceived {
             byte_size: metrics.size_of(),
             count: metrics.len(),
-            uri: &self.endpoint,
+            endpoint: &self.endpoint,
         });
 
         metrics
@@ -279,9 +292,10 @@ impl MongoDbMetrics {
             .await
             .map_err(CollectError::Mongo)?;
         let byte_size = document_size(&doc);
-        emit!(BytesReceived {
-            protocol: "tcp",
+        emit!(EndpointBytesReceived {
             byte_size,
+            protocol: "tcp",
+            endpoint: &self.endpoint,
         });
         let status: CommandServerStatus = from_document(doc).map_err(CollectError::Bson)?;
 
@@ -1079,7 +1093,13 @@ mod integration_tests {
     use tokio::time::{timeout, Duration};
 
     use super::*;
-    use crate::{test_util::trace_init, SourceSender};
+    use crate::{
+        test_util::{
+            components::{assert_source_compliance, PULL_SOURCE_TAGS},
+            trace_init,
+        },
+        SourceSender,
+    };
 
     fn primary_mongo_address() -> String {
         std::env::var("PRIMARY_MONGODB_ADDRESS")
@@ -1099,53 +1119,60 @@ mod integration_tests {
     }
 
     async fn test_instance(endpoint: String) {
-        let host = ClientOptions::parse(endpoint.as_str()).await.unwrap().hosts[0].to_string();
-        let namespace = "vector_mongodb";
+        assert_source_compliance(&PULL_SOURCE_TAGS, async {
+            let host = ClientOptions::parse(endpoint.as_str()).await.unwrap().hosts[0].to_string();
+            let namespace = "vector_mongodb";
 
-        let (sender, mut recv) = SourceSender::new_test();
+            let (sender, mut recv) = SourceSender::new_test();
 
-        let endpoints = vec![endpoint.clone()];
-        tokio::spawn(async move {
-            MongoDbMetricsConfig {
-                endpoints,
-                scrape_interval_secs: 15,
-                namespace: namespace.to_owned(),
+            let endpoints = vec![endpoint.clone()];
+            tokio::spawn(async move {
+                MongoDbMetricsConfig {
+                    endpoints,
+                    scrape_interval_secs: 15,
+                    namespace: namespace.to_owned(),
+                }
+                .build(SourceContext::new_test(sender, None))
+                .await
+                .unwrap()
+                .await
+                .unwrap()
+            });
+
+            // TODO: We should have a simpler/cleaner method for this sort of collection, where we're essentially waiting
+            // for a burst of events, and want to debounce ourselves in terms of stopping collection once all events in the
+            // burst have been collected. This code here isn't bad or anything... I've just noticed now that we do it in a
+            // few places, and we could solve it in a cleaner way, most likely.
+            let event = timeout(Duration::from_secs(30), recv.next())
+                .await
+                .expect("fetch metrics timeout")
+                .expect("failed to get metrics from a stream");
+            let mut events = vec![event];
+            loop {
+                match timeout(Duration::from_millis(10), recv.next()).await {
+                    Ok(Some(event)) => events.push(event),
+                    Ok(None) => break,
+                    Err(_) => break,
+                }
             }
-            .build(SourceContext::new_test(sender, None))
-            .await
-            .unwrap()
-            .await
-            .unwrap()
-        });
 
-        let event = timeout(Duration::from_secs(30), recv.next())
-            .await
-            .expect("fetch metrics timeout")
-            .expect("failed to get metrics from a stream");
-        let mut events = vec![event];
-        loop {
-            match timeout(Duration::from_millis(10), recv.next()).await {
-                Ok(Some(event)) => events.push(event),
-                Ok(None) => break,
-                Err(_) => break,
+            let clean_endpoint = remove_creds(&endpoint);
+
+            assert!(events.len() > 100);
+            for event in events {
+                let metric = event.into_metric();
+                // validate namespace
+                assert!(metric.namespace() == Some(namespace));
+                // validate timestamp
+                let timestamp = metric.timestamp().expect("existed timestamp");
+                assert!((timestamp - Utc::now()).num_seconds() < 1);
+                // validate basic tags
+                let tags = metric.tags().expect("existed tags");
+                assert_eq!(tags.get("endpoint"), Some(&clean_endpoint));
+                assert_eq!(tags.get("host"), Some(&host));
             }
-        }
-
-        let clean_endpoint = remove_creds(&endpoint);
-
-        assert!(events.len() > 100);
-        for event in events {
-            let metric = event.into_metric();
-            // validate namespace
-            assert!(metric.namespace() == Some(namespace));
-            // validate timestamp
-            let timestamp = metric.timestamp().expect("existed timestamp");
-            assert!((timestamp - Utc::now()).num_seconds() < 1);
-            // validate basic tags
-            let tags = metric.tags().expect("existed tags");
-            assert_eq!(tags.get("endpoint"), Some(&clean_endpoint));
-            assert_eq!(tags.get("host"), Some(&host));
-        }
+        })
+        .await;
     }
 
     #[tokio::test]

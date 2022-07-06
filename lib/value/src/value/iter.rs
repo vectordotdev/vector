@@ -1,5 +1,6 @@
-use crate::Value;
 use std::{marker::PhantomData, ops::IndexMut};
+
+use crate::Value;
 
 impl Value {
     /// Create an iterater over the `Value`.

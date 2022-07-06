@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn is_empty(value: Value) -> Resolved {
@@ -69,11 +70,6 @@ impl Function for IsEmpty {
         let value = arguments.required("value");
 
         Ok(Box::new(IsEmptyFn { value }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        is_empty(value)
     }
 }
 

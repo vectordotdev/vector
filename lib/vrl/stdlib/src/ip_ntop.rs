@@ -1,5 +1,6 @@
 use std::net::IpAddr;
 
+use ::value::Value;
 use vrl::prelude::*;
 
 fn ip_ntop(value: Value) -> Resolved {
@@ -58,11 +59,6 @@ impl Function for IpNtop {
         let value = arguments.required("value");
 
         Ok(Box::new(IpNtopFn { value }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        ip_ntop(value)
     }
 }
 

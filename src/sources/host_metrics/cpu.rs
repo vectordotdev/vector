@@ -1,9 +1,10 @@
+use std::collections::BTreeMap;
+
 use chrono::Utc;
 use futures::{stream, StreamExt};
 #[cfg(target_os = "linux")]
 use heim::cpu::os::linux::CpuTimeExt;
 use heim::units::time::second;
-use vector_common::btreemap;
 
 use super::{filter_result, HostMetrics};
 use crate::event::metric::Metric;
@@ -24,26 +25,38 @@ impl HostMetrics {
                                     name,
                                     timestamp,
                                     times.idle().get::<second>(),
-                                    btreemap! { "mode" => "idle", "cpu" => index.to_string() },
+                                    BTreeMap::from([
+                                        (String::from("mode"), String::from("idle")),
+                                        (String::from("cpu"), index.to_string()),
+                                    ]),
                                 ),
                                 #[cfg(target_os = "linux")]
                                 self.counter(
                                     name,
                                     timestamp,
                                     times.nice().get::<second>(),
-                                    btreemap! { "mode" => "nice", "cpu" => index.to_string() },
+                                    BTreeMap::from([
+                                        (String::from("mode"), String::from("nice")),
+                                        (String::from("cpu"), index.to_string()),
+                                    ]),
                                 ),
                                 self.counter(
                                     name,
                                     timestamp,
                                     times.system().get::<second>(),
-                                    btreemap! { "mode" => "system", "cpu" => index.to_string() },
+                                    BTreeMap::from([
+                                        (String::from("mode"), String::from("system")),
+                                        (String::from("cpu"), index.to_string()),
+                                    ]),
                                 ),
                                 self.counter(
                                     name,
                                     timestamp,
                                     times.user().get::<second>(),
-                                    btreemap! { "mode" => "user", "cpu" => index.to_string() },
+                                    BTreeMap::from([
+                                        (String::from("mode"), String::from("user")),
+                                        (String::from("cpu"), index.to_string()),
+                                    ]),
                                 ),
                             ]
                             .into_iter(),

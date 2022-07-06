@@ -1,3 +1,4 @@
+use ::value::Value;
 use cidr_utils::cidr::IpCidr;
 use vrl::prelude::*;
 
@@ -76,13 +77,6 @@ impl Function for IpCidrContains {
         let value = arguments.required("value");
 
         Ok(Box::new(IpCidrContainsFn { cidr, value }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let cidr = args.required("cidr");
-        let value = args.required("value");
-
-        ip_cidr_contains(value, cidr)
     }
 }
 

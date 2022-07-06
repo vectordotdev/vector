@@ -507,6 +507,20 @@ individual use-cases, this list shows one available solution per use-case.
    }
    ```
 
+21. merge array of objects into single object
+
+   ```coffee
+   result = {}
+   objects = [
+     { "foo": "bar" },
+     { "foo": "baz" },
+     { "bar": true },
+     { "baz": [{ "qux": null, "quux": [2,4,6] }] },
+   ]
+
+   for_each(objects) -> |_, value| { result |= value }
+   ```
+
 ### In-Depth Example
 
 To explain iteration, let’s look at a more in-depth scenario, including comments

@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn match_array(list: Value, pattern: Value, all: Option<Value>) -> Resolved {
@@ -77,14 +78,6 @@ impl Function for MatchArray {
                 required: false,
             },
         ]
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let pattern = args.required("pattern");
-        let all = args.optional("all");
-
-        match_array(value, pattern, all)
     }
 }
 

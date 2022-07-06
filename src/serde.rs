@@ -1,11 +1,10 @@
-use indexmap::map::IndexMap;
-use serde::{Deserialize, Serialize};
-pub use vector_core::serde::{bool_or_struct, skip_serializing_if_default};
-
 use codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     BytesDecoderConfig, BytesDeserializerConfig,
 };
+use indexmap::map::IndexMap;
+use serde::{Deserialize, Serialize};
+pub use vector_core::serde::{bool_or_struct, skip_serializing_if_default};
 
 pub const fn default_true() -> bool {
     true
@@ -64,14 +63,19 @@ pub mod json {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+/// A field reference or value.
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum FieldsOrValue<V> {
+    /// A set of fields mapped by to either another field or a value.
     Fields(Fields<V>),
+
+    /// A value.
     Value(V),
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+/// Mapping of field names to either a value or another field.
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Fields<V>(IndexMap<String, FieldsOrValue<V>>);
 
 impl<V: 'static> Fields<V> {

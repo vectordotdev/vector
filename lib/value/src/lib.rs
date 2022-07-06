@@ -1,6 +1,7 @@
 //! The `value` crate contains types shared across Vector libraries to support it's use of `Value`
 //! and the closely linked `Kind` in support of progressive type checking.
 
+#![deny(warnings)]
 #![deny(
     clippy::all,
     clippy::cargo,
@@ -36,7 +37,10 @@
 )]
 
 pub mod kind;
+pub mod secrets;
 pub mod value;
 
-pub use self::value::{Value, ValueRegex};
 pub use kind::Kind;
+
+pub use self::secrets::Secrets;
+pub use self::value::{Value, ValueRegex};

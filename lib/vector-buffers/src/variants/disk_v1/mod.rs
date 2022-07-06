@@ -15,12 +15,13 @@ use std::{
     num::NonZeroU64,
     path::{Path, PathBuf},
     sync::{
-        atomic::{AtomicU64, AtomicUsize},
+        atomic::{AtomicU64, AtomicUsize, Ordering},
         Arc,
     },
 };
 
 use async_trait::async_trait;
+use futures::StreamExt;
 use leveldb::{
     batch::{Batch, Writebatch},
     database::Database,
@@ -29,7 +30,10 @@ use leveldb::{
 };
 use snafu::{ResultExt, Snafu};
 use tokio::{sync::Notify, time::Instant};
+use vector_common::{finalizer::OrderedFinalizer, shutdown::ShutdownSignal};
 
+use self::key::Key;
+pub use self::{acknowledgements::create_disk_v1_acker, reader::Reader, writer::Writer};
 use crate::{
     buffer_usage_data::BufferUsageHandle,
     topology::{
@@ -39,9 +43,6 @@ use crate::{
     },
     Acker, Bufferable,
 };
-
-use self::key::Key;
-pub use self::{acknowledgements::create_disk_v1_acker, reader::Reader, writer::Writer};
 
 /// How much of disk buffer needs to be deleted before we trigger compaction.
 const MAX_UNCOMPACTED_DENOMINATOR: u64 = 10;
@@ -390,6 +391,18 @@ fn build<T: Bufferable>(
     let write_waker = Arc::new(Notify::new());
     let ack_counter = Arc::new(AtomicUsize::new(0));
     let acker = create_disk_v1_acker(&ack_counter, &read_waker);
+    let (finalizer, mut stream) = OrderedFinalizer::<u64>::new(ShutdownSignal::noop());
+    {
+        let ack_counter = Arc::clone(&ack_counter);
+        let read_waker = Arc::clone(&read_waker);
+        tokio::spawn(async move {
+            while let Some((_status, amount)) = stream.next().await {
+                let amount = amount.try_into().expect("too many records on 32-bit");
+                ack_counter.fetch_add(amount, Ordering::Relaxed);
+                read_waker.notify_one();
+            }
+        });
+    }
 
     let writer = Writer {
         db: Some(Arc::clone(&db)),
@@ -423,6 +436,7 @@ fn build<T: Bufferable>(
         pending_read: None,
         usage_handle,
         phantom: PhantomData,
+        finalizer,
     };
 
     Ok((writer, reader, acker))

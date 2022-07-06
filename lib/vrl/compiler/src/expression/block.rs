@@ -3,8 +3,7 @@ use std::fmt;
 use crate::{
     expression::{Expr, Resolved},
     state::{ExternalEnv, LocalEnv},
-    vm::OpCode,
-    Context, Expression, TypeDef, Value,
+    Context, Expression, TypeDef,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -16,14 +15,16 @@ pub struct Block {
     /// This allows any expressions within the block to mutate the local
     /// environment, but once the block ends, the environment is reset to the
     /// state of the parent expression of the block.
-    local_env: LocalEnv,
+    pub(crate) local_env: LocalEnv,
 }
 
 impl Block {
+    #[must_use]
     pub fn new(inner: Vec<Expr>, local_env: LocalEnv) -> Self {
         Self { inner, local_env }
     }
 
+    #[must_use]
     pub fn into_inner(self) -> Vec<Expr> {
         self.inner
     }
@@ -42,65 +43,43 @@ impl Expression for Block {
         //
         // This also means we don't need to make any changes to the VM runtime,
         // as it uses the same compiler as this AST runtime.
-        self.inner
+        let (last, other) = self.inner.split_last().expect("at least one expression");
+
+        other
             .iter()
-            .map(|expr| expr.resolve(ctx))
-            .collect::<Result<Vec<_>, _>>()
-            .map(|mut v| v.pop().unwrap_or(Value::Null))
+            .try_for_each(|expr| expr.resolve(ctx).map(|_| ()))?;
+
+        last.resolve(ctx)
     }
 
+    /// If an expression has a "never" type, it is considered a "terminating" expression.
+    /// Type information of future expressions in this block should not be considered after
+    /// a terminating expression.
+    ///
+    /// Since type definitions due to assignments are calculated outside of the "`type_def`" function,
+    /// assignments that can never execute might still have adjusted the type definition.
+    /// Therefore, expressions after a terminating expression must not be included in a block.
+    /// It is considered an internal compiler error if this situation occurs, which is checked here
+    /// and will result in a panic.
+    ///
+    /// VRL is allowed to have expressions after a terminating expression, but the compiler
+    /// MUST not include them in a block expression when compiled.
     fn type_def(&self, (_, external): (&LocalEnv, &ExternalEnv)) -> TypeDef {
-        let mut type_defs = self
-            .inner
-            .iter()
-            .map(|expr| expr.type_def((&self.local_env, external)))
-            .collect::<Vec<_>>();
-
-        // If any of the stored expressions is fallible, the entire block is
-        // fallible.
-        let fallible = type_defs.iter().any(TypeDef::is_fallible);
-
-        // The last expression determines the resulting value of the block.
-        let type_def = type_defs.pop().unwrap_or_else(TypeDef::null);
-
-        type_def.with_fallibility(fallible)
-    }
-
-    fn compile_to_vm(
-        &self,
-        vm: &mut crate::vm::Vm,
-        state: (&mut LocalEnv, &mut ExternalEnv),
-    ) -> Result<(), String> {
-        let (local, external) = state;
-        let mut jumps = Vec::new();
-
-        // An empty block should resolve to Null.
-        if self.inner.is_empty() {
-            let null = vm.add_constant(Value::Null);
-            vm.write_opcode(OpCode::Constant);
-            vm.write_primitive(null);
-        }
-
-        let mut expressions = self.inner.iter().peekable();
-
-        while let Some(expr) = expressions.next() {
-            // Write each of the inner expressions
-            expr.compile_to_vm(vm, (local, external))?;
-
-            if expressions.peek().is_some() {
-                // At the end of each statement (apart from the last one) we need to clean up
-                // This involves popping the value remaining on the stack, and jumping to the end
-                // of the block if we are in error.
-                jumps.push(vm.emit_jump(OpCode::EndStatement));
+        let mut last = TypeDef::null();
+        let mut fallible = false;
+        let mut has_terminated = false;
+        for expr in &self.inner {
+            assert!(!has_terminated, "VRL block contains an expression after a terminating expression. This is an internal compiler error. Please submit a bug report.");
+            last = expr.type_def((&self.local_env, external));
+            if last.is_never() {
+                has_terminated = true;
+            }
+            if last.is_fallible() {
+                fallible = true;
             }
         }
 
-        // Update all the jumps to jump to the end of the block.
-        for jump in jumps {
-            vm.patch_jump(jump);
-        }
-
-        Ok(())
+        last.with_fallibility(fallible)
     }
 }
 

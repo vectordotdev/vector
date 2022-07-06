@@ -1,7 +1,9 @@
-use super::prelude::{error_stage, error_type};
-use metrics::counter;
 use std::net::AddrParseError;
+
+use metrics::counter;
 use vector_core::internal_event::InternalEvent;
+
+use super::prelude::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct GeoipIpAddressParseError<'a> {

@@ -1,12 +1,13 @@
 //! Intercept [`watcher::Event`]'s.
 
+use std::{hash::Hash, time::Duration};
+
 use futures::StreamExt;
 use futures_util::Stream;
 use kube::{
     runtime::{reflector::store, watcher},
     Resource,
 };
-use std::{hash::Hash, time::Duration};
 use tokio::pin;
 use tokio_util::time::DelayQueue;
 
@@ -58,14 +59,9 @@ pub async fn custom_reflector<K, W>(
             }
             result = delay_queue.next(), if !delay_queue.is_empty() => {
                 match result {
-                    Some(Ok(event)) => {
+                    Some(event) => {
                         trace!(message = "Processing Deleted event.", ?event);
                         store.apply_watcher_event(&event.into_inner());
-                    },
-                    // DelayQueue should never return an Err, resolved upstream
-                    // https://github.com/tokio-rs/tokio/pull/4241
-                    Some(Err(_)) => {
-                        unreachable!("a DelayQueue never returns an error");
                     },
                     // DelayQueue returns None if the queue is exhausted,
                     // however we disable the DelayQueue branch if there are
@@ -81,7 +77,8 @@ pub async fn custom_reflector<K, W>(
 
 #[cfg(test)]
 mod tests {
-    use super::custom_reflector;
+    use std::time::Duration;
+
     use futures::channel::mpsc;
     use futures_util::SinkExt;
     use k8s_openapi::{api::core::v1::ConfigMap, apimachinery::pkg::apis::meta::v1::ObjectMeta};
@@ -89,7 +86,8 @@ mod tests {
         reflector::{store, ObjectRef},
         watcher,
     };
-    use std::time::Duration;
+
+    use super::custom_reflector;
 
     #[tokio::test]
     async fn applied_should_add_object() {

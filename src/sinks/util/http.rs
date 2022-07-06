@@ -469,7 +469,7 @@ where
     F: Fn(&T) -> StatusCode + Clone + Send + Sync + 'static,
     T: Send + Sync + 'static,
 {
-    pub fn new(func: F) -> HttpStatusRetryLogic<F, T> {
+    pub const fn new(func: F) -> HttpStatusRetryLogic<F, T> {
         HttpStatusRetryLogic {
             func,
             request: PhantomData,

@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use super::prelude::{error_stage, error_type};
 use http::{
     header::{self, HeaderMap, HeaderValue},
     Request, Response,
@@ -8,6 +7,8 @@ use http::{
 use hyper::{body::HttpBody, Error};
 use metrics::{counter, histogram};
 use vector_core::internal_event::InternalEvent;
+
+use super::prelude::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct AboutToSendHttpRequest<'a, T> {

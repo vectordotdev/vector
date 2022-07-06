@@ -1,26 +1,24 @@
+use std::collections::HashMap;
+use std::time::SystemTime;
+
 use aws_sigv4::http_request::{SignableRequest, SigningSettings};
 use aws_sigv4::SigningParams;
 use aws_types::credentials::{ProvideCredentials, SharedCredentialsProvider};
 use aws_types::region::Region;
 use bytes::Bytes;
-use std::collections::HashMap;
-use std::time::SystemTime;
-
 use http::{StatusCode, Uri};
 use snafu::ResultExt;
 
-use super::{InvalidHostSnafu, Request};
+use super::{
+    request_builder::ElasticsearchRequestBuilder, ElasticsearchEncoder, InvalidHostSnafu, Request,
+};
 use crate::{
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         elasticsearch::{
-            encoder::ElasticsearchEncoder, ElasticsearchAuth, ElasticsearchCommonMode,
-            ElasticsearchConfig, ParseError,
+            ElasticsearchAuth, ElasticsearchCommonMode, ElasticsearchConfig, ParseError,
         },
-        util::{
-            encoding::EncodingConfigFixed, http::RequestConfig, Compression, TowerRequestConfig,
-            UriSerde,
-        },
+        util::{http::RequestConfig, TowerRequestConfig, UriSerde},
         HealthcheckError,
     },
     tls::TlsSettings,
@@ -33,12 +31,9 @@ pub struct ElasticsearchCommon {
     pub bulk_uri: Uri,
     pub http_auth: Option<Auth>,
     pub aws_auth: Option<SharedCredentialsProvider>,
-    pub encoding: EncodingConfigFixed<ElasticsearchEncoder>,
     pub mode: ElasticsearchCommonMode,
-    pub doc_type: String,
-    pub suppress_type_name: bool,
+    pub request_builder: ElasticsearchRequestBuilder,
     pub tls_settings: TlsSettings,
-    pub compression: Compression,
     pub region: Option<Region>,
     pub request: RequestConfig,
     pub query_params: HashMap<String, String>,
@@ -77,16 +72,24 @@ impl ElasticsearchCommon {
                     .aws
                     .as_ref()
                     .map(|config| config.region())
+                    .ok_or(ParseError::RegionRequired)?
                     .ok_or(ParseError::RegionRequired)?;
 
                 Some(aws.credentials_provider(region).await?)
             }
         };
 
-        let compression = config.compression;
         let mode = config.common_mode()?;
 
         let doc_type = config.doc_type.clone().unwrap_or_else(|| "_doc".into());
+        let request_builder = ElasticsearchRequestBuilder {
+            compression: config.compression,
+            encoder: ElasticsearchEncoder {
+                transformer: config.encoding.clone(),
+                doc_type,
+                suppress_type_name: config.suppress_type_name,
+            },
+        };
 
         let tower_request = config
             .request
@@ -120,18 +123,15 @@ impl ElasticsearchCommon {
             metric_config.timezone.unwrap_or_default(),
         );
 
-        let region = config.aws.as_ref().map(|config| config.region());
+        let region = config.aws.as_ref().and_then(|config| config.region());
 
         Ok(Self {
             http_auth,
             base_url,
             bulk_uri,
-            compression,
             aws_auth,
-            doc_type,
-            suppress_type_name: config.suppress_type_name,
-            encoding: config.encoding,
             mode,
+            request_builder,
             query_params,
             request,
             region,

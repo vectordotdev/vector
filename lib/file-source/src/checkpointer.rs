@@ -17,7 +17,7 @@ use super::{
 };
 
 const TMP_FILE_NAME: &str = "checkpoints.new.json";
-const STABLE_FILE_NAME: &str = "checkpoints.json";
+pub const CHECKPOINT_FILE_NAME: &str = "checkpoints.json";
 
 /// This enum represents the file format of checkpoints persisted to disk. Right
 /// now there is only one variant, but any incompatible changes will require and
@@ -196,7 +196,7 @@ impl Checkpointer {
         let directory = data_dir.join("checkpoints");
         let glob_string = directory.join("*").to_string_lossy().into_owned();
         let tmp_file_path = data_dir.join(TMP_FILE_NAME);
-        let stable_file_path = data_dir.join(STABLE_FILE_NAME);
+        let stable_file_path = data_dir.join(CHECKPOINT_FILE_NAME);
 
         Checkpointer {
             directory,
@@ -425,7 +425,8 @@ mod test {
 
     use super::{
         super::{FingerprintStrategy, Fingerprinter},
-        Checkpoint, Checkpointer, FileFingerprint, FilePosition, STABLE_FILE_NAME, TMP_FILE_NAME,
+        Checkpoint, Checkpointer, FileFingerprint, FilePosition, CHECKPOINT_FILE_NAME,
+        TMP_FILE_NAME,
     };
 
     #[test]
@@ -620,7 +621,7 @@ mod test {
 
         // Ensure that the new files were not written but the old style of files were
         assert!(!data_dir.path().join(TMP_FILE_NAME).exists());
-        assert!(!data_dir.path().join(STABLE_FILE_NAME).exists());
+        assert!(!data_dir.path().join(CHECKPOINT_FILE_NAME).exists());
         assert!(data_dir.path().join("checkpoints").is_dir());
 
         // Read from those old files, ensure the checkpoints were loaded properly, and then write
@@ -635,7 +636,7 @@ mod test {
         // Ensure that the stable file is present, the tmp file is not, and the legacy files have
         // been cleaned up
         assert!(!data_dir.path().join(TMP_FILE_NAME).exists());
-        assert!(data_dir.path().join(STABLE_FILE_NAME).exists());
+        assert!(data_dir.path().join(CHECKPOINT_FILE_NAME).exists());
         assert!(!data_dir.path().join("checkpoints").is_dir());
 
         // Ensure one last time that we can reread from the new files and get the same result
@@ -765,7 +766,8 @@ mod test {
             chkptr.write_checkpoints().unwrap();
 
             let got: serde_json::Value = {
-                let s = std::fs::read_to_string(data_dir.path().join("checkpoints.json")).unwrap();
+                let s =
+                    std::fs::read_to_string(data_dir.path().join(CHECKPOINT_FILE_NAME)).unwrap();
                 let mut checkpoints: serde_json::Value = serde_json::from_str(&s).unwrap();
                 for checkpoint in checkpoints["checkpoints"].as_array_mut().unwrap() {
                     checkpoint.as_object_mut().unwrap().remove("modified");
@@ -826,7 +828,7 @@ mod test {
         let mut chkptr = Checkpointer::new(data_dir.path());
 
         std::fs::write(
-            data_dir.path().join("checkpoints.json"),
+            data_dir.path().join(CHECKPOINT_FILE_NAME),
             serialized_checkpoints,
         )
         .unwrap();

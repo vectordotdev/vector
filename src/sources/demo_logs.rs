@@ -9,10 +9,10 @@ use codecs::{
 use fakedata::logs::*;
 use futures::StreamExt;
 use rand::seq::SliceRandom;
-use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tokio::time::{self, Duration};
 use tokio_util::codec::FramedRead;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -24,19 +24,34 @@ use crate::{
     SourceSender,
 };
 
-#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
+/// Configuration for the `demo_logs` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(default)]
 pub struct DemoLogsConfig {
+    /// The amount of time, in seconds, to pause between each batch of output lines.
+    ///
+    /// The default is one batch per second. In order to remove the delay and output batches as quickly as possible, set
+    /// `interval` to `0.0`.
     #[serde(alias = "batch_interval")]
     #[derivative(Default(value = "default_interval()"))]
     pub interval: f64,
+
+    /// The total number of lines to output.
+    ///
+    /// By default, the source continuously prints logs (infinitely).
     #[derivative(Default(value = "default_count()"))]
     pub count: usize,
+
     #[serde(flatten)]
     pub format: OutputFormat,
+
+    #[configurable(derived)]
     #[derivative(Default(value = "default_framing_message_based()"))]
     pub framing: FramingConfig,
+
+    #[configurable(derived)]
     #[derivative(Default(value = "default_decoding()"))]
     pub decoding: DeserializerConfig,
 }
@@ -55,21 +70,36 @@ pub enum DemoLogsConfigError {
     ShuffleDemoLogsItemsEmpty,
 }
 
-#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
+/// Output format configuration.
+#[configurable_component]
+#[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(tag = "format", rename_all = "snake_case")]
 pub enum OutputFormat {
+    /// Lines are chosen at random from the list specified using `lines`.
     Shuffle {
+        /// If `true`, each output line starts with an increasing sequence number, beginning with 0.
         #[serde(default)]
         sequence: bool,
+        /// The list of lines to output.
         lines: Vec<String>,
     },
+
+    /// Randomly generated logs in [Apache common](\(urls.apache_common)) format.
     ApacheCommon,
+
+    /// Randomly generated logs in [Apache error](\(urls.apache_error)) format.
     ApacheError,
+
+    /// Randomly generated logs in Syslog format ([RFC 5424](\(urls.syslog_5424))).
     #[serde(alias = "rfc5424")]
     Syslog,
+
+    /// Randomly generated logs in Syslog format ([RFC 3164](\(urls.syslog_3164))).
     #[serde(alias = "rfc3164")]
     BsdSyslog,
+
+    /// Randomly generated HTTP server logs in [JSON](\(urls.json)) format.
     #[derivative(Default)]
     Json,
 }
@@ -236,9 +266,13 @@ impl SourceConfig for DemoLogsConfig {
     }
 }
 
+/// Configuration for the `generator` source.
 // Add a compatibility alias to avoid breaking existing configs
-#[derive(Deserialize, Serialize, Debug, Clone)]
-struct DemoLogsCompatConfig(DemoLogsConfig);
+//
+// TODO: Is this old enough now that we could actually remove it?
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
+pub struct DemoLogsCompatConfig(#[configurable(transparent)] DemoLogsConfig);
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "generator")]

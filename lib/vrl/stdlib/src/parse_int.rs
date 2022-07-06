@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn parse_int(value: Value, base: Option<Value>) -> Resolved {
@@ -20,7 +21,7 @@ fn parse_int(value: Value, base: Option<Value>) -> Resolved {
                 Some('b') => (2, 2),
                 Some('o') => (8, 2),
                 Some('x') => (16, 2),
-                _ => (8, 1),
+                _ => (8, 0),
             },
             Some(_) => (10u32, 0),
             None => return Err("value is empty".into()),
@@ -86,13 +87,6 @@ impl Function for ParseInt {
 
         Ok(Box::new(ParseIntFn { value, base }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let base = args.optional("base");
-
-        parse_int(value, base)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -126,33 +120,39 @@ mod tests {
         parse_int => ParseInt;
 
         decimal {
-             args: func_args![value: "-42"],
-             want: Ok(-42),
-             tdef: TypeDef::integer().fallible(),
+            args: func_args![value: "-42"],
+            want: Ok(-42),
+            tdef: TypeDef::integer().fallible(),
         }
 
         binary {
-             args: func_args![value: "0b1001"],
-             want: Ok(9),
-             tdef: TypeDef::integer().fallible(),
+            args: func_args![value: "0b1001"],
+            want: Ok(9),
+            tdef: TypeDef::integer().fallible(),
         }
 
         octal {
-             args: func_args![value: "042"],
-             want: Ok(34),
-             tdef: TypeDef::integer().fallible(),
+            args: func_args![value: "042"],
+            want: Ok(34),
+            tdef: TypeDef::integer().fallible(),
         }
 
         hexadecimal {
-             args: func_args![value: "0x2a"],
-             want: Ok(42),
-             tdef: TypeDef::integer().fallible(),
+            args: func_args![value: "0x2a"],
+            want: Ok(42),
+            tdef: TypeDef::integer().fallible(),
+        }
+
+        zero {
+            args: func_args![value: "0"],
+            want: Ok(0),
+            tdef: TypeDef::integer().fallible(),
         }
 
         explicit_hexadecimal {
-             args: func_args![value: "2a", base: 16],
-             want: Ok(42),
-             tdef: TypeDef::integer().fallible(),
+            args: func_args![value: "2a", base: 16],
+            want: Ok(42),
+            tdef: TypeDef::integer().fallible(),
         }
     ];
 }

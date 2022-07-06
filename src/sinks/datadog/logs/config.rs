@@ -4,19 +4,18 @@ use futures::FutureExt;
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
+use value::Kind;
 use vector_core::config::proxy::ProxyConfig;
 
-use super::{
-    service::LogApiRetry,
-    sink::{DatadogLogsJsonEncoding, LogSinkBuilder},
-};
+use super::{service::LogApiRetry, sink::LogSinkBuilder};
 use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
+    schema,
     sinks::{
         datadog::{get_api_validate_endpoint, healthcheck, logs::service::LogApiService, Region},
         util::{
-            encoding::EncodingConfigFixed, service::ServiceBuilderExt, BatchConfig, Compression,
+            encoding::Transformer, service::ServiceBuilderExt, BatchConfig, Compression,
             SinkBatchSettings, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
@@ -50,33 +49,37 @@ impl SinkBatchSettings for DatadogLogsDefaultBatchSettings {
 pub(crate) struct DatadogLogsConfig {
     pub(crate) endpoint: Option<String>,
     // Deprecated, replaced by the site option
-    region: Option<Region>,
-    site: Option<String>,
+    pub region: Option<Region>,
+    pub site: Option<String>,
     // Deprecated name
     #[serde(alias = "api_key")]
-    default_api_key: String,
+    pub default_api_key: String,
+    pub tls: Option<TlsEnableableConfig>,
+
+    #[serde(default)]
+    pub compression: Option<Compression>,
+
     #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    encoding: EncodingConfigFixed<DatadogLogsJsonEncoding>,
-    tls: Option<TlsEnableableConfig>,
+    pub encoding: Transformer,
 
     #[serde(default)]
-    compression: Option<Compression>,
+    pub batch: BatchConfig<DatadogLogsDefaultBatchSettings>,
 
     #[serde(default)]
-    batch: BatchConfig<DatadogLogsDefaultBatchSettings>,
-
-    #[serde(default)]
-    request: TowerRequestConfig,
+    pub request: TowerRequestConfig,
 
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    acknowledgements: AcknowledgementsConfig,
+    pub acknowledgements: AcknowledgementsConfig,
+
+    #[serde(skip)]
+    pub enterprise: bool,
 }
 
 impl GenerateConfig for DatadogLogsConfig {
@@ -89,23 +92,6 @@ impl GenerateConfig for DatadogLogsConfig {
 }
 
 impl DatadogLogsConfig {
-    /// Creates a default [`DatadogLogsConfig`] with the given API key.
-    #[cfg(feature = "enterprise")]
-    pub fn enterprise<T: Into<String>>(
-        api_key: T,
-        endpoint: Option<String>,
-        site: Option<String>,
-        region: Option<Region>,
-    ) -> Self {
-        Self {
-            default_api_key: api_key.into(),
-            endpoint,
-            site,
-            region,
-            ..Self::default()
-        }
-    }
-
     // TODO: We should probably hoist this type of base URI generation so that all DD sinks can
     // utilize it, since it all follows the same pattern.
     fn get_uri(&self) -> http::Uri {
@@ -147,13 +133,9 @@ impl DatadogLogsConfig {
 
         let service = ServiceBuilder::new()
             .settings(request_limits, LogApiRetry)
-            .service(LogApiService::new(
-                client,
-                self.get_uri(),
-                cx.globals.enterprise,
-            ));
-        let sink = LogSinkBuilder::new(service, cx, default_api_key, batch)
-            .encoding(self.encoding.clone())
+            .service(LogApiService::new(client, self.get_uri(), self.enterprise));
+
+        let sink = LogSinkBuilder::new(self.encoding.clone(), service, cx, default_api_key, batch)
             .compression(self.compression.unwrap_or_default())
             .build();
 
@@ -190,7 +172,16 @@ impl SinkConfig for DatadogLogsConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        let requirement = schema::Requirement::empty()
+            .required_meaning("message", Kind::bytes())
+            .required_meaning("timestamp", Kind::timestamp())
+            .optional_meaning("host", Kind::bytes())
+            .optional_meaning("source", Kind::bytes())
+            .optional_meaning("severity", Kind::bytes())
+            .optional_meaning("service", Kind::bytes())
+            .optional_meaning("trace_id", Kind::bytes());
+
+        Input::log().with_schema_requirement(requirement)
     }
 
     fn sink_type(&self) -> &'static str {

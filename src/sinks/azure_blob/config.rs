@@ -3,13 +3,12 @@ use std::{convert::TryInto, sync::Arc};
 use azure_storage_blobs::prelude::*;
 use codecs::{
     encoding::{Framer, Serializer},
-    CharacterDelimitedEncoder, NewlineDelimitedEncoder,
+    CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder,
 };
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
 
 use super::request_builder::AzureBlobRequestOptions;
-
 use crate::{
     codecs::Encoder,
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
@@ -32,8 +31,10 @@ use crate::{
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct AzureBlobSinkConfig {
-    pub connection_string: String,
+    pub connection_string: Option<String>,
+    pub storage_account: Option<String>,
     pub(super) container_name: String,
     pub blob_prefix: Option<String>,
     pub blob_time_format: Option<String>,
@@ -60,7 +61,8 @@ pub struct AzureBlobSinkConfig {
 impl GenerateConfig for AzureBlobSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            connection_string: String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=some-account-key;"),
+            connection_string: Some(String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=some-account-key;")),
+            storage_account: Some(String::from("some-account-name")),
             container_name: String::from("logs"),
             blob_prefix: Some(String::from("blob")),
             blob_time_format: Some(String::from("%s")),
@@ -81,8 +83,10 @@ impl SinkConfig for AzureBlobSinkConfig {
     async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck)> {
         let client = azure_common::config::build_client(
             self.connection_string.clone(),
+            self.storage_account.clone(),
             self.container_name.clone(),
         )?;
+
         let healthcheck = azure_common::config::build_healthcheck(
             self.container_name.clone(),
             Arc::clone(&client),
@@ -92,7 +96,7 @@ impl SinkConfig for AzureBlobSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(self.encoding.config().1.input_type())
     }
 
     fn sink_type(&self) -> &'static str {
@@ -135,17 +139,20 @@ impl AzureBlobSinkConfig {
             .unwrap_or(DEFAULT_FILENAME_APPEND_UUID);
 
         let transformer = self.encoding.transformer();
-        let (framer, serializer) = self.encoding.clone().encoding();
+        let (framer, serializer) = self.encoding.clone().encoding()?;
         let framer = match (framer, &serializer) {
             (Some(framer), _) => framer,
             (None, Serializer::Json(_)) => CharacterDelimitedEncoder::new(b',').into(),
-            (None, Serializer::Native(_)) => {
-                // TODO: We probably want to use something like octet framing here.
-                return Err("Native encoding is not implemented for this sink yet".into());
+            (None, Serializer::Avro(_) | Serializer::Native(_)) => {
+                LengthDelimitedEncoder::new().into()
             }
-            (None, Serializer::NativeJson(_) | Serializer::RawMessage(_)) => {
-                NewlineDelimitedEncoder::new().into()
-            }
+            (
+                None,
+                Serializer::Logfmt(_)
+                | Serializer::NativeJson(_)
+                | Serializer::RawMessage(_)
+                | Serializer::Text(_),
+            ) => NewlineDelimitedEncoder::new().into(),
         };
         let encoder = Encoder::<Framer>::new(framer, serializer);
 

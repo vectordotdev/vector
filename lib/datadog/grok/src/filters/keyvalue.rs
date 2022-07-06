@@ -1,9 +1,6 @@
-use crate::{
-    ast::{Function, FunctionArgument},
-    grok_filter::GrokFilter,
-    parse_grok::Error as GrokRuntimeError,
-    parse_grok_rules::Error as GrokStaticError,
-};
+use std::collections::BTreeMap;
+use std::fmt::Formatter;
+
 use bytes::Bytes;
 use lookup::{Lookup, LookupBuf};
 use nom::{
@@ -20,10 +17,14 @@ use nom::{
 use once_cell::sync::Lazy;
 use ordered_float::NotNan;
 use regex::Regex;
-use std::collections::BTreeMap;
-use std::fmt::Formatter;
-use tracing::warn;
-use vrl_compiler::{Target, Value};
+use value::Value;
+
+use crate::{
+    ast::{Function, FunctionArgument},
+    grok_filter::GrokFilter,
+    parse_grok::Error as GrokRuntimeError,
+    parse_grok_rules::Error as GrokStaticError,
+};
 
 static DEFAULT_FILTER_RE: Lazy<regex::Regex> = Lazy::new(|| Regex::new(r"^[\w.\-_@]*").unwrap());
 
@@ -143,12 +144,9 @@ pub fn apply_filter(value: &Value, filter: &KeyValueFilter) -> Result<Value, Gro
                     || matches!(&v, Value::Bytes(b) if b.is_empty())
                     || k.trim().is_empty())
                 {
-                    let lookup: LookupBuf = Lookup::from_str(&k)
-                        .unwrap_or_else(|_| Lookup::from(&k))
-                        .into();
-                    result.target_insert(&lookup, v).unwrap_or_else(
-                        |error| warn!(message = "Error updating field value", field = %lookup, %error)
-                    );
+                    let lookup: LookupBuf = Lookup::from(&k).into();
+
+                    result.insert_by_path(&lookup, v);
                 }
             });
             Ok(result)

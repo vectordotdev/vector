@@ -3,10 +3,10 @@
 
 #![deny(missing_docs)]
 
-mod decoder;
-mod encoder;
+mod decoding;
+mod encoding;
 mod ready_frames;
 
-pub use decoder::{Decoder, DecodingConfig};
-pub use encoder::Encoder;
+pub use decoding::{Decoder, DecodingConfig};
+pub use encoding::{Encoder, EncodingConfig, EncodingConfigWithFraming};
 pub use ready_frames::ReadyFrames;

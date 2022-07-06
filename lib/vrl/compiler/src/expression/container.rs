@@ -12,6 +12,7 @@ pub struct Container {
 }
 
 impl Container {
+    #[must_use]
     pub fn new(variant: Variant) -> Self {
         Self { variant }
     }
@@ -27,7 +28,7 @@ pub enum Variant {
 
 impl Expression for Container {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        use Variant::*;
+        use Variant::{Array, Block, Group, Object};
 
         match &self.variant {
             Group(v) => v.resolve(ctx),
@@ -38,7 +39,7 @@ impl Expression for Container {
     }
 
     fn as_value(&self) -> Option<Value> {
-        use Variant::*;
+        use Variant::{Array, Block, Group, Object};
 
         match &self.variant {
             Group(v) => v.as_value(),
@@ -49,7 +50,7 @@ impl Expression for Container {
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
-        use Variant::*;
+        use Variant::{Array, Block, Group, Object};
 
         match &self.variant {
             Group(v) => v.type_def(state),
@@ -58,27 +59,11 @@ impl Expression for Container {
             Object(v) => v.type_def(state),
         }
     }
-
-    fn compile_to_vm(
-        &self,
-        vm: &mut crate::vm::Vm,
-        state: (&mut LocalEnv, &mut ExternalEnv),
-    ) -> Result<(), String> {
-        use Variant::*;
-
-        // Pass the call on to the contained expression.
-        match &self.variant {
-            Group(v) => v.compile_to_vm(vm, state),
-            Block(v) => v.compile_to_vm(vm, state),
-            Array(v) => v.compile_to_vm(vm, state),
-            Object(v) => v.compile_to_vm(vm, state),
-        }
-    }
 }
 
 impl fmt::Display for Container {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Variant::*;
+        use Variant::{Array, Block, Group, Object};
 
         match &self.variant {
             Group(v) => v.fmt(f),

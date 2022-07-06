@@ -1,14 +1,55 @@
 // We allow dead code because some of the things we're testing are meant to ensure that the macros do the right thing
 // for codegen i.e. not doing codegen for fields that `serde` is going to skip, etc.
 #![allow(dead_code)]
+#![allow(clippy::print_stdout)] // tests
+#![allow(clippy::print_stderr)] // tests
 
 use std::{
     collections::HashMap,
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
+    num::NonZeroU64,
+    path::PathBuf,
 };
 
 use serde::{de, Deserialize, Deserializer};
 use vector_config::{configurable_component, schema::generate_root_schema};
+
+/// A templated string.
+#[configurable_component]
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+#[serde(try_from = "String", into = "String")]
+pub struct Template {
+    /// The template string.
+    src: String,
+
+    #[serde(skip)]
+    has_ts: bool,
+
+    #[serde(skip)]
+    has_fields: bool,
+}
+
+impl TryFrom<String> for Template {
+    type Error = String;
+
+    fn try_from(src: String) -> Result<Self, Self::Error> {
+        if src.is_empty() {
+            Err("wahhh".to_string())
+        } else {
+            Ok(Self {
+                src,
+                has_ts: false,
+                has_fields: false,
+            })
+        }
+    }
+}
+
+impl From<Template> for String {
+    fn from(template: Template) -> String {
+        template.src
+    }
+}
 
 /// A period of time.
 #[derive(Clone)]
@@ -22,9 +63,9 @@ pub struct SpecialDuration(#[configurable(transparent)] u64);
 pub struct BatchConfig {
     /// The maximum number of events in a batch before it is flushed.
     #[configurable(validation(range(max = 100000)))]
-    max_events: Option<u64>,
+    max_events: Option<NonZeroU64>,
     /// The maximum number of bytes in a batch before it is flushed.
-    max_bytes: Option<u64>,
+    max_bytes: Option<NonZeroU64>,
     /// The maximum amount of time a batch can exist before it is flushed.
     timeout: Option<SpecialDuration>,
 }
@@ -32,7 +73,7 @@ pub struct BatchConfig {
 impl Default for BatchConfig {
     fn default() -> Self {
         Self {
-            max_events: Some(1000),
+            max_events: Some(NonZeroU64::new(1000).expect("must be nonzero")),
             max_bytes: None,
             timeout: Some(SpecialDuration(10)),
         }
@@ -60,6 +101,26 @@ pub enum Encoding {
         /// Starting offset for fields something something this is a fake description anyways.
         u64,
     ),
+}
+
+/// Enableable TLS configuration.
+#[derive(Clone)]
+#[configurable_component]
+pub struct TlsEnablableConfig {
+    /// Whether or not TLS is enabled.
+    pub enabled: bool,
+    #[serde(flatten)]
+    pub options: TlsConfig,
+}
+
+/// TLS configuration.
+#[derive(Clone)]
+#[configurable_component]
+pub struct TlsConfig {
+    /// Certificate file.
+    pub crt_file: Option<PathBuf>,
+    /// Private key file.
+    pub key_file: Option<PathBuf>,
 }
 
 /// A listening address that can optionally support being passed in by systemd.
@@ -122,6 +183,9 @@ pub struct SimpleSinkConfig {
     #[configurable(derived)]
     #[serde(default = "default_simple_sink_encoding")]
     encoding: Encoding,
+    /// The filepath to write the events to.
+    #[configurable(metadata(templateable))]
+    output_path: Template,
     /// The tags to apply to each event.
     #[configurable(validation(length(max = 32)))]
     tags: HashMap<String, String>,
@@ -129,10 +193,10 @@ pub struct SimpleSinkConfig {
     meaningless_field: String,
 }
 
-const fn default_simple_sink_batch() -> BatchConfig {
+fn default_simple_sink_batch() -> BatchConfig {
     BatchConfig {
-        max_events: Some(10000),
-        max_bytes: Some(16_000_000),
+        max_events: Some(NonZeroU64::new(10000).expect("must be nonzero")),
+        max_bytes: Some(NonZeroU64::new(16_000_000).expect("must be nonzero")),
         timeout: Some(SpecialDuration(5)),
     }
 }
@@ -162,20 +226,30 @@ pub struct AdvancedSinkConfig {
     #[configurable(derived)]
     #[serde(default = "default_advanced_sink_batch")]
     batch: BatchConfig,
-    #[configurable(derived)]
-    #[deprecated]
+    #[configurable(deprecated, derived)]
     #[serde(default = "default_advanced_sink_encoding")]
     encoding: Encoding,
+    /// Overridden TLS description.
+    #[configurable(derived)]
+    tls: Option<TlsEnablableConfig>,
+    /// The partition key to use for each event.
+    #[configurable(metadata(templateable))]
+    #[serde(default = "default_partition_key")]
+    partition_key: String,
     /// The tags to apply to each event.
     tags: HashMap<String, String>,
 }
 
-const fn default_advanced_sink_batch() -> BatchConfig {
+fn default_advanced_sink_batch() -> BatchConfig {
     BatchConfig {
-        max_events: Some(5678),
-        max_bytes: Some(36_000_000),
+        max_events: Some(NonZeroU64::new(5678).expect("must be nonzero")),
+        max_bytes: Some(NonZeroU64::new(36_000_000).expect("must be nonzero")),
         timeout: Some(SpecialDuration(15)),
     }
+}
+
+fn default_partition_key() -> String {
+    "foo".to_string()
 }
 
 const fn default_advanced_sink_encoding() -> Encoding {
@@ -189,6 +263,7 @@ fn default_advanced_sink_endpoint() -> String {
 /// Collection of various sources available in Vector.
 #[derive(Clone)]
 #[configurable_component]
+#[serde(tag = "type")]
 pub enum SourceConfig {
     /// Simple source.
     Simple(#[configurable(derived)] SimpleSourceConfig),
@@ -197,6 +272,7 @@ pub enum SourceConfig {
 /// Collection of various sinks available in Vector.
 #[derive(Clone)]
 #[configurable_component]
+#[serde(tag = "type")]
 pub enum SinkConfig {
     /// Simple sink.
     Simple(#[configurable(derived)] SimpleSinkConfig),

@@ -1,7 +1,6 @@
 use async_graphql::Union;
 
 use super::{log::Log, metric::Metric, notification::EventNotification, trace::Trace};
-
 use crate::api::tap::TapPayload;
 
 #[derive(Union, Debug, Clone)]

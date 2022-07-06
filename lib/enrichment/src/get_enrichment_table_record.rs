@@ -1,9 +1,20 @@
 use std::collections::BTreeMap;
 
-use vrl::prelude::*;
+use value::{kind::Collection, Kind, Value};
+use vrl::{
+    function::{
+        ArgumentList, Compiled, CompiledArgument, Example, FunctionCompileContext, Parameter,
+    },
+    prelude::{
+        expression, DiagnosticMessage, FunctionArgument, Resolved, Result, TypeDef, VrlValueConvert,
+    },
+    state,
+    value::kind,
+    Context, Expression, Function,
+};
 
 use crate::{
-    vrl_util::{self, add_index, evaluate_condition, index_from_args, EnrichmentTableRecord},
+    vrl_util::{self, add_index, evaluate_condition, index_from_args},
     Case, Condition, IndexHandle, TableRegistry, TableSearch,
 };
 
@@ -21,7 +32,7 @@ fn get_enrichment_table_record(
                 .iter()
                 .map(|value| Ok(value.try_bytes_utf8_lossy()?.to_string()))
                 .collect::<std::result::Result<Vec<_>, _>>(),
-            value => Err(value::Error::Expected {
+            value => Err(vrl::value::Error::Expected {
                 got: value.kind(),
                 expected: Kind::array(Collection::any()),
             }),
@@ -105,7 +116,8 @@ impl Function for GetEnrichmentTableRecord {
 
         let case_sensitive = arguments
             .optional_literal("case_sensitive")?
-            .map(|literal| literal.to_value().try_boolean())
+            .and_then(|literal| literal.as_value())
+            .map(|value| value.try_boolean())
             .transpose()
             .expect("case_sensitive should be boolean") // This will have been caught by the type checker.
             .map(|case_sensitive| {
@@ -165,32 +177,6 @@ impl Function for GetEnrichmentTableRecord {
             _ => Ok(None),
         }
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let condition = args.required("condition");
-        let condition = condition
-            .into_object()
-            .expect("condition should be an object");
-        let condition = condition
-            .iter()
-            .map(|(key, value)| evaluate_condition(key, value.clone()))
-            .collect::<Result<Vec<Condition>>>()?;
-
-        let record = args
-            .required_any("table")
-            .downcast_ref::<EnrichmentTableRecord>()
-            .unwrap();
-        let select = args.optional("select");
-
-        get_enrichment_table_record(
-            select,
-            &record.enrichment_tables,
-            &record.table,
-            record.case_sensitive,
-            &condition,
-            record.index,
-        )
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -242,7 +228,9 @@ impl Expression for GetEnrichmentTableRecordFn {
 
 #[cfg(test)]
 mod tests {
-    use vector_common::{btreemap, TimeZone};
+    use value::Secrets;
+    use vector_common::TimeZone;
+    use vrl::TargetValue;
 
     use super::*;
     use crate::test_util::get_table_registry;
@@ -252,9 +240,10 @@ mod tests {
         let registry = get_table_registry();
         let func = GetEnrichmentTableRecordFn {
             table: "dummy1".to_string(),
-            condition: btreemap! {
-                "field" =>  expression::Literal::from("value"),
-            },
+            condition: BTreeMap::from([(
+                "field".into(),
+                expression::Literal::from("value").into(),
+            )]),
             index: Some(IndexHandle(999)),
             select: None,
             case_sensitive: Case::Sensitive,
@@ -262,14 +251,19 @@ mod tests {
         };
 
         let tz = TimeZone::default();
-        let mut object: Value = BTreeMap::new().into();
+        let object: Value = BTreeMap::new().into();
+        let mut target = TargetValue {
+            value: object,
+            metadata: vrl::value!({}),
+            secrets: Secrets::new(),
+        };
         let mut runtime_state = vrl::state::Runtime::default();
-        let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
+        let mut ctx = Context::new(&mut target, &mut runtime_state, &tz);
 
         registry.finish_load();
 
         let got = func.resolve(&mut ctx);
 
-        assert_eq!(Ok(value! ({ "field": "result" })), got);
+        assert_eq!(Ok(vrl::value! ({ "field": "result" })), got);
     }
 }

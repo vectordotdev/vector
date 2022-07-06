@@ -25,18 +25,17 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | bash
 {{< tab title="Docker" >}}
 
 ```shell
-docker pull timberio/vector:{{< version >}}-distroless-libc
+docker pull timberio/vector:{{< version >}}-debian
 ```
 
-In addition to `distroless-libc`, `distroless-static`, `alpine` and `debian` distributions are also available.
+In addition to `debian`, `distroless-libc`, `distroless-static`, and `alpine` distributions are also available.
 
 If you install Vector using Docker, we recommend using an alias to run the commands throughout this tutorial:
 
 ```shell
-alias vector='docker run -it --rm timberio/vector:{{< version >}}'
+alias vector='docker run -i -v $(pwd)/:/etc/vector/ --rm timberio/vector:{{< version >}}-debian'
 ```
 
-And now something after.
 {{< /tab >}}
 {{< /tabs >}}
 
@@ -79,7 +78,7 @@ The `inputs` option of the `sinks.out` component tells Vector where this sink's 
 That's it for our first config. Now let's pipe an event through it:
 
 ```shell
-echo 'Hello world!' | vector --config ./vector.toml
+echo 'Hello world!' | vector
 ```
 
 The `echo` statement sends a single log to Vector via stdin. The `vector...` command starts Vector with our previously created config file.
@@ -144,7 +143,7 @@ Let's re-run Vector. This time we don't need to echo any data to it; just run in
 100 lines of generated Syslog data, emit the processed data as JSON, and exit:
 
 ```shell
-vector --config ./vector.toml
+vector
 ```
 
 Now you should have a series of JSON-formatted events, something like this:

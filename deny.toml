@@ -53,4 +53,6 @@ ignore = [
 deny = [
     # https://github.com/vectordotdev/vector/issues/11257
     { name = "tokio-util", version = ">=0.6.9" },
+    # https://github.com/vectordotdev/vector/pull/10274#issuecomment-1012508830
+    { name = "inventory", version = ">=0.2.0" },
 ]

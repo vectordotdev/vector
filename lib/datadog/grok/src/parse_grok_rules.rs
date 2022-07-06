@@ -1,3 +1,13 @@
+use std::{
+    collections::{BTreeMap, HashMap},
+    convert::TryFrom,
+};
+
+use lookup::LookupBuf;
+use once_cell::sync::Lazy;
+use tracing::error;
+use value::Value;
+
 use crate::grok::Grok;
 use crate::{
     ast::{self, Destination, GrokPattern},
@@ -5,14 +15,6 @@ use crate::{
     matchers::{date, date::DateFilter},
     parse_grok_pattern::parse_grok_pattern,
 };
-use lookup::LookupBuf;
-use once_cell::sync::Lazy;
-use std::{
-    collections::{BTreeMap, HashMap},
-    convert::TryFrom,
-};
-use tracing::error;
-use value::Value;
 
 static GROK_PATTERN_RE: Lazy<onig::Regex> =
     Lazy::new(|| onig::Regex::new(r#"%\{(?:[^"\}]|(?<!\\)"(?:\\"|[^"])*(?<!\\)")+\}"#).unwrap());
@@ -422,15 +424,13 @@ fn resolves_match_function(
 // test some tricky cases here, more high-level tests are in parse_grok
 #[cfg(test)]
 mod tests {
-    use vector_common::btreemap;
-
     use super::*;
 
     #[test]
     fn supports_escaped_quotes() {
         let rules = parse_grok_rules(
             &[r#"%{notSpace:field:nullIf("with \"escaped\" quotes")}"#.to_string()],
-            btreemap! {},
+            BTreeMap::new(),
         )
         .expect("couldn't parse rules");
         assert!(matches!(

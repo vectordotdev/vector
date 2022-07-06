@@ -1,3 +1,4 @@
+use ::value::Value;
 use indexmap::IndexSet;
 use vrl::prelude::*;
 
@@ -40,11 +41,6 @@ impl Function for Unique {
             kind: kind::ARRAY,
             required: true,
         }]
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        unique(value)
     }
 }
 

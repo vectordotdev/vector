@@ -59,6 +59,15 @@ components: transforms: geoip: {
 				examples: ["geoip", "parent.child"]
 			}
 		}
+		locale: {
+			description: "The locale to use to lookup the country name and region name for the city database. See [Locations Files](https://dev.maxmind.com/geoip/docs/databases/city-and-country?lang=en)"
+			required:    false
+			common:      false
+			type: string: {
+				default: "en"
+				examples: ["de", "en", "es", "fr", "ja", "pt-BR", "ru", "zh-CN"]
+			}
+		}
 	}
 
 	input: {
@@ -180,6 +189,49 @@ components: transforms: geoip: {
 							required:    true
 							type: string: {
 								examples: ["US", "US-PR", "FR", "FR-BL", "GB", "A1", "A2"]
+							}
+							groups: ["City"]
+						}
+						country_name: {
+							description: """
+								The country name associated with the IP address. Is looked up using
+								the configured locale.
+								"""
+							required: true
+							type: string: {
+								examples: ["United States", "United Kingdom"]
+							}
+							groups: ["City"]
+						}
+						region_code: {
+							description: """
+								The [ISO 3166-2 region code](\(urls.iso3166_2)) associated with
+								the IP address.
+								"""
+							required:    true
+							type: string: {
+								examples: ["WBK"]
+							}
+							groups: ["City"]
+						}
+						region_name: {
+							description: """
+								The region name associated with the IP address. Is looked up using
+								the configured locale.
+								"""
+							required: true
+							type: string: {
+								examples: ["West Berkshire"]
+							}
+							groups: ["City"]
+						}
+						metro_code: {
+							description: """
+								The metro code of the location if the location is in the US.
+								"""
+							required: true
+							type: string: {
+								examples: ["501"]
 							}
 							groups: ["City"]
 						}

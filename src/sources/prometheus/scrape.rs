@@ -9,6 +9,7 @@ use hyper::{Body, Request};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio_stream::wrappers::IntervalStream;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use super::parser;
@@ -18,8 +19,8 @@ use crate::{
     },
     http::{Auth, HttpClient},
     internal_events::{
-        BytesReceived, PrometheusEventsReceived, PrometheusHttpError, PrometheusHttpResponseError,
-        PrometheusParseError, PrometheusRequestCompleted, StreamClosedError,
+        EndpointBytesReceived, PrometheusEventsReceived, PrometheusHttpError,
+        PrometheusHttpResponseError, PrometheusParseError, RequestCompleted, StreamClosedError,
     },
     shutdown::ShutdownSignal,
     sources,
@@ -41,19 +42,52 @@ enum ConfigError {
     BothEndpointsAndHosts,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
-struct PrometheusScrapeConfig {
-    // Deprecated name
+/// Configuration for the `prometheus_scrape` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
+pub struct PrometheusScrapeConfig {
+    /// Endpoints to scrape metrics from.
     #[serde(alias = "hosts")]
     endpoints: Vec<String>,
+
+    /// The interval between scrapes, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
+
+    /// Overrides the name of the tag used to add the instance to each metric.
+    ///
+    /// The tag value will be the host/port of the scraped instance.
+    ///
+    /// By default, `"instance"` is used.
     instance_tag: Option<String>,
+
+    /// Overrides the name of the tag used to add the endpoint to each metric.
+    ///
+    /// The tag value will be the endpoint of the scraped instance.
+    ///
+    /// By default, `"endpoint"` is used.
     endpoint_tag: Option<String>,
+
+    /// Controls how tag conflicts are handled if the scraped source has tags that Vector would add.
+    ///
+    /// If `true`, Vector will not add the new tag if the scraped metric has the tag already. If `false`, Vector will
+    /// rename the conflicting tag by prepending `exported_` to the name.
+    ///
+    /// This matches Prometheus’ `honor_labels` configuration.
     #[serde(default = "crate::serde::default_false")]
     honor_labels: bool,
+
+    /// Custom parameters for the scrape request query string.
+    ///
+    /// One or more values for the same parameter key can be provided. The parameters provided in this option are
+    /// appended to any parameters manually provided in the `endpoints` option. This option is especially useful when
+    /// scraping the `/federate` endpoint.
     query: Option<HashMap<String, Vec<String>>>,
+
+    #[configurable(derived)]
     tls: Option<TlsConfig>,
+
+    #[configurable(derived)]
     auth: Option<Auth>,
 }
 
@@ -233,8 +267,10 @@ async fn prometheus(
     .flatten()
     .map(move |url| {
         let client = HttpClient::new(tls.clone(), &proxy).expect("Building HTTP client failed");
+        let endpoint = url.to_string();
 
         let mut request = Request::get(&url)
+            .header(http::header::ACCEPT, "text/plain")
             .body(Body::empty())
             .expect("error creating request");
         if let Some(auth) = &config.auth {
@@ -270,9 +306,10 @@ async fn prometheus(
             .and_then(|response| async move {
                 let (header, body) = response.into_parts();
                 let body = hyper::body::to_bytes(body).await?;
-                emit!(BytesReceived {
+                emit!(EndpointBytesReceived {
                     byte_size: body.len(),
-                    protocol: "http"
+                    protocol: "http",
+                    endpoint: endpoint.as_str(),
                 });
                 Ok((header, body))
             })
@@ -283,7 +320,7 @@ async fn prometheus(
 
                 ready(match response {
                     Ok((header, body)) if header.status == hyper::StatusCode::OK => {
-                        emit!(PrometheusRequestCompleted {
+                        emit!(RequestCompleted {
                             start,
                             end: Instant::now()
                         });
@@ -414,13 +451,50 @@ mod test {
     use crate::{
         config,
         sinks::prometheus::exporter::PrometheusExporterConfig,
-        test_util::{self, next_addr, start_topology},
+        test_util::{
+            components::{
+                assert_source_compliance, run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS,
+            },
+            next_addr, start_topology,
+        },
         Error,
     };
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<PrometheusScrapeConfig>();
+    }
+
+    #[tokio::test]
+    async fn test_prometheus_sets_headers() {
+        let in_addr = next_addr();
+
+        let dummy_endpoint = warp::path!("metrics").and(warp::header::exact("Accept", "text/plain")).map(|| {
+            r#"
+                    promhttp_metric_handler_requests_total{endpoint="http://example.com", instance="localhost:9999", code="200"} 100 1612411516789
+                    "#
+        });
+
+        tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+
+        let config = PrometheusScrapeConfig {
+            endpoints: vec![format!("http://{}/metrics", in_addr)],
+            scrape_interval_secs: 1,
+            instance_tag: Some("instance".to_string()),
+            endpoint_tag: Some("endpoint".to_string()),
+            honor_labels: true,
+            query: None,
+            auth: None,
+            tls: None,
+        };
+
+        let events = run_and_assert_source_compliance(
+            config,
+            Duration::from_secs(1),
+            &HTTP_PULL_SOURCE_TAGS,
+        )
+        .await;
+        assert!(!events.is_empty());
     }
 
     #[tokio::test]
@@ -446,16 +520,12 @@ mod test {
             tls: None,
         };
 
-        let (tx, rx) = SourceSender::new_test();
-        let source = config
-            .build(SourceContext::new_test(tx, None))
-            .await
-            .unwrap();
-
-        tokio::spawn(source);
-        tokio::time::sleep(Duration::from_secs(1)).await;
-
-        let events = test_util::collect_ready(rx).await;
+        let events = run_and_assert_source_compliance(
+            config,
+            Duration::from_secs(1),
+            &HTTP_PULL_SOURCE_TAGS,
+        )
+        .await;
         assert!(!events.is_empty());
 
         let metrics: Vec<_> = events
@@ -500,16 +570,12 @@ mod test {
             tls: None,
         };
 
-        let (tx, rx) = SourceSender::new_test();
-        let source = config
-            .build(SourceContext::new_test(tx, None))
-            .await
-            .unwrap();
-
-        tokio::spawn(source);
-        tokio::time::sleep(Duration::from_secs(1)).await;
-
-        let events = test_util::collect_ready(rx).await;
+        let events = run_and_assert_source_compliance(
+            config,
+            Duration::from_secs(1),
+            &HTTP_PULL_SOURCE_TAGS,
+        )
+        .await;
         assert!(!events.is_empty());
 
         let metrics: Vec<_> = events
@@ -573,16 +639,12 @@ mod test {
             tls: None,
         };
 
-        let (tx, rx) = SourceSender::new_test();
-        let source = config
-            .build(SourceContext::new_test(tx, None))
-            .await
-            .unwrap();
-
-        tokio::spawn(source);
-        tokio::time::sleep(Duration::from_secs(1)).await;
-
-        let events = test_util::collect_ready(rx).await;
+        let events = run_and_assert_source_compliance(
+            config,
+            Duration::from_secs(1),
+            &HTTP_PULL_SOURCE_TAGS,
+        )
+        .await;
         assert!(!events.is_empty());
 
         let metrics: Vec<_> = events
@@ -687,55 +749,58 @@ mod test {
                 quantiles: vec![],
                 distributions_as_summaries: false,
                 flush_period_secs: Duration::from_secs(1),
+                suppress_timestamp: false,
             },
         );
 
-        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
-        sleep(Duration::from_secs(1)).await;
+        assert_source_compliance(&HTTP_PULL_SOURCE_TAGS, async move {
+            let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+            sleep(Duration::from_secs(1)).await;
 
-        let response = Client::new()
-            .get(format!("http://{}/metrics", out_addr).parse().unwrap())
-            .await
-            .unwrap();
-        assert!(response.status().is_success());
+            let response = Client::new()
+                .get(format!("http://{}/metrics", out_addr).parse().unwrap())
+                .await
+                .unwrap();
 
-        let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
-        let lines = std::str::from_utf8(&body)
-            .unwrap()
-            .lines()
-            .collect::<Vec<_>>();
+            assert!(response.status().is_success());
+            let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+            let lines = std::str::from_utf8(&body)
+                .unwrap()
+                .lines()
+                .collect::<Vec<_>>();
 
-        assert_eq!(lines, vec![
-            "# HELP vector_http_request_duration_seconds http_request_duration_seconds",
-            "# TYPE vector_http_request_duration_seconds histogram",
-            "vector_http_request_duration_seconds_bucket{le=\"0.05\"} 24054 1612411516789",
-            "vector_http_request_duration_seconds_bucket{le=\"0.1\"} 33444 1612411516789",
-            "vector_http_request_duration_seconds_bucket{le=\"0.2\"} 100392 1612411516789",
-            "vector_http_request_duration_seconds_bucket{le=\"0.5\"} 129389 1612411516789",
-            "vector_http_request_duration_seconds_bucket{le=\"1\"} 133988 1612411516789",
-            "vector_http_request_duration_seconds_bucket{le=\"+Inf\"} 144320 1612411516789",
-            "vector_http_request_duration_seconds_sum 53423 1612411516789",
-            "vector_http_request_duration_seconds_count 144320 1612411516789",
-            "# HELP vector_prometheus_remote_storage_samples_in_total prometheus_remote_storage_samples_in_total",
-            "# TYPE vector_prometheus_remote_storage_samples_in_total gauge",
-            "vector_prometheus_remote_storage_samples_in_total 57011636 1612411516789",
-            "# HELP vector_promhttp_metric_handler_requests_total promhttp_metric_handler_requests_total",
-            "# TYPE vector_promhttp_metric_handler_requests_total counter",
-            "vector_promhttp_metric_handler_requests_total{code=\"200\"} 100 1612411516789",
-            "vector_promhttp_metric_handler_requests_total{code=\"404\"} 7 1612411516789",
-            "# HELP vector_rpc_duration_seconds rpc_duration_seconds",
-            "# TYPE vector_rpc_duration_seconds summary",
-            "vector_rpc_duration_seconds{code=\"200\",quantile=\"0.01\"} 3102 1612411516789",
-            "vector_rpc_duration_seconds{code=\"200\",quantile=\"0.05\"} 3272 1612411516789",
-            "vector_rpc_duration_seconds{code=\"200\",quantile=\"0.5\"} 4773 1612411516789",
-            "vector_rpc_duration_seconds{code=\"200\",quantile=\"0.9\"} 9001 1612411516789",
-            "vector_rpc_duration_seconds{code=\"200\",quantile=\"0.99\"} 76656 1612411516789",
-            "vector_rpc_duration_seconds_sum{code=\"200\"} 17560473 1612411516789",
-            "vector_rpc_duration_seconds_count{code=\"200\"} 2693 1612411516789",
-            ],
-        );
+            assert_eq!(lines, vec![
+                "# HELP vector_http_request_duration_seconds http_request_duration_seconds",
+                "# TYPE vector_http_request_duration_seconds histogram",
+                "vector_http_request_duration_seconds_bucket{le=\"0.05\"} 24054 1612411516789",
+                "vector_http_request_duration_seconds_bucket{le=\"0.1\"} 33444 1612411516789",
+                "vector_http_request_duration_seconds_bucket{le=\"0.2\"} 100392 1612411516789",
+                "vector_http_request_duration_seconds_bucket{le=\"0.5\"} 129389 1612411516789",
+                "vector_http_request_duration_seconds_bucket{le=\"1\"} 133988 1612411516789",
+                "vector_http_request_duration_seconds_bucket{le=\"+Inf\"} 144320 1612411516789",
+                "vector_http_request_duration_seconds_sum 53423 1612411516789",
+                "vector_http_request_duration_seconds_count 144320 1612411516789",
+                "# HELP vector_prometheus_remote_storage_samples_in_total prometheus_remote_storage_samples_in_total",
+                "# TYPE vector_prometheus_remote_storage_samples_in_total gauge",
+                "vector_prometheus_remote_storage_samples_in_total 57011636 1612411516789",
+                "# HELP vector_promhttp_metric_handler_requests_total promhttp_metric_handler_requests_total",
+                "# TYPE vector_promhttp_metric_handler_requests_total counter",
+                "vector_promhttp_metric_handler_requests_total{code=\"200\"} 100 1612411516789",
+                "vector_promhttp_metric_handler_requests_total{code=\"404\"} 7 1612411516789",
+                "# HELP vector_rpc_duration_seconds rpc_duration_seconds",
+                "# TYPE vector_rpc_duration_seconds summary",
+                "vector_rpc_duration_seconds{code=\"200\",quantile=\"0.01\"} 3102 1612411516789",
+                "vector_rpc_duration_seconds{code=\"200\",quantile=\"0.05\"} 3272 1612411516789",
+                "vector_rpc_duration_seconds{code=\"200\",quantile=\"0.5\"} 4773 1612411516789",
+                "vector_rpc_duration_seconds{code=\"200\",quantile=\"0.9\"} 9001 1612411516789",
+                "vector_rpc_duration_seconds{code=\"200\",quantile=\"0.99\"} 76656 1612411516789",
+                "vector_rpc_duration_seconds_sum{code=\"200\"} 17560473 1612411516789",
+                "vector_rpc_duration_seconds_count{code=\"200\"} 2693 1612411516789",
+                ],
+            );
 
-        topology.stop().await;
+            topology.stop().await;
+        }).await;
     }
 }
 
@@ -745,9 +810,8 @@ mod integration_tests {
 
     use super::*;
     use crate::{
-        config::SourceContext,
         event::{MetricKind, MetricValue},
-        test_util, SourceSender,
+        test_util::components::{run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS},
     };
 
     #[tokio::test]
@@ -763,16 +827,12 @@ mod integration_tests {
             tls: None,
         };
 
-        let (tx, rx) = SourceSender::new_test();
-        let source = config
-            .build(SourceContext::new_test(tx, None))
-            .await
-            .unwrap();
-
-        tokio::spawn(source);
-        tokio::time::sleep(Duration::from_secs(1)).await;
-
-        let events = test_util::collect_ready(rx).await;
+        let events = run_and_assert_source_compliance(
+            config,
+            Duration::from_secs(1),
+            &HTTP_PULL_SOURCE_TAGS,
+        )
+        .await;
         assert!(!events.is_empty());
 
         let metrics: Vec<_> = events

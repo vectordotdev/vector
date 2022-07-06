@@ -32,7 +32,7 @@ impl BytesDeserializerConfig {
 
     /// The schema produced by the deserializer.
     pub fn schema_definition(&self) -> schema::Definition {
-        schema::Definition::empty().required_field(
+        schema::Definition::empty().with_field(
             log_schema().message_key(),
             Kind::bytes(),
             Some("message"),
@@ -74,8 +74,9 @@ impl Deserializer for BytesDeserializer {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use vector_core::config::log_schema;
+
+    use super::*;
 
     #[test]
     fn deserialize_bytes() {

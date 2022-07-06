@@ -1,6 +1,7 @@
-use bytes::Bytes;
 use std::net::IpAddr;
 
+use ::value::Value;
+use bytes::Bytes;
 use vrl::prelude::*;
 
 fn ip_pton(value: Value) -> Resolved {
@@ -57,11 +58,6 @@ impl Function for IpPton {
         let value = arguments.required("value");
 
         Ok(Box::new(IpPtonFn { value }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        ip_pton(value)
     }
 }
 

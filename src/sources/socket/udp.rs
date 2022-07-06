@@ -7,9 +7,9 @@ use codecs::{
     StreamDecodingError,
 };
 use futures::StreamExt;
-use serde::{Deserialize, Serialize};
 use tokio::net::UdpSocket;
 use tokio_util::codec::FramedRead;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -25,18 +25,44 @@ use crate::{
     udp, SourceSender,
 };
 
-/// UDP processes messages per packet, where messages are separated by newline.
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// UDP configuration for the `socket` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct UdpConfig {
+    /// The address to listen for messages on.
     address: SocketAddr,
+
+    /// The maximum buffer size, in bytes, of incoming messages.
+    ///
+    /// Messages larger than this are truncated.
     #[serde(default = "crate::serde::default_max_length")]
     pub(super) max_length: usize,
+
+    /// Overrides the name of the log field used to add the peer host to each event.
+    ///
+    /// The value will be the peer host's address, including the port i.e. `1.2.3.4:9000`.
+    ///
+    /// By default, the [global `host_key` option](https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key) is used.
     host_key: Option<String>,
+
+    /// Overrides the name of the log field used to add the peer host's port to each event.
+    ///
+    /// The value will be the peer host's port i.e. `9000`.
+    ///
+    /// By default, `"port"` is used.
     port_key: Option<String>,
+
+    /// The size, in bytes, of the receive buffer used for the listening socket.
+    ///
+    /// This should not typically needed to be changed.
     receive_buffer_bytes: Option<usize>,
+
+    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     pub(super) framing: FramingConfig,
+
+    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
 }

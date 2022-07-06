@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn downcase(value: Value) -> Resolved {
@@ -37,11 +38,6 @@ impl Function for Downcase {
             source: r#"downcase("FOO 2 BAR")"#,
             result: Ok("foo 2 bar"),
         }]
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        downcase(value)
     }
 }
 

@@ -1,3 +1,4 @@
+use ::value::Value;
 use bytes::Bytes;
 use vrl::prelude::*;
 
@@ -39,11 +40,6 @@ impl Function for StripAnsiEscapeCodes {
         let value = arguments.required("value");
 
         Ok(Box::new(StripAnsiEscapeCodesFn { value }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        strip_ansi_escape_codes(value)
     }
 }
 

@@ -1,15 +1,19 @@
-use aws_sdk_cloudwatchlogs::{Endpoint, Region};
-use std::sync::Arc;
-use tower::ServiceBuilder;
-
+use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
+use aws_smithy_types::retry::RetryConfig;
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
-use vector_core::config::log_schema;
+use tower::ServiceBuilder;
 
 use crate::{
-    aws::{create_client, AwsAuthentication, ClientBuilder, RegionOrEndpoint},
+    aws::{
+        create_client, create_smithy_client, resolve_region, AwsAuthentication, ClientBuilder,
+        RegionOrEndpoint,
+    },
     codecs::Encoder,
-    config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
+    config::{
+        log_schema, AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig,
+        SinkContext,
+    },
     sinks::{
         aws_cloudwatch_logs::{
             healthcheck::healthcheck, request_builder::CloudwatchRequestBuilder,
@@ -19,6 +23,7 @@ use crate::{
             encoding::{
                 EncodingConfig, EncodingConfigAdapter, StandardEncodings, StandardEncodingsMigrator,
             },
+            http::RequestConfig,
             BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
@@ -26,56 +31,30 @@ use crate::{
     template::Template,
     tls::TlsConfig,
 };
-use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
-use aws_smithy_async::rt::sleep::AsyncSleep;
-use aws_smithy_client::erase::DynConnector;
-use aws_types::credentials::SharedCredentialsProvider;
 
 pub struct CloudwatchLogsClientBuilder;
 
 impl ClientBuilder for CloudwatchLogsClientBuilder {
-    type ConfigBuilder = aws_sdk_cloudwatchlogs::config::Builder;
-    type Client = CloudwatchLogsClient;
+    type Config = aws_sdk_cloudwatchlogs::config::Config;
+    type Client = aws_sdk_cloudwatchlogs::client::Client;
+    type DefaultMiddleware = aws_sdk_cloudwatchlogs::middleware::DefaultMiddleware;
 
-    fn create_config_builder(
-        credentials_provider: SharedCredentialsProvider,
-    ) -> Self::ConfigBuilder {
-        aws_sdk_cloudwatchlogs::config::Builder::new().credentials_provider(credentials_provider)
+    fn default_middleware() -> Self::DefaultMiddleware {
+        aws_sdk_cloudwatchlogs::middleware::DefaultMiddleware::new()
     }
 
-    fn with_endpoint_resolver(
-        builder: Self::ConfigBuilder,
-        endpoint: Endpoint,
-    ) -> Self::ConfigBuilder {
-        builder.endpoint_resolver(endpoint)
-    }
-
-    fn with_region(builder: Self::ConfigBuilder, region: Region) -> Self::ConfigBuilder {
-        builder.region(region)
-    }
-
-    fn with_sleep_impl(
-        builder: Self::ConfigBuilder,
-        sleep_impl: Arc<dyn AsyncSleep>,
-    ) -> Self::ConfigBuilder {
-        builder.sleep_impl(sleep_impl)
-    }
-
-    fn client_from_conf_conn(
-        builder: Self::ConfigBuilder,
-        connector: DynConnector,
-    ) -> Self::Client {
-        Self::Client::from_conf_conn(builder.build(), connector)
+    fn build(client: aws_smithy_client::Client, config: &aws_types::SdkConfig) -> Self::Client {
+        aws_sdk_cloudwatchlogs::client::Client::with_config(client, config.into())
     }
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct CloudwatchLogsSinkConfig {
     pub group_name: Template,
     pub stream_name: Template,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    #[serde(flatten)]
     pub encoding:
         EncodingConfigAdapter<EncodingConfig<StandardEncodings>, StandardEncodingsMigrator>,
     pub create_missing_group: Option<bool>,
@@ -85,7 +64,7 @@ pub struct CloudwatchLogsSinkConfig {
     #[serde(default)]
     pub batch: BatchConfig<CloudwatchLogsDefaultBatchSettings>,
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub request: RequestConfig,
     pub tls: Option<TlsConfig>,
     // Deprecated name. Moved to auth.
     pub assume_role: Option<String>,
@@ -107,6 +86,22 @@ impl CloudwatchLogsSinkConfig {
             self.region.endpoint()?,
             proxy,
             &self.tls,
+            true,
+        )
+        .await
+    }
+
+    pub async fn create_smithy_client(
+        &self,
+        proxy: &ProxyConfig,
+    ) -> crate::Result<aws_smithy_client::Client> {
+        let region = resolve_region(self.region.region()).await?;
+        create_smithy_client::<CloudwatchLogsClientBuilder>(
+            region,
+            proxy,
+            &self.tls,
+            true,
+            RetryConfig::disabled(),
         )
         .await
     }
@@ -117,16 +112,21 @@ impl CloudwatchLogsSinkConfig {
 impl SinkConfig for CloudwatchLogsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let batcher_settings = self.batch.into_batcher_settings()?;
-        let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
+        let request_settings = self
+            .request
+            .tower
+            .unwrap_with(&TowerRequestConfig::default());
         let client = self.create_client(cx.proxy()).await?;
+        let smithy_client = self.create_smithy_client(cx.proxy()).await?;
         let svc = ServiceBuilder::new()
             .settings(request_settings, CloudwatchRetryLogic::new())
             .service(CloudwatchLogsPartitionSvc::new(
                 self.clone(),
                 client.clone(),
+                std::sync::Arc::new(smithy_client),
             ));
         let transformer = self.encoding.transformer();
-        let serializer = self.encoding.clone().encoding();
+        let serializer = self.encoding.clone().encoding()?;
         let encoder = Encoder::<()>::new(serializer);
         let healthcheck = healthcheck(self.clone(), client).boxed();
         let sink = CloudwatchSink {
@@ -146,7 +146,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(self.encoding.config().input_type())
     }
 
     fn sink_type(&self) -> &'static str {

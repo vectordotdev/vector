@@ -1,8 +1,10 @@
-use super::NewRelicCredentials;
-use crate::{http::HttpClient, sinks::HealthcheckError};
+use std::sync::Arc;
+
 use http::Request;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+
+use super::NewRelicCredentials;
+use crate::{http::HttpClient, sinks::HealthcheckError};
 
 #[derive(Serialize, Deserialize, Debug)]
 struct NewRelicStatusModel {

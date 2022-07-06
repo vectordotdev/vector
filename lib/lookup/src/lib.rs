@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 use std::{
     fmt::{Debug, Display},
     hash::Hash,

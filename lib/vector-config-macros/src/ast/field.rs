@@ -1,10 +1,13 @@
 use darling::{util::Flag, FromAttributes};
 use serde_derive_internals::ast as serde_ast;
 use syn::{ExprPath, Ident};
-use vector_config_common::validation::Validation;
+use vector_config_common::{attributes::CustomAttribute, validation::Validation};
 
-use super::util::{
-    err_field_missing_description, get_serde_default_value, try_extract_doc_title_description,
+use super::{
+    util::{
+        err_field_missing_description, get_serde_default_value, try_extract_doc_title_description,
+    },
+    Metadata,
 };
 
 pub struct Field<'a> {
@@ -15,13 +18,16 @@ pub struct Field<'a> {
 }
 
 impl<'a> Field<'a> {
-    pub fn from_ast(serde: &serde_ast::Field<'a>) -> darling::Result<Field<'a>> {
+    pub fn from_ast(
+        serde: &serde_ast::Field<'a>,
+        is_virtual_newtype: bool,
+    ) -> darling::Result<Field<'a>> {
         let original = serde.original;
         let name = serde.attrs.name().deserialize_name();
         let default_value = get_serde_default_value(serde.attrs.default());
 
         Attributes::from_attributes(&original.attrs)
-            .and_then(|attrs| attrs.finalize(serde, &original.attrs))
+            .and_then(|attrs| attrs.finalize(serde, &original.attrs, is_virtual_newtype))
             .map(|attrs| Field {
                 original,
                 name,
@@ -55,11 +61,11 @@ impl<'a> Field<'a> {
     }
 
     pub fn transparent(&self) -> bool {
-        self.attrs.transparent.is_present()
+        self.attrs.transparent.is_some()
     }
 
     pub fn deprecated(&self) -> bool {
-        self.attrs.deprecated
+        self.attrs.deprecated.is_some()
     }
 
     pub fn validation(&self) -> &[Validation] {
@@ -69,19 +75,34 @@ impl<'a> Field<'a> {
     pub fn visible(&self) -> bool {
         self.attrs.visible
     }
+
+    pub fn flatten(&self) -> bool {
+        self.attrs.flatten
+    }
+
+    pub fn metadata(&self) -> impl Iterator<Item = CustomAttribute> {
+        self.attrs
+            .metadata
+            .clone()
+            .into_iter()
+            .flat_map(|metadata| metadata.attributes())
+    }
 }
 
-#[derive(Debug, FromAttributes)]
-#[darling(attributes(configurable))]
+#[derive(Debug, Default, FromAttributes)]
+#[darling(default, attributes(configurable))]
 struct Attributes {
     title: Option<String>,
     description: Option<String>,
     derived: Flag,
     transparent: Flag,
-    #[darling(skip)]
-    deprecated: bool,
+    deprecated: Flag,
     #[darling(skip)]
     visible: bool,
+    #[darling(skip)]
+    flatten: bool,
+    #[darling(multiple)]
+    metadata: Vec<Metadata>,
     #[darling(multiple)]
     validation: Vec<Validation>,
 }
@@ -91,14 +112,11 @@ impl Attributes {
         mut self,
         field: &serde_ast::Field<'_>,
         forwarded_attrs: &[syn::Attribute],
+        is_virtual_newtype: bool,
     ) -> darling::Result<Self> {
         // Derive any of the necessary fields from the `serde` side of things.
         self.visible = !field.attrs.skip_deserializing() || !field.attrs.skip_serializing();
-
-        // Parse any forwarded attributes that `darling` left us.
-        self.deprecated = forwarded_attrs
-            .iter()
-            .any(|a| a.path.is_ident("deprecated"));
+        self.flatten = field.attrs.flatten();
 
         // We additionally attempt to extract a title/description from the forwarded doc attributes, if they exist.
         // Whether we extract both a title and description, or just description, is documented in more detail in
@@ -107,21 +125,40 @@ impl Attributes {
         self.title = self.title.or(doc_title);
         self.description = self.description.or(doc_description);
 
-        // Make sure that if we weren't able to derive a description from the attributes on this
-        // field, that they used the `derived` flag, which implies forwarding the description from
-        // the underlying type of the field when the field type's schema is being finalized.
+        // If no description was provided for the field, it is typically an error. There are few situations when this is
+        // fine/valid, though:
         //
-        // The goal with doing so here is to be able to raise a compile-time error that points the
-        // user towards setting an explicit description unless they opt to derive it from the
-        // underlying type, which won't be _rare_, but is the only way for us to surface such a
-        // contextual error, as procedural macros can't dive into the given `T` to know if it has a
-        // description or not.
+        // - the field is derived (`#[configurable(derived)]`)
+        // - the field is transparent (`#[configurable(transparent)]`)
+        // - the field is not visible (`#[serde(skip)]`)
+        // - the field is flattened (`#[serde(flatten)]`)
+        // - the field is part of a virtual newtype
+        //
+        // If a field is derived, it means we're taking the description/title from the `Configurable` implementation of
+        // the field type, which we can only do at runtime so we ignore it here. Similarly, if a field is transparent,
+        // we're explicitly saying that our container is meant to essentially take on the schema of the field, rather
+        // than the container being defined by the fields, if that makes sense. Derived and transparent fields are most
+        // common in newtype structs and newtype variants in enums, where they're a `(T)`, and so the container acts
+        // much like `T` itself.
+        //
+        // If the field is not visible, well, then, we're not inserting it in the schema and so requiring a description
+        // or title makes no sense. Similarly, if a field is flattened, that field also won't exist in the schema as
+        // we're lifting up all the fields from the type of the field itself, so again, requiring a description or title
+        // makes no sense.
+        //
+        // Finally, if a field is part of a virtual newtype, this means the container has instructed `serde` to
+        // (de)serialize it as some entirely different type. This means the original field will never show up in a
+        // schema, because the schema of the thing being (de)esrialized is some `T`, not `ContainerType`. Simply put,
+        // like a field that is flattened or not visible, it makes no sense to require a description or title for fields
+        // in a virtual newtype.
         if self.description.is_none()
-            && !self.derived.is_present()
-            && !self.transparent.is_present()
+            && !self.derived.is_some()
+            && !self.transparent.is_some()
             && self.visible
+            && !self.flatten
+            && !is_virtual_newtype
         {
-            return Err(err_field_missing_description(field.original));
+            return Err(err_field_missing_description(&field.original));
         }
 
         Ok(self)

@@ -1,14 +1,14 @@
+use std::path::{Path, PathBuf};
+
+use serde_toml_merge::merge_into_table;
+use toml::value::{Table, Value};
+
 use super::{component_name, open_file, read_dir, Format};
 use crate::config::format;
-use serde_toml_merge::merge_into_table;
-use std::path::{Path, PathBuf};
-use strum::IntoEnumIterator;
-use strum_macros::EnumIter;
-use toml::value::{Table, Value};
 
 /// Provides a hint to the loading system of the type of components that should be found
 /// when traversing an explicitly named directory.
-#[derive(Debug, Copy, Clone, EnumIter)]
+#[derive(Debug, Copy, Clone)]
 pub enum ComponentHint {
     Source,
     Transform,
@@ -44,8 +44,9 @@ impl ComponentHint {
 // because there are numerous internal functions for dealing with (non)recursive loading that
 // rely on `&self` but don't need overriding and would be confusingly named in a public API.
 pub(super) mod process {
-    use super::*;
     use std::io::Read;
+
+    use super::*;
 
     /// This trait contains methods that deserialize files/folders. There are a few methods
     /// in here with subtly different names that can be hidden from public view, hence why
@@ -53,11 +54,11 @@ pub(super) mod process {
     pub trait Process {
         /// Prepares input for serialization. This can be a useful step to interpolate
         /// environment variables or perform some other pre-processing on the input.
-        fn prepare<R: Read>(&self, input: R) -> Result<(String, Vec<String>), Vec<String>>;
+        fn prepare<R: Read>(&mut self, input: R) -> Result<(String, Vec<String>), Vec<String>>;
 
         /// Calls into the `prepare` method, and deserializes a `Read` to a `T`.
         fn load<R: std::io::Read, T>(
-            &self,
+            &mut self,
             input: R,
             format: Format,
         ) -> Result<(T, Vec<String>), Vec<String>>
@@ -72,7 +73,7 @@ pub(super) mod process {
         /// Helper method used by other methods to recursively handle file/dir loading, merging
         /// values against a provided TOML `Table`.
         fn load_dir_into(
-            &self,
+            &mut self,
             path: &Path,
             result: &mut Table,
             recurse: bool,
@@ -167,7 +168,7 @@ pub(super) mod process {
 
         /// Loads and deserializes a file into a TOML `Table`.
         fn load_file(
-            &self,
+            &mut self,
             path: &Path,
             format: Format,
         ) -> Result<Option<(String, Table, Vec<String>)>, Vec<String>> {
@@ -182,7 +183,7 @@ pub(super) mod process {
         /// Loads a file, and if the path provided contains a sub-folder by the same name as the
         /// component, descend into it recursively, returning a TOML `Table`.
         fn load_file_recursive(
-            &self,
+            &mut self,
             path: &Path,
             format: Format,
         ) -> Result<Option<(String, Table, Vec<String>)>, Vec<String>> {
@@ -201,7 +202,7 @@ pub(super) mod process {
         /// Loads a directory (optionally, recursively), returning a TOML `Table`. This will
         /// create an initial `Table` and pass it into `load_dir_into` for recursion handling.
         fn load_dir(
-            &self,
+            &mut self,
             path: &Path,
             recurse: bool,
         ) -> Result<(Table, Vec<String>), Vec<String>> {
@@ -241,7 +242,17 @@ where
     /// Returns a vector of non-fatal warnings on success, or a vector of error strings on failure.
     fn load_from_dir(&mut self, path: &Path) -> Result<Vec<String>, Vec<String>> {
         // Iterator containing component-specific sub-folders to attempt traversing into.
-        let paths = ComponentHint::iter().map(|hint| (hint.join_path(path), hint));
+        let hints = [
+            ComponentHint::Source,
+            ComponentHint::Transform,
+            ComponentHint::Sink,
+            ComponentHint::Test,
+            ComponentHint::EnrichmentTable,
+        ];
+        let paths = hints
+            .iter()
+            .copied()
+            .map(|hint| (hint.join_path(path), hint));
 
         // Get files from the root of the folder. These represent top-level config settings,
         // and need to merged down first to represent a more 'complete' config.

@@ -1,18 +1,18 @@
+use core::ExpressionError;
+use std::collections::BTreeMap;
+
 use parser::ast::Ident;
 use value::{
     kind::{Collection, Field, Index},
     Value,
 };
 
+use super::Example;
 use crate::{
     state::Runtime,
     value::{Kind, VrlValueConvert},
     Context,
 };
-use core::ExpressionError;
-use std::collections::BTreeMap;
-
-use super::Example;
 
 /// The definition of a function-closure block a function expects to
 /// receive.
@@ -115,6 +115,7 @@ pub enum Output {
 }
 
 impl Output {
+    #[must_use]
     pub fn into_kind(self) -> Kind {
         match self {
             Output::Array { elements } => {
@@ -157,16 +158,15 @@ where
     /// Run the closure to completion, given the provided key/value pair, and
     /// the runtime context.
     ///
-    /// The provided values are *NOT* mutated during the run, and no return
-    /// value is provided by this method. See `map_key` or `map_value` for
-    /// mutating alternatives.
+    /// The provided values are *NOT* mutated during the run. See `map_key` or
+    /// `map_value` for mutating alternatives.
     pub fn run_key_value(
         &self,
         ctx: &mut Context,
         key: &str,
         value: &Value,
-    ) -> Result<(), ExpressionError> {
-        // TODO: we need to allow `LocalEnv` to take a muable reference to
+    ) -> Result<Value, ExpressionError> {
+        // TODO: we need to allow `LocalEnv` to take a mutable reference to
         // values, instead of owning them.
         let cloned_key = key.to_owned();
         let cloned_value = value.clone();
@@ -177,27 +177,26 @@ where
         let old_key = insert(ctx.state_mut(), key_ident, cloned_key.into());
         let old_value = insert(ctx.state_mut(), value_ident, cloned_value);
 
-        (self.runner)(ctx)?;
+        let value = (self.runner)(ctx)?;
 
         cleanup(ctx.state_mut(), key_ident, old_key);
         cleanup(ctx.state_mut(), value_ident, old_value);
 
-        Ok(())
+        Ok(value)
     }
 
     /// Run the closure to completion, given the provided index/value pair, and
     /// the runtime context.
     ///
-    /// The provided values are *NOT* mutated during the run, and no return
-    /// value is provided by this method. See `map_key` or `map_value` for
-    /// mutating alternatives.
+    /// The provided values are *NOT* mutated during the run. See `map_key` or
+    /// `map_value` for mutating alternatives.
     pub fn run_index_value(
         &self,
         ctx: &mut Context,
         index: usize,
         value: &Value,
-    ) -> Result<(), ExpressionError> {
-        // TODO: we need to allow `LocalEnv` to take a muable reference to
+    ) -> Result<Value, ExpressionError> {
+        // TODO: we need to allow `LocalEnv` to take a mutable reference to
         // values, instead of owning them.
         let cloned_value = value.clone();
 
@@ -207,12 +206,12 @@ where
         let old_index = insert(ctx.state_mut(), index_ident, index.into());
         let old_value = insert(ctx.state_mut(), value_ident, cloned_value);
 
-        (self.runner)(ctx)?;
+        let value = (self.runner)(ctx)?;
 
         cleanup(ctx.state_mut(), index_ident, old_index);
         cleanup(ctx.state_mut(), value_ident, old_value);
 
-        Ok(())
+        Ok(value)
     }
 
     /// Run the closure to completion, given the provided key, and the runtime
@@ -223,7 +222,7 @@ where
     ///
     /// See `run_key_value` and `run_index_value` for immutable alternatives.
     pub fn map_key(&self, ctx: &mut Context, key: &mut String) -> Result<(), ExpressionError> {
-        // TODO: we need to allow `LocalEnv` to take a muable reference to
+        // TODO: we need to allow `LocalEnv` to take a mutable reference to
         // values, instead of owning them.
         let cloned_key = key.clone();
         let ident = self.ident(0);
@@ -244,7 +243,7 @@ where
     ///
     /// See `run_key_value` and `run_index_value` for immutable alternatives.
     pub fn map_value(&self, ctx: &mut Context, value: &mut Value) -> Result<(), ExpressionError> {
-        // TODO: we need to allow `LocalEnv` to take a muable reference to
+        // TODO: we need to allow `LocalEnv` to take a mutable reference to
         // values, instead of owning them.
         let cloned_value = value.clone();
         let ident = self.ident(0);

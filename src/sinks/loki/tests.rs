@@ -3,7 +3,7 @@ use futures::StreamExt;
 use super::{config::LokiConfig, healthcheck::healthcheck, sink::LokiSink};
 use crate::{
     config::ProxyConfig,
-    event::Event,
+    event::{Event, LogEvent},
     http::HttpClient,
     sinks::util::test::{build_test_server, load_sink},
     test_util,
@@ -27,13 +27,13 @@ async fn interpolate_labels() {
     )
     .unwrap();
     let client = config.build_client(cx.clone()).unwrap();
-    let sink = LokiSink::new(config, client, cx).unwrap();
+    let mut sink = LokiSink::new(config, client, cx).unwrap();
 
-    let mut e1 = Event::from("hello world");
+    let mut e1 = Event::Log(LogEvent::from("hello world"));
 
     e1.as_mut_log().insert("foo", "bar");
 
-    let mut record = sink.encoder.encode_event(e1);
+    let mut record = sink.encoder.encode_event(e1).unwrap();
 
     // HashMap -> Vec doesn't like keeping ordering
     record.labels.sort();
@@ -68,13 +68,13 @@ async fn use_label_from_dropped_fields() {
     )
     .unwrap();
     let client = config.build_client(cx.clone()).unwrap();
-    let sink = LokiSink::new(config, client, cx).unwrap();
+    let mut sink = LokiSink::new(config, client, cx).unwrap();
 
-    let mut e1 = Event::from("hello world");
+    let mut e1 = Event::Log(LogEvent::from("hello world"));
 
     e1.as_mut_log().insert("foo", "bar");
 
-    let record = sink.encoder.encode_event(e1);
+    let record = sink.encoder.encode_event(e1).unwrap();
 
     let expected_line = serde_json::to_string(&serde_json::json!({
         "message": "hello world",

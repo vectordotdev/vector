@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::{diagnostic::Note, prelude::*};
 
 fn assert_eq(left: Value, right: Value, message: Option<Value>) -> Resolved {
@@ -83,14 +84,6 @@ impl Function for AssertEq {
             right,
             message,
         }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let left = args.required("left");
-        let right = args.required("right");
-        let message = args.optional("message");
-
-        assert_eq(left, right, message)
     }
 }
 

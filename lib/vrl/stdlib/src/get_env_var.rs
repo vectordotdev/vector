@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn get_env_var(value: Value) -> Resolved {
@@ -40,11 +41,6 @@ impl Function for GetEnvVar {
         let name = arguments.required("name");
 
         Ok(Box::new(GetEnvVarFn { name }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let name = args.required("name");
-        get_env_var(name)
     }
 }
 

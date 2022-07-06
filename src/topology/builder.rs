@@ -23,6 +23,7 @@ use vector_core::{
         BufferType, WhenFull,
     },
     internal_event::EventsSent,
+    schema::Definition,
     ByteSizeOf,
 };
 
@@ -35,7 +36,7 @@ use super::{
 use crate::{
     config::{
         ComponentKey, DataType, Input, Output, OutputId, ProxyConfig, SinkContext, SourceContext,
-        TransformContext,
+        TransformContext, TransformOuter,
     },
     event::{EventArray, EventContainer},
     internal_events::EventsReceived,
@@ -53,13 +54,14 @@ static ENRICHMENT_TABLES: Lazy<enrichment::TableRegistry> =
 pub(crate) static SOURCE_SENDER_BUFFER_SIZE: Lazy<usize> =
     Lazy::new(|| *TRANSFORM_CONCURRENCY_LIMIT * CHUNK_SIZE);
 
+const READY_ARRAY_CAPACITY: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(CHUNK_SIZE * 4) };
 pub(crate) const TOPOLOGY_BUFFER_SIZE: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(100) };
 
 static TRANSFORM_CONCURRENCY_LIMIT: Lazy<usize> = Lazy::new(|| {
     crate::app::WORKER_THREADS
         .get()
         .map(std::num::NonZeroUsize::get)
-        .unwrap_or_else(num_cpus::get)
+        .unwrap_or_else(crate::num_threads)
 });
 
 pub(self) async fn load_enrichment_tables<'a>(
@@ -297,14 +299,7 @@ pub async fn build_pieces(
             merged_schema_definition: merged_definition.clone(),
         };
 
-        let node = TransformNode {
-            key: key.clone(),
-            typetag: transform.inner.transform_type(),
-            inputs: transform.inputs.clone(),
-            input_details: transform.inner.input(),
-            outputs: transform.inner.outputs(&merged_definition),
-            enable_concurrency: transform.inner.enable_concurrency(),
-        };
+        let node = TransformNode::from_parts(key.clone(), transform, &merged_definition);
 
         let transform = match transform.inner.build(&context).await {
             Err(error) => {
@@ -339,6 +334,15 @@ pub async fn build_pieces(
         let typetag = sink.inner.sink_type();
         let input_type = sink.inner.input().data_type();
 
+        if config.schema.enabled {
+            // At this point, we've validated that all transforms are valid, including any
+            // transform that mutates the schema provided by their sources. We can now validate the
+            // schema expectations of each invidual sink.
+            if let Err(mut err) = schema::validate_sink_expectations(key, sink, config) {
+                errors.append(&mut err);
+            };
+        }
+
         let (tx, rx, acker) = if let Some(buffer) = buffers.remove(key) {
             buffer
         } else {
@@ -372,6 +376,7 @@ pub async fn build_pieces(
             healthcheck,
             globals: config.global.clone(),
             proxy: ProxyConfig::merge_with_env(&config.global.proxy, sink.proxy()),
+            schema: config.schema,
         };
 
         let (sink, healthcheck) = match sink.inner.build(cx).await {
@@ -515,6 +520,23 @@ struct TransformNode {
     enable_concurrency: bool,
 }
 
+impl TransformNode {
+    pub fn from_parts(
+        key: ComponentKey,
+        transform: &TransformOuter<OutputId>,
+        schema_definition: &Definition,
+    ) -> Self {
+        Self {
+            key,
+            typetag: transform.inner.transform_type(),
+            inputs: transform.inputs.clone(),
+            input_details: transform.inner.input(),
+            outputs: transform.inner.outputs(schema_definition),
+            enable_concurrency: transform.inner.enable_concurrency(),
+        }
+    }
+}
+
 fn build_transform(
     transform: Transform,
     node: TransformNode,
@@ -630,12 +652,15 @@ impl Runner {
     }
 
     async fn run_concurrently(mut self) -> Result<TaskOutput, ()> {
-        let mut input_rx = self
+        let input_rx = self
             .input_rx
             .take()
             .expect("can't run runner twice")
             .into_stream()
             .filter(move |events| ready(filter_events_type(events, self.input_type)));
+
+        let mut input_rx =
+            super::ready_arrays::ReadyArrays::with_capacity(input_rx, READY_ARRAY_CAPACITY);
 
         let mut in_flight = FuturesOrdered::new();
         let mut shutting_down = false;
@@ -655,15 +680,21 @@ impl Runner {
                     }
                 }
 
-                input_events = input_rx.next(), if in_flight.len() < *TRANSFORM_CONCURRENCY_LIMIT && !shutting_down => {
-                    match input_events {
-                        Some(events) => {
-                            self.on_events_received(&events);
+                input_arrays = input_rx.next(), if in_flight.len() < *TRANSFORM_CONCURRENCY_LIMIT && !shutting_down => {
+                    match input_arrays {
+                        Some(input_arrays) => {
+                            let mut len = 0;
+                            for events in &input_arrays {
+                                self.on_events_received(events);
+                                len += events.len();
+                            }
 
                             let mut t = self.transform.clone();
-                            let mut outputs_buf = self.outputs.new_buf_with_capacity(events.len());
+                            let mut outputs_buf = self.outputs.new_buf_with_capacity(len);
                             let task = tokio::spawn(async move {
-                                t.transform_all(events, &mut outputs_buf);
+                                for events in input_arrays {
+                                    t.transform_all(events, &mut outputs_buf);
+                                }
                                 outputs_buf
                             }.in_current_span());
                             in_flight.push(task);

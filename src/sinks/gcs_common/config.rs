@@ -5,14 +5,13 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 
 use crate::{
-    gcp::{GcpCredentials, GcpError},
+    gcp::{GcpAuthenticator, GcpError},
     http::HttpClient,
     sinks::{
         gcs_common::service::GcsResponse,
         util::retries::{RetryAction, RetryLogic},
         Healthcheck, HealthcheckError,
     },
-    template::TemplateParseError,
 };
 
 pub const BASE_URL: &str = "https://storage.googleapis.com/";
@@ -47,35 +46,22 @@ pub enum GcsError {
     BucketNotFound { bucket: String },
 }
 
-#[derive(Debug, Snafu)]
-#[snafu(visibility(pub))]
-pub enum GcsHealthcheckError {
-    #[snafu(display("Invalid credentials"))]
-    InvalidCredentials,
-    #[snafu(display("Unknown bucket: {:?}", bucket))]
-    UnknownBucket { bucket: String },
-    #[snafu(display("key_prefix template parse error: {}", source))]
-    KeyPrefixTemplate { source: TemplateParseError },
-}
-
 pub fn build_healthcheck(
     bucket: String,
     client: HttpClient,
     base_url: String,
-    creds: Option<GcpCredentials>,
+    auth: GcpAuthenticator,
 ) -> crate::Result<Healthcheck> {
     let healthcheck = async move {
         let uri = base_url.parse::<Uri>()?;
         let mut request = http::Request::head(uri).body(Body::empty())?;
 
-        if let Some(creds) = creds.as_ref() {
-            creds.apply(&mut request);
-        }
+        auth.apply(&mut request);
 
         let not_found_error = GcsError::BucketNotFound { bucket }.into();
 
         let response = client.send(request).await?;
-        healthcheck_response(creds, not_found_error)(response)
+        healthcheck_response(response, auth, not_found_error)
     };
 
     Ok(healthcheck.boxed())
@@ -83,22 +69,18 @@ pub fn build_healthcheck(
 
 // Use this to map a healthcheck response, as it handles setting up the renewal task.
 pub fn healthcheck_response(
-    creds: Option<GcpCredentials>,
+    response: http::Response<hyper::Body>,
+    auth: GcpAuthenticator,
     not_found_error: crate::Error,
-) -> impl FnOnce(http::Response<hyper::Body>) -> crate::Result<()> {
-    move |response| match response.status() {
-        StatusCode::OK => {
-            // If there are credentials configured, the
-            // generated OAuth token needs to be periodically
-            // regenerated. Since the health check runs at
-            // startup, after a successful health check is a
-            // good place to create the regeneration task.
-            if let Some(creds) = creds {
-                creds.spawn_regenerate_token();
-            }
-            Ok(())
-        }
-        StatusCode::FORBIDDEN => Err(GcpError::InvalidCredentials0.into()),
+) -> crate::Result<()> {
+    // If there are credentials configured, the generated OAuth
+    // token needs to be periodically regenerated. Since the
+    // health check runs at startup, after a health check is a
+    // good place to create the regeneration task.
+    auth.spawn_regenerate_token();
+    match response.status() {
+        StatusCode::OK => Ok(()),
+        StatusCode::FORBIDDEN => Err(GcpError::HealthcheckForbidden.into()),
         StatusCode::NOT_FOUND => Err(not_found_error),
         status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
     }

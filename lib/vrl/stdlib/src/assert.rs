@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::{diagnostic::Note, prelude::*};
 
 fn assert(condition: Value, message: Option<Value>, format: Option<String>) -> Resolved {
@@ -75,13 +76,6 @@ impl Function for Assert {
         let message = arguments.optional("message");
 
         Ok(Box::new(AssertFn { condition, message }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let condition = args.required("condition");
-        let message = args.optional("message");
-
-        assert(condition, message, None)
     }
 }
 

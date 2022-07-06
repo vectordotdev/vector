@@ -4,14 +4,17 @@
 
 use k8s_openapi::{api::core::v1::Namespace, apimachinery::pkg::apis::meta::v1::ObjectMeta};
 use kube::runtime::reflector::{store::Store, ObjectRef};
-use serde::{Deserialize, Serialize};
+use lookup::lookup_v2::{parse_path, OwnedSegment};
+use vector_config::configurable_component;
 
 use crate::event::{Event, LogEvent};
-use lookup::lookup_v2::{parse_path, OwnedSegment};
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for how the events are annotated with Namespace metadata.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct FieldsSpec {
+    /// Event field for Namespace labels.
     pub namespace_labels: String,
 }
 

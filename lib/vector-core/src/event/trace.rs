@@ -1,27 +1,41 @@
+use std::{collections::BTreeMap, fmt::Debug};
+
 use lookup::LookupBuf;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, fmt::Debug, sync::Arc};
-
 use vector_buffers::EventCount;
 use vector_common::EventDataEq;
 
 use super::{
-    util, BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable, LogEvent,
-    Value,
+    BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable, LogEvent, Value,
 };
 use crate::ByteSizeOf;
+use lookup::path;
 
 /// Traces are a newtype of `LogEvent`
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, PartialOrd, Serialize)]
 pub struct TraceEvent(LogEvent);
 
 impl TraceEvent {
+    /// Convert a `TraceEvent` into a tuple of its components
+    /// # Panics
+    ///
+    /// Panics if the fields of the `TraceEvent` are not a `Value::Map`.
     pub fn into_parts(self) -> (BTreeMap<String, Value>, EventMetadata) {
-        self.0.into_parts()
+        let (value, metadata) = self.0.into_parts();
+        let map = value.into_object().expect("inner value must be a map");
+        (map, metadata)
     }
 
     pub fn from_parts(fields: BTreeMap<String, Value>, metadata: EventMetadata) -> Self {
-        Self(LogEvent::from_parts(fields, metadata))
+        Self(LogEvent::from_map(fields, metadata))
+    }
+
+    pub fn value(&self) -> &Value {
+        self.0.value()
+    }
+
+    pub fn value_mut(&mut self) -> &mut Value {
+        self.0.value_mut()
     }
 
     pub fn metadata(&self) -> &EventMetadata {
@@ -37,17 +51,21 @@ impl TraceEvent {
     }
 
     #[must_use]
-    pub fn with_batch_notifier(self, batch: &Arc<BatchNotifier>) -> Self {
+    pub fn with_batch_notifier(self, batch: &BatchNotifier) -> Self {
         Self(self.0.with_batch_notifier(batch))
     }
 
     #[must_use]
-    pub fn with_batch_notifier_option(self, batch: &Option<Arc<BatchNotifier>>) -> Self {
+    pub fn with_batch_notifier_option(self, batch: &Option<BatchNotifier>) -> Self {
         Self(self.0.with_batch_notifier_option(batch))
     }
 
+    /// Convert a `TraceEvent` into a `BTreeMap` of it's fields
+    /// # Panics
+    ///
+    /// Panics if the fields of the `TraceEvent` are not a `Value::Map`.
     pub fn as_map(&self) -> &BTreeMap<String, Value> {
-        self.0.as_map()
+        self.0.as_map().expect("inner value must be a map")
     }
 
     pub fn get(&self, key: impl AsRef<str>) -> Option<&Value> {
@@ -58,8 +76,12 @@ impl TraceEvent {
         self.0.lookup(path)
     }
 
+    pub fn lookup_mut(&mut self, path: &LookupBuf) -> Option<&mut Value> {
+        self.0.lookup_mut(path)
+    }
+
     pub fn get_flat(&self, key: impl AsRef<str>) -> Option<&Value> {
-        self.0.as_map().get(key.as_ref())
+        self.0.get(path!(key.as_ref()))
     }
 
     pub fn get_mut(&mut self, key: impl AsRef<str>) -> Option<&mut Value> {
@@ -67,7 +89,7 @@ impl TraceEvent {
     }
 
     pub fn contains(&self, key: impl AsRef<str>) -> bool {
-        util::log::contains(self.0.as_map(), key.as_ref())
+        self.0.contains(key.as_ref())
     }
 
     pub fn insert(
@@ -75,7 +97,7 @@ impl TraceEvent {
         key: impl AsRef<str>,
         value: impl Into<Value> + Debug,
     ) -> Option<Value> {
-        util::log::insert(self.0.as_map_mut(), key.as_ref(), value.into())
+        self.0.insert(key.as_ref(), value.into())
     }
 }
 

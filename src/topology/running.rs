@@ -13,7 +13,9 @@ use tokio::{
 };
 use tracing::Instrument;
 use vector_buffers::topology::channel::BufferSender;
+use vector_common::trigger::DisabledTrigger;
 
+use super::{TapOutput, TapResource};
 use crate::{
     config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, OutputId, Resource},
     event::EventArray,
@@ -27,10 +29,7 @@ use crate::{
         task::TaskOutput,
         BuiltBuffer, TaskHandle, WatchRx, WatchTx,
     },
-    trigger::DisabledTrigger,
 };
-
-use super::{TapOutput, TapResource};
 
 #[allow(dead_code)]
 pub struct RunningTopology {

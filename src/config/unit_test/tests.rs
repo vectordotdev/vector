@@ -1,15 +1,17 @@
+use indoc::indoc;
+
 use super::*;
 use crate::config::ConfigBuilder;
-use indoc::indoc;
 
 #[tokio::test]
 async fn parse_no_input() {
     let config: ConfigBuilder = toml::from_str(indoc! {r#"
         [transforms.bar]
           inputs = ["foo"]
-          type = "add_fields"
-          [transforms.bar.fields]
-            my_string_field = "string value"
+          type = "remap"
+          source = '''
+          .my_string_field = "string value"
+          '''
 
           [[tests]]
             name = "broken test"
@@ -38,9 +40,10 @@ async fn parse_no_input() {
     let config: ConfigBuilder = toml::from_str(indoc! {r#"
         [transforms.bar]
           inputs = ["foo"]
-          type = "add_fields"
-          [transforms.bar.fields]
-            my_string_field = "string value"
+          type = "remap"
+          source = '''
+          .my_string_field = "string value"
+          '''
 
           [[tests]]
             name = "broken test"
@@ -76,9 +79,10 @@ async fn parse_no_test_input() {
     let config: ConfigBuilder = toml::from_str(indoc! {r#"
         [transforms.bar]
           inputs = ["foo"]
-          type = "add_fields"
-          [transforms.bar.fields]
-            my_string_field = "string value"
+          type = "remap"
+          source = '''
+          .my_string_field = "string value"
+          '''
 
           [[tests]]
             name = "broken test"
@@ -106,9 +110,10 @@ async fn parse_no_outputs() {
     let config: ConfigBuilder = toml::from_str(indoc! {r#"
         [transforms.foo]
           inputs = ["ignored"]
-          type = "add_fields"
-          [transforms.foo.fields]
-            my_string_field = "string value"
+          type = "remap"
+          source = '''
+          .my_string_field = "string value"
+          '''
 
           [[tests]]
             name = "broken test"
@@ -134,9 +139,10 @@ async fn parse_invalid_output_targets() {
     let config: ConfigBuilder = toml::from_str(indoc! {r#"
         [transforms.bar]
           inputs = ["foo"]
-          type = "add_fields"
-          [transforms.bar.fields]
-            my_string_field = "string value"
+          type = "remap"
+          source = '''
+          .my_string_field = "string value"
+          '''
 
           [[tests]]
             name = "broken test"
@@ -165,9 +171,10 @@ async fn parse_invalid_output_targets() {
     let config: ConfigBuilder = toml::from_str(indoc! {r#"
         [transforms.bar]
           inputs = ["foo"]
-          type = "add_fields"
-          [transforms.bar.fields]
-            my_string_field = "string value"
+          type = "remap"
+          source = '''
+          .my_string_field = "string value"
+          '''
 
           [[tests]]
             name = "broken test"
@@ -194,27 +201,31 @@ async fn parse_broken_topology() {
     let config: ConfigBuilder = toml::from_str(indoc! {r#"
         [transforms.foo]
           inputs = ["something"]
-          type = "add_fields"
-          [transforms.foo.fields]
-            foo_field = "string value"
+          type = "remap"
+          source = '''
+          .mfoo_field = "string value"
+          '''
 
         [transforms.nah]
           inputs = ["ignored"]
-          type = "add_fields"
-          [transforms.nah.fields]
-            new_field = "string value"
+          type = "remap"
+          source = '''
+          .new_field = "string value"
+          '''
 
         [transforms.baz]
           inputs = ["bar"]
-          type = "add_fields"
-          [transforms.baz.fields]
-            baz_field = "string value"
+          type = "remap"
+          source = '''
+          .baz_field = "string value"
+          '''
 
         [transforms.quz]
           inputs = ["bar"]
-          type = "add_fields"
-          [transforms.quz.fields]
-            quz_field = "string value"
+          type = "remap"
+          source = '''
+          .quz_field = "string value"
+          '''
 
         [[tests]]
           name = "broken test"
@@ -291,9 +302,10 @@ async fn parse_bad_input_event() {
     let config: ConfigBuilder = toml::from_str(indoc! {r#"
         [transforms.foo]
           inputs = ["ignored"]
-          type = "add_fields"
-          [transforms.foo.fields]
-            my_string_field = "string value"
+          type = "remap"
+          source = '''
+          .my_string_field = "string value"
+          '''
 
           [[tests]]
             name = "broken test"
@@ -326,27 +338,31 @@ async fn test_success_multi_inputs() {
     let config: ConfigBuilder = toml::from_str(indoc! {r#"
         [transforms.foo]
           inputs = ["ignored"]
-          type = "add_fields"
-          [transforms.foo.fields]
-            new_field = "string value"
+          type = "remap"
+          source = '''
+          .new_field = "string value"
+          '''
 
         [transforms.foo_two]
           inputs = ["ignored"]
-          type = "add_fields"
-          [transforms.foo_two.fields]
-            new_field_two = "second string value"
+          type = "remap"
+          source = '''
+          .new_field_two = "string value"
+          '''
 
         [transforms.bar]
           inputs = ["foo", "foo_two"]
-          type = "add_fields"
-          [transforms.bar.fields]
-            second_new_field = "also a string value"
+          type = "remap"
+          source = '''
+          .second_new_field = "also a string value"
+          '''
 
         [transforms.baz]
           inputs = ["bar"]
-          type = "add_fields"
-          [transforms.baz.fields]
-            third_new_field = "also also a string value"
+          type = "remap"
+          source = '''
+          .third_new_field = "also also a string value"
+          '''
 
         [[tests]]
           name = "successful test"
@@ -424,21 +440,24 @@ async fn test_success() {
     let config: ConfigBuilder = toml::from_str(indoc! {r#"
         [transforms.foo]
           inputs = ["ignored"]
-          type = "add_fields"
-          [transforms.foo.fields]
-            new_field = "string value"
+          type = "remap"
+          source = '''
+          .new_field = "string value"
+          '''
 
         [transforms.bar]
           inputs = ["foo"]
-          type = "add_fields"
-          [transforms.bar.fields]
-            second_new_field = "also a string value"
+          type = "remap"
+          source = '''
+          .second_new_field = "also a string value"
+          '''
 
         [transforms.baz]
           inputs = ["bar"]
-          type = "add_fields"
-          [transforms.baz.fields]
-            third_new_field = "also also a string value"
+          type = "remap"
+          source = '''
+          .third_new_field = "also also a string value"
+          '''
 
         [[tests]]
           name = "successful test"
@@ -495,9 +514,10 @@ async fn test_route() {
 
           [transforms.bar]
             inputs = ["foo.first"]
-            type = "add_fields"
-            [transforms.bar.fields]
-              new_field = "new field added"
+            type = "remap"
+            source = '''
+            .new_field = "new field added"
+            '''
 
           [[tests]]
             name = "successful route test 1"
@@ -582,27 +602,31 @@ async fn test_fail_two_output_events() {
     let config: ConfigBuilder = toml::from_str(indoc! {r#"
           [transforms.foo]
             inputs = [ "TODO" ]
-            type = "add_fields"
-            [transforms.foo.fields]
-              foo = "new field 1"
+            type = "remap"
+            source = '''
+            .foo = "new field 1"
+            '''
 
           [transforms.bar]
             inputs = [ "foo" ]
-            type = "add_fields"
-            [transforms.bar.fields]
-              bar = "new field 2"
+            type = "remap"
+            source = '''
+            .bar = "new field 2"
+            '''
 
           [transforms.baz]
             inputs = [ "foo" ]
-            type = "add_fields"
-            [transforms.baz.fields]
-              baz = "new field 3"
+            type = "remap"
+            source = '''
+            .baz = "new field 3"
+            '''
 
           [transforms.boo]
             inputs = [ "bar", "baz" ]
-            type = "add_fields"
-            [transforms.boo.fields]
-              boo = "new field 4"
+            type = "remap"
+            source = '''
+            .boo = "new field 4"
+            '''
 
           [[tests]]
             name = "check_multi_payloads"
@@ -703,9 +727,10 @@ async fn test_no_outputs_from_chained() {
 
           [transforms.bar]
             inputs = [ "foo" ]
-            type = "add_fields"
-            [transforms.bar.fields]
-              bar = "new field"
+            type = "remap"
+            source = '''
+            .bar = "new field"
+            '''
 
           [[tests]]
             name = "check_no_outputs_from_succeeds"
@@ -737,9 +762,10 @@ async fn test_log_input() {
     let config: ConfigBuilder = toml::from_str(indoc! { r#"
           [transforms.foo]
             inputs = ["ignored"]
-            type = "add_fields"
-            [transforms.foo.fields]
-              new_field = "string value"
+            type = "remap"
+            source = '''
+            .new_field = "string value"
+            '''
 
           [[tests]]
             name = "successful test with log event"
@@ -775,9 +801,10 @@ async fn test_metric_input() {
     let config: ConfigBuilder = toml::from_str(indoc! { r#"
           [transforms.foo]
             inputs = ["ignored"]
-            type = "add_tags"
-            [transforms.foo.tags]
-              new_tag = "new value added"
+            type = "remap"
+            source = '''
+            .tags.new_tag = "new value added"
+            '''
 
           [[tests]]
             name = "successful test with metric event"
@@ -813,21 +840,24 @@ async fn test_success_over_gap() {
     let config: ConfigBuilder = toml::from_str(indoc! { r#"
           [transforms.foo]
             inputs = ["ignored"]
-            type = "add_fields"
-            [transforms.foo.fields]
-              new_field = "string value"
+            type = "remap"
+            source = '''
+            .new_field = "string value"
+            '''
 
           [transforms.bar]
             inputs = ["foo"]
-            type = "add_fields"
-            [transforms.bar.fields]
-              second_new_field = "also a string value"
+            type = "remap"
+            source = '''
+            .second_new_field = "also a string value"
+            '''
 
           [transforms.baz]
             inputs = ["bar"]
-            type = "add_fields"
-            [transforms.baz.fields]
-              third_new_field = "also also a string value"
+            type = "remap"
+            source = '''
+            .third_new_field = "also also a string value"
+            '''
 
           [[tests]]
             name = "successful test"
@@ -858,27 +888,31 @@ async fn test_success_tree() {
     let config: ConfigBuilder = toml::from_str(indoc! { r#"
           [transforms.ignored]
             inputs = ["also_ignored"]
-            type = "add_fields"
-            [transforms.ignored.fields]
-              not_field = "string value"
+            type = "remap"
+            source = '''
+            .not_field = "string value"
+            '''
 
           [transforms.foo]
             inputs = ["ignored"]
-            type = "add_fields"
-            [transforms.foo.fields]
-              new_field = "string value"
+            type = "remap"
+            source = '''
+            .new_field = "string value"
+            '''
 
           [transforms.bar]
             inputs = ["foo"]
-            type = "add_fields"
-            [transforms.bar.fields]
-              second_new_field = "also a string value"
+            type = "remap"
+            source = '''
+            .second_new_field = "also a string value"
+            '''
 
           [transforms.baz]
             inputs = ["foo"]
-            type = "add_fields"
-            [transforms.baz.fields]
-              second_new_field = "also also a string value"
+            type = "remap"
+            source = '''
+            .second_new_field = "also also a string value"
+            '''
 
           [[tests]]
             name = "successful test"
@@ -918,20 +952,24 @@ async fn test_fails() {
     let config: ConfigBuilder = toml::from_str(indoc! { r#"
           [transforms.foo]
             inputs = ["ignored"]
-            type = "remove_fields"
-            fields = ["timestamp"]
+            type = "remap"
+            source = '''
+            del(.timestamp)
+            '''
 
           [transforms.bar]
             inputs = ["foo"]
-            type = "add_fields"
-            [transforms.bar.fields]
-              second_new_field = "also a string value"
+            type = "remap"
+            source = '''
+            .second_new_field = "also a string value"
+            '''
 
           [transforms.baz]
             inputs = ["bar"]
-            type = "add_fields"
-            [transforms.baz.fields]
-              third_new_field = "also also a string value"
+            type = "remap"
+            source = '''
+            .third_new_field = "also also a string value"
+            '''
 
           [[tests]]
             name = "failing test"

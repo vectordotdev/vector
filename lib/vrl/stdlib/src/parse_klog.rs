@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use ::value::Value;
 use chrono::{offset::TimeZone, Datelike, Utc};
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -113,11 +114,6 @@ impl Function for ParseKlog {
             kind: kind::BYTES,
             required: true,
         }]
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        parse_klog(value)
     }
 }
 

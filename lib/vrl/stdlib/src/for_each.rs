@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn for_each<T>(value: Value, ctx: &mut Context, runner: closure::Runner<T>) -> Resolved
@@ -8,7 +9,7 @@ where
         match item {
             IterItem::KeyValue(key, value) => runner.run_key_value(ctx, key, value)?,
             IterItem::IndexValue(index, value) => runner.run_index_value(ctx, index, value)?,
-            _ => {}
+            IterItem::Value(_) => continue,
         };
     }
 
@@ -82,14 +83,6 @@ impl Function for ForEach {
             }],
             is_iterator: true,
         })
-    }
-
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Result<Value> {
-        let value = args.required("value");
-        let VmFunctionClosure { variables, vm } = args.closure();
-        let runner = closure::Runner::new(variables, |ctx| vm.interpret(ctx));
-
-        for_each(value, ctx, runner)
     }
 }
 

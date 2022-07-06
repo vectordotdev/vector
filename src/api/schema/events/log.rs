@@ -63,7 +63,7 @@ impl Log {
                 .expect("JSON serialization of log event failed. Please report."),
             EventEncodingType::Yaml => serde_yaml::to_string(&self.event)
                 .expect("YAML serialization of log event failed. Please report."),
-            EventEncodingType::Logfmt => encode_logfmt::to_string(self.event.as_map())
+            EventEncodingType::Logfmt => encode_logfmt::encode_value(self.event.value())
                 .expect("logfmt serialization of log event failed. Please report."),
         }
     }

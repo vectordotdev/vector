@@ -3,6 +3,7 @@ use prost::Message;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder;
 use vector_core::{
+    config::DataType,
     event::{proto, Event, EventArray},
     schema,
 };
@@ -15,6 +16,11 @@ impl NativeSerializerConfig {
     /// Build the `NativeSerializer` from this configuration.
     pub const fn build(&self) -> NativeSerializer {
         NativeSerializer
+    }
+
+    /// The data type of events that are accepted by `NativeSerializer`.
+    pub fn input_type(&self) -> DataType {
+        DataType::all()
     }
 
     /// The schema required by the serializer.

@@ -1,18 +1,16 @@
 mod request_limiter;
 
+use std::collections::BTreeMap;
+use std::net::SocketAddr;
+use std::{fmt, io, mem::drop, time::Duration};
+
 use bytes::Bytes;
+use codecs::StreamDecodingError;
 use futures::{future::BoxFuture, FutureExt, StreamExt};
 use listenfd::ListenFd;
-use serde::{de, Deserialize, Deserializer, Serialize};
+use serde::{de, Deserialize, Deserializer};
 use smallvec::SmallVec;
 use socket2::SockRef;
-use vector_core::ByteSizeOf;
-
-use std::net::SocketAddr;
-
-use std::{fmt, io, mem::drop, sync::Arc, time::Duration};
-
-use codecs::StreamDecodingError;
 use tokio::{
     io::AsyncWriteExt,
     net::{TcpListener, TcpStream},
@@ -20,6 +18,9 @@ use tokio::{
 };
 use tokio_util::codec::{Decoder, FramedRead};
 use tracing::Instrument;
+use vector_common::finalization::AddBatchNotifier;
+use vector_config::configurable_component;
+use vector_core::ByteSizeOf;
 
 use super::AfterReadExt as _;
 use crate::sources::util::tcp::request_limiter::RequestLimiter;
@@ -33,7 +34,7 @@ use crate::{
     },
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
+    tls::{CertificateMetadata, MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
     SourceSender,
 };
 
@@ -122,6 +123,7 @@ where
         keepalive: Option<TcpKeepaliveConfig>,
         shutdown_timeout_secs: u64,
         tls: MaybeTlsSettings,
+        tls_client_metadata_key: Option<String>,
         receive_buffer_bytes: Option<usize>,
         cx: SourceContext,
         acknowledgements: AcknowledgementsConfig,
@@ -155,7 +157,8 @@ where
             let connection_gauge = OpenGauge::new();
             let shutdown_clone = cx.shutdown.clone();
 
-            let request_limiter = RequestLimiter::new(MAX_IN_FLIGHT_EVENTS_TARGET, num_cpus::get());
+            let request_limiter =
+                RequestLimiter::new(MAX_IN_FLIGHT_EVENTS_TARGET, crate::num_threads());
 
             listener
                 .accept_stream_limited(max_connections)
@@ -167,6 +170,7 @@ where
                     let out = cx.out.clone();
                     let connection_gauge = connection_gauge.clone();
                     let request_limiter = request_limiter.clone();
+                    let tls_client_metadata_key = tls_client_metadata_key.clone();
 
                     async move {
                         let socket = match connection {
@@ -209,6 +213,7 @@ where
                                 out,
                                 acknowledgements,
                                 request_limiter,
+                                tls_client_metadata_key.clone(),
                             );
 
                             tokio::spawn(
@@ -239,6 +244,7 @@ async fn handle_stream<T>(
     mut out: SourceSender,
     acknowledgements: bool,
     request_limiter: RequestLimiter,
+    tls_client_metadata_key: Option<String>,
 ) where
     <<T as TcpSource>::Decoder as tokio_util::codec::Decoder>::Item: std::marker::Send,
     T: TcpSource,
@@ -273,6 +279,13 @@ async fn handle_stream<T>(
             peer_addr
         });
     });
+
+    let certificate_metadata = socket
+        .get_ref()
+        .ssl_stream()
+        .and_then(|stream| stream.ssl().peer_certificate())
+        .map(CertificateMetadata::from_x509);
+
     let reader = FramedRead::new(socket, source.decoder());
     let mut reader = ReadyFrames::new(reader);
 
@@ -332,7 +345,18 @@ async fn handle_stream<T>(
 
                         if let Some(batch) = batch {
                             for event in &mut events {
-                                event.add_batch_notifier(Arc::clone(&batch));
+                                event.add_batch_notifier(batch.clone());
+                            }
+                        }
+
+                        if let Some(tls_client_metadata_key) = &tls_client_metadata_key {
+                            if let Some(certificate_metadata) = &certificate_metadata {
+                                let mut metadata: BTreeMap<String, value::Value> = BTreeMap::new();
+                                metadata.insert("subject".to_string(), certificate_metadata.subject().into());
+                                for event in &mut events {
+                                    let log = event.as_mut_log();
+                                    log.insert(&tls_client_metadata_key[..], value::Value::from(metadata.clone()));
+                                }
                             }
                         }
 
@@ -409,12 +433,17 @@ fn close_socket(socket: &MaybeTlsIncomingStream<TcpStream>) -> bool {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+/// A listening address that can be given directly or be managed via `systemd` socket activation.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, PartialEq)]
 #[serde(untagged)]
 pub enum SocketListenAddr {
-    SocketAddr(SocketAddr),
+    /// An IPv4/IPv6 address and port.
+    SocketAddr(#[configurable(derived)] SocketAddr),
+
+    /// A file descriptor identifier that is given from, and managed by, the socket activation feature of `systemd`.
     #[serde(deserialize_with = "parse_systemd_fd")]
-    SystemdFd(usize),
+    SystemdFd(#[configurable(transparent)] usize),
 }
 
 impl fmt::Display for SocketListenAddr {

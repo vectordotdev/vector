@@ -99,7 +99,7 @@ fn encode_field<'a>(output: &mut String, key: &str, value: &str, key_value_delim
 }
 
 fn encode_string(output: &mut String, str: &str) {
-    let needs_quoting = str.chars().any(char::is_whitespace);
+    let needs_quoting = str.chars().any(|c| c.is_whitespace() || c == '"');
 
     if needs_quoting {
         output.write_char('"').unwrap();
@@ -583,6 +583,24 @@ mod tests {
             )
             .unwrap(),
             r#"lvl=info msg="This is a log message""#
+        );
+    }
+
+    #[test]
+    fn string_with_quotes() {
+        assert_eq!(
+            &to_string::<Value>(
+                &btreemap! {
+                    "lvl" => "info",
+                    "msg" => "{\"key\":\"value\"}"
+                },
+                &[],
+                "=",
+                " ",
+                true
+            )
+            .unwrap(),
+            r#"lvl=info msg="{\"key\":\"value\"}""#
         );
     }
 

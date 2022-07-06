@@ -10,7 +10,6 @@ use std::collections::HashSet;
 use async_graphql::{Context, Subscription};
 use encoding::EventEncodingType;
 use futures::{stream, Stream, StreamExt};
-use itertools::Itertools;
 use output::OutputEventsPayload;
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use tokio::{select, sync::mpsc, time};
@@ -158,9 +157,8 @@ pub(crate) fn create_events_stream(
 
                         // Since events will appear out of order per the random sampling
                         // strategy, drain the existing results and sort by timestamp.
-                        let results = results
-                            .drain(..)
-                            .sorted_by_key(|r| r.batch)
+                        results.sort_by_key(|r| r.batch);
+                        let results = results.drain(..)
                             .map(|r| r.payload)
                             .collect();
 

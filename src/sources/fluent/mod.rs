@@ -4,10 +4,12 @@ use std::net::SocketAddr;
 use bytes::{Buf, Bytes, BytesMut};
 use codecs::StreamDecodingError;
 use flate2::read::MultiGzDecoder;
+use lookup::path;
 use rmp_serde::{decode, Deserializer};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use smallvec::{smallvec, SmallVec};
 use tokio_util::codec::Decoder;
+use vector_config::configurable_component;
 
 use super::util::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
@@ -19,21 +21,36 @@ use crate::{
     internal_events::{FluentMessageDecodeError, FluentMessageReceived},
     serde::bool_or_struct,
     tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
+    tls::{MaybeTlsSettings, TlsSourceConfig},
 };
 
 mod message;
 use self::message::{FluentEntry, FluentMessage, FluentRecord, FluentTag, FluentTimestamp};
 
-#[derive(Deserialize, Serialize, Debug)]
+/// Configuration for the `fluent` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
 pub struct FluentConfig {
+    /// The address to listen for connections on.
     address: SocketListenAddr,
-    tls: Option<TlsEnableableConfig>,
+
+    /// The maximum number of TCP connections that will be allowed at any given time.
+    connection_limit: Option<u32>,
+
+    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
+
+    /// The size, in bytes, of the receive buffer used for each connection.
+    ///
+    /// This should not typically needed to be changed.
     receive_buffer_bytes: Option<usize>,
+
+    #[configurable(derived)]
+    tls: Option<TlsSourceConfig>,
+
+    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
-    connection_limit: Option<u32>,
 }
 
 inventory::submit! {
@@ -60,12 +77,18 @@ impl SourceConfig for FluentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let source = FluentSource {};
         let shutdown_secs = 30;
-        let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
+        let tls_config = self.tls.as_ref().map(|tls| tls.tls_config.clone());
+        let tls_client_metadata_key = self
+            .tls
+            .as_ref()
+            .and_then(|tls| tls.client_metadata_key.clone());
+        let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
         source.run(
             self.address,
             self.keepalive,
             shutdown_secs,
             tls,
+            tls_client_metadata_key,
             self.receive_buffer_bytes,
             cx,
             self.acknowledgements,
@@ -442,7 +465,7 @@ impl From<FluentEvent> for LogEvent {
         log.insert(log_schema().timestamp_key(), timestamp);
         log.insert("tag", tag);
         for (key, value) in record.into_iter() {
-            log.insert_flat(key, value);
+            log.insert(path!(&key), value);
         }
         log
     }
@@ -453,12 +476,14 @@ mod tests {
     use bytes::BytesMut;
     use chrono::{DateTime, Utc};
     use rmp_serde::Serializer;
+    use serde::Serialize;
+    use std::collections::BTreeMap;
     use tokio::{
         io::{AsyncReadExt, AsyncWriteExt},
         time::{error::Elapsed, timeout, Duration},
     };
     use tokio_util::codec::Decoder;
-    use vector_common::{assert_event_data_eq, btreemap};
+    use vector_common::assert_event_data_eq;
     use vector_core::event::Value;
 
     use super::{message::FluentMessageOptions, *};
@@ -491,11 +516,18 @@ mod tests {
             101, 115, 115, 97, 103, 101, 163, 98, 97, 114,
         ];
 
-        let expected = Event::from(btreemap! {
-            "message" => "bar",
-            "tag" => "tag.name",
-            "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
-        });
+        let expected = Event::Log(LogEvent::from(BTreeMap::from([
+            (String::from("message"), Value::from("bar")),
+            (String::from("tag"), Value::from("tag.name")),
+            (
+                String::from("timestamp"),
+                Value::Timestamp(
+                    DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z")
+                        .unwrap()
+                        .into(),
+                ),
+            ),
+        ])));
         let got = decode_all(message.clone()).unwrap();
         assert_event_data_eq!(got.0[0], expected);
         assert_eq!(got.1, message.len());
@@ -514,11 +546,18 @@ mod tests {
             101, 115, 115, 97, 103, 101, 163, 98, 97, 114, 129, 164, 115, 105, 122, 101, 1,
         ];
 
-        let expected = Event::from(btreemap! {
-            "message" => "bar",
-            "tag" => "tag.name",
-            "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
-        });
+        let expected = Event::Log(LogEvent::from(BTreeMap::from([
+            (String::from("message"), Value::from("bar")),
+            (String::from("tag"), Value::from("tag.name")),
+            (
+                String::from("timestamp"),
+                Value::Timestamp(
+                    DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z")
+                        .unwrap()
+                        .into(),
+                ),
+            ),
+        ])));
         let got = decode_all(message.clone()).unwrap();
         assert_eq!(got.1, message.len());
         assert_event_data_eq!(got.0[0], expected);
@@ -542,21 +581,42 @@ mod tests {
         ];
 
         let expected = vec![
-            Event::from(btreemap! {
-                "message" => "foo",
-                "tag" => "tag.name",
-                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
-            }),
-            Event::from(btreemap! {
-                "message" => "bar",
-                "tag" => "tag.name",
-                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z").unwrap().into()),
-            }),
-            Event::from(btreemap! {
-                "message" => "baz",
-                "tag" => "tag.name",
-                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z").unwrap().into()),
-            }),
+            Event::Log(LogEvent::from(BTreeMap::from([
+                (String::from("message"), Value::from("foo")),
+                (String::from("tag"), Value::from("tag.name")),
+                (
+                    String::from("timestamp"),
+                    Value::Timestamp(
+                        DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z")
+                            .unwrap()
+                            .into(),
+                    ),
+                ),
+            ]))),
+            Event::Log(LogEvent::from(BTreeMap::from([
+                (String::from("message"), Value::from("bar")),
+                (String::from("tag"), Value::from("tag.name")),
+                (
+                    String::from("timestamp"),
+                    Value::Timestamp(
+                        DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z")
+                            .unwrap()
+                            .into(),
+                    ),
+                ),
+            ]))),
+            Event::Log(LogEvent::from(BTreeMap::from([
+                (String::from("message"), Value::from("baz")),
+                (String::from("tag"), Value::from("tag.name")),
+                (
+                    String::from("timestamp"),
+                    Value::Timestamp(
+                        DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z")
+                            .unwrap()
+                            .into(),
+                    ),
+                ),
+            ]))),
         ];
 
         let got = decode_all(message.clone()).unwrap();
@@ -587,21 +647,42 @@ mod tests {
         ];
 
         let expected = vec![
-            Event::from(btreemap! {
-                "message" => "foo",
-                "tag" => "tag.name",
-                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
-            }),
-            Event::from(btreemap! {
-                "message" => "bar",
-                "tag" => "tag.name",
-                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z").unwrap().into()),
-            }),
-            Event::from(btreemap! {
-                "message" => "baz",
-                "tag" => "tag.name",
-                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z").unwrap().into()),
-            }),
+            Event::Log(LogEvent::from(BTreeMap::from([
+                (String::from("message"), Value::from("foo")),
+                (String::from("tag"), Value::from("tag.name")),
+                (
+                    String::from("timestamp"),
+                    Value::Timestamp(
+                        DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z")
+                            .unwrap()
+                            .into(),
+                    ),
+                ),
+            ]))),
+            Event::Log(LogEvent::from(BTreeMap::from([
+                (String::from("message"), Value::from("bar")),
+                (String::from("tag"), Value::from("tag.name")),
+                (
+                    String::from("timestamp"),
+                    Value::Timestamp(
+                        DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z")
+                            .unwrap()
+                            .into(),
+                    ),
+                ),
+            ]))),
+            Event::Log(LogEvent::from(BTreeMap::from([
+                (String::from("message"), Value::from("baz")),
+                (String::from("tag"), Value::from("tag.name")),
+                (
+                    String::from("timestamp"),
+                    Value::Timestamp(
+                        DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z")
+                            .unwrap()
+                            .into(),
+                    ),
+                ),
+            ]))),
         ];
 
         let got = decode_all(message.clone()).unwrap();
@@ -633,21 +714,42 @@ mod tests {
         ];
 
         let expected = vec![
-            Event::from(btreemap! {
-                "message" => "foo",
-                "tag" => "tag.name",
-                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
-            }),
-            Event::from(btreemap! {
-                "message" => "bar",
-                "tag" => "tag.name",
-                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z").unwrap().into()),
-            }),
-            Event::from(btreemap! {
-                "message" => "baz",
-                "tag" => "tag.name",
-                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z").unwrap().into()),
-            }),
+            Event::Log(LogEvent::from(BTreeMap::from([
+                (String::from("message"), Value::from("foo")),
+                (String::from("tag"), Value::from("tag.name")),
+                (
+                    String::from("timestamp"),
+                    Value::Timestamp(
+                        DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z")
+                            .unwrap()
+                            .into(),
+                    ),
+                ),
+            ]))),
+            Event::Log(LogEvent::from(BTreeMap::from([
+                (String::from("message"), Value::from("bar")),
+                (String::from("tag"), Value::from("tag.name")),
+                (
+                    String::from("timestamp"),
+                    Value::Timestamp(
+                        DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z")
+                            .unwrap()
+                            .into(),
+                    ),
+                ),
+            ]))),
+            Event::Log(LogEvent::from(BTreeMap::from([
+                (String::from("message"), Value::from("baz")),
+                (String::from("tag"), Value::from("tag.name")),
+                (
+                    String::from("timestamp"),
+                    Value::Timestamp(
+                        DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z")
+                            .unwrap()
+                            .into(),
+                    ),
+                ),
+            ]))),
         ];
 
         let got = decode_all(message.clone()).unwrap();
@@ -680,21 +782,42 @@ mod tests {
         ];
 
         let expected = vec![
-            Event::from(btreemap! {
-                "message" => "foo",
-                "tag" => "tag.name",
-                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z").unwrap().into()),
-            }),
-            Event::from(btreemap! {
-                "message" => "bar",
-                "tag" => "tag.name",
-                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z").unwrap().into()),
-            }),
-            Event::from(btreemap! {
-                "message" => "baz",
-                "tag" => "tag.name",
-                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z").unwrap().into()),
-            }),
+            Event::Log(LogEvent::from(BTreeMap::from([
+                (String::from("message"), Value::from("foo")),
+                (String::from("tag"), Value::from("tag.name")),
+                (
+                    String::from("timestamp"),
+                    Value::Timestamp(
+                        DateTime::parse_from_rfc3339("2015-09-07T01:23:04Z")
+                            .unwrap()
+                            .into(),
+                    ),
+                ),
+            ]))),
+            Event::Log(LogEvent::from(BTreeMap::from([
+                (String::from("message"), Value::from("bar")),
+                (String::from("tag"), Value::from("tag.name")),
+                (
+                    String::from("timestamp"),
+                    Value::Timestamp(
+                        DateTime::parse_from_rfc3339("2015-09-07T01:23:05Z")
+                            .unwrap()
+                            .into(),
+                    ),
+                ),
+            ]))),
+            Event::Log(LogEvent::from(BTreeMap::from([
+                (String::from("message"), Value::from("baz")),
+                (String::from("tag"), Value::from("tag.name")),
+                (
+                    String::from("timestamp"),
+                    Value::Timestamp(
+                        DateTime::parse_from_rfc3339("2015-09-07T01:23:06Z")
+                            .unwrap()
+                            .into(),
+                    ),
+                ),
+            ]))),
         ];
 
         let got = decode_all(message.clone()).unwrap();
@@ -825,7 +948,9 @@ mod integration_tests {
         docker::Container,
         sources::fluent::FluentConfig,
         test_util::{
-            collect_ready, next_addr, next_addr_for_ip, random_string, trace_init, wait_for_tcp,
+            collect_ready,
+            components::{assert_source_compliance, SOCKET_PUSH_SOURCE_TAGS},
+            next_addr, next_addr_for_ip, random_string, wait_for_tcp,
         },
         SourceSender,
     };
@@ -853,15 +978,14 @@ mod integration_tests {
     }
 
     async fn test_fluentbit(status: EventStatus) {
-        trace_init();
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async move {
+            let test_address = next_addr();
+            let (out, source_address) = source(status).await;
 
-        let test_address = next_addr();
-        let (out, source_address) = source(status).await;
-
-        let dir = make_file(
-            "fluent-bit.conf",
-            &format!(
-                r#"
+            let dir = make_file(
+                "fluent-bit.conf",
+                &format!(
+                    r#"
 [SERVICE]
     Grace      0
     Flush      1
@@ -878,39 +1002,41 @@ mod integration_tests {
     Host          host.docker.internal
     Port          {send_port}
     Require_ack_response true
-"#,
-                listen_host = test_address.ip(),
-                listen_port = test_address.port(),
-                send_port = source_address.port(),
-            ),
-        );
+    "#,
+                    listen_host = test_address.ip(),
+                    listen_port = test_address.port(),
+                    send_port = source_address.port(),
+                ),
+            );
 
-        let msg = random_string(64);
-        let body = serde_json::json!({ "message": msg });
+            let msg = random_string(64);
+            let body = serde_json::json!({ "message": msg });
 
-        let events = Container::new(FLUENT_BIT_IMAGE, FLUENT_BIT_TAG)
-            .bind(dir.path().display(), "/fluent-bit/etc")
-            .run(async move {
-                wait_for_tcp(test_address).await;
-                reqwest::Client::new()
-                    .post(&format!("http://{}/", test_address))
-                    .header("content-type", "application/json")
-                    .body(body.to_string())
-                    .send()
-                    .await
-                    .unwrap();
-                sleep(Duration::from_secs(2)).await;
-                let result = collect_ready(out).await;
-                result
-            })
-            .await;
+            let events = Container::new(FLUENT_BIT_IMAGE, FLUENT_BIT_TAG)
+                .bind(dir.path().display(), "/fluent-bit/etc")
+                .run(async move {
+                    wait_for_tcp(test_address).await;
+                    reqwest::Client::new()
+                        .post(&format!("http://{}/", test_address))
+                        .header("content-type", "application/json")
+                        .body(body.to_string())
+                        .send()
+                        .await
+                        .unwrap();
+                    sleep(Duration::from_secs(2)).await;
+                    let result = collect_ready(out).await;
+                    result
+                })
+                .await;
 
-        assert_eq!(events.len(), 1);
-        let log = events[0].as_log();
-        assert_eq!(log["tag"], "http.0".into());
-        assert_eq!(log["message"], msg.into());
-        assert!(log.get("timestamp").is_some());
-        assert!(log.get("host").is_some());
+            assert_eq!(events.len(), 1);
+            let log = events[0].as_log();
+            assert_eq!(log["tag"], "http.0".into());
+            assert_eq!(log["message"], msg.into());
+            assert!(log.get("timestamp").is_some());
+            assert!(log.get("host").is_some());
+        })
+        .await;
     }
 
     #[tokio::test]
@@ -929,13 +1055,12 @@ mod integration_tests {
     }
 
     async fn test_fluentd(status: EventStatus, options: &str) {
-        trace_init();
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async move {
+            let test_address = next_addr();
+            let (out, source_address) = source(status).await;
 
-        let test_address = next_addr();
-        let (out, source_address) = source(status).await;
-
-        let config = format!(
-            r#"
+            let config = format!(
+                r#"
 <source>
   @type http
   bind {http_host}
@@ -957,38 +1082,40 @@ mod integration_tests {
   {options}
 </match>
 "#,
-            http_host = test_address.ip(),
-            http_port = test_address.port(),
-            port = source_address.port(),
-            options = options
-        );
+                http_host = test_address.ip(),
+                http_port = test_address.port(),
+                port = source_address.port(),
+                options = options
+            );
 
-        let dir = make_file("fluent.conf", &config);
+            let dir = make_file("fluent.conf", &config);
 
-        let msg = random_string(64);
-        let body = serde_json::json!({ "message": msg });
+            let msg = random_string(64);
+            let body = serde_json::json!({ "message": msg });
 
-        let events = Container::new(FLUENTD_IMAGE, FLUENTD_TAG)
-            .bind(dir.path().display(), "/fluentd/etc")
-            .run(async move {
-                wait_for_tcp(test_address).await;
-                reqwest::Client::new()
-                    .post(&format!("http://{}/", test_address))
-                    .header("content-type", "application/json")
-                    .body(body.to_string())
-                    .send()
-                    .await
-                    .unwrap();
-                sleep(Duration::from_secs(2)).await;
-                collect_ready(out).await
-            })
-            .await;
+            let events = Container::new(FLUENTD_IMAGE, FLUENTD_TAG)
+                .bind(dir.path().display(), "/fluentd/etc")
+                .run(async move {
+                    wait_for_tcp(test_address).await;
+                    reqwest::Client::new()
+                        .post(&format!("http://{}/", test_address))
+                        .header("content-type", "application/json")
+                        .body(body.to_string())
+                        .send()
+                        .await
+                        .unwrap();
+                    sleep(Duration::from_secs(2)).await;
+                    collect_ready(out).await
+                })
+                .await;
 
-        assert_eq!(events.len(), 1);
-        assert_eq!(events[0].as_log()["tag"], "".into());
-        assert_eq!(events[0].as_log()["message"], msg.into());
-        assert!(events[0].as_log().get("timestamp").is_some());
-        assert!(events[0].as_log().get("host").is_some());
+            assert_eq!(events.len(), 1);
+            assert_eq!(events[0].as_log()["tag"], "".into());
+            assert_eq!(events[0].as_log()["message"], msg.into());
+            assert!(events[0].as_log().get("timestamp").is_some());
+            assert!(events[0].as_log().get("host").is_some());
+        })
+        .await;
     }
 
     async fn source(status: EventStatus) -> (impl Stream<Item = Event>, SocketAddr) {

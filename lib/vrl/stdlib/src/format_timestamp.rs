@@ -1,3 +1,4 @@
+use ::value::Value;
 use chrono::{
     format::{strftime::StrftimeItems, Item},
     DateTime, Utc,
@@ -53,13 +54,6 @@ impl Function for FormatTimestamp {
             source: r#"format_timestamp!(t'2021-02-10T23:32:00+00:00', "%d %B %Y %H:%M")"#,
             result: Ok("10 February 2021 23:32"),
         }]
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let format = args.required("format");
-
-        format_timestamp(format, value)
     }
 }
 

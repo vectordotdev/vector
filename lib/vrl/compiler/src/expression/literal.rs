@@ -5,13 +5,12 @@ use chrono::{DateTime, SecondsFormat, Utc};
 use diagnostic::{DiagnosticMessage, Label, Note, Urls};
 use ordered_float::NotNan;
 use regex::Regex;
-use value::ValueRegex;
+use value::{Value, ValueRegex};
 
 use crate::{
     expression::Resolved,
     state::{ExternalEnv, LocalEnv},
-    vm::OpCode,
-    Context, Expression, Span, TypeDef, Value,
+    Context, Expression, Span, TypeDef,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -26,16 +25,22 @@ pub enum Literal {
 }
 
 impl Literal {
+    /// Get a `Value` type stored in the literal.
+    ///
+    /// This differs from `Expression::as_value` insofar as this *always*
+    /// returns a `Value`, whereas `as_value` returns `Option<Value>` which, in
+    /// the case of `Literal` means it always returns `Some(Value)`, requiring
+    /// an extra `unwrap()`.
     pub fn to_value(&self) -> Value {
-        use Literal::*;
+        use Literal::{Boolean, Float, Integer, Null, Regex, String, Timestamp};
 
         match self {
             String(v) => Value::Bytes(v.clone()),
             Integer(v) => Value::Integer(*v),
-            Float(v) => Value::Float(v.to_owned()),
+            Float(v) => Value::Float(*v),
             Boolean(v) => Value::Boolean(*v),
             Regex(v) => Value::Regex(v.clone()),
-            Timestamp(v) => Value::Timestamp(v.to_owned()),
+            Timestamp(v) => Value::Timestamp(*v),
             Null => Value::Null,
         }
     }
@@ -51,7 +56,7 @@ impl Expression for Literal {
     }
 
     fn type_def(&self, _: (&LocalEnv, &ExternalEnv)) -> TypeDef {
-        use Literal::*;
+        use Literal::{Boolean, Float, Integer, Null, Regex, String, Timestamp};
 
         let type_def = match self {
             String(_) => TypeDef::bytes(),
@@ -65,23 +70,11 @@ impl Expression for Literal {
 
         type_def.infallible()
     }
-
-    fn compile_to_vm(
-        &self,
-        vm: &mut crate::vm::Vm,
-        _state: (&mut LocalEnv, &mut ExternalEnv),
-    ) -> Result<(), String> {
-        // Add the literal as a constant.
-        let constant = vm.add_constant(self.to_value());
-        vm.write_opcode(OpCode::Constant);
-        vm.write_primitive(constant);
-        Ok(())
-    }
 }
 
 impl fmt::Display for Literal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Literal::*;
+        use Literal::{Boolean, Float, Integer, Null, Regex, String, Timestamp};
 
         match self {
             String(v) => write!(f, r#""{}""#, std::string::String::from_utf8_lossy(v)),
@@ -137,19 +130,19 @@ impl From<&str> for Literal {
 
 impl From<i8> for Literal {
     fn from(v: i8) -> Self {
-        Literal::Integer(v as i64)
+        Literal::Integer(i64::from(v))
     }
 }
 
 impl From<i16> for Literal {
     fn from(v: i16) -> Self {
-        Literal::Integer(v as i64)
+        Literal::Integer(i64::from(v))
     }
 }
 
 impl From<i32> for Literal {
     fn from(v: i32) -> Self {
-        Literal::Integer(v as i64)
+        Literal::Integer(i64::from(v))
     }
 }
 
@@ -161,13 +154,13 @@ impl From<i64> for Literal {
 
 impl From<u16> for Literal {
     fn from(v: u16) -> Self {
-        Literal::Integer(v as i64)
+        Literal::Integer(i64::from(v))
     }
 }
 
 impl From<u32> for Literal {
     fn from(v: u32) -> Self {
-        Literal::Integer(v as i64)
+        Literal::Integer(i64::from(v))
     }
 }
 
@@ -283,7 +276,7 @@ impl std::error::Error for Error {
 
 impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
-        use ErrorVariant::*;
+        use ErrorVariant::{InvalidRegex, InvalidTimestamp, NanFloat};
 
         match &self.variant {
             InvalidRegex(..) => 101,
@@ -293,7 +286,7 @@ impl DiagnosticMessage for Error {
     }
 
     fn labels(&self) -> Vec<Label> {
-        use ErrorVariant::*;
+        use ErrorVariant::{InvalidRegex, InvalidTimestamp, NanFloat};
 
         match &self.variant {
             InvalidRegex(err) => {
@@ -326,7 +319,7 @@ impl DiagnosticMessage for Error {
     }
 
     fn notes(&self) -> Vec<Note> {
-        use ErrorVariant::*;
+        use ErrorVariant::{InvalidRegex, InvalidTimestamp, NanFloat};
 
         match &self.variant {
             InvalidRegex(_) => vec![Note::SeeDocs(

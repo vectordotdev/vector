@@ -73,6 +73,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         transforms,
         tests,
         provider: _,
+        secret,
     } = builder;
 
     let str_expansions = to_string_expansions(&expansions);
@@ -129,6 +130,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
             transforms,
             tests,
             expansions,
+            secret,
         };
 
         config.propagate_acknowledgements()?;

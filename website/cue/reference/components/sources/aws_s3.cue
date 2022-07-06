@@ -161,73 +161,29 @@ components: sources: aws_s3: components._aws & {
 
 				You will commonly want to use [transforms](\(urls.vector_transforms)) to
 				parse the data. For example, to parse VPC flow logs sent to S3 you can
-				chain the `tokenizer` transform:
+				chain the `remap` transform:
 
 				```toml
 				[transforms.flow_logs]
-				type = "tokenizer" # required
+				type = "remap" # required
 				inputs = ["s3"]
-				field_names = ["version", "account_id", "interface_id", "srcaddr", "dstaddr", "srcport", "dstport", "protocol", "packets", "bytes", "start", "end", "action", "log_status"]
-
-				types.srcport = "int"
-				types.dstport = "int"
-				types.packets = "int"
-				types.bytes = "int"
-				types.start = "timestamp|%s"
-				types.end = "timestamp|%s"
+				drop_on_error = false
+				source = '''
+				. = parse_aws_vpc_flow_log!(string!(.message))
+				'''
 				```
 
-				To parse AWS load balancer logs, the `regex_parser` transform can be used:
+				To parse AWS load balancer logs, the `remap` transform can be used:
 
 				```toml
 				[transforms.elasticloadbalancing_fields_parsed]
-				type = "regex_parser"
+				type = "remap" # required
 				inputs = ["s3"]
-				regex = '''
-					(?x)^
-					(?P<type>[\\w]+)[ ]
-					(?P<timestamp>[\\w:.-]+)[ ]
-					(?P<elb>[^\\s]+)[ ]
-					(?P<client_host>[\\d.:-]+)[ ]
-					(?P<target_host>[\\d.:-]+)[ ]
-					(?P<request_processing_time>[\\d.-]+)[ ]
-					(?P<target_processing_time>[\\d.-]+)[ ]
-					(?P<response_processing_time>[\\d.-]+)[ ]
-					(?P<elb_status_code>[\\d-]+)[ ]
-					(?P<target_status_code>[\\d-]+)[ ]
-					(?P<received_bytes>[\\d-]+)[ ]
-					(?P<sent_bytes>[\\d-]+)[ ]
-					"(?P<request_method>[\\w-]+)[ ]
-					(?P<request_url>[^\\s]+)[ ]
-					(?P<request_protocol>[^"\\s]+)"[ ]
-					"(?P<user_agent>[^"]+)"[ ]
-					(?P<ssl_cipher>[^\\s]+)[ ]
-					(?P<ssl_protocol>[^\\s]+)[ ]
-					(?P<target_group_arn>[\\w.:/-]+)[ ]
-					"(?P<trace_id>[^\\s"]+)"[ ]
-					"(?P<domain_name>[^\\s"]+)"[ ]
-					"(?P<chosen_cert_arn>[\\w:./-]+)"[ ]
-					(?P<matched_rule_priority>[\\d-]+)[ ]
-					(?P<request_creation_time>[\\w.:-]+)[ ]
-					"(?P<actions_executed>[\\w,-]+)"[ ]
-					"(?P<redirect_url>[^"]+)"[ ]
-					"(?P<error_reason>[^"]+)"
+				drop_on_error = false
+				source = '''
+				. = parse_aws_alb_log!(string!(.message))
+				.request_url_parts = parse_url!(.request_url)
 				'''
-				field = "message"
-				drop_failed = false
-
-				types.received_bytes = "int"
-				types.request_processing_time = "float"
-				types.sent_bytes = "int"
-				types.target_processing_time = "float"
-				types.response_processing_time = "float"
-
-				[transforms.elasticloadbalancing_url_parsed]
-				type = "regex_parser"
-				inputs = ["elasticloadbalancing_fields_parsed"]
-				regex = '^(?P<url_scheme>[\\w]+)://(?P<url_hostname>[^\\s:/?#]+)(?::(?P<request_port>[\\d-]+))?-?(?:/(?P<url_path>[^\\s?#]*))?(?P<request_url_query>\\?[^\\s#]+)?'
-				field = "request_url"
-				drop_failed = false
 				```
 				"""
 		}

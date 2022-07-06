@@ -2,27 +2,14 @@
 mod tests;
 mod unit_test_components;
 
-use crate::{
-    conditions::Condition,
-    config::{
-        self, compiler::expand_macros, loading, ComponentKey, Config, ConfigBuilder, ConfigPath,
-        SinkOuter, SourceOuter, TestDefinition, TestInput, TestInputValue, TestOutput,
-    },
-    event::{Event, Value},
-    schema,
-    serde::OneOrMany,
-    topology::{
-        self,
-        builder::{self, Pieces},
-    },
-};
-use futures_util::{stream::FuturesUnordered, StreamExt};
-use indexmap::IndexMap;
-use ordered_float::NotNan;
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
+
+use futures_util::{stream::FuturesUnordered, StreamExt};
+use indexmap::IndexMap;
+use ordered_float::NotNan;
 use tokio::sync::{
     oneshot::{self, Receiver},
     Mutex,
@@ -32,8 +19,22 @@ use uuid::Uuid;
 use self::unit_test_components::{
     UnitTestSinkCheck, UnitTestSinkConfig, UnitTestSinkResult, UnitTestSourceConfig,
 };
-
 use super::{compiler::expand_globs, graph::Graph, OutputId};
+use crate::{
+    conditions::Condition,
+    config::{
+        self, compiler::expand_macros, loading, ComponentKey, Config, ConfigBuilder, ConfigPath,
+        SinkOuter, SourceOuter, TestDefinition, TestInput, TestInputValue, TestOutput,
+    },
+    event::{Event, LogEvent, Value},
+    schema,
+    serde::OneOrMany,
+    signal,
+    topology::{
+        self,
+        builder::{self, Pieces},
+    },
+};
 
 pub struct UnitTest {
     pub name: String,
@@ -72,10 +73,20 @@ impl UnitTest {
     }
 }
 
-pub async fn build_unit_tests_main(paths: &[ConfigPath]) -> Result<Vec<UnitTest>, Vec<String>> {
+pub async fn build_unit_tests_main(
+    paths: &[ConfigPath],
+    signal_handler: &mut signal::SignalHandler,
+) -> Result<Vec<UnitTest>, Vec<String>> {
     config::init_log_schema(paths, false)?;
-
-    let (config_builder, _) = loading::load_builder_from_paths(paths)?;
+    let (mut secrets_backends_loader, _) = loading::load_secret_backends_from_paths(paths)?;
+    let (config_builder, _) = if secrets_backends_loader.has_secrets_to_retrieve() {
+        let resolved_secrets = secrets_backends_loader
+            .retrieve(&mut signal_handler.subscribe())
+            .map_err(|e| vec![e])?;
+        loading::load_builder_from_paths_with_secrets(paths, resolved_secrets)?
+    } else {
+        loading::load_builder_from_paths(paths)?
+    };
 
     build_unit_tests(config_builder).await
 }
@@ -565,12 +576,12 @@ fn build_outputs(
 fn build_input_event(input: &TestInput) -> Result<Event, String> {
     match input.type_str.as_ref() {
         "raw" => match input.value.as_ref() {
-            Some(v) => Ok(Event::from(v.clone())),
+            Some(v) => Ok(Event::Log(LogEvent::from(v.clone()))),
             None => Err("input type 'raw' requires the field 'value'".to_string()),
         },
         "log" => {
             if let Some(log_fields) = &input.log_fields {
-                let mut event = Event::from("");
+                let mut event = LogEvent::from("");
                 for (path, value) in log_fields {
                     let value: Value = match value {
                         TestInputValue::String(s) => Value::from(s.to_owned()),
@@ -580,9 +591,9 @@ fn build_input_event(input: &TestInput) -> Result<Event, String> {
                             NotNan::new(*f).map_err(|_| "NaN value not supported".to_string())?,
                         ),
                     };
-                    event.as_mut_log().insert(path.as_str(), value);
+                    event.insert(path.as_str(), value);
                 }
-                Ok(event)
+                Ok(event.into())
             } else {
                 Err("input type 'log' requires the field 'log_fields'".to_string())
             }

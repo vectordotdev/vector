@@ -1,22 +1,18 @@
 use std::convert::TryInto;
 use std::io::ErrorKind;
-use std::sync::Arc;
 
 use async_compression::tokio::bufread;
 use aws_sdk_s3::types::ByteStream;
-use aws_sdk_s3::{Endpoint, Region};
-use aws_smithy_async::rt::sleep::AsyncSleep;
-use aws_smithy_client::erase::DynConnector;
-use aws_types::credentials::SharedCredentialsProvider;
 use futures::stream;
 use futures::{stream::StreamExt, TryStreamExt};
-use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tokio_util::io::StreamReader;
+use vector_config::configurable_component;
 
 use super::util::MultilineConfig;
+use crate::aws::create_client;
 use crate::aws::RegionOrEndpoint;
-use crate::aws::{create_client, ClientBuilder};
+use crate::common::s3::S3ClientBuilder;
 use crate::common::sqs::SqsClientBuilder;
 use crate::tls::TlsConfig;
 use crate::{
@@ -31,47 +27,81 @@ use crate::{
 
 pub mod sqs;
 
-#[derive(Derivative, Copy, Clone, Debug, Deserialize, Serialize, PartialEq)]
+/// Compression scheme for objects retrieved from S3.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative, PartialEq)]
 #[serde(rename_all = "lowercase")]
 #[derivative(Default)]
 pub enum Compression {
+    /// Automatically attempt to determine the compression scheme.
+    ///
+    /// Vector will try to determine the compression scheme of the object from its: `Content-Encoding` and
+    /// `Content-Type` metadata, as well as the key suffix (e.g. `.gz`).
+    ///
+    /// It will fallback to 'none' if the compression scheme cannot be determined.
     #[derivative(Default)]
     Auto,
+    /// Uncompressed.
     None,
+    /// GZIP.
     Gzip,
+    /// ZSTD.
     Zstd,
 }
 
-#[derive(Derivative, Copy, Clone, Debug, Deserialize, Serialize)]
+/// Strategies for consuming objects from S3.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative)]
 #[serde(rename_all = "lowercase")]
 #[derivative(Default)]
 enum Strategy {
+    /// Consumes objects by processing bucket notification events sent to an [AWS SQS queue](\(urls.aws_sqs)).
     #[derivative(Default)]
     Sqs,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+/// Configuration for the `aws_s3` source.
+// TODO: The `Default` impl here makes the configuration schema output look pretty weird, especially because all the
+// usage of optionals means we're spewing out a ton of `"foo": null` stuff in the default value, and that's not helpful
+// when there's required fields.
+//
+// Maybe showing defaults at all, when there are required properties, doesn't actually make sense? :thinkies:
+#[configurable_component(source)]
+#[derive(Clone, Debug, Default)]
 #[serde(default, deny_unknown_fields)]
-struct AwsS3Config {
+pub struct AwsS3Config {
     #[serde(flatten)]
     region: RegionOrEndpoint,
 
+    /// The compression scheme used for decompressing objects retrieved from S3.
     compression: Compression,
 
+    /// The strategy to use to consume objects from S3.
     strategy: Strategy,
 
+    /// Configuration options for SQS.
+    ///
+    /// Only relevant when `strategy = "sqs"`.
     sqs: Option<sqs::Config>,
 
-    // Deprecated name. Moved to auth.
+    /// The ARN of an [IAM role](\(urls.aws_iam_role)) to assume at startup.
+    #[deprecated]
     assume_role: Option<String>,
+
+    #[configurable(derived)]
     #[serde(default)]
     auth: AwsAuthentication,
 
+    /// Multiline aggregation configuration.
+    ///
+    /// If not specified, multiline aggregation is disabled.
     multiline: Option<MultilineConfig>,
 
+    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
 
+    #[configurable(derived)]
     tls_options: Option<TlsConfig>,
 }
 
@@ -80,44 +110,6 @@ inventory::submit! {
 }
 
 impl_generate_config_from_default!(AwsS3Config);
-
-struct S3ClientBuilder {}
-
-impl ClientBuilder for S3ClientBuilder {
-    type ConfigBuilder = aws_sdk_s3::config::Builder;
-    type Client = aws_sdk_s3::Client;
-
-    fn create_config_builder(
-        credentials_provider: SharedCredentialsProvider,
-    ) -> Self::ConfigBuilder {
-        aws_sdk_s3::Config::builder().credentials_provider(credentials_provider)
-    }
-
-    fn with_endpoint_resolver(
-        builder: Self::ConfigBuilder,
-        endpoint: Endpoint,
-    ) -> Self::ConfigBuilder {
-        builder.endpoint_resolver(endpoint)
-    }
-
-    fn with_region(builder: Self::ConfigBuilder, region: Region) -> Self::ConfigBuilder {
-        builder.region(region)
-    }
-
-    fn with_sleep_impl(
-        builder: Self::ConfigBuilder,
-        sleep_impl: Arc<dyn AsyncSleep>,
-    ) -> Self::ConfigBuilder {
-        builder.sleep_impl(sleep_impl)
-    }
-
-    fn client_from_conf_conn(
-        builder: Self::ConfigBuilder,
-        connector: DynConnector,
-    ) -> Self::Client {
-        Self::Client::from_conf_conn(builder.build(), connector)
-    }
-}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_s3")]
@@ -157,7 +149,10 @@ impl AwsS3Config {
         multiline: Option<line_agg::Config>,
         proxy: &ProxyConfig,
     ) -> crate::Result<sqs::Ingestor> {
-        let region = self.region.region();
+        let region = self
+            .region
+            .region()
+            .ok_or(CreateSqsIngestorError::RegionMissing)?;
 
         let endpoint = self
             .region
@@ -166,10 +161,11 @@ impl AwsS3Config {
 
         let s3_client = create_client::<S3ClientBuilder>(
             &self.auth,
-            region.clone(),
+            Some(region.clone()),
             endpoint.clone(),
             proxy,
             &self.tls_options,
+            false,
         )
         .await?;
 
@@ -177,10 +173,11 @@ impl AwsS3Config {
             Some(ref sqs) => {
                 let sqs_client = create_client::<SqsClientBuilder>(
                     &self.auth,
-                    region.clone(),
+                    Some(region.clone()),
                     endpoint,
                     proxy,
                     &sqs.tls_options,
+                    false,
                 )
                 .await?;
 
@@ -211,6 +208,8 @@ enum CreateSqsIngestorError {
     Credentials { source: crate::Error },
     #[snafu(display("Configuration for `sqs` required when strategy=sqs"))]
     ConfigMissing,
+    #[snafu(display("Region is required"))]
+    RegionMissing,
     #[snafu(display("Endpoint is invalid"))]
     InvalidEndpoint,
 }
@@ -387,7 +386,10 @@ mod integration_tests {
         event::EventStatus::{self, *},
         line_agg,
         sources::util::MultilineConfig,
-        test_util::{collect_n, lines_from_gzip_file, random_lines, trace_init},
+        test_util::{
+            collect_n, components::assert_source_compliance, lines_from_gzip_file, random_lines,
+            trace_init,
+        },
         SourceSender,
     };
 
@@ -404,6 +406,25 @@ mod integration_tests {
 
         test_event(
             None,
+            None,
+            None,
+            None,
+            logs.join("\n").into_bytes(),
+            logs,
+            Delivered,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn s3_process_message_spaces() {
+        trace_init();
+
+        let key = "key with spaces".to_string();
+        let logs: Vec<String> = random_lines(100).take(10).collect();
+
+        test_event(
+            Some(key),
             None,
             None,
             None,
@@ -583,31 +604,32 @@ mod integration_tests {
         expected_lines: Vec<String>,
         status: EventStatus,
     ) {
-        let key = key.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+        assert_source_compliance(&["protocol"], async move {
+            let key = key.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
 
-        let s3 = s3_client().await;
-        let sqs = sqs_client().await;
+            let s3 = s3_client().await;
+            let sqs = sqs_client().await;
 
-        let queue = create_queue(&sqs).await;
-        let bucket = create_bucket(&s3).await;
+            let queue = create_queue(&sqs).await;
+            let bucket = create_bucket(&s3).await;
 
-        tokio::time::sleep(Duration::from_secs(1)).await;
+            tokio::time::sleep(Duration::from_secs(1)).await;
 
-        let config = config(&queue, multiline);
+            let config = config(&queue, multiline);
 
-        s3.put_object()
-            .bucket(bucket.clone())
-            .key(key.clone())
-            .body(ByteStream::from(payload))
-            .set_content_type(content_type.map(|t| t.to_owned()))
-            .set_content_encoding(content_encoding.map(|t| t.to_owned()))
-            .send()
-            .await
-            .expect("Could not put object");
+            s3.put_object()
+                .bucket(bucket.clone())
+                .key(key.clone())
+                .body(ByteStream::from(payload))
+                .set_content_type(content_type.map(|t| t.to_owned()))
+                .set_content_encoding(content_encoding.map(|t| t.to_owned()))
+                .send()
+                .await
+                .expect("Could not put object");
 
-        let sqs_client = sqs_client().await;
+            let sqs_client = sqs_client().await;
 
-        let mut s3_event: S3Event = serde_json::from_str(
+            let mut s3_event: S3Event = serde_json::from_str(
             r#"
 {
    "Records":[
@@ -648,50 +670,51 @@ mod integration_tests {
    ]
 }
         "#,
-        )
-        .unwrap();
-
-        s3_event.records[0].s3.bucket.name = bucket.clone();
-        s3_event.records[0].s3.object.key = key.clone();
-
-        // send SQS message (this is usually sent by S3 itself when an object is uploaded)
-        // This does not automatically work with localstack and the AWS SDK, so this is done manually
-        let _send_message_output = sqs_client
-            .send_message()
-            .queue_url(queue.clone())
-            .message_body(serde_json::to_string(&s3_event).unwrap())
-            .send()
-            .await
+            )
             .unwrap();
 
-        let (tx, rx) = SourceSender::new_test_finalize(status);
-        let cx = SourceContext::new_test(tx, None);
-        let source = config.build(cx).await.unwrap();
-        tokio::spawn(async move { source.await.unwrap() });
+            s3_event.records[0].s3.bucket.name = bucket.clone();
+            s3_event.records[0].s3.object.key = key.clone();
 
-        let events = collect_n(rx, expected_lines.len()).await;
+            // send SQS message (this is usually sent by S3 itself when an object is uploaded)
+            // This does not automatically work with localstack and the AWS SDK, so this is done manually
+            let _send_message_output = sqs_client
+                .send_message()
+                .queue_url(queue.clone())
+                .message_body(serde_json::to_string(&s3_event).unwrap())
+                .send()
+                .await
+                .unwrap();
 
-        assert_eq!(expected_lines.len(), events.len());
-        for (i, event) in events.iter().enumerate() {
-            let message = expected_lines[i].as_str();
+            let (tx, rx) = SourceSender::new_test_finalize(status);
+            let cx = SourceContext::new_test(tx, None);
+            let source = config.build(cx).await.unwrap();
+            tokio::spawn(async move { source.await.unwrap() });
 
-            let log = event.as_log();
-            assert_eq!(log["message"], message.into());
-            assert_eq!(log["bucket"], bucket.clone().into());
-            assert_eq!(log["object"], key.clone().into());
-            assert_eq!(log["region"], "us-east-1".into());
-        }
+            let events = collect_n(rx, expected_lines.len()).await;
 
-        // Make sure the SQS message is deleted
-        match status {
-            Errored => {
-                // need to wait up to the visibility timeout before it will be counted again
-                assert_eq!(count_messages(&sqs, &queue, 10).await, 1);
+            assert_eq!(expected_lines.len(), events.len());
+            for (i, event) in events.iter().enumerate() {
+                let message = expected_lines[i].as_str();
+
+                let log = event.as_log();
+                assert_eq!(log["message"], message.into());
+                assert_eq!(log["bucket"], bucket.clone().into());
+                assert_eq!(log["object"], key.clone().into());
+                assert_eq!(log["region"], "us-east-1".into());
             }
-            _ => {
-                assert_eq!(count_messages(&sqs, &queue, 0).await, 0);
-            }
-        };
+
+            // Make sure the SQS message is deleted
+            match status {
+                Errored => {
+                    // need to wait up to the visibility timeout before it will be counted again
+                    assert_eq!(count_messages(&sqs, &queue, 10).await, 1);
+                }
+                _ => {
+                    assert_eq!(count_messages(&sqs, &queue, 0).await, 0);
+                }
+            };
+        }).await;
     }
 
     /// creates a new SQS queue
@@ -747,7 +770,7 @@ mod integration_tests {
     async fn s3_client() -> S3Client {
         let auth = AwsAuthentication::test_auth();
         let region_endpoint = RegionOrEndpoint {
-            region: "us-east-1".to_owned(),
+            region: Some("us-east-1".to_owned()),
             endpoint: Some(s3_address()),
         };
         let proxy_config = ProxyConfig::default();
@@ -757,6 +780,7 @@ mod integration_tests {
             region_endpoint.endpoint().unwrap(),
             &proxy_config,
             &None,
+            false,
         )
         .await
         .unwrap()
@@ -765,7 +789,7 @@ mod integration_tests {
     async fn sqs_client() -> SqsClient {
         let auth = AwsAuthentication::test_auth();
         let region_endpoint = RegionOrEndpoint {
-            region: "us-east-1".to_owned(),
+            region: Some("us-east-1".to_owned()),
             endpoint: Some(s3_address()),
         };
         let proxy_config = ProxyConfig::default();
@@ -775,6 +799,7 @@ mod integration_tests {
             region_endpoint.endpoint().unwrap(),
             &proxy_config,
             &None,
+            false,
         )
         .await
         .unwrap()

@@ -1,5 +1,6 @@
-use lookup::lookup_v2::{BorrowedSegment, Path};
 use std::{cmp::Ordering, collections::BTreeMap, iter::Peekable, mem};
+
+use lookup::lookup_v2::{BorrowedSegment, Path};
 
 use super::Value;
 

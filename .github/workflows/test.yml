@@ -6,6 +6,14 @@ on:
     branches:
       - master
 
+concurrency:
+  # For pull requests, cancel running workflows, for master, run all
+  #
+  # `github.event.number` exists for pull requests, otherwise fall back to SHA
+  # for master
+  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
+  cancel-in-progress: true
+
 env:
   AUTOINSTALL: true
   AWS_ACCESS_KEY_ID: "dummy"
@@ -19,20 +27,8 @@ env:
   VERBOSE: true
   CI: true
   PROFILE: debug
-  RUSTFLAGS: "-D warnings"
 
 jobs:
-  cancel-previous:
-    name: Cancel redundant jobs
-    runs-on: ubuntu-20.04
-    timeout-minutes: 3
-    if: github.ref != 'refs/heads/master'
-    steps:
-      - uses: styfle/cancel-workflow-action@0.9.1
-        with:
-          access_token: ${{ secrets.GITHUB_TOKEN }}
-          all_but_latest: true # can cancel workflows scheduled later
-
   changes:
       runs-on: ubuntu-20.04
       # Set job outputs to values from filter step
@@ -110,6 +106,7 @@ jobs:
       - run: make test
         env:
           CARGO_BUILD_JOBS: 5
+      - run: make test-enterprise
       - name: Upload test results
         run: scripts/upload-test-results.sh
         if: always()
@@ -171,7 +168,7 @@ jobs:
 
   cross-linux:
     name: Cross - ${{ matrix.target }}
-    runs-on: ubuntu-20.04
+    runs-on: [linux, test-runner]
     needs: changes
     env:
       CARGO_INCREMENTAL: 0
@@ -213,7 +210,7 @@ jobs:
 
   cross-linux-check:
     if: ${{ needs.changes.outputs.dependencies == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     name: Cross - Linux
     needs: cross-linux
     steps:
@@ -226,7 +223,7 @@ jobs:
     # Full CI suites for this platform were only recently introduced.
     # Some failures are permitted until we can properly correct them.
     continue-on-error: true
-    runs-on: macos-latest
+    runs-on: macos-11
     needs: changes
     env:
       CARGO_INCREMENTAL: 0
@@ -249,6 +246,7 @@ jobs:
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make test
       - run: make test-behavior
+      - run: make test-enterprise
 
   test-windows:
     name: Unit - Windows
@@ -259,6 +257,7 @@ jobs:
       - uses: actions/checkout@v3
       - run: .\scripts\environment\bootstrap-windows-2019.ps1
       - run: make test
+      - run: make test-enterprise
 
   test-vrl:
     name: VRL - Linux
@@ -282,7 +281,6 @@ jobs:
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: cargo install cargo-hack
       - run: make check-component-features
 
   check-msrv:
@@ -298,7 +296,7 @@ jobs:
 
   checks:
     name: Checks
-    runs-on: ubuntu-20.04
+    runs-on: [linux, test-runner]
     needs: changes
     env:
       CARGO_INCREMENTAL: 0
@@ -339,12 +337,12 @@ jobs:
         run: make check-events
       - name: Check cargo deny advisories
         if: needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.deny == 'true'
-        uses: EmbarkStudios/cargo-deny-action@v1.2.15
+        uses: EmbarkStudios/cargo-deny-action@v1.3.1
         with:
           command: check advisories
       - name: Check cargo deny licenses
         if: needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.deny == 'true'
-        uses: EmbarkStudios/cargo-deny-action@v1.2.15
+        uses: EmbarkStudios/cargo-deny-action@v1.3.1
         with:
           command: check licenses
       - name: Check Cue docs
@@ -357,7 +355,6 @@ jobs:
     name: master-failure
     if: failure() && github.ref == 'refs/heads/master'
     needs:
-      - cancel-previous
       - changes
       - cross-linux
       - test-misc

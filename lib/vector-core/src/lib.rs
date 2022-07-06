@@ -8,6 +8,7 @@
 //! This library was extracted from the top-level project package, discussed in
 //! RFC 7027.
 
+#![deny(warnings)]
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
 #![deny(unreachable_pub)]
@@ -30,25 +31,24 @@ pub mod config;
 pub mod event;
 pub mod fanout;
 pub mod metrics;
+pub mod partition;
 pub mod schema;
+pub mod serde;
 pub mod sink;
 pub mod source;
+pub mod stream;
 #[cfg(test)]
 mod test_util;
-pub mod transform;
-pub use vector_buffers as buffers;
-pub mod partition;
-pub mod serde;
-pub mod stream;
 pub mod time;
+pub mod transform;
+
 use std::path::PathBuf;
 
+pub use vector_buffers as buffers;
 #[cfg(any(test, feature = "test"))]
 pub use vector_common::event_test_util;
 pub use vector_common::{byte_size_of::ByteSizeOf, internal_event};
 
-#[macro_use]
-extern crate derivative;
 #[macro_use]
 extern crate tracing;
 

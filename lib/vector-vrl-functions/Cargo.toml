@@ -9,3 +9,4 @@ license = "MPL-2.0"
 [dependencies]
 lookup = { path = "../lookup" }
 vrl = { package = "vrl", path = "../vrl/vrl" }
+value = { path = "../value", default-features = false, features = [] }

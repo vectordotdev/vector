@@ -2,7 +2,7 @@ use std::convert::TryInto;
 
 use aws_sdk_s3::Client as S3Client;
 use codecs::encoding::{Framer, Serializer};
-use codecs::{CharacterDelimitedEncoder, NewlineDelimitedEncoder};
+use codecs::{CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder};
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
 use vector_core::sink::VectorSink;
@@ -36,6 +36,7 @@ const DEFAULT_FILENAME_TIME_FORMAT: &str = "%s";
 const DEFAULT_FILENAME_APPEND_UUID: bool = true;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct S3SinkConfig {
     pub bucket: String,
     pub key_prefix: Option<String>,
@@ -101,7 +102,7 @@ impl SinkConfig for S3SinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(self.encoding.config().1.input_type())
     }
 
     fn sink_type(&self) -> &'static str {
@@ -149,17 +150,20 @@ impl S3SinkConfig {
             .unwrap_or(DEFAULT_FILENAME_APPEND_UUID);
 
         let transformer = self.encoding.transformer();
-        let (framer, serializer) = self.encoding.clone().encoding();
+        let (framer, serializer) = self.encoding.encoding()?;
         let framer = match (framer, &serializer) {
             (Some(framer), _) => framer,
             (None, Serializer::Json(_)) => CharacterDelimitedEncoder::new(b',').into(),
-            (None, Serializer::Native(_)) => {
-                // TODO: We probably want to use something like octet framing here.
-                return Err("Native encoding is not implemented for this sink yet".into());
+            (None, Serializer::Avro(_) | Serializer::Native(_)) => {
+                LengthDelimitedEncoder::new().into()
             }
-            (None, Serializer::NativeJson(_) | Serializer::RawMessage(_)) => {
-                NewlineDelimitedEncoder::new().into()
-            }
+            (
+                None,
+                Serializer::Logfmt(_)
+                | Serializer::NativeJson(_)
+                | Serializer::RawMessage(_)
+                | Serializer::Text(_),
+            ) => NewlineDelimitedEncoder::new().into(),
         };
         let encoder = Encoder::<Framer>::new(framer, serializer);
 

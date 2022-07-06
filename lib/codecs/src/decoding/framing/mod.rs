@@ -9,10 +9,13 @@ mod length_delimited;
 mod newline_delimited;
 mod octet_counting;
 
-pub use self::bytes::{BytesDecoder, BytesDecoderConfig};
+use std::fmt::Debug;
+
+use ::bytes::Bytes;
 pub use character_delimited::{
     CharacterDelimitedDecoder, CharacterDelimitedDecoderConfig, CharacterDelimitedDecoderOptions,
 };
+use dyn_clone::DynClone;
 pub use length_delimited::{LengthDelimitedDecoder, LengthDelimitedDecoderConfig};
 pub use newline_delimited::{
     NewlineDelimitedDecoder, NewlineDelimitedDecoderConfig, NewlineDelimitedDecoderOptions,
@@ -20,12 +23,10 @@ pub use newline_delimited::{
 pub use octet_counting::{
     OctetCountingDecoder, OctetCountingDecoderConfig, OctetCountingDecoderOptions,
 };
-
-use super::StreamDecodingError;
-use ::bytes::Bytes;
-use dyn_clone::DynClone;
-use std::fmt::Debug;
 use tokio_util::codec::LinesCodecError;
+
+pub use self::bytes::{BytesDecoder, BytesDecoderConfig};
+use super::StreamDecodingError;
 
 /// An error that occurred while producing byte frames from a byte stream / byte
 /// message.

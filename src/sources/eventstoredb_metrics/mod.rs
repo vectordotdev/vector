@@ -3,8 +3,8 @@ use std::time::Duration;
 use futures::{FutureExt, StreamExt};
 use http::Uri;
 use hyper::{Body, Request};
-use serde::{Deserialize, Serialize};
 use tokio_stream::wrappers::IntervalStream;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use self::types::Stats;
@@ -12,20 +12,29 @@ use crate::{
     config::{self, Output, SourceConfig, SourceContext, SourceDescription},
     http::HttpClient,
     internal_events::{
-        BytesReceived, EventStoreDbMetricsEventsReceived, EventStoreDbMetricsHttpError,
-        EventStoreDbStatsParsingError, StreamClosedError,
+        BytesReceived, EventStoreDbMetricsHttpError, EventStoreDbStatsParsingError,
+        OldEventsReceived, StreamClosedError,
     },
     tls::TlsSettings,
 };
 
 pub mod types;
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default)]
-struct EventStoreDbConfig {
+/// Configuration for the `eventstoredb_metrics` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug, Default)]
+pub struct EventStoreDbConfig {
+    /// Endpoints to scrape stats from.
     #[serde(default = "default_endpoint")]
     endpoint: String,
+
+    /// The interval between scrapes, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
+
+    /// Overrides the default namespace for the metrics emitted by the source.
+    ///
+    /// By default, `eventstoredb` is used.
     default_namespace: Option<String>,
 }
 
@@ -48,7 +57,7 @@ impl_generate_config_from_default!(EventStoreDbConfig);
 impl SourceConfig for EventStoreDbConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         eventstoredb(
-            self.endpoint.as_str(),
+            self.endpoint.clone(),
             self.scrape_interval_secs,
             self.default_namespace.clone(),
             cx,
@@ -69,7 +78,7 @@ impl SourceConfig for EventStoreDbConfig {
 }
 
 fn eventstoredb(
-    endpoint: &str,
+    endpoint: String,
     interval: u64,
     namespace: Option<String>,
     mut cx: SourceContext,
@@ -78,7 +87,7 @@ fn eventstoredb(
         .take_until(cx.shutdown);
     let tls_settings = TlsSettings::from_options(&None)?;
     let client = HttpClient::new(tls_settings, &cx.proxy)?;
-    let url: Uri = endpoint.parse()?;
+    let url: Uri = endpoint.as_str().parse()?;
 
     Ok(Box::pin(
         async move {
@@ -122,7 +131,7 @@ fn eventstoredb(
                                 let count = metrics.len();
                                 let byte_size = metrics.size_of();
 
-                                emit!(EventStoreDbMetricsEventsReceived { count, byte_size });
+                                emit!(OldEventsReceived { count, byte_size });
 
                                 if let Err(error) = cx.out.send_batch(metrics).await {
                                     emit!(StreamClosedError { count, error });
@@ -144,30 +153,20 @@ mod integration_tests {
     use tokio::time::Duration;
 
     use super::*;
-    use crate::{test_util, SourceSender};
+    use crate::test_util::components::{run_and_assert_source_compliance, SOURCE_TAGS};
 
-    const EVENTSTOREDB_SCRAP_ADDRESS: &str = "http://localhost:2113/stats";
+    const EVENTSTOREDB_SCRAPE_ADDRESS: &str = "http://localhost:2113/stats";
 
     #[tokio::test]
     async fn scrape_something() {
-        test_util::trace_init();
         let config = EventStoreDbConfig {
-            endpoint: EVENTSTOREDB_SCRAP_ADDRESS.to_owned(),
+            endpoint: EVENTSTOREDB_SCRAPE_ADDRESS.to_owned(),
             scrape_interval_secs: 1,
             default_namespace: None,
         };
 
-        let (tx, rx) = SourceSender::new_test();
-        let source = config
-            .build(SourceContext::new_test(tx, None))
-            .await
-            .unwrap();
-
-        tokio::spawn(source);
-
-        tokio::time::sleep(Duration::from_secs(5)).await;
-
-        let events = test_util::collect_ready(rx).await;
+        let events =
+            run_and_assert_source_compliance(config, Duration::from_secs(5), &SOURCE_TAGS).await;
         assert!(!events.is_empty());
     }
 }

@@ -1,11 +1,13 @@
-use crate::value::regex::ValueRegex;
-use crate::{Kind, Value};
+use std::borrow::Cow;
+use std::collections::BTreeMap;
+
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
 use regex::Regex;
-use std::borrow::Cow;
-use std::collections::BTreeMap;
+
+use crate::value::regex::ValueRegex;
+use crate::{Kind, Value};
 
 impl Value {
     /// Returns self as `NotNan<f64>`, only if self is `Value::Float`.
@@ -29,6 +31,18 @@ impl Value {
         match &self {
             Value::Timestamp(ts) => Some(ts),
             _ => None,
+        }
+    }
+
+    /// Returns self as a `DateTime<Utc>`.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if self is anything other than `Value::Timestamp`.
+    pub fn as_timestamp_unwrap(&self) -> &DateTime<Utc> {
+        match self {
+            Value::Timestamp(ref timestamp) => timestamp,
+            _ => panic!("Tried to call `Value::as_timestamp_unwrap` on a non-timestamp value."),
         }
     }
 
@@ -110,6 +124,12 @@ impl Value {
         }
     }
 
+    /// Returns self as `Cow<str>`, only if self is `Value::Bytes`
+    pub fn as_str(&self) -> Option<Cow<'_, str>> {
+        self.as_bytes()
+            .map(|bytes| String::from_utf8_lossy(bytes.as_ref()))
+    }
+
     /// Converts the Value into a byte representation regardless of its original type.
     /// Object and Array are currently not supported, although technically there's no reason why it
     /// couldn't in future should the need arise.
@@ -130,7 +150,7 @@ impl Value {
             Value::Array(_a) => Err("cannot convert array to bytes.".to_string()),
             Value::Timestamp(t) => Ok(Bytes::copy_from_slice(&t.timestamp().to_le_bytes())),
             Value::Regex(r) => Ok(r.to_string().into()),
-            Value::Null => Ok(Bytes::copy_from_slice(&[0_u8])),
+            Self::Null => Ok(Bytes::copy_from_slice(&[0_u8])),
         }
     }
 
@@ -162,13 +182,13 @@ impl Value {
 
     /// Returns true if self is `Value::Null`.
     pub fn is_null(&self) -> bool {
-        matches!(self, Value::Null)
+        matches!(self, Self::Null)
     }
 
     /// Returns self as `())`, only if self is `Value::Null`.
     pub fn as_null(&self) -> Option<()> {
         match self {
-            Value::Null => Some(()),
+            Self::Null => Some(()),
             _ => None,
         }
     }

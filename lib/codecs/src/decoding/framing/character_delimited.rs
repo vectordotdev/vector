@@ -3,6 +3,7 @@ use memchr::memchr;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Decoder;
 use tracing::{trace, warn};
+use vector_config::configurable_component;
 
 use super::BoxedFramingError;
 
@@ -28,7 +29,8 @@ impl CharacterDelimitedDecoderConfig {
 }
 
 /// Options for building a `CharacterDelimitedDecoder`.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[configurable_component]
+#[derive(Clone, Debug, PartialEq)]
 pub struct CharacterDelimitedDecoderOptions {
     /// The character that delimits byte sequences.
     #[serde(with = "vector_core::serde::ascii_char")]
@@ -113,7 +115,7 @@ impl Decoder for CharacterDelimitedDecoder {
                         let frame = buf.split_to(next_delimiter_idx).freeze();
                         trace!(
                             message = "Decoding the frame.",
-                            bytes_proccesed = frame.len()
+                            bytes_processed = frame.len()
                         );
                         buf.advance(1); // scoot past the delimiter
                         return Ok(Some(frame));
@@ -148,10 +150,12 @@ impl Decoder for CharacterDelimitedDecoder {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::collections::HashMap;
+
     use bytes::BufMut;
     use indoc::indoc;
-    use std::collections::HashMap;
+
+    use super::*;
 
     #[test]
     fn decode() {

@@ -5,11 +5,11 @@ pub use self::source::*;
 
 #[cfg(feature = "sinks-splunk_hec")]
 mod sink {
-    use crate::internal_events::prelude::{error_stage, error_type};
     use metrics::{counter, decrement_gauge, increment_gauge};
     use serde_json::Error;
     use vector_core::internal_event::InternalEvent;
 
+    use crate::internal_events::prelude::{error_stage, error_type};
     use crate::{
         event::metric::{MetricKind, MetricValue},
         sinks::splunk_hec::common::acknowledgements::HecAckApiError,
@@ -158,6 +158,32 @@ mod sink {
     impl InternalEvent for SplunkIndexerAcknowledgementAcksRemoved {
         fn emit(self) {
             decrement_gauge!("splunk_pending_acks", self.count);
+        }
+    }
+
+    pub struct SplunkEventTimestampInvalidType<'a> {
+        pub r#type: &'a str,
+    }
+
+    impl<'a> InternalEvent for SplunkEventTimestampInvalidType<'a> {
+        fn emit(self) {
+            warn!(
+                message =
+                    "Timestamp was an unexpected type. Deferring to Splunk to set the timestamp.",
+                invalid_type = self.r#type,
+                internal_log_rate_secs = 10
+            );
+        }
+    }
+
+    pub struct SplunkEventTimestampMissing;
+
+    impl InternalEvent for SplunkEventTimestampMissing {
+        fn emit(self) {
+            warn!(
+                message = "Timestamp was not found. Deferring to Splunk to set the timestamp.",
+                internal_log_rate_secs = 10
+            );
         }
     }
 }

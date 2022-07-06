@@ -1,27 +1,33 @@
+use std::str::FromStr;
+
 use aws_smithy_http::endpoint::Endpoint;
 use aws_types::region::Region;
 use http::Uri;
-use serde::{Deserialize, Serialize};
-use std::str::FromStr;
+use vector_config::configurable_component;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+/// Configuration of the region/endpoint to use when interacting with an AWS service.
+#[configurable_component]
+#[derive(Clone, Debug, Default, PartialEq)]
 #[serde(default)]
 pub struct RegionOrEndpoint {
-    pub region: String,
+    /// The AWS region to use.
+    pub region: Option<String>,
+
+    /// The API endpoint of the service.
     pub endpoint: Option<String>,
 }
 
 impl RegionOrEndpoint {
     pub const fn with_region(region: String) -> Self {
         Self {
-            region,
+            region: Some(region),
             endpoint: None,
         }
     }
 
     pub fn with_both(region: impl Into<String>, endpoint: impl Into<String>) -> Self {
         Self {
-            region: region.into(),
+            region: Some(region.into()),
             endpoint: Some(endpoint.into()),
         }
     }
@@ -34,7 +40,37 @@ impl RegionOrEndpoint {
         }
     }
 
-    pub fn region(&self) -> Region {
-        Region::new(self.region.clone())
+    pub fn region(&self) -> Option<Region> {
+        self.region.clone().map(Region::new)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use super::*;
+
+    #[test]
+    fn optional() {
+        assert!(toml::from_str::<RegionOrEndpoint>(indoc! {r#"
+        "#})
+        .is_ok());
+    }
+
+    #[test]
+    fn region_optional() {
+        assert!(toml::from_str::<RegionOrEndpoint>(indoc! {r#"
+            endpoint = "http://localhost:8080"
+        "#})
+        .is_ok());
+    }
+
+    #[test]
+    fn endpoint_optional() {
+        assert!(toml::from_str::<RegionOrEndpoint>(indoc! {r#"
+            region = "us-east-1"
+        "#})
+        .is_ok());
     }
 }

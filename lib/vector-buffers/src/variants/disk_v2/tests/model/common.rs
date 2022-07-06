@@ -2,11 +2,10 @@ use std::time::Duration;
 
 use proptest::{arbitrary::any, strategy::Strategy};
 
+use super::{filesystem::TestFilesystem, record::Record};
 use crate::variants::disk_v2::{
     DiskBufferConfig, DiskBufferConfigBuilder, Reader, ReaderError, Writer, WriterError,
 };
-
-use super::{filesystem::TestFilesystem, record::Record};
 
 pub type TestReader = Reader<Record, TestFilesystem>;
 pub type TestWriter = Writer<Record, TestFilesystem>;

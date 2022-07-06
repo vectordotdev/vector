@@ -1,5 +1,6 @@
-use async_graphql::{InputObject, InputType};
 use std::collections::BTreeSet;
+
+use async_graphql::{InputObject, InputType};
 
 use super::components::{source, ComponentKind};
 

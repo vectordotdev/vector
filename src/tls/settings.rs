@@ -12,8 +12,8 @@ use openssl::{
     stack::Stack,
     x509::{store::X509StoreBuilder, X509},
 };
-use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
+use vector_config::configurable_component;
 
 use super::{
     AddCertToStoreSnafu, AddExtraChainCertSnafu, CaStackPushSnafu, DerExportSnafu,
@@ -25,14 +25,30 @@ use super::{
 const PEM_START_MARKER: &str = "-----BEGIN ";
 
 #[cfg(test)]
-pub const TEST_PEM_CA_PATH: &str = "tests/data/Vector_CA.crt";
+pub const TEST_PEM_CA_PATH: &str = "tests/data/ca/certs/ca.cert.pem";
+#[cfg(all(test, feature = "kafka-integration-tests"))]
+pub const TEST_PEM_INTERMEDIATE_CA_PATH: &str =
+    "tests/data/ca/intermediate_server/certs/ca-chain.cert.pem";
 #[cfg(test)]
-pub const TEST_PEM_CRT_PATH: &str = "tests/data/localhost.crt";
+pub const TEST_PEM_CRT_PATH: &str =
+    "tests/data/ca/intermediate_server/certs/localhost-chain.cert.pem";
 #[cfg(test)]
-pub const TEST_PEM_KEY_PATH: &str = "tests/data/localhost.key";
+pub const TEST_PEM_KEY_PATH: &str = "tests/data/ca/intermediate_server/private/localhost.key.pem";
+#[cfg(all(test, feature = "sources-socket"))]
+pub const TEST_PEM_CLIENT_CRT_PATH: &str =
+    "tests/data/ca/intermediate_client/certs/localhost-chain.cert.pem";
+#[cfg(all(test, feature = "sources-socket"))]
+pub const TEST_PEM_CLIENT_KEY_PATH: &str =
+    "tests/data/ca/intermediate_client/private/localhost.key.pem";
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+/// Configures the TLS options for incoming/outgoing connections.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
 pub struct TlsEnableableConfig {
+    /// Whether or not to require TLS for incoming/outgoing connections.
+    ///
+    /// When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
+    /// more information.
     pub enabled: Option<bool>,
     #[serde(flatten)]
     pub options: TlsConfig,
@@ -55,18 +71,67 @@ impl TlsEnableableConfig {
     }
 }
 
-/// Standard TLS options
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+/// TlsEnableableConfig for `sources`, adding metadata from the client certificate
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
+pub struct TlsSourceConfig {
+    /// Event field for client certificate metadata.
+    pub client_metadata_key: Option<String>,
+    #[serde(flatten)]
+    pub tls_config: TlsEnableableConfig,
+}
+
+/// Standard TLS options.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct TlsConfig {
+    /// Enables certificate verification.
+    ///
+    /// If enabled, certificates must be valid in terms of not being expired, as well as being issued by a trusted
+    /// issuer. This verification operates in a hierarchical manner, checking that not only the leaf certificate (the
+    /// certificate presented by the client/server) is valid, but also that the issuer of that certificate is valid, and
+    /// so on until reaching a root certificate.
+    ///
+    /// Relevant for both incoming and outgoing connections.
+    ///
+    /// Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
     pub verify_certificate: Option<bool>,
+
+    /// Enables hostname verification.
+    ///
+    /// If enabled, the hostname used to connect to the remote host must be present in the TLS certificate presented by
+    /// the remote host, either as the Common Name or as an entry in the Subject Alternative Name extension.
+    ///
+    /// Only relevant for outgoing connections.
+    ///
+    /// Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname.
     pub verify_hostname: Option<bool>,
+
+    /// Absolute path to an additional CA certificate file.
+    ///
+    /// The certficate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
     #[serde(alias = "ca_path")]
     pub ca_file: Option<PathBuf>,
+
+    /// Absolute path to a certificate file used to identify this server.
+    ///
+    /// The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
+    /// an inline string in PEM format.
+    ///
+    /// If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
     #[serde(alias = "crt_path")]
     pub crt_file: Option<PathBuf>,
+
+    /// Absolute path to a private key file used to identify this server.
+    ///
+    /// The key must be in DER or PEM (PKCS#8) format. Additionally, the key can be provided as an inline string in PEM format.
     #[serde(alias = "key_path")]
     pub key_file: Option<PathBuf>,
+
+    /// Passphrase used to unlock the encrypted key file.
+    ///
+    /// This has no effect unless `key_file` is set.
     pub key_pass: Option<String>,
 }
 
@@ -499,9 +564,11 @@ fn open_read(filename: &Path, note: &'static str) -> Result<(Vec<u8>, PathBuf)> 
 mod test {
     use super::*;
 
-    const TEST_PKCS12_PATH: &str = "tests/data/localhost.p12";
-    const TEST_PEM_CRT_BYTES: &[u8] = include_bytes!("../../tests/data/localhost.crt");
-    const TEST_PEM_KEY_BYTES: &[u8] = include_bytes!("../../tests/data/localhost.key");
+    const TEST_PKCS12_PATH: &str = "tests/data/ca/intermediate_client/private/localhost.p12";
+    const TEST_PEM_CRT_BYTES: &[u8] =
+        include_bytes!("../../tests/data/ca/intermediate_server/certs/localhost.cert.pem");
+    const TEST_PEM_KEY_BYTES: &[u8] =
+        include_bytes!("../../tests/data/ca/intermediate_server/private/localhost.key.pem");
 
     #[test]
     fn from_options_pkcs12() {
@@ -559,7 +626,8 @@ mod test {
     #[test]
     fn from_options_inline_ca() {
         let ca =
-            String::from_utf8(include_bytes!("../../tests/data/Vector_CA.crt").to_vec()).unwrap();
+            String::from_utf8(include_bytes!("../../tests/data/ca/certs/ca.cert.pem").to_vec())
+                .unwrap();
         let options = TlsConfig {
             ca_file: Some(ca.into()),
             ..Default::default()
@@ -573,13 +641,13 @@ mod test {
     #[test]
     fn from_options_intermediate_ca() {
         let options = TlsConfig {
-            ca_file: Some("tests/data/Chain_with_intermediate.crt".into()),
+            ca_file: Some("tests/data/ca/intermediate_server/certs/ca-chain.cert.pem".into()),
             ..Default::default()
         };
         let settings = TlsSettings::from_options(&Some(options))
             .expect("Failed to load authority certificate");
         assert!(settings.identity.is_none());
-        assert_eq!(settings.authorities.len(), 3);
+        assert_eq!(settings.authorities.len(), 2);
     }
 
     #[test]

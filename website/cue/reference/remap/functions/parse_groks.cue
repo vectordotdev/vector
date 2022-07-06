@@ -27,13 +27,6 @@ remap: functions: parse_groks: {
 			type: ["array"]
 		},
 		{
-			name:        "remove_empty"
-			description: "If set to `true`, any patterns that resolve to an empty string are removed from the result."
-			required:    false
-			default:     true
-			type: ["boolean"]
-		},
-		{
 			name:        "aliases"
 			description: "The shared set of grok aliases that can be referenced in the patterns to simplify them."
 			required:    false

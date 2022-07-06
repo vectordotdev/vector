@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use ::value::Value;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -61,11 +62,6 @@ impl Function for TagTypesExternally {
             kind: kind::ANY,
             required: true,
         }]
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        Ok(tag_type_externally(value))
     }
 }
 

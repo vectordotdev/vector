@@ -1,15 +1,17 @@
-use super::Deserializer;
+use std::convert::TryInto;
+
 use bytes::Bytes;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
-use std::convert::TryInto;
 use value::Kind;
 use vector_core::{
     config::{log_schema, DataType},
     event::Event,
     schema,
 };
+
+use super::Deserializer;
 
 /// Config used to build a `JsonDeserializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -29,7 +31,7 @@ impl JsonDeserializerConfig {
     /// The schema produced by the deserializer.
     pub fn schema_definition(&self) -> schema::Definition {
         schema::Definition::empty()
-            .required_field(
+            .with_field(
                 log_schema().timestamp_key(),
                 // The JSON decoder will try to insert a new `timestamp`-type value into the
                 // "timestamp_key" field, but only if that field doesn't already exist.
@@ -100,8 +102,9 @@ impl From<&JsonDeserializerConfig> for JsonDeserializer {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use vector_core::config::log_schema;
+
+    use super::*;
 
     #[test]
     fn deserialize_json() {

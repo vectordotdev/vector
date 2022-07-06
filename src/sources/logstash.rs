@@ -8,10 +8,11 @@ use std::{
 use bytes::{Buf, Bytes, BytesMut};
 use codecs::StreamDecodingError;
 use flate2::read::ZlibDecoder;
-use serde::{Deserialize, Serialize};
+use lookup::path;
 use smallvec::{smallvec, SmallVec};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Decoder;
+use vector_config::configurable_component;
 
 use super::util::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
@@ -19,22 +20,37 @@ use crate::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Output, Resource,
         SourceConfig, SourceContext, SourceDescription,
     },
-    event::{Event, Value},
+    event::{Event, LogEvent, Value},
     serde::bool_or_struct,
     tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
+    tls::{MaybeTlsSettings, TlsSourceConfig},
     types,
 };
 
-#[derive(Deserialize, Serialize, Debug)]
+/// Configuration for the `logstash` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
 pub struct LogstashConfig {
+    /// The address to listen for connections on.
     address: SocketListenAddr,
+
+    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
-    tls: Option<TlsEnableableConfig>,
+
+    #[configurable(derived)]
+    tls: Option<TlsSourceConfig>,
+
+    /// The size, in bytes, of the receive buffer used for each connection.
+    ///
+    /// This should not typically needed to be changed.
     receive_buffer_bytes: Option<usize>,
+
+    /// The maximum number of TCP connections that will be allowed at any given time.
+    connection_limit: Option<u32>,
+
+    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
-    connection_limit: Option<u32>,
 }
 
 inventory::submit! {
@@ -63,12 +79,18 @@ impl SourceConfig for LogstashConfig {
             timestamp_converter: types::Conversion::Timestamp(cx.globals.timezone),
         };
         let shutdown_secs = 30;
-        let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
+        let tls_config = self.tls.as_ref().map(|tls| tls.tls_config.clone());
+        let tls_client_metadata_key = self
+            .tls
+            .as_ref()
+            .and_then(|tls| tls.client_metadata_key.clone());
+        let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
         source.run(
             self.address,
             self.keepalive,
             shutdown_secs,
             tls,
+            tls_client_metadata_key,
             self.receive_buffer_bytes,
             cx,
             self.acknowledgements,
@@ -116,7 +138,7 @@ impl TcpSource for LogstashSource {
             if log.get(log_schema().timestamp_key()).is_none() {
                 // Attempt to parse @timestamp if it exists; otherwise set to receipt time.
                 let timestamp = log
-                    .get_flat("@timestamp")
+                    .get(path!("@timestamp"))
                     .and_then(|timestamp| {
                         self.timestamp_converter
                             .convert::<Value>(timestamp.coerce_to_bytes())
@@ -548,12 +570,13 @@ impl Decoder for LogstashDecoder {
 
 impl From<LogstashEventFrame> for Event {
     fn from(frame: LogstashEventFrame) -> Self {
-        frame
-            .fields
-            .into_iter()
-            .map(|(key, value)| (key, Value::from(value)))
-            .collect::<BTreeMap<_, _>>()
-            .into()
+        Event::Log(LogEvent::from(
+            frame
+                .fields
+                .into_iter()
+                .map(|(key, value)| (key, Value::from(value)))
+                .collect::<BTreeMap<_, _>>(),
+        ))
     }
 }
 
@@ -572,7 +595,10 @@ mod test {
     use super::*;
     use crate::{
         event::EventStatus,
-        test_util::{next_addr, spawn_collect_n, wait_for_tcp},
+        test_util::{
+            components::{assert_source_compliance, SOCKET_PUSH_SOURCE_TAGS},
+            next_addr, spawn_collect_n, wait_for_tcp,
+        },
         SourceSender,
     };
 
@@ -592,27 +618,30 @@ mod test {
     }
 
     async fn test_protocol(status: EventStatus, sends_ack: bool) {
-        let (sender, recv) = SourceSender::new_test_finalize(status);
-        let address = next_addr();
-        let source = LogstashConfig {
-            address: address.into(),
-            tls: None,
-            keepalive: None,
-            receive_buffer_bytes: None,
-            acknowledgements: true.into(),
-            connection_limit: None,
-        }
-        .build(SourceContext::new_test(sender, None))
-        .await
-        .unwrap();
-        tokio::spawn(source);
-        wait_for_tcp(address).await;
+        let events = assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let (sender, recv) = SourceSender::new_test_finalize(status);
+            let address = next_addr();
+            let source = LogstashConfig {
+                address: address.into(),
+                tls: None,
+                keepalive: None,
+                receive_buffer_bytes: None,
+                acknowledgements: true.into(),
+                connection_limit: None,
+            }
+            .build(SourceContext::new_test(sender, None))
+            .await
+            .unwrap();
+            tokio::spawn(source);
+            wait_for_tcp(address).await;
 
-        let events = spawn_collect_n(
-            send_req(address, &[("message", "Hello, world!")], sends_ack),
-            recv,
-            1,
-        )
+            spawn_collect_n(
+                send_req(address, &[("message", "Hello, world!")], sends_ack),
+                recv,
+                1,
+            )
+            .await
+        })
         .await;
 
         assert_eq!(events.len(), 1);
@@ -674,24 +703,30 @@ mod integration_tests {
     use crate::{
         config::SourceContext,
         event::EventStatus,
-        test_util::{collect_n, trace_init, wait_for_tcp},
-        tls::TlsConfig,
+        test_util::{
+            collect_n,
+            components::{assert_source_compliance, SOCKET_PUSH_SOURCE_TAGS},
+            wait_for_tcp,
+        },
+        tls::{TlsConfig, TlsEnableableConfig},
         SourceSender,
     };
 
     fn heartbeat_address() -> String {
-        std::env::var("HEARTBEAT_ADDRESS").unwrap_or_else(|_| "0.0.0.0:8080".into())
+        std::env::var("HEARTBEAT_ADDRESS")
+            .expect("Address of Beats Heartbeat service must be specified.")
     }
 
     #[tokio::test]
     async fn beats_heartbeat() {
-        trace_init();
+        let events = assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let out = source(heartbeat_address(), None).await;
 
-        let out = source(heartbeat_address(), None).await;
-
-        let events = timeout(Duration::from_secs(60), collect_n(out, 1))
-            .await
-            .unwrap();
+            timeout(Duration::from_secs(60), collect_n(out, 1))
+                .await
+                .unwrap()
+        })
+        .await;
 
         assert!(!events.is_empty());
 
@@ -706,29 +741,31 @@ mod integration_tests {
     }
 
     fn logstash_address() -> String {
-        std::env::var("LOGSTASH_ADDRESS").unwrap_or_else(|_| "0.0.0.0:8081".into())
+        std::env::var("LOGSTASH_ADDRESS")
+            .expect("Listen address for `logstash` source must be specified.")
     }
 
     #[tokio::test]
     async fn logstash() {
-        trace_init();
+        let events = assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let out = source(
+                logstash_address(),
+                Some(TlsEnableableConfig {
+                    enabled: Some(true),
+                    options: TlsConfig {
+                        crt_file: Some("tests/data/host.docker.internal.crt".into()),
+                        key_file: Some("tests/data/host.docker.internal.key".into()),
+                        ..Default::default()
+                    },
+                }),
+            )
+            .await;
 
-        let out = source(
-            logstash_address(),
-            Some(TlsEnableableConfig {
-                enabled: Some(true),
-                options: TlsConfig {
-                    crt_file: Some("tests/data/host.docker.internal.crt".into()),
-                    key_file: Some("tests/data/host.docker.internal.key".into()),
-                    ..Default::default()
-                },
-            }),
-        )
+            timeout(Duration::from_secs(60), collect_n(out, 1))
+                .await
+                .unwrap()
+        })
         .await;
-
-        let events = timeout(Duration::from_secs(60), collect_n(out, 1))
-            .await
-            .unwrap();
 
         assert!(!events.is_empty());
 
@@ -747,10 +784,18 @@ mod integration_tests {
     ) -> impl Stream<Item = Event> {
         let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
         let address: std::net::SocketAddr = address.parse().unwrap();
+        let tls_options = match tls {
+            Some(options) => options,
+            None => TlsEnableableConfig::default(),
+        };
+        let tls_config = TlsSourceConfig {
+            client_metadata_key: None,
+            tls_config: tls_options,
+        };
         tokio::spawn(async move {
             LogstashConfig {
                 address: address.into(),
-                tls,
+                tls: Some(tls_config),
                 keepalive: None,
                 receive_buffer_bytes: None,
                 acknowledgements: false.into(),

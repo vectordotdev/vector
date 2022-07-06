@@ -105,18 +105,11 @@
 //! ```
 mod config;
 
-use crate::{
-    conditions::is_log::IsLogConfig,
-    conditions::is_metric::IsMetricConfig,
-    conditions::AnyCondition,
-    config::{GenerateConfig, TransformDescription},
-    schema,
-    transforms::route::{RouteConfig, UNMATCHED_ROUTE},
-};
+use std::{collections::HashSet, fmt::Debug};
+
 use config::EventTypeConfig;
 use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, fmt::Debug};
+use vector_config::configurable_component;
 use vector_core::{
     config::{ComponentKey, DataType, Input, Output},
     transform::{
@@ -124,17 +117,27 @@ use vector_core::{
     },
 };
 
-//------------------------------------------------------------------------------
+use crate::{
+    conditions::AnyCondition,
+    conditions::ConditionConfig,
+    config::{GenerateConfig, TransformDescription},
+    schema,
+    transforms::route::{RouteConfig, UNMATCHED_ROUTE},
+};
 
 inventory::submit! {
     TransformDescription::new::<PipelinesConfig>("pipelines")
 }
 
-/// The configuration of the pipelines transform itself.
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub(crate) struct PipelinesConfig {
+/// Configuration for the `pipelines` transform.
+#[configurable_component(transform)]
+#[derive(Clone, Debug, Default)]
+pub struct PipelinesConfig {
+    /// Configuration for the logs-specific side of the pipeline.
     #[serde(default)]
     logs: EventTypeConfig,
+
+    /// Configuration for the metrics-specific side of the pipeline.
     #[serde(default)]
     metrics: EventTypeConfig,
 }
@@ -188,7 +191,7 @@ impl TransformConfig for PipelinesConfig {
             let logs_route = name.join("logs");
             conditions.insert(
                 "logs".to_string(),
-                AnyCondition::Map(Box::new(IsLogConfig {})),
+                AnyCondition::from(ConditionConfig::IsLog),
             );
             let logs_inputs = vec![router_name.port("logs")];
             let inner_topology = self
@@ -202,7 +205,7 @@ impl TransformConfig for PipelinesConfig {
             let metrics_route = name.join("metrics");
             conditions.insert(
                 "metrics".to_string(),
-                AnyCondition::Map(Box::new(IsMetricConfig {})),
+                AnyCondition::from(ConditionConfig::IsMetric),
             );
             let metrics_inputs = vec![router_name.port("metrics")];
             let inner_topology = self
@@ -234,8 +237,8 @@ impl TransformConfig for PipelinesConfig {
         "pipelines"
     }
 
-    /// The pipelines transform shouldn't be embedded in another pipelines transform.
     fn nestable(&self, parents: &HashSet<&'static str>) -> bool {
+        // The pipelines transform shouldn't be embedded in another pipelines transform.
         !parents.contains(&self.transform_type())
     }
 }
@@ -327,34 +330,18 @@ mod tests {
                 .keys()
                 .map(|key| key.to_string())
                 .collect::<Vec<String>>(),
-            vec![
-                "foo.logs.0.filter",
-                "foo.logs.0.0",
-                "foo.logs.0.1",
-                "foo.logs.1.0",
-                "foo.type_router",
-            ],
+            vec!["foo.logs.0", "foo.logs.1", "foo.type_router",],
         );
+
         assert_eq!(routes["foo.type_router"], vec!["source".to_string()]);
         assert_eq!(
-            routes["foo.logs.0.filter"],
+            routes["foo.logs.0"],
             vec!["foo.type_router.logs".to_string()]
         );
-        assert_eq!(
-            routes["foo.logs.0.0"],
-            vec!["foo.logs.0.filter.success".to_string()]
-        );
-        assert_eq!(routes["foo.logs.0.1"], vec!["foo.logs.0.0".to_string()]);
-        assert_eq!(
-            routes["foo.logs.1.0"],
-            vec![
-                "foo.logs.0.1".to_string(),
-                "foo.logs.0.filter._unmatched".to_string(),
-            ],
-        );
+        assert_eq!(routes["foo.logs.1"], vec!["foo.logs.0".to_string()]);
         assert_eq!(
             expansions["foo"],
-            vec!["foo.type_router._unmatched", "foo.logs.1.0"]
+            vec!["foo.type_router._unmatched", "foo.logs.1"]
         );
     }
 }

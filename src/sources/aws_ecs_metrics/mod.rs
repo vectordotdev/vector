@@ -2,17 +2,16 @@ use std::{env, time::Instant};
 
 use futures::StreamExt;
 use hyper::{Body, Client, Request};
-use serde::{Deserialize, Serialize};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
     config::{self, GenerateConfig, Output, SourceConfig, SourceContext, SourceDescription},
     internal_events::{
         AwsEcsMetricsEventsReceived, AwsEcsMetricsHttpError, AwsEcsMetricsParseError,
-        AwsEcsMetricsRequestCompleted, AwsEcsMetricsResponseError, HttpBytesReceived,
-        StreamClosedError,
+        AwsEcsMetricsResponseError, BytesReceived, RequestCompleted, StreamClosedError,
     },
     shutdown::ShutdownSignal,
     SourceSender,
@@ -20,23 +19,67 @@ use crate::{
 
 mod parser;
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+/// Version of the AWS ECS task metadata endpoint to use.
+///
+/// More information about the different versions can be found
+/// (here)[https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-metadata-endpoint.html].
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum Version {
+    /// Version 2.
+    ///
+    /// More information about version 2 of the task metadata endpoint can be found
+    /// (here)[https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-metadata-endpoint-v2.html].
     V2,
+    /// Version 3.
+    ///
+    /// More information about version 3 of the task metadata endpoint can be found
+    /// (here)[https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-metadata-endpoint-v3.html].
     V3,
+    /// Version 4.
+    ///
+    /// More information about version 4 of the task metadata endpoint can be found
+    /// (here)[https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-metadata-endpoint-v4.html].
     V4,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+/// Configuration for the `aws_ecs_metrics` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-struct AwsEcsMetricsSourceConfig {
+pub struct AwsEcsMetricsSourceConfig {
+    /// Base URI of the task metadata endpoint.
+    ///
+    /// If empty, the URI will be automatically discovered based on the latest version detected.
+    ///
+    /// By default:
+    /// - The version 2 endpoint base URI is `169.254.170.2/v2/`.
+    /// - The version 3 endpoint base URI is stored in the environment variable `ECS_CONTAINER_METADATA_URI`.
+    /// - The version 4 endpoint base URI is stored in the environment variable `ECS_CONTAINER_METADATA_URI_V4`.
     #[serde(default = "default_endpoint")]
     endpoint: String,
+
+    /// The version of the task metadata endpoint to use.
+    ///
+    /// If empty, the version is automatically discovered based on environment variables.
+    ///
+    /// By default:
+    /// - Version 4 is used if the environment variable `ECS_CONTAINER_METADATA_URI_V4` is defined.
+    /// - Version 3 is used if the environment variable `ECS_CONTAINER_METADATA_URI_V4` is not defined, but the
+    ///   environment variable `ECS_CONTAINER_METADATA_URI` _is_ defined.
+    /// - Version 2 is used if neither of the environment variables `ECS_CONTAINER_METADATA_URI_V4` or
+    ///   `ECS_CONTAINER_METADATA_URI` are defined.
     #[serde(default = "default_version")]
     version: Version,
+
+    /// The interval between scrapes, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
+
+    /// The namespace of the metric.
+    ///
+    /// Disabled if empty.
     #[serde(default = "default_namespace")]
     namespace: String,
 }
@@ -143,15 +186,14 @@ async fn aws_ecs_metrics(
             Ok(response) if response.status() == hyper::StatusCode::OK => {
                 match hyper::body::to_bytes(response).await {
                     Ok(body) => {
-                        emit!(AwsEcsMetricsRequestCompleted {
+                        emit!(RequestCompleted {
                             start,
                             end: Instant::now()
                         });
 
-                        emit!(HttpBytesReceived {
+                        emit!(BytesReceived {
                             byte_size: body.len(),
                             protocol: "http",
-                            http_path: uri.path(),
                         });
 
                         match parser::parse(body.as_ref(), namespace.clone()) {
@@ -160,7 +202,7 @@ async fn aws_ecs_metrics(
                                 emit!(AwsEcsMetricsEventsReceived {
                                     byte_size: metrics.size_of(),
                                     count,
-                                    http_path: uri.path(),
+                                    endpoint: uri.path(),
                                 });
 
                                 if let Err(error) = out.send_batch(metrics).await {
@@ -209,12 +251,15 @@ mod test {
         service::{make_service_fn, service_fn},
         Body, Response, Server,
     };
-    use tokio::time::{sleep, Duration};
+    use tokio::time::Duration;
 
     use super::*;
     use crate::{
         event::MetricValue,
-        test_util::{collect_ready, next_addr, wait_for_tcp},
+        test_util::{
+            components::{run_and_assert_source_compliance, SOURCE_TAGS},
+            next_addr, wait_for_tcp,
+        },
         Error,
     };
 
@@ -528,23 +573,18 @@ mod test {
         });
         wait_for_tcp(in_addr).await;
 
-        let (tx, rx) = SourceSender::new_test();
-
-        let source = AwsEcsMetricsSourceConfig {
+        let config = AwsEcsMetricsSourceConfig {
             endpoint: format!("http://{}", in_addr),
             version: Version::V4,
             scrape_interval_secs: 1,
             namespace: default_namespace(),
-        }
-        .build(SourceContext::new_test(tx, None))
-        .await
-        .unwrap();
-        tokio::spawn(source);
+        };
 
-        sleep(Duration::from_secs(1)).await;
+        let events =
+            run_and_assert_source_compliance(config, Duration::from_secs(1), &SOURCE_TAGS).await;
+        assert!(!events.is_empty());
 
-        let metrics = collect_ready(rx)
-            .await
+        let metrics = events
             .into_iter()
             .map(|e| e.into_metric())
             .collect::<Vec<_>>();
@@ -575,10 +615,10 @@ mod test {
 #[cfg(feature = "aws-ecs-metrics-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use tokio::time::{sleep, Duration};
+    use tokio::time::Duration;
 
     use super::*;
-    use crate::test_util::collect_ready;
+    use crate::test_util::components::{run_and_assert_source_compliance, SOURCE_TAGS};
 
     fn ecs_address() -> String {
         std::env::var("ECS_ADDRESS").unwrap_or_else(|_| "http://localhost:9088".into())
@@ -589,24 +629,16 @@ mod integration_tests {
     }
 
     async fn scrape_metrics(endpoint: String, version: Version) {
-        let (tx, rx) = SourceSender::new_test();
-
-        let source = AwsEcsMetricsSourceConfig {
+        let config = AwsEcsMetricsSourceConfig {
             endpoint,
             version,
             scrape_interval_secs: 1,
             namespace: default_namespace(),
-        }
-        .build(SourceContext::new_test(tx, None))
-        .await
-        .unwrap();
-        tokio::spawn(source);
+        };
 
-        sleep(Duration::from_secs(5)).await;
-
-        let metrics = collect_ready(rx).await;
-
-        assert!(!metrics.is_empty());
+        let events =
+            run_and_assert_source_compliance(config, Duration::from_secs(5), &SOURCE_TAGS).await;
+        assert!(!events.is_empty());
     }
 
     #[tokio::test]
