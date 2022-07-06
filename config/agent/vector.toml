@@ -26,57 +26,30 @@ playground = false
 type = "datadog_agent"
 address = "[::]:8282"
 
-# Collect logs from a Fluentd or Fluent Bit agent.
-[sources.fluent]
-type = "fluent"
-address = "[::]:24224"
+# Collect logs from files.
+[sources.file]
+type = "file"
+include = ["/var/log/**/*.log"]
+
+# Collect metric data from the local system.
+[sources.host_metrics]
+type = "host_metrics"
+[sources.host_metrics.filesystem]
+devices.excludes = ["binfmt_misc"]
+filesystems.excludes = ["binfmt_misc"]
+mountPoints.excludes = ["*/proc/sys/fs/binfmt_misc"]
 
 # Access to the metrics produced by Vector itself.
 [sources.internal_metrics]
 type = "internal_metrics"
 
-# Collect logs from a Logstash agent.
-[sources.logstash]
-type = "logstash"
-address = "[::]:5044"
-
-# Receive logs from Splunk.
-[sources.splunk_hec]
-type = "splunk_hec"
-address = "[::]:8080"
-
-# Collect metrics emitted by the StatsD aggregator.
-[sources.statsd]
-type = "statsd"
-mode = "tcp"
-address = "[::]:8125"
-
-# Collect logs sent via Syslog.
-[sources.syslog]
-type = "syslog"
-mode = "tcp"
-address = "[::]:9000"
-
-# Collect observability data from another Vector instance.
-[sources.vector]
-type = "vector"
-address = "[::]:6000"
-
 # Send observability events nowhere
 [sinks.blackhole]
 type = "blackhole"
-inputs = [
-    "datadog_agent",
-    "fluent",
-    "logstash",
-    "splunk_hec",
-    "statsd",
-    "syslog",
-    "vector",
-]
+inputs = ["datadog_agent", "file"]
 
 # Output metric events to a Prometheus exporter running on the host.
 [sinks.prom_exporter]
 type = "prometheus_exporter"
-inputs = ["internal_metrics"]
+inputs = ["host_metrics", "internal_metrics"]
 address = "[::]:9090"
