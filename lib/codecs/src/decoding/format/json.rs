@@ -40,9 +40,7 @@ impl JsonDeserializerConfig {
                     Some("timestamp"),
                 )
                 .unknown_fields(Kind::json()),
-            LogNamespace::Vector => {
-                schema::Definition::empty_with_kind(Kind::json(), [log_namespace])
-            }
+            LogNamespace::Vector => schema::Definition::new(Kind::json(), [log_namespace]),
         }
     }
 }

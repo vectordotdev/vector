@@ -45,7 +45,7 @@ pub fn merged_definition(
         return definition.clone();
     }
 
-    let mut definition = Definition::empty_with_kind(Kind::never(), []);
+    let mut definition = Definition::new(Kind::never(), []);
 
     for input in inputs {
         let key = &input.component;
@@ -104,6 +104,8 @@ pub fn merged_definition(
             }
         }
     }
+    definition
+}
 
 /// Get a list of definitions from individual pipelines feeding into a component.
 ///

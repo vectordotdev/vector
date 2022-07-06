@@ -83,13 +83,13 @@ impl From<LookupBuf> for MeaningPointer {
 impl Definition {
     /// The most general possible definition. The `Kind` is `any`, and all `log_namespaces` are enabled.
     pub fn any() -> Self {
-        Self::empty_with_kind(Kind::any(), [LogNamespace::Legacy, LogNamespace::Vector])
+        Self::new(Kind::any(), [LogNamespace::Legacy, LogNamespace::Vector])
     }
 
-    /// Creates an empty definition that is of the kind specified.
-    /// There are no meanings or optional fields.
+    /// Creates a new definition that is of the kind specified.
+    /// There are no meanings.
     /// The `log_namespaces` are used to list the possible namespaces the schema is for.
-    pub fn empty_with_kind(kind: Kind, log_namespaces: impl Into<BTreeSet<LogNamespace>>) -> Self {
+    pub fn new(kind: Kind, log_namespaces: impl Into<BTreeSet<LogNamespace>>) -> Self {
         Self {
             kind,
             meaning: BTreeMap::default(),
@@ -100,13 +100,13 @@ impl Definition {
     /// An object with any fields, and the `Legacy` namespace.
     /// This is the default schema for a source that does not explicitely provide one yet.
     pub fn default_legacy_namespace() -> Self {
-        Self::empty_with_kind(Kind::any_object(), [LogNamespace::Legacy])
+        Self::new(Kind::any_object(), [LogNamespace::Legacy])
     }
 
     /// An object with any fields, and the `Legacy` namespace.
     /// This is what most sources use for the legacy namespace.
     pub fn empty_legacy_namespace() -> Self {
-        Self::empty_with_kind(Kind::object(Collection::empty()), [LogNamespace::Legacy])
+        Self::new(Kind::object(Collection::empty()), [LogNamespace::Legacy])
     }
 
     /// Returns the source schema for a source that produce the listed log namespaces,
@@ -115,12 +115,10 @@ impl Definition {
         let is_legacy = log_namespaces.contains(&LogNamespace::Legacy);
         let is_vector = log_namespaces.contains(&LogNamespace::Vector);
         match (is_legacy, is_vector) {
-            (false, false) => Self::empty_with_kind(Kind::any(), []),
+            (false, false) => Self::new(Kind::any(), []),
             (true, false) => Self::default_legacy_namespace(),
-            (false, true) => Self::empty_with_kind(Kind::any(), [LogNamespace::Vector]),
-            (true, true) => {
-                Self::empty_with_kind(Kind::any(), [LogNamespace::Legacy, LogNamespace::Vector])
-            }
+            (false, true) => Self::new(Kind::any(), [LogNamespace::Vector]),
+            (true, true) => Self::new(Kind::any(), [LogNamespace::Legacy, LogNamespace::Vector]),
         }
     }
 
@@ -435,7 +433,7 @@ mod tests {
                 },
             ),
         ]) {
-            let mut got = Definition::empty_with_kind(Kind::object(BTreeMap::new()), []);
+            let mut got = Definition::new(Kind::object(BTreeMap::new()), []);
             got = got.optional_field(path, kind, meaning);
 
             assert_eq!(got, want, "{}", title);
@@ -450,7 +448,7 @@ mod tests {
             log_namespaces: BTreeSet::new(),
         };
 
-        let mut got = Definition::empty_with_kind(Kind::object(Collection::empty()), []);
+        let mut got = Definition::new(Kind::object(Collection::empty()), []);
         got = got.unknown_fields(Kind::boolean());
         got = got.unknown_fields(Kind::bytes().or_integer());
 

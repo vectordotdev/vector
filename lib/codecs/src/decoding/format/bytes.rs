@@ -40,10 +40,8 @@ impl BytesDeserializerConfig {
                 Kind::bytes(),
                 Some("message"),
             ),
-            LogNamespace::Vector => {
-                schema::Definition::empty_with_kind(Kind::bytes(), [log_namespace])
-                    .with_meaning(LookupBuf::root(), "message")
-            }
+            LogNamespace::Vector => schema::Definition::new(Kind::bytes(), [log_namespace])
+                .with_meaning(LookupBuf::root(), "message"),
         }
     }
 }
