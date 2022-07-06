@@ -8694,6 +8694,7 @@ dependencies = [
  "clap 3.2.7",
  "exitcode",
  "indoc",
+ "lookup",
  "once_cell",
  "prettytable-rs",
  "regex",

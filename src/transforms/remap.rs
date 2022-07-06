@@ -12,10 +12,12 @@ use snafu::{ResultExt, Snafu};
 use value::Kind;
 use vector_common::TimeZone;
 use vector_config::configurable_component;
+use vector_core::compile_vrl;
 use vector_core::config::LogNamespace;
 use vector_core::schema::Definition;
 
 use vector_vrl_functions::set_semantic_meaning::MeaningList;
+use vrl::state::LocalEnv;
 use vrl::{
     diagnostic::{Formatter, Note},
     prelude::{DiagnosticMessage, ExpressionError},
@@ -137,7 +139,7 @@ impl RemapConfig {
         state.set_external_context(enrichment_tables);
         state.set_external_context(MeaningList::default());
 
-        vrl::compile_with_external(&source, &functions, &mut state)
+        compile_vrl(&source, &functions, &mut state, LocalEnv::default())
             .map_err(|diagnostics| {
                 Formatter::new(&source, diagnostics)
                     .colored()
