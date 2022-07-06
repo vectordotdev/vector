@@ -1,6 +1,7 @@
 use crate::{get_metadata_key, MetadataKey};
 use ::value::Value;
 use vrl::prelude::*;
+use vrl::state::{ExternalEnv, LocalEnv};
 
 fn set_metadata_field(
     ctx: &mut Context,
@@ -100,5 +101,13 @@ impl Expression for SetMetadataFieldFn {
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         TypeDef::null().infallible()
+    }
+
+    fn update_state(
+        &mut self,
+        local: &mut LocalEnv,
+        external: &mut ExternalEnv,
+    ) -> std::result::Result<(), ExpressionError> {
+        Ok(())
     }
 }

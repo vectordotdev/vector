@@ -216,6 +216,7 @@ impl TransformConfig for RemapConfig {
             })
             .unwrap_or_else(|_| {
                 Definition::empty_with_kind(
+                    // a program that fails to compile will "never" return a value
                     Kind::never(),
                     input_definition.log_namespaces().clone(),
                 )
