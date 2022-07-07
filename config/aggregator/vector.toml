@@ -12,10 +12,6 @@
 # Chat: https://chat.vector.dev
 # ------------------------------------------------------------------------------
 
-# NOTE: This is an example config that can be edited in place as desired.
-# By default all events are routed to a `blackhole` sink and thrown away,
-# this sink should be changed to a "real" one for actual use.
-
 # The directory used for persisting Vector state.
 data_dir = "/var/lib/vector"
 
@@ -66,9 +62,9 @@ address = "[::]:9000"
 type = "vector"
 address = "[::]:6000"
 
-# Send observability events nowhere
-[sinks.blackhole]
-type = "blackhole"
+# Publish log events to Datadog
+[sinks.datadog_logs]
+type = "datadog_logs"
 inputs = [
     "datadog_agent",
     "fluent",
@@ -77,6 +73,7 @@ inputs = [
     "syslog",
     "vector",
 ]
+default_api_key = "${DATADOG_API_KEY}"
 
 # Output metric events to a Prometheus exporter running on the host.
 [sinks.prom_exporter]
