@@ -333,9 +333,11 @@ configuration: {
 						}
 						```
 
-						If an `error` is returned for any secrets, or if the
-						command exits with a non-zero status code, Vector will
-						log the errors and exit.
+						If an `error` is returned for any secrets, or if the command exits with a non-zero status code,
+						Vector will log the errors and exit.
+
+						Secrets will be loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
+						configuration reload process.
 						"""
 					type: object: options: {
 						command: {
