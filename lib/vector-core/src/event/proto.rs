@@ -155,21 +155,34 @@ impl From<Metric> for event::Metric {
                 samples: dist.samples.into_iter().map(Into::into).collect(),
             },
             MetricValue::AggregatedHistogram1(hist) => event::MetricValue::AggregatedHistogram {
-                buckets: event::metric::zip_buckets(hist.buckets, hist.counts),
-                count: hist.count,
+                buckets: event::metric::zip_buckets(
+                    hist.buckets,
+                    hist.counts.iter().map(|h| u64::from(*h)),
+                ),
+                count: u64::from(hist.count),
                 sum: hist.sum,
             },
             MetricValue::AggregatedHistogram2(hist) => event::MetricValue::AggregatedHistogram {
+                buckets: hist.buckets.into_iter().map(Into::into).collect(),
+                count: u64::from(hist.count),
+                sum: hist.sum,
+            },
+            MetricValue::AggregatedHistogram3(hist) => event::MetricValue::AggregatedHistogram {
                 buckets: hist.buckets.into_iter().map(Into::into).collect(),
                 count: hist.count,
                 sum: hist.sum,
             },
             MetricValue::AggregatedSummary1(summary) => event::MetricValue::AggregatedSummary {
                 quantiles: event::metric::zip_quantiles(summary.quantiles, summary.values),
-                count: summary.count,
+                count: u64::from(summary.count),
                 sum: summary.sum,
             },
             MetricValue::AggregatedSummary2(summary) => event::MetricValue::AggregatedSummary {
+                quantiles: summary.quantiles.into_iter().map(Into::into).collect(),
+                count: u64::from(summary.count),
+                sum: summary.sum,
+            },
+            MetricValue::AggregatedSummary3(summary) => event::MetricValue::AggregatedSummary {
                 quantiles: summary.quantiles.into_iter().map(Into::into).collect(),
                 count: summary.count,
                 sum: summary.sum,
@@ -306,7 +319,7 @@ impl From<event::Metric> for WithMetadata<Metric> {
                 buckets,
                 count,
                 sum,
-            } => MetricValue::AggregatedHistogram2(AggregatedHistogram2 {
+            } => MetricValue::AggregatedHistogram3(AggregatedHistogram3 {
                 buckets: buckets.into_iter().map(Into::into).collect(),
                 count,
                 sum,
@@ -315,7 +328,7 @@ impl From<event::Metric> for WithMetadata<Metric> {
                 quantiles,
                 count,
                 sum,
-            } => MetricValue::AggregatedSummary2(AggregatedSummary2 {
+            } => MetricValue::AggregatedSummary3(AggregatedSummary3 {
                 quantiles: quantiles.into_iter().map(Into::into).collect(),
                 count,
                 sum,

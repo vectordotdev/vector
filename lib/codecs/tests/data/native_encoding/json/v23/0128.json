@@ -1,0 +1,1 @@
+{"metric":{"name":"z","namespace":"l","kind":"absolute","aggregated_summary":{"quantiles":[{"quantile":662592.0,"value":858240.0},{"quantile":-513536.0,"value":633344.0},{"quantile":-148928.0,"value":-624768.0},{"quantile":326080.0,"value":448320.0}],"count":1001486270,"sum":-398336.0}}}

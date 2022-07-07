@@ -41,8 +41,10 @@ configuration: {
 			common:      false
 			description: """
 				Configuration options for an [enrichment table](\(urls.enrichment_tables_concept)) to be used in a
-				[`remap`](\(urls.vector_remap_transform)) transform. Currently, only [CSV](\(urls.csv)) files are
-				supported.
+				[`remap`](\(urls.vector_remap_transform)) transform. Currently supported are:
+
+				* [CSV](\(urls.csv)) files
+				* [MaxMind](\(urls.maxmind)) databases
 
 				For the lookup in the enrichment tables to be as performant as possible, the data is indexed according
 				to the fields that are used in the search. Note that indices can only be created for fields for which an
@@ -129,6 +131,57 @@ configuration: {
 								]
 
 								options: {}
+							}
+						}
+					}
+				}
+			}
+			type: object: options: {
+				geoip: {
+					required:    true
+					description: """
+						Configuration options for [MaxMind](\(urls.maxmind)) databases.
+
+						The following [MaxMind](\(urls.maxmind)) databases are currently supported:
+
+						* [GeoLite2-ASN.mmdb](\(urls.maxmind_geolite2_asn)) (free) — Determine the
+							autonomous system number and organization associated with an IP address.
+						* [GeoLite2-City.mmdb](\(urls.maxmind_geolite2_city)) (free) — Determine the
+							country, subdivisions, city, and postal code associated with IPv4 and IPv6
+							addresses worldwide.
+						* [GeoIP2-City.mmdb](\(urls.maxmind_geoip2_city)) (paid) — Determine the country,
+							subdivisions, city, and postal code associated with IPv4 and IPv6
+							addresses worldwide.
+						* [GeoIP2-ISP.mmdb](\(urls.maxmind_geoip2_isp)) (paid) — Determine the Internet
+							Service Provider (ISP), organization name, and autonomous system organization
+							and number associated with an IP address.
+
+						The database file should be in the [MaxMind DB file format](\(urls.maxmind_db_file_format)).
+
+						This enrichment table only supports lookup with IP address.
+						"""
+					type: object: options: {
+						path: {
+							description: """
+								Path to the [MaxMind GeoIP2](\(urls.maxmind_geoip2)) or [GeoLite2 binary city
+								database](\(urls.maxmind_geolite2_city)) file (`GeoLite2-City.mmdb`). Other
+								databases, such as the country database, are not supported.
+								"""
+							required:    true
+							type: string: {
+								examples: ["/path/to/GeoLite2-City.mmdb", "/path/to/GeoLite2-ISP.mmdb"]
+							}
+						}
+						locale: {
+							description: """
+								The locale to use to lookup the country name and region name for the city database.
+								See [Locations Files](https://dev.maxmind.com/geoip/docs/databases/city-and-country?lang=en)
+								"""
+							required: false
+							common:   false
+							type: string: {
+								default: "en"
+								examples: ["de", "en", "es", "fr", "ja", "pt-BR", "ru", "zh-CN"]
 							}
 						}
 					}
