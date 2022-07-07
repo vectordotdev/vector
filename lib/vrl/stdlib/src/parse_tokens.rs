@@ -77,7 +77,7 @@ impl Expression for ParseTokensFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_parse_tokens(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 #[cfg(test)]

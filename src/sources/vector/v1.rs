@@ -4,8 +4,8 @@ use codecs::{
     LengthDelimitedDecoder,
 };
 use prost::Message;
-use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -18,18 +18,33 @@ use crate::{
         Source,
     },
     tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
+    tls::{MaybeTlsSettings, TlsSourceConfig},
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for version one of the `vector` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct VectorConfig {
+    /// The address to listen for connections on.
+    ///
+    /// It _must_ include a port.
     address: SocketListenAddr,
+
+    #[configurable(derived)]
     keepalive: Option<TcpKeepaliveConfig>,
+
+    /// The timeout, in seconds, before a connection is forcefully closed during shutdown.
     #[serde(default = "default_shutdown_timeout_secs")]
     shutdown_timeout_secs: u64,
-    tls: Option<TlsEnableableConfig>,
+
+    /// The size, in bytes, of the receive buffer used for each connection.
+    ///
+    /// This should not typically needed to be changed.
     receive_buffer_bytes: Option<usize>,
+
+    #[configurable(derived)]
+    tls: Option<TlsSourceConfig>,
 }
 
 const fn default_shutdown_timeout_secs() -> u64 {
@@ -40,7 +55,7 @@ impl VectorConfig {
     #[cfg(test)]
     #[allow(unused)] // this test function is not always used in test, breaking
                      // our check-component-features run
-    pub fn set_tls(&mut self, config: Option<TlsEnableableConfig>) {
+    pub fn set_tls(&mut self, config: Option<TlsSourceConfig>) {
         self.tls = config;
     }
 
@@ -67,12 +82,19 @@ impl GenerateConfig for VectorConfig {
 impl VectorConfig {
     pub(super) async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let vector = VectorSource;
-        let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
+        let tls_config = self.tls.as_ref().map(|tls| tls.tls_config.clone());
+        let tls_client_metadata_key = self
+            .tls
+            .as_ref()
+            .and_then(|tls| tls.client_metadata_key.clone());
+
+        let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
         vector.run(
             self.address,
             self.keepalive,
             self.shutdown_timeout_secs,
             tls,
+            tls_client_metadata_key,
             self.receive_buffer_bytes,
             cx,
             false.into(),
@@ -166,7 +188,7 @@ mod test {
         config::{ComponentKey, GlobalOptions, SinkContext, SourceContext},
         event::{
             metric::{MetricKind, MetricValue},
-            Event, Metric,
+            Event, LogEvent, Metric,
         },
         shutdown::ShutdownSignal,
         sinks::vector::v1::VectorConfig as SinkConfig,
@@ -175,7 +197,7 @@ mod test {
             components::{assert_source_compliance, SOCKET_PUSH_SOURCE_TAGS},
             next_addr, trace_init, wait_for_tcp,
         },
-        tls::{TlsConfig, TlsEnableableConfig},
+        tls::{TlsConfig, TlsEnableableConfig, TlsSourceConfig},
         SourceSender,
     };
 
@@ -198,14 +220,14 @@ mod test {
         let (sink, _) = sink.build(cx).await.unwrap();
 
         let events = vec![
-            Event::from("test"),
-            Event::from("events"),
-            Event::from("to roundtrip"),
-            Event::from("through"),
-            Event::from("the native"),
-            Event::from("sink"),
-            Event::from("and"),
-            Event::from("source"),
+            Event::Log(LogEvent::from("test")),
+            Event::Log(LogEvent::from("events")),
+            Event::Log(LogEvent::from("to roundtrip")),
+            Event::Log(LogEvent::from("through")),
+            Event::Log(LogEvent::from("the native")),
+            Event::Log(LogEvent::from("sink")),
+            Event::Log(LogEvent::from("and")),
+            Event::Log(LogEvent::from("source")),
             Event::Metric(Metric::new(
                 String::from("also test a metric"),
                 MetricKind::Absolute,
@@ -243,7 +265,10 @@ mod test {
                 addr,
                 {
                     let mut config = VectorConfig::from_address(addr.into());
-                    config.set_tls(Some(TlsEnableableConfig::test_config()));
+                    config.set_tls(Some(TlsSourceConfig {
+                        tls_config: TlsEnableableConfig::test_config(),
+                        client_metadata_key: None,
+                    }));
                     config
                 },
                 {
@@ -326,7 +351,7 @@ mod test {
             .unwrap();
         tokio::spawn(server);
 
-        let event = proto::EventWrapper::from(Event::from("short"));
+        let event = proto::EventWrapper::from(Event::Log(LogEvent::from("short")));
         let event_len = event.encoded_len();
         let full_len = event_len + 4;
 

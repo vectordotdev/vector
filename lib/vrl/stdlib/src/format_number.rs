@@ -185,7 +185,7 @@ impl Expression for FormatNumberFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_format_number(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 #[cfg(test)]
 mod tests {
@@ -226,7 +226,7 @@ mod tests {
         }
 
         big_number {
-            args: func_args![value: 11222333444.56789,
+            args: func_args![value: 11_222_333_444.567_89,
                              scale: 3,
                              decimal_separator: ",",
                              grouping_separator: "."],

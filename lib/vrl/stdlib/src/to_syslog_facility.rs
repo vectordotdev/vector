@@ -104,7 +104,7 @@ impl Expression for ToSyslogFacilityFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_to_syslog_facility(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 #[cfg(test)]

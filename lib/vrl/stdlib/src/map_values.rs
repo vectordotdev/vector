@@ -75,8 +75,8 @@ impl Function for MapValues {
 
         Ok(Box::new(MapValuesFn {
             value,
-            closure,
             recursive,
+            closure,
         }))
     }
 
@@ -140,7 +140,7 @@ impl Expression for MapValuesFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_map_values(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 fn recursive_type_def(from: &mut Kind, to: Kind, root: bool) {

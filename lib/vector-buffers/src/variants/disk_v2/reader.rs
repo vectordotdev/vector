@@ -11,7 +11,7 @@ use crc32fast::Hasher;
 use rkyv::{archived_root, AlignedVec};
 use snafu::{ResultExt, Snafu};
 use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
-use vector_common::internal_event::emit;
+use vector_common::{finalization::BatchNotifier, finalizer::OrderedFinalizer};
 
 use super::{
     common::create_crc32c_hasher,
@@ -21,7 +21,7 @@ use super::{
 };
 use crate::{
     encoding::{AsMetadata, Encodable},
-    internal_events::EventsCorrupted,
+    internal_events::BufferReadError,
     topology::acks::{EligibleMarker, EligibleMarkerLength, MarkerError, OrderedAcknowledgements},
     variants::disk_v2::{io::AsyncFile, record::try_as_record_archive},
     Bufferable,
@@ -136,6 +136,32 @@ where
                 | ReaderError::Deserialization { .. }
                 | ReaderError::PartialWrite
         )
+    }
+
+    fn as_error_code(&self) -> &'static str {
+        match self {
+            ReaderError::Io { .. } => "io_error",
+            ReaderError::Deserialization { .. } => "deser_failed",
+            ReaderError::Checksum { .. } => "checksum_mismatch",
+            ReaderError::Decode { .. } => "decode_failed",
+            ReaderError::Incompatible { .. } => "incompatible_record_version",
+            ReaderError::PartialWrite => "partial_write",
+            ReaderError::EmptyRecord => "empty_record",
+        }
+    }
+
+    pub fn as_recoverable_error(&self) -> Option<BufferReadError> {
+        let error = self.to_string();
+        let error_code = self.as_error_code();
+
+        match self {
+            ReaderError::Io { .. } | ReaderError::EmptyRecord => None,
+            ReaderError::Deserialization { .. }
+            | ReaderError::Checksum { .. }
+            | ReaderError::Decode { .. }
+            | ReaderError::Incompatible { .. }
+            | ReaderError::PartialWrite => Some(BufferReadError { error_code, error }),
+        }
     }
 }
 
@@ -384,6 +410,7 @@ where
     ready_to_read: bool,
     record_acks: OrderedAcknowledgements<u64, u64>,
     data_file_acks: OrderedAcknowledgements<u64, (PathBuf, u64)>,
+    finalizer: OrderedFinalizer<u64>,
     _t: PhantomData<T>,
 }
 
@@ -394,7 +421,7 @@ where
     FS::File: Unpin,
 {
     /// Creates a new [`Reader`] attached to the given [`Ledger`].
-    pub(crate) fn new(ledger: Arc<Ledger<FS>>) -> Self {
+    pub(crate) fn new(ledger: Arc<Ledger<FS>>, finalizer: OrderedFinalizer<u64>) -> Self {
         let ledger_last_reader_record_id = ledger.state().get_last_reader_record_id();
         let next_expected_record_id = ledger_last_reader_record_id.wrapping_add(1);
 
@@ -409,6 +436,7 @@ where
             ready_to_read: false,
             record_acks: OrderedAcknowledgements::from_acked(next_expected_record_id),
             data_file_acks: OrderedAcknowledgements::from_acked(0),
+            finalizer,
             _t: PhantomData,
         }
     }
@@ -610,18 +638,7 @@ where
 
             // If any events were skipped, do our logging/metrics for that.
             if events_skipped > 0 {
-                error!(
-                    dropped_events = events_skipped,
-                    "Detected missing/dropped events.  Buffer data loss has occurred."
-                );
-
-                // TODO: We probably need to make this actually decrement the buffer events gauge directly.
-                //
-                // We don't update it unless there's a received/sent event emitted, which these
-                // events naturally will not be part of as they don't flow out of the buffer.
-                emit(EventsCorrupted {
-                    count: events_skipped,
-                });
+                self.ledger.track_dropped_events(events_skipped);
             }
         }
 
@@ -1056,16 +1073,20 @@ where
             .reader
             .as_mut()
             .expect("reader should exist after `ensure_ready_for_read`");
-        let record = reader.read_record(token)?;
+        let mut record = reader.read_record(token)?;
 
         let record_events: u64 = record
             .event_count()
             .try_into()
-            .expect("Vector does not support 128-bit platforms.");
+            .expect("Event count for a record cannot exceed 2^64 events.");
         let record_events = record_events
             .try_into()
             .map_err(|_| ReaderError::EmptyRecord)?;
         self.track_read(record_id, record_bytes, record_events);
+
+        let (batch, receiver) = BatchNotifier::new_with_receiver();
+        record.add_batch_notifier(batch);
+        self.finalizer.add(record_events.get(), receiver);
 
         if self.ready_to_read {
             trace!(

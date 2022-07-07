@@ -98,7 +98,6 @@ pub enum DatadogTracesEndpoint {
 /// Store traces & APM stats endpoints actual URIs.
 pub struct DatadogTracesEndpointConfiguration {
     traces_endpoint: Uri,
-    // Unused so far
     stats_endpoint: Uri,
 }
 
@@ -186,7 +185,6 @@ impl SinkConfig for DatadogTracesConfig {
     }
 
     fn input(&self) -> Input {
-        // Metric will be accepted as soon as APM stats will be handled
         Input::trace()
     }
 

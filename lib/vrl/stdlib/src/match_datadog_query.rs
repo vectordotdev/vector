@@ -159,7 +159,7 @@ fn type_def() -> TypeDef {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_match_datadog_query(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 #[derive(Default, Clone)]

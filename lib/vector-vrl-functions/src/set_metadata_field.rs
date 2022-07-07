@@ -1,14 +1,25 @@
+use std::any::Any;
+
+use crate::{get_metadata_key, MetadataKey};
 use ::value::Value;
 use vrl::prelude::*;
 
 fn set_metadata_field(
     ctx: &mut Context,
-    key: &str,
+    key: &MetadataKey,
     value: Value,
 ) -> std::result::Result<Value, ExpressionError> {
-    let value = value.try_bytes_utf8_lossy()?.to_string();
-    ctx.target_mut().set_metadata(key, value)?;
-    Ok(Value::Null)
+    Ok(match key {
+        MetadataKey::Legacy(key) => {
+            let str_value = value.as_str().expect("must be a string");
+            ctx.target_mut().insert_secret(key, str_value.as_ref());
+            Value::Null
+        }
+        MetadataKey::Query(query) => {
+            ctx.target_mut().set_metadata(query.path(), value)?;
+            Value::Null
+        }
+    })
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -23,12 +34,12 @@ impl Function for SetMetadataField {
         &[
             Parameter {
                 keyword: "key",
-                kind: kind::BYTES,
+                kind: kind::ANY,
                 required: true,
             },
             Parameter {
                 keyword: "value",
-                kind: kind::BYTES,
+                kind: kind::ANY,
                 required: true,
             },
         ]
@@ -44,18 +55,36 @@ impl Function for SetMetadataField {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        (local, external): (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
-        let key = arguments
-            .required_enum("key", &super::keys())?
-            .try_bytes_utf8_lossy()
-            .expect("key not bytes")
-            .to_string();
-        let value = arguments.required("value");
+        let key = get_metadata_key(&mut arguments)?;
+        let value = arguments.required_expr("value");
 
-        Ok(Box::new(SetMetadataFieldFn { key, value }))
+        if let MetadataKey::Query(query) = &key {
+            if external.is_read_only_metadata_path(query.path()) {
+                return Err(vrl::function::Error::ReadOnlyMutation {
+                    context: format!("{} is read-only, and cannot be modified", query),
+                }
+                .into());
+            }
+        }
+
+        // for backwards compatibility, make sure value is a string when using legacy.
+        if matches!(key, MetadataKey::Legacy(_)) && !value.type_def((local, external)).is_bytes() {
+            return Err(vrl::function::Error::UnexpectedExpression {
+                keyword: "value",
+                expected: "string",
+                expr: value,
+            }
+            .into());
+        }
+
+        Ok(Box::new(SetMetadataFieldFn {
+            key,
+            value: Box::new(value),
+        }))
     }
 
     fn compile_argument(
@@ -66,14 +95,7 @@ impl Function for SetMetadataField {
         expr: Option<&expression::Expr>,
     ) -> CompiledArgument {
         match (name, expr) {
-            ("key", Some(expr)) => {
-                let key = expr
-                    .as_enum("key", super::keys())?
-                    .try_bytes_utf8_lossy()
-                    .expect("key not bytes")
-                    .to_string();
-                Ok(Some(Box::new(key) as _))
-            }
+            ("key", Some(_)) => Ok(Some(Box::new(()) as _)),
             _ => Ok(None),
         }
     }
@@ -85,16 +107,14 @@ impl Function for SetMetadataField {
 
 #[derive(Debug, Clone)]
 struct SetMetadataFieldFn {
-    key: String,
+    key: MetadataKey,
     value: Box<dyn Expression>,
 }
 
 impl Expression for SetMetadataFieldFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let key = &self.key;
-
-        set_metadata_field(ctx, key, value)
+        set_metadata_field(ctx, &self.key, value)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
@@ -104,6 +124,10 @@ impl Expression for SetMetadataFieldFn {
 
 #[inline(never)]
 #[no_mangle]
-pub extern "C" fn vrl_fn_set_metadata_field(value: &mut Value, result: &mut Resolved) {
-    todo!()
+pub extern "C" fn vrl_fn_set_metadata_field(
+    key: &Box<dyn Any + Send + Sync>,
+    value: &mut Value,
+    result: &mut Resolved,
+) {
+    todo!("{key:?}{value}{result:?}")
 }

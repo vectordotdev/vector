@@ -15,8 +15,8 @@ use crate::{
     sinks::{
         datadog::{get_api_validate_endpoint, healthcheck, logs::service::LogApiService, Region},
         util::{
-            service::ServiceBuilderExt, BatchConfig, Compression, SinkBatchSettings,
-            TowerRequestConfig,
+            encoding::Transformer, service::ServiceBuilderExt, BatchConfig, Compression,
+            SinkBatchSettings, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -58,6 +58,12 @@ pub(crate) struct DatadogLogsConfig {
 
     #[serde(default)]
     pub compression: Option<Compression>,
+
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub encoding: Transformer,
 
     #[serde(default)]
     pub batch: BatchConfig<DatadogLogsDefaultBatchSettings>,
@@ -129,7 +135,7 @@ impl DatadogLogsConfig {
             .settings(request_limits, LogApiRetry)
             .service(LogApiService::new(client, self.get_uri(), self.enterprise));
 
-        let sink = LogSinkBuilder::new(service, cx, default_api_key, batch)
+        let sink = LogSinkBuilder::new(self.encoding.clone(), service, cx, default_api_key, batch)
             .compression(self.compression.unwrap_or_default())
             .build();
 

@@ -95,7 +95,7 @@ fn try_format(dt: &DateTime<Utc>, format: &str) -> Result<String> {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_format_timestamp(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 #[cfg(test)]

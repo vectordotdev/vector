@@ -6,7 +6,7 @@ fn parse_timestamp(value: Value, format: Value, ctx: &Context) -> Resolved {
     match value {
         Value::Bytes(v) => {
             let format = format.try_bytes_utf8_lossy()?;
-            Conversion::parse(format!("timestamp|{}", format), ctx.timezone().to_owned())
+            Conversion::parse(format!("timestamp|{}", format), *ctx.timezone())
                 .map_err(|e| e.to_string())?
                 .convert(v)
                 .map_err(|e| e.to_string().into())
@@ -86,7 +86,7 @@ impl Expression for ParseTimestampFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_parse_timestamp(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 #[cfg(test)]

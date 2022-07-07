@@ -35,7 +35,7 @@ fn get(value: Value, path: Value) -> Resolved {
             .into())
         }
     };
-    Ok(value.target_get(&path)?.cloned().unwrap_or(Value::Null))
+    Ok(value.get_by_path(&path).cloned().unwrap_or(Value::Null))
 }
 
 #[derive(Clone, Copy, Debug)]

@@ -1,13 +1,12 @@
 use metrics::counter;
 use vector_common::internal_event::InternalEvent;
 
-pub struct AwsBytesSent<'a> {
+pub struct AwsBytesSent {
     pub byte_size: usize,
     pub region: Option<aws_types::region::Region>,
-    pub endpoint: &'a str,
 }
 
-impl<'a> InternalEvent for AwsBytesSent<'a> {
+impl InternalEvent for AwsBytesSent {
     fn emit(self) {
         let region = self
             .region
@@ -18,13 +17,11 @@ impl<'a> InternalEvent for AwsBytesSent<'a> {
             protocol = "https",
             byte_size = %self.byte_size,
             region = ?self.region,
-            endpoint = %self.endpoint,
         );
         counter!(
             "component_sent_bytes_total", self.byte_size as u64,
             "protocol" => "https",
             "region" => region,
-            "endpoint" => self.endpoint.to_string(),
         );
     }
 }

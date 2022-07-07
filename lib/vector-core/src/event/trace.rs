@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, fmt::Debug, sync::Arc};
+use std::{collections::BTreeMap, fmt::Debug};
 
 use lookup::LookupBuf;
 use serde::{Deserialize, Serialize};
@@ -51,12 +51,12 @@ impl TraceEvent {
     }
 
     #[must_use]
-    pub fn with_batch_notifier(self, batch: &Arc<BatchNotifier>) -> Self {
+    pub fn with_batch_notifier(self, batch: &BatchNotifier) -> Self {
         Self(self.0.with_batch_notifier(batch))
     }
 
     #[must_use]
-    pub fn with_batch_notifier_option(self, batch: &Option<Arc<BatchNotifier>>) -> Self {
+    pub fn with_batch_notifier_option(self, batch: &Option<BatchNotifier>) -> Self {
         Self(self.0.with_batch_notifier_option(batch))
     }
 

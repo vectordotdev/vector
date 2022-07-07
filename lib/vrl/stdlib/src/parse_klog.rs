@@ -141,7 +141,7 @@ impl Expression for ParseKlogFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_parse_klog(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 // same logic as our handling of RFC3164 syslog messages: since we don't know the year, we look at

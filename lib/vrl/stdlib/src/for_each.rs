@@ -9,7 +9,7 @@ where
         match item {
             IterItem::KeyValue(key, value) => runner.run_key_value(ctx, key, value)?,
             IterItem::IndexValue(index, value) => runner.run_index_value(ctx, index, value)?,
-            _ => {}
+            IterItem::Value(_) => continue,
         };
     }
 
@@ -115,5 +115,5 @@ impl Expression for ForEachFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_for_each(value: &mut Value, result: &mut Resolved) {
-    todo!();
+    todo!("{value}{result:?}");
 }

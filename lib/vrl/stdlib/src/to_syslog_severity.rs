@@ -87,7 +87,7 @@ impl Expression for ToSyslogSeverityFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_to_syslog_severity(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 #[cfg(test)]

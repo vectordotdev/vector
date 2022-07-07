@@ -54,16 +54,12 @@ services:
       - "cargo"
       - "nextest"
       - "run"
-      - "--retries"
-      - "0"
       - "--no-fail-fast"
       - "--no-default-features"
       - "--features"
       - "nats-integration-tests"
       - "--lib"
       - "::nats::"
-      - "--"
-      - "--nocapture"
     depends_on:
       - nats
       - nats-userpass

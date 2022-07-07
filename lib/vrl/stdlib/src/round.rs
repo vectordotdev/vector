@@ -103,7 +103,7 @@ impl Expression for RoundFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_round(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 #[cfg(test)]
@@ -148,10 +148,10 @@ mod tests {
         }
 
         huge {
-             args: func_args![value: 9876543210123456789098765432101234567890987654321.987654321,
+             args: func_args![value: 9_876_543_210_123_456_789_098_765_432_101_234_567_890_987_654_321.987_654_321,
                               precision: 5
              ],
-             want: Ok(9876543210123456789098765432101234567890987654321.98765),
+             want: Ok(9_876_543_210_123_456_789_098_765_432_101_234_567_890_987_654_321.987_65),
              tdef: TypeDef::integer().infallible(),
          }
     ];

@@ -1,12 +1,21 @@
+use crate::{get_metadata_key, MetadataKey};
 use ::value::Value;
 use vrl::prelude::*;
 
 fn remove_metadata_field(
     ctx: &mut Context,
-    key: &str,
+    key: &MetadataKey,
 ) -> std::result::Result<Value, ExpressionError> {
-    ctx.target_mut().remove_metadata(key)?;
-    Ok(Value::Null)
+    Ok(match key {
+        MetadataKey::Legacy(key) => {
+            ctx.target_mut().remove_secret(key);
+            Value::Null
+        }
+        MetadataKey::Query(query) => {
+            ctx.target_mut().remove_metadata(query.path())?;
+            Value::Null
+        }
+    })
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -20,7 +29,7 @@ impl Function for RemoveMetadataField {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "key",
-            kind: kind::BYTES,
+            kind: kind::ANY,
             required: true,
         }]
     }
@@ -35,15 +44,20 @@ impl Function for RemoveMetadataField {
 
     fn compile(
         &self,
-        _state: (&mut state::LocalEnv, &mut state::ExternalEnv),
+        (_, external): (&mut state::LocalEnv, &mut state::ExternalEnv),
         _ctx: &mut FunctionCompileContext,
         mut arguments: ArgumentList,
     ) -> Compiled {
-        let key = arguments
-            .required_enum("key", &super::keys())?
-            .try_bytes_utf8_lossy()
-            .expect("key not bytes")
-            .to_string();
+        let key = get_metadata_key(&mut arguments)?;
+
+        if let MetadataKey::Query(query) = &key {
+            if external.is_read_only_metadata_path(query.path()) {
+                return Err(vrl::function::Error::ReadOnlyMutation {
+                    context: format!("{} is read-only, and cannot be removed", query),
+                }
+                .into());
+            }
+        }
 
         Ok(Box::new(RemoveMetadataFieldFn { key }))
     }
@@ -56,14 +70,7 @@ impl Function for RemoveMetadataField {
         expr: Option<&expression::Expr>,
     ) -> CompiledArgument {
         match (name, expr) {
-            ("key", Some(expr)) => {
-                let key = expr
-                    .as_enum("key", super::keys())?
-                    .try_bytes_utf8_lossy()
-                    .expect("key not bytes")
-                    .to_string();
-                Ok(Some(Box::new(key) as _))
-            }
+            ("key", Some(_)) => Ok(Some(Box::new(()) as _)),
             _ => Ok(None),
         }
     }
@@ -78,14 +85,12 @@ impl Function for RemoveMetadataField {
 
 #[derive(Debug, Clone)]
 struct RemoveMetadataFieldFn {
-    key: String,
+    key: MetadataKey,
 }
 
 impl Expression for RemoveMetadataFieldFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let key = &self.key;
-
-        remove_metadata_field(ctx, key)
+        remove_metadata_field(ctx, &self.key)
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
@@ -96,5 +101,5 @@ impl Expression for RemoveMetadataFieldFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_remove_metadata_field(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }

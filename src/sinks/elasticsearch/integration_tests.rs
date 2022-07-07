@@ -47,7 +47,7 @@ impl ElasticsearchCommon {
             .unwrap();
         let mut builder = Request::post(&url);
 
-        if let Some(ce) = self.compression.content_encoding() {
+        if let Some(ce) = self.request_builder.compression.content_encoding() {
             builder = builder.header("Content-Encoding", ce);
         }
 

@@ -76,8 +76,8 @@ impl Function for MapKeys {
 
         Ok(Box::new(MapKeysFn {
             value,
-            closure,
             recursive,
+            closure,
         }))
     }
 
@@ -139,5 +139,5 @@ impl Expression for MapKeysFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_map_keys(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }

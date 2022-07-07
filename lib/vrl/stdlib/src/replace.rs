@@ -148,7 +148,7 @@ impl Expression for ReplaceFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_replace(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 #[cfg(test)]

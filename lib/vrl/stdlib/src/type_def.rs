@@ -1,15 +1,14 @@
-use vrl::prelude::*;
+use ::value::Value;
+use vrl::prelude::{TypeDef as VrlTypeDef, *};
 
-use vrl::prelude::TypeDef as VrlTypeDef;
-
-fn type_def(type_def: &VrlTypeDef) -> Resolved {
+fn type_def(type_def: &VrlTypeDef) -> Value {
     let mut tree = type_def.kind().debug_info();
 
     if type_def.is_fallible() {
         tree.insert("fallible".to_owned(), true.into());
     }
 
-    Ok(tree.into())
+    tree.into()
 }
 
 /// A debug function to print the type definition of an expression at runtime.
@@ -65,7 +64,7 @@ struct TypeDefFn {
 
 impl Expression for TypeDefFn {
     fn resolve(&self, _ctx: &mut Context) -> Resolved {
-        type_def(&self.type_def.clone())
+        Ok(type_def(&self.type_def.clone()))
     }
 
     fn type_def(&self, _state: (&state::LocalEnv, &state::ExternalEnv)) -> VrlTypeDef {
@@ -76,5 +75,5 @@ impl Expression for TypeDefFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_type_def(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }

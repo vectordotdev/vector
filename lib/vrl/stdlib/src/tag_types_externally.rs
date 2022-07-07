@@ -95,7 +95,7 @@ impl Expression for TagTypesExternallyFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_tag_types_externally(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 fn tag_type_externally(value: Value) -> Value {

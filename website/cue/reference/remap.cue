@@ -228,6 +228,7 @@ remap: #Remap & {
 				  = see documentation about error handling at https://errors.vrl.dev/#handling
 				  = learn more about error code 110 at https://errors.vrl.dev/110
 				  = see language documentation at https://vrl.dev
+				  = try your code in the VRL REPL, learn more at https://vrl.dev/examples
 				"""
 		},
 		{
@@ -251,6 +252,7 @@ remap: #Remap & {
 				  = see documentation about error handling at https://errors.vrl.dev/#handling
 				  = learn more about error code 103 at https://errors.vrl.dev/103
 				  = see language documentation at https://vrl.dev
+				  = try your code in the VRL REPL, learn more at https://vrl.dev/examples
 				"""
 		},
 	]

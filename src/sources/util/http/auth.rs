@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 
 use headers::{Authorization, HeaderMapExt};
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 use warp::http::HeaderMap;
 
 #[cfg(any(
@@ -10,9 +10,14 @@ use warp::http::HeaderMap;
 ))]
 use super::error::ErrorMessage;
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// HTTP Basic authentication configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
 pub struct HttpSourceAuthConfig {
+    /// The username for basic authentication.
     pub username: String,
+
+    /// The password for basic authentication.
     pub password: String,
 }
 
@@ -40,7 +45,7 @@ impl TryFrom<Option<&HttpSourceAuthConfig>> for HttpSourceAuth {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct HttpSourceAuth {
     #[allow(unused)] // triggered by check-component-features
     pub(self) token: Option<String>,

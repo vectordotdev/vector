@@ -8,16 +8,15 @@ use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use tower::ServiceBuilder;
 
-use crate::aws::RegionOrEndpoint;
 use crate::{
+    aws::RegionOrEndpoint,
     config::{log_schema, AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext},
     event::{EventRef, LogEvent, Value},
     http::HttpClient,
     internal_events::TemplateRenderingError,
+    sinks::util::encoding::Transformer,
     sinks::{
         elasticsearch::{
-            encoder::ElasticsearchEncoder,
-            request_builder::ElasticsearchRequestBuilder,
             retry::ElasticsearchRetryLogic,
             service::{ElasticsearchService, HttpRequestBuilder},
             sink::ElasticsearchSink,
@@ -25,8 +24,8 @@ use crate::{
             ElasticsearchCommonMode, ElasticsearchMode, IndexTemplateSnafu,
         },
         util::{
-            encoding::EncodingConfigFixed, http::RequestConfig, BatchConfig, Compression,
-            RealtimeSizeBasedDefaultBatchSettings, ServiceBuilderExt, TowerRequestConfig,
+            http::RequestConfig, BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings,
+            ServiceBuilderExt, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -58,7 +57,7 @@ pub struct ElasticsearchConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
     )]
-    pub encoding: EncodingConfigFixed<ElasticsearchEncoder>,
+    pub encoding: Transformer,
 
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
@@ -80,14 +79,6 @@ pub struct ElasticsearchConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
-}
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-pub enum Encoding {
-    #[derivative(Default)]
-    Default,
 }
 
 impl ElasticsearchConfig {
@@ -307,29 +298,19 @@ impl SinkConfig for ElasticsearchConfig {
         let http_client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
         let batch_settings = self.batch.into_batcher_settings()?;
 
-        // This is a bit ugly, but removes a String allocation on every event
-        let mut encoding = self.encoding.clone();
-        encoding.codec.doc_type = common.doc_type;
-        encoding.codec.suppress_type_name = common.suppress_type_name;
-
-        let request_builder = ElasticsearchRequestBuilder {
-            compression: self.compression,
-            encoder: encoding,
-        };
-
         let request_limits = self
             .request
             .tower
             .unwrap_with(&TowerRequestConfig::default());
 
         let http_request_builder = HttpRequestBuilder {
-            bulk_uri: common.bulk_uri,
+            bulk_uri: common.bulk_uri.clone(),
             http_request_config: self.request.clone(),
-            http_auth: common.http_auth,
-            query_params: common.query_params,
-            region: common.region,
+            http_auth: common.http_auth.clone(),
+            query_params: common.query_params.clone(),
+            region: common.region.clone(),
             compression: self.compression,
-            credentials_provider: common.aws_auth,
+            credentials_provider: common.aws_auth.clone(),
         };
 
         let service = ServiceBuilder::new()
@@ -338,16 +319,15 @@ impl SinkConfig for ElasticsearchConfig {
 
         let sink = ElasticsearchSink {
             batch_settings,
-            request_builder,
-            compression: self.compression,
+            request_builder: common.request_builder.clone(),
+            transformer: self.encoding.clone(),
             service,
             acker: cx.acker(),
-            metric_to_log: common.metric_to_log,
-            mode: common.mode,
+            metric_to_log: common.metric_to_log.clone(),
+            mode: common.mode.clone(),
             id_key_field: self.id_key.clone(),
         };
 
-        let common = ElasticsearchCommon::parse_config(self).await?;
         let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
         let healthcheck = common.healthcheck(client).boxed();
         let stream = VectorSink::from_event_streamsink(sink);

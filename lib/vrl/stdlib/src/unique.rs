@@ -68,7 +68,7 @@ impl Expression for UniqueFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_unique(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 #[cfg(test)]

@@ -5,7 +5,7 @@ use vector_core::partition::Partitioner;
 
 use super::config::AzureBlobSinkConfig;
 use super::request_builder::AzureBlobRequestOptions;
-use crate::event::Event;
+use crate::event::{Event, LogEvent};
 use crate::sinks::util::{
     encoding::{EncodingConfig, StandardEncodings},
     request_builder::RequestBuilder,
@@ -36,7 +36,7 @@ fn generate_config() {
 
 #[test]
 fn azure_blob_build_request_without_compression() {
-    let log = Event::from("test message");
+    let log = Event::Log(LogEvent::from("test message"));
     let compression = Compression::None;
     let container_name = String::from("logs");
     let sink_config = AzureBlobSinkConfig {
@@ -77,7 +77,7 @@ fn azure_blob_build_request_without_compression() {
 
 #[test]
 fn azure_blob_build_request_with_compression() {
-    let log = Event::from("test message");
+    let log = Event::Log(LogEvent::from("test message"));
     let compression = Compression::gzip_default();
     let container_name = String::from("logs");
     let sink_config = AzureBlobSinkConfig {
@@ -118,7 +118,7 @@ fn azure_blob_build_request_with_compression() {
 
 #[test]
 fn azure_blob_build_request_with_time_format() {
-    let log = Event::from("test message");
+    let log = Event::Log(LogEvent::from("test message"));
     let compression = Compression::None;
     let container_name = String::from("logs");
     let sink_config = AzureBlobSinkConfig {
@@ -162,7 +162,7 @@ fn azure_blob_build_request_with_time_format() {
 
 #[test]
 fn azure_blob_build_request_with_uuid() {
-    let log = Event::from("test message");
+    let log = Event::Log(LogEvent::from("test message"));
     let compression = Compression::None;
     let container_name = String::from("logs");
     let sink_config = AzureBlobSinkConfig {

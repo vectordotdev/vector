@@ -5,7 +5,7 @@ use std::{borrow::Cow, collections::VecDeque};
 use lookup::{Field, Lookup, Segment};
 
 use super::Kind;
-use crate::kind::{merge, EmptyKindError};
+use crate::kind::merge;
 
 /// The list of errors that can occur when `remove_at_path` fails.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -119,7 +119,7 @@ impl Kind {
                 },
 
                 Segment::Coalesce(fields) => {
-                    let mut merged_kind = Self::empty();
+                    let mut merged_kind = Self::never();
 
                     for field in fields {
                         let mut segments = iter.clone().cloned().collect::<VecDeque<_>>();
@@ -136,18 +136,14 @@ impl Kind {
                                 // If this `Kind` cannot be null, then the entire coalesced segment
                                 // will never be null, so we have to remove any reference to it.
                                 if non_null {
-                                    // Can error if we're left with an empty kind after removing
-                                    // `null`, but that's okay in this case, as we deal with the
-                                    // empty state at the end.
-                                    if let Err(EmptyKindError) = merged_kind.remove_null() {
-                                        merged_kind = Self::empty();
-                                    }
+                                    // if the type is empty after removing null, we deal with it at the end.
+                                    merged_kind.remove_null();
                                 }
 
                                 merged_kind.merge(
                                     kind.into_owned(),
                                     merge::Strategy {
-                                        depth: merge::Depth::Deep,
+                                        collisions: merge::CollisionStrategy::Union,
                                         indices: merge::Indices::Keep,
                                     },
                                 );
@@ -161,7 +157,7 @@ impl Kind {
                         };
                     }
 
-                    return Ok(if merged_kind.is_empty() {
+                    return Ok(if merged_kind.is_never() {
                         None
                     } else {
                         Some(Cow::Owned(merged_kind))
@@ -419,17 +415,16 @@ mod tests {
                         ),
                     ])),
                     path: LookupBuf::from_str(".(foo | bar)").unwrap(),
-                    // TODO(Jean):
-                    //
-                    // This isn't as accurate as it can be, but it is accurate enough to pass all
-                    // existing tests. In reality, we should track two different `object` states
-                    // for the kind, one for each potential coalesced arm. For this to work, the
-                    // internal API of `Kind` has to be updated to store `BTreeSet<Collection<T>>`,
-                    // instead of the existing `Option<Collection<T>>`.
+                    // TODO: This is returning a type more general than it could be, but it is "correct"
+                    //       otherwise
+                    // The type system currently doesn't distinguish between "null" and "undefined",
+                    // but the runtime behavior of coalescing _does_, so in general types
+                    // for coalesced paths won't be as accurate as possible.
+                    // (This specific example could be fixed though)
                     want: Ok(Some(Kind::object(BTreeMap::from([
-                        ("one".into(), Kind::integer()),
+                        ("one".into(), Kind::integer().or_null()),
                         ("two".into(), Kind::integer().or_boolean()),
-                        ("three".into(), Kind::boolean()),
+                        ("three".into(), Kind::boolean().or_null()),
                     ])))),
                 },
             ),

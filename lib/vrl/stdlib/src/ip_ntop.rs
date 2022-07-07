@@ -86,7 +86,7 @@ impl Expression for IpNtopFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_ip_ntop(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 #[cfg(test)]

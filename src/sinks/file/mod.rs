@@ -166,7 +166,7 @@ impl SinkConfig for FileSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let sink = FileSink::new(self, cx.acker());
+        let sink = FileSink::new(self, cx.acker())?;
         Ok((
             super::VectorSink::from_event_streamsink(sink),
             future::ok(()).boxed(),
@@ -198,13 +198,13 @@ pub struct FileSink {
 }
 
 impl FileSink {
-    pub fn new(config: &FileSinkConfig, acker: Acker) -> Self {
+    pub fn new(config: &FileSinkConfig, acker: Acker) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
-        let (framer, serializer) = config.encoding.encoding();
+        let (framer, serializer) = config.encoding.encoding()?;
         let framer = framer.unwrap_or_else(|| NewlineDelimitedEncoder::new().into());
         let encoder = Encoder::<Framer>::new(framer, serializer);
 
-        Self {
+        Ok(Self {
             acker,
             path: config.path.clone(),
             transformer,
@@ -212,7 +212,7 @@ impl FileSink {
             idle_timeout: Duration::from_secs(config.idle_timeout_secs.unwrap_or(30)),
             files: ExpiringHashMap::default(),
             compression: config.compression,
-        }
+        })
     }
 
     /// Uses pass the `event` to `self.path` template to obtain the file path
@@ -421,7 +421,7 @@ mod tests {
 
     use futures::{stream, SinkExt};
     use pretty_assertions::assert_eq;
-    use vector_core::sink::VectorSink;
+    use vector_core::{event::LogEvent, sink::VectorSink};
 
     use super::*;
     use crate::{
@@ -452,10 +452,15 @@ mod tests {
             acknowledgements: Default::default(),
         };
 
-        let sink = FileSink::new(&config, Acker::passthrough());
+        let sink = FileSink::new(&config, Acker::passthrough()).unwrap();
         let (input, _events) = random_lines_with_stream(100, 64, None);
 
-        let events = Box::pin(stream::iter(input.clone().into_iter().map(Event::from)));
+        let events = Box::pin(stream::iter(
+            input
+                .clone()
+                .into_iter()
+                .map(|e| Event::Log(LogEvent::from(e))),
+        ));
         run_and_assert_sink_compliance(
             VectorSink::from_event_streamsink(sink),
             events,
@@ -483,10 +488,15 @@ mod tests {
             acknowledgements: Default::default(),
         };
 
-        let sink = FileSink::new(&config, Acker::passthrough());
+        let sink = FileSink::new(&config, Acker::passthrough()).unwrap();
         let (input, _) = random_lines_with_stream(100, 64, None);
 
-        let events = Box::pin(stream::iter(input.clone().into_iter().map(Event::from)));
+        let events = Box::pin(stream::iter(
+            input
+                .clone()
+                .into_iter()
+                .map(|e| Event::Log(LogEvent::from(e))),
+        ));
         run_and_assert_sink_compliance(
             VectorSink::from_event_streamsink(sink),
             events,
@@ -519,7 +529,7 @@ mod tests {
             acknowledgements: Default::default(),
         };
 
-        let sink = FileSink::new(&config, Acker::passthrough());
+        let sink = FileSink::new(&config, Acker::passthrough()).unwrap();
 
         let (mut input, _events) = random_events_with_stream(32, 8, None);
         input[0].as_mut_log().insert("date", "2019-26-07");
@@ -604,7 +614,7 @@ mod tests {
             acknowledgements: Default::default(),
         };
 
-        let sink = FileSink::new(&config, Acker::passthrough());
+        let sink = FileSink::new(&config, Acker::passthrough()).unwrap();
         let (mut input, _events) = random_lines_with_stream(10, 64, None);
 
         let (mut tx, rx) = futures::channel::mpsc::channel(0);
@@ -620,7 +630,7 @@ mod tests {
 
         // send initial payload
         for line in input.clone() {
-            tx.send(Event::from(line)).await.unwrap();
+            tx.send(Event::Log(LogEvent::from(line))).await.unwrap();
         }
 
         // wait for file to go idle and be closed
@@ -628,7 +638,7 @@ mod tests {
 
         // trigger another write
         let last_line = "i should go at the end";
-        tx.send(Event::from(last_line)).await.unwrap();
+        tx.send(LogEvent::from(last_line).into()).await.unwrap();
         input.push(String::from(last_line));
 
         // wait for another flush

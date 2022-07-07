@@ -90,6 +90,12 @@ components: transforms: aws_ec2_metadata: {
 				unit:    null
 			}
 		}
+		required: {
+			common:      false
+			description: "Whether or not vector should exit with error if initial metadata request fails."
+			required:    false
+			type: bool: default: true
+		}
 	}
 
 	env_vars: {

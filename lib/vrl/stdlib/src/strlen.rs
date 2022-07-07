@@ -68,7 +68,7 @@ impl Expression for StrlenFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_strlen(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 #[cfg(test)]

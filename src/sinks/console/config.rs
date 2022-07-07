@@ -38,6 +38,12 @@ pub struct ConsoleSinkConfig {
         EncodingConfig<StandardEncodings>,
         StandardEncodingsWithFramingMigrator,
     >,
+    #[serde(
+        default,
+        deserialize_with = "crate::serde::bool_or_struct",
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 impl GenerateConfig for ConsoleSinkConfig {
@@ -45,6 +51,7 @@ impl GenerateConfig for ConsoleSinkConfig {
         toml::Value::try_from(Self {
             target: Target::Stdout,
             encoding: EncodingConfig::from(StandardEncodings::Json).into(),
+            acknowledgements: Default::default(),
         })
         .unwrap()
     }
@@ -55,7 +62,7 @@ impl GenerateConfig for ConsoleSinkConfig {
 impl SinkConfig for ConsoleSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let transformer = self.encoding.transformer();
-        let (framer, serializer) = self.encoding.encoding();
+        let (framer, serializer) = self.encoding.encoding()?;
         let framer = match (framer, &serializer) {
             (Some(framer), _) => framer,
             (
@@ -66,7 +73,9 @@ impl SinkConfig for ConsoleSinkConfig {
                 | Serializer::NativeJson(_)
                 | Serializer::RawMessage(_),
             ) => NewlineDelimitedEncoder::new().into(),
-            (None, Serializer::Native(_)) => LengthDelimitedEncoder::new().into(),
+            (None, Serializer::Avro(_) | Serializer::Native(_)) => {
+                LengthDelimitedEncoder::new().into()
+            }
         };
         let encoder = Encoder::<Framer>::new(framer, serializer);
 
@@ -97,7 +106,7 @@ impl SinkConfig for ConsoleSinkConfig {
     }
 
     fn acknowledgements(&self) -> Option<&AcknowledgementsConfig> {
-        None
+        Some(&self.acknowledgements)
     }
 }
 

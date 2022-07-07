@@ -12,20 +12,24 @@ impl std::fmt::Display for Span {
 }
 
 impl Span {
+    #[must_use]
     pub fn new(start: usize, end: usize) -> Self {
         Self { start, end }
     }
 
     /// Get the start index
+    #[must_use]
     pub fn start(self) -> usize {
         self.start
     }
 
     /// Get the end index
+    #[must_use]
     pub fn end(self) -> usize {
         self.end
     }
 
+    #[must_use]
     pub fn range(self) -> std::ops::Range<usize> {
         self.start..self.end
     }
@@ -54,6 +58,7 @@ impl From<(usize, usize)> for Span {
     }
 }
 
+#[must_use]
 pub fn span(start: usize, end: usize) -> Span {
     Span { start, end }
 }

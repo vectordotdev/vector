@@ -26,4 +26,4 @@ cargo check --workspace --all-targets --no-default-features --features all-integ
 # The feature builds already run in parallel below, don't overload
 export CARGO_BUILD_JOBS=1
 
-exec parallel --verbose --retries 2 scripts/check-one-feature {} ::: $features
+exec parallel --group --verbose --retries 2 scripts/check-one-feature {} ::: $features

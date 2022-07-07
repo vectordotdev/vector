@@ -22,7 +22,7 @@ fn parse_query_string(bytes: Value) -> Resolved {
                         v.push(value.into());
                     }
                     v => {
-                        *v = Value::Array(vec![v.to_owned(), value.into()]);
+                        *v = Value::Array(vec![v.clone(), value.into()]);
                     }
                 };
             })
@@ -99,7 +99,7 @@ fn inner_kind() -> Collection<Field> {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_parse_query_string(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 #[cfg(test)]

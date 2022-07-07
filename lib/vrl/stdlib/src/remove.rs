@@ -36,7 +36,7 @@ fn remove(path: Value, compact: Value, mut value: Value) -> Resolved {
         }
     };
     let compact = compact.try_boolean()?;
-    value.target_remove(&path, compact)?;
+    value.remove_by_path(&path, compact);
     Ok(value)
 }
 
@@ -183,7 +183,7 @@ impl Expression for RemoveFn {
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         let value_td = self.value.type_def(state);
 
-        let mut td = TypeDef::from(Kind::empty()).fallible();
+        let mut td = TypeDef::from(Kind::never()).fallible();
 
         if value_td.is_array() {
             td = td.add_array(Collection::any())
@@ -200,7 +200,7 @@ impl Expression for RemoveFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_remove(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 #[cfg(test)]

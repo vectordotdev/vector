@@ -18,8 +18,6 @@ services:
       - "datadog-logs-integration-tests"
       - "--lib"
       - "::datadog::logs::"
-      - "--"
-      - "--nocapture"
     environment:
       - TEST_DATADOG_API_KEY
     volumes:

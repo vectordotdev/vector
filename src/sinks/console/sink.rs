@@ -12,7 +12,7 @@ use vector_core::{
 
 use crate::{
     codecs::Encoder,
-    event::Event,
+    event::{Event, EventStatus, Finalizable},
     sinks::util::{encoding::Transformer, StreamSink},
 };
 
@@ -33,28 +33,36 @@ where
             let event_byte_size = event.size_of();
             self.transformer.transform(&mut event);
 
+            let finalizers = event.take_finalizers();
             let mut bytes = BytesMut::new();
             self.encoder.encode(event, &mut bytes).map_err(|_| {
                 // Error is handled by `Encoder`.
+                finalizers.update_status(EventStatus::Errored);
             })?;
 
-            self.output.write_all(&bytes).await.map_err(|error| {
-                // Error when writing to stdout/stderr is likely irrecoverable,
-                // so stop the sink.
-                error!(message = "Error writing to output. Stopping sink.", %error);
-            })?;
+            match self.output.write_all(&bytes).await {
+                Err(error) => {
+                    // Error when writing to stdout/stderr is likely irrecoverable,
+                    // so stop the sink.
+                    error!(message = "Error writing to output. Stopping sink.", %error);
+                    finalizers.update_status(EventStatus::Errored);
+                    return Err(());
+                }
+                Ok(()) => {
+                    finalizers.update_status(EventStatus::Delivered);
+                    self.acker.ack(1);
 
-            self.acker.ack(1);
-
-            emit!(EventsSent {
-                byte_size: event_byte_size,
-                count: 1,
-                output: None,
-            });
-            emit!(BytesSent {
-                byte_size: bytes.len(),
-                protocol: "console"
-            });
+                    emit!(EventsSent {
+                        byte_size: event_byte_size,
+                        count: 1,
+                        output: None,
+                    });
+                    emit!(BytesSent {
+                        byte_size: bytes.len(),
+                        protocol: "console"
+                    });
+                }
+            }
         }
 
         Ok(())
@@ -74,7 +82,7 @@ mod test {
     use crate::{
         event::{
             metric::{Metric, MetricKind, MetricValue, StatisticKind},
-            Event, Value,
+            Event, LogEvent, Value,
         },
         sinks::util::encoding::{
             EncodingConfig, EncodingConfigWithFramingAdapter, StandardEncodings,
@@ -90,7 +98,7 @@ mod test {
             StandardEncodingsWithFramingMigrator,
         >,
     ) -> Result<String, codecs::encoding::Error> {
-        let (framer, serializer) = encoding.encoding();
+        let (framer, serializer) = encoding.encoding().unwrap();
         let framer = framer.unwrap_or_else(|| BytesEncoder::new().into());
         let mut encoder = Encoder::<Framer>::new(framer, serializer);
         let mut bytes = BytesMut::new();
@@ -100,14 +108,14 @@ mod test {
 
     #[tokio::test]
     async fn component_spec_compliance() {
-        let event = Event::from("foo");
+        let event = Event::Log(LogEvent::from("foo"));
 
         let encoding: EncodingConfigWithFramingAdapter<
             EncodingConfig<StandardEncodings>,
             StandardEncodingsWithFramingMigrator,
         > = EncodingConfig::from(StandardEncodings::Json).into();
         let transformer = encoding.transformer();
-        let (_, serializer) = encoding.encoding();
+        let (_, serializer) = encoding.encoding().unwrap();
         let encoder = Encoder::<Framer>::new(NewlineDelimitedEncoder::new().into(), serializer);
 
         let sink = WriterSink {
@@ -127,7 +135,7 @@ mod test {
 
     #[test]
     fn encodes_raw_logs() {
-        let event = Event::from("foo");
+        let event = Event::Log(LogEvent::from("foo"));
         assert_eq!(
             "foo",
             encode_event(event, EncodingConfig::from(StandardEncodings::Text).into()).unwrap()
@@ -136,13 +144,15 @@ mod test {
 
     #[test]
     fn encodes_log_events() {
-        let mut event = Event::new_empty_log();
-        let log = event.as_mut_log();
+        let mut log = LogEvent::default();
         log.insert("x", Value::from("23"));
         log.insert("z", Value::from(25));
         log.insert("a", Value::from("0"));
 
-        let encoded = encode_event(event, EncodingConfig::from(StandardEncodings::Json).into());
+        let encoded = encode_event(
+            log.into(),
+            EncodingConfig::from(StandardEncodings::Json).into(),
+        );
         let expected = r#"{"a":"0","x":"23","z":25}"#;
         assert_eq!(encoded.unwrap(), expected);
     }

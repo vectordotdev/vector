@@ -140,7 +140,7 @@ impl Expression for ParseGlogFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_parse_glog(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 fn inner_kind() -> BTreeMap<Field, Kind> {

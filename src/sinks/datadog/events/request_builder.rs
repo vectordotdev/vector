@@ -81,7 +81,7 @@ impl RequestBuilder<LogEvent> for DatadogEventsRequestBuilder {
     fn split_input(&self, mut log: LogEvent) -> (Self::Metadata, Self::Events) {
         let metadata = Metadata {
             finalizers: log.take_finalizers(),
-            api_key: log.metadata_mut().datadog_api_key().clone(),
+            api_key: log.metadata_mut().datadog_api_key(),
             event_byte_size: log.size_of(),
         };
         (metadata, log)

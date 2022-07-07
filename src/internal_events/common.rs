@@ -98,17 +98,6 @@ impl InternalEvent for StreamClosedError {
 }
 
 #[derive(Debug)]
-pub struct FieldOverwritten<'a> {
-    pub(crate) field: &'a str,
-}
-
-impl<'a> InternalEvent for FieldOverwritten<'a> {
-    fn emit(self) {
-        debug!(message = "Field overwritten.", field = %self.field, internal_log_rate_secs = 30);
-    }
-}
-
-#[derive(Debug)]
 pub struct RequestCompleted {
     pub start: Instant,
     pub end: Instant,

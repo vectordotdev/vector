@@ -13,7 +13,7 @@ use vector_core::{buffers::Ackable, internal_event::EventsSent, stream::DriverRe
 
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
-    gcp::GcpCredentials,
+    gcp::GcpAuthenticator,
     http::{get_http_scheme_from_uri, HttpClient, HttpError},
     sinks::util::metadata::RequestMetadata,
 };
@@ -22,19 +22,15 @@ use crate::{
 pub struct GcsService {
     client: HttpClient,
     base_url: String,
-    creds: Option<GcpCredentials>,
+    auth: GcpAuthenticator,
 }
 
 impl GcsService {
-    pub const fn new(
-        client: HttpClient,
-        base_url: String,
-        creds: Option<GcpCredentials>,
-    ) -> GcsService {
+    pub const fn new(client: HttpClient, base_url: String, auth: GcpAuthenticator) -> GcsService {
         GcsService {
             client,
             base_url,
-            creds,
+            auth,
         }
     }
 }
@@ -135,9 +131,7 @@ impl Service<GcsRequest> for GcsService {
         }
 
         let mut http_request = builder.body(Body::from(request.body)).unwrap();
-        if let Some(creds) = &self.creds {
-            creds.apply(&mut http_request);
-        }
+        self.auth.apply(&mut http_request);
 
         let mut client = self.client.clone();
         Box::pin(async move {

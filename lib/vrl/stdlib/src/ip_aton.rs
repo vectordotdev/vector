@@ -71,7 +71,7 @@ impl Expression for IpAtonFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_ip_aton(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 #[cfg(test)]
@@ -89,7 +89,7 @@ mod tests {
 
         valid {
             args: func_args![value: "1.2.3.4"],
-            want: Ok(value!(16909060)),
+            want: Ok(value!(16_909_060)),
             tdef: TypeDef::integer().fallible(),
         }
     ];

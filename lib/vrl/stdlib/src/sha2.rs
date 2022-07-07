@@ -130,7 +130,7 @@ impl Expression for Sha2Fn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_sha2(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 #[inline]

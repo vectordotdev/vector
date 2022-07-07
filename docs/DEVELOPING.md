@@ -232,7 +232,7 @@ is around 4 times faster than rebuilding tests with all features.
 
 Dependencies should be _carefully_ selected and avoided if possible. You can
 see how dependencies are reviewed in the
-[Reviewing guide](/REVIEWING.md#dependencies).
+[Reviewing guide](/docs/REVIEWING.md#dependencies).
 
 If a dependency is required only by one or multiple components, but not by
 Vector's core, make it optional and add it to the list of dependencies of
@@ -359,7 +359,7 @@ before using a cached asset.
 In order to use `sccache`, you must first [install](https://github.com/mozilla/sccache#installation)
 it.  There are pre-built binaries for all major platforms to get you going quickly. The
 [usage](https://github.com/mozilla/sccache#usage) documentation also explains how to set up your
-environment to actually use it.  We recommend using the `.cargo/config` approach as this can help
+environment to actually use it.  We recommend using the `$HOME/.cargo/config` approach as this can help
 speed up all of your Rust development work, and not just developing on Vector.
 
 While `sccache` was originally designed to cache compilation assets in cloud storage, maximizing
@@ -389,12 +389,12 @@ times:
      'cargo test --lib --no-default-features --features=<component type>-<component id> <component type>::<component id>'
    ```
 
-   For example, if the component is `add_fields` transform, the command above
+   For example, if the component is `reduce` transform, the command above
    turns into
 
    ```sh
    cargo watch -s clear -s \
-     'cargo test --lib --no-default-features --features=transforms-add_fields transforms::add_fields'
+     'cargo test --lib --no-default-features --features=transforms-reduce transforms::reduce'
    ```
 
 #### Generating sample logs

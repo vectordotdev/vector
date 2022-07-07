@@ -106,5 +106,5 @@ impl Expression for RandomBytesFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_random_bytes(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }

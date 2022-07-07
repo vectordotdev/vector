@@ -811,7 +811,7 @@ impl CAPIDefinitionGenerator for CustomDefinitionGenerator {
             };
 
             let address = unsafe { dlsym(libc::RTLD_DEFAULT, symbol_name.as_ptr()) };
-            if address.is_null() {
+            if address.is_null() && !symbol_name.to_string_lossy().contains("proc_macro") {
                 let error = unsafe { dlerror() };
                 if !error.is_null() {
                     let error = unsafe { CStr::from_ptr(error) };

@@ -81,7 +81,7 @@ impl Function for Split {
     ) -> Compiled {
         let value = arguments.required("value");
         let pattern = arguments.required("pattern");
-        let limit = arguments.optional("limit").unwrap_or(expr!(999999999));
+        let limit = arguments.optional("limit").unwrap_or(expr!(999_999_999));
 
         Ok(Box::new(SplitFn {
             value,
@@ -120,7 +120,7 @@ impl Expression for SplitFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_split(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 #[cfg(test)]

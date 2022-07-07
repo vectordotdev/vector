@@ -7,26 +7,37 @@ use std::{
 
 use chrono::{DateTime, Utc};
 use futures::future::BoxFuture;
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::{
     fs::{self, File},
     io::AsyncReadExt,
 };
 use vector_common::btreemap;
+use vector_config::configurable_component;
 
 use super::{filter_result_sync, FilterList, HostMetrics};
 use crate::event::metric::Metric;
 
 const MICROSECONDS: f64 = 1.0 / 1_000_000.0;
 
-#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
+/// Options for the “cgroups” (controller groups) metrics collector.
+///
+/// This collector is only available on Linux systems, and only supports either version 2 or hybrid cgroups.
+#[configurable_component]
+#[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(default)]
 pub(crate) struct CGroupsConfig {
+    /// The number of levels of the cgroups hierarchy for which to report metrics.
+    ///
+    /// A value of `1` means just the root or named cgroup.
     #[derivative(Default(value = "100"))]
     levels: usize,
+
+    /// The base cgroup name to provide metrics for.
     pub(super) base: Option<PathBuf>,
+
+    /// Lists of group name patterns to include or exclude.
     groups: FilterList,
 }
 

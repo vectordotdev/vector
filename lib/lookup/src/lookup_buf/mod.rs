@@ -204,6 +204,21 @@ impl LookupBuf {
 
         components
     }
+
+    pub fn can_start_with(&self, prefix: &LookupBuf) -> bool {
+        let mut self_iter = self.iter();
+        for prefix_segment in prefix.iter() {
+            match self_iter.next() {
+                None => return false,
+                Some(self_segment) => {
+                    if !self_segment.can_equal(prefix_segment) {
+                        return false;
+                    }
+                }
+            }
+        }
+        true
+    }
 }
 
 #[inherent]
@@ -254,8 +269,14 @@ impl Look<'static> for LookupBuf {
     }
 
     /// Returns `true` if `needle` is a prefix of the lookup.
-    pub fn starts_with(&self, needle: &LookupBuf) -> bool {
-        needle.iter().zip(&self.segments).all(|(n, s)| n == s)
+    pub fn starts_with(&self, prefix: &LookupBuf) -> bool {
+        let mut self_iter = self.iter();
+        for prefix_segment in prefix.iter() {
+            if self_iter.next() != Some(prefix_segment) {
+                return false;
+            }
+        }
+        true
     }
 }
 

@@ -24,7 +24,7 @@ mod integration_test {
 
     use crate::{
         event::Value,
-        kafka::{KafkaAuthConfig, KafkaCompression, KafkaSaslConfig, KafkaTlsConfig},
+        kafka::{KafkaAuthConfig, KafkaCompression, KafkaSaslConfig},
         sinks::{
             kafka::{
                 config::{KafkaRole, KafkaSinkConfig},
@@ -41,7 +41,7 @@ mod integration_test {
             components::{run_and_assert_sink_compliance, SINK_TAGS},
             random_lines_with_stream, random_string, wait_for,
         },
-        tls::TlsConfig,
+        tls::{TlsConfig, TlsEnableableConfig, TEST_PEM_INTERMEDIATE_CA_PATH},
     };
 
     fn kafka_host() -> String {
@@ -203,25 +203,14 @@ mod integration_test {
     #[tokio::test]
     async fn kafka_happy_path_tls() {
         crate::test_util::trace_init();
+        let mut options = TlsConfig::test_config();
+        // couldn't get Kafka to load and return a certificate chain, it only returns the leaf
+        // certificate
+        options.ca_file = Some(TEST_PEM_INTERMEDIATE_CA_PATH.into());
         kafka_happy_path(
             kafka_address(9092),
             None,
-            Some(KafkaTlsConfig {
-                enabled: Some(true),
-                options: TlsConfig::test_config(),
-            }),
-            KafkaCompression::None,
-        )
-        .await;
-    }
-
-    #[tokio::test]
-    async fn kafka_happy_path_tls_with_key() {
-        crate::test_util::trace_init();
-        kafka_happy_path(
-            kafka_address(9092),
-            None,
-            Some(KafkaTlsConfig {
+            Some(TlsEnableableConfig {
                 enabled: Some(true),
                 options: TlsConfig::test_config(),
             }),
@@ -250,7 +239,7 @@ mod integration_test {
     async fn kafka_happy_path(
         server: String,
         sasl: Option<KafkaSaslConfig>,
-        tls: Option<KafkaTlsConfig>,
+        tls: Option<TlsEnableableConfig>,
         compression: KafkaCompression,
     ) {
         let topic = format!("test-{}", random_string(10));

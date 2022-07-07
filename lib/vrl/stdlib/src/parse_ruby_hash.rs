@@ -87,7 +87,7 @@ impl Expression for ParseRubyHashFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_parse_ruby_hash(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 fn inner_kinds() -> Kind {
@@ -274,7 +274,7 @@ fn parse(input: &str) -> Result<Value> {
                 // Create a descriptive error message if possible.
                 nom::error::convert_error(input, err)
             }
-            _ => err.to_string(),
+            nom::Err::Incomplete(_) => err.to_string(),
         })
         .and_then(|(rest, result)| {
             rest.trim()

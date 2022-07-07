@@ -48,5 +48,5 @@ impl Expression for NowFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_now(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }

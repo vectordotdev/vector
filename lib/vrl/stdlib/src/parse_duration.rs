@@ -133,7 +133,7 @@ impl Expression for ParseDurationFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_parse_duration(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 #[cfg(test)]
@@ -181,7 +181,7 @@ mod tests {
         s_ns {
             args: func_args![value: "1 s",
                              unit: "ns"],
-            want: Ok(1000000000.0),
+            want: Ok(1_000_000_000.0),
             tdef: TypeDef::float().fallible(),
         }
 

@@ -25,8 +25,7 @@ impl Expression for IfStatement {
             false => self
                 .alternative
                 .as_ref()
-                .map(|block| block.resolve(ctx))
-                .unwrap_or(Ok(Value::Null)),
+                .map_or(Ok(Value::Null), |block| block.resolve(ctx)),
         }
     }
 

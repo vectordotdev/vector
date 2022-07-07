@@ -90,8 +90,8 @@ pub(crate) static REGEX_NGINX_COMBINED_LOG: Lazy<Regex> = Lazy::new(|| {
         r#"(?x)                                 # Ignore whitespace and comments in the regex expression.
         ^\s*                                    # Start with any number of whitespaces.
         (-|(?P<client>\S+))\s+                  # Match `-` or any non space character
-        (-|(?P<user>\S+))\s+                    # Match `-` or any non space character
         \-\s+                                   # Always a dash
+        (-|(?P<user>\S+))\s+                    # Match `-` or any non space character
         \[(?P<timestamp>.+)\]\s+                # Match date between brackets
         "(?P<request>
         (?P<method>\w+)\s+                      # Match at least a word

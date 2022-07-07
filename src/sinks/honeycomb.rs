@@ -12,6 +12,7 @@ use crate::{
     event::{Event, Value},
     http::HttpClient,
     sinks::util::{
+        encoding::Transformer,
         http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
         BatchConfig, BoxedRawValue, JsonArrayBuffer, SinkBatchSettings, TowerRequestConfig,
     },
@@ -33,6 +34,12 @@ pub(super) struct HoneycombConfig {
 
     #[serde(default)]
     request: TowerRequestConfig,
+
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    encoding: Transformer,
 
     #[serde(
         default,
@@ -111,10 +118,13 @@ impl SinkConfig for HoneycombConfig {
     }
 }
 
-pub struct HoneycombEventEncoder;
+pub struct HoneycombEventEncoder {
+    transformer: Transformer,
+}
 
 impl HttpEventEncoder<serde_json::Value> for HoneycombEventEncoder {
-    fn encode_event(&mut self, event: Event) -> Option<serde_json::Value> {
+    fn encode_event(&mut self, mut event: Event) -> Option<serde_json::Value> {
+        self.transformer.transform(&mut event);
         let mut log = event.into_log();
 
         let timestamp = if let Some(Value::Timestamp(ts)) = log.remove(log_schema().timestamp_key())
@@ -140,7 +150,9 @@ impl HttpSink for HoneycombConfig {
     type Encoder = HoneycombEventEncoder;
 
     fn build_encoder(&self) -> Self::Encoder {
-        HoneycombEventEncoder
+        HoneycombEventEncoder {
+            transformer: self.encoding.clone(),
+        }
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Bytes>> {
@@ -201,7 +213,7 @@ async fn healthcheck(config: HoneycombConfig, client: HttpClient) -> crate::Resu
 #[cfg(test)]
 mod test {
     use futures::{future::ready, stream};
-    use vector_core::event::Event;
+    use vector_core::event::{Event, LogEvent};
 
     use crate::{
         config::{GenerateConfig, SinkConfig, SinkContext},
@@ -230,7 +242,7 @@ mod test {
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
 
-        let event = Event::from("simple message");
+        let event = Event::Log(LogEvent::from("simple message"));
         run_and_assert_sink_compliance(sink, stream::once(ready(event)), &SINK_TAGS).await;
     }
 }

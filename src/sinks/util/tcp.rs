@@ -211,7 +211,12 @@ impl<E> TcpSink<E>
 where
     E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync + 'static,
 {
-    fn new(connector: TcpConnector, acker: Acker, transformer: Transformer, encoder: E) -> Self {
+    const fn new(
+        connector: TcpConnector,
+        acker: Acker,
+        transformer: Transformer,
+        encoder: E,
+    ) -> Self {
         Self {
             connector,
             acker,
@@ -286,6 +291,9 @@ where
             let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
 
             let mut mapped_input = stream::once(ready(item)).chain(&mut input).map(|event| {
+                drop(event.finalizers);
+                self.acker.ack(1);
+
                 emit!(EventsSent {
                     count: 1,
                     byte_size: event.byte_size,

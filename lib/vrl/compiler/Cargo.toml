@@ -33,16 +33,18 @@ diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 parser = { package = "vrl-parser", path = "../parser" }
 precompiled = { path = "./precompiled", optional = true }
 lookup = { path = "../../lookup" }
-vector_common = { path = "../../vector-common", default-features = false, features = ["conversion"] }
+vector_common = { path = "../../vector-common", default-features = false, features = ["conversion", "serde"] }
+vector_config = { path = "../../vector-config" }
+vector_config_macros = { path = "../../vector-config-macros" }
 value = { path = "../../value" }
 
 bytes = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4", default-features = false }
-dyn-clone = { version = "1.0.5", default-features = false }
-inkwell = { git = "https://github.com/pablosichert/inkwell", branch = "pablosichert/orc2", features = ["llvm13-0"], optional = true }
+dyn-clone = { version = "1.0.6", default-features = false }
+inkwell = { git = "https://github.com/pablosichert/inkwell", branch = "pablosichert/orc2", features = ["llvm14-0"], optional = true }
 lalrpop-util = { version = "0.19", default-features = false }
 libc = "0.2"
-llvm-sys = { version = "130", optional = true }
+llvm-sys = { version = "140", optional = true }
 ordered-float = { version = "3", default-features = false }
 paste = { version = "1", default-features = false }
 regex = { version = "1", default-features = false }

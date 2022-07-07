@@ -1,4 +1,4 @@
-use std::{borrow::Cow, convert::TryFrom, fmt, hash::Hash, path::PathBuf};
+use std::{borrow::Cow, convert::TryFrom, hash::Hash, path::PathBuf};
 
 use bytes::Bytes;
 use chrono::{
@@ -7,11 +7,8 @@ use chrono::{
 };
 use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
-use serde::{
-    de::{self, Deserialize, Deserializer, Visitor},
-    ser::{Serialize, Serializer},
-};
 use snafu::Snafu;
+use vector_config::configurable_component;
 
 use crate::{
     config::log_schema,
@@ -20,10 +17,27 @@ use crate::{
 
 static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap());
 
-#[derive(Debug, Default, Eq, PartialEq, Hash, Clone)]
+/// A templated field.
+///
+/// In many cases, components can be configured in such a way where some portion of the component's functionality can be
+/// customized on a per-event basis. An example of this might be a sink that writes events to a file, where we want to
+/// provide the flexibility to specify which file an event should go to by using an event field itself as part of the
+/// input to the filename we use.
+///
+/// By using `Template`, users can specify either fixed strings or "templated" strings, which use a common syntax to
+/// refer to fields in an event that will serve as the input data when rendering the template.  While a fixed string may
+/// look something like `my-file.log`, a template string could look something like `my-file-{{key}}.log`, and the `key`
+/// field of the event being processed would serve as the value when rendering the template into a string.
+#[configurable_component]
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+#[serde(try_from = "String", into = "String")]
 pub struct Template {
     src: String,
+
+    #[serde(skip)]
     has_ts: bool,
+
+    #[serde(skip)]
     has_fields: bool,
 }
 
@@ -80,6 +94,12 @@ impl TryFrom<Cow<'_, str>> for Template {
                 has_ts: is_dynamic,
             })
         }
+    }
+}
+
+impl From<Template> for String {
+    fn from(template: Template) -> String {
+        template.src
     }
 }
 
@@ -201,43 +221,6 @@ fn render_timestamp(src: &str, event: EventRef<'_>) -> String {
     }
 }
 
-impl<'de> Deserialize<'de> for Template {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        deserializer.deserialize_str(TemplateVisitor)
-    }
-}
-
-struct TemplateVisitor;
-
-impl<'de> Visitor<'de> for TemplateVisitor {
-    type Value = Template;
-
-    fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "a string")
-    }
-
-    fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        Template::try_from(s).map_err(de::Error::custom)
-    }
-}
-
-impl Serialize for Template {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        // TODO: determine if we should serialize this as a struct or just the
-        // str.
-        serializer.serialize_str(&self.src)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
@@ -245,7 +228,7 @@ mod tests {
     use chrono::TimeZone;
 
     use super::*;
-    use crate::event::{Event, MetricKind, MetricValue};
+    use crate::event::{Event, LogEvent, MetricKind, MetricValue};
 
     #[test]
     fn get_fields() {
@@ -280,7 +263,7 @@ mod tests {
 
     #[test]
     fn render_log_static() {
-        let event = Event::from("hello world");
+        let event = Event::Log(LogEvent::from("hello world"));
         let template = Template::try_from("foo").unwrap();
 
         assert_eq!(Ok(Bytes::from("foo")), template.render(&event))
@@ -288,7 +271,7 @@ mod tests {
 
     #[test]
     fn render_log_dynamic() {
-        let mut event = Event::from("hello world");
+        let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("log_stream", "stream");
         let template = Template::try_from("{{log_stream}}").unwrap();
 
@@ -297,7 +280,7 @@ mod tests {
 
     #[test]
     fn render_log_dynamic_with_prefix() {
-        let mut event = Event::from("hello world");
+        let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("log_stream", "stream");
         let template = Template::try_from("abcd-{{log_stream}}").unwrap();
 
@@ -306,7 +289,7 @@ mod tests {
 
     #[test]
     fn render_log_dynamic_with_postfix() {
-        let mut event = Event::from("hello world");
+        let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("log_stream", "stream");
         let template = Template::try_from("{{log_stream}}-abcd").unwrap();
 
@@ -315,7 +298,7 @@ mod tests {
 
     #[test]
     fn render_log_dynamic_missing_key() {
-        let event = Event::from("hello world");
+        let event = Event::Log(LogEvent::from("hello world"));
         let template = Template::try_from("{{log_stream}}-{{foo}}").unwrap();
 
         assert_eq!(
@@ -328,7 +311,7 @@ mod tests {
 
     #[test]
     fn render_log_dynamic_multiple_keys() {
-        let mut event = Event::from("hello world");
+        let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("foo", "bar");
         event.as_mut_log().insert("baz", "quux");
         let template = Template::try_from("stream-{{foo}}-{{baz}}.log").unwrap();
@@ -341,7 +324,7 @@ mod tests {
 
     #[test]
     fn render_log_dynamic_weird_junk() {
-        let mut event = Event::from("hello world");
+        let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("foo", "bar");
         event.as_mut_log().insert("baz", "quux");
         let template = Template::try_from(r"{stream}{\{{}}}-{{foo}}-{{baz}}.log").unwrap();
@@ -356,7 +339,7 @@ mod tests {
     fn render_log_timestamp_strftime_style() {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
-        let mut event = Event::from("hello world");
+        let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert(log_schema().timestamp_key(), ts);
 
         let template = Template::try_from("abcd-%F").unwrap();
@@ -368,7 +351,7 @@ mod tests {
     fn render_log_timestamp_multiple_strftime_style() {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
-        let mut event = Event::from("hello world");
+        let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert(log_schema().timestamp_key(), ts);
 
         let template = Template::try_from("abcd-%F_%T").unwrap();
@@ -383,7 +366,7 @@ mod tests {
     fn render_log_dynamic_with_strftime() {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
-        let mut event = Event::from("hello world");
+        let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("foo", "butts");
         event.as_mut_log().insert(log_schema().timestamp_key(), ts);
 
@@ -399,7 +382,7 @@ mod tests {
     fn render_log_dynamic_with_nested_strftime() {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
-        let mut event = Event::from("hello world");
+        let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("format", "%F");
         event.as_mut_log().insert(log_schema().timestamp_key(), ts);
 
@@ -415,7 +398,7 @@ mod tests {
     fn render_log_dynamic_with_reverse_nested_strftime() {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
-        let mut event = Event::from("hello world");
+        let mut event = Event::Log(LogEvent::from("hello world"));
         event.as_mut_log().insert("\"%F\"", "foo");
         event.as_mut_log().insert(log_schema().timestamp_key(), ts);
 

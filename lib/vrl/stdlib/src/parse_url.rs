@@ -113,7 +113,7 @@ impl Expression for ParseUrlFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_parse_url(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 fn url_to_value(url: Url, default_known_ports: bool) -> Value {

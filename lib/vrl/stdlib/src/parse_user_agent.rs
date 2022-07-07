@@ -254,7 +254,7 @@ impl fmt::Debug for ParseUserAgentFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_parse_user_agent(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -266,7 +266,7 @@ pub(crate) enum Mode {
 
 impl Mode {
     fn all_value() -> Vec<Value> {
-        use Mode::*;
+        use Mode::{Enriched, Fast, Reliable};
 
         vec![Fast, Reliable, Enriched]
             .into_iter()
@@ -275,7 +275,7 @@ impl Mode {
     }
 
     const fn as_str(self) -> &'static str {
-        use Mode::*;
+        use Mode::{Enriched, Fast, Reliable};
 
         match self {
             Fast => "fast",
@@ -355,7 +355,7 @@ impl FromStr for Mode {
     type Err = &'static str;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        use Mode::*;
+        use Mode::{Enriched, Fast, Reliable};
 
         match s {
             "fast" => Ok(Fast),
@@ -559,7 +559,7 @@ fn into_value<'a>(iter: impl IntoIterator<Item = (&'a str, Option<String>)>) -> 
         .map(|(name, value)| {
             (
                 name.to_string(),
-                value.map(|s| s.into()).unwrap_or(Value::Null),
+                value.map_or(Value::Null, std::convert::Into::into),
             )
         })
         .collect()

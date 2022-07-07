@@ -14,7 +14,7 @@ fn parse_regex(value: Value, pattern: &Regex, numeric_groups: Option<Value>) -> 
         .unwrap_or(true);
     let parsed = pattern
         .captures(&value)
-        .map(|capture| util::capture_regex_to_map(pattern, capture, numeric_groups))
+        .map(|capture| util::capture_regex_to_map(pattern, &capture, numeric_groups))
         .ok_or("could not find any pattern matches")?;
     Ok(parsed.into())
 }

@@ -67,7 +67,7 @@ impl Expression for Md5Fn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_md5(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 #[cfg(test)]

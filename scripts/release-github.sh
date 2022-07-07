@@ -9,7 +9,8 @@ set -euo pipefail
 
 VERSION="${VECTOR_VERSION:-"$(scripts/version.sh)"}"
 
-grease --debug create-release vectordotdev/vector "v${VERSION}" "${SHA1}" \
-  --assets './target/artifacts/*' \
+gh release --repo "vectordotdev/vector" \
+  create "v${VERSION}" \
+  --title "v${VERSION}" \
   --notes "[View release notes](https://vector.dev/releases/${VERSION}/)" \
-  --name "v${VERSION}"
+  target/artifacts/*

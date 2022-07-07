@@ -4,8 +4,9 @@ use ::value::Value;
 use compiler::state;
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use indoc::indoc;
+use value::Secrets;
 use vector_common::TimeZone;
-use vrl::Runtime;
+use vrl::{Runtime, TargetValue};
 
 struct Source {
     name: &'static str,
@@ -684,7 +685,12 @@ fn benchmark_vrl_runtimes(c: &mut Criterion) {
         let execute = library.get_function().unwrap();
 
         {
-            let mut target: Value = serde_json::from_str(source.target).expect("valid json");
+            let value: Value = serde_json::from_str(source.target).expect("valid json");
+            let mut target = TargetValue {
+                value,
+                metadata: Value::Null,
+                secrets: Secrets::new(),
+            };
             let mut context = core::Context {
                 target: &mut target,
                 timezone: &tz,
@@ -694,7 +700,12 @@ fn benchmark_vrl_runtimes(c: &mut Criterion) {
         }
 
         {
-            let mut target: Value = serde_json::from_str(source.target).expect("valid json");
+            let value: Value = serde_json::from_str(source.target).expect("valid json");
+            let mut target = TargetValue {
+                value,
+                metadata: Value::Null,
+                secrets: Secrets::new(),
+            };
             let mut context = core::Context {
                 target: &mut target,
                 timezone: &tz,
@@ -702,18 +713,23 @@ fn benchmark_vrl_runtimes(c: &mut Criterion) {
             let mut result = Ok(Value::Null);
             unsafe { execute.call(&mut context, &mut result) };
 
-            println!("LLVM target: {}", target);
+            println!("LLVM target: {:?}", target);
             println!("LLVM result: {:?}", result);
         }
 
         {
             let state = state::Runtime::default();
             let mut runtime = Runtime::new(state);
-            let mut target: Value = serde_json::from_str(source.target).expect("valid json");
+            let value: Value = serde_json::from_str(source.target).expect("valid json");
+            let mut target = TargetValue {
+                value,
+                metadata: Value::Null,
+                secrets: Secrets::new(),
+            };
             let result = runtime.resolve(&mut target, &program, &tz);
             runtime.clear();
 
-            println!("AST target: {}", target);
+            println!("AST target: {:?}", target);
             println!("AST result: {:?}", result);
         }
 
@@ -721,20 +737,25 @@ fn benchmark_vrl_runtimes(c: &mut Criterion) {
             BenchmarkId::new("LLVM", source.name),
             &execute,
             |b, execute| {
-                let target: Value = serde_json::from_str(source.target).expect("valid json");
+                let value: Value = serde_json::from_str(source.target).expect("valid json");
+                let target = TargetValue {
+                    value,
+                    metadata: Value::Null,
+                    secrets: Secrets::new(),
+                };
 
                 b.iter_with_setup(
                     || target.clone(),
-                    |mut obj| {
+                    |mut target| {
                         {
                             let mut context = core::Context {
-                                target: &mut obj,
+                                target: &mut target,
                                 timezone: &tz,
                             };
                             let mut result = Ok(Value::Null);
                             unsafe { execute.call(&mut context, &mut result) };
                         }
-                        obj // Return the obj so it doesn't get dropped.
+                        target // Return the target so it doesn't get dropped.
                     },
                 )
             },
@@ -743,14 +764,19 @@ fn benchmark_vrl_runtimes(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new(source.name, "ast"), &(), |b, _| {
             let state = state::Runtime::default();
             let mut runtime = Runtime::new(state);
-            let target: Value = serde_json::from_str(source.target).expect("valid json");
+            let value: Value = serde_json::from_str(source.target).expect("valid json");
+            let target = TargetValue {
+                value,
+                metadata: Value::Null,
+                secrets: Secrets::new(),
+            };
 
             b.iter_with_setup(
                 || target.clone(),
-                |mut obj| {
-                    let _ = black_box(runtime.resolve(&mut obj, &program, &tz));
+                |mut target| {
+                    let _ = black_box(runtime.resolve(&mut target, &program, &tz));
                     runtime.clear();
-                    obj
+                    target
                 },
             )
         });

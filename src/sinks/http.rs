@@ -158,7 +158,8 @@ fn default_sink(encoding: Encoding) -> HttpSink {
     let encoding = EncodingConfigWithFramingAdapter::<EncodingConfig<Encoding>, Migrator>::legacy(
         encoding.into(),
     )
-    .encoding();
+    .encoding()
+    .unwrap();
     let framing = encoding
         .0
         .unwrap_or_else(|| NewlineDelimitedEncoder::new().into());
@@ -197,7 +198,7 @@ impl SinkConfig for HttpSinkConfig {
         request.add_old_option(self.headers.clone());
         validate_headers(&request.headers, &self.auth)?;
 
-        let encoding = self.encoding.encoding();
+        let encoding = self.encoding.encoding()?;
         let framing = encoding
             .0
             .unwrap_or_else(|| NewlineDelimitedEncoder::new().into());
@@ -409,7 +410,7 @@ mod tests {
     use http::request::Parts;
     use hyper::{Method, Response, StatusCode};
     use serde::Deserialize;
-    use vector_core::event::{BatchNotifier, BatchStatus};
+    use vector_core::event::{BatchNotifier, BatchStatus, LogEvent};
 
     use super::*;
     use crate::{
@@ -429,7 +430,7 @@ mod tests {
 
     #[test]
     fn http_encode_event_text() {
-        let event = Event::from("hello world");
+        let event = Event::Log(LogEvent::from("hello world"));
 
         let sink = default_sink(Encoding::Text);
         let mut encoder = sink.build_encoder();
@@ -440,7 +441,7 @@ mod tests {
 
     #[test]
     fn http_encode_event_ndjson() {
-        let event = Event::from("hello world");
+        let event = Event::Log(LogEvent::from("hello world"));
 
         let sink = default_sink(Encoding::Ndjson);
         let mut encoder = sink.build_encoder();

@@ -6,7 +6,7 @@ use std::{
 
 use async_stream::stream;
 use futures::{Stream, StreamExt};
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use crate::{
     config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
@@ -16,10 +16,14 @@ use crate::{
     transforms::{TaskTransform, Transform},
 };
 
-#[derive(Deserialize, Serialize, Debug, Default, Clone)]
+/// Configuration for the `aggregate` transform.
+#[configurable_component(transform)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct AggregateConfig {
-    /// The interval between flushes in milliseconds.
+    /// The interval between flushes, in milliseconds.
+    ///
+    /// Over this period metrics with the same series data (name, namespace, tags, …) will be aggregated.
     #[serde(default = "default_interval_ms")]
     pub interval_ms: u64,
 }
@@ -55,8 +59,6 @@ impl TransformConfig for AggregateConfig {
 }
 
 type MetricEntry = (metric::MetricData, EventMetadata);
-
-//------------------------------------------------------------------------------
 
 #[derive(Debug)]
 pub struct Aggregate {

@@ -35,7 +35,7 @@ This guide walks through how you can start enriching your observability by
 ## Use Case 1 - IoT Devices
 
 When working with IoT devices, you often want to minimize payloads being
-emmitted by the devices, even when collecting events from those devices. This
+emitted by the devices, even when collecting events from those devices. This
 is where [Enrichment tables] comes in very handy. Let's assume that you have an
 IoT device that emits its status - `online`, `offline`, `transmitting`, and
 `error` states, but the device needs to emit as little payload as possible

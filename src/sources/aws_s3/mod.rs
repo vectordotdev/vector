@@ -5,9 +5,9 @@ use async_compression::tokio::bufread;
 use aws_sdk_s3::types::ByteStream;
 use futures::stream;
 use futures::{stream::StreamExt, TryStreamExt};
-use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tokio_util::io::StreamReader;
+use vector_config::configurable_component;
 
 use super::util::MultilineConfig;
 use crate::aws::create_client;
@@ -27,47 +27,81 @@ use crate::{
 
 pub mod sqs;
 
-#[derive(Derivative, Copy, Clone, Debug, Deserialize, Serialize, PartialEq)]
+/// Compression scheme for objects retrieved from S3.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative, PartialEq)]
 #[serde(rename_all = "lowercase")]
 #[derivative(Default)]
 pub enum Compression {
+    /// Automatically attempt to determine the compression scheme.
+    ///
+    /// Vector will try to determine the compression scheme of the object from its: `Content-Encoding` and
+    /// `Content-Type` metadata, as well as the key suffix (e.g. `.gz`).
+    ///
+    /// It will fallback to 'none' if the compression scheme cannot be determined.
     #[derivative(Default)]
     Auto,
+    /// Uncompressed.
     None,
+    /// GZIP.
     Gzip,
+    /// ZSTD.
     Zstd,
 }
 
-#[derive(Derivative, Copy, Clone, Debug, Deserialize, Serialize)]
+/// Strategies for consuming objects from S3.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative)]
 #[serde(rename_all = "lowercase")]
 #[derivative(Default)]
 enum Strategy {
+    /// Consumes objects by processing bucket notification events sent to an [AWS SQS queue](\(urls.aws_sqs)).
     #[derivative(Default)]
     Sqs,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+/// Configuration for the `aws_s3` source.
+// TODO: The `Default` impl here makes the configuration schema output look pretty weird, especially because all the
+// usage of optionals means we're spewing out a ton of `"foo": null` stuff in the default value, and that's not helpful
+// when there's required fields.
+//
+// Maybe showing defaults at all, when there are required properties, doesn't actually make sense? :thinkies:
+#[configurable_component(source)]
+#[derive(Clone, Debug, Default)]
 #[serde(default, deny_unknown_fields)]
-struct AwsS3Config {
+pub struct AwsS3Config {
     #[serde(flatten)]
     region: RegionOrEndpoint,
 
+    /// The compression scheme used for decompressing objects retrieved from S3.
     compression: Compression,
 
+    /// The strategy to use to consume objects from S3.
     strategy: Strategy,
 
+    /// Configuration options for SQS.
+    ///
+    /// Only relevant when `strategy = "sqs"`.
     sqs: Option<sqs::Config>,
 
-    // Deprecated name. Moved to auth.
+    /// The ARN of an [IAM role](\(urls.aws_iam_role)) to assume at startup.
+    #[deprecated]
     assume_role: Option<String>,
+
+    #[configurable(derived)]
     #[serde(default)]
     auth: AwsAuthentication,
 
+    /// Multiline aggregation configuration.
+    ///
+    /// If not specified, multiline aggregation is disabled.
     multiline: Option<MultilineConfig>,
 
+    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
 
+    #[configurable(derived)]
     tls_options: Option<TlsConfig>,
 }
 

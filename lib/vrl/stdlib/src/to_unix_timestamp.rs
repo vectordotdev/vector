@@ -117,7 +117,7 @@ enum Unit {
 
 impl Unit {
     fn all_value() -> Vec<Value> {
-        use Unit::*;
+        use Unit::{Milliseconds, Nanoseconds, Seconds};
 
         vec![Seconds, Milliseconds, Nanoseconds]
             .into_iter()
@@ -126,7 +126,7 @@ impl Unit {
     }
 
     const fn as_str(self) -> &'static str {
-        use Unit::*;
+        use Unit::{Milliseconds, Nanoseconds, Seconds};
 
         match self {
             Seconds => "seconds",
@@ -146,7 +146,7 @@ impl FromStr for Unit {
     type Err = &'static str;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        use Unit::*;
+        use Unit::{Milliseconds, Nanoseconds, Seconds};
 
         match s {
             "seconds" => Ok(Seconds),
@@ -179,7 +179,7 @@ impl Expression for ToUnixTimestampFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_to_unix_timestamp(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 #[cfg(test)]
@@ -195,7 +195,7 @@ mod test {
             args: func_args![value: chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0),
                              unit: "seconds"
             ],
-            want: Ok(1609459200i64),
+            want: Ok(1_609_459_200_i64),
             tdef: TypeDef::integer().infallible(),
         }
 
@@ -203,7 +203,7 @@ mod test {
             args: func_args![value: chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0),
                              unit: "milliseconds"
             ],
-            want: Ok(1609459200000i64),
+            want: Ok(1_609_459_200_000_i64),
             tdef: TypeDef::integer().infallible(),
         }
 
@@ -211,7 +211,7 @@ mod test {
              args: func_args![value: chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0),
                               unit: "nanoseconds"
              ],
-             want: Ok(1609459200000000000i64),
+             want: Ok(1_609_459_200_000_000_000_i64),
              tdef: TypeDef::integer().infallible(),
          }
     ];

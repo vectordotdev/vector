@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-20.04
     timeout-minutes: 3
     steps:
-      - uses: styfle/cancel-workflow-action@0.9.1
+      - uses: styfle/cancel-workflow-action@0.10.0
         with:
           access_token: ${{ secrets.GITHUB_TOKEN }}
           all_but_latest: true # can cancel workflows scheduled later
@@ -343,7 +343,7 @@ jobs:
 
     steps:
       - name: Set up Python3
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v4
         with:
           python-version: "3.10.2"
 
@@ -382,7 +382,7 @@ jobs:
 
     steps:
       - name: Set up Python3
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v4
         with:
           python-version: "3.10.2"
 
@@ -421,7 +421,7 @@ jobs:
 
     steps:
       - name: Set up Python3
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v4
         with:
           python-version: "3.10.2"
 
@@ -475,7 +475,7 @@ jobs:
 
     steps:
       - name: Set up Python3
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v4
         with:
           python-version: "3.10.2"
 
@@ -513,7 +513,7 @@ jobs:
 
     steps:
       - name: Set up Python3
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v4
         with:
           python-version: "3.10.2"
 

@@ -114,7 +114,7 @@ impl Expression for MatchArrayFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_match_array(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 #[cfg(test)]

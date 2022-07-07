@@ -3,6 +3,7 @@ use http::uri::InvalidUri;
 use hyper_proxy::{Custom, Intercept, Proxy, ProxyConnector};
 use no_proxy::NoProxy;
 use url::Url;
+use vector_config::configurable_component;
 
 // suggestion of standardization coming from https://about.gitlab.com/blog/2021/01/27/we-need-to-talk-no-proxy/
 fn from_env(key: &str) -> Option<String> {
@@ -36,18 +37,47 @@ impl NoProxyInterceptor {
     }
 }
 
-#[derive(serde::Deserialize, serde::Serialize, Clone, Debug, PartialEq, Eq)]
+/// Proxy configuration.
+///
+/// Vector can be configured to proxy traffic through an HTTP(S) proxy when making external requests. Similar to common
+/// proxy configuration convention, users can set different proxies to use based on the type of traffic being proxied,
+/// as well as set specific hosts that should not be proxied.
+#[configurable_component]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct ProxyConfig {
+    /// Enables proxying support.
     #[serde(
         default = "ProxyConfig::default_enabled",
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub enabled: bool,
+
+    /// Proxy endpoint to use when proxying HTTP traffic.
+    ///
+    /// Must be a valid URI string.
     #[serde(default)]
     pub http: Option<String>,
+
+    /// Proxy endpoint to use when proxying HTTPS traffic.
+    ///
+    /// Must be a valid URI string.
     #[serde(default)]
     pub https: Option<String>,
+
+    /// A list of hosts to avoid proxying.
+    ///
+    /// Multiple patterns are allowed:
+    ///
+    /// | Pattern             | Example match                                                               |
+    /// | ------------------- | --------------------------------------------------------------------------- |
+    /// | Domain names        | `**example.com**` matches requests to `**example.com**`                     |
+    /// | Wildcard domains    | `**.example.com**` matches requests to `**example.com**` and its subdomains |
+    /// | IP addresses        | `**127.0.0.1**` matches requests to `**127.0.0.1**`                         |
+    /// | [CIDR][cidr] blocks | `**192.168.0.0/16**` matches requests to any IP addresses in this range     |
+    /// | Splat               | `__*__` matches all hosts                                                   |
+    ///
+    /// [cidr]: https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"

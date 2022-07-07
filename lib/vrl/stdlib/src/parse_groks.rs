@@ -62,11 +62,6 @@ impl Function for ParseGroks {
                 required: true,
             },
             Parameter {
-                keyword: "remove_empty",
-                kind: kind::BOOLEAN,
-                required: false,
-            },
-            Parameter {
                 keyword: "aliases",
                 kind: kind::OBJECT,
                 required: false,
@@ -224,15 +219,7 @@ impl Function for ParseGroks {
         let grok_rules = parse_grok_rules::parse_grok_rules(&patterns, aliases)
             .map_err(|e| Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticMessage>)?;
 
-        let remove_empty = arguments
-            .optional("remove_empty")
-            .unwrap_or_else(|| expr!(false));
-
-        Ok(Box::new(ParseGrokFn {
-            value,
-            grok_rules,
-            remove_empty,
-        }))
+        Ok(Box::new(ParseGrokFn { value, grok_rules }))
     }
 
     fn symbol(&self) -> Option<(&'static str, usize)> {
@@ -244,16 +231,14 @@ impl Function for ParseGroks {
 struct ParseGrokFn {
     value: Box<dyn Expression>,
     grok_rules: Vec<GrokRule>,
-    remove_empty: Box<dyn Expression>,
 }
 
 impl Expression for ParseGrokFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let bytes = value.try_bytes_utf8_lossy()?;
-        let remove_empty = self.remove_empty.resolve(ctx)?.try_boolean()?;
 
-        let v = parse_grok::parse_grok(bytes.as_ref(), &self.grok_rules, remove_empty)
+        let v = parse_grok::parse_grok(bytes.as_ref(), &self.grok_rules)
             .map_err(|err| format!("unable to parse grok: {}", err))?;
 
         Ok(v)
@@ -269,7 +254,6 @@ impl Expression for ParseGrokFn {
 pub extern "C" fn vrl_fn_parse_groks(
     value: &mut Value,
     patterns: &Box<dyn Any + Send + Sync>,
-    remove_empty: &mut Option<Value>,
     _aliases: &Box<dyn Any + Send + Sync>,
     resolved: &mut Resolved,
 ) {
@@ -278,21 +262,12 @@ pub extern "C" fn vrl_fn_parse_groks(
         std::mem::swap(value, &mut moved);
         moved
     };
-    let remove_empty = {
-        let mut moved = None;
-        std::mem::swap(remove_empty, &mut moved);
-        moved
-    };
-
-    let remove_empty = remove_empty
-        .and_then(|value| value.as_boolean())
-        .unwrap_or(false);
 
     let patterns = patterns.downcast_ref::<Vec<GrokRule>>().unwrap();
 
     *resolved = (|| {
         let bytes = value.try_bytes_utf8_lossy()?;
-        parse_grok::parse_grok(bytes.as_ref(), patterns, remove_empty)
+        parse_grok::parse_grok(bytes.as_ref(), patterns)
             .map_err(|err| format!("unable to parse grok: {}", err).into())
     })();
 }
@@ -346,17 +321,6 @@ mod test {
                 "timestamp" => "2020-10-02T23:22:12.223222Z",
                 "level" => "",
             })),
-            tdef: TypeDef::object(Collection::any()).fallible(),
-        }
-
-        remove_empty {
-            args: func_args![ value: "2020-10-02T23:22:12.223222Z",
-                              patterns: vec!["(%{TIMESTAMP_ISO8601:timestamp}|%{LOGLEVEL:level})"],
-                              remove_empty: true,
-            ],
-            want: Ok(Value::from(
-                btreemap! { "timestamp" => "2020-10-02T23:22:12.223222Z" },
-            )),
             tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
@@ -432,7 +396,7 @@ mod test {
             ],
             want: Ok(Value::Object(btreemap! {
                 "date_access" => "13/Jul/2016:10:55:36",
-                "duration" => 202000000,
+                "duration" => 202_000_000,
                 "http" => btreemap! {
                     "auth" => "frank",
                     "ident" => "-",

@@ -85,7 +85,7 @@ impl Expression for IpPtonFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_ip_pton(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 #[cfg(test)]

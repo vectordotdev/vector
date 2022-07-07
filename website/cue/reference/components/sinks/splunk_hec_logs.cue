@@ -79,6 +79,25 @@ components: sinks: splunk_hec_logs: {
 				examples: ["https://http-inputs-hec.splunkcloud.com", "https://hec.splunk.com:8088", "http://example.com"]
 			}
 		}
+		endpoint_target: {
+			common:      false
+			description: """
+                                     The Splunk endpoint to send to. Either the [event endpoint](\(urls.splunk_hec_event_endpoint)) or the
+                                     [raw endpoint](\(urls.splunk_hec_raw_endpoint)). [metadata](\(urls.splunk_hec_metadata)) for the event
+                                     endpoint is sent with each event. For the `raw` endpoint, configured [event metadata](\(urls.splunk_hec_metadata))
+                                     is sent as query parameters - except the `timestamp` field.
+                                     """
+			required:    false
+			warnings: []
+			type: string: {
+				default: "event"
+				enum: {
+					event: "[Event endpoint](\(urls.splunk_hec_event_endpoint))"
+					raw:   "[Raw endpoint](\(urls.splunk_hec_raw_endpoint))"
+				}
+				syntax: "literal"
+			}
+		}
 		host_key: {
 			common:      true
 			description: """
@@ -133,8 +152,20 @@ components: sinks: splunk_hec_logs: {
 				syntax: "template"
 			}
 		}
+		timestamp_key: {
+			common:      false
+			description: """
+				The name of the log field to be used as the timestamp sent to Splunk HEC. This overrides the
+				[global `timestamp_key` option](\(urls.vector_configuration)/global-options#log_schema.timestamp_key).
+				When set to "", vector omits setting a timestamp in the events sent to Splunk HEC.
+				"""
+			required:    false
+			type: string: {
+				default: null
+				examples: ["timestamp", ""]
+			}
+		}
 	}
-
 	input: {
 		logs:    true
 		metrics: null

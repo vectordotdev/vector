@@ -3,7 +3,7 @@ use vector_common::conversion::Conversion;
 use vrl::prelude::*;
 
 fn to_bool(value: Value) -> Resolved {
-    use Value::*;
+    use Value::{Boolean, Bytes, Float, Integer, Null};
 
     match value {
         Boolean(_) => Ok(value),
@@ -193,7 +193,7 @@ impl Expression for ToBoolFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_to_bool(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 #[cfg(test)]

@@ -101,7 +101,7 @@ impl Expression for ParseCsvFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_parse_csv(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 #[inline]

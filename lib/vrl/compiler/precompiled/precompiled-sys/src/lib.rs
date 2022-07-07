@@ -1,8 +1,7 @@
 use bytes::{BufMut, BytesMut};
 use std::{any::Any, collections::BTreeMap};
 use vrl_core::{
-    Context, Error, ExpressionError, Label, LookupBuf, Resolved, Span, Target, Value,
-    VrlValueArithmetic,
+    Context, Error, ExpressionError, Label, LookupBuf, Resolved, Span, Value, VrlValueArithmetic,
 };
 
 // We only want to precompile the stub for this function, and therefore don't
@@ -1095,10 +1094,8 @@ pub extern "C" fn vrl_expression_query_target(path: &LookupBuf, result: &mut Res
     *result = Ok(result
         .as_ref()
         .expect("VRL result must not contain an error")
-        .target_get(path)
-        .ok()
-        .flatten()
-        .map(Clone::clone)
+        .get_by_path(path)
+        .cloned()
         .unwrap_or(Value::Null));
 }
 

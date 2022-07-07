@@ -3,7 +3,7 @@ use vrl::prelude::*;
 
 fn to_string(value: Value) -> Resolved {
     use chrono::SecondsFormat;
-    use Value::*;
+    use Value::{Boolean, Bytes, Float, Integer, Null, Timestamp};
     let value = match value {
         v @ Bytes(_) => v,
         Integer(v) => v.to_string().into(),
@@ -133,7 +133,7 @@ impl Expression for ToStringFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_to_string(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 #[cfg(test)]

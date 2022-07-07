@@ -185,13 +185,13 @@ impl LogEvent {
     }
 
     #[must_use]
-    pub fn with_batch_notifier(mut self, batch: &Arc<BatchNotifier>) -> Self {
+    pub fn with_batch_notifier(mut self, batch: &BatchNotifier) -> Self {
         self.metadata = self.metadata.with_batch_notifier(batch);
         self
     }
 
     #[must_use]
-    pub fn with_batch_notifier_option(mut self, batch: &Option<Arc<BatchNotifier>>) -> Self {
+    pub fn with_batch_notifier_option(mut self, batch: &Option<BatchNotifier>) -> Self {
         self.metadata = self.metadata.with_batch_notifier_option(batch);
         self
     }

@@ -41,7 +41,7 @@ impl Function for GetHostname {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_get_hostname(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 #[derive(Debug, Clone)]

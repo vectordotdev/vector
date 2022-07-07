@@ -165,7 +165,7 @@ impl Expression for ParseApacheLogFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_parse_apache_log(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 fn kind_common() -> BTreeMap<Field, Kind> {

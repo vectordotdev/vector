@@ -16,6 +16,10 @@ pub struct HecRequest {
     pub events_byte_size: usize,
     pub finalizers: EventFinalizers,
     pub passthrough_token: Option<Arc<str>>,
+    pub index: Option<String>,
+    pub source: Option<String>,
+    pub sourcetype: Option<String>,
+    pub host: Option<String>,
 }
 
 impl ByteSizeOf for HecRequest {

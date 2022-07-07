@@ -77,7 +77,7 @@ impl Expression for TallyValueFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_tally_value(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 #[cfg(test)]

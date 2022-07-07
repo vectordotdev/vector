@@ -236,12 +236,14 @@ impl Expression for GetEnrichmentTableRecordFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_get_enrichment_table_record(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 #[cfg(test)]
 mod tests {
+    use value::Secrets;
     use vector_common::TimeZone;
+    use vrl::TargetValue;
 
     use super::*;
     use crate::test_util::get_table_registry;
@@ -262,9 +264,14 @@ mod tests {
         };
 
         let tz = TimeZone::default();
-        let mut object: Value = BTreeMap::new().into();
+        let object: Value = BTreeMap::new().into();
+        let mut target = TargetValue {
+            value: object,
+            metadata: vrl::value!({}),
+            secrets: Secrets::new(),
+        };
         let mut runtime_state = vrl::state::Runtime::default();
-        let mut ctx = Context::new(&mut object, &mut runtime_state, &tz);
+        let mut ctx = Context::new(&mut target, &mut runtime_state, &tz);
 
         registry.finish_load();
 

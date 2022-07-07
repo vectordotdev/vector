@@ -131,7 +131,7 @@ impl Expression for MatchAnyFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_match_any(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 #[cfg(test)]

@@ -74,7 +74,7 @@ impl Expression for ReverseDnsFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_reverse_dns(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 #[cfg(test)]

@@ -9,7 +9,7 @@ use regex::{Regex, RegexBuilder};
 use roxmltree::{Document, Node, NodeType};
 use vrl::prelude::*;
 
-/// Used to keep Clippy's too_many_argument check happy.
+/// Used to keep Clippy's `too_many_argument` check happy.
 #[derive(Debug)]
 struct ParseOptions {
     trim: Option<Value>,
@@ -276,7 +276,7 @@ impl Expression for ParseXmlFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_parse_xml(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 fn type_def() -> TypeDef {

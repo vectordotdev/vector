@@ -21,8 +21,6 @@ services:
       - "clickhouse-integration-tests"
       - "--lib"
       - "::clickhouse::"
-      - "--"
-      - "--nocapture"
     environment:
       - CLICKHOUSE_ADDRESS=http://clickhouse:8123
     depends_on:

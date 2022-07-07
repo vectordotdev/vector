@@ -13,8 +13,7 @@ fn join(array: Value, separator: Option<Value>) -> Resolved {
     let separator: String = separator
         .map(Value::try_bytes)
         .transpose()?
-        .map(|s| String::from_utf8_lossy(&s).to_string())
-        .unwrap_or_else(|| "".into());
+        .map_or_else(String::new, |s| String::from_utf8_lossy(&s).to_string());
     let joined = string_vec.join(&separator);
     Ok(Value::from(joined))
 }

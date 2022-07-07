@@ -54,14 +54,11 @@ impl Kind {
     /// Returns `Kind`, with non-primitive states removed.
     ///
     /// That is, it returns `self,` but removes the `object` and `array` states.
-    ///
-    /// Returns `None` if no primitive states are set.
     #[must_use]
-    pub fn to_primitives(mut self) -> Option<Self> {
-        self.remove_array().ok()?;
-        self.remove_object().ok()?;
-
-        Some(self)
+    pub fn to_primitives(mut self) -> Self {
+        self.remove_array();
+        self.remove_object();
+        self
     }
 }
 
@@ -87,7 +84,7 @@ mod tests {
     fn test_to_primitive() {
         struct TestCase {
             kind: Kind,
-            want: Option<Kind>,
+            want: Kind,
         }
 
         for (title, TestCase { kind, want }) in HashMap::from([
@@ -95,28 +92,28 @@ mod tests {
                 "single primitive",
                 TestCase {
                     kind: Kind::bytes(),
-                    want: Some(Kind::bytes()),
+                    want: Kind::bytes(),
                 },
             ),
             (
                 "multiple primitives",
                 TestCase {
                     kind: Kind::integer().or_regex(),
-                    want: Some(Kind::integer().or_regex()),
+                    want: Kind::integer().or_regex(),
                 },
             ),
             (
                 "array only",
                 TestCase {
                     kind: Kind::array(BTreeMap::default()),
-                    want: None,
+                    want: Kind::never(),
                 },
             ),
             (
                 "object only",
                 TestCase {
                     kind: Kind::object(BTreeMap::default()),
-                    want: None,
+                    want: Kind::never(),
                 },
             ),
             (
@@ -126,7 +123,7 @@ mod tests {
                         .or_integer()
                         .or_object(BTreeMap::default())
                         .or_array(BTreeMap::default()),
-                    want: Some(Kind::timestamp().or_integer()),
+                    want: Kind::timestamp().or_integer(),
                 },
             ),
         ]) {

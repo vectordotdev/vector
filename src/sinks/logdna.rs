@@ -14,7 +14,7 @@ use crate::{
     event::Event,
     http::{Auth, HttpClient},
     sinks::util::{
-        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
+        encoding::Transformer,
         http::{HttpEventEncoder, HttpSink, PartitionHttpSink},
         BatchConfig, BoxedRawValue, JsonArrayBuffer, PartitionBuffer, PartitionInnerBuffer,
         RealtimeSizeBasedDefaultBatchSettings, TowerRequestConfig, UriSerde,
@@ -39,10 +39,10 @@ pub(super) struct LogdnaConfig {
     tags: Option<Vec<Template>>,
 
     #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
+    pub encoding: Transformer,
 
     default_app: Option<String>,
     default_env: Option<String>,
@@ -73,14 +73,6 @@ impl GenerateConfig for LogdnaConfig {
         )
         .unwrap()
     }
-}
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-pub enum Encoding {
-    #[derivative(Default)]
-    Default,
 }
 
 #[async_trait::async_trait]
@@ -131,7 +123,7 @@ pub struct PartitionKey {
 pub struct LogdnaEventEncoder {
     hostname: Template,
     tags: Option<Vec<Template>>,
-    encoding: EncodingConfigWithDefault<Encoding>,
+    transformer: Transformer,
     default_app: Option<String>,
     default_env: Option<String>,
 }
@@ -178,7 +170,7 @@ impl HttpEventEncoder<PartitionInnerBuffer<serde_json::Value, PartitionKey>>
             })
             .ok()?;
 
-        self.encoding.apply_rules(&mut event);
+        self.transformer.transform(&mut event);
         let mut log = event.into_log();
 
         let line = log
@@ -238,7 +230,7 @@ impl HttpSink for LogdnaConfig {
         LogdnaEventEncoder {
             hostname: self.hostname.clone(),
             tags: self.tags.clone(),
-            encoding: self.encoding.clone(),
+            transformer: self.encoding.clone(),
             default_app: self.default_app.clone(),
             default_env: self.default_env.clone(),
         }
@@ -366,16 +358,16 @@ mod tests {
         .unwrap();
         let mut encoder = config.build_encoder();
 
-        let mut event1 = Event::from("hello world");
+        let mut event1 = Event::Log(LogEvent::from("hello world"));
         event1.as_mut_log().insert("app", "notvector");
         event1.as_mut_log().insert("magic", "vector");
 
-        let mut event2 = Event::from("hello world");
+        let mut event2 = Event::Log(LogEvent::from("hello world"));
         event2.as_mut_log().insert("file", "log.txt");
 
-        let event3 = Event::from("hello world");
+        let event3 = Event::Log(LogEvent::from("hello world"));
 
-        let mut event4 = Event::from("hello world");
+        let mut event4 = Event::Log(LogEvent::from("hello world"));
         event4.as_mut_log().insert("env", "staging");
 
         let event1_out = encoder.encode_event(event1).unwrap().into_parts().0;

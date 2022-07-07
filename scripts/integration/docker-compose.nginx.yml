@@ -37,8 +37,6 @@ services:
       - "nginx-integration-tests"
       - "--lib"
       - "::nginx_metrics::"
-      - "--"
-      - "--nocapture"
     depends_on:
       - nginx
       - squid

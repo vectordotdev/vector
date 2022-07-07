@@ -253,9 +253,7 @@ impl Encoder<Event> for StatsdEncoder {
         };
 
         let message = encode_namespace(
-            metric
-                .namespace()
-                .or_else(|| self.default_namespace.as_deref()),
+            metric.namespace().or(self.default_namespace.as_deref()),
             '.',
             buf.join("|"),
         );

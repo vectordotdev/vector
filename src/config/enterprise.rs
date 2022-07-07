@@ -21,24 +21,26 @@ use super::{
     SourceOuter, TransformOuter,
 };
 use crate::{
-    built_info,
     common::datadog::{get_api_base_endpoint, Region},
+    conditions::AnyCondition,
     http::{HttpClient, HttpError},
     sinks::{
         datadog::{logs::DatadogLogsConfig, metrics::DatadogMetricsConfig},
         util::retries::ExponentialBackoff,
     },
     sources::{
-        host_metrics::{self, HostMetricsConfig},
+        host_metrics::{Collector, HostMetricsConfig},
         internal_logs::InternalLogsConfig,
         internal_metrics::InternalMetricsConfig,
     },
-    transforms::remap::RemapConfig,
+    transforms::{filter::FilterConfig, remap::RemapConfig},
 };
 
 static HOST_METRICS_KEY: &str = "#datadog_host_metrics";
 static TAG_METRICS_KEY: &str = "#datadog_tag_metrics";
 static TAG_LOGS_KEY: &str = "#datadog_tag_logs";
+static FILTER_METRICS_KEY: &str = "#datadog_filter_metrics";
+static PIPELINES_NAMESPACE_METRICS_KEY: &str = "#datadog_pipelines_namespace_metrics";
 static INTERNAL_METRICS_KEY: &str = "#datadog_internal_metrics";
 static INTERNAL_LOGS_KEY: &str = "#datadog_internal_logs";
 static DATADOG_METRICS_KEY: &str = "#datadog_metrics";
@@ -46,6 +48,11 @@ static DATADOG_LOGS_KEY: &str = "#datadog_logs";
 
 static DATADOG_REPORTING_PRODUCT: &str = "Datadog Observability Pipelines";
 static DATADOG_REPORTING_PATH_STUB: &str = "/api/unstable/observability_pipelines/configuration";
+
+// Users can pass their Datadog API key through environment variables directly
+// rather than placing it in their configuration.
+pub static DATADOG_API_KEY_ENV_VAR_SHORT: &str = "DD_API_KEY";
+pub static DATADOG_API_KEY_ENV_VAR_FULL: &str = "DATADOG_API_KEY";
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(deny_unknown_fields)]
@@ -279,7 +286,9 @@ impl TryFrom<&Config> for EnterpriseMetadata {
             // API key provided explicitly.
             Some(api_key) => api_key.clone(),
             // No API key; attempt to get it from the environment.
-            None => match env::var("DATADOG_API_KEY").or_else(|_| env::var("DD_API_KEY")) {
+            None => match env::var(DATADOG_API_KEY_ENV_VAR_FULL)
+                .or_else(|_| env::var(DATADOG_API_KEY_ENV_VAR_SHORT))
+            {
                 Ok(api_key) => api_key,
                 _ => return Err(EnterpriseError::MissingApiKey),
             },
@@ -414,9 +423,6 @@ fn setup_logs_reporting(
 
     let configuration_key = &datadog.configuration_key;
     let vector_version = crate::vector_version();
-    let build_arch = built_info::TARGET_ARCH;
-    let build_os = built_info::TARGET_OS;
-    let build_vendor = built_info::TARGET_VENDOR;
     let tag_logs = RemapConfig {
         source: Some(format!(
             r#"
@@ -424,9 +430,6 @@ fn setup_logs_reporting(
             .vector.configuration_key = "{configuration_key}"
             .vector.configuration_version_hash = "{configuration_version_hash}"
             .vector.version = "{vector_version}"
-            .vector.arch = "{build_arch}"
-            .vector.os = "{build_os}"
-            .vector.vendor = "{build_vendor}"
             {}
         "#,
             custom_logs_tags_vrl,
@@ -469,18 +472,36 @@ fn setup_metrics_reporting(
     let host_metrics_id = OutputId::from(ComponentKey::from(HOST_METRICS_KEY));
     let tag_metrics_id = OutputId::from(ComponentKey::from(TAG_METRICS_KEY));
     let internal_metrics_id = OutputId::from(ComponentKey::from(INTERNAL_METRICS_KEY));
+    let filter_metrics_id = OutputId::from(ComponentKey::from(FILTER_METRICS_KEY));
+    let pipelines_namespace_metrics_id =
+        OutputId::from(ComponentKey::from(PIPELINES_NAMESPACE_METRICS_KEY));
     let datadog_metrics_id = ComponentKey::from(DATADOG_METRICS_KEY);
 
     // Create internal sources for host and internal metrics. We're using distinct sources here and
     // not attempting to reuse existing ones, to configure according to enterprise requirements.
+
+    // By default, host_metrics generates many metrics and some with high
+    // cardinality which can negatively impact customers' costs and downstream
+    // systems' performance. To avoid this, we explicitly set `collectors`.
     let host_metrics = HostMetricsConfig {
-        namespace: host_metrics::Namespace::from(Some("pipelines".to_owned())),
+        namespace: Some("vector.host".to_owned()),
         scrape_interval_secs: datadog.reporting_interval_secs,
+        collectors: Some(vec![
+            Collector::Cpu,
+            Collector::Disk,
+            Collector::Load,
+            Collector::Host,
+            Collector::Memory,
+            Collector::Network,
+        ]),
         ..Default::default()
     };
 
     let internal_metrics = InternalMetricsConfig {
-        namespace: Some("pipelines".to_owned()),
+        // While the default namespace for internal metrics is already "vector",
+        // setting the namespace here is meant for clarity and resistance
+        // against any future or accidental changes.
+        namespace: Some("vector".to_owned()),
         scrape_interval_secs: datadog.reporting_interval_secs,
         ..Default::default()
     };
@@ -502,6 +523,16 @@ fn setup_metrics_reporting(
         "#,
             custom_metric_tags_vrl
         )),
+        ..Default::default()
+    };
+
+    // Preserve the `pipelines` namespace for specific metrics
+    let filter_metrics = FilterConfig::from(AnyCondition::String(
+        r#".name == "component_received_bytes_total""#.to_string(),
+    ));
+
+    let pipelines_namespace_metrics = RemapConfig {
+        source: Some(r#".namespace = "pipelines""#.to_string()),
         ..Default::default()
     };
 
@@ -528,9 +559,22 @@ fn setup_metrics_reporting(
         TransformOuter::new(vec![host_metrics_id, internal_metrics_id], tag_metrics),
     );
 
+    config.transforms.insert(
+        filter_metrics_id.component.clone(),
+        TransformOuter::new(vec![tag_metrics_id.clone()], filter_metrics),
+    );
+
+    config.transforms.insert(
+        pipelines_namespace_metrics_id.component.clone(),
+        TransformOuter::new(vec![filter_metrics_id], pipelines_namespace_metrics),
+    );
+
     config.sinks.insert(
         datadog_metrics_id,
-        SinkOuter::new(vec![tag_metrics_id], Box::new(datadog_metrics)),
+        SinkOuter::new(
+            vec![tag_metrics_id, pipelines_namespace_metrics_id],
+            Box::new(datadog_metrics),
+        ),
     );
 }
 
@@ -563,8 +607,7 @@ pub(crate) fn report_configuration(
         // We need to create a JSON representation of config, based on the original files
         // that Vector was spawned with.
         let (table, _) = process_paths(&config_paths)
-            .map(|paths| load_source_from_paths(&paths).ok())
-            .flatten()
+            .and_then(|paths| load_source_from_paths(&paths).ok())
             .expect("Couldn't load source from config paths. Please report.");
 
         // Set the relevant fields needed to report a config to Datadog. This is a struct rather than
@@ -725,16 +768,17 @@ async fn report_serialized_config_to_datadog<'a>(
     Err(ReportingError::MaxRetriesReached)
 }
 
-#[cfg(all(test, feature = "enterprise-tests"))]
+#[cfg(all(
+    test,
+    feature = "enterprise",
+    feature = "sources-demo_logs",
+    feature = "sinks-blackhole"
+))]
 mod test {
-    use std::{
-        collections::BTreeMap, io::Write, net::TcpListener, path::PathBuf, str::FromStr, thread,
-        time::Duration,
-    };
+    use std::{collections::BTreeMap, net::TcpListener, time::Duration};
 
     use http::StatusCode;
     use indexmap::IndexMap;
-    use indoc::formatdoc;
     use tokio::time::sleep;
     use value::Kind;
     use vector_common::btreemap;
@@ -746,11 +790,8 @@ mod test {
         PipelinesVersionPayload,
     };
     use crate::{
-        app::Application,
-        cli::{Color, LogFormat, Opts, RootOpts},
         config::enterprise::{convert_tags_to_vrl, default_max_retries},
         http::HttpClient,
-        metrics,
         test_util::next_addr,
     };
 
@@ -787,29 +828,6 @@ mod test {
             .await;
 
         mock_server
-    }
-
-    fn get_vector_config_file(config: impl Into<String>) -> tempfile::NamedTempFile {
-        let mut file = tempfile::NamedTempFile::new().unwrap();
-        let _ = writeln!(file, "{}", config.into());
-        file
-    }
-
-    fn get_root_opts(config_path: PathBuf) -> RootOpts {
-        RootOpts {
-            config_paths: vec![config_path],
-            config_dirs: vec![],
-            config_paths_toml: vec![],
-            config_paths_json: vec![],
-            config_paths_yaml: vec![],
-            require_healthy: None,
-            threads: None,
-            verbose: 0,
-            quiet: 3,
-            log_format: LogFormat::from_str("text").unwrap(),
-            color: Color::from_str("auto").unwrap(),
-            watch_config: false,
-        }
     }
 
     #[tokio::test]
@@ -916,105 +934,6 @@ mod test {
         )
         .await
         .is_err());
-    }
-
-    /// This test asserts that configuration reporting errors do NOT impact the
-    /// rest of Vector starting and running.
-    ///
-    /// In general, Vector should continue operating even in the event that the
-    /// enterprise API is down/having issues. Do not modify this behavior
-    /// without prior approval.
-    #[tokio::test]
-    async fn vector_continues_on_reporting_error() {
-        let _ = metrics::init_test();
-
-        let server = build_test_server_error_and_recover(StatusCode::NOT_IMPLEMENTED).await;
-        let endpoint = server.uri();
-
-        let vector_config = formatdoc! {r#"
-            [enterprise]
-            application_key = "application_key"
-            api_key = "api_key"
-            configuration_key = "configuration_key"
-            endpoint = "{endpoint}"
-            max_retries = 1
-
-            [sources.in]
-            type = "demo_logs"
-            format = "syslog"
-            count = 3
-
-            [sinks.out]
-            type = "blackhole"
-            inputs = ["*"]
-        "#, endpoint=endpoint};
-
-        let config_file = get_vector_config_file(vector_config);
-
-        let opts = Opts {
-            root: get_root_opts(config_file.path().to_path_buf()),
-            sub_command: None,
-        };
-
-        // Spawn a separate thread to avoid nested async runtime errors
-        let vector_continued = thread::spawn(|| {
-            // Configuration reporting is guaranteed to fail here due to API
-            // server issues. However, the app should still start up and run.
-            Application::prepare_from_opts(opts).map_or(false, |app| {
-                // Finish running the topology to avoid error logs
-                app.run();
-                true
-            })
-        })
-        .join()
-        .unwrap();
-
-        assert!(!server.received_requests().await.unwrap().is_empty());
-        assert!(vector_continued);
-    }
-
-    #[tokio::test]
-    async fn vector_does_not_start_with_enterprise_misconfigured() {
-        let _ = metrics::init_test();
-
-        let server = build_test_server_error_and_recover(StatusCode::NOT_IMPLEMENTED).await;
-        let endpoint = server.uri();
-
-        let vector_config = formatdoc! {r#"
-            [enterprise]
-            application_key = "application_key"
-            configuration_key = "configuration_key"
-            endpoint = "{endpoint}"
-            max_retries = 1
-
-            [sources.in]
-            type = "demo_logs"
-            format = "syslog"
-            count = 1
-            interval = 0.0
-
-            [sinks.out]
-            type = "blackhole"
-            inputs = ["*"]
-        "#, endpoint=endpoint};
-
-        let config_file = get_vector_config_file(vector_config);
-
-        let opts = Opts {
-            root: get_root_opts(config_file.path().to_path_buf()),
-            sub_command: None,
-        };
-
-        let vector_failed_to_start = thread::spawn(|| {
-            // With [enterprise] configured but no API key, starting the app
-            // should fail
-            Application::prepare_from_opts(opts).is_err()
-        })
-        .join()
-        .unwrap();
-
-        assert!(server.received_requests().await.unwrap().is_empty());
-        assert!(vector_failed_to_start);
     }
 
     #[test]

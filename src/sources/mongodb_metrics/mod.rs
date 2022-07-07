@@ -11,10 +11,10 @@ use mongodb::{
     options::ClientOptions,
     Client,
 };
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -72,12 +72,25 @@ enum CollectError {
     Bson(bson::de::Error),
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default)]
+/// Configuration for the `mongodb_metrics` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
-struct MongoDbMetricsConfig {
+pub struct MongoDbMetricsConfig {
+    /// A list of MongoDB instances to scrape.
+    ///
+    /// Each endpoint must be in the [Connection String URI Format](https://www.mongodb.com/docs/manual/reference/connection-string/).
     endpoints: Vec<String>,
+
+    /// The interval between scrapes, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
+
+    /// Overrides the default namespace for the metrics emitted by the source.
+    ///
+    /// If set to an empty string, no namespace is added to the metrics.
+    ///
+    /// By default, `mongodb` is used.
     #[serde(default = "default_namespace")]
     namespace: String,
 }

@@ -8,8 +8,7 @@ fn find(value: Value, pattern: Value, from: Option<Value>) -> Resolved {
     } as usize;
 
     Ok(FindFn::find(value, pattern, from)?
-        .map(|value| Value::Integer(value as i64))
-        .unwrap_or_else(|| Value::Integer(-1)))
+        .map_or(Value::Integer(-1), |value| Value::Integer(value as i64)))
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -86,7 +85,7 @@ impl FindFn {
         if pattern.len() > value.len() {
             return None;
         }
-        for from in offset..(value.len() - pattern.len() + 1) {
+        for from in offset..=(value.len() - pattern.len()) {
             let to = from + pattern.len();
             if value[from..to] == pattern {
                 return Some(from);
@@ -204,7 +203,7 @@ mod tests {
 
         wrong_pattern {
             args: func_args![value: "foobar", pattern: Value::Integer(42)],
-            want: Err("expected regex or string, got integer"),
+            want: Err("expected string or regex, got integer"),
             tdef: TypeDef::integer().infallible(),
         }
     ];

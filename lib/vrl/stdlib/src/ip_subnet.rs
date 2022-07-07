@@ -111,7 +111,7 @@ impl Expression for IpSubnetFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_ip_subnet(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 /// Parses a subnet in the form "/8" returns the number.

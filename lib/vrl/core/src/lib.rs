@@ -1,9 +1,17 @@
-#![deny(clippy::all)]
-#![deny(unreachable_pub)]
-#![deny(unused_allocation)]
-#![deny(unused_extern_crates)]
-#![deny(unused_assignments)]
-#![deny(unused_comparisons)]
+#![deny(
+    warnings,
+    clippy::all,
+    clippy::pedantic,
+    unreachable_pub,
+    unused_allocation,
+    unused_extern_crates,
+    unused_assignments,
+    unused_comparisons
+)]
+#![allow(
+    clippy::missing_errors_doc, // allowed in initial deny commit
+    clippy::module_name_repetitions, // allowed in initial deny commit
+)]
 
 mod arithmetic;
 mod convert;
@@ -18,7 +26,7 @@ pub use diagnostic::{Label, Span};
 pub use error::Error;
 pub use expression::{ExpressionError, Resolved};
 pub use lookup::LookupBuf;
-pub use target::Target;
+pub use target::{MetadataTarget, SecretTarget, Target, TargetValue, TargetValueRef};
 pub use value::{kind, Kind, Value, ValueRegex};
 
 use vector_common::TimeZone;

@@ -34,12 +34,13 @@ pub fn build_unix_datagram_source(
     shutdown: ShutdownSignal,
     out: SourceSender,
 ) -> crate::Result<Source> {
-    let socket = UnixDatagram::bind(&listen_path).expect("Failed to bind to datagram socket");
-    info!(message = "Listening.", path = ?listen_path, r#type = "unix_datagram");
-
-    change_socket_permissions(&listen_path, socket_file_mode)?;
-
     Ok(Box::pin(async move {
+        let socket = UnixDatagram::bind(&listen_path).expect("Failed to bind to datagram socket");
+        info!(message = "Listening.", path = ?listen_path, r#type = "unix_datagram");
+
+        change_socket_permissions(&listen_path, socket_file_mode)
+            .expect("Failed to set socket permissions");
+
         let result = listen(socket, max_length, decoder, shutdown, handle_events, out).await;
 
         // Delete socket file.

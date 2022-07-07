@@ -114,7 +114,7 @@ impl Expression for ParseCommonLogFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_parse_common_log(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 fn inner_kind() -> BTreeMap<Field, Kind> {

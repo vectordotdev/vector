@@ -76,7 +76,7 @@ impl Expression for Ipv6ToIpV4Fn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_ipv6_to_ipv4(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 #[cfg(test)]

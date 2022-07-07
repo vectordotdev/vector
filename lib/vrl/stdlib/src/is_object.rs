@@ -71,7 +71,7 @@ impl Expression for IsObjectFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_is_object(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 #[cfg(test)]

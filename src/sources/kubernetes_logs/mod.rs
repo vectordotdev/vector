@@ -24,9 +24,9 @@ use kube::{
     },
     Client, Config as ClientConfig,
 };
-use serde::{Deserialize, Serialize};
 use vector_common::TimeZone;
-use vector_core::ByteSizeOf;
+use vector_config::configurable_component;
+use vector_core::{transform::TaskTransform, ByteSizeOf};
 
 use crate::{
     config::{
@@ -43,7 +43,7 @@ use crate::{
     kubernetes::custom_reflector,
     shutdown::ShutdownSignal,
     sources,
-    transforms::{FunctionTransform, OutputBuffer, TaskTransform},
+    transforms::{FunctionTransform, OutputBuffer},
     SourceSender,
 };
 
@@ -60,6 +60,7 @@ mod util;
 
 use self::namespace_metadata_annotator::NamespaceMetadataAnnotator;
 use self::node_metadata_annotator::NodeMetadataAnnotator;
+use self::parser::Parser;
 use self::pod_metadata_annotator::PodMetadataAnnotator;
 use futures::{future::FutureExt, stream::StreamExt};
 use k8s_paths_provider::K8sPathsProvider;
@@ -72,40 +73,40 @@ const FILE_KEY: &str = "file";
 const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
 
 /// Configuration for the `kubernetes_logs` source.
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct Config {
-    /// Specifies the label selector to filter `Pod`s with, to be used in
-    /// addition to the built-in `vector.dev/exclude` filter.
+    /// Specifies the label selector to filter `Pod`s with, to be used in addition to the built-in `vector.dev/exclude` filter.
     extra_label_selector: String,
 
-    /// Specifies the label selector to filter `Namespace`s with, to be used in
-    /// addition to the built-in `vector.dev/exclude` filter.
+    /// Specifies the label selector to filter `Namespace`s with, to be used in  addition to the built-in `vector.dev/exclude` filter.
     extra_namespace_label_selector: String,
 
     /// The `name` of the Kubernetes `Node` that Vector runs at.
-    /// Required to filter the `Pod`s to only include the ones with the log
-    /// files accessible locally.
+    ///
+    /// Configured to use an environment var by default, to be evaluated to a value provided by Kubernetes at `Pod` deploy time.
     self_node_name: String,
 
-    /// Specifies the field selector to filter `Pod`s with, to be used in
-    /// addition to the built-in `Node` filter.
+    /// Specifies the field selector to filter `Pod`s with, to be used in addition to the built-in `Node` filter.
     extra_field_selector: String,
 
-    /// Automatically merge partial events.
+    /// Whether or not to automatically merge partial events.
     auto_partial_merge: bool,
 
-    /// Override global data_dir
+    /// The directory used to persist file checkpoint positions.
+    ///
+    /// By default, the global `data_dir` option is used. Please make sure the user Vector is running as has write permissions to this directory.
     data_dir: Option<PathBuf>,
 
-    /// Specifies the field names for Pod metadata annotation.
+    #[configurable(derived)]
     #[serde(alias = "annotation_fields")]
     pod_annotation_fields: pod_metadata_annotator::FieldsSpec,
 
-    /// Specifies the field names for Namespace metadata annotation.
+    #[configurable(derived)]
     namespace_annotation_fields: namespace_metadata_annotator::FieldsSpec,
 
-    /// Specifies the field names for Node metadata annotation.
+    #[configurable(derived)]
     node_annotation_fields: node_metadata_annotator::FieldsSpec,
 
     /// A list of glob patterns to exclude from reading the files.
@@ -236,7 +237,6 @@ struct Source {
     fingerprint_lines: usize,
     glob_minimum_cooldown: Duration,
     ingestion_timestamp_field: Option<String>,
-    timezone: TimeZone,
     delay_deletion: Duration,
 }
 
@@ -281,7 +281,6 @@ impl Source {
         let client = Client::try_from(client_config)?;
 
         let data_dir = globals.resolve_and_make_data_subdir(config.data_dir.as_ref(), key.id())?;
-        let timezone = config.timezone.unwrap_or(globals.timezone);
 
         let exclude_paths = prepare_exclude_paths(config)?;
 
@@ -315,7 +314,6 @@ impl Source {
             fingerprint_lines: config.fingerprint_lines,
             glob_minimum_cooldown,
             ingestion_timestamp_field: config.ingestion_timestamp_field.clone(),
-            timezone,
             delay_deletion,
         })
     }
@@ -343,7 +341,6 @@ impl Source {
             fingerprint_lines,
             glob_minimum_cooldown,
             ingestion_timestamp_field,
-            timezone,
             delay_deletion,
         } = self;
 
@@ -469,12 +466,11 @@ impl Source {
 
         let (file_source_tx, file_source_rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
 
-        let mut parser = parser::build(timezone);
+        let mut parser = Parser::new();
         let partial_events_merger = Box::new(partial_events_merger::build(auto_partial_merge));
 
         let checkpoints = checkpointer.view();
-        let events = file_source_rx.map(futures::stream::iter);
-        let events = events.flatten();
+        let events = file_source_rx.flat_map(futures::stream::iter);
         let events = events.map(move |line| {
             let byte_size = line.text.len();
             emit!(BytesReceived {

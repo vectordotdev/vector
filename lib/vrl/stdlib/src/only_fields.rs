@@ -73,7 +73,7 @@ impl Expression for OnlyFieldsFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_only_fields(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 #[cfg(test)]

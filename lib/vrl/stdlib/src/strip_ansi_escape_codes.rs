@@ -71,7 +71,7 @@ impl Expression for StripAnsiEscapeCodesFn {
 #[inline(never)]
 #[no_mangle]
 pub extern "C" fn vrl_fn_strip_ansi_escape_codes(value: &mut Value, result: &mut Resolved) {
-    todo!()
+    todo!("{value}{result:?}")
 }
 
 #[cfg(test)]

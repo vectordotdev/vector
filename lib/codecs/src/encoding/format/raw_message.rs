@@ -68,12 +68,13 @@ impl Encoder<Event> for RawMessageSerializer {
 #[cfg(test)]
 mod tests {
     use bytes::{Bytes, BytesMut};
+    use vector_core::event::LogEvent;
 
     use super::*;
 
     #[test]
     fn serialize_bytes() {
-        let input = Event::from("foo");
+        let input = Event::Log(LogEvent::from("foo"));
         let mut serializer = RawMessageSerializer;
 
         let mut buffer = BytesMut::new();

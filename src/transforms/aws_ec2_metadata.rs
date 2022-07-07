@@ -7,10 +7,11 @@ use http::{uri::PathAndQuery, Request, StatusCode, Uri};
 use hyper::{body::to_bytes as body_to_bytes, Body};
 use lookup::lookup_v2::{parse_path, OwnedPath};
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use snafu::ResultExt as _;
 use tokio::time::{sleep, Duration, Instant};
 use tracing::Instrument;
+use vector_config::configurable_component;
 
 use crate::{
     config::{
@@ -73,20 +74,35 @@ static API_TOKEN: Lazy<PathAndQuery> = Lazy::new(|| PathAndQuery::from_static("/
 static TOKEN_HEADER: Lazy<Bytes> = Lazy::new(|| Bytes::from("X-aws-ec2-metadata-token"));
 static HOST: Lazy<Uri> = Lazy::new(|| Uri::from_static("http://169.254.169.254"));
 
-#[derive(Default, Debug, Serialize, Deserialize, Clone)]
+/// Configuration for the `aws_ec2_metadata` transform.
+#[configurable_component(transform)]
+#[derive(Clone, Debug, Default)]
 pub struct Ec2Metadata {
-    // Deprecated name
+    /// Overrides the default EC2 metadata endpoint.
     #[serde(alias = "host")]
     endpoint: Option<String>,
+
+    /// Sets a prefix for all event fields added by the transform.
     namespace: Option<String>,
+
+    /// The interval between querying for updated metadata, in seconds.
     refresh_interval_secs: Option<u64>,
+
+    /// A list of metadata fields to include in each transformed event.
     fields: Option<Vec<String>>,
+
+    /// The timeout for querying the EC2 metadata endpoint, in seconds.
     refresh_timeout_secs: Option<u64>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     proxy: ProxyConfig,
+
+    /// Requires the transform to be able to successfully query the EC2 metadata before Vector can start.
+    required: Option<bool>,
 }
 
 #[derive(Clone, Debug)]
@@ -159,6 +175,7 @@ impl TransformConfig for Ec2Metadata {
             .refresh_timeout_secs
             .map(Duration::from_secs)
             .unwrap_or_else(|| Duration::from_secs(1));
+        let required = self.required.unwrap_or(true);
 
         let proxy = ProxyConfig::merge_with_env(&context.globals.proxy, &self.proxy);
         let http_client = HttpClient::new(None, &proxy)?;
@@ -173,7 +190,14 @@ impl TransformConfig for Ec2Metadata {
             fields,
         );
 
-        client.refresh_metadata().await?;
+        // If initial metadata is not required, log and proceed. Otherwise return error.
+        if let Err(error) = client.refresh_metadata().await {
+            if required {
+                return Err(error);
+            } else {
+                emit!(AwsEc2MetadataRefreshError { error });
+            }
+        }
 
         tokio::spawn(
             async move {
@@ -444,7 +468,11 @@ impl MetadataClient {
                     for (i, role_name) in role_names.lines().enumerate() {
                         new_state.push((
                             MetadataKey {
-                                log_path: self.keys.role_name_key.log_path.with_index_appended(i),
+                                log_path: self
+                                    .keys
+                                    .role_name_key
+                                    .log_path
+                                    .with_index_appended(i as isize),
                                 metric_tag: format!(
                                     "{}[{}]",
                                     self.keys.role_name_key.metric_tag, i
@@ -726,6 +754,35 @@ mod integration_tests {
                 "Unable to fetch metadata authentication token: deadline has elapsed."
             ),
         }
+    }
+
+    // validates the configuration setting 'required'=false allows vector to run
+    #[tokio::test(flavor = "multi_thread")]
+    async fn not_required() {
+        trace_init();
+
+        let addr = next_addr();
+
+        async fn sleepy() -> Result<impl warp::Reply, std::convert::Infallible> {
+            tokio::time::sleep(Duration::from_secs(3)).await;
+            Ok("I waited 3 seconds!")
+        }
+
+        let slow = warp::any().and_then(sleepy);
+        let server = warp::serve(slow).bind(addr);
+        let _server = tokio::spawn(server);
+
+        let config = Ec2Metadata {
+            endpoint: Some(format!("http://{}", addr)),
+            refresh_timeout_secs: Some(1),
+            required: Some(false),
+            ..Default::default()
+        };
+
+        assert!(
+            config.build(&TransformContext::default()).await.is_ok(),
+            "expected no failure because 'required' config value set to false"
+        );
     }
 
     #[tokio::test]
