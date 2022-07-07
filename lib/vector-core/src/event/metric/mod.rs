@@ -65,7 +65,7 @@ impl Metric {
             },
             data: MetricData {
                 timestamp: None,
-                interval: None,
+                interval_ms: None,
                 kind,
                 value,
             },
@@ -100,8 +100,8 @@ impl Metric {
     /// Consumes this metric, returning it with an updated interval.
     #[inline]
     #[must_use]
-    pub fn with_interval(mut self, interval: Option<u64>) -> Self {
-        self.data.interval = interval;
+    pub fn with_interval_ms(mut self, interval_ms: Option<u64>) -> Self {
+        self.data.interval_ms = interval_ms;
         self
     }
 
@@ -200,10 +200,10 @@ impl Metric {
         self.data.timestamp
     }
 
-    /// Gets a reference to the interval coverred by this metric, if it exists.
+    /// Gets a reference to the interval (in milliseconds) coverred by this metric, if it exists.
     #[inline]
-    pub fn interval(&self) -> Option<u64> {
-        self.data.interval
+    pub fn interval_ms(&self) -> Option<u64> {
+        self.data.interval_ms
     }
 
     /// Gets a reference to the value of this metric.

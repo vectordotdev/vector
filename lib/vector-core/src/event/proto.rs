@@ -132,6 +132,12 @@ impl From<Metric> for event::Metric {
             .timestamp
             .map(|ts| chrono::Utc.timestamp(ts.seconds, ts.nanos as u32));
 
+        let interval_ms = if metric.interval_ms == 0 {
+            None
+        } else {
+            Some(metric.interval_ms)
+        };
+
         let tags = if metric.tags.is_empty() {
             None
         } else {
@@ -198,6 +204,7 @@ impl From<Metric> for event::Metric {
             .with_namespace(namespace)
             .with_tags(tags)
             .with_timestamp(timestamp)
+            .with_interval_ms(interval_ms)
     }
 }
 
@@ -291,6 +298,8 @@ impl From<event::Metric> for WithMetadata<Metric> {
             nanos: ts.timestamp_subsec_nanos() as i32,
         });
 
+        let interval_ms = data.interval_ms.unwrap_or(0);
+
         let tags = series.tags.unwrap_or_default();
 
         let kind = match data.kind {
@@ -361,6 +370,7 @@ impl From<event::Metric> for WithMetadata<Metric> {
             timestamp,
             tags,
             kind,
+            interval_ms,
             value: Some(metric),
         };
         Self { data, metadata }

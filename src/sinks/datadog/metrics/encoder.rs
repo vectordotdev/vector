@@ -435,7 +435,7 @@ fn generate_series_metrics(
         .map(|then| then.elapsed())
         .map(|d| d.as_secs().try_into().unwrap_or(i64::MAX));
 
-    let results = match (metric.value(), metric.interval()) {
+    let results = match (metric.value(), metric.interval_ms()) {
         (MetricValue::Counter { value }, None) => vec![DatadogSeriesMetric {
             metric: name,
             r#type: DatadogMetricType::Count,
@@ -450,7 +450,7 @@ fn generate_series_metrics(
             metric: name,
             r#type: DatadogMetricType::Rate,
             interval: Some(i as i64),
-            points: vec![DatadogPoint(ts, (*value) / (i as f64))],
+            points: vec![DatadogPoint(ts, (*value) * 1000 / (i as f64))],
             tags,
             host,
             source_type_name,

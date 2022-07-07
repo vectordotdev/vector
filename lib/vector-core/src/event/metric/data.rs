@@ -10,7 +10,7 @@ pub struct MetricData {
     pub timestamp: Option<DateTime<Utc>>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub interval: Option<u64>,
+    pub interval_ms: Option<u64>,
 
     pub kind: MetricKind,
 
@@ -41,7 +41,7 @@ impl MetricData {
     pub fn into_absolute(self) -> Self {
         Self {
             timestamp: self.timestamp,
-            interval: self.interval,
+            interval_ms: self.interval_ms,
             kind: MetricKind::Absolute,
             value: self.value,
         }
@@ -54,7 +54,7 @@ impl MetricData {
     pub fn into_incremental(self) -> Self {
         Self {
             timestamp: self.timestamp,
-            interval: self.interval,
+            interval_ms: self.interval_ms,
             kind: MetricKind::Incremental,
             value: self.value,
         }
@@ -63,13 +63,13 @@ impl MetricData {
     /// Creates a `MetricData` directly from the raw components of another `MetricData`.
     pub fn from_parts(
         timestamp: Option<DateTime<Utc>>,
-        interval: Option<u64>,
+        interval_ms: Option<u64>,
         kind: MetricKind,
         value: MetricValue,
     ) -> Self {
         Self {
             timestamp,
-            interval,
+            interval_ms,
             kind,
             value,
         }
@@ -77,7 +77,7 @@ impl MetricData {
 
     /// Decomposes a `MetricData` into its individual parts.
     pub fn into_parts(self) -> (Option<DateTime<Utc>>, Option<u64>, MetricKind, MetricValue) {
-        (self.timestamp, self.interval, self.kind, self.value)
+        (self.timestamp, self.interval_ms, self.kind, self.value)
     }
 
     /// Updates this metric by adding the value from `other`.
@@ -91,10 +91,27 @@ impl MetricData {
                 (Some(t1), Some(t2)) => Some(t1.max(t2)),
             };
 
-            self.interval = match (self.interval, other.interval) {
-                (None, None) => None,
-                (Some(i), None) | (None, Some(i)) => Some(i),
-                (Some(i1), Some(i2)) => Some(i1 + i2),
+            let delta_t = self
+                .timestamp
+                .map(|ts| {
+                    other
+                        .timestamp
+                        .map(|other_ts| (ts.timestamp_millis() - other_ts.timestamp_millis().abs()))
+                })
+                .flatten()
+                .unwrap_or(0);
+
+            self.interval_ms = match (self.interval_ms, other.interval_ms) {
+                // If either interval is None discard the other
+                (_, None) | (None, _) => None,
+                // If metrics timestamps are within their interval range (should be the usual case) we use the longest interval
+                (Some(i1), Some(i2)) => {
+                    if delta_t < i1.max(i2) {
+                        Some(i1.max(i2))
+                    } else {
+                        Some(i1 + i2)
+                    }
+                }
             };
             true
         }
