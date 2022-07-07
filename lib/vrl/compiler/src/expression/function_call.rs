@@ -586,31 +586,37 @@ impl FunctionCall {
 
 impl Expression for FunctionCall {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        self.expr.resolve(ctx).map_err(|err| match err {
-            #[cfg(feature = "expr-abort")]
-            ExpressionError::Abort { .. } => {
-                panic!("abort errors must only be defined by `abort` statement")
-            }
-            ExpressionError::Error {
-                message,
-                mut labels,
-                notes,
-            } => {
-                labels.push(Label::primary(message.clone(), self.span));
+        let mut resolved = self.expr.resolve(ctx);
 
-                ExpressionError::Error {
-                    message: format!(
-                        r#"function call error for "{}" at ({}:{}): {}"#,
-                        self.ident,
-                        self.span.start(),
-                        self.span.end(),
-                        message
-                    ),
-                    labels,
-                    notes,
+        if !ctx.discard_error() {
+            resolved = resolved.map_err(|err| match err {
+                #[cfg(feature = "expr-abort")]
+                ExpressionError::Abort { .. } => {
+                    panic!("abort errors must only be defined by `abort` statement")
                 }
-            }
-        })
+                ExpressionError::Error {
+                    message,
+                    mut labels,
+                    notes,
+                } => {
+                    labels.push(Label::primary(message.clone(), self.span));
+
+                    ExpressionError::Error {
+                        message: format!(
+                            r#"function call error for "{}" at ({}:{}): {}"#,
+                            self.ident,
+                            self.span.start(),
+                            self.span.end(),
+                            message
+                        ),
+                        labels,
+                        notes,
+                    }
+                }
+            })
+        }
+
+        resolved
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {

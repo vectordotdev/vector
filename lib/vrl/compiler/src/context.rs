@@ -6,6 +6,12 @@ pub struct Context<'a> {
     target: &'a mut dyn Target,
     state: &'a mut Runtime,
     timezone: &'a TimeZone,
+    /// If this value is `true`, the error can be discarded since it's not read by the parent
+    /// expression.
+    ///
+    /// This allows for some optimizations to construct cheaper `Err` values, e.g. in the left hand
+    /// side of the `??` operator.
+    discard_error: bool,
 }
 
 impl<'a> Context<'a> {
@@ -15,6 +21,7 @@ impl<'a> Context<'a> {
             target,
             state,
             timezone,
+            discard_error: false,
         }
     }
 
@@ -40,9 +47,20 @@ impl<'a> Context<'a> {
         self.state
     }
 
-    /// Get a reference to the [`TimeZone`]
+    /// Get a reference to the [`TimeZone`].
     #[must_use]
     pub fn timezone(&self) -> &TimeZone {
         self.timezone
+    }
+
+    /// Probe if errors should be discarded in this `Context`.
+    #[must_use]
+    pub fn discard_error(&self) -> bool {
+        self.discard_error
+    }
+
+    /// Set if errors should be discarded in this `Context`.
+    pub fn set_discard_error(&mut self, discard_error: bool) {
+        self.discard_error = discard_error;
     }
 }
