@@ -23,7 +23,12 @@ mod test {
 
     #[test]
     fn is_trace_basic() {
-        assert!(check_is_trace(Event::from(TraceEvent::from(LogEvent::from("just a trace")))).0);
+        assert!(
+            check_is_trace(Event::from(TraceEvent::from(LogEvent::from(
+                "just a trace"
+            ))))
+            .0
+        );
         assert!(
             !check_is_trace(Event::from(Metric::new(
                 "test metric",
