@@ -99,7 +99,7 @@ impl MetricData {
                         .map(|other_ts| (ts.timestamp_millis() - other_ts.timestamp_millis().abs()))
                 })
                 .flatten()
-                .unwrap_or(0);
+                .unwrap_or(0) as u64;
 
             self.interval_ms = match (self.interval_ms, other.interval_ms) {
                 // If either interval is None discard the other

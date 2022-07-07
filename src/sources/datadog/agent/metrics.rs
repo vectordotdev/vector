@@ -325,7 +325,7 @@ pub(crate) fn decode_ddseries_v2(
                             },
                         )
                         .with_timestamp(Some(Utc.timestamp(dd_point.timestamp, 0)))
-                        .with_interval_ms(Some(i * 1000))
+                        .with_interval_ms(Some((i * 1000.0) as u64))
                         .with_tags(Some(tags.clone()))
                         .with_namespace(namespace)
                     })
@@ -463,7 +463,7 @@ fn into_vector_metric(
                 )
                 .with_timestamp(Some(Utc.timestamp(dd_point.0, 0)))
                 // interval is in second in the ddog world, this need to be changed to at least ms
-                .with_interval_ms(Some(i * 1000 as u64))
+                .with_interval_ms(Some((i * 1000) as u64))
                 .with_tags(Some(tags.clone()))
                 .with_namespace(namespace)
             })
