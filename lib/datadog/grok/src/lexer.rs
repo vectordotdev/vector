@@ -249,7 +249,7 @@ fn is_ident_continue(ch: char) -> bool {
 }
 
 fn is_digit(ch: char) -> bool {
-    ch.is_digit(10)
+    ch.is_ascii_digit()
 }
 
 fn unescape_string_literal(mut s: &str) -> Result<String, Error> {
