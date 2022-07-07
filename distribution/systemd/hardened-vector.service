@@ -16,8 +16,10 @@ User=vector
 Group=vector
 # Use `systemctl edit vector` override environment variables,
 # or place `.conf` files under `/etc/systemd/system/vector.service.d/`.
-Environment="LOG_FORMAT=json"
-Environment="VECTOR_CONFIG_YAML=/etc/vector/aggregator/vector.yaml"
+#
+# To run Vector as an Agent with the default configuration
+# can set the following environment variable.
+# Environment="VECTOR_CONFIG=/etc/vector/agent/vector.toml"
 ExecStartPre=/usr/bin/vector validate
 ExecStart=/usr/bin/vector
 ExecReload=/usr/bin/vector validate
