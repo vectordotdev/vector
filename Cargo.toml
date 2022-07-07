@@ -177,7 +177,7 @@ azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git",
 # Tower
 tower = { version = "0.4.13", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util"] }
 # Serde
-serde = { version = "1.0.137", default-features = false, features = ["derive"] }
+serde = { version = "1.0.138", default-features = false, features = ["derive"] }
 serde-toml-merge = { version = "0.3.0", default-features = false }
 serde_bytes = { version = "0.11.6", default-features = false, features = ["std"], optional = true }
 serde_json = { version = "1.0.82", default-features = false, features = ["raw_value"] }
@@ -202,7 +202,7 @@ async-graphql-warp = { version = "3.0.38", default-features = false, optional = 
 itertools = { version = "0.10.3", default-features = false, optional = true }
 
 # API client
-crossterm = { version = "0.23.2", default-features = false, features = ["event-stream"], optional = true }
+crossterm = { version = "0.24.0", default-features = false, features = ["event-stream"], optional = true }
 num-format = { version = "0.4.0", default-features = false, features = ["with-num-bigint"], optional = true }
 number_prefix = { version = "0.4.0", default-features = false, features = ["std"], optional = true }
 tui = { version = "0.18.0", optional = true, default-features = false, features = ["crossterm"] }
@@ -229,7 +229,7 @@ bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.7", default-features = false }
-clap = { version = "3.2.7", default-features = false, features = ["derive", "env", "std"] }
+clap = { version = "3.2.8", default-features = false, features = ["derive", "env", "std"] }
 colored = { version = "2.0.0", default-features = false }
 csv = { version = "1.1", default-features = false, optional = true }
 derivative = { version = "2.2.0", default-features = false }
@@ -267,7 +267,7 @@ nats = { version = "0.21.0", default-features = false, optional = true }
 nkeys = { version = "0.2.0", default-features = false, optional = true }
 nom = { version = "7.1.1", default-features = false, optional = true }
 notify = { version = "4.0.17", default-features = false }
-once_cell = { version = "1.12", default-features = false }
+once_cell = { version = "1.13", default-features = false }
 openssl = { version = "0.10.40", default-features = false, features = ["vendored"] }
 openssl-probe = { version = "0.1.5", default-features = false }
 ordered-float = { version = "3.0.0", default-features = false }
@@ -279,7 +279,7 @@ rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.3", default-features = false }
 rdkafka = { version = "0.27.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
 redis = { version = "0.21.5", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
-regex = { version = "1.5.6", default-features = false, features = ["std", "perf"] }
+regex = { version = "1.6.0", default-features = false, features = ["std", "perf"] }
 roaring = { version = "0.9.0", default-features = false, optional = true }
 seahash = { version = "4.1.0", default-features = false, optional = true }
 semver = { version = "1.0.12", default-features = false, features = ["serde", "std"], optional = true }
@@ -331,7 +331,7 @@ azure_identity = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev 
 azure_storage = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b7171eb40909f7f2805f4622e076f8a6dbbe2d98", default-features = false, features = ["azurite_workaround"] }
 azure_storage_blobs = { git = "https://github.com/Azure/azure-sdk-for-rust.git", rev = "b7171eb40909f7f2805f4622e076f8a6dbbe2d98", default-features = false, features = ["azurite_workaround"] }
 base64 = "0.13.0"
-criterion = { version = "0.3.5", features = ["html_reports", "async_tokio"] }
+criterion = { version = "0.3.6", features = ["html_reports", "async_tokio"] }
 libc = "0.2.126"
 pretty_assertions = "1.2.1"
 proptest = "1.0"
@@ -428,8 +428,9 @@ protobuf-build = ["dep:tonic-build", "dep:prost-build"]
 gcp = ["dep:base64", "dep:goauth", "dep:smpl_jwt"]
 
 # Enrichment Tables
-enrichment-tables = ["enrichment-tables-file"]
+enrichment-tables = ["enrichment-tables-file","enrichment-tables-geoip"]
 enrichment-tables-file = [ "dep:csv", "dep:seahash", "dep:hash_hasher" ]
+enrichment-tables-geoip = ["dep:maxminddb"]
 
 # Sources
 sources = ["sources-logs", "sources-metrics"]
@@ -809,7 +810,7 @@ remap-benches = ["transforms-remap"]
 transform-benches = ["transforms-filter", "transforms-dedupe", "transforms-reduce", "transforms-route"]
 codecs-benches = []
 loki-benches = ["sinks-loki"]
-enrichment-tables-benches = ["enrichment-tables-file"]
+enrichment-tables-benches = ["enrichment-tables-file","enrichment-tables-geoip"]
 
 [[bench]]
 name = "default"
@@ -828,7 +829,7 @@ harness = false
 required-features = ["remap-benches"]
 
 [[bench]]
-name = "enrichment_tables_file"
+name = "enrichment_tables"
 harness = false
 required-features = ["enrichment-tables-benches"]
 
