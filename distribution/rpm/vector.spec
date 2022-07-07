@@ -82,6 +82,9 @@ rm -rf %{buildroot}
 %{_bindir}/*
 %{_unitdir}/vector.service
 %config(noreplace) %{_sysconfdir}/%{_name}/vector.toml
+%config %{_sysconfdir}/%{_name}/examples/*
+%config %{_sysconfdir}/%{_name}/agent/*
+%config %{_sysconfdir}/%{_name}/aggregator/*
 %dir %{_sharedstatedir}/%{_name}
 %doc README.md
 %license LICENSE
