@@ -330,7 +330,7 @@ impl DockerLogsSourceCore {
         }
 
         self.docker.events(Some(EventsOptions {
-            since: Some(self.now_timestamp),
+            since: Some(self.now_timestamp.to_string()),
             until: None,
             filters,
         }))
