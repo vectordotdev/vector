@@ -313,15 +313,38 @@ configuration: {
 			required: false
 			type: object: options: {
 				exec: {
-					required:    true
-					description: "Run a local command to retrieve secrets."
+					required: true
+					description: """
+						Run a local command to retrieve secrets.
+
+						The provided command will be run and provided a list of
+						secrets to fetch, determined from the configuration file, on stdin as JSON in the format:
+
+						```json
+						{"version": "1.0", "secrets": ["secret1", "secret2"]}
+						```
+
+						The executable is expected to respond with the values of these secrets on stdout, also as JSON, in the format:
+
+						```json
+						{
+							"secret1": {"value": "secret_value", "error": null},
+							"secret2": {"value": null, "error": "could not fetch the secret"}
+						}
+						```
+
+						If an `error` is returned for any secrets, or if the command exits with a non-zero status code,
+						Vector will log the errors and exit.
+
+						Secrets will be loaded when Vector starts or if Vector receives a `SIGHUP` signal triggering its
+						configuration reload process.
+						"""
 					type: object: options: {
 						command: {
 							description: """
-								The command to be run, plus any arguments required. It shall comply with the
-								[Datadog Agent executable API](\(urls.datadog_agent_exec_api)).
+								The command to be run, plus any arguments required.
 								"""
-							required:    true
+							required: true
 							type: array: {
 								examples: [["/path/to/get-secret", "-s"], ["/path/to/vault-wrappper"]]
 								items: type: string: {}
