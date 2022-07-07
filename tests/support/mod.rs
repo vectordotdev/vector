@@ -276,7 +276,7 @@ impl FunctionTransform for MockTransform {
                 if let Some(increment) = increment {
                     assert!(metric.add(&MetricData {
                         kind: metric.kind(),
-                        interval: metric.interval(),
+                        interval_ms: metric.interval_ms(),
                         timestamp: metric.timestamp(),
                         value: increment,
                     }));

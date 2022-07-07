@@ -93,12 +93,11 @@ impl MetricData {
 
             let delta_t = self
                 .timestamp
-                .map(|ts| {
+                .and_then(|ts| {
                     other
                         .timestamp
                         .map(|other_ts| (ts.timestamp_millis() - other_ts.timestamp_millis().abs()))
                 })
-                .flatten()
                 .unwrap_or(0) as u64;
 
             self.interval_ms = match (self.interval_ms, other.interval_ms) {
