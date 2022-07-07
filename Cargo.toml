@@ -462,6 +462,7 @@ sources-logs = [
 sources-metrics = [
   "sources-apache_metrics",
   "sources-aws_ecs_metrics",
+  "sources-docker_metrics",
   "sources-eventstoredb_metrics",
   "sources-host_metrics",
   "sources-internal_metrics",
@@ -482,6 +483,7 @@ sources-datadog_agent = ["sources-utils-tls", "sources-utils-http-error", "proto
 sources-demo_logs = ["dep:fakedata"]
 sources-dnstap = ["dep:base64", "dep:trust-dns-proto", "dep:dnsmsg-parser", "protobuf-build"]
 sources-docker_logs = ["docker"]
+sources-docker_metrics = ["docker"]
 sources-eventstoredb_metrics = []
 sources-exec = []
 sources-file = ["dep:file-source"]

@@ -18,6 +18,8 @@ pub mod demo_logs;
 pub mod dnstap;
 #[cfg(feature = "sources-docker_logs")]
 pub mod docker_logs;
+#[cfg(feature = "sources-docker_metrics")]
+pub mod docker_metrics;
 #[cfg(feature = "sources-eventstoredb_metrics")]
 pub mod eventstoredb_metrics;
 #[cfg(feature = "sources-exec")]
