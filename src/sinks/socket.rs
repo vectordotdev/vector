@@ -9,7 +9,8 @@ use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
     codecs::Encoder,
     config::{
-        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
+        SinkDescription,
     },
     sinks::util::{
         encoding::{
@@ -112,7 +113,7 @@ impl SinkConfig for SocketSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(self.encoding.config().1.input_type())
+        Input::new(self.encoding.config().1.input_type() & DataType::Log)
     }
 
     fn sink_type(&self) -> &'static str {
