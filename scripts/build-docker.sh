@@ -15,7 +15,7 @@ VERSION="${VECTOR_VERSION:-"$(scripts/version.sh)"}"
 DATE="${DATE:-"$(date -u +%Y-%m-%d)"}"
 PLATFORM="${PLATFORM:-}"
 PUSH="${PUSH:-"true"}"
-REPO="${REPO:-"timberio/vector"}"
+REPO="${REPO:-"nextdoor/vector"}"
 
 #
 # Functions
