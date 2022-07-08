@@ -1,5 +1,6 @@
 use std::{
     collections::{BTreeMap, HashSet},
+    fmt::Write as _,
     iter,
     path::PathBuf,
     time::Instant,
@@ -403,7 +404,7 @@ impl DatnameFilter {
                 if i > 0 {
                     query.push_str(" OR");
                 }
-                query.push_str(&format!(" datname ~ ${}", params.len()));
+                write!(query, " datname ~ ${}", params.len()).expect("write to String never fails");
             }
             query.push(')');
         }
@@ -419,7 +420,7 @@ impl DatnameFilter {
                 if i > 0 {
                     query.push_str(" OR");
                 }
-                query.push_str(&format!(" datname ~ ${}", params.len()));
+                write!(query, " datname ~ ${}", params.len()).expect("write to String never fails");
             }
             query.push(')');
         }

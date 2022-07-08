@@ -293,7 +293,7 @@ mod integration_tests {
 
         // Unsubscribe from the channel.
         thread::sleep(Duration::from_secs(3));
-        let _ = sub.drain().await.unwrap();
+        sub.drain().await.unwrap();
 
         let mut output: Vec<String> = Vec::new();
         while let Some(msg) = sub.next().await {
