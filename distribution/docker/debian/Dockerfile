@@ -43,6 +43,7 @@ RUN apt-get update \
     && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
+        tini \
         tzdata \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system \
@@ -50,5 +51,5 @@ RUN apt-get update \
         --user-group vector
 
 # Configure the image entrypoint
-ENTRYPOINT ["docker-entrypoint.sh"]
+ENTRYPOINT ["tini", "--", "docker-entrypoint.sh"]
 CMD ["vector"]

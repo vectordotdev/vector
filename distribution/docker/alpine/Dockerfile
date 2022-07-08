@@ -40,6 +40,7 @@ COPY --from=staging /staging/rootfs/ /
 
 RUN apk --no-cache add \
         ca-certificates \
+        tini \
         tzdata \
     && addgroup -S vector \
     && adduser -S -H \
@@ -48,5 +49,5 @@ RUN apk --no-cache add \
     && chown vector /etc/vector /var/lib/vector
 
 # Configure the image entrypoint
-ENTRYPOINT ["docker-entrypoint.sh"]
+ENTRYPOINT ["tini", "--", "docker-entrypoint.sh"]
 CMD ["vector"]

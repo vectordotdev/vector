@@ -4,11 +4,12 @@ set -o errexit
 # Prevent core dumps
 ulimit -c 0
 
-if [ "${1:0:1}" = '-' ]; then
-  set -- vector "$@"
-fi
+case $1 in -*) set -- vector "$@"; esac
 
-if vector "$1" --help 2>&1 | grep -q "vector $1"; then
+if [ "$1" = 'help' ]; then
+    # This needs a special case because there's no help output.
+    set -- vector "$@"
+elif vector "$1" --help 2>&1 | grep -q "vector $1"; then
   set -- vector "$@"
 fi
 
