@@ -102,7 +102,7 @@ impl FunctionTransform for BasicTransform {
                 if let Some(increment) = increment {
                     assert!(metric.add(&MetricData {
                         kind: metric.kind(),
-                        interval: metric.interval_ms(),
+                        interval_ms: metric.interval_ms(),
                         timestamp: metric.timestamp(),
                         value: increment,
                     }));

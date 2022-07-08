@@ -1,7 +1,6 @@
 use std::{
     cmp,
     collections::BTreeMap,
-    convert::TryInto,
     io::{self, Write},
     mem,
     sync::Arc,
@@ -433,7 +432,7 @@ fn generate_series_metrics(
     let tags = Some(encode_tags(&tags));
     let interval = last_sent
         .map(|then| then.elapsed())
-        .map(|d| d.as_secs().try_into().unwrap_or(u64::MAX));
+        .map(|d| d.as_secs());
 
     let results = match (metric.value(), metric.interval_ms()) {
         (MetricValue::Counter { value }, None) => vec![DatadogSeriesMetric {
@@ -449,7 +448,7 @@ fn generate_series_metrics(
         (MetricValue::Counter { value }, Some(i)) => vec![DatadogSeriesMetric {
             metric: name,
             r#type: DatadogMetricType::Rate,
-            interval: Some(i),
+            interval: Some(i / 1000),
             points: vec![DatadogPoint(ts, (*value) * 1000.0 / (i as f64))],
             tags,
             host,
