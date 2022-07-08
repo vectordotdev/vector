@@ -1,22 +1,54 @@
-FROM docker.io/debian:bullseye-slim AS builder
+ARG ALPINE_IMAGE=docker.io/alpine:3.15
+ARG DEBIAN_IMAGE=docker.io/debian:bullseye-slim
 
-WORKDIR /vector
+#-------------------------------------------------------------------------------
+FROM ${ALPINE_IMAGE} AS staging
 
-COPY vector_*.deb ./
-RUN dpkg -i vector_*_"$(dpkg --print-architecture)".deb
+# Set a well-known working directory for staging
+WORKDIR /staging
 
-RUN mkdir -p /var/lib/vector
+# Prepare a staging root filesystem
+RUN mkdir -p \
+  rootfs/etc/vector \
+  rootfs/usr/bin \
+  rootfs/var/lib/vector
 
-FROM docker.io/debian:bullseye-slim
+COPY docker-entrypoint.sh rootfs/usr/bin/docker-entrypoint.sh
+COPY --from=docker.io/tianon/gosu:latest gosu rootfs/usr/bin/gosu
 
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates tzdata systemd && rm -rf /var/lib/apt/lists/*
+# Copy and unpack Vector distribution
+COPY vector-*-unknown-linux-gnu*.tar.gz .
+RUN mkdir vector \
+    && tar zxvf vector-*-"$(cat /etc/apk/arch)"-unknown-linux-gnu*.tar.gz \
+    -C vector --strip-components=2
 
-COPY --from=builder /usr/bin/vector /usr/bin/vector
-COPY --from=builder /usr/share/doc/vector /usr/share/doc/vector
-COPY --from=builder /etc/vector /etc/vector
-COPY --from=builder /var/lib/vector /var/lib/vector
+# Prepare Vector in the staging root filesystem
+RUN cp vector/bin/* rootfs/usr/bin/ \
+  && cp -r vector/config/* rootfs/etc/vector/
 
-# Smoke test
-RUN ["vector", "--version"]
+#-------------------------------------------------------------------------------
+FROM ${DEBIAN_IMAGE}
 
-ENTRYPOINT ["/usr/bin/vector"]
+# Set image labels
+ARG VECTOR_VERSION
+LABEL org.opencontainers.image.source="https://github.com/vectordotdev/vector" \
+  org.opencontainers.image.title="Vector (Debian variant)" \
+  org.opencontainers.image.url="https://vector.dev/" \
+  org.opencontainers.image.version="${VECTOR_VERSION}"
+
+# Copy root filesystem from staging
+COPY --from=staging /staging/rootfs/ /
+
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        tzdata \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --system \
+        --shell /sbin/nologin \
+        --user-group vector
+
+# Configure the image entrypoint
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["vector"]
