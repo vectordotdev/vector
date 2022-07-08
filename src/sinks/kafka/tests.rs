@@ -291,7 +291,7 @@ mod integration_test {
         client_config.set("bootstrap.servers", server.as_str());
         client_config.set("group.id", &random_string(10));
         client_config.set("enable.partition.eof", "true");
-        let _ = kafka_auth.apply(&mut client_config).unwrap();
+        kafka_auth.apply(&mut client_config).unwrap();
 
         let mut tpl = TopicPartitionList::new();
         tpl.add_partition(&topic, 0)

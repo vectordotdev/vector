@@ -41,7 +41,7 @@ pub struct AwsEcsMetricsParseError<'a> {
     pub body: Cow<'a, str>,
 }
 
-impl<'a> InternalEvent for AwsEcsMetricsParseError<'_> {
+impl<'a> InternalEvent for AwsEcsMetricsParseError<'a> {
     fn emit(self) {
         error!(
             message = "Parsing error.",

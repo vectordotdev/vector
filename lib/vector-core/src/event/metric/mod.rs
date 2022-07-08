@@ -469,21 +469,21 @@ impl From<MetricKind> for ::value::Value {
 #[macro_export]
 macro_rules! samples {
     ( $( $value:expr => $rate:expr ),* ) => {
-        vec![ $( crate::event::metric::Sample { value: $value, rate: $rate }, )* ]
+        vec![ $( $crate::event::metric::Sample { value: $value, rate: $rate }, )* ]
     }
 }
 
 #[macro_export]
 macro_rules! buckets {
     ( $( $limit:expr => $count:expr ),* ) => {
-        vec![ $( crate::event::metric::Bucket { upper_limit: $limit, count: $count }, )* ]
+        vec![ $( $crate::event::metric::Bucket { upper_limit: $limit, count: $count }, )* ]
     }
 }
 
 #[macro_export]
 macro_rules! quantiles {
     ( $( $q:expr => $value:expr ),* ) => {
-        vec![ $( crate::event::metric::Quantile { quantile: $q, value: $value }, )* ]
+        vec![ $( $crate::event::metric::Quantile { quantile: $q, value: $value }, )* ]
     }
 }
 

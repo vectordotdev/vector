@@ -190,6 +190,12 @@ impl From<serde_json::Value> for Value {
     }
 }
 
+impl From<&serde_json::Value> for Value {
+    fn from(json_value: &serde_json::Value) -> Self {
+        json_value.clone().into()
+    }
+}
+
 impl TryInto<serde_json::Value> for Value {
     type Error = StdError;
 
