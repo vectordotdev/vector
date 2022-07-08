@@ -16,9 +16,9 @@ now, rather than just specifying `encoding.codec`, you can now supply custom
 `framing` options. Additionally, the supported codecs (`encoding.codec`) for
 each sink was expanded to be a uniform set of codecs.
 
-For example, if you have a `socket` sink that you want to send [octet
-framed][octet_framing], JSON-encoded, messages, you can now do so with
-configuration like:
+For example, if you have a `socket` sink that you want to send
+[length-delimited][length_delimited] JSON-encoded, messages, you can now do so
+with configuration like:
 
 ```toml
 [sinks.socket]
@@ -30,7 +30,7 @@ encoding.codec = "json"
 ```
 
 This will encode messages flowing into this sink as JSON and frame them using
-[octet framing][octet_framing].
+[length-delimited][length_delimited] framing.
 
 [source_decoding]: /highlights/2021-10-06-source-codecs
-[octet_framing]: https://datatracker.ietf.org/doc/html/rfc6587#section-3.4.1
+[length_delimited]: https://docs.rs/tokio-util/0.7.3/tokio_util/codec/length_delimited/index.html
