@@ -858,7 +858,15 @@ impl Expression for FunctionCall {
             }
         }
 
-        if self.abort_on_error {
+        let ident_ref = ctx
+            .into_const(self.ident.to_owned(), self.ident)
+            .as_pointer_value();
+        let span_ref = ctx
+            .into_const(self.span, &self.span.to_string())
+            .as_pointer_value();
+        let type_def = self.type_def((state.0, state.1));
+
+        if type_def.is_fallible() || self.abort_on_error {
             let is_error = ctx
                 .vrl_resolved_is_err()
                 .build_call(ctx.builder(), result_ref)
@@ -881,10 +889,43 @@ impl Expression for FunctionCall {
             );
 
             ctx.builder().position_at_end(function_call_abort_block);
-            ctx.vrl_resolved_swap()
-                .build_call(ctx.builder(), result_ref, ctx.global_result_ref());
+            if self.abort_on_error {
+                ctx.vrl_resolved_swap().build_call(
+                    ctx.builder(),
+                    result_ref,
+                    ctx.global_result_ref(),
+                );
+                function_call_abort_stack.push(function_call_abort_block);
+            } else {
+                let vrl_expression_function_call_abort = ctx.vrl_expression_function_call_abort();
+                vrl_expression_function_call_abort.build_call(
+                    ctx.builder(),
+                    ctx.builder().build_bitcast(
+                        ident_ref,
+                        vrl_expression_function_call_abort
+                            .function
+                            .get_nth_param(0)
+                            .unwrap()
+                            .get_type()
+                            .into_pointer_type(),
+                        "cast",
+                    ),
+                    ctx.builder().build_bitcast(
+                        span_ref,
+                        vrl_expression_function_call_abort
+                            .function
+                            .get_nth_param(1)
+                            .unwrap()
+                            .get_type()
+                            .into_pointer_type(),
+                        "cast",
+                    ),
+                    result_ref,
+                );
+                ctx.builder()
+                    .build_unconditional_branch(function_call_resume_block);
+            }
 
-            function_call_abort_stack.push(function_call_abort_block);
             ctx.builder().position_at_end(function_call_resume_block);
         }
 
@@ -892,12 +933,6 @@ impl Expression for FunctionCall {
 
         for abort_block in function_call_abort_stack {
             ctx.builder().position_at_end(*abort_block);
-            let ident_ref = ctx
-                .into_const(self.ident.to_owned(), self.ident)
-                .as_pointer_value();
-            let span_ref = ctx
-                .into_const(self.span, &self.span.to_string())
-                .as_pointer_value();
             let vrl_expression_function_call_abort = ctx.vrl_expression_function_call_abort();
             vrl_expression_function_call_abort.build_call(
                 ctx.builder(),
