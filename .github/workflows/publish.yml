@@ -234,33 +234,33 @@ jobs:
           name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf
           path: target/artifacts/vector*
 
-  build-x86_64-apple-darwin-packages:
-    name: Build Vector for x86_64-apple-darwin (.tar.gz)
-    runs-on: macos-11
-    needs: generate-publish-metadata
-    env:
-      VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
-      VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
-      CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
-    steps:
-      - name: Checkout Vector
-        uses: actions/checkout@v3
-        with:
-          ref: ${{ inputs.git_ref }}
-      - name: Bootstrap runner environment (macOS-specific)
-        run: brew install bash coreutils
-      - name: Build Vector
-        env:
-          TARGET: "x86_64-apple-darwin"
-          NATIVE_BUILD: true
-        run: |
-          export PATH="$HOME/.cargo/bin:$PATH"
-          make package
-      - name: Stage package artifacts for publish
-        uses: actions/upload-artifact@v3
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin
-          path: target/artifacts/vector*
+  # build-x86_64-apple-darwin-packages:
+  #   name: Build Vector for x86_64-apple-darwin (.tar.gz)
+  #   runs-on: macos-11
+  #   needs: generate-publish-metadata
+  #   env:
+  #     VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
+  #     VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
+  #     CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
+  #   steps:
+  #     - name: Checkout Vector
+  #       uses: actions/checkout@v3
+  #       with:
+  #         ref: ${{ inputs.git_ref }}
+  #     - name: Bootstrap runner environment (macOS-specific)
+  #       run: brew install bash coreutils
+  #     - name: Build Vector
+  #       env:
+  #         TARGET: "x86_64-apple-darwin"
+  #         NATIVE_BUILD: true
+  #       run: |
+  #         export PATH="$HOME/.cargo/bin:$PATH"
+  #         make package
+  #     - name: Stage package artifacts for publish
+  #       uses: actions/upload-artifact@v3
+  #       with:
+  #         name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin
+  #         path: target/artifacts/vector*
 
   build-x86_64-pc-windows-msvc-packages:
     name: Build Vector for x86_64-pc-windows-msvc (.zip)
@@ -403,27 +403,27 @@ jobs:
           rpm -i --replacepkgs target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm
           ./scripts/verify-install.sh
 
-  macos-verify:
-    name: Verify macOS Package
-    runs-on: macos-11
-    needs:
-      - generate-publish-metadata
-      - build-x86_64-apple-darwin-packages
-    env:
-      VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
-    steps:
-      - name: Checkout Vector
-        uses: actions/checkout@v3
-        with:
-          ref: ${{ inputs.git_ref }}
-      - name: Download staged package artifacts (x86_64-apple-darwin)
-        uses: actions/download-artifact@v3
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin
-          path: target/artifacts
-      - name: Verify macOS package
-        run: |
-          tar -xvf target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin.tar.gz && vector-x86_64-apple-darwin/bin/vector --version
+  # macos-verify:
+  #   name: Verify macOS Package
+  #   runs-on: macos-11
+  #   needs:
+  #     - generate-publish-metadata
+  #     - build-x86_64-apple-darwin-packages
+  #   env:
+  #     VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
+  #   steps:
+  #     - name: Checkout Vector
+  #       uses: actions/checkout@v3
+  #       with:
+  #         ref: ${{ inputs.git_ref }}
+  #     - name: Download staged package artifacts (x86_64-apple-darwin)
+  #       uses: actions/download-artifact@v3
+  #       with:
+  #         name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin
+  #         path: target/artifacts
+  #     - name: Verify macOS package
+  #       run: |
+  #         tar -xvf target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin.tar.gz && vector-x86_64-apple-darwin/bin/vector --version
 
   publish-docker:
     name: Publish to Docker
@@ -497,310 +497,310 @@ jobs:
         run: |
           make release-docker
 
-  publish-s3:
-    name: Publish to S3
-    runs-on: ubuntu-20.04
-    needs:
-      - generate-publish-metadata
-      - build-x86_64-unknown-linux-gnu-packages
-      - build-x86_64-unknown-linux-gnu-debug-tarball
-      - build-x86_64-unknown-linux-musl-packages
-      - build-aarch64-unknown-linux-musl-packages
-      - build-aarch64-unknown-linux-gnu-packages
-      - build-x86_64-apple-darwin-packages
-      - build-x86_64-pc-windows-msvc-packages
-      - build-armv7-unknown-linux-musleabihf-packages
-      - build-armv7-unknown-linux-gnueabihf-packages
-      - deb-verify
-      - rpm-verify
-      - macos-verify
-    env:
-      VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
-      CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
-    steps:
-      - name: Checkout Vector
-        uses: actions/checkout@v3
-        with:
-          ref: ${{ inputs.git_ref }}
-      - name: Download staged package artifacts (aarch64-unknown-linux-gnu)
-        uses: actions/download-artifact@v3
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu
-          path: target/artifacts
-      - name: Download staged package artifacts (aarch64-unknown-linux-musl)
-        uses: actions/download-artifact@v3
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl
-          path: target/artifacts
-      - name: Download staged package artifacts (x86_64-unknown-linux-gnu)
-        uses: actions/download-artifact@v3
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
-          path: target/artifacts
-      - name: Download staged package artifacts (x86_64-unknown-linux-gnu-debug)
-        uses: actions/download-artifact@v3
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu-debug
-          path: target/artifacts
-      - name: Download staged package artifacts (x86_64-unknown-linux-musl)
-        uses: actions/download-artifact@v3
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl
-          path: target/artifacts
-      - name: Download staged package artifacts (x86_64-apple-darwin)
-        uses: actions/download-artifact@v3
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin
-          path: target/artifacts
-      - name: Download staged package artifacts (x86_64-pc-windows-msvc)
-        uses: actions/download-artifact@v3
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc
-          path: target/artifacts
-      - name: Download staged package artifacts (armv7-unknown-linux-gnueabihf)
-        uses: actions/download-artifact@v3
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-gnueabihf
-          path: target/artifacts
-      - name: Download staged package artifacts (armv7-unknown-linux-musleabihf)
-        uses: actions/download-artifact@v3
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf
-          path: target/artifacts
-      - name: Publish artifacts to S3
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.CI_AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}
-        run: make release-s3
+  # publish-s3:
+  #   name: Publish to S3
+  #   runs-on: ubuntu-20.04
+  #   needs:
+  #     - generate-publish-metadata
+  #     - build-x86_64-unknown-linux-gnu-packages
+  #     - build-x86_64-unknown-linux-gnu-debug-tarball
+  #     - build-x86_64-unknown-linux-musl-packages
+  #     - build-aarch64-unknown-linux-musl-packages
+  #     - build-aarch64-unknown-linux-gnu-packages
+  #     - build-x86_64-apple-darwin-packages
+  #     - build-x86_64-pc-windows-msvc-packages
+  #     - build-armv7-unknown-linux-musleabihf-packages
+  #     - build-armv7-unknown-linux-gnueabihf-packages
+  #     - deb-verify
+  #     - rpm-verify
+  #     - macos-verify
+  #   env:
+  #     VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
+  #     CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
+  #   steps:
+  #     - name: Checkout Vector
+  #       uses: actions/checkout@v3
+  #       with:
+  #         ref: ${{ inputs.git_ref }}
+  #     - name: Download staged package artifacts (aarch64-unknown-linux-gnu)
+  #       uses: actions/download-artifact@v3
+  #       with:
+  #         name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu
+  #         path: target/artifacts
+  #     - name: Download staged package artifacts (aarch64-unknown-linux-musl)
+  #       uses: actions/download-artifact@v3
+  #       with:
+  #         name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl
+  #         path: target/artifacts
+  #     - name: Download staged package artifacts (x86_64-unknown-linux-gnu)
+  #       uses: actions/download-artifact@v3
+  #       with:
+  #         name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
+  #         path: target/artifacts
+  #     - name: Download staged package artifacts (x86_64-unknown-linux-gnu-debug)
+  #       uses: actions/download-artifact@v3
+  #       with:
+  #         name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu-debug
+  #         path: target/artifacts
+  #     - name: Download staged package artifacts (x86_64-unknown-linux-musl)
+  #       uses: actions/download-artifact@v3
+  #       with:
+  #         name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl
+  #         path: target/artifacts
+  #     - name: Download staged package artifacts (x86_64-apple-darwin)
+  #       uses: actions/download-artifact@v3
+  #       with:
+  #         name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin
+  #         path: target/artifacts
+  #     - name: Download staged package artifacts (x86_64-pc-windows-msvc)
+  #       uses: actions/download-artifact@v3
+  #       with:
+  #         name: vector-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc
+  #         path: target/artifacts
+  #     - name: Download staged package artifacts (armv7-unknown-linux-gnueabihf)
+  #       uses: actions/download-artifact@v3
+  #       with:
+  #         name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-gnueabihf
+  #         path: target/artifacts
+  #     - name: Download staged package artifacts (armv7-unknown-linux-musleabihf)
+  #       uses: actions/download-artifact@v3
+  #       with:
+  #         name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf
+  #         path: target/artifacts
+  #     - name: Publish artifacts to S3
+  #       env:
+  #         AWS_ACCESS_KEY_ID: ${{ secrets.CI_AWS_ACCESS_KEY_ID }}
+  #         AWS_SECRET_ACCESS_KEY: ${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}
+  #       run: make release-s3
 
-  publish-github:
-    name: Publish to Github
-    # We only publish to Github for versioned releases, not nightlies.
-    if: ${{ inputs.mode == 'Release' }}
-    runs-on: ubuntu-20.04
-    needs:
-      - generate-publish-metadata
-      - build-x86_64-unknown-linux-gnu-packages
-      - build-x86_64-unknown-linux-musl-packages
-      - build-aarch64-unknown-linux-musl-packages
-      - build-aarch64-unknown-linux-gnu-packages
-      - build-x86_64-apple-darwin-packages
-      - build-x86_64-pc-windows-msvc-packages
-      - build-armv7-unknown-linux-gnueabihf-packages
-      - build-armv7-unknown-linux-musleabihf-packages
-      - deb-verify
-      - rpm-verify
-      - macos-verify
-    env:
-      VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
-    steps:
-      - name: Checkout Vector
-        uses: actions/checkout@v3
-        with:
-          ref: ${{ inputs.git_ref }}
-      - name: Download staged package artifacts (aarch64-unknown-linux-gnu)
-        uses: actions/download-artifact@v3
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu
-          path: target/artifacts
-      - name: Download staged package artifacts (aarch64-unknown-linux-musl)
-        uses: actions/download-artifact@v3
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl
-          path: target/artifacts
-      - name: Download staged package artifacts (x86_64-unknown-linux-gnu)
-        uses: actions/download-artifact@v3
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
-          path: target/artifacts
-      - name: Download staged package artifacts (x86_64-unknown-linux-musl)
-        uses: actions/download-artifact@v3
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl
-          path: target/artifacts
-      - name: Download staged package artifacts (x86_64-apple-darwin)
-        uses: actions/download-artifact@v3
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin
-          path: target/artifacts
-      - name: Download staged package artifacts (x86_64-pc-windows-msvc)
-        uses: actions/download-artifact@v3
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc
-          path: target/artifacts
-      - name: Download staged package artifacts (armv7-unknown-linux-gnueabihf)
-        uses: actions/download-artifact@v3
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-gnueabihf
-          path: target/artifacts
-      - name: Download staged package artifacts (armv7-unknown-linux-musleabihf)
-        uses: actions/download-artifact@v3
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf
-          path: target/artifacts
-      - name: Publish release to Github
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: make release-github
+  # publish-github:
+  #   name: Publish to Github
+  #   # We only publish to Github for versioned releases, not nightlies.
+  #   if: ${{ inputs.mode == 'Release' }}
+  #   runs-on: ubuntu-20.04
+  #   needs:
+  #     - generate-publish-metadata
+  #     - build-x86_64-unknown-linux-gnu-packages
+  #     - build-x86_64-unknown-linux-musl-packages
+  #     - build-aarch64-unknown-linux-musl-packages
+  #     - build-aarch64-unknown-linux-gnu-packages
+  #     - build-x86_64-apple-darwin-packages
+  #     - build-x86_64-pc-windows-msvc-packages
+  #     - build-armv7-unknown-linux-gnueabihf-packages
+  #     - build-armv7-unknown-linux-musleabihf-packages
+  #     - deb-verify
+  #     - rpm-verify
+  #     - macos-verify
+  #   env:
+  #     VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
+  #   steps:
+  #     - name: Checkout Vector
+  #       uses: actions/checkout@v3
+  #       with:
+  #         ref: ${{ inputs.git_ref }}
+  #     - name: Download staged package artifacts (aarch64-unknown-linux-gnu)
+  #       uses: actions/download-artifact@v3
+  #       with:
+  #         name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu
+  #         path: target/artifacts
+  #     - name: Download staged package artifacts (aarch64-unknown-linux-musl)
+  #       uses: actions/download-artifact@v3
+  #       with:
+  #         name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl
+  #         path: target/artifacts
+  #     - name: Download staged package artifacts (x86_64-unknown-linux-gnu)
+  #       uses: actions/download-artifact@v3
+  #       with:
+  #         name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
+  #         path: target/artifacts
+  #     - name: Download staged package artifacts (x86_64-unknown-linux-musl)
+  #       uses: actions/download-artifact@v3
+  #       with:
+  #         name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl
+  #         path: target/artifacts
+  #     - name: Download staged package artifacts (x86_64-apple-darwin)
+  #       uses: actions/download-artifact@v3
+  #       with:
+  #         name: vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin
+  #         path: target/artifacts
+  #     - name: Download staged package artifacts (x86_64-pc-windows-msvc)
+  #       uses: actions/download-artifact@v3
+  #       with:
+  #         name: vector-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc
+  #         path: target/artifacts
+  #     - name: Download staged package artifacts (armv7-unknown-linux-gnueabihf)
+  #       uses: actions/download-artifact@v3
+  #       with:
+  #         name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-gnueabihf
+  #         path: target/artifacts
+  #     - name: Download staged package artifacts (armv7-unknown-linux-musleabihf)
+  #       uses: actions/download-artifact@v3
+  #       with:
+  #         name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-musleabihf
+  #         path: target/artifacts
+  #     - name: Publish release to Github
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #       run: make release-github
 
-  publish-homebrew:
-    name: Publish to Homebrew
-    # We only publish to Homebrew for versioned releases, not nightlies.
-    if: ${{ inputs.mode == 'Release' }}
-    runs-on: ubuntu-20.04
-    needs:
-      - generate-publish-metadata
-      - publish-s3
-    env:
-      VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
-    steps:
-      - name: Checkout Vector
-        uses: actions/checkout@v3
-        with:
-          ref: ${{ inputs.git_ref }}
-      - name: Publish update to Homebrew tap
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_PACKAGE_PUBLISHER_TOKEN }}
-        run: make release-homebrew
+  # publish-homebrew:
+  #   name: Publish to Homebrew
+  #   # We only publish to Homebrew for versioned releases, not nightlies.
+  #   if: ${{ inputs.mode == 'Release' }}
+  #   runs-on: ubuntu-20.04
+  #   needs:
+  #     - generate-publish-metadata
+  #     - publish-s3
+  #   env:
+  #     VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
+  #   steps:
+  #     - name: Checkout Vector
+  #       uses: actions/checkout@v3
+  #       with:
+  #         ref: ${{ inputs.git_ref }}
+  #     - name: Publish update to Homebrew tap
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GH_PACKAGE_PUBLISHER_TOKEN }}
+  #       run: make release-homebrew
 
-  publish-cloudsmith:
-    name: Publish to Cloudsmith
-    runs-on: ubuntu-20.04
-    needs:
-      - generate-publish-metadata
-      - build-x86_64-unknown-linux-gnu-packages
-      - build-aarch64-unknown-linux-gnu-packages
-      - build-armv7-unknown-linux-gnueabihf-packages
-      - deb-verify
-      - rpm-verify
-    env:
-      VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
-      CLOUDSMITH_REPO: ${{ needs.generate-publish-metadata.outputs.vector_cloudsmith_repo }}
-    steps:
-      - name: Checkout Vector
-        uses: actions/checkout@v3
-        with:
-          ref: ${{ inputs.git_ref }}
-      - name: Download staged package artifacts (aarch64-unknown-linux-gnu)
-        uses: actions/download-artifact@v3
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu
-          path: target/artifacts
-      - name: Download staged package artifacts (x86_64-unknown-linux-gnu)
-        uses: actions/download-artifact@v3
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
-          path: target/artifacts
-      - name: Download staged package artifacts (armv7-unknown-linux-gnueabihf)
-        uses: actions/download-artifact@v3
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-gnueabihf
-          path: target/artifacts
-      - name: Push amd64 deb
-        id: push-deb-amd64
-        uses: cloudsmith-io/action@master
-        with:
-          api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
-          command: "push"
-          format: "deb"
-          owner: "timber"
-          repo: ${{ env.CLOUDSMITH_REPO }}
-          distro: "any-distro"
-          release: "any-version"
-          republish: "true"
-          file: "target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_amd64.deb"
-      - name: Push arm64 deb
-        id: push-deb-arm64
-        uses: cloudsmith-io/action@master
-        with:
-          api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
-          command: "push"
-          format: "deb"
-          owner: "timber"
-          repo: ${{ env.CLOUDSMITH_REPO }}
-          distro: "any-distro"
-          release: "any-version"
-          republish: "true"
-          file: "target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_arm64.deb"
-      - name: Push armhf deb
-        id: push-deb-armhf
-        uses: cloudsmith-io/action@master
-        with:
-          api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
-          command: "push"
-          format: "deb"
-          owner: "timber"
-          repo: ${{ env.CLOUDSMITH_REPO }}
-          distro: "any-distro"
-          release: "any-version"
-          republish: "true"
-          file: "target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_armhf.deb"
-      - name: Push x86_64 RPM
-        id: push-rpm-x86_64
-        uses: cloudsmith-io/action@master
-        with:
-          api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
-          command: "push"
-          format: "rpm"
-          owner: "timber"
-          repo: ${{ env.CLOUDSMITH_REPO }}
-          distro: "any-distro"
-          release: "any-version"
-          republish: "true"
-          file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm"
-      - name: Push aarch64 RPM
-        id: push-rpm-aarch64
-        uses: cloudsmith-io/action@master
-        with:
-          api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
-          command: "push"
-          format: "rpm"
-          owner: "timber"
-          repo: ${{ env.CLOUDSMITH_REPO }}
-          distro: "any-distro"
-          release: "any-version"
-          republish: "true"
-          file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm"
-      - name: Push armv7-gnu RPM
-        id: push-rpm-armv7-gnu
-        uses: cloudsmith-io/action@master
-        with:
-          api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
-          command: "push"
-          format: "rpm"
-          owner: "timber"
-          repo: ${{ env.CLOUDSMITH_REPO }}
-          distro: "any-distro"
-          release: "any-version"
-          republish: "true"
-          file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.armv7.rpm"
+  # publish-cloudsmith:
+  #   name: Publish to Cloudsmith
+  #   runs-on: ubuntu-20.04
+  #   needs:
+  #     - generate-publish-metadata
+  #     - build-x86_64-unknown-linux-gnu-packages
+  #     - build-aarch64-unknown-linux-gnu-packages
+  #     - build-armv7-unknown-linux-gnueabihf-packages
+  #     - deb-verify
+  #     - rpm-verify
+  #   env:
+  #     VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
+  #     CLOUDSMITH_REPO: ${{ needs.generate-publish-metadata.outputs.vector_cloudsmith_repo }}
+  #   steps:
+  #     - name: Checkout Vector
+  #       uses: actions/checkout@v3
+  #       with:
+  #         ref: ${{ inputs.git_ref }}
+  #     - name: Download staged package artifacts (aarch64-unknown-linux-gnu)
+  #       uses: actions/download-artifact@v3
+  #       with:
+  #         name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu
+  #         path: target/artifacts
+  #     - name: Download staged package artifacts (x86_64-unknown-linux-gnu)
+  #       uses: actions/download-artifact@v3
+  #       with:
+  #         name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-gnu
+  #         path: target/artifacts
+  #     - name: Download staged package artifacts (armv7-unknown-linux-gnueabihf)
+  #       uses: actions/download-artifact@v3
+  #       with:
+  #         name: vector-${{ env.VECTOR_VERSION }}-armv7-unknown-linux-gnueabihf
+  #         path: target/artifacts
+  #     - name: Push amd64 deb
+  #       id: push-deb-amd64
+  #       uses: cloudsmith-io/action@master
+  #       with:
+  #         api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
+  #         command: "push"
+  #         format: "deb"
+  #         owner: "timber"
+  #         repo: ${{ env.CLOUDSMITH_REPO }}
+  #         distro: "any-distro"
+  #         release: "any-version"
+  #         republish: "true"
+  #         file: "target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_amd64.deb"
+  #     - name: Push arm64 deb
+  #       id: push-deb-arm64
+  #       uses: cloudsmith-io/action@master
+  #       with:
+  #         api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
+  #         command: "push"
+  #         format: "deb"
+  #         owner: "timber"
+  #         repo: ${{ env.CLOUDSMITH_REPO }}
+  #         distro: "any-distro"
+  #         release: "any-version"
+  #         republish: "true"
+  #         file: "target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_arm64.deb"
+  #     - name: Push armhf deb
+  #       id: push-deb-armhf
+  #       uses: cloudsmith-io/action@master
+  #       with:
+  #         api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
+  #         command: "push"
+  #         format: "deb"
+  #         owner: "timber"
+  #         repo: ${{ env.CLOUDSMITH_REPO }}
+  #         distro: "any-distro"
+  #         release: "any-version"
+  #         republish: "true"
+  #         file: "target/artifacts/vector_${{ env.VECTOR_VERSION }}-1_armhf.deb"
+  #     - name: Push x86_64 RPM
+  #       id: push-rpm-x86_64
+  #       uses: cloudsmith-io/action@master
+  #       with:
+  #         api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
+  #         command: "push"
+  #         format: "rpm"
+  #         owner: "timber"
+  #         repo: ${{ env.CLOUDSMITH_REPO }}
+  #         distro: "any-distro"
+  #         release: "any-version"
+  #         republish: "true"
+  #         file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm"
+  #     - name: Push aarch64 RPM
+  #       id: push-rpm-aarch64
+  #       uses: cloudsmith-io/action@master
+  #       with:
+  #         api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
+  #         command: "push"
+  #         format: "rpm"
+  #         owner: "timber"
+  #         repo: ${{ env.CLOUDSMITH_REPO }}
+  #         distro: "any-distro"
+  #         release: "any-version"
+  #         republish: "true"
+  #         file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm"
+  #     - name: Push armv7-gnu RPM
+  #       id: push-rpm-armv7-gnu
+  #       uses: cloudsmith-io/action@master
+  #       with:
+  #         api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
+  #         command: "push"
+  #         format: "rpm"
+  #         owner: "timber"
+  #         repo: ${{ env.CLOUDSMITH_REPO }}
+  #         distro: "any-distro"
+  #         release: "any-version"
+  #         republish: "true"
+  #         file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.armv7.rpm"
 
-  publish-failure:
-    name: Send Publish Failure Notification
-    if: failure()
-    runs-on: ubuntu-20.04
-    needs:
-      - generate-publish-metadata
-      - build-x86_64-unknown-linux-gnu-packages
-      - build-x86_64-unknown-linux-gnu-debug-tarball
-      - build-x86_64-unknown-linux-musl-packages
-      - build-aarch64-unknown-linux-musl-packages
-      - build-aarch64-unknown-linux-gnu-packages
-      - build-x86_64-apple-darwin-packages
-      - build-x86_64-pc-windows-msvc-packages
-      - build-armv7-unknown-linux-gnueabihf-packages
-      - build-armv7-unknown-linux-musleabihf-packages
-      - deb-verify
-      - rpm-verify
-      - macos-verify
-      - publish-docker
-      - publish-s3
-      - publish-cloudsmith
-      - publish-github
-    steps:
-    - name: Send notification to Discord
-      env:
-        DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-      uses: Ilshidur/action-discord@0.3.2
-      with:
-        args: "${{ inputs.mode }} failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
+  # publish-failure:
+  #   name: Send Publish Failure Notification
+  #   if: failure()
+  #   runs-on: ubuntu-20.04
+  #   needs:
+  #     - generate-publish-metadata
+  #     - build-x86_64-unknown-linux-gnu-packages
+  #     - build-x86_64-unknown-linux-gnu-debug-tarball
+  #     - build-x86_64-unknown-linux-musl-packages
+  #     - build-aarch64-unknown-linux-musl-packages
+  #     - build-aarch64-unknown-linux-gnu-packages
+  #     - build-x86_64-apple-darwin-packages
+  #     - build-x86_64-pc-windows-msvc-packages
+  #     - build-armv7-unknown-linux-gnueabihf-packages
+  #     - build-armv7-unknown-linux-musleabihf-packages
+  #     - deb-verify
+  #     - rpm-verify
+  #     - macos-verify
+  #     - publish-docker
+  #     - publish-s3
+  #     - publish-cloudsmith
+  #     - publish-github
+  #   steps:
+  #   - name: Send notification to Discord
+  #     env:
+  #       DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+  #     uses: Ilshidur/action-discord@0.3.2
+  #     with:
+  #       args: "${{ inputs.mode }} failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
