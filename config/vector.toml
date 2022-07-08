@@ -22,18 +22,27 @@ data_dir = "/var/lib/vector"
 # Configure Vector's GraphQL API.
 [api]
 enabled = true
-address = "[::]:8686"
+address = "0.0.0.0:8686"
 playground = false
 
 # Receives observability data from a Datadog Agent over HTTP or HTTPS.
 [sources.datadog_agent]
 type = "datadog_agent"
-address = "[::]:8282"
+address = "0.0.0.0:8282"
 
 # Collect logs from a Fluentd or Fluent Bit agent.
 [sources.fluent]
 type = "fluent"
-address = "[::]:24224"
+address = "0.0.0.0:24224"
+
+# Collect logs emitted by an HTTP server.
+[sources.http]
+type = "http"
+address = "0.0.0.0:80"
+[sources.http.framing]
+method = "newline_delimited"
+[sources.http.decoding]
+codec = "json"
 
 # Access to the metrics produced by Vector itself.
 [sources.internal_metrics]
@@ -42,29 +51,35 @@ type = "internal_metrics"
 # Collect logs from a Logstash agent.
 [sources.logstash]
 type = "logstash"
-address = "[::]:5044"
+address = "0.0.0.0:5044"
 
 # Receive logs from Splunk.
 [sources.splunk_hec]
 type = "splunk_hec"
-address = "[::]:8080"
+address = "0.0.0.0:8080"
 
 # Collect metrics emitted by the StatsD aggregator.
 [sources.statsd]
 type = "statsd"
 mode = "tcp"
-address = "[::]:8125"
+address = "0.0.0.0:8125"
 
 # Collect logs sent via Syslog.
-[sources.syslog]
+[sources.syslog_tcp]
 type = "syslog"
 mode = "tcp"
-address = "[::]:9000"
+address = "0.0.0.0:601"
+
+# Collect logs sent via Syslog.
+[sources.syslog_udp]
+type = "syslog"
+mode = "udp"
+address = "0.0.0.0:514"
 
 # Collect observability data from another Vector instance.
 [sources.vector]
 type = "vector"
-address = "[::]:6000"
+address = "0.0.0.0:6000"
 
 # Send observability events nowhere
 [sinks.blackhole]
@@ -72,9 +87,11 @@ type = "blackhole"
 inputs = [
     "datadog_agent",
     "fluent",
+    "http",
     "logstash",
     "splunk_hec",
-    "syslog",
+    "syslog_tcp",
+    "syslog_udp",
     "vector",
 ]
 
@@ -82,4 +99,4 @@ inputs = [
 [sinks.prom_exporter]
 type = "prometheus_exporter"
 inputs = ["internal_metrics", "statsd"]
-address = "[::]:9090"
+address = "0.0.0.0:9090"

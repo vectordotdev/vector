@@ -14,6 +14,7 @@ Group=vector
 # To run Vector as an Agent with the default configuration
 # can set the following environment variable.
 # Environment="VECTOR_CONFIG=/etc/vector/agent/vector.toml"
+EnvironmentFile=-/etc/default/vector
 ExecStartPre=/usr/bin/vector validate
 ExecStart=/usr/bin/vector
 ExecReload=/usr/bin/vector validate

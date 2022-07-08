@@ -18,13 +18,8 @@ data_dir = "/var/lib/vector"
 # Configure Vector's GraphQL API.
 [api]
 enabled = true
-address = "[::]:8686"
+address = "0.0.0.0:8686"
 playground = false
-
-# Receives observability data from a Datadog Agent over HTTP or HTTPS.
-[sources.datadog_agent]
-type = "datadog_agent"
-address = "[::]:8282"
 
 # Collect logs from files.
 [sources.file]
@@ -34,10 +29,12 @@ include = ["/var/log/**/*.log"]
 # Collect metric data from the local system.
 [sources.host_metrics]
 type = "host_metrics"
-[sources.host_metrics.filesystem]
-devices.excludes = ["binfmt_misc"]
-filesystems.excludes = ["binfmt_misc"]
-mountPoints.excludes = ["*/proc/sys/fs/binfmt_misc"]
+[sources.host_metrics.filesystem.devices]
+excludes = ["binfmt_misc"]
+[sources.host_metrics.filesystem.filesystems]
+excludes = ["binfmt_misc"]
+[sources.host_metrics.filesystem.mountPoints]
+excludes = ["*/proc/sys/fs/binfmt_misc"]
 
 # Access to the metrics produced by Vector itself.
 [sources.internal_metrics]
@@ -46,10 +43,10 @@ type = "internal_metrics"
 # Send observability events nowhere
 [sinks.blackhole]
 type = "blackhole"
-inputs = ["datadog_agent", "file"]
+inputs = ["file"]
 
 # Output metric events to a Prometheus exporter running on the host.
 [sinks.prom_exporter]
 type = "prometheus_exporter"
 inputs = ["host_metrics", "internal_metrics"]
-address = "[::]:9090"
+address = "0.0.0.0:9090"

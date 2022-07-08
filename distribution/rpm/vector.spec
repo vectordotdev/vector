@@ -50,6 +50,7 @@ rm -rf %{buildroot}
 mkdir -p %{buildroot}
 mkdir -p %{buildroot}%{_bindir}
 mkdir -p %{buildroot}%{_sysconfdir}/%{_name}
+mkdir -p %{buildroot}%{_sysconfdir}/default
 mkdir -p %{buildroot}%{_sharedstatedir}/%{_name}
 mkdir -p %{buildroot}%{_unitdir}
 
@@ -59,6 +60,7 @@ cp -a %{_builddir}/config/examples/. %{buildroot}%{_sysconfdir}/%{_name}/example
 cp -a %{_builddir}/config/agent/. %{buildroot}%{_sysconfdir}/%{_name}/agent
 cp -a %{_builddir}/config/aggregator/. %{buildroot}%{_sysconfdir}/%{_name}/aggregator
 cp -a %{_builddir}/systemd/vector.service %{buildroot}%{_unitdir}/vector.service
+cp -a %{_builddir}/systemd/vector.default %{buildroot}%{_sysconfdir}/default/vector
 
 %post
 getent passwd %{_username} > /dev/null || \
@@ -82,6 +84,7 @@ rm -rf %{buildroot}
 %{_bindir}/*
 %{_unitdir}/vector.service
 %config(noreplace) %{_sysconfdir}/%{_name}/vector.toml
+%config(noreplace) %{_sysconfdir}/default/vector
 %config %{_sysconfdir}/%{_name}/examples/*
 %config %{_sysconfdir}/%{_name}/agent/*
 %config %{_sysconfdir}/%{_name}/aggregator/*
