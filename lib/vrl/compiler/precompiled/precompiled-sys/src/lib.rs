@@ -353,7 +353,7 @@ pub unsafe extern "C" fn vrl_expression_op_div_integer(
     *result = if rhs == 0 {
         Err(Error::DivideByZero.into())
     } else {
-        Ok((lhs / rhs).into())
+        Ok(Value::from_f64_or_zero(lhs as f64 / rhs as f64))
     }
 }
 

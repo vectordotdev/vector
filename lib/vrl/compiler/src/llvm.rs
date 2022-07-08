@@ -94,6 +94,7 @@ impl Compiler {
             resolveds: Default::default(),
             lookup_buf_map: Default::default(),
             lookup_bufs: Default::default(),
+            discard_error: false,
         };
 
         let mut abort_stack = Vec::new();
@@ -190,6 +191,7 @@ pub struct Context<'ctx> {
     resolveds: Vec<GlobalValue<'ctx>>,
     lookup_buf_map: HashMap<LookupBuf, usize>,
     lookup_bufs: Vec<GlobalValue<'ctx>>,
+    discard_error: bool,
 }
 
 impl<'ctx> Context<'ctx> {
@@ -231,6 +233,14 @@ impl<'ctx> Context<'ctx> {
 
     pub fn set_result_ref(&mut self, result_ref: inkwell::values::PointerValue<'ctx>) {
         self.result_ref = result_ref
+    }
+
+    pub fn discard_error(&self) -> bool {
+        self.discard_error
+    }
+
+    pub fn set_discard_error(&mut self, discard_error: bool) {
+        self.discard_error = discard_error;
     }
 
     pub fn get_or_insert_variable_ref(

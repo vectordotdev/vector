@@ -622,8 +622,11 @@ impl Expression for Op {
             }
             ast::Opcode::Err => {
                 let mut abort_stack = Vec::new();
+                let discard_error = ctx.discard_error();
+                ctx.set_discard_error(true);
                 self.lhs
                     .emit_llvm((state.0, state.1), ctx, &mut abort_stack)?;
+                ctx.set_discard_error(discard_error);
                 function_call_abort_stack.extend(abort_stack);
 
                 let op_err_end_block = ctx.context().append_basic_block(function, "op_err_end");

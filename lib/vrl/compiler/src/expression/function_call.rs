@@ -866,7 +866,7 @@ impl Expression for FunctionCall {
             .as_pointer_value();
         let type_def = self.type_def((state.0, state.1));
 
-        if type_def.is_fallible() || self.abort_on_error {
+        if type_def.is_fallible() && !ctx.discard_error() || self.abort_on_error {
             let is_error = ctx
                 .vrl_resolved_is_err()
                 .build_call(ctx.builder(), result_ref)

@@ -16,6 +16,99 @@ struct Source {
 
 static SOURCES: &[Source] = &[
     Source {
+        name: "operation",
+        target: r#"{ "custom": { "level": "d" } }"#,
+        program: indoc! {r#"
+            foo = 123
+            (foo * 3 + 5) / 10
+        "#},
+    },
+    Source {
+        name: "pipelinesz",
+        target: r#"{ "custom": { "level": "d" } }"#,
+        program: indoc! {r#"
+            status = string(.custom.http.status_category) ?? string(.custom.level) ?? ""
+            status = downcase(status)
+            if status == "" {
+                .status = 6
+            } else {
+                if starts_with(status, "f") || starts_with(status, "emerg") {
+                    .status = 0
+                } else if starts_with(status, "a") {
+                    .status = 1
+                } else if starts_with(status, "c") {
+                    .status = 2
+                } else if starts_with(status, "e") {
+                    .status = 3
+                } else if starts_with(status, "w") {
+                    .status = 4
+                } else if starts_with(status, "n") {
+                    .status = 5
+                } else if starts_with(status, "i") {
+                    .status = 6
+                } else if starts_with(status, "d") || starts_with(status, "trace") || starts_with(status, "verbose") {
+                    .status = 7
+                } else if starts_with(status, "o") || starts_with(status, "s") || status == "ok" || status == "success" {
+                    .status = 8
+                }
+            }
+        "#},
+    },
+    Source {
+        name: "pipelinesz",
+        target: r#"{ "custom": { "level": "d" } }"#,
+        program: indoc! {r#"
+            status = string(.custom.http.status_category) ?? string(.custom.level) ?? ""
+            status = downcase(status)
+            if status == "" {
+                .status = 6
+            } else {
+                if starts_with(status, "f") || starts_with(status, "emerg") {
+                    .status = 0
+                } else if starts_with(status, "a") {
+                    .status = 1
+                } else if starts_with(status, "c") {
+                    .status = 2
+                } else if starts_with(status, "e") {
+                    .status = 3
+                } else if starts_with(status, "w") {
+                    .status = 4
+                } else if starts_with(status, "n") {
+                    .status = 5
+                } else if starts_with(status, "i") {
+                    .status = 6
+                } else if starts_with(status, "d") || starts_with(status, "trace") || starts_with(status, "verbose") {
+                    .status = 7
+                } else if starts_with(status, "o") || starts_with(status, "s") || status == "ok" || status == "success" {
+                    .status = 8
+                }
+            }
+        "#},
+    },
+    Source {
+        name: "parse_json_err_",
+        target: "{}",
+        program: indoc! {r#"
+            parse_json!("{")
+            123
+        "#},
+    },
+    Source {
+        name: "parse_json_err",
+        target: "{}",
+        program: indoc! {r#"
+            .result, .err = parse_json("{")
+            [.result, .err]
+        "#},
+    },
+    Source {
+        name: "parse_json_err_infallible_return",
+        target: "{}",
+        program: indoc! {r#"
+            .result, .err = parse_json("{")
+        "#},
+    },
+    Source {
         name: "syslog_regex_logs2metric_ddmetrics",
         target: r#"{ "foo": "derp", "host": "foo.com" }"#,
         program: r#". |= parse_regex!(.host, r'^(?P<hostname>[a-z]+)\.(?P<tld>[a-z]+)')"#,
