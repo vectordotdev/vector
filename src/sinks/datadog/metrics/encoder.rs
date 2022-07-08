@@ -430,9 +430,7 @@ fn generate_series_metrics(
     let device = tags.remove("device");
     let ts = encode_timestamp(metric.timestamp());
     let tags = Some(encode_tags(&tags));
-    let interval = last_sent
-        .map(|then| then.elapsed())
-        .map(|d| d.as_secs());
+    let interval = last_sent.map(|then| then.elapsed()).map(|d| d.as_secs());
 
     let results = match (metric.value(), metric.interval_ms()) {
         (MetricValue::Counter { value }, None) => vec![DatadogSeriesMetric {
