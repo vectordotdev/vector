@@ -37,7 +37,7 @@ configure_permissions() {
   # Own and RW restrict Vector config directory
   chown -R vector:vector /etc/vector
   chmod 740 /etc/vector
-  
+
   # Own and RW restrict SystemD default EnvironmentFile
   chown vector:vector /etc/default/vector
   chmod 640 /etc/default/vector
