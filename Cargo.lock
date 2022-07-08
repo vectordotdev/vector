@@ -1730,7 +1730,7 @@ checksum = "06c5fd425783d81668ed68ec98408a80498fb4ae2fd607797539e1a9dfa3618f"
 dependencies = [
  "prost",
  "prost-types",
- "tonic",
+ "tonic 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "tracing-core 0.1.28",
 ]
 
@@ -1752,7 +1752,7 @@ dependencies = [
  "thread_local",
  "tokio",
  "tokio-stream",
- "tonic",
+ "tonic 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "tracing 0.1.34",
  "tracing-core 0.1.28",
  "tracing-subscriber 0.3.14",
@@ -7694,6 +7694,37 @@ dependencies = [
  "axum",
  "base64",
  "bytes 1.1.0",
+ "futures-core",
+ "futures-util",
+ "h2",
+ "http",
+ "http-body",
+ "hyper",
+ "hyper-timeout",
+ "percent-encoding",
+ "pin-project",
+ "prost",
+ "prost-derive",
+ "tokio",
+ "tokio-stream",
+ "tokio-util 0.7.1",
+ "tower",
+ "tower-layer",
+ "tower-service",
+ "tracing 0.1.34",
+ "tracing-futures 0.2.5",
+]
+
+[[package]]
+name = "tonic"
+version = "0.7.2"
+source = "git+https://github.com/StephenWakely/tonic.git?branch=stephen/compression_feature#b05b565a284874970afa5e49ca5ffc893d940ac1"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "axum",
+ "base64",
+ "bytes 1.1.0",
  "flate2",
  "futures-core",
  "futures-util",
@@ -7722,8 +7753,7 @@ dependencies = [
 [[package]]
 name = "tonic-build"
 version = "0.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9263bf4c9bfaae7317c1c2faf7f18491d2fe476f70c414b73bf5d445b00ffa1"
+source = "git+https://github.com/StephenWakely/tonic.git?branch=stephen/compression_feature#b05b565a284874970afa5e49ca5ffc893d940ac1"
 dependencies = [
  "prettyplease",
  "proc-macro2",
@@ -8543,7 +8573,7 @@ dependencies = [
  "tokio-tungstenite 0.17.1",
  "tokio-util 0.7.1",
  "toml",
- "tonic",
+ "tonic 0.7.2 (git+https://github.com/StephenWakely/tonic.git?branch=stephen/compression_feature)",
  "tonic-build",
  "tower",
  "tower-test",

@@ -3,6 +3,7 @@ use std::net::SocketAddr;
 use futures::TryFutureExt;
 use tokio::net::TcpStream;
 use tonic::{
+    codec::CompressionEncoding,
     transport::{server::Connected, Certificate},
     Request, Response, Status,
 };
@@ -135,7 +136,7 @@ impl VectorConfig {
             pipeline: cx.out,
             acknowledgements,
         })
-        .accept_gzip();
+        .accept_compressed(CompressionEncoding::Gzip);
 
         let source =
             run_grpc_server(self.address, tls_settings, service, cx.shutdown).map_err(|error| {
