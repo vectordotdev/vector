@@ -1,28 +1,35 @@
 use crate::{
-    codecs::{self, DecodingConfig, FramingConfig, ParserConfig},
-    config::{
-        log_schema, DataType, GenerateConfig, SourceConfig, SourceContext, SourceDescription,
-    },
+    codecs::{Decoder, DecodingConfig},
+    config::{log_schema, GenerateConfig, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
-    internal_events::{MqttClientError, MqttConnectionError, MqttEventsReceived},
+    internal_events::{
+        MqttClientError, MqttConnectionError, MqttEventsReceived, StreamClosedError,
+    },
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
-    sources::util::TcpError,
-    Pipeline,
+    SourceSender,
 };
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{pin_mut, stream, SinkExt, Stream, StreamExt};
+use codecs::decoding::{DeserializerConfig, FramingConfig, StreamDecodingError};
+use futures::{pin_mut, stream, Stream, StreamExt};
 use rumqttc::v4::Packet;
 use rumqttc::{AsyncClient, ConnectionError, Event as MqttEvent, EventLoop, MqttOptions, QoS};
-use serde::{Deserialize, Serialize};
 use tokio::time::Duration;
 use tokio_util::codec::FramedRead;
+use vector_config::configurable_component;
+use vector_core::ByteSizeOf;
 
-#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
+/// Configuration for the `mqtt` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug, Derivative)]
+#[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub struct MqttSourceConfig {
+    /// The address of the MQTT server.
     address: String,
+
+    /// The topic to read from.
     topic: String,
 
     /// The max allowed packet size.
@@ -44,12 +51,15 @@ pub struct MqttSourceConfig {
     #[serde(default)]
     topic_field: Option<String>,
 
+    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
-    framing: Box<dyn FramingConfig>,
+    framing: FramingConfig,
+
+    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
-    decoding: Box<dyn ParserConfig>,
+    decoding: DeserializerConfig,
 }
 
 fn client_id_default() -> String {
@@ -81,7 +91,7 @@ impl GenerateConfig for MqttSourceConfig {
 impl SourceConfig for MqttSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let (client, eventloop) = create_subscription(self).await?;
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build()?;
+        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
 
         Ok(Box::pin(mqtt_source(
             client,
@@ -93,16 +103,16 @@ impl SourceConfig for MqttSourceConfig {
         )))
     }
 
-    fn output_type(&self) -> DataType {
-        DataType::Log
+    fn outputs(&self) -> Vec<Output> {
+        vec![Output::default(self.decoding.output_type())]
     }
 
     fn source_type(&self) -> &'static str {
         "mqtt"
     }
 
-    fn resources(&self) -> Vec<crate::config::Resource> {
-        Vec::new()
+    fn can_acknowledge(&self) -> bool {
+        false
     }
 }
 
@@ -124,9 +134,9 @@ async fn create_subscription(config: &MqttSourceConfig) -> crate::Result<(AsyncC
 async fn mqtt_source(
     client: AsyncClient,
     eventloop: EventLoop,
-    decoder: codecs::Decoder,
+    decoder: Decoder,
     shutdown: ShutdownSignal,
-    mut out: Pipeline,
+    mut out: SourceSender,
     topic_field: Option<String>,
 ) -> Result<(), ()> {
     let stream = get_eventloop_stream(eventloop).take_until(shutdown);
@@ -134,16 +144,18 @@ async fn mqtt_source(
 
     while let Some(msg) = stream.next().await {
         match msg {
-            Ok(event) => handle_mqtt_event(event, &decoder, &mut out, topic_field.as_deref()).await,
+            Ok(event) => {
+                handle_mqtt_event(event, &decoder, &mut out, topic_field.as_deref()).await?
+            }
             Err(error) => {
-                emit!(&MqttConnectionError { error });
+                emit!(MqttConnectionError { error });
                 tokio::time::sleep(Duration::from_secs(1)).await;
             }
         }
     }
 
     let _ = client.cancel().await.map_err(|error| {
-        emit!(&MqttClientError { error });
+        emit!(MqttClientError { error });
     });
 
     Ok(())
@@ -151,36 +163,41 @@ async fn mqtt_source(
 
 async fn handle_mqtt_event(
     event: MqttEvent,
-    decoder: &codecs::Decoder,
-    out: &mut Pipeline,
+    decoder: &Decoder,
+    out: &mut SourceSender,
     topic_field: Option<&str>,
-) {
+) -> Result<(), ()> {
     match event {
         rumqttc::Event::Incoming(packet) => match packet {
             Packet::Publish(publish) => {
                 let mut stream = FramedRead::new(publish.payload.as_ref(), decoder.clone());
                 while let Some(next) = stream.next().await {
                     match next {
-                        Ok((events, byte_size)) => {
-                            emit!(&MqttEventsReceived {
-                                byte_size,
-                                count: events.len()
+                        Ok((events, _byte_size)) => {
+                            let count = events.len();
+                            emit!(MqttEventsReceived {
+                                byte_size: events.size_of(),
+                                count
                             });
 
-                            for mut event in events {
+                            let now = Utc::now();
+
+                            let events = events.into_iter().map(|mut event| {
                                 if let Event::Log(ref mut log) = event {
-                                    log.insert(log_schema().timestamp_key(), Utc::now());
                                     log.insert(log_schema().source_type_key(), Bytes::from("mqtt"));
+                                    log.insert(log_schema().timestamp_key(), now);
 
                                     if let Some(field) = topic_field {
                                         log.insert(field, publish.topic.clone());
                                     }
                                 }
 
-                                let _ = out.send(event).await.map_err(|error| {
-                                    error!(message = "Error sending to sink.", %error);
-                                });
-                            }
+                                event
+                            });
+
+                            out.send_batch(events).await.map_err(|error| {
+                                emit!(StreamClosedError { error, count });
+                            })?;
                         }
                         Err(error) => {
                             // Error is logged by `crate::codecs::Decoder`, no further
@@ -196,6 +213,8 @@ async fn handle_mqtt_event(
         },
         _ => {}
     }
+
+    Ok(())
 }
 
 fn get_eventloop_stream(
@@ -239,7 +258,7 @@ mod integration_tests {
 
         let pub_client = client.clone();
 
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = SourceSender::new_test();
         tokio::spawn(mqtt_source(
             client,
             eventloop,
