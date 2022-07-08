@@ -82,7 +82,7 @@ impl GelfSerializer {
     pub fn to_json_value(&self, event: Event) -> Result<serde_json::Value, vector_core::Error> {
         match event {
             Event::Log(log) => {
-                if let Some(conformed) = self.to_gelf_event(&log)? {
+                if let Some(conformed) = to_gelf_event(&log)? {
                     serde_json::to_value(&conformed)
                 } else {
                     serde_json::to_value(&log)
@@ -93,149 +93,6 @@ impl GelfSerializer {
             }
         }
         .map_err(|e| e.to_string().into())
-    }
-
-    /// Returns Error for invalid type
-    fn err_invalid_type(
-        &self,
-        field: &str,
-        expected_type: &str,
-        actual_type: &str,
-    ) -> vector_core::Result<()> {
-        InvalidValueTypeSnafu {
-            field,
-            actual_type,
-            expected_type,
-        }
-        .fail()
-        .map_err(|e| e.to_string().into())
-    }
-
-    /// Helper method to centralize creating the clone of the original LogEvent
-    fn conformed_log_mut<'a>(
-        &self,
-        log: &LogEvent,
-        conformed_log: &'a mut Option<LogEvent>,
-    ) -> &'a mut LogEvent {
-        if conformed_log.is_none() {
-            *conformed_log = Some(log.clone());
-        }
-        conformed_log.as_mut().unwrap()
-    }
-
-    /// Validates that the GELF required fields exist in the event.
-    fn validate_required_fields(
-        &self,
-        log: &LogEvent,
-        conformed_log: &mut Option<LogEvent>,
-    ) -> vector_core::Result<()> {
-        // returns Error for missing field
-        fn err_missing_field(field: &str) -> vector_core::Result<()> {
-            MissingFieldSnafu { field }
-                .fail()
-                .map_err(|e| e.to_string().into())
-        }
-
-        // add the VERSION if it does not exist
-        if !log.contains(VERSION) {
-            self.conformed_log_mut(log, conformed_log)
-                .insert(VERSION, GELF_VERSION);
-        }
-
-        if !log.contains(HOST) {
-            err_missing_field(HOST)?;
-        }
-
-        let message_key = log_schema().message_key();
-        if !log.contains(SHORT_MESSAGE) {
-            // rename the log_schema().message_key() to SHORT_MESSAGE
-            if log.contains(message_key) {
-                self.conformed_log_mut(log, conformed_log)
-                    .rename_key(message_key, SHORT_MESSAGE);
-            } else {
-                err_missing_field(SHORT_MESSAGE)?;
-            }
-        }
-        Ok(())
-    }
-
-    /// Valides rules for additional field names and value types.
-    fn validate_additional_field(
-        &self,
-        field: &str,
-        value: &Value,
-        log: &LogEvent,
-        conformed_log: &mut Option<LogEvent>,
-    ) -> vector_core::Result<()> {
-        // Additional fields must be prefixed with underscores.
-        // Prepending the underscore since vector adds fields such as 'source_type'
-        // which would otherwise throw errors.
-        if !field.is_empty() && !field.starts_with('_') {
-            self.conformed_log_mut(log, conformed_log)
-                .rename_key(field, &*format!("_{}", &field));
-        }
-
-        // additional fields must be only word chars, dashes and periods.
-        if !VALID_FIELD_REGEX.is_match(field) {
-            return MissingFieldSnafu { field }
-                .fail()
-                .map_err(|e| e.to_string().into());
-        }
-
-        // additional field values must be only strings or numbers
-        if !(value.is_integer() || value.is_float() || value.is_bytes()) {
-            self.err_invalid_type(field, "string or number", value.kind_str())?;
-        }
-        Ok(())
-    }
-
-    /// Validates rules for field names and value types.
-    fn validate_field_names_and_values(
-        &self,
-        log: &LogEvent,
-        conformed_log: &mut Option<LogEvent>,
-    ) -> vector_core::Result<()> {
-        if let Some(event_data) = log.as_map() {
-            for (key, value) in event_data {
-                match key.as_str() {
-                    VERSION | HOST | SHORT_MESSAGE | FULL_MESSAGE | FACILITY | FILE => {
-                        if !value.is_bytes() {
-                            self.err_invalid_type(key, "UTF-8 string", value.kind_str())?;
-                        }
-                    }
-                    TIMESTAMP => {
-                        if !(value.is_timestamp() || value.is_integer()) {
-                            self.err_invalid_type(key, "timestamp or integer", value.kind_str())?;
-                        }
-                    }
-                    LEVEL => {
-                        if !value.is_integer() {
-                            self.err_invalid_type(key, "integer", value.kind_str())?;
-                        }
-                    }
-                    LINE => {
-                        if !(value.is_float() || value.is_integer()) {
-                            self.err_invalid_type(key, "number", value.kind_str())?;
-                        }
-                    }
-                    _ => {
-                        self.validate_additional_field(key, value, log, conformed_log)?;
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
-
-    /// Determine if input log event is in valid GELF format
-    /// Potentially return a copy of the log event that was modified to conform to valid GELF
-    fn to_gelf_event(&self, log: &LogEvent) -> vector_core::Result<Option<LogEvent>> {
-        let mut conformed_log = None;
-
-        self.validate_required_fields(log, &mut conformed_log)?;
-        self.validate_field_names_and_values(log, &mut conformed_log)?;
-
-        Ok(conformed_log)
     }
 }
 
@@ -254,13 +111,148 @@ impl Encoder<Event> for GelfSerializer {
 
         // Encode the original event if already valid GELF or conformed event if it was able to be
         // conformed to valif GELF without Error
-        if let Some(conformed) = self.to_gelf_event(log)? {
+        if let Some(conformed) = to_gelf_event(log)? {
             serde_json::to_writer(writer, &conformed)?;
         } else {
             serde_json::to_writer(writer, &log)?;
         }
         Ok(())
     }
+}
+
+/// Returns Error for invalid type
+fn err_invalid_type(
+    field: &str,
+    expected_type: &str,
+    actual_type: &str,
+) -> vector_core::Result<()> {
+    InvalidValueTypeSnafu {
+        field,
+        actual_type,
+        expected_type,
+    }
+    .fail()
+    .map_err(|e| e.to_string().into())
+}
+
+/// Helper method to centralize creating the clone of the original LogEvent
+fn conformed_log_mut<'a>(
+    log: &LogEvent,
+    conformed_log: &'a mut Option<LogEvent>,
+) -> &'a mut LogEvent {
+    if conformed_log.is_none() {
+        *conformed_log = Some(log.clone());
+    }
+    conformed_log.as_mut().unwrap()
+}
+
+/// Validates that the GELF required fields exist in the event.
+fn validate_required_fields(
+    log: &LogEvent,
+    conformed_log: &mut Option<LogEvent>,
+) -> vector_core::Result<()> {
+    // returns Error for missing field
+    fn err_missing_field(field: &str) -> vector_core::Result<()> {
+        MissingFieldSnafu { field }
+            .fail()
+            .map_err(|e| e.to_string().into())
+    }
+
+    // add the VERSION if it does not exist
+    if !log.contains(VERSION) {
+        conformed_log_mut(log, conformed_log).insert(VERSION, GELF_VERSION);
+    }
+
+    if !log.contains(HOST) {
+        err_missing_field(HOST)?;
+    }
+
+    let message_key = log_schema().message_key();
+    if !log.contains(SHORT_MESSAGE) {
+        // rename the log_schema().message_key() to SHORT_MESSAGE
+        if log.contains(message_key) {
+            conformed_log_mut(log, conformed_log).rename_key(message_key, SHORT_MESSAGE);
+        } else {
+            err_missing_field(SHORT_MESSAGE)?;
+        }
+    }
+    Ok(())
+}
+
+/// Valides rules for additional field names and value types.
+fn validate_additional_field(
+    field: &str,
+    value: &Value,
+    log: &LogEvent,
+    conformed_log: &mut Option<LogEvent>,
+) -> vector_core::Result<()> {
+    // Additional fields must be prefixed with underscores.
+    // Prepending the underscore since vector adds fields such as 'source_type'
+    // which would otherwise throw errors.
+    if !field.is_empty() && !field.starts_with('_') {
+        conformed_log_mut(log, conformed_log).rename_key(field, &*format!("_{}", &field));
+    }
+
+    // additional fields must be only word chars, dashes and periods.
+    if !VALID_FIELD_REGEX.is_match(field) {
+        return MissingFieldSnafu { field }
+            .fail()
+            .map_err(|e| e.to_string().into());
+    }
+
+    // additional field values must be only strings or numbers
+    if !(value.is_integer() || value.is_float() || value.is_bytes()) {
+        err_invalid_type(field, "string or number", value.kind_str())?;
+    }
+    Ok(())
+}
+
+/// Validates rules for field names and value types.
+fn validate_field_names_and_values(
+    log: &LogEvent,
+    conformed_log: &mut Option<LogEvent>,
+) -> vector_core::Result<()> {
+    if let Some(event_data) = log.as_map() {
+        for (key, value) in event_data {
+            match key.as_str() {
+                VERSION | HOST | SHORT_MESSAGE | FULL_MESSAGE | FACILITY | FILE => {
+                    if !value.is_bytes() {
+                        err_invalid_type(key, "UTF-8 string", value.kind_str())?;
+                    }
+                }
+                TIMESTAMP => {
+                    if !(value.is_timestamp() || value.is_integer()) {
+                        err_invalid_type(key, "timestamp or integer", value.kind_str())?;
+                    }
+                }
+                LEVEL => {
+                    if !value.is_integer() {
+                        err_invalid_type(key, "integer", value.kind_str())?;
+                    }
+                }
+                LINE => {
+                    if !(value.is_float() || value.is_integer()) {
+                        err_invalid_type(key, "number", value.kind_str())?;
+                    }
+                }
+                _ => {
+                    validate_additional_field(key, value, log, conformed_log)?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Determine if input log event is in valid GELF format
+/// Potentially return a copy of the log event that was modified to conform to valid GELF
+fn to_gelf_event(log: &LogEvent) -> vector_core::Result<Option<LogEvent>> {
+    let mut conformed_log = None;
+
+    validate_required_fields(log, &mut conformed_log)?;
+    validate_field_names_and_values(log, &mut conformed_log)?;
+
+    Ok(conformed_log)
 }
 
 #[cfg(test)]
