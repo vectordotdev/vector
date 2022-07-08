@@ -287,7 +287,7 @@ components: sinks: [Name=string]: {
 										enum: {
 											bytes:               "Byte frames are concatenated."
 											character_delimited: "Byte frames are delimited by a chosen character."
-											length_delimited:    "Byte frames whose messages are prefixed by a unsized big-endian 32-bit integer indicating the length."
+											length_delimited:    "Byte frames are prefixed by a unsized big-endian 32-bit integer indicating the length."
 											newline_delimited:   "Byte frames are delimited by a newline character."
 										}
 									}
