@@ -1,10 +1,16 @@
 use ::value::Value;
 use vrl::prelude::*;
 
-fn string(value: Value) -> Resolved {
+fn string(value: Value, discard_error: bool) -> Resolved {
     match value {
         v @ Value::Bytes(_) => Ok(v),
-        v => Err(format!("expected string, got {}", v.kind()).into()),
+        v => {
+            if discard_error {
+                Err("".into())
+            } else {
+                Err(format!("expected string, got {}", v.kind()).into())
+            }
+        }
     }
 }
 
@@ -60,7 +66,7 @@ struct StringFn {
 
 impl Expression for StringFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        string(self.value.resolve(ctx)?)
+        string(self.value.resolve(ctx)?, ctx.discard_error())
     }
 
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
