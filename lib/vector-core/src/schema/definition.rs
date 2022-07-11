@@ -373,6 +373,7 @@ mod tests {
                     meaning: Some("foo_meaning"),
                     want: Definition {
                         event_kind: Kind::object(BTreeMap::from([("foo".into(), Kind::boolean())])),
+                        metadata_kind: Kind::object(Collection::empty()),
                         meaning: [("foo_meaning".to_owned(), "foo".into())].into(),
                         log_namespaces: BTreeSet::new(),
                     },
@@ -389,6 +390,7 @@ mod tests {
                             "foo".into(),
                             Kind::object(BTreeMap::from([("bar".into(), Kind::regex().or_null())])),
                         )])),
+                        metadata_kind: Kind::object(Collection::empty()),
                         meaning: [(
                             "foobar".to_owned(),
                             LookupBuf::from_str(".foo.bar").unwrap().into(),
@@ -406,6 +408,7 @@ mod tests {
                     meaning: None,
                     want: Definition {
                         event_kind: Kind::object(BTreeMap::from([("foo".into(), Kind::boolean())])),
+                        metadata_kind: Kind::object(Collection::empty()),
                         meaning: BTreeMap::default(),
                         log_namespaces: BTreeSet::new(),
                     },
@@ -446,6 +449,7 @@ mod tests {
                             "foo".into(),
                             Kind::boolean().or_null(),
                         )])),
+                        metadata_kind: Kind::object(Collection::empty()),
                         meaning: [("foo_meaning".to_owned(), "foo".into())].into(),
                         log_namespaces: BTreeSet::new(),
                     },
@@ -462,6 +466,7 @@ mod tests {
                             "foo".into(),
                             Kind::object(BTreeMap::from([("bar".into(), Kind::regex().or_null())])),
                         )])),
+                        metadata_kind: Kind::object(Collection::empty()),
                         meaning: [(
                             "foobar".to_owned(),
                             LookupBuf::from_str(".foo.bar").unwrap().into(),
@@ -482,6 +487,7 @@ mod tests {
                             "foo".into(),
                             Kind::boolean().or_null(),
                         )])),
+                        metadata_kind: Kind::object(Collection::empty()),
                         meaning: BTreeMap::default(),
                         log_namespaces: BTreeSet::new(),
                     },
@@ -499,6 +505,7 @@ mod tests {
     fn test_unknown_fields() {
         let want = Definition {
             event_kind: Kind::object(Collection::from_unknown(Kind::bytes().or_integer())),
+            metadata_kind: Kind::object(Collection::empty()),
             meaning: BTreeMap::default(),
             log_namespaces: BTreeSet::new(),
         };
@@ -528,6 +535,7 @@ mod tests {
                             "foo".into(),
                             Kind::boolean().or_null(),
                         )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
                         meaning: BTreeMap::from([("foo_meaning".to_owned(), "foo".into())]),
                         log_namespaces: BTreeSet::new(),
                     },
@@ -536,6 +544,7 @@ mod tests {
                             "foo".into(),
                             Kind::boolean().or_null(),
                         )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
                         meaning: BTreeMap::from([("foo_meaning".to_owned(), "foo".into())]),
                         log_namespaces: BTreeSet::new(),
                     },
@@ -544,174 +553,190 @@ mod tests {
                             "foo".into(),
                             Kind::boolean().or_null(),
                         )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
                         meaning: BTreeMap::from([("foo_meaning".to_owned(), "foo".into())]),
                         log_namespaces: BTreeSet::new(),
                     },
                 },
             ),
-            // (
-            //     "this optional, other required",
-            //     TestCase {
-            //         this: Definition {
-            //             event_kind: Kind::object(Collection::from(BTreeMap::from([(
-            //                 "foo".into(),
-            //                 Kind::boolean().or_null(),
-            //             )]))),
-            //             meaning: BTreeMap::default(),
-            //             log_namespaces: BTreeSet::new(),
-            //         },
-            //         other: Definition {
-            //             event_kind: Kind::object(Collection::from(BTreeMap::from([(
-            //                 "foo".into(),
-            //                 Kind::boolean(),
-            //             )]))),
-            //             meaning: BTreeMap::default(),
-            //             log_namespaces: BTreeSet::new(),
-            //         },
-            //         want: Definition {
-            //             event_kind: Kind::object(Collection::from(BTreeMap::from([(
-            //                 "foo".into(),
-            //                 Kind::boolean().or_null(),
-            //             )]))),
-            //             meaning: BTreeMap::default(),
-            //             log_namespaces: BTreeSet::new(),
-            //         },
-            //     },
-            // ),
-            // (
-            //     "this required, other optional",
-            //     TestCase {
-            //         this: Definition {
-            //             event_kind: Kind::object(Collection::from(BTreeMap::from([(
-            //                 "foo".into(),
-            //                 Kind::boolean(),
-            //             )]))),
-            //             meaning: BTreeMap::default(),
-            //             log_namespaces: BTreeSet::new(),
-            //         },
-            //         other: Definition {
-            //             event_kind: Kind::object(Collection::from(BTreeMap::from([(
-            //                 "foo".into(),
-            //                 Kind::boolean().or_null(),
-            //             )]))),
-            //             meaning: BTreeMap::default(),
-            //             log_namespaces: BTreeSet::new(),
-            //         },
-            //         want: Definition {
-            //             event_kind: Kind::object(Collection::from(BTreeMap::from([(
-            //                 "foo".into(),
-            //                 Kind::boolean().or_null(),
-            //             )]))),
-            //             meaning: BTreeMap::default(),
-            //             log_namespaces: BTreeSet::new(),
-            //         },
-            //     },
-            // ),
-            // (
-            //     "this required, other required",
-            //     TestCase {
-            //         this: Definition {
-            //             event_kind: Kind::object(Collection::from(BTreeMap::from([(
-            //                 "foo".into(),
-            //                 Kind::boolean(),
-            //             )]))),
-            //             meaning: BTreeMap::default(),
-            //             log_namespaces: BTreeSet::new(),
-            //         },
-            //         other: Definition {
-            //             event_kind: Kind::object(Collection::from(BTreeMap::from([(
-            //                 "foo".into(),
-            //                 Kind::boolean(),
-            //             )]))),
-            //             meaning: BTreeMap::default(),
-            //             log_namespaces: BTreeSet::new(),
-            //         },
-            //         want: Definition {
-            //             event_kind: Kind::object(Collection::from(BTreeMap::from([(
-            //                 "foo".into(),
-            //                 Kind::boolean(),
-            //             )]))),
-            //             meaning: BTreeMap::default(),
-            //             log_namespaces: BTreeSet::new(),
-            //         },
-            //     },
-            // ),
-            // (
-            //     "same meaning, pointing to different paths",
-            //     TestCase {
-            //         this: Definition {
-            //             event_kind: Kind::object(Collection::from(BTreeMap::from([(
-            //                 "foo".into(),
-            //                 Kind::boolean(),
-            //             )]))),
-            //             meaning: BTreeMap::from([(
-            //                 "foo".into(),
-            //                 MeaningPointer::Valid("foo".into()),
-            //             )]),
-            //             log_namespaces: BTreeSet::new(),
-            //         },
-            //         other: Definition {
-            //             event_kind: Kind::object(Collection::from(BTreeMap::from([(
-            //                 "foo".into(),
-            //                 Kind::boolean(),
-            //             )]))),
-            //             meaning: BTreeMap::from([(
-            //                 "foo".into(),
-            //                 MeaningPointer::Valid("bar".into()),
-            //             )]),
-            //             log_namespaces: BTreeSet::new(),
-            //         },
-            //         want: Definition {
-            //             event_kind: Kind::object(Collection::from(BTreeMap::from([(
-            //                 "foo".into(),
-            //                 Kind::boolean(),
-            //             )]))),
-            //             meaning: BTreeMap::from([(
-            //                 "foo".into(),
-            //                 MeaningPointer::Invalid(BTreeSet::from(["foo".into(), "bar".into()])),
-            //             )]),
-            //             log_namespaces: BTreeSet::new(),
-            //         },
-            //     },
-            // ),
-            // (
-            //     "same meaning, pointing to same path",
-            //     TestCase {
-            //         this: Definition {
-            //             event_kind: Kind::object(Collection::from(BTreeMap::from([(
-            //                 "foo".into(),
-            //                 Kind::boolean(),
-            //             )]))),
-            //             meaning: BTreeMap::from([(
-            //                 "foo".into(),
-            //                 MeaningPointer::Valid("foo".into()),
-            //             )]),
-            //             log_namespaces: BTreeSet::new(),
-            //         },
-            //         other: Definition {
-            //             event_kind: Kind::object(Collection::from(BTreeMap::from([(
-            //                 "foo".into(),
-            //                 Kind::boolean(),
-            //             )]))),
-            //             meaning: BTreeMap::from([(
-            //                 "foo".into(),
-            //                 MeaningPointer::Valid("foo".into()),
-            //             )]),
-            //             log_namespaces: BTreeSet::new(),
-            //         },
-            //         want: Definition {
-            //             event_kind: Kind::object(Collection::from(BTreeMap::from([(
-            //                 "foo".into(),
-            //                 Kind::boolean(),
-            //             )]))),
-            //             meaning: BTreeMap::from([(
-            //                 "foo".into(),
-            //                 MeaningPointer::Valid("foo".into()),
-            //             )]),
-            //             log_namespaces: BTreeSet::new(),
-            //         },
-            //     },
-            // ),
+            (
+                "this optional, other required",
+                TestCase {
+                    this: Definition {
+                        event_kind: Kind::object(Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean().or_null(),
+                        )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
+                        meaning: BTreeMap::default(),
+                        log_namespaces: BTreeSet::new(),
+                    },
+                    other: Definition {
+                        event_kind: Kind::object(Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean(),
+                        )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
+                        meaning: BTreeMap::default(),
+                        log_namespaces: BTreeSet::new(),
+                    },
+                    want: Definition {
+                        event_kind: Kind::object(Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean().or_null(),
+                        )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
+                        meaning: BTreeMap::default(),
+                        log_namespaces: BTreeSet::new(),
+                    },
+                },
+            ),
+            (
+                "this required, other optional",
+                TestCase {
+                    this: Definition {
+                        event_kind: Kind::object(Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean(),
+                        )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
+                        meaning: BTreeMap::default(),
+                        log_namespaces: BTreeSet::new(),
+                    },
+                    other: Definition {
+                        event_kind: Kind::object(Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean().or_null(),
+                        )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
+                        meaning: BTreeMap::default(),
+                        log_namespaces: BTreeSet::new(),
+                    },
+                    want: Definition {
+                        event_kind: Kind::object(Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean().or_null(),
+                        )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
+                        meaning: BTreeMap::default(),
+                        log_namespaces: BTreeSet::new(),
+                    },
+                },
+            ),
+            (
+                "this required, other required",
+                TestCase {
+                    this: Definition {
+                        event_kind: Kind::object(Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean(),
+                        )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
+                        meaning: BTreeMap::default(),
+                        log_namespaces: BTreeSet::new(),
+                    },
+                    other: Definition {
+                        event_kind: Kind::object(Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean(),
+                        )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
+                        meaning: BTreeMap::default(),
+                        log_namespaces: BTreeSet::new(),
+                    },
+                    want: Definition {
+                        event_kind: Kind::object(Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean(),
+                        )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
+                        meaning: BTreeMap::default(),
+                        log_namespaces: BTreeSet::new(),
+                    },
+                },
+            ),
+            (
+                "same meaning, pointing to different paths",
+                TestCase {
+                    this: Definition {
+                        event_kind: Kind::object(Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean(),
+                        )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
+                        meaning: BTreeMap::from([(
+                            "foo".into(),
+                            MeaningPointer::Valid("foo".into()),
+                        )]),
+                        log_namespaces: BTreeSet::new(),
+                    },
+                    other: Definition {
+                        event_kind: Kind::object(Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean(),
+                        )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
+                        meaning: BTreeMap::from([(
+                            "foo".into(),
+                            MeaningPointer::Valid("bar".into()),
+                        )]),
+                        log_namespaces: BTreeSet::new(),
+                    },
+                    want: Definition {
+                        event_kind: Kind::object(Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean(),
+                        )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
+                        meaning: BTreeMap::from([(
+                            "foo".into(),
+                            MeaningPointer::Invalid(BTreeSet::from(["foo".into(), "bar".into()])),
+                        )]),
+                        log_namespaces: BTreeSet::new(),
+                    },
+                },
+            ),
+            (
+                "same meaning, pointing to same path",
+                TestCase {
+                    this: Definition {
+                        event_kind: Kind::object(Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean(),
+                        )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
+                        meaning: BTreeMap::from([(
+                            "foo".into(),
+                            MeaningPointer::Valid("foo".into()),
+                        )]),
+                        log_namespaces: BTreeSet::new(),
+                    },
+                    other: Definition {
+                        event_kind: Kind::object(Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean(),
+                        )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
+                        meaning: BTreeMap::from([(
+                            "foo".into(),
+                            MeaningPointer::Valid("foo".into()),
+                        )]),
+                        log_namespaces: BTreeSet::new(),
+                    },
+                    want: Definition {
+                        event_kind: Kind::object(Collection::from(BTreeMap::from([(
+                            "foo".into(),
+                            Kind::boolean(),
+                        )]))),
+                        metadata_kind: Kind::object(Collection::empty()),
+                        meaning: BTreeMap::from([(
+                            "foo".into(),
+                            MeaningPointer::Valid("foo".into()),
+                        )]),
+                        log_namespaces: BTreeSet::new(),
+                    },
+                },
+            ),
         ]) {
             let got = this.merge(other);
 

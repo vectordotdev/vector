@@ -54,7 +54,7 @@ impl Function for GetMetadataField {
                 .ok()
                 .flatten()
                 .map(|x| x.into_owned())
-                .unwrap_or_else(|| Kind::any()),
+                .unwrap_or_else(Kind::any),
         };
         Ok(Box::new(GetMetadataFieldFn { key, kind }))
     }

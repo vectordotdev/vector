@@ -12,7 +12,7 @@ impl Kind {
     /// Returns a new kind with the type at the specific path set
     ///
     /// # Errors
-    /// Because `nest_at_path` doesnt support coalescing or negative indices, an error will
+    /// Because `nest_at_path` doesn't support coalescing or negative indices, an error will
     /// be returned if a path is used that contains either of those. In the future those should
     /// be supported so this functon can just return `Kind` instead of `Result`
     pub fn with_type_set_at_path(
