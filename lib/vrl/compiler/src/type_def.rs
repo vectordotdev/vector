@@ -101,9 +101,8 @@ impl TypeDef {
                     coalesced_path: CoalescedPath::Reject,
                 },
             )
-            // An unsupported path was used, so nothing can be assumed about the type any more
-            // This can be removed once "nest_at_path" supports all paths
-            .unwrap_or_else(|_| Kind::any());
+            // This in incorrect. See: https://github.com/vectordotdev/vector/issues/13460
+            .unwrap_or_else(self.kind);
 
         Self { fallible, kind }
     }

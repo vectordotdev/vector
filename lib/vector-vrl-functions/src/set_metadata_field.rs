@@ -111,9 +111,6 @@ impl Expression for SetMetadataFieldFn {
     ) -> std::result::Result<(), ExpressionError> {
         if let MetadataKey::Query(query) = &self.key {
             let new_type = self.value.type_def((local, external)).kind().clone();
-            println!("Updating type at path = {:?}", query.path());
-            println!("New type: {:?}", new_type.debug_info());
-
             match query.target() {
                 QueryTarget::External => {
                     external.update_metadata(
@@ -124,7 +121,6 @@ impl Expression for SetMetadataFieldFn {
                             // If an unsupported path is used, no type information must be assumed, so any must be returned
                             .unwrap_or_else(|_| Kind::any()),
                     );
-                    println!("After update: {:?}", external.metadata_kind().debug_info());
                 }
                 QueryTarget::Container(_)
                 | QueryTarget::FunctionCall(_)
