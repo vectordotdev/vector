@@ -4,16 +4,16 @@ use crate::{
         SourceContext,
     },
     internal_events::{EventsReceived, StreamClosedError},
+    opentelemetry::LogService::{
+        logs_service_server::{LogsService, LogsServiceServer},
+        ExportLogsServiceRequest, ExportLogsServiceResponse,
+    },
     serde::bool_or_struct,
     sources::{util::grpc::run_grpc_server, Source},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
     SourceSender,
 };
 use futures::TryFutureExt;
-use otel_proto::LogService::{
-    logs_service_server::{LogsService, LogsServiceServer},
-    ExportLogsServiceRequest, ExportLogsServiceResponse,
-};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use tonic::{Request, Response, Status};
@@ -149,17 +149,17 @@ async fn handle_batch_status(receiver: Option<BatchStatusReceiver>) -> Result<()
 mod tests {
     use super::*;
     use crate::{
+        opentelemetry::{
+            Common::{any_value, AnyValue, KeyValue},
+            LogService::logs_service_client::LogsServiceClient,
+            Logs::{LogRecord, ResourceLogs, ScopeLogs},
+            Resource as OtelResource,
+        },
         test_util::{
             self,
             components::{assert_source_compliance, SOURCE_TAGS},
         },
         SourceSender,
-    };
-    use otel_proto::{
-        Common::{any_value, AnyValue, KeyValue},
-        LogService::logs_service_client::LogsServiceClient,
-        Logs::{LogRecord, ResourceLogs, ScopeLogs},
-        Resource as OtelResource,
     };
 
     #[tokio::test]
