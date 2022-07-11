@@ -298,7 +298,7 @@ toml = { version = "0.5.9", default-features = false }
 # since we are running into issues where turning on the compression feature causes the `tokio-console` feature not
 # compiling. Turning it off causes the `sinks_datadog_metrics` feature not to compile. This branch fixes those issues.
 # This should be reverted when version 0.7.3 of tonic is released.
-tonic = { git = "https://github.com/StephenWakely/tonic.git", sha="b05b565a284874970afa5e49ca5ffc893d940ac1", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
+tonic = { git = "https://github.com/StephenWakely/tonic.git", rev="b05b565a284874970afa5e49ca5ffc893d940ac1", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 trust-dns-proto = { version = "0.21.0", default-features = false, features = ["dnssec"], optional = true }
 typetag = { version = "0.1.8", default-features = false }
 url = { version = "2.2.2", default-features = false, features = ["serde"] }
@@ -325,7 +325,7 @@ nix = { version = "0.24.1", default-features = false, features = ["socket", "sig
 
 [build-dependencies]
 prost-build = { version = "0.10.4", default-features = false, optional = true }
-tonic-build = { git = "https://github.com/StephenWakely/tonic.git", sha="b05b565a284874970afa5e49ca5ffc893d940ac1", default-features = false, features = ["transport", "prost"], optional = true }
+tonic-build = { git = "https://github.com/StephenWakely/tonic.git", rev="b05b565a284874970afa5e49ca5ffc893d940ac1", default-features = false, features = ["transport", "prost"], optional = true }
 
 [dev-dependencies]
 approx = "0.5.1"

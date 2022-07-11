@@ -7718,7 +7718,7 @@ dependencies = [
 [[package]]
 name = "tonic"
 version = "0.7.2"
-source = "git+https://github.com/StephenWakely/tonic.git#9ea03c2c44ad6bf76e4141e6fb40870b9b30ab63"
+source = "git+https://github.com/StephenWakely/tonic.git?rev=b05b565a284874970afa5e49ca5ffc893d940ac1#b05b565a284874970afa5e49ca5ffc893d940ac1"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -7753,7 +7753,7 @@ dependencies = [
 [[package]]
 name = "tonic-build"
 version = "0.7.2"
-source = "git+https://github.com/StephenWakely/tonic.git#9ea03c2c44ad6bf76e4141e6fb40870b9b30ab63"
+source = "git+https://github.com/StephenWakely/tonic.git?rev=b05b565a284874970afa5e49ca5ffc893d940ac1#b05b565a284874970afa5e49ca5ffc893d940ac1"
 dependencies = [
  "prettyplease",
  "proc-macro2",
@@ -8573,7 +8573,7 @@ dependencies = [
  "tokio-tungstenite 0.17.1",
  "tokio-util 0.7.1",
  "toml",
- "tonic 0.7.2 (git+https://github.com/StephenWakely/tonic.git)",
+ "tonic 0.7.2 (git+https://github.com/StephenWakely/tonic.git?rev=b05b565a284874970afa5e49ca5ffc893d940ac1)",
  "tonic-build",
  "tower",
  "tower-test",
