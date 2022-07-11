@@ -55,7 +55,7 @@ impl UnitTest {
         let (topology, _) = topology::start_validated(self.config, diff, self.pieces)
             .await
             .unwrap();
-        let _ = topology.sources_finished().await;
+        topology.sources_finished().await;
         let _stop_complete = topology.stop();
 
         let mut in_flight = self
@@ -326,7 +326,7 @@ fn get_relevant_test_components(
     sources: &[&ComponentKey],
     graph: &Graph,
 ) -> Result<HashSet<String>, Vec<String>> {
-    let _ = graph.check_for_cycles().map_err(|error| vec![error])?;
+    graph.check_for_cycles().map_err(|error| vec![error])?;
     let mut errors = Vec::new();
     let mut components = HashSet::new();
     for source in sources {

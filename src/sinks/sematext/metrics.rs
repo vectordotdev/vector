@@ -420,7 +420,7 @@ mod tests {
             events.push(event);
         }
 
-        let _ = sink.run_events(events).await.unwrap();
+        sink.run_events(events).await.unwrap();
 
         let output = rx.take(metrics.len()).collect::<Vec<_>>().await;
         assert_eq!("os,metric_type=counter,os.host=somehost,token=atoken swap.size=324292 1597784400000000000", output[0].1);

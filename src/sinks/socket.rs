@@ -9,7 +9,8 @@ use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
     codecs::Encoder,
     config::{
-        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
+        SinkDescription,
     },
     sinks::util::{
         encoding::{
@@ -112,7 +113,7 @@ impl SinkConfig for SocketSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(self.encoding.config().1.input_type())
+        Input::new(self.encoding.config().1.input_type() & DataType::Log)
     }
 
     fn sink_type(&self) -> &'static str {
@@ -361,7 +362,7 @@ mod test {
 
         let (_, mut events) = random_lines_with_stream(10, 10, None);
         while let Some(event) = events.next().await {
-            let _ = sender.send(Some(event)).await.unwrap();
+            sender.send(Some(event)).await.unwrap();
         }
 
         // Loop and check for 10 events, we should always get 10 events. Once,
@@ -383,13 +384,13 @@ mod test {
         // Send another 10 events
         let (_, mut events) = random_lines_with_stream(10, 10, None);
         while let Some(event) = events.next().await {
-            let _ = sender.send(Some(event)).await.unwrap();
+            sender.send(Some(event)).await.unwrap();
         }
 
         // Wait for server task to be complete.
-        let _ = sender.send(None).await.unwrap();
-        let _ = jh1.await.unwrap();
-        let _ = jh2.await.unwrap();
+        sender.send(None).await.unwrap();
+        jh1.await.unwrap();
+        jh2.await.unwrap();
 
         // Check that there are exactly 20 events.
         assert_eq!(msg_counter.load(Ordering::SeqCst), 20);

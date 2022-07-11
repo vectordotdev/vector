@@ -1,3 +1,4 @@
+use std::fmt::Write as _;
 use std::path::PathBuf;
 
 use clap::Parser;
@@ -85,35 +86,41 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let mut dot = String::from("digraph {\n");
 
     for (id, _source) in config.sources() {
-        dot += &format!("  \"{}\" [shape=trapezium]\n", id);
+        writeln!(dot, "  \"{}\" [shape=trapezium]", id).expect("write to String never fails");
     }
 
     for (id, transform) in config.transforms() {
-        dot += &format!("  \"{}\" [shape=diamond]\n", id);
+        writeln!(dot, "  \"{}\" [shape=diamond]", id).expect("write to String never fails");
 
         for input in transform.inputs.iter() {
             if let Some(port) = &input.port {
-                dot += &format!(
-                    "  \"{}\" -> \"{}\" [label=\"{}\"]\n",
+                writeln!(
+                    dot,
+                    "  \"{}\" -> \"{}\" [label=\"{}\"]",
                     input.component, id, port
-                );
+                )
+                .expect("write to String never fails");
             } else {
-                dot += &format!("  \"{}\" -> \"{}\"\n", input, id);
+                writeln!(dot, "  \"{}\" -> \"{}\"", input, id)
+                    .expect("write to String never fails");
             }
         }
     }
 
     for (id, sink) in config.sinks() {
-        dot += &format!("  \"{}\" [shape=invtrapezium]\n", id);
+        writeln!(dot, "  \"{}\" [shape=invtrapezium]", id).expect("write to String never fails");
 
         for input in &sink.inputs {
             if let Some(port) = &input.port {
-                dot += &format!(
-                    "  \"{}\" -> \"{}\" [label=\"{}\"]\n",
+                writeln!(
+                    dot,
+                    "  \"{}\" -> \"{}\" [label=\"{}\"]",
                     input.component, id, port
-                );
+                )
+                .expect("write to String never fails");
             } else {
-                dot += &format!("  \"{}\" -> \"{}\"\n", input, id);
+                writeln!(dot, "  \"{}\" -> \"{}\"", input, id)
+                    .expect("write to String never fails");
             }
         }
     }

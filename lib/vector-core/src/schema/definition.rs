@@ -119,12 +119,6 @@ impl Definition {
         Self::new(Kind::object(Collection::empty()), [LogNamespace::Legacy])
     }
 
-    /// An object without any fields, and the `Legacy` namespace.
-    /// This is what most sources use for the legacy namespace.
-    pub fn empty_object(namespace: LogNamespace) -> Self {
-        Self::new(Kind::object(Collection::empty()), [namespace])
-    }
-
     /// Returns the source schema for a source that produce the listed log namespaces,
     /// but an explicit schema was not provided.
     pub fn default_for_namespace(log_namespaces: &BTreeSet<LogNamespace>) -> Self {

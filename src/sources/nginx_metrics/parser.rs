@@ -27,7 +27,7 @@ pub struct NginxStubStatus {
 
 fn get_usize(input: &str) -> nom::IResult<&str, usize, nom::error::Error<&str>> {
     map_res(
-        take_while_m_n(1, 20, |c: char| c.is_digit(10)),
+        take_while_m_n(1, 20, |c: char| c.is_ascii_digit()),
         |s: &str| s.parse::<usize>(),
     )(input)
 }
