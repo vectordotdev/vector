@@ -437,7 +437,7 @@ releases: "0.23.0": {
 			scopes: ["gcp_pubsub source"]
 			description: """
 				The performance of the `gcp_pubsub` source has been improved by automatically scaling up the number of
-				internal consumers within Vector to a maximum of the newly added `max_concurrency` option (defaults to
+				consumers within Vector to a maximum of the newly added `max_concurrency` option (defaults to
 				10).
 				"""
 			pr_numbers: [13240]
