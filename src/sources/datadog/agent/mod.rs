@@ -29,6 +29,7 @@ use snafu::Snafu;
 use tracing::Span;
 use value::Kind;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 use vector_core::event::{BatchNotifier, BatchStatus};
 use warp::{filters::BoxedFilter, reject::Rejection, reply::Response, Filter, Reply};
 
@@ -84,6 +85,10 @@ pub struct DatadogAgentConfig {
     #[serde(default = "crate::serde::default_false")]
     multiple_outputs: bool,
 
+    /// The namespace to use for logs. This overrides the global settings
+    #[serde(default)]
+    log_namespace: Option<bool>,
+
     #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
@@ -113,6 +118,7 @@ impl GenerateConfig for DatadogAgentConfig {
             disable_metrics: false,
             disable_traces: false,
             multiple_outputs: false,
+            log_namespace: Some(true),
         })
         .unwrap()
     }
@@ -126,6 +132,8 @@ inventory::submit! {
 #[typetag::serde(name = "datadog_agent")]
 impl SourceConfig for DatadogAgentConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
+        let log_namespace = cx.log_namespace(self.log_namespace);
+
         let logs_schema_definition = cx
             .schema_definitions
             .get(&Some(LOGS.to_owned()))
@@ -139,7 +147,9 @@ impl SourceConfig for DatadogAgentConfig {
             .expect("registered metrics schema required")
             .clone();
 
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
+        let decoder =
+            DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace).build();
+
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         let source = DatadogAgentSource::new(
             self.store_api_key,
@@ -147,6 +157,7 @@ impl SourceConfig for DatadogAgentConfig {
             tls.http_protocol_name(),
             logs_schema_definition,
             metrics_schema_definition,
+            log_namespace,
         );
         let listener = tls.bind(&self.address).await?;
         let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
@@ -176,35 +187,44 @@ impl SourceConfig for DatadogAgentConfig {
         }))
     }
 
-    fn outputs(&self) -> Vec<Output> {
-        let definition = match self.decoding {
-            // See: `LogMsg` struct.
-            DeserializerConfig::Bytes => self
-                .decoding
-                .schema_definition()
-                .with_field("message", Kind::bytes(), Some("message"))
-                .with_field("status", Kind::bytes(), Some("severity"))
-                .with_field("timestamp", Kind::timestamp(), Some("timestamp"))
-                .with_field("hostname", Kind::bytes(), Some("host"))
-                .with_field("service", Kind::bytes(), Some("service"))
-                .with_field("ddsource", Kind::bytes(), Some("source"))
-                .with_field("ddtags", Kind::bytes(), Some("tags")),
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<Output> {
+        let log_namespace = global_log_namespace.merge(self.log_namespace);
 
-            // JSON deserializer can overwrite existing fields at runtime, so we have to treat
-            // those events as if there is no known type details we can provide, other than the
-            // details provided by the generic JSON schema definition.
-            DeserializerConfig::Json => self.decoding.schema_definition(),
+        let definition = match log_namespace {
+            LogNamespace::Legacy => {
+                match self.decoding {
+                    // See: `LogMsg` struct.
+                    DeserializerConfig::Bytes => self
+                        .decoding
+                        .schema_definition(log_namespace)
+                        .with_field("message", Kind::bytes(), Some("message"))
+                        .with_field("status", Kind::bytes(), Some("severity"))
+                        .with_field("timestamp", Kind::timestamp(), Some("timestamp"))
+                        .with_field("hostname", Kind::bytes(), Some("host"))
+                        .with_field("service", Kind::bytes(), Some("service"))
+                        .with_field("ddsource", Kind::bytes(), Some("source"))
+                        .with_field("ddtags", Kind::bytes(), Some("tags")),
 
-            // Syslog deserializer allows for arbritrary "structured data" that can overwrite
-            // existing fields, similar to the JSON deserializer.
-            //
-            // See also: https://datatracker.ietf.org/doc/html/rfc5424#section-6.3
-            #[cfg(feature = "sources-syslog")]
-            DeserializerConfig::Syslog => self.decoding.schema_definition(),
+                    // JSON deserializer can overwrite existing fields at runtime, so we have to treat
+                    // those events as if there is no known type details we can provide, other than the
+                    // details provided by the generic JSON schema definition.
+                    DeserializerConfig::Json => self.decoding.schema_definition(log_namespace),
 
-            DeserializerConfig::Native => self.decoding.schema_definition(),
-            DeserializerConfig::NativeJson => self.decoding.schema_definition(),
-            DeserializerConfig::Gelf => self.decoding.schema_definition(),
+                    // Syslog deserializer allows for arbritrary "structured data" that can overwrite
+                    // existing fields, similar to the JSON deserializer.
+                    //
+                    // See also: https://datatracker.ietf.org/doc/html/rfc5424#section-6.3
+                    #[cfg(feature = "sources-syslog")]
+                    DeserializerConfig::Syslog => self.decoding.schema_definition(log_namespace),
+
+                    DeserializerConfig::Native => self.decoding.schema_definition(log_namespace),
+                    DeserializerConfig::NativeJson => {
+                        self.decoding.schema_definition(log_namespace)
+                    }
+                    DeserializerConfig::Gelf => self.decoding.schema_definition(log_namespace),
+                }
+            }
+            LogNamespace::Vector => self.decoding.schema_definition(log_namespace),
         };
 
         if self.multiple_outputs {
@@ -254,6 +274,7 @@ pub(crate) struct DatadogAgentSource {
     pub(crate) log_schema_host_key: &'static str,
     pub(crate) log_schema_timestamp_key: &'static str,
     pub(crate) log_schema_source_type_key: &'static str,
+    pub(crate) log_namespace: LogNamespace,
     pub(crate) decoder: Decoder,
     protocol: &'static str,
     logs_schema_definition: Arc<schema::Definition>,
@@ -294,6 +315,7 @@ impl DatadogAgentSource {
         protocol: &'static str,
         logs_schema_definition: schema::Definition,
         metrics_schema_definition: schema::Definition,
+        log_namespace: LogNamespace,
     ) -> Self {
         Self {
             api_key_extractor: ApiKeyExtractor {
@@ -308,6 +330,7 @@ impl DatadogAgentSource {
             protocol,
             logs_schema_definition: Arc::new(logs_schema_definition),
             metrics_schema_definition: Arc::new(metrics_schema_definition),
+            log_namespace,
         }
     }
 

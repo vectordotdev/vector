@@ -4,6 +4,7 @@ use codecs::decoding::{
     NewlineDelimitedDecoder,
 };
 use smallvec::SmallVec;
+use vector_core::config::LogNamespace;
 
 use crate::{
     event::Event,
@@ -16,6 +17,7 @@ use crate::{
 pub struct Decoder {
     framer: Framer,
     deserializer: Deserializer,
+    log_namespace: LogNamespace,
 }
 
 impl Default for Decoder {
@@ -23,6 +25,7 @@ impl Default for Decoder {
         Self {
             framer: Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
             deserializer: Deserializer::Bytes(BytesDeserializer::new()),
+            log_namespace: LogNamespace::Legacy,
         }
     }
 }
@@ -35,7 +38,14 @@ impl Decoder {
         Self {
             framer,
             deserializer,
+            log_namespace: LogNamespace::Legacy,
         }
+    }
+
+    /// Sets the log namespace that will be used when decoding.
+    pub const fn with_log_namespace(mut self, log_namespace: LogNamespace) -> Self {
+        self.log_namespace = log_namespace;
+        self
     }
 
     /// Handles the framing result and parses it into a structured event, if
@@ -57,11 +67,10 @@ impl Decoder {
         };
 
         let byte_size = frame.len();
-
         // Parse structured events from the byte frame.
         self.deserializer
-            .parse(frame)
-            .map(|event| Some((event, byte_size)))
+            .parse(frame, self.log_namespace)
+            .map(|events| Some((events, byte_size)))
             .map_err(|error| {
                 emit!(DecoderDeserializeFailed { error: &error });
                 Error::ParsingError(error)

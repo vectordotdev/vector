@@ -10,6 +10,7 @@ use codecs::{
 use futures::{channel::mpsc, executor, SinkExt, StreamExt};
 use tokio_util::{codec::FramedRead, io::StreamReader};
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -75,7 +76,7 @@ impl SourceConfig for StdinConfig {
         )
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.decoding.output_type())]
     }
 
@@ -109,7 +110,7 @@ where
     let framing = config
         .framing
         .unwrap_or_else(|| config.decoding.default_stream_framing());
-    let decoder = DecodingConfig::new(framing, config.decoding).build();
+    let decoder = DecodingConfig::new(framing, config.decoding, LogNamespace::Legacy).build();
 
     let (mut sender, receiver) = mpsc::channel(1024);
 

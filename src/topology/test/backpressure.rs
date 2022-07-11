@@ -278,6 +278,7 @@ mod test_source {
     use async_trait::async_trait;
     use futures::FutureExt;
     use serde::{Deserialize, Serialize};
+    use vector_core::config::LogNamespace;
 
     use crate::config::{DataType, Output, SourceConfig, SourceContext};
     use crate::event::{Event, LogEvent};
@@ -315,7 +316,7 @@ mod test_source {
             .boxed())
         }
 
-        fn outputs(&self) -> Vec<Output> {
+        fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
             vec![Output::default(DataType::all())]
         }
 

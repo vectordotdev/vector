@@ -6,11 +6,18 @@ use std::{
     path::PathBuf,
 };
 
+use lookup::lookup_v2::Path;
+use lookup::path;
 use snafu::{ResultExt, Snafu};
 use value::Kind;
 use vector_common::TimeZone;
 use vector_config::configurable_component;
+use vector_core::compile_vrl;
+use vector_core::config::LogNamespace;
+use vector_core::schema::Definition;
+
 use vector_vrl_functions::set_semantic_meaning::MeaningList;
+use vrl::state::LocalEnv;
 use vrl::{
     diagnostic::{Formatter, Note},
     prelude::{DiagnosticMessage, ExpressionError},
@@ -127,13 +134,12 @@ impl RemapConfig {
         functions.append(&mut enrichment::vrl_functions());
         functions.append(&mut vector_vrl_functions::vrl_functions());
 
-        let mut state = vrl::state::ExternalEnv::new_with_kind(
-            merged_schema_definition.collection().clone().into(),
-        );
+        let mut state =
+            vrl::state::ExternalEnv::new_with_kind(merged_schema_definition.kind().clone());
         state.set_external_context(enrichment_tables);
         state.set_external_context(MeaningList::default());
 
-        vrl::compile_with_state(&source, &functions, &mut state)
+        compile_vrl(&source, &functions, &mut state, LocalEnv::default())
             .map_err(|diagnostics| {
                 Formatter::new(&source, diagnostics)
                     .colored()
@@ -183,50 +189,61 @@ impl TransformConfig for RemapConfig {
         Input::all()
     }
 
-    fn outputs(&self, merged_definition: &schema::Definition) -> Vec<Output> {
+    fn outputs(&self, input_definition: &schema::Definition) -> Vec<Output> {
         // We need to compile the VRL program in order to know the schema definition output of this
         // transform. We ignore any compilation errors, as those are caught by the transform build
         // step.
         let default_definition = self
             .compile_vrl_program(
                 enrichment::TableRegistry::default(),
-                merged_definition.clone(),
+                input_definition.clone(),
             )
-            .ok()
-            .and_then(|(_, _, _, state)| {
+            .map(|(_, _, _, state)| {
                 let meaning = state
                     .get_external_context::<MeaningList>()
                     .cloned()
                     .expect("context exists")
                     .0;
 
-                state
-                    .target_kind()
-                    .clone()
-                    .into_object()
-                    .map(schema::Definition::from)
-                    .map(|mut def| {
-                        for (id, path) in meaning {
-                            def = def.with_known_meaning(path, &id);
-                        }
-                        def
-                    })
+                let mut new_type_def = Definition::new(
+                    state.target_kind().clone(),
+                    input_definition.log_namespaces().clone(),
+                );
+                for (id, path) in meaning {
+                    new_type_def = new_type_def.with_meaning(path, &id);
+                }
+                new_type_def
             })
-            .unwrap_or_else(schema::Definition::empty);
+            .unwrap_or_else(|_| {
+                Definition::new(
+                    // The program failed to compile, so it can "never" return a value
+                    Kind::never(),
+                    input_definition.log_namespaces().clone(),
+                )
+            });
 
         // When a message is dropped and re-routed, we keep the original event, but also annotate
         // it with additional metadata.
-        let dropped_definition = merged_definition.clone().with_field(
-            log_schema().metadata_key(),
-            Kind::object(BTreeMap::from([
-                ("reason".into(), Kind::bytes()),
-                ("message".into(), Kind::bytes()),
-                ("component_id".into(), Kind::bytes()),
-                ("component_type".into(), Kind::bytes()),
-                ("component_kind".into(), Kind::bytes()),
-            ])),
-            Some("metadata"),
-        );
+        let mut dropped_definition =
+            Definition::new(Kind::never(), input_definition.log_namespaces().clone());
+
+        // The vector namespace appends the dropped fields to the "event metadata", which doesn't yet have a schema
+        if input_definition
+            .log_namespaces()
+            .contains(&LogNamespace::Legacy)
+        {
+            dropped_definition = dropped_definition.merge(input_definition.clone().with_field(
+                log_schema().metadata_key(),
+                Kind::object(BTreeMap::from([
+                    ("reason".into(), Kind::bytes()),
+                    ("message".into(), Kind::bytes()),
+                    ("component_id".into(), Kind::bytes()),
+                    ("component_type".into(), Kind::bytes()),
+                    ("component_kind".into(), Kind::bytes()),
+                ])),
+                Some("metadata"),
+            ));
+        }
 
         let default_output =
             Output::default(DataType::all()).with_schema_definition(default_definition);
@@ -361,7 +378,7 @@ where
         &self.runner
     }
 
-    fn anotate_data(&self, reason: &str, error: ExpressionError) -> serde_json::Value {
+    fn dropped_data(&self, reason: &str, error: ExpressionError) -> serde_json::Value {
         let message = error
             .notes()
             .iter()
@@ -370,24 +387,29 @@ where
             .map(|note| note.to_string())
             .unwrap_or_else(|| error.to_string());
         serde_json::json!({
-            "dropped": {
                 "reason": reason,
                 "message": message,
                 "component_id": self.component_key,
                 "component_type": "remap",
                 "component_kind": "transform",
-            }
         })
     }
 
     fn annotate_dropped(&self, event: &mut Event, reason: &str, error: ExpressionError) {
         match event {
-            Event::Log(ref mut log) => {
-                log.insert(
-                    log_schema().metadata_key(),
-                    self.anotate_data(reason, error),
-                );
-            }
+            Event::Log(ref mut log) => match log.namespace() {
+                LogNamespace::Legacy => {
+                    log.insert(
+                        log_schema().metadata_key().concat(path!("dropped")),
+                        self.dropped_data(reason, error),
+                    );
+                }
+                LogNamespace::Vector => {
+                    log.metadata_mut()
+                        .value_mut()
+                        .insert(path!("vector", "dropped"), self.dropped_data(reason, error));
+                }
+            },
             Event::Metric(ref mut metric) => {
                 let m = log_schema().metadata_key();
                 metric.insert_tag(format!("{}.dropped.reason", m), reason.into());
@@ -404,7 +426,7 @@ where
             Event::Trace(ref mut trace) => {
                 trace.insert(
                     log_schema().metadata_key(),
-                    self.anotate_data(reason, error),
+                    self.dropped_data(reason, error),
                 );
             }
         }
@@ -545,7 +567,7 @@ mod tests {
     };
 
     fn test_default_schema_definition() -> schema::Definition {
-        schema::Definition::empty().with_field(
+        schema::Definition::empty_legacy_namespace().with_field(
             "a default field",
             Kind::integer().or_bytes(),
             Some("default"),
@@ -553,7 +575,7 @@ mod tests {
     }
 
     fn test_dropped_schema_definition() -> schema::Definition {
-        schema::Definition::empty().with_field(
+        schema::Definition::empty_legacy_namespace().with_field(
             "a dropped field",
             Kind::boolean().or_null(),
             Some("dropped"),
@@ -976,7 +998,7 @@ mod tests {
         let context = TransformContext {
             key: Some(ComponentKey::from("remapper")),
             schema_definitions,
-            merged_schema_definition: schema::Definition::empty().with_field(
+            merged_schema_definition: schema::Definition::empty_legacy_namespace().with_field(
                 "hello",
                 Kind::bytes(),
                 None,
@@ -1225,7 +1247,7 @@ mod tests {
             ..Default::default()
         };
 
-        let schema_definition = schema::Definition::empty()
+        let schema_definition = schema::Definition::empty_legacy_namespace()
             .with_field("foo", Kind::bytes().or_null(), None)
             .with_field(
                 "tags",
@@ -1234,7 +1256,7 @@ mod tests {
             );
 
         assert_eq!(
-            conf.outputs(&schema::Definition::empty()),
+            conf.outputs(&schema::Definition::empty_legacy_namespace()),
             vec![Output::default(DataType::all()).with_schema_definition(schema_definition)]
         );
 

@@ -8,6 +8,7 @@ use futures::{stream::StreamExt, TryStreamExt};
 use snafu::Snafu;
 use tokio_util::io::StreamReader;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
 use super::util::MultilineConfig;
 use crate::aws::create_client;
@@ -130,7 +131,7 @@ impl SourceConfig for AwsS3Config {
         }
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 

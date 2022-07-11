@@ -65,6 +65,7 @@ use self::pod_metadata_annotator::PodMetadataAnnotator;
 use futures::{future::FutureExt, stream::StreamExt};
 use k8s_paths_provider::K8sPathsProvider;
 use lifecycle::Lifecycle;
+use vector_core::config::LogNamespace;
 
 /// The key we use for `file` field.
 const FILE_KEY: &str = "file";
@@ -205,7 +206,7 @@ impl SourceConfig for Config {
         })))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -574,7 +575,7 @@ impl Source {
 }
 
 fn create_event(line: Bytes, file: &str, ingestion_timestamp_field: Option<&str>) -> Event {
-    let mut event = LogEvent::from(line);
+    let mut event = LogEvent::from_bytes_legacy(&line);
 
     // Add source type.
     event.insert(log_schema().source_type_key(), COMPONENT_ID.to_owned());
