@@ -106,7 +106,6 @@ members = [
   "lib/datadog/grok",
   "lib/datadog/search-syntax",
   "lib/datadog/filter",
-  "lib/opentelemetry",
 ]
 
 [dependencies]
@@ -117,7 +116,6 @@ enrichment = { path = "lib/enrichment" }
 fakedata = { path = "lib/fakedata", optional = true }
 file-source = { path = "lib/file-source", optional = true }
 lookup = { path = "lib/lookup" }
-otel_proto = { path = "lib/opentelemetry", default-features = false, optional = true }
 portpicker = { path = "lib/portpicker" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
@@ -429,6 +427,8 @@ protobuf-build = ["dep:tonic-build", "dep:prost-build"]
 
 gcp = ["dep:base64", "dep:goauth", "dep:smpl_jwt"]
 
+opentelemetry = ["dep:hex"]
+
 # Enrichment Tables
 enrichment-tables = ["enrichment-tables-file"]
 enrichment-tables-file = [ "dep:csv", "dep:seahash", "dep:hash_hasher" ]
@@ -502,7 +502,7 @@ sources-logstash = ["listenfd", "tokio-util/net", "sources-utils-tcp-keepalive",
 sources-mongodb_metrics = ["dep:mongodb"]
 sources-nats = ["dep:nats", "dep:nkeys"]
 sources-nginx_metrics = ["dep:nom"]
-sources-opentelemetry = ["sources-vector", "dep:otel_proto", "dep:hex"]
+sources-opentelemetry = ["listenfd", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "dep:tonic", "protobuf-build", "opentelemetry"]
 sources-postgresql_metrics = ["dep:postgres-openssl", "dep:tokio-postgres"]
 sources-prometheus = ["dep:prometheus-parser", "sinks-prometheus", "sources-http", "sources-utils-http"]
 sources-redis= ["dep:redis"]
