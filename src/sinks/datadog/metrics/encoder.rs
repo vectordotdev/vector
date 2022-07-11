@@ -204,7 +204,7 @@ impl DatadogMetricsEncoder {
                     {
                         return Ok(Some(metric));
                     }
-                    let _ = serde_json::to_writer(&mut self.state.buf, series)
+                    serde_json::to_writer(&mut self.state.buf, series)
                         .context(JsonEncodingFailedSnafu)?;
                 }
             }
@@ -268,7 +268,7 @@ impl DatadogMetricsEncoder {
         }
 
         // We should be safe to write our holding buffer to the compressor and store the metric.
-        let _ = self.state.writer.write_all(&self.state.buf)?;
+        self.state.writer.write_all(&self.state.buf)?;
         self.state.written += n;
         Ok(true)
     }
@@ -323,7 +323,7 @@ impl DatadogMetricsEncoder {
 
         // Consume of all of the "pending" metrics and try to write them out as sketches.
         let pending = mem::take(&mut self.state.pending);
-        let _ = write_sketches(
+        write_sketches(
             &pending,
             &self.default_namespace,
             self.log_schema,
@@ -349,7 +349,7 @@ impl DatadogMetricsEncoder {
 
     pub fn finish(&mut self) -> Result<(Bytes, Vec<Metric>, usize), FinishError> {
         // Try to encode any pending metrics we had stored up.
-        let _ = self.try_encode_pending()?;
+        self.try_encode_pending()?;
 
         // Write any payload footer necessary for the configured endpoint.
         let n = write_payload_footer(self.endpoint, &mut self.state.writer)

@@ -1,3 +1,5 @@
+use bytes::Bytes;
+use chrono::Utc;
 use std::{
     cmp,
     collections::{BTreeMap, HashMap},
@@ -9,8 +11,6 @@ use std::{
     sync::Arc,
 };
 
-use bytes::Bytes;
-use chrono::Utc;
 use crossbeam_utils::atomic::AtomicCell;
 use lookup::{lookup_v2::Path, LookupBuf};
 use serde::{Deserialize, Serialize, Serializer};
@@ -21,7 +21,10 @@ use super::{
     metadata::EventMetadata,
     util, EventFinalizers, Finalizable, Value,
 };
-use crate::{config::log_schema, event::MaybeAsLogMut, ByteSizeOf};
+use crate::config::log_schema;
+use crate::config::LogNamespace;
+use crate::{event::MaybeAsLogMut, ByteSizeOf};
+use lookup::path;
 
 #[derive(Debug, Deserialize)]
 struct Inner {
@@ -117,6 +120,21 @@ pub struct LogEvent {
 }
 
 impl LogEvent {
+    /// This used to be the implementation for `LogEvent::from(&'str)`, but this is now only
+    /// valid for `LogNamespace::Legacy`
+    pub fn from_str_legacy(msg: impl Into<String>) -> Self {
+        let mut log = LogEvent::default();
+        log.insert(log_schema().message_key(), msg.into());
+        log.insert(log_schema().timestamp_key(), Utc::now());
+        log
+    }
+
+    /// This used to be the implementation for `LogEvent::from(Bytes)`, but this is now only
+    /// valid for `LogNamespace::Legacy`
+    pub fn from_bytes_legacy(msg: &Bytes) -> Self {
+        Self::from_str_legacy(String::from_utf8_lossy(msg.as_ref()).to_string())
+    }
+
     pub fn value(&self) -> &Value {
         self.inner.as_ref().as_value()
     }
@@ -135,6 +153,18 @@ impl LogEvent {
 
     pub fn metadata_mut(&mut self) -> &mut EventMetadata {
         &mut self.metadata
+    }
+
+    pub fn namespace(&self) -> LogNamespace {
+        // The (read-only) vector prefix on metadata is used to determine which namespace
+        // is being used. The user is prevented from modifying data here.
+        // This prefix should always exist for logs with the "Vector" namespace,
+        // and should never exist otherwise.
+        if self.metadata().value().contains(path!("vector")) {
+            LogNamespace::Vector
+        } else {
+            LogNamespace::Legacy
+        }
     }
 }
 
@@ -235,16 +265,12 @@ impl LogEvent {
         self.value().get(path).is_some()
     }
 
-    pub fn insert<'a>(
-        &mut self,
-        path: impl Path<'a>,
-        value: impl Into<Value> + Debug,
-    ) -> Option<Value> {
+    pub fn insert<'a>(&mut self, path: impl Path<'a>, value: impl Into<Value>) -> Option<Value> {
         self.value_mut().insert(path, value.into())
     }
 
     // deprecated - using this means the schema is unknown
-    pub fn try_insert<'a>(&mut self, path: impl Path<'a>, value: impl Into<Value> + Debug) {
+    pub fn try_insert<'a>(&mut self, path: impl Path<'a>, value: impl Into<Value>) {
         if !self.contains(path.clone()) {
             self.insert(path, value);
         }
@@ -340,26 +366,37 @@ impl EventDataEq for LogEvent {
     }
 }
 
-impl From<Bytes> for LogEvent {
-    fn from(message: Bytes) -> Self {
-        let mut log = LogEvent::default();
+#[cfg(any(test, feature = "test"))]
+mod test_utils {
+    use super::*;
 
-        log.insert(log_schema().message_key(), message);
-        log.insert(log_schema().timestamp_key(), Utc::now());
+    // these rely on the global log schema, which is no longer supported when using the
+    // "LogNamespace::Vector" namespace.
+    // The tests that rely on this are testing the "Legacy" log namespace. As these
+    // tests are updated, they should be migrated away from using these implementations
+    // to make it more clear which namespace is being used
 
-        log
+    impl From<Bytes> for LogEvent {
+        fn from(message: Bytes) -> Self {
+            let mut log = LogEvent::default();
+
+            log.insert(log_schema().message_key(), message);
+            log.insert(log_schema().timestamp_key(), Utc::now());
+
+            log
+        }
     }
-}
 
-impl From<&str> for LogEvent {
-    fn from(message: &str) -> Self {
-        message.to_owned().into()
+    impl From<&str> for LogEvent {
+        fn from(message: &str) -> Self {
+            message.to_owned().into()
+        }
     }
-}
 
-impl From<String> for LogEvent {
-    fn from(message: String) -> Self {
-        Bytes::from(message).into()
+    impl From<String> for LogEvent {
+        fn from(message: String) -> Self {
+            Bytes::from(message).into()
+        }
     }
 }
 

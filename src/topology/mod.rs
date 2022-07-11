@@ -7,11 +7,11 @@
 //! each type of component.
 
 pub(super) use vector_core::fanout;
+pub mod schema;
 
 pub mod builder;
 mod ready_arrays;
 mod running;
-mod schema;
 mod task;
 
 #[cfg(test)]

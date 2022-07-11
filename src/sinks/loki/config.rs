@@ -9,7 +9,7 @@ use super::{healthcheck::healthcheck, sink::LokiSink};
 use crate::sinks::util::encoding::{EncodingConfigAdapter, EncodingConfigMigrator};
 use crate::sinks::util::Compression;
 use crate::{
-    config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
+    config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         util::{
@@ -143,7 +143,7 @@ impl SinkConfig for LokiConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(self.encoding.config().input_type())
+        Input::new(self.encoding.config().input_type() & DataType::Log)
     }
 
     fn sink_type(&self) -> &'static str {

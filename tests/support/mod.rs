@@ -37,8 +37,9 @@ use vector::{
     test_util::{temp_dir, temp_file},
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
-use vector_buffers::topology::channel::LimitedReceiver;
+use vector_buffers::{topology::channel::LimitedReceiver, Acker};
 use vector_common::finalization::Finalizable;
+use vector_core::config::LogNamespace;
 
 pub fn sink(channel_size: usize) -> (impl Stream<Item = EventArray>, MockSinkConfig) {
     let (tx, rx) = SourceSender::new_with_buffer(channel_size);
@@ -216,7 +217,7 @@ impl SourceConfig for MockSourceConfig {
         }))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.data_type.unwrap())]
     }
 

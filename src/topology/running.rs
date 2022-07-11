@@ -370,14 +370,14 @@ impl RunningTopology {
             let previous = self.tasks.remove(key).unwrap();
             drop(previous); // detach and forget
 
-            self.remove_inputs(key, diff).await;
+            self.remove_inputs(key, diff, new_config).await;
             self.remove_outputs(key);
         }
 
         for key in &diff.transforms.to_change {
             debug!(component = %key, "Changing transform.");
 
-            self.remove_inputs(key, diff).await;
+            self.remove_inputs(key, diff, new_config).await;
             self.remove_outputs(key);
         }
 
@@ -435,7 +435,7 @@ impl RunningTopology {
         // First, we remove any inputs to removed sinks so they can naturally shut down.
         for key in &diff.sinks.to_remove {
             debug!(component = %key, "Removing sink.");
-            self.remove_inputs(key, diff).await;
+            self.remove_inputs(key, diff, new_config).await;
         }
 
         // After that, for any changed sinks, we temporarily detach their inputs (not remove) so
@@ -463,7 +463,7 @@ impl RunningTopology {
                 // at other stages.
                 buffer_tx.insert(key.clone(), self.inputs.get(key).unwrap().clone());
             }
-            self.remove_inputs(key, diff).await;
+            self.remove_inputs(key, diff, new_config).await;
         }
 
         // Now that we've disconnected or temporarily detached the inputs to all changed/removed
@@ -683,19 +683,33 @@ impl RunningTopology {
         self.outputs.retain(|id, _output| &id.component != key);
     }
 
-    async fn remove_inputs(&mut self, key: &ComponentKey, diff: &ConfigDiff) {
+    async fn remove_inputs(&mut self, key: &ComponentKey, diff: &ConfigDiff, new_config: &Config) {
         self.inputs.remove(key);
         self.detach_triggers.remove(key);
 
         let old_inputs = self.config.inputs_for_node(key).expect("node exists");
+        let new_inputs = new_config
+            .inputs_for_node(key)
+            .unwrap_or_default()
+            .iter()
+            .collect::<HashSet<_>>();
 
         for input in old_inputs {
             if let Some(output) = self.outputs.get_mut(input) {
-                if diff.contains(&input.component) || diff.is_removed(key) {
-                    // If the input we're removing ourselves from is changing, that means its outputs will be
-                    // recreated, so instead of pausing the sink, we just delete it outright to
-                    // ensure things are clean.  Additionally, if this component itself is being
-                    // removed, then pausing makes no sense because it isn't coming back.
+                if diff.contains(&input.component)
+                    || diff.is_removed(key)
+                    || !new_inputs.contains(input)
+                {
+                    // 3 cases to remove the input:
+                    //
+                    // Case 1: If the input we're removing ourselves from is changing, that means its
+                    // outputs will be recreated, so instead of pausing the sink, we just delete it
+                    // outright to ensure things are clean.
+                    //
+                    // Case 2: If this component itself is being removed, then pausing makes no sense
+                    // because it isn't coming back.
+                    //
+                    // Case 3: This component is no longer connected to the input from new config.
                     debug!(component = %key, fanout_id = %input, "Removing component input from fanout.");
 
                     let _ = output.send(ControlMessage::Remove(key.clone()));

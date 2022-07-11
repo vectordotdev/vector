@@ -10,7 +10,10 @@ use crate::{
     aws::create_client,
     aws::{AwsAuthentication, RegionOrEndpoint},
     common::sqs::SqsClientBuilder,
-    config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
+        SinkContext,
+    },
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfigAdapter, EncodingConfigMigrator},
         TowerRequestConfig,
@@ -104,7 +107,7 @@ impl SinkConfig for SqsSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(self.encoding.config().input_type())
+        Input::new(self.encoding.config().input_type() & DataType::Log)
     }
 
     fn sink_type(&self) -> &'static str {

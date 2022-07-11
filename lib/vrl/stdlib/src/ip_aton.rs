@@ -72,7 +72,7 @@ mod tests {
 
         invalid {
             args: func_args![value: "i am not an ipaddress"],
-            want: Err("unable to parse IPv4 address: invalid IP address syntax"),
+            want: Err("unable to parse IPv4 address: invalid IPv4 address syntax"),
             tdef: TypeDef::integer().fallible(),
         }
 

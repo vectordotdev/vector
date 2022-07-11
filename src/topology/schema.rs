@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use value::Kind;
 
 pub(super) use crate::schema::Definition;
 
@@ -30,102 +31,79 @@ use crate::{
 ///
 /// Finally, The merged definition (named `Definition 1 & 2`), and `Definition 4` are merged
 /// together to produce the new `Definition` returned by this method.
-pub(super) fn merged_definition(
+pub fn merged_definition(
     inputs: &[OutputId],
     config: &dyn ComponentContainer,
-    cache: &mut HashMap<Vec<OutputId>, Definition>,
+    cache: &mut HashMap<(bool, Vec<OutputId>), Definition>,
 ) -> Definition {
+    if inputs.is_empty() {
+        return Definition::default_legacy_namespace();
+    }
+
     // Try to get the definition from the cache.
-    if let Some(definition) = cache.get(inputs) {
+    if let Some(definition) = cache.get(&(config.schema_enabled(), inputs.to_vec())) {
         return definition.clone();
     }
 
-    // This should be "never", but that isn't supported yet (coming soon!)
-    let mut definition: Option<Definition> = None;
+    let mut definition = Definition::new(Kind::never(), []);
 
     for input in inputs {
         let key = &input.component;
 
-        // If the input is a source, it'll always have schema definition attached, even if it is an
-        // "empty" schema.
-        //
-        // We merge this schema into the top-level schema.
-        if let Some(outputs) = config.source_outputs(key) {
-            // After getting the source matching to the given input, we need to further narrow the
-            // actual output of the source feeding into this input, and then get the definition
-            // belonging to that output.
-            let maybe_source_definition = outputs.iter().find_map(|output| {
-                if output.port == input.port {
-                    // For sources, a `None` schema definition is equal to an "empty" definition.
-                    Some(
-                        output
-                            .log_schema_definition
-                            .clone()
-                            .unwrap_or_else(Definition::empty),
+        // If the input is a source, the output is merged into the top-level schema.
+        // Not all sources contain a schema yet, in which case they use a default.
+        if let Ok(maybe_output) = config.source_output_for_port(key, &input.port) {
+            let source_definition = maybe_output
+                .unwrap_or_else(|| {
+                    unreachable!(
+                        "source output mis-configured - output for port {:?} missing",
+                        &input.port
                     )
-                } else {
-                    None
-                }
-            });
+                })
+                .log_schema_definition
+                .clone()
+                // Schemas must be implemented for components that support the "Vector" namespace, so since
+                // one doesn't exist here, we can assume it's using the default "legacy" namespace schema definition
+                .unwrap_or_else(Definition::default_legacy_namespace);
 
-            let source_definition = match maybe_source_definition {
-                Some(source_definition) => source_definition,
-                // If we find no match, it means the topology is misconfigured. This is a fatal
-                // error, but other parts of the topology builder deal with this state.
-                None => unreachable!("source output misconfigured"),
-            };
-
-            definition = Some(if let Some(prev_definition) = definition {
-                prev_definition.merge(source_definition)
+            if config.schema_enabled() {
+                definition = definition.merge(source_definition);
             } else {
-                source_definition
-            });
-
-        // If the input is a transform, it _might_ define its own output schema, or it might not
-        // change anything in the schema from its inputs, in which case we need to recursively get
-        // the schemas of the transform inputs.
-        } else if let Some(inputs) = config.transform_inputs(key) {
+                definition = definition.merge(Definition::default_for_namespace(
+                    source_definition.log_namespaces(),
+                ));
+            }
+        }
+        // If the input is a transform, the output is merged into the top-level schema
+        // Not all transforms contain a schema yet. If that's the case, it's assumed
+        // that the transform doesn't modify the event schema, so it is passed through as-is (recursively)
+        if let Some(inputs) = config.transform_inputs(key) {
             let merged_definition = merged_definition(inputs, config, cache);
 
-            // After getting the transform matching to the given input, we need to further narrow
-            // the actual output of the transform feeding into this input, and then get the
-            // definition belonging to that output.
-            let maybe_transform_definition = config
-                .transform_outputs(key, &merged_definition)
-                .expect("already found inputs")
-                .iter()
-                .find_map(|output| {
-                    if output.port == input.port {
-                        // For transforms, a `None` schema definition is equal to "pass-through merged
-                        // input schemas".
-                        Some(output.log_schema_definition.clone())
-                    } else {
-                        None
-                    }
+            let transform_definition = config
+                .transform_output_for_port(key, &input.port, &merged_definition)
+                .expect("transform must exist - already found inputs")
+                .unwrap_or_else(|| {
+                    unreachable!(
+                        "transform output mis-configured - output for port {:?} missing",
+                        &input.port
+                    )
                 })
-                // If we find no match, it means the topology is misconfigured. This is a fatal
-                // error, but other parts of the topology builder deal with this state.
-                .expect("transform output misconfigured");
+                .log_schema_definition
+                .clone()
+                .unwrap_or(merged_definition);
 
-            let transform_definition = match maybe_transform_definition {
-                Some(transform_definition) => transform_definition,
-                // If we get no match, we need to recursively call this method for the inputs of
-                // the given transform.
-                None => merged_definition,
-            };
-
-            definition = Some(if let Some(prev_definition) = definition {
-                prev_definition.merge(transform_definition)
+            if config.schema_enabled() {
+                definition = definition.merge(transform_definition);
             } else {
-                transform_definition
-            });
+                // Schemas must be implemented for components that support the "Vector" namespace, so since
+                // one doesn't exist here, we can assume it's using the default "legacy" namespace schema definit
+                definition = definition.merge(Definition::default_for_namespace(
+                    transform_definition.log_namespaces(),
+                ));
+            }
         }
     }
-
-    let definition = definition.unwrap_or_else(Definition::empty);
-
-    cache.insert(inputs.to_vec(), definition.clone());
-
     definition
 }
 
@@ -145,10 +123,10 @@ pub(super) fn merged_definition(
 pub(super) fn expanded_definitions(
     inputs: &[OutputId],
     config: &dyn ComponentContainer,
-    cache: &mut HashMap<Vec<OutputId>, Vec<Definition>>,
+    cache: &mut HashMap<(bool, Vec<OutputId>), Vec<Definition>>,
 ) -> Vec<Definition> {
     // Try to get the definition from the cache.
-    if let Some(definitions) = cache.get(inputs) {
+    if let Some(definitions) = cache.get(&(config.schema_enabled(), inputs.to_vec())) {
         return definitions.clone();
     }
 
@@ -170,8 +148,7 @@ pub(super) fn expanded_definitions(
                         output
                             .log_schema_definition
                             .clone()
-                            // For sources, a `None` schema definition is equal to an "empty" definition.
-                            .unwrap_or_else(Definition::empty),
+                            .unwrap_or_else(Definition::default_legacy_namespace),
                     )
                 } else {
                     None
@@ -182,7 +159,7 @@ pub(super) fn expanded_definitions(
                 Some(source_definition) => source_definition,
                 // If we find no match, it means the topology is misconfigured. This is a fatal
                 // error, but other parts of the topology builder deal with this state.
-                None => unreachable!("source output misconfigured"),
+                None => unreachable!("source output mis-configured"),
             };
 
             definitions.push(source_definition);
@@ -228,7 +205,10 @@ pub(super) fn expanded_definitions(
         }
     }
 
-    cache.insert(inputs.to_vec(), definitions.clone());
+    cache.insert(
+        (config.schema_enabled(), inputs.to_vec()),
+        definitions.clone(),
+    );
 
     definitions
 }
@@ -270,7 +250,9 @@ pub(super) fn validate_sink_expectations(
     Ok(())
 }
 
-pub(super) trait ComponentContainer {
+pub trait ComponentContainer {
+    fn schema_enabled(&self) -> bool;
+
     fn source_outputs(&self, key: &ComponentKey) -> Option<Vec<Output>>;
 
     fn transform_inputs(&self, key: &ComponentKey) -> Option<&[OutputId]>;
@@ -280,11 +262,60 @@ pub(super) trait ComponentContainer {
         key: &ComponentKey,
         merged_definition: &Definition,
     ) -> Option<Vec<Output>>;
+
+    /// Gets the transform output for the given port.
+    ///
+    /// Returns Err(()) if there is no transform with the given key
+    /// Returns Some(None) if the source does not have an output for the port given
+    #[allow(clippy::result_unit_err)]
+    fn transform_output_for_port(
+        &self,
+        key: &ComponentKey,
+        port: &Option<String>,
+        merged_definition: &Definition,
+    ) -> Result<Option<Output>, ()> {
+        if let Some(outputs) = self.transform_outputs(key, merged_definition) {
+            Ok(get_output_for_port(outputs, port))
+        } else {
+            Err(())
+        }
+    }
+
+    /// Gets the source output for the given port.
+    ///
+    /// Returns Err(()) if there is no source with the given key
+    /// Returns Some(None) if the source does not have an output for the port given
+    #[allow(clippy::result_unit_err)]
+    fn source_output_for_port(
+        &self,
+        key: &ComponentKey,
+        port: &Option<String>,
+    ) -> Result<Option<Output>, ()> {
+        if let Some(outputs) = self.source_outputs(key) {
+            Ok(get_output_for_port(outputs, port))
+        } else {
+            Err(())
+        }
+    }
+}
+
+fn get_output_for_port(outputs: Vec<Output>, port: &Option<String>) -> Option<Output> {
+    for output in outputs {
+        if &output.port == port {
+            return Some(output);
+        }
+    }
+    None
 }
 
 impl ComponentContainer for Config {
+    fn schema_enabled(&self) -> bool {
+        self.schema.enabled
+    }
+
     fn source_outputs(&self, key: &ComponentKey) -> Option<Vec<Output>> {
-        self.source(key).map(|source| source.inner.outputs())
+        self.source(key)
+            .map(|source| source.inner.outputs(self.schema.log_namespace()))
     }
 
     fn transform_inputs(&self, key: &ComponentKey) -> Option<&[OutputId]> {
@@ -323,12 +354,16 @@ mod tests {
         }
 
         impl ComponentContainer for TestCase {
+            fn schema_enabled(&self) -> bool {
+                true
+            }
+
             fn source_outputs(&self, key: &ComponentKey) -> Option<Vec<Output>> {
                 self.sources.get(key.id()).cloned()
             }
 
             fn transform_inputs(&self, _key: &ComponentKey) -> Option<&[OutputId]> {
-                Some(&[])
+                None
             }
 
             fn transform_outputs(
@@ -347,7 +382,7 @@ mod tests {
                     inputs: vec![],
                     sources: IndexMap::default(),
                     transforms: IndexMap::default(),
-                    want: Definition::empty(),
+                    want: Definition::default_legacy_namespace(),
                 },
             ),
             (
@@ -356,7 +391,7 @@ mod tests {
                     inputs: vec![("foo", None)],
                     sources: IndexMap::from([("foo", vec![Output::default(DataType::all())])]),
                     transforms: IndexMap::default(),
-                    want: Definition::empty(),
+                    want: Definition::default_legacy_namespace(),
                 },
             ),
             (
@@ -366,7 +401,7 @@ mod tests {
                     sources: IndexMap::from([(
                         "source-foo",
                         vec![Output::default(DataType::all()).with_schema_definition(
-                            Definition::empty().with_field(
+                            Definition::empty_legacy_namespace().with_field(
                                 "foo",
                                 Kind::integer().or_bytes(),
                                 Some("foo bar"),
@@ -374,7 +409,7 @@ mod tests {
                         )],
                     )]),
                     transforms: IndexMap::default(),
-                    want: Definition::empty().with_field(
+                    want: Definition::empty_legacy_namespace().with_field(
                         "foo",
                         Kind::integer().or_bytes(),
                         Some("foo bar"),
@@ -389,7 +424,7 @@ mod tests {
                         (
                             "source-foo",
                             vec![Output::default(DataType::all()).with_schema_definition(
-                                Definition::empty().with_field(
+                                Definition::empty_legacy_namespace().with_field(
                                     "foo",
                                     Kind::integer().or_bytes(),
                                     Some("foo bar"),
@@ -399,7 +434,7 @@ mod tests {
                         (
                             "source-bar",
                             vec![Output::default(DataType::all()).with_schema_definition(
-                                Definition::empty().with_field(
+                                Definition::empty_legacy_namespace().with_field(
                                     "foo",
                                     Kind::timestamp(),
                                     Some("baz qux"),
@@ -408,13 +443,13 @@ mod tests {
                         ),
                     ]),
                     transforms: IndexMap::default(),
-                    want: Definition::empty()
+                    want: Definition::empty_legacy_namespace()
                         .with_field(
                             "foo",
                             Kind::integer().or_bytes().or_timestamp(),
                             Some("foo bar"),
                         )
-                        .with_known_meaning("foo", "baz qux"),
+                        .with_meaning("foo", "baz qux"),
                 },
             ),
         ]) {
@@ -443,6 +478,10 @@ mod tests {
         }
 
         impl ComponentContainer for TestCase {
+            fn schema_enabled(&self) -> bool {
+                true
+            }
+
             fn source_outputs(&self, key: &ComponentKey) -> Option<Vec<Output>> {
                 self.sources.get(key.id()).cloned()
             }
@@ -471,12 +510,12 @@ mod tests {
                 },
             ),
             (
-                "single input, source with empty schema",
+                "single input, source with default schema",
                 TestCase {
                     inputs: vec![("foo", None)],
                     sources: IndexMap::from([("foo", vec![Output::default(DataType::all())])]),
                     transforms: IndexMap::default(),
-                    want: vec![Definition::empty()],
+                    want: vec![Definition::default_legacy_namespace()],
                 },
             ),
             (
@@ -486,7 +525,7 @@ mod tests {
                     sources: IndexMap::from([(
                         "source-foo",
                         vec![Output::default(DataType::all()).with_schema_definition(
-                            Definition::empty().with_field(
+                            Definition::empty_legacy_namespace().with_field(
                                 "foo",
                                 Kind::integer().or_bytes(),
                                 Some("foo bar"),
@@ -494,7 +533,7 @@ mod tests {
                         )],
                     )]),
                     transforms: IndexMap::default(),
-                    want: vec![Definition::empty().with_field(
+                    want: vec![Definition::empty_legacy_namespace().with_field(
                         "foo",
                         Kind::integer().or_bytes(),
                         Some("foo bar"),
@@ -509,7 +548,7 @@ mod tests {
                         (
                             "source-foo",
                             vec![Output::default(DataType::all()).with_schema_definition(
-                                Definition::empty().with_field(
+                                Definition::empty_legacy_namespace().with_field(
                                     "foo",
                                     Kind::integer().or_bytes(),
                                     Some("foo bar"),
@@ -519,7 +558,7 @@ mod tests {
                         (
                             "source-bar",
                             vec![Output::default(DataType::all()).with_schema_definition(
-                                Definition::empty().with_field(
+                                Definition::empty_legacy_namespace().with_field(
                                     "foo",
                                     Kind::timestamp(),
                                     Some("baz qux"),
@@ -529,12 +568,16 @@ mod tests {
                     ]),
                     transforms: IndexMap::default(),
                     want: vec![
-                        Definition::empty().with_field(
+                        Definition::empty_legacy_namespace().with_field(
                             "foo",
                             Kind::integer().or_bytes(),
                             Some("foo bar"),
                         ),
-                        Definition::empty().with_field("foo", Kind::timestamp(), Some("baz qux")),
+                        Definition::empty_legacy_namespace().with_field(
+                            "foo",
+                            Kind::timestamp(),
+                            Some("baz qux"),
+                        ),
                     ],
                 },
             ),
@@ -546,13 +589,21 @@ mod tests {
                         (
                             "source-foo",
                             vec![Output::default(DataType::all()).with_schema_definition(
-                                Definition::empty().with_field("foo", Kind::boolean(), Some("foo")),
+                                Definition::empty_legacy_namespace().with_field(
+                                    "foo",
+                                    Kind::boolean(),
+                                    Some("foo"),
+                                ),
                             )],
                         ),
                         (
                             "source-bar",
                             vec![Output::default(DataType::all()).with_schema_definition(
-                                Definition::empty().with_field("bar", Kind::integer(), Some("bar")),
+                                Definition::empty_legacy_namespace().with_field(
+                                    "bar",
+                                    Kind::integer(),
+                                    Some("bar"),
+                                ),
                             )],
                         ),
                     ]),
@@ -561,13 +612,25 @@ mod tests {
                         (
                             vec![OutputId::from("source-foo")],
                             vec![Output::default(DataType::all()).with_schema_definition(
-                                Definition::empty().with_field("baz", Kind::regex(), Some("baz")),
+                                Definition::empty_legacy_namespace().with_field(
+                                    "baz",
+                                    Kind::regex(),
+                                    Some("baz"),
+                                ),
                             )],
                         ),
                     )]),
                     want: vec![
-                        Definition::empty().with_field("bar", Kind::integer(), Some("bar")),
-                        Definition::empty().with_field("baz", Kind::regex(), Some("baz")),
+                        Definition::empty_legacy_namespace().with_field(
+                            "bar",
+                            Kind::integer(),
+                            Some("bar"),
+                        ),
+                        Definition::empty_legacy_namespace().with_field(
+                            "baz",
+                            Kind::regex(),
+                            Some("baz"),
+                        ),
                     ],
                 },
             ),
@@ -587,7 +650,7 @@ mod tests {
                         (
                             "Source 1",
                             vec![Output::default(DataType::all()).with_schema_definition(
-                                Definition::empty().with_field(
+                                Definition::empty_legacy_namespace().with_field(
                                     "source-1",
                                     Kind::boolean(),
                                     Some("source-1"),
@@ -597,7 +660,7 @@ mod tests {
                         (
                             "Source 2",
                             vec![Output::default(DataType::all()).with_schema_definition(
-                                Definition::empty().with_field(
+                                Definition::empty_legacy_namespace().with_field(
                                     "source-2",
                                     Kind::integer(),
                                     Some("source-2"),
@@ -611,7 +674,7 @@ mod tests {
                             (
                                 vec![OutputId::from("Source 1")],
                                 vec![Output::default(DataType::all()).with_schema_definition(
-                                    Definition::empty().with_field(
+                                    Definition::empty_legacy_namespace().with_field(
                                         "transform-1",
                                         Kind::regex(),
                                         None,
@@ -624,7 +687,7 @@ mod tests {
                             (
                                 vec![OutputId::from("Source 2")],
                                 vec![Output::default(DataType::all()).with_schema_definition(
-                                    Definition::empty().with_field(
+                                    Definition::empty_legacy_namespace().with_field(
                                         "transform-2",
                                         Kind::float().or_null(),
                                         Some("transform-2"),
@@ -637,7 +700,7 @@ mod tests {
                             (
                                 vec![OutputId::from("Source 2")],
                                 vec![Output::default(DataType::all()).with_schema_definition(
-                                    Definition::empty().with_field(
+                                    Definition::empty_legacy_namespace().with_field(
                                         "transform-3",
                                         Kind::integer(),
                                         Some("transform-3"),
@@ -650,7 +713,7 @@ mod tests {
                             (
                                 vec![OutputId::from("Source 2")],
                                 vec![Output::default(DataType::all()).with_schema_definition(
-                                    Definition::empty().with_field(
+                                    Definition::empty_legacy_namespace().with_field(
                                         "transform-4",
                                         Kind::timestamp().or_bytes(),
                                         Some("transform-4"),
@@ -663,7 +726,7 @@ mod tests {
                             (
                                 vec![OutputId::from("Transform 3"), OutputId::from("Transform 4")],
                                 vec![Output::default(DataType::all()).with_schema_definition(
-                                    Definition::empty().with_field(
+                                    Definition::empty_legacy_namespace().with_field(
                                         "transform-5",
                                         Kind::boolean(),
                                         Some("transform-5"),
@@ -674,21 +737,25 @@ mod tests {
                     ]),
                     want: vec![
                         // Pipeline 1
-                        Definition::empty().with_field("transform-1", Kind::regex(), None),
+                        Definition::empty_legacy_namespace().with_field(
+                            "transform-1",
+                            Kind::regex(),
+                            None,
+                        ),
                         // Pipeline 2
-                        Definition::empty().with_field(
+                        Definition::empty_legacy_namespace().with_field(
                             "transform-2",
                             Kind::float().or_null(),
                             Some("transform-2"),
                         ),
                         // Pipeline 3
-                        Definition::empty().with_field(
+                        Definition::empty_legacy_namespace().with_field(
                             "transform-5",
                             Kind::boolean(),
                             Some("transform-5"),
                         ),
                         // Pipeline 4
-                        Definition::empty().with_field(
+                        Definition::empty_legacy_namespace().with_field(
                             "transform-5",
                             Kind::boolean(),
                             Some("transform-5"),

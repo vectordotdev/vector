@@ -5,7 +5,7 @@ use futures_util::{stream::BoxStream, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot::{channel, Receiver, Sender};
 use vector_core::{
-    config::{AcknowledgementsConfig, DataType, Input, Output},
+    config::{AcknowledgementsConfig, DataType, Input, LogNamespace, Output},
     event::{Event, EventArray, EventContainer, LogEvent},
     schema::Definition,
     sink::{StreamSink, VectorSink},
@@ -74,7 +74,7 @@ struct OneshotSourceConfig {
 #[async_trait]
 #[typetag::serde(name = "oneshot")]
 impl SourceConfig for OneshotSourceConfig {
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::all())]
     }
 

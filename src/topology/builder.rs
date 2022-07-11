@@ -157,7 +157,7 @@ pub async fn build_pieces(
         debug!(component = %key, "Building new source.");
 
         let typetag = source.inner.source_type();
-        let source_outputs = source.inner.outputs();
+        let source_outputs = source.inner.outputs(config.schema.log_namespace());
 
         let span = error_span!(
             "source",
@@ -198,7 +198,7 @@ pub async fn build_pieces(
 
             let schema_definition = output
                 .log_schema_definition
-                .unwrap_or_else(schema::Definition::empty);
+                .unwrap_or_else(schema::Definition::default_legacy_namespace);
 
             schema_definitions.insert(output.port, schema_definition);
         }
@@ -227,6 +227,7 @@ pub async fn build_pieces(
             proxy: ProxyConfig::merge_with_env(&config.global.proxy, &source.proxy),
             acknowledgements: source.sink_acknowledgements,
             schema_definitions,
+            schema: config.schema,
         };
         let server = match source.inner.build(context).await {
             Err(error) => {
@@ -276,11 +277,8 @@ pub async fn build_pieces(
         debug!(component = %key, "Building new transform.");
 
         let mut schema_definitions = HashMap::new();
-        let merged_definition = if config.schema.enabled {
-            schema::merged_definition(&transform.inputs, config, &mut definition_cache)
-        } else {
-            schema::Definition::empty()
-        };
+        let merged_definition =
+            schema::merged_definition(&transform.inputs, config, &mut definition_cache);
 
         for output in transform.inner.outputs(&merged_definition) {
             let definition = match output.log_schema_definition {
@@ -337,7 +335,7 @@ pub async fn build_pieces(
         if config.schema.enabled {
             // At this point, we've validated that all transforms are valid, including any
             // transform that mutates the schema provided by their sources. We can now validate the
-            // schema expectations of each invidual sink.
+            // schema expectations of each individual sink.
             if let Err(mut err) = schema::validate_sink_expectations(key, sink, config) {
                 errors.append(&mut err);
             };
