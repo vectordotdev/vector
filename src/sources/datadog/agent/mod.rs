@@ -118,7 +118,7 @@ impl GenerateConfig for DatadogAgentConfig {
             disable_metrics: false,
             disable_traces: false,
             multiple_outputs: false,
-            log_namespace: Some(true),
+            log_namespace: Some(false),
         })
         .unwrap()
     }

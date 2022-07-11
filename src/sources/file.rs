@@ -104,7 +104,7 @@ pub struct FileConfig {
     #[serde(alias = "ignore_older")]
     pub ignore_older_secs: Option<u64>,
 
-    /// The maximum number of a bytes a line can contain before being discarded.
+    /// The maximum number of bytes a line can contain before being discarded.
     ///
     /// This protects against malformed lines or tailing incorrect files.
     #[serde(default = "default_max_line_bytes")]
