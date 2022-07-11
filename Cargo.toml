@@ -296,7 +296,7 @@ tokio-tungstenite = {version = "0.17.1", default-features = false, features = ["
 toml = { version = "0.5.9", default-features = false }
 tonic = { version = "0.7.2", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "compression"] }
 trust-dns-proto = { version = "0.21.0", default-features = false, features = ["dnssec"], optional = true }
-typetag = { version = "0.2.0", default-features = false }
+typetag = { version = "0.2.1", default-features = false }
 url = { version = "2.2.2", default-features = false, features = ["serde"] }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
 warp = { version = "0.3.1", default-features = false }
