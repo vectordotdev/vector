@@ -119,7 +119,7 @@ impl Expression for SetMetadataFieldFn {
                             .clone()
                             .with_type_set_at_path(&query.path().to_lookup(), new_type)
                             // If an unsupported path is used, no type information must be assumed, so any must be returned
-                            .unwrap_or(Kind::any()),
+                            .unwrap_or_else(|_| Kind::any()),
                     );
                 }
                 QueryTarget::Container(_)

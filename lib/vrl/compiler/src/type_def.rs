@@ -95,16 +95,15 @@ impl TypeDef {
         let fallible = self.fallible;
         let kind = self
             .kind
-            .clone()
             .nest_at_path(
                 path,
                 Strategy {
                     coalesced_path: CoalescedPath::Reject,
                 },
             )
-            // An unsupported nested was used, so nothing can be assumed about the type any more
+            // An unsupported path was used, so nothing can be assumed about the type any more
             // This can be removed once "nest_at_path" supports all paths
-            .unwrap_or(Kind::any());
+            .unwrap_or_else(|_| Kind::any());
 
         Self { fallible, kind }
     }
