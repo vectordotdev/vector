@@ -426,7 +426,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::from("program me");
+        let event = Event::Log(LogEvent::from("program me"));
         let in_stream = Box::pin(stream::iter(vec![event]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
@@ -451,7 +451,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::from("Hello, my name is Bob.");
+        let event = Event::Log(LogEvent::from("Hello, my name is Bob."));
         let in_stream = Box::pin(stream::iter(vec![event]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
@@ -876,7 +876,7 @@ mod tests {
 
         let n: usize = 10;
 
-        let events = (0..n).map(|i| Event::from(format!("program me {}", i)));
+        let events = (0..n).map(|i| Event::Log(LogEvent::from(format!("program me {}", i))));
 
         let in_stream = Box::pin(stream::iter(events));
         let out_stream = transform.transform(in_stream);

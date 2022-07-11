@@ -5,7 +5,7 @@ use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use indexmap::IndexMap;
 use vector::{
     config::{DataType, Output},
-    event::{Event, Value},
+    event::{Event, LogEvent, Value},
     transforms::{
         remap::{Remap, RemapConfig},
         SyncTransform, TransformOutputsBuf,
@@ -64,7 +64,7 @@ fn benchmark_remap(c: &mut Criterion) {
         );
 
         let event = {
-            let mut event = Event::from("augment me");
+            let mut event = Event::Log(LogEvent::from("augment me"));
             event.as_mut_log().insert("copy_from", "buz".to_owned());
             event
         };
@@ -113,7 +113,7 @@ fn benchmark_remap(c: &mut Criterion) {
         );
 
         let event = {
-            let mut event = Event::from("parse me");
+            let mut event = Event::Log(LogEvent::from("parse me"));
             event
                 .as_mut_log()
                 .insert("foo", r#"{"key": "value"}"#.to_owned());
@@ -164,7 +164,7 @@ fn benchmark_remap(c: &mut Criterion) {
             .0,
         );
 
-        let mut event = Event::from("coerce me");
+        let mut event = Event::Log(LogEvent::from("coerce me"));
         for &(key, value) in &[
             ("number", "1234"),
             ("bool", "yes"),

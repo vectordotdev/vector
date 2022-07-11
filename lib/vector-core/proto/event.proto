@@ -87,6 +87,8 @@ message Metric {
     AggregatedHistogram2 aggregated_histogram2 = 13;
     AggregatedSummary2 aggregated_summary2 = 14;
     Sketch sketch = 15;
+    AggregatedHistogram3 aggregated_histogram3 = 16;
+    AggregatedSummary3 aggregated_summary3 = 17;
   }
   string namespace = 11;
 }
@@ -137,9 +139,20 @@ message AggregatedHistogram2 {
   double sum = 3;
 }
 
+message AggregatedHistogram3 {
+  repeated HistogramBucket3 buckets = 1;
+  uint64 count = 2;
+  double sum = 3;
+}
+
 message HistogramBucket {
   double upper_limit = 1;
   uint32 count = 2;
+}
+
+message HistogramBucket3 {
+  double upper_limit = 1;
+  uint64 count = 2;
 }
 
 message AggregatedSummary1 {
@@ -152,6 +165,12 @@ message AggregatedSummary1 {
 message AggregatedSummary2 {
   repeated SummaryQuantile quantiles = 1;
   uint32 count = 2;
+  double sum = 3;
+}
+
+message AggregatedSummary3 {
+  repeated SummaryQuantile quantiles = 1;
+  uint64 count = 2;
   double sum = 3;
 }
 

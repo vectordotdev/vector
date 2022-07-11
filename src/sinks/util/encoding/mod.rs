@@ -482,7 +482,7 @@ mod tests {
     fn test_timestamp() {
         let config: TestConfig = toml::from_str(TOML_TIMESTAMP_FORMAT).unwrap();
         config.encoding.validate().unwrap();
-        let mut event = Event::from("Demo");
+        let mut event = Event::Log(LogEvent::from("Demo"));
         let timestamp = event
             .as_mut_log()
             .get(log_schema().timestamp_key())

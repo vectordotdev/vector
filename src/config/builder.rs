@@ -291,7 +291,17 @@ impl ConfigBuilder {
 
         #[cfg(feature = "enterprise")]
         {
-            self.enterprise = with.enterprise;
+            match (self.enterprise.as_ref(), with.enterprise) {
+                (Some(_), Some(_)) => {
+                    errors.push(
+                        "duplicate 'enterprise' definition, only one definition allowed".to_owned(),
+                    );
+                }
+                (None, Some(other)) => {
+                    self.enterprise = Some(other);
+                }
+                _ => {}
+            };
         }
 
         self.provider = with.provider;
@@ -309,6 +319,18 @@ impl ConfigBuilder {
         }
 
         self.global.proxy = self.global.proxy.merge(&with.global.proxy);
+
+        if self.schema.log_namespace.is_some()
+            && with.schema.log_namespace.is_some()
+            && self.schema.log_namespace != with.schema.log_namespace
+        {
+            errors.push(
+                format!("conflicting values for 'log_namespace' found. Both {:?} and {:?} used in the same component",
+                                self.schema.log_namespace(), with.schema.log_namespace())
+            );
+        }
+
+        self.schema.log_namespace = self.schema.log_namespace.or(with.schema.log_namespace);
 
         if self.global.data_dir.is_none() || self.global.data_dir == default_data_dir() {
             self.global.data_dir = with.global.data_dir;
@@ -402,7 +424,7 @@ mod tests {
 
     use crate::config::{
         builder::{sort_json_value, to_sorted_json_string},
-        ConfigBuilder,
+        enterprise, ConfigBuilder,
     };
 
     use super::ConfigBuilderHash;
@@ -452,8 +474,51 @@ mod tests {
     /// should ideally be able to fix so that the original hash passes!
     fn version_hash_match() {
         assert_eq!(
-            "84112522217c90260692863950365f9149f87b723ceea7930eec863653d697c8",
+            "53dff3cdc4bcf9ac23a04746b253b2f3ba8b1120e483e13d586b3643a4e066de",
             ConfigBuilder::default().sha256_hash()
+        );
+    }
+
+    #[test]
+    fn append_keeps_enterprise() {
+        let mut base = ConfigBuilder {
+            enterprise: Some(enterprise::Options::default()),
+            ..Default::default()
+        };
+        let other = ConfigBuilder::default();
+        base.append(other).unwrap();
+        assert!(base.enterprise.is_some());
+    }
+
+    #[test]
+    fn append_sets_enterprise() {
+        let mut base = ConfigBuilder::default();
+        let other = ConfigBuilder {
+            enterprise: Some(enterprise::Options::default()),
+            ..Default::default()
+        };
+        base.append(other).unwrap();
+        assert!(base.enterprise.is_some());
+    }
+
+    #[test]
+    fn append_overwrites_enterprise() {
+        let mut base_ent = enterprise::Options::default();
+        base_ent.application_key = "base".to_string();
+        let mut base = ConfigBuilder {
+            enterprise: Some(base_ent),
+            ..Default::default()
+        };
+        let mut other_ent = enterprise::Options::default();
+        other_ent.application_key = "other".to_string();
+        let other = ConfigBuilder {
+            enterprise: Some(other_ent),
+            ..Default::default()
+        };
+        let errors = base.append(other).unwrap_err();
+        assert_eq!(
+            errors[0],
+            "duplicate 'enterprise' definition, only one definition allowed"
         );
     }
 

@@ -19,6 +19,7 @@ use pretty_assertions::assert_eq;
 use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use value::Kind;
+use vector_core::config::LogNamespace;
 
 use crate::{
     common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
@@ -42,7 +43,7 @@ use crate::{
 };
 
 fn test_logs_schema_definition() -> schema::Definition {
-    schema::Definition::empty().with_field(
+    schema::Definition::empty_legacy_namespace().with_field(
         "a log field",
         Kind::integer().or_bytes(),
         Some("log field"),
@@ -50,7 +51,11 @@ fn test_logs_schema_definition() -> schema::Definition {
 }
 
 fn test_metrics_schema_definition() -> schema::Definition {
-    schema::Definition::empty().with_field("a schema tag", Kind::boolean().or_null(), Some("tag"))
+    schema::Definition::empty_legacy_namespace().with_field(
+        "a schema tag",
+        Kind::boolean().or_null(),
+        Some("tag"),
+    )
 }
 
 impl Arbitrary for LogMsg {
@@ -87,6 +92,7 @@ fn test_decode_log_body() {
             "http",
             test_logs_schema_definition(),
             test_metrics_schema_definition(),
+            LogNamespace::Legacy,
         );
 
         let events = decode_log_body(body, api_key, &source).unwrap();
@@ -1302,7 +1308,7 @@ fn test_config_outputs() {
                 want: HashMap::from([(
                     None,
                     Some(
-                        schema::Definition::empty()
+                        schema::Definition::empty_legacy_namespace()
                             .with_field("message", Kind::bytes(), Some("message"))
                             .with_field("status", Kind::bytes(), Some("severity"))
                             .with_field("timestamp", Kind::timestamp(), Some("timestamp"))
@@ -1322,7 +1328,7 @@ fn test_config_outputs() {
                 want: HashMap::from([(
                     None,
                     Some(
-                        schema::Definition::empty()
+                        schema::Definition::empty_legacy_namespace()
                             .with_field("message", Kind::bytes(), Some("message"))
                             .with_field("status", Kind::bytes(), Some("severity"))
                             .with_field("timestamp", Kind::timestamp(), Some("timestamp"))
@@ -1343,7 +1349,7 @@ fn test_config_outputs() {
                     (
                         Some(LOGS),
                         Some(
-                            schema::Definition::empty()
+                            schema::Definition::empty_legacy_namespace()
                                 .with_field("message", Kind::bytes(), Some("message"))
                                 .with_field("status", Kind::bytes(), Some("severity"))
                                 .with_field("timestamp", Kind::timestamp(), Some("timestamp"))
@@ -1366,7 +1372,7 @@ fn test_config_outputs() {
                 want: HashMap::from([(
                     None,
                     Some(
-                        schema::Definition::empty()
+                        schema::Definition::empty_legacy_namespace()
                             .with_field("timestamp", Kind::json().or_timestamp(), Some("timestamp"))
                             .unknown_fields(Kind::json()),
                     ),
@@ -1382,7 +1388,7 @@ fn test_config_outputs() {
                     (
                         Some(LOGS),
                         Some(
-                            schema::Definition::empty()
+                            schema::Definition::empty_legacy_namespace()
                                 .with_field(
                                     "timestamp",
                                     Kind::json().or_timestamp(),
@@ -1405,7 +1411,7 @@ fn test_config_outputs() {
                 want: HashMap::from([(
                     None,
                     Some(
-                        schema::Definition::empty()
+                        schema::Definition::empty_legacy_namespace()
                             .with_field("message", Kind::bytes(), Some("message"))
                             .optional_field("timestamp", Kind::timestamp(), Some("timestamp"))
                             .optional_field("hostname", Kind::bytes(), None)
@@ -1432,7 +1438,7 @@ fn test_config_outputs() {
                     (
                         Some(LOGS),
                         Some(
-                            schema::Definition::empty()
+                            schema::Definition::empty_legacy_namespace()
                                 .with_field("message", Kind::bytes(), Some("message"))
                                 .optional_field("timestamp", Kind::timestamp(), Some("timestamp"))
                                 .optional_field("hostname", Kind::bytes(), None)
@@ -1464,10 +1470,11 @@ fn test_config_outputs() {
             disable_logs: false,
             disable_metrics: false,
             disable_traces: false,
+            log_namespace: Some(false),
         };
 
         let mut outputs = config
-            .outputs()
+            .outputs(LogNamespace::Legacy)
             .into_iter()
             .map(|output| (output.port, output.log_schema_definition))
             .collect::<HashMap<_, _>>();

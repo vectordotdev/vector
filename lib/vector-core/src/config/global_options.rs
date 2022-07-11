@@ -1,7 +1,6 @@
-use std::{fs::DirBuilder, path::PathBuf};
-
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use std::{fs::DirBuilder, path::PathBuf};
 use vector_common::TimeZone;
 
 use super::{proxy::ProxyConfig, AcknowledgementsConfig, LogSchema};
@@ -28,6 +27,7 @@ pub(crate) enum DataDirError {
     },
 }
 
+// If this is modified, make sure those changes are reflected in the `ConfigBuilder::append` function!
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(default)]
 pub struct GlobalOptions {

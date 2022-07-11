@@ -358,16 +358,16 @@ mod tests {
         .unwrap();
         let mut encoder = config.build_encoder();
 
-        let mut event1 = Event::from("hello world");
+        let mut event1 = Event::Log(LogEvent::from("hello world"));
         event1.as_mut_log().insert("app", "notvector");
         event1.as_mut_log().insert("magic", "vector");
 
-        let mut event2 = Event::from("hello world");
+        let mut event2 = Event::Log(LogEvent::from("hello world"));
         event2.as_mut_log().insert("file", "log.txt");
 
-        let event3 = Event::from("hello world");
+        let event3 = Event::Log(LogEvent::from("hello world"));
 
-        let mut event4 = Event::from("hello world");
+        let mut event4 = Event::Log(LogEvent::from("hello world"));
         event4.as_mut_log().insert("env", "staging");
 
         let event1_out = encoder.encode_event(event1).unwrap().into_parts().0;

@@ -13,6 +13,7 @@ use serde::{
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 use vector_config::{configurable_component, Configurable};
+use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -139,7 +140,7 @@ impl SourceConfig for HostMetricsConfig {
         Ok(Box::pin(config.run(cx.out, cx.shutdown)))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Metric)]
     }
 

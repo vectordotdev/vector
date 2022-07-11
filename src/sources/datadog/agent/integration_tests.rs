@@ -69,8 +69,14 @@ async fn wait_for_message() {
 
     let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
     let schema_definitions = HashMap::from([
-        (Some(LOGS.to_owned()), schema::Definition::empty()),
-        (Some(METRICS.to_owned()), schema::Definition::empty()),
+        (
+            Some(LOGS.to_owned()),
+            schema::Definition::empty_legacy_namespace(),
+        ),
+        (
+            Some(METRICS.to_owned()),
+            schema::Definition::empty_legacy_namespace(),
+        ),
     ]);
     let context = SourceContext::new_test(sender, Some(schema_definitions));
     tokio::spawn(async move {
@@ -105,8 +111,14 @@ async fn wait_for_traces() {
 
     let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
     let schema_definitions = HashMap::from([
-        (Some(LOGS.to_owned()), schema::Definition::empty()),
-        (Some(METRICS.to_owned()), schema::Definition::empty()),
+        (
+            Some(LOGS.to_owned()),
+            schema::Definition::empty_legacy_namespace(),
+        ),
+        (
+            Some(METRICS.to_owned()),
+            schema::Definition::empty_legacy_namespace(),
+        ),
     ]);
     let context = SourceContext::new_test(sender, Some(schema_definitions));
     tokio::spawn(async move {

@@ -181,11 +181,14 @@ where
     encoding: EncodingWithTransformationConfig<LegacyEncodingConfig, Migrator>,
 }
 
-impl<'de, LegacyEncodingConfig, Migrator> Deserialize<'de> for EncodingConfigWithFramingAdapter<LegacyEncodingConfig, Migrator>
+impl<'de, LegacyEncodingConfig, Migrator> Deserialize<'de>
+    for EncodingConfigWithFramingAdapter<LegacyEncodingConfig, Migrator>
 where
     LegacyEncodingConfig: EncodingConfiguration + Deserialize<'de> + Clone + 'static,
     LegacyEncodingConfig::Codec: Deserialize<'de>,
-    Migrator: EncodingConfigWithFramingMigrator<Codec = LegacyEncodingConfig::Codec> + Deserialize<'de> + Clone,
+    Migrator: EncodingConfigWithFramingMigrator<Codec = LegacyEncodingConfig::Codec>
+        + Deserialize<'de>
+        + Clone,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -247,8 +250,7 @@ impl<LegacyEncodingConfig, Migrator> From<LegacyEncodingConfig>
     for EncodingConfigWithFramingAdapter<LegacyEncodingConfig, Migrator>
 where
     LegacyEncodingConfig: EncodingConfiguration + Clone + 'static,
-    Migrator:
-        EncodingConfigWithFramingMigrator<Codec = LegacyEncodingConfig::Codec> + Clone,
+    Migrator: EncodingConfigWithFramingMigrator<Codec = LegacyEncodingConfig::Codec> + Clone,
 {
     fn from(config: LegacyEncodingConfig) -> Self {
         let (framing, encoding) = Migrator::migrate(config.codec());
@@ -269,8 +271,7 @@ impl<LegacyEncodingConfig, Migrator>
     EncodingConfigWithFramingAdapter<LegacyEncodingConfig, Migrator>
 where
     LegacyEncodingConfig: EncodingConfiguration + Clone + 'static,
-    Migrator:
-        EncodingConfigWithFramingMigrator<Codec = LegacyEncodingConfig::Codec> + Clone,
+    Migrator: EncodingConfigWithFramingMigrator<Codec = LegacyEncodingConfig::Codec> + Clone,
 {
     /// Create a new encoding configuration.
     pub const fn new(framing: Option<FramingConfig>, encoding: SerializerConfig) -> Self {

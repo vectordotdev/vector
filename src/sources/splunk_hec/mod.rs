@@ -15,6 +15,7 @@ use serde_json::{de::Read as JsonRead, Deserializer, Value as JsonValue};
 use snafu::Snafu;
 use tracing::Span;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 use vector_core::{event::BatchNotifier, ByteSizeOf};
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
@@ -166,7 +167,7 @@ impl SourceConfig for SplunkConfig {
         }))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -1107,16 +1108,20 @@ mod tests {
     }
 
     async fn channel_n(
-        messages: Vec<impl Into<Event> + Send + 'static>,
+        messages: Vec<impl Into<String> + Send + 'static>,
         sink: VectorSink,
         source: impl Stream<Item = Event> + Unpin,
     ) -> Vec<Event> {
         let n = messages.len();
 
         tokio::spawn(async move {
-            sink.run_events(messages.into_iter().map(Into::into))
-                .await
-                .unwrap();
+            sink.run_events(
+                messages
+                    .into_iter()
+                    .map(|s| Event::Log(LogEvent::from(s.into()))),
+            )
+            .await
+            .unwrap();
         });
 
         let events = collect_n(source, n).await;

@@ -282,14 +282,15 @@ mod tests {
 
     use super::TopologyBuilder;
     use crate::{
-        topology::{builder::TopologyError, test_util::assert_current_send_capacity},
+        topology::builder::TopologyError,
+        topology::test_util::{assert_current_send_capacity, Sample},
         variants::MemoryBuffer,
         WhenFull,
     };
 
     #[tokio::test]
     async fn single_stage_topology_block() {
-        let mut builder = TopologyBuilder::<u64>::default();
+        let mut builder = TopologyBuilder::<Sample>::default();
         builder.stage(
             MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
             WhenFull::Block,
@@ -303,7 +304,7 @@ mod tests {
 
     #[tokio::test]
     async fn single_stage_topology_drop_newest() {
-        let mut builder = TopologyBuilder::<u64>::default();
+        let mut builder = TopologyBuilder::<Sample>::default();
         builder.stage(
             MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
             WhenFull::DropNewest,
@@ -317,7 +318,7 @@ mod tests {
 
     #[tokio::test]
     async fn single_stage_topology_overflow() {
-        let mut builder = TopologyBuilder::<u64>::default();
+        let mut builder = TopologyBuilder::<Sample>::default();
         builder.stage(
             MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
             WhenFull::Overflow,
@@ -331,7 +332,7 @@ mod tests {
 
     #[tokio::test]
     async fn two_stage_topology_block() {
-        let mut builder = TopologyBuilder::<u64>::default();
+        let mut builder = TopologyBuilder::<Sample>::default();
         builder.stage(
             MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
             WhenFull::Block,
@@ -349,7 +350,7 @@ mod tests {
 
     #[tokio::test]
     async fn two_stage_topology_drop_newest() {
-        let mut builder = TopologyBuilder::<u64>::default();
+        let mut builder = TopologyBuilder::<Sample>::default();
         builder.stage(
             MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
             WhenFull::DropNewest,
@@ -367,7 +368,7 @@ mod tests {
 
     #[tokio::test]
     async fn two_stage_topology_overflow() {
-        let mut builder = TopologyBuilder::<u64>::default();
+        let mut builder = TopologyBuilder::<Sample>::default();
         builder.stage(
             MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
             WhenFull::Overflow,

@@ -5,9 +5,10 @@ use futures_util::{stream::BoxStream, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot::{channel, Receiver, Sender};
 use vector_buffers::Acker;
+use vector_core::config::LogNamespace;
 use vector_core::{
     config::{AcknowledgementsConfig, DataType, Input, Output},
-    event::{Event, EventArray, EventContainer},
+    event::{Event, EventArray, EventContainer, LogEvent},
     schema::Definition,
     sink::{StreamSink, VectorSink},
     source::Source,
@@ -75,7 +76,7 @@ struct OneshotSourceConfig {
 #[async_trait]
 #[typetag::serde(name = "oneshot")]
 impl SourceConfig for OneshotSourceConfig {
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::all())]
     }
 
@@ -209,7 +210,7 @@ async fn create_topology(
 #[tokio::test]
 async fn test_function_transform_single_event() {
     assert_transform_compliance(async {
-        let original_event = Event::from("function transform being tested");
+        let original_event = Event::Log(LogEvent::from("function transform being tested"));
 
         let (topology, rx) = create_topology(original_event.clone(), TransformType::Function).await;
         topology.stop().await;
@@ -227,7 +228,7 @@ async fn test_function_transform_single_event() {
 #[tokio::test]
 async fn test_sync_transform_single_event() {
     assert_transform_compliance(async {
-        let original_event = Event::from("function transform being tested");
+        let original_event = Event::Log(LogEvent::from("function transform being tested"));
 
         let (topology, rx) =
             create_topology(original_event.clone(), TransformType::Synchronous).await;
@@ -246,7 +247,7 @@ async fn test_sync_transform_single_event() {
 #[tokio::test]
 async fn test_task_transform_single_event() {
     assert_transform_compliance(async {
-        let original_event = Event::from("function transform being tested");
+        let original_event = Event::Log(LogEvent::from("function transform being tested"));
 
         let (topology, rx) = create_topology(original_event.clone(), TransformType::Task).await;
         topology.stop().await;

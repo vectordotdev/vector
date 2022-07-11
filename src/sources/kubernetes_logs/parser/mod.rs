@@ -89,7 +89,11 @@ mod tests {
     #[test]
     fn test_parsing() {
         trace_init();
-        test_util::test_parser(|| Transform::function(Parser::new()), Event::from, cases());
+        test_util::test_parser(
+            || Transform::function(Parser::new()),
+            |s| Event::Log(LogEvent::from(s)),
+            cases(),
+        );
     }
 
     #[test]
@@ -99,10 +103,10 @@ mod tests {
         let cases = vec!["", "qwe", "{"];
 
         for message in cases {
-            let input = Event::from(message);
+            let input = LogEvent::from(message);
             let mut parser = Parser::new();
             let mut output = OutputBuffer::default();
-            parser.transform(&mut output, input);
+            parser.transform(&mut output, input.into());
             assert!(output.is_empty(), "Expected no events: {:?}", output);
         }
     }

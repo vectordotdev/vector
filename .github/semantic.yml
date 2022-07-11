@@ -181,6 +181,7 @@ scopes:
   - aws_kinesis_streams sink # Anything `aws_kinesis_streams` sink related
   - aws_s3 sink # Anything `aws_s3` sink related
   - aws_sqs sink # Anything `aws_sqs` sink related
+  - axiom sink # Anything `axiom` sink related
   - azure_blob sink # Anything `azure_blob` sink related
   - azure_monitor_logs sink # Anything `azure_monitor_logs` sink related
   - blackhole sink # Anything `blackhole` sink related
@@ -219,6 +220,7 @@ scopes:
   - splunk_hec sink # Anything `splunk_hec` sink related
   - statsd sink # Anything `statsd` sink related
   - vector sink # Anything `vector` sink related
+  - websocket sink # Anything `websocket` sink related
 
   # website
   - blog website # Anything related to the Vector blog

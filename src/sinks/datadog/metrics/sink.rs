@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, sync::Arc};
 
 use async_trait::async_trait;
 use futures_util::{
@@ -38,10 +38,10 @@ struct DatadogMetricsTypePartitioner;
 
 impl Partitioner for DatadogMetricsTypePartitioner {
     type Item = Metric;
-    type Key = DatadogMetricsEndpoint;
+    type Key = (Option<Arc<str>>, DatadogMetricsEndpoint);
 
     fn partition(&self, item: &Self::Item) -> Self::Key {
-        match item.data().value() {
+        let endpoint = match item.data().value() {
             MetricValue::Counter { .. } => DatadogMetricsEndpoint::Series,
             MetricValue::Gauge { .. } => DatadogMetricsEndpoint::Series,
             MetricValue::Set { .. } => DatadogMetricsEndpoint::Series,
@@ -49,7 +49,8 @@ impl Partitioner for DatadogMetricsTypePartitioner {
             MetricValue::AggregatedHistogram { .. } => DatadogMetricsEndpoint::Sketches,
             MetricValue::AggregatedSummary { .. } => DatadogMetricsEndpoint::Series,
             MetricValue::Sketch { .. } => DatadogMetricsEndpoint::Sketches,
-        }
+        };
+        (item.metadata().datadog_api_key(), endpoint)
     }
 }
 
@@ -99,10 +100,10 @@ where
             // We batch metrics by their endpoint: series endpoint for counters, gauge, and sets vs sketch endpoint for
             // distributions, aggregated histograms, and sketches.
             .batched_partitioned(DatadogMetricsTypePartitioner, self.batch_settings)
-            .map(|(endpoint, mut metrics)| {
+            .map(|((api_key, endpoint), mut metrics)| {
                 // Sorting significantly improves HTTP compression
                 sort_for_compression(&mut metrics);
-                (endpoint, metrics)
+                ((api_key, endpoint), metrics)
             })
             // We build our requests "incrementally", which means that for a single batch of metrics, we might generate
             // N requests to send them all, as Datadog has API-level limits on payload size, so we keep adding metrics

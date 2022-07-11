@@ -419,7 +419,7 @@ mod tests {
 
     #[test]
     fn encodes_raw_logs() {
-        let event = Event::from("foo");
+        let event = Event::Log(LogEvent::from("foo"));
         assert_eq!(
             Message::text("foo"),
             encode_event(event, EncodingConfig::from(StandardEncodings::Text).into()).unwrap()
