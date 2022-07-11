@@ -1,4 +1,4 @@
-ARG ALPINE_IMAGE=docker.io/alpine:3.15
+ARG ALPINE_IMAGE=docker.io/alpine:3.16.0
 ARG DISTROLESS_CC_IMAGE=gcr.io/distroless/static-debian11
 
 #-------------------------------------------------------------------------------

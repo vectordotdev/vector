@@ -1,4 +1,4 @@
-ARG ALPINE_IMAGE=docker.io/alpine:3.15
+ARG ALPINE_IMAGE=docker.io/alpine:3.16.0
 ARG DEBIAN_IMAGE=docker.io/debian:bullseye-slim
 
 #-------------------------------------------------------------------------------
@@ -39,6 +39,9 @@ LABEL org.opencontainers.image.source="https://github.com/vectordotdev/vector" \
 # Copy root filesystem from staging
 COPY --from=staging /staging/rootfs/ /
 
+# Prepare a user/group for running Vector
+ARG VECTOR_USER=vector
+ARG VECTOR_GROUP=vector
 RUN apt-get update \
     && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends \
@@ -48,7 +51,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system \
         --shell /sbin/nologin \
-        --user-group vector
+        --user-group "${VECTOR_USER}" \
+    && chown -R "${VECTOR_USER}":"${VECTOR_GROUP}" /etc/vector /var/lib/vector
 
 # Configure the image entrypoint
 ENTRYPOINT ["tini", "--", "docker-entrypoint.sh"]

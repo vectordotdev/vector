@@ -1,4 +1,4 @@
-ARG ALPINE_IMAGE=docker.io/alpine:3.15
+ARG ALPINE_IMAGE=docker.io/alpine:3.16.0
 
 #-------------------------------------------------------------------------------
 FROM ${ALPINE_IMAGE} AS staging
@@ -49,7 +49,7 @@ RUN apk --no-cache add \
     && adduser -S -H \
         -s /sbin/nologin \
         -G "${VECTOR_GROUP}" "${VECTOR_USER}" \
-    && chown -r "${VECTOR_USER}":"${VECTOR_GROUP}" /etc/vector /var/lib/vector
+    && chown -R "${VECTOR_USER}":"${VECTOR_GROUP}" /etc/vector /var/lib/vector
 
 # Configure the image entrypoint
 ENTRYPOINT ["tini", "--", "docker-entrypoint.sh"]
