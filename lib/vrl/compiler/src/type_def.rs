@@ -95,6 +95,7 @@ impl TypeDef {
         let fallible = self.fallible;
         let kind = self
             .kind
+            .clone()
             .nest_at_path(
                 path,
                 Strategy {
@@ -102,7 +103,7 @@ impl TypeDef {
                 },
             )
             // This in incorrect. See: https://github.com/vectordotdev/vector/issues/13460
-            .unwrap_or_else(self.kind);
+            .unwrap_or(self.kind);
 
         Self { fallible, kind }
     }
