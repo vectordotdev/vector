@@ -24,20 +24,34 @@ use vector_buffers::{
     Acker, BufferType, Bufferable, EventCount, WhenFull,
 };
 use vector_common::byte_size_of::ByteSizeOf;
+use vector_common::finalization::{
+    AddBatchNotifier, BatchNotifier, EventFinalizer, EventFinalizers,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VariableMessage {
     id: u64,
     payload: Vec<u8>,
+    finalizer: EventFinalizers,
 }
 
 impl VariableMessage {
     pub fn new(id: u64, payload: Vec<u8>) -> Self {
-        VariableMessage { id, payload }
+        VariableMessage {
+            id,
+            payload,
+            finalizer: Default::default(),
+        }
     }
 
     pub fn id(&self) -> u64 {
         self.id
+    }
+}
+
+impl AddBatchNotifier for VariableMessage {
+    fn add_batch_notifier(&mut self, batch: BatchNotifier) {
+        self.finalizer.add(EventFinalizer::new(batch));
     }
 }
 

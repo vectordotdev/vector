@@ -29,7 +29,7 @@ indexmap = { version = "~1.9.1", default-features = false, optional = true}
 md-5 = { version = "0.10", optional = true }
 nom = { version = "7", optional = true }
 percent-encoding = { version = "2.1", optional = true }
-once_cell = { version = "1.12", optional = true }
+once_cell = { version = "1.13", optional = true }
 rand = { version = "0.8.5", optional = true }
 regex = { version = "1", optional = true }
 rust_decimal = { version = "1", optional = true }
@@ -90,6 +90,7 @@ default = [
     "encrypt",
     "ends_with",
     "exists",
+    "filter",
     "find",
     "flatten",
     "float",
@@ -225,6 +226,7 @@ encode_percent = ["dep:percent-encoding"]
 encrypt = ["cryptography", "random_bytes", "decrypt"]
 ends_with = []
 exists = []
+filter = []
 find = ["dep:regex"]
 find_table_row = []
 flatten = []

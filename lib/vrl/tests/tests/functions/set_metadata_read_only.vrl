@@ -11,5 +11,6 @@
 #   │
 #   = learn more about error code 315 at https://errors.vrl.dev/315
 #   = see language documentation at https://vrl.dev
+#   = try your code in the VRL REPL, learn more at https://vrl.dev/examples
 
 set_metadata_field(.read_only, 5)

@@ -56,6 +56,7 @@ jobs:
       matrix:
         include:
           - test: 'aws'
+          - test: 'axiom'
           - test: 'azure'
           - test: 'clickhouse'
           - test: 'datadog-agent'

@@ -361,7 +361,7 @@ components: {
 					enabled: bool
 
 					if enabled {
-						batched: bool | *false
+						framing: bool | *false
 						enum:    [#EncodingCodec, ...#EncodingCodec] | null
 					}
 				}
@@ -725,7 +725,7 @@ components: {
 					if Args.can_verify_certificate {
 						verify_certificate: {
 							common:      false
-							description: "If `true` (the default), Vector will validate the TLS certificate of the remote host."
+							description: "If `true` (the default), Vector will validate the TLS certificate of the remote host. Specifically the issuer is checked but not CRLs (Certificate Revocation Lists)."
 							required:    false
 							type: bool: default: true
 						}
