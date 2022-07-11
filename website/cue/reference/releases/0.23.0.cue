@@ -5,16 +5,22 @@ releases: "0.23.0": {
 	codename: ""
 
 	whats_next: [
-		"""
-			We plan to focus on adding Open Telemetry support to Vector in the form of an `opentelemetry` source and sink in
-			Q3 (starting from the [contribution](https://github.com/vectordotdev/vector/pull/13320) from
-			[caibirdme](https://github.com/caibirdme))!.
-			""",
-		"""
-			Another focus of Q3 for us will be shoring up Vector's delivery guarantees to eliminate the possibilities
-			of Vector unintentionally dropping data once it has accepted it (when end-to-end acknowledgements are
-			enabled, which we also intend to make the default eventually!).
-			""",
+		{
+			title: "OpenTelemetry support"
+			description: """
+				We plan to focus on adding Open Telemetry support to Vector in the form of an `opentelemetry` source and sink in
+				Q3 (starting from the [contribution](https://github.com/vectordotdev/vector/pull/13320) from
+				[caibirdme](https://github.com/caibirdme))!.
+				"""
+		},
+		{
+			title: "Improving Vector's delivery guarantees"
+			description: """
+				Another focus of Q3 for us will be shoring up Vector's delivery guarantees to eliminate the possibilities
+				of Vector unintentionally dropping data once it has accepted it (when end-to-end acknowledgements are
+				enabled, which we also intend to make the default eventually!).
+				"""
+		},
 	]
 
 	known_issues: []
