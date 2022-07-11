@@ -623,7 +623,7 @@ impl<'a> DnstapParser<'a> {
         self.parent_key_path.push_field(key_path);
 
         for (i, query) in questions.iter().enumerate() {
-            self.parent_key_path.push_index(i);
+            self.parent_key_path.push_index(i as isize);
             self.log_dns_query_question(query);
             self.parent_key_path.segments.pop();
         }
@@ -828,7 +828,7 @@ impl<'a> DnstapParser<'a> {
         self.parent_key_path.push_field(key_path);
 
         options.iter().enumerate().for_each(|(i, opt)| {
-            self.parent_key_path.push_index(i);
+            self.parent_key_path.push_index(i as isize);
             self.log_edns_opt(opt);
             self.parent_key_path.segments.pop();
         });
@@ -855,7 +855,7 @@ impl<'a> DnstapParser<'a> {
         self.parent_key_path.push_field(key_path);
 
         for (i, record) in records.iter().enumerate() {
-            self.parent_key_path.push_index(i);
+            self.parent_key_path.push_index(i as isize);
             self.log_dns_record(record);
             self.parent_key_path.segments.pop();
         }
@@ -916,6 +916,14 @@ fn to_socket_protocol_name(socket_protocol: i32) -> Result<&'static str> {
         Ok("UDP")
     } else if socket_protocol == SocketProtocol::Tcp as i32 {
         Ok("TCP")
+    } else if socket_protocol == SocketProtocol::Dot as i32 {
+        Ok("DOT")
+    } else if socket_protocol == SocketProtocol::Doh as i32 {
+        Ok("DOH")
+    } else if socket_protocol == SocketProtocol::DnsCryptUdp as i32 {
+        Ok("DNSCryptUDP")
+    } else if socket_protocol == SocketProtocol::DnsCryptTcp as i32 {
+        Ok("DNSCryptTCP")
     } else {
         Err(Error::from(format!(
             "Unknown socket protocol: {}",
@@ -954,46 +962,51 @@ fn to_dnstap_message_type(type_id: i32) -> String {
 #[cfg(test)]
 mod tests {
     use super::{super::schema::DnstapEventSchema, *};
-    use crate::event::{Event, Value};
+    use crate::event::Value;
 
     #[test]
     fn test_parse_dnstap_data_with_query_message() {
-        let mut event = Event::new_empty_log();
-        let log_event = event.as_mut_log();
+        let mut log_event = LogEvent::default();
         let schema = DnstapEventSchema::new();
-        let mut parser = DnstapParser::new(&schema, log_event);
+        let mut parser = DnstapParser::new(&schema, &mut log_event);
         let raw_dnstap_data = "ChVqYW1lcy1WaXJ0dWFsLU1hY2hpbmUSC0JJTkQgOS4xNi4zcnoIAxACGAEiEAAAAAAAAA\
         AAAAAAAAAAAAAqECABBQJwlAAAAAAAAAAAADAw8+0CODVA7+zq9wVNMU3WNlI2kwIAAAABAAAAAAABCWZhY2Vib29rMQNjb\
         20AAAEAAQAAKQIAAACAAAAMAAoACOxjCAG9zVgzWgUDY29tAHgB";
         let dnstap_data = base64::decode(raw_dnstap_data).expect("Invalid base64 encoded data.");
         let parse_result = parser.parse_dnstap_data(Bytes::from(dnstap_data));
         assert!(parse_result.is_ok());
-        assert!(log_event.all_fields().any(|(key, value)| key == "time"
-            && match *value {
-                Value::Integer(time) => time == 1_593_489_007_920_014_129,
-                _ => false,
-            }));
-        assert!(log_event.all_fields().any(|(key, value)| key == "timestamp"
-            && match *value {
-                Value::Timestamp(timestamp) =>
-                    timestamp.timestamp_nanos() == 1_593_489_007_920_014_129,
-                _ => false,
-            }));
         assert!(log_event
             .all_fields()
+            .unwrap()
+            .any(|(key, value)| key == "time"
+                && match *value {
+                    Value::Integer(time) => time == 1_593_489_007_920_014_129,
+                    _ => false,
+                }));
+        assert!(log_event
+            .all_fields()
+            .unwrap()
+            .any(|(key, value)| key == "timestamp"
+                && match *value {
+                    Value::Timestamp(timestamp) =>
+                        timestamp.timestamp_nanos() == 1_593_489_007_920_014_129,
+                    _ => false,
+                }));
+        assert!(log_event
+            .all_fields()
+            .unwrap()
             .any(|(key, value)| key == "requestData.header.qr"
                 && match *value {
                     Value::Integer(qr) => qr == 0,
                     _ => false,
                 }));
-        assert!(log_event
-            .all_fields()
-            .any(|(key, value)| key == "requestData.opt.udpPayloadSize"
-                && match *value {
-                    Value::Integer(udp_payload_size) => udp_payload_size == 512,
-                    _ => false,
-                }));
-        assert!(log_event.all_fields().any(|(key, value)| key
+        assert!(log_event.all_fields().unwrap().any(|(key, value)| key
+            == "requestData.opt.udpPayloadSize"
+            && match *value {
+                Value::Integer(udp_payload_size) => udp_payload_size == 512,
+                _ => false,
+            }));
+        assert!(log_event.all_fields().unwrap().any(|(key, value)| key
             == "requestData.question[0].domainName"
             && match value {
                 Value::Bytes(domain_name) => *domain_name == Bytes::from_static(b"facebook1.com."),
@@ -1003,29 +1016,35 @@ mod tests {
 
     #[test]
     fn test_parse_dnstap_data_with_update_message() {
-        let mut event = Event::new_empty_log();
-        let log_event = event.as_mut_log();
+        let mut log_event = LogEvent::default();
         let schema = DnstapEventSchema::new();
-        let mut parser = DnstapParser::new(&schema, log_event);
+        let mut parser = DnstapParser::new(&schema, &mut log_event);
         let raw_dnstap_data = "ChVqYW1lcy1WaXJ0dWFsLU1hY2hpbmUSC0JJTkQgOS4xNi4zcmsIDhABGAEiBH8AAA\
         EqBH8AAAEwrG44AEC+iu73BU14gfofUh1wi6gAAAEAAAAAAAAHZXhhbXBsZQNjb20AAAYAAWC+iu73BW0agDwvch1wi6gAA\
         AEAAAAAAAAHZXhhbXBsZQNjb20AAAYAAXgB";
         let dnstap_data = base64::decode(raw_dnstap_data).expect("Invalid base64 encoded data.");
         let parse_result = parser.parse_dnstap_data(Bytes::from(dnstap_data));
         assert!(parse_result.is_ok());
-        assert!(log_event.all_fields().any(|(key, value)| key == "time"
-            && match *value {
-                Value::Integer(time) => time == 1_593_541_950_792_494_106,
-                _ => false,
-            }));
-        assert!(log_event.all_fields().any(|(key, value)| key == "timestamp"
-            && match *value {
-                Value::Timestamp(timestamp) =>
-                    timestamp.timestamp_nanos() == 1_593_541_950_792_494_106,
-                _ => false,
-            }));
         assert!(log_event
             .all_fields()
+            .unwrap()
+            .any(|(key, value)| key == "time"
+                && match *value {
+                    Value::Integer(time) => time == 1_593_541_950_792_494_106,
+                    _ => false,
+                }));
+        assert!(log_event
+            .all_fields()
+            .unwrap()
+            .any(|(key, value)| key == "timestamp"
+                && match *value {
+                    Value::Timestamp(timestamp) =>
+                        timestamp.timestamp_nanos() == 1_593_541_950_792_494_106,
+                    _ => false,
+                }));
+        assert!(log_event
+            .all_fields()
+            .unwrap()
             .any(|(key, value)| key == "requestData.header.qr"
                 && match *value {
                     Value::Integer(qr) => qr == 1,
@@ -1033,27 +1052,25 @@ mod tests {
                 }));
         assert!(log_event
             .all_fields()
+            .unwrap()
             .any(|(key, value)| key == "messageType"
                 && match value {
                     Value::Bytes(data_type) => *data_type == Bytes::from_static(b"UpdateResponse"),
                     _ => false,
                 }));
-        assert!(log_event
-            .all_fields()
-            .any(|(key, value)| key == "requestData.zone.zName"
-                && match value {
-                    Value::Bytes(domain_name) =>
-                        *domain_name == Bytes::from_static(b"example.com."),
-                    _ => false,
-                }));
+        assert!(log_event.all_fields().unwrap().any(|(key, value)| key
+            == "requestData.zone.zName"
+            && match value {
+                Value::Bytes(domain_name) => *domain_name == Bytes::from_static(b"example.com."),
+                _ => false,
+            }));
     }
 
     #[test]
     fn test_parse_dnstap_data_with_invalid_data() {
-        let mut event = Event::new_empty_log();
-        let log_event = event.as_mut_log();
+        let mut log_event = LogEvent::default();
         let schema = DnstapEventSchema::new();
-        let mut parser = DnstapParser::new(&schema, log_event);
+        let mut parser = DnstapParser::new(&schema, &mut log_event);
         let e = parser
             .parse_dnstap_data(Bytes::from(vec![1, 2, 3]))
             .expect_err("Expected TrustDnsError.");
@@ -1071,6 +1088,10 @@ mod tests {
     fn test_get_socket_protocol_name() {
         assert_eq!("UDP", to_socket_protocol_name(1).unwrap());
         assert_eq!("TCP", to_socket_protocol_name(2).unwrap());
-        assert!(to_socket_protocol_name(3).is_err());
+        assert_eq!("DOT", to_socket_protocol_name(3).unwrap());
+        assert_eq!("DOH", to_socket_protocol_name(4).unwrap());
+        assert_eq!("DNSCryptUDP", to_socket_protocol_name(5).unwrap());
+        assert_eq!("DNSCryptTCP", to_socket_protocol_name(6).unwrap());
+        assert!(to_socket_protocol_name(7).is_err());
     }
 }

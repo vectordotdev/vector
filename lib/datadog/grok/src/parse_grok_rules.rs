@@ -424,15 +424,13 @@ fn resolves_match_function(
 // test some tricky cases here, more high-level tests are in parse_grok
 #[cfg(test)]
 mod tests {
-    use vector_common::btreemap;
-
     use super::*;
 
     #[test]
     fn supports_escaped_quotes() {
         let rules = parse_grok_rules(
             &[r#"%{notSpace:field:nullIf("with \"escaped\" quotes")}"#.to_string()],
-            btreemap! {},
+            BTreeMap::new(),
         )
         .expect("couldn't parse rules");
         assert!(matches!(

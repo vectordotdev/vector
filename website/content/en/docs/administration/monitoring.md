@@ -95,7 +95,7 @@ however you wish. Here's an example configuration that delivers Vector's metrics
 [sources.vector_metrics]
 type = "internal_metrics"
 
-[sources.prometheus]
+[sinks.prometheus]
 type = ["prometheus_remote_write"]
 endpoint = ["https://localhost:8087/"]
 inputs = ["vector_metrics"]

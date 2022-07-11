@@ -61,11 +61,6 @@ impl Function for ToSyslogLevel {
 
         Ok(Box::new(ToSyslogLevelFn { value }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        to_syslog_level(value)
-    }
 }
 
 #[derive(Debug, Clone)]

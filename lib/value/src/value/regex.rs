@@ -1,13 +1,9 @@
-//! This was copied from VRL code, to make the Vector Value more similar to the VRL value.
-//! Both copies will eventually be merged when the value types are merged
-
+use bytes::Bytes;
 use std::cmp::Ordering;
 use std::{
     hash::{Hash, Hasher},
     ops::Deref,
 };
-
-use bytes::Bytes;
 
 /// Wraps a `Regex` and provides several trait implementations, such as `PartialOrd`
 #[derive(Debug, Clone)]

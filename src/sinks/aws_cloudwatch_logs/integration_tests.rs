@@ -7,7 +7,7 @@ use std::str::FromStr;
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 use aws_sdk_cloudwatchlogs::{Endpoint, Region};
 use chrono::Duration;
-use futures::StreamExt;
+use futures::{stream, StreamExt};
 use http::Uri;
 use pretty_assertions::assert_eq;
 
@@ -17,13 +17,16 @@ use crate::aws::{AwsAuthentication, RegionOrEndpoint};
 use crate::sinks::aws_cloudwatch_logs::config::CloudwatchLogsClientBuilder;
 use crate::{
     config::{log_schema, ProxyConfig, SinkConfig, SinkContext},
-    event::{Event, Value},
+    event::{Event, LogEvent, Value},
     sinks::util::{
         encoding::{EncodingConfig, StandardEncodings},
         BatchConfig,
     },
     template::Template,
-    test_util::{random_lines, random_lines_with_stream, random_string, trace_init},
+    test_util::{
+        components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
+        random_lines, random_lines_with_stream, random_string, trace_init,
+    },
 };
 
 const GROUP_NAME: &str = "vector-cw";
@@ -60,7 +63,7 @@ async fn cloudwatch_insert_log_event() {
     let timestamp = chrono::Utc::now();
 
     let (input_lines, events) = random_lines_with_stream(100, 11, None);
-    sink.run(events).await.unwrap();
+    run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
     let response = create_client_test()
         .await
@@ -126,7 +129,7 @@ async fn cloudwatch_insert_log_events_sorted() {
 
         events
     });
-    let _ = sink.run(events).await.unwrap();
+    run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
     let response = create_client_test()
         .await
@@ -184,11 +187,9 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
 
     let mut add_event = |offset: chrono::Duration| {
         let line = input_lines.next().unwrap();
-        let mut event = Event::from(line.clone());
-        event
-            .as_mut_log()
-            .insert(log_schema().timestamp_key(), now + offset);
-        events.push(event);
+        let mut event = LogEvent::from(line.clone());
+        event.insert(log_schema().timestamp_key(), now + offset);
+        events.push(Event::Log(event));
         line
     };
 
@@ -204,7 +205,7 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
     lines.push(add_event(Duration::days(-1)));
     lines.push(add_event(Duration::days(-13)));
 
-    sink.run_events(events).await.unwrap();
+    run_and_assert_sink_compliance(sink, stream::iter(events), &AWS_SINK_TAGS).await;
 
     let response = create_client_test()
         .await
@@ -254,7 +255,7 @@ async fn cloudwatch_dynamic_group_and_stream_creation() {
     let timestamp = chrono::Utc::now();
 
     let (input_lines, events) = random_lines_with_stream(100, 11, None);
-    sink.run(events).await.unwrap();
+    run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
     let response = create_client_test()
         .await
@@ -309,8 +310,7 @@ async fn cloudwatch_insert_log_event_batched() {
     let timestamp = chrono::Utc::now();
 
     let (input_lines, events) = random_lines_with_stream(100, 11, None);
-    let stream = sink.into_stream(); //.send_all(&mut events).await.unwrap();
-    stream.run(events.map(Into::into).boxed()).await.unwrap();
+    run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
 
     let response = create_client_test()
         .await
@@ -366,13 +366,13 @@ async fn cloudwatch_insert_log_event_partitioned() {
         .into_iter()
         .enumerate()
         .map(|(i, e)| {
-            let mut event = Event::from(e);
+            let mut event = LogEvent::from(e);
             let stream = (i % 2).to_string();
-            event.as_mut_log().insert("key", stream);
-            event
+            event.insert("key", stream);
+            Event::Log(event)
         })
         .collect::<Vec<_>>();
-    sink.run_events(events).await.unwrap();
+    run_and_assert_sink_compliance(sink, stream::iter(events), &AWS_SINK_TAGS).await;
 
     let response = create_client_test()
         .await
@@ -460,7 +460,7 @@ async fn create_client_test() -> CloudwatchLogsClient {
     ));
     let proxy = ProxyConfig::default();
 
-    create_client::<CloudwatchLogsClientBuilder>(&auth, region, endpoint, &proxy, &None)
+    create_client::<CloudwatchLogsClientBuilder>(&auth, region, endpoint, &proxy, &None, true)
         .await
         .unwrap()
 }

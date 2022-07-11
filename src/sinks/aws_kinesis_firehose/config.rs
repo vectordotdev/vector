@@ -1,14 +1,8 @@
-use std::sync::Arc;
-
 use aws_sdk_firehose::error::{
     DescribeDeliveryStreamError, PutRecordBatchError, PutRecordBatchErrorKind,
 };
 use aws_sdk_firehose::types::SdkError;
-use aws_sdk_firehose::{Client as KinesisFirehoseClient, Endpoint, Region};
-use aws_smithy_async::rt::sleep::AsyncSleep;
-use aws_smithy_client::erase::DynConnector;
-use aws_smithy_types::retry::RetryConfig;
-use aws_types::credentials::SharedCredentialsProvider;
+use aws_sdk_firehose::Client as KinesisFirehoseClient;
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -17,7 +11,10 @@ use tower::ServiceBuilder;
 use crate::{
     aws::{create_client, is_retriable_error, AwsAuthentication, ClientBuilder, RegionOrEndpoint},
     codecs::Encoder,
-    config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
+    config::{
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
+        SinkContext,
+    },
     sinks::{
         aws_kinesis_firehose::{
             request_builder::KinesisRequestBuilder,
@@ -51,11 +48,11 @@ impl SinkBatchSettings for KinesisFirehoseDefaultBatchSettings {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct KinesisFirehoseSinkConfig {
     pub stream_name: String,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    #[serde(flatten)]
     pub encoding:
         EncodingConfigAdapter<EncodingConfig<StandardEncodings>, StandardEncodingsMigrator>,
     #[serde(default)]
@@ -114,45 +111,16 @@ impl GenerateConfig for KinesisFirehoseSinkConfig {
 pub struct KinesisFirehoseClientBuilder;
 
 impl ClientBuilder for KinesisFirehoseClientBuilder {
-    type ConfigBuilder = aws_sdk_firehose::config::Builder;
-    type Client = aws_sdk_firehose::Client;
+    type Config = aws_sdk_firehose::config::Config;
+    type Client = aws_sdk_firehose::client::Client;
+    type DefaultMiddleware = aws_sdk_firehose::middleware::DefaultMiddleware;
 
-    fn create_config_builder(
-        credentials_provider: SharedCredentialsProvider,
-    ) -> Self::ConfigBuilder {
-        Self::ConfigBuilder::new().credentials_provider(credentials_provider)
+    fn default_middleware() -> Self::DefaultMiddleware {
+        aws_sdk_firehose::middleware::DefaultMiddleware::new()
     }
 
-    fn with_endpoint_resolver(
-        builder: Self::ConfigBuilder,
-        endpoint: Endpoint,
-    ) -> Self::ConfigBuilder {
-        builder.endpoint_resolver(endpoint)
-    }
-
-    fn with_region(builder: Self::ConfigBuilder, region: Region) -> Self::ConfigBuilder {
-        builder.region(region)
-    }
-
-    fn with_sleep_impl(
-        builder: Self::ConfigBuilder,
-        sleep_impl: Arc<dyn AsyncSleep>,
-    ) -> Self::ConfigBuilder {
-        builder.sleep_impl(sleep_impl)
-    }
-
-    fn with_retry_config(
-        builder: Self::ConfigBuilder,
-        retry_config: RetryConfig,
-    ) -> Self::ConfigBuilder {
-        builder.retry_config(retry_config)
-    }
-
-    fn client_from_conf_conn(
-        builder: Self::ConfigBuilder,
-        connector: DynConnector,
-    ) -> Self::Client {
-        Self::Client::from_conf_conn(builder.build(), connector)
+    fn build(client: aws_smithy_client::Client, config: &aws_types::SdkConfig) -> Self::Client {
+        aws_sdk_firehose::client::Client::with_config(client, config.into())
     }
 }
 
@@ -182,7 +150,7 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
             });
 
         let transformer = self.encoding.transformer();
-        let serializer = self.encoding.encoding();
+        let serializer = self.encoding.encoding()?;
         let encoder = Encoder::<()>::new(serializer);
 
         let request_builder = KinesisRequestBuilder {
@@ -200,7 +168,7 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(self.encoding.config().input_type())
+        Input::new(self.encoding.config().input_type() & DataType::Log)
     }
 
     fn sink_type(&self) -> &'static str {
@@ -247,6 +215,7 @@ impl KinesisFirehoseSinkConfig {
             self.region.endpoint()?,
             proxy,
             &self.tls,
+            true,
         )
         .await
     }

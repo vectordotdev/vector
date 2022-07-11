@@ -23,15 +23,21 @@ use crate::{
         },
         VectorSink,
     },
-    test_util::{random_events_with_stream, random_lines, random_lines_with_stream},
+    test_util::{
+        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        random_events_with_stream, random_lines, random_lines_with_stream, random_string,
+    },
 };
 
 #[tokio::test]
 async fn azure_blob_healthcheck_passed() {
     let config = AzureBlobSinkConfig::new_emulator().await;
-    let client =
-        azure_common::config::build_client(config.connection_string, config.container_name.clone())
-            .expect("Failed to create client");
+    let client = azure_common::config::build_client(
+        config.connection_string,
+        None,
+        config.container_name.clone(),
+    )
+    .expect("Failed to create client");
 
     let response = azure_common::config::build_healthcheck(config.container_name, client);
 
@@ -45,9 +51,12 @@ async fn azure_blob_healthcheck_unknown_container() {
         container_name: String::from("other-container-name"),
         ..config
     };
-    let client =
-        azure_common::config::build_client(config.connection_string, config.container_name.clone())
-            .expect("Failed to create client");
+    let client = azure_common::config::build_client(
+        config.connection_string,
+        config.storage_account,
+        config.container_name.clone(),
+    )
+    .expect("Failed to create client");
 
     assert_eq!(
         azure_common::config::build_healthcheck(config.container_name, client)
@@ -61,7 +70,7 @@ async fn azure_blob_healthcheck_unknown_container() {
 
 #[tokio::test]
 async fn azure_blob_insert_lines_into_blob() {
-    let blob_prefix = String::from("lines/into/blob");
+    let blob_prefix = format!("lines/into/blob/{}", random_string(10));
     let config = AzureBlobSinkConfig::new_emulator().await;
     let config = AzureBlobSinkConfig {
         blob_prefix: Some(blob_prefix.clone()),
@@ -70,7 +79,7 @@ async fn azure_blob_insert_lines_into_blob() {
     let sink = config.to_sink();
     let (lines, input) = random_lines_with_stream(100, 10, None);
 
-    sink.run(input).await.expect("Failed to run sink");
+    run_and_assert_sink_compliance(sink, input, &SINK_TAGS).await;
 
     let blobs = config.list_blobs(blob_prefix.as_str()).await;
     assert_eq!(blobs.len(), 1);
@@ -82,7 +91,7 @@ async fn azure_blob_insert_lines_into_blob() {
 
 #[tokio::test]
 async fn azure_blob_insert_json_into_blob() {
-    let blob_prefix = String::from("json/into/blob");
+    let blob_prefix = format!("json/into/blob/{}", random_string(10));
     let config = AzureBlobSinkConfig::new_emulator().await;
     let config = AzureBlobSinkConfig {
         blob_prefix: Some(blob_prefix.clone()),
@@ -92,7 +101,7 @@ async fn azure_blob_insert_json_into_blob() {
     let sink = config.to_sink();
     let (events, input) = random_events_with_stream(100, 10, None);
 
-    sink.run(input).await.expect("Failed to run sink");
+    run_and_assert_sink_compliance(sink, input, &SINK_TAGS).await;
 
     let blobs = config.list_blobs(blob_prefix.as_str()).await;
     assert_eq!(blobs.len(), 1);
@@ -101,17 +110,16 @@ async fn azure_blob_insert_json_into_blob() {
     assert_eq!(blob.properties.content_type, String::from("text/plain"));
     let expected = events
         .iter()
-        .map(|event| serde_json::to_string(&event.as_log().all_fields()).unwrap())
+        .map(|event| serde_json::to_string(&event.as_log().all_fields().unwrap()).unwrap())
         .collect::<Vec<_>>();
     assert_eq!(expected, blob_lines);
 }
 
-#[ignore]
 #[tokio::test]
 // This test will fail with Azurite blob emulator because of this issue:
 // https://github.com/Azure/Azurite/issues/629
 async fn azure_blob_insert_lines_into_blob_gzip() {
-    let blob_prefix = String::from("lines-gzip/into/blob");
+    let blob_prefix = format!("lines-gzip/into/blob/{}", random_string(10));
     let config = AzureBlobSinkConfig::new_emulator().await;
     let config = AzureBlobSinkConfig {
         blob_prefix: Some(blob_prefix.clone()),
@@ -121,7 +129,7 @@ async fn azure_blob_insert_lines_into_blob_gzip() {
     let sink = config.to_sink();
     let (lines, events) = random_lines_with_stream(100, 10, None);
 
-    sink.run(events).await.expect("Failed to run sink");
+    run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
 
     let blobs = config.list_blobs(blob_prefix.as_str()).await;
     assert_eq!(blobs.len(), 1);
@@ -139,7 +147,7 @@ async fn azure_blob_insert_lines_into_blob_gzip() {
 // This test will fail with Azurite blob emulator because of this issue:
 // https://github.com/Azure/Azurite/issues/629
 async fn azure_blob_insert_json_into_blob_gzip() {
-    let blob_prefix = String::from("json-gzip/into/blob");
+    let blob_prefix = format!("json-gzip/into/blob/{}", random_string(10));
     let config = AzureBlobSinkConfig::new_emulator().await;
     let config = AzureBlobSinkConfig {
         blob_prefix: Some(blob_prefix.clone()),
@@ -150,7 +158,7 @@ async fn azure_blob_insert_json_into_blob_gzip() {
     let sink = config.to_sink();
     let (events, input) = random_events_with_stream(100, 10, None);
 
-    sink.run(input).await.expect("Failed to run sink");
+    run_and_assert_sink_compliance(sink, input, &SINK_TAGS).await;
 
     let blobs = config.list_blobs(blob_prefix.as_str()).await;
     assert_eq!(blobs.len(), 1);
@@ -162,7 +170,7 @@ async fn azure_blob_insert_json_into_blob_gzip() {
     );
     let expected = events
         .iter()
-        .map(|event| serde_json::to_string(&event.as_log().all_fields()).unwrap())
+        .map(|event| serde_json::to_string(&event.as_log().all_fields().unwrap()).unwrap())
         .collect::<Vec<_>>();
     assert_eq!(expected, blob_lines);
 }
@@ -173,7 +181,7 @@ async fn azure_blob_rotate_files_after_the_buffer_size_is_reached() {
     let (lines, size, input) = random_lines_with_stream_with_group_key(100, 30, groups);
     let size_per_group = (size / groups) + 10;
 
-    let blob_prefix = String::from("lines-rotate/into/blob/");
+    let blob_prefix = format!("lines-rotate/into/blob/{}", random_string(10));
     let mut config = AzureBlobSinkConfig::new_emulator().await;
     config.batch.max_bytes = Some(size_per_group);
 
@@ -185,7 +193,7 @@ async fn azure_blob_rotate_files_after_the_buffer_size_is_reached() {
     };
 
     let sink = config.to_sink();
-    sink.run(input).await.expect("Failed to run sink");
+    run_and_assert_sink_compliance(sink, input, &SINK_TAGS).await;
 
     let blobs = config.list_blobs(blob_prefix.as_str()).await;
     assert_eq!(blobs.len(), 3);
@@ -206,7 +214,8 @@ impl AzureBlobSinkConfig {
     pub async fn new_emulator() -> AzureBlobSinkConfig {
         let address = std::env::var("AZURE_ADDRESS").unwrap_or_else(|_| "localhost".into());
         let config = AzureBlobSinkConfig {
-                connection_string: format!("UseDevelopmentStorage=true;DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://{}:10000/devstoreaccount1;QueueEndpoint=http://{}:10001/devstoreaccount1;TableEndpoint=http://{}:10002/devstoreaccount1;", address, address, address),
+                connection_string: Some(format!("UseDevelopmentStorage=true;DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://{}:10000/devstoreaccount1;QueueEndpoint=http://{}:10001/devstoreaccount1;TableEndpoint=http://{}:10002/devstoreaccount1;", address, address, address)),
+                storage_account: None,
                 container_name: "logs".to_string(),
                 blob_prefix: None,
                 blob_time_format: None,
@@ -227,6 +236,7 @@ impl AzureBlobSinkConfig {
         let cx = SinkContext::new_test();
         let client = azure_common::config::build_client(
             self.connection_string.clone(),
+            self.storage_account.clone(),
             self.container_name.clone(),
         )
         .expect("Failed to create client");
@@ -238,6 +248,7 @@ impl AzureBlobSinkConfig {
     pub async fn list_blobs(&self, prefix: &str) -> Vec<String> {
         let client = azure_common::config::build_client(
             self.connection_string.clone(),
+            self.storage_account.clone(),
             self.container_name.clone(),
         )
         .unwrap();
@@ -264,6 +275,7 @@ impl AzureBlobSinkConfig {
     pub async fn get_blob(&self, blob: String) -> (Blob, Vec<String>) {
         let client = azure_common::config::build_client(
             self.connection_string.clone(),
+            self.storage_account.clone(),
             self.container_name.clone(),
         )
         .unwrap();
@@ -294,6 +306,7 @@ impl AzureBlobSinkConfig {
     async fn ensure_container(&self) {
         let client = azure_common::config::build_client(
             self.connection_string.clone(),
+            self.storage_account.clone(),
             self.container_name.clone(),
         )
         .unwrap();

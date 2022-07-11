@@ -55,13 +55,6 @@ impl Function for FormatTimestamp {
             result: Ok("10 February 2021 23:32"),
         }]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let format = args.required("format");
-
-        format_timestamp(format, value)
-    }
 }
 
 #[derive(Debug, Clone)]

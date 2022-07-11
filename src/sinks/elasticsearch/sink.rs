@@ -16,7 +16,7 @@ use crate::{
             encoder::ProcessedEvent, request_builder::ElasticsearchRequestBuilder,
             service::ElasticsearchRequest, BulkAction, ElasticsearchCommonMode,
         },
-        util::{Compression, SinkBuilderExt, StreamSink},
+        util::{encoding::Transformer, SinkBuilderExt, StreamSink},
     },
     transforms::metric_to_log::MetricToLog,
 };
@@ -41,7 +41,7 @@ impl ByteSizeOf for BatchedEvents {
 pub struct ElasticsearchSink<S> {
     pub batch_settings: BatcherSettings,
     pub request_builder: ElasticsearchRequestBuilder,
-    pub compression: Compression,
+    pub transformer: Transformer,
     pub service: S,
     pub acker: Acker,
     pub metric_to_log: MetricToLog,
@@ -63,6 +63,10 @@ where
         let id_key_field = self.id_key_field;
 
         let sink = input
+            .map(|mut event| {
+                self.transformer.transform(&mut event);
+                event
+            })
             .scan(self.metric_to_log, |metric_to_log, event| {
                 future::ready(Some(match event {
                     Event::Metric(metric) => metric_to_log.transform_one(metric),

@@ -29,7 +29,7 @@ impl<T> TransformOuter<T> {
         self.with_inputs(inputs)
     }
 
-    pub(super) fn with_inputs<U>(self, inputs: Vec<U>) -> TransformOuter<U> {
+    pub(crate) fn with_inputs<U>(self, inputs: Vec<U>) -> TransformOuter<U> {
         TransformOuter {
             inputs,
             inner: self.inner,

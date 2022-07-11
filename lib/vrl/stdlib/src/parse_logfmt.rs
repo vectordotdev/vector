@@ -1,4 +1,3 @@
-use ::value::Value;
 use vrl::prelude::*;
 
 use crate::parse_key_value::{ParseKeyValueFn, Whitespace};
@@ -56,22 +55,5 @@ impl Function for ParseLogFmt {
             whitespace,
             standalone_key,
         }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let bytes = args.required("value");
-
-        let key_value_delimiter = Value::from("=");
-        let field_delimiter = Value::from(" ");
-        let whitespace = Whitespace::Lenient;
-        let standalone_key = Value::from(true);
-
-        super::parse_key_value::parse_key_value(
-            bytes,
-            key_value_delimiter,
-            field_delimiter,
-            standalone_key,
-            whitespace,
-        )
     }
 }

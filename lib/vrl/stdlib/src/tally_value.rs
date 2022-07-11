@@ -48,13 +48,6 @@ impl Function for TallyValue {
             },
         ]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let array = args.required("array");
-        let value = args.required("value");
-
-        tally_value(array, value)
-    }
 }
 
 #[derive(Debug, Clone)]

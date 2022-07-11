@@ -77,13 +77,6 @@ impl Function for Assert {
 
         Ok(Box::new(AssertFn { condition, message }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let condition = args.required("condition");
-        let message = args.optional("message");
-
-        assert(condition, message, None)
-    }
 }
 
 #[derive(Debug, Clone)]

@@ -136,7 +136,7 @@ impl<T: Bufferable> TopologyBuilder<T> {
             // sender/receiver/acker.  This is slightly awkward since we just end up actually giving
             // the handle to the `BufferSender`/`BufferReceiver` wrappers, but that's the price we
             // have to pay for letting each stage function in an opaque way when wrapped.
-            let usage_handle = buffer_usage.add_stage(stage_idx, stage.when_full);
+            let usage_handle = buffer_usage.add_stage(stage_idx);
             let provides_instrumentation = stage.untransformed.provides_instrumentation();
             let (sender, receiver, acker) = stage
                 .untransformed
@@ -211,7 +211,7 @@ impl<T: Bufferable> TopologyBuilder<T> {
         max_events: NonZeroUsize,
         when_full: WhenFull,
     ) -> (BufferSender<T>, BufferReceiver<T>) {
-        let usage_handle = BufferUsageHandle::noop(when_full);
+        let usage_handle = BufferUsageHandle::noop();
 
         let memory_buffer = Box::new(MemoryBuffer::new(max_events));
         let (sender, receiver, _) = memory_buffer
@@ -282,14 +282,15 @@ mod tests {
 
     use super::TopologyBuilder;
     use crate::{
-        topology::{builder::TopologyError, test_util::assert_current_send_capacity},
+        topology::builder::TopologyError,
+        topology::test_util::{assert_current_send_capacity, Sample},
         variants::MemoryBuffer,
         WhenFull,
     };
 
     #[tokio::test]
     async fn single_stage_topology_block() {
-        let mut builder = TopologyBuilder::<u64>::default();
+        let mut builder = TopologyBuilder::<Sample>::default();
         builder.stage(
             MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
             WhenFull::Block,
@@ -303,7 +304,7 @@ mod tests {
 
     #[tokio::test]
     async fn single_stage_topology_drop_newest() {
-        let mut builder = TopologyBuilder::<u64>::default();
+        let mut builder = TopologyBuilder::<Sample>::default();
         builder.stage(
             MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
             WhenFull::DropNewest,
@@ -317,7 +318,7 @@ mod tests {
 
     #[tokio::test]
     async fn single_stage_topology_overflow() {
-        let mut builder = TopologyBuilder::<u64>::default();
+        let mut builder = TopologyBuilder::<Sample>::default();
         builder.stage(
             MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
             WhenFull::Overflow,
@@ -331,7 +332,7 @@ mod tests {
 
     #[tokio::test]
     async fn two_stage_topology_block() {
-        let mut builder = TopologyBuilder::<u64>::default();
+        let mut builder = TopologyBuilder::<Sample>::default();
         builder.stage(
             MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
             WhenFull::Block,
@@ -349,7 +350,7 @@ mod tests {
 
     #[tokio::test]
     async fn two_stage_topology_drop_newest() {
-        let mut builder = TopologyBuilder::<u64>::default();
+        let mut builder = TopologyBuilder::<Sample>::default();
         builder.stage(
             MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
             WhenFull::DropNewest,
@@ -367,7 +368,7 @@ mod tests {
 
     #[tokio::test]
     async fn two_stage_topology_overflow() {
-        let mut builder = TopologyBuilder::<u64>::default();
+        let mut builder = TopologyBuilder::<Sample>::default();
         builder.stage(
             MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
             WhenFull::Overflow,

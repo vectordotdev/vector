@@ -354,6 +354,13 @@ impl TransformOutputsBuf {
             .drain()
     }
 
+    pub fn extend(&mut self, events: impl Iterator<Item = Event>) {
+        self.primary_buffer
+            .as_mut()
+            .expect("no default output")
+            .extend(events);
+    }
+
     pub fn take_primary(&mut self) -> OutputBuffer {
         std::mem::take(self.primary_buffer.as_mut().expect("no default output"))
     }
@@ -433,6 +440,10 @@ impl OutputBuffer {
         self.0.iter().map(EventArray::len).sum()
     }
 
+    pub fn capacity(&self) -> usize {
+        self.0.capacity()
+    }
+
     pub fn first(&self) -> Option<EventRef> {
         self.0.first().and_then(|first| match first {
             EventArray::Logs(l) => l.first().map(Into::into),
@@ -441,7 +452,7 @@ impl OutputBuffer {
         })
     }
 
-    fn drain(&mut self) -> impl Iterator<Item = Event> + '_ {
+    pub fn drain(&mut self) -> impl Iterator<Item = Event> + '_ {
         self.0.drain(..).flat_map(EventArray::into_events)
     }
 

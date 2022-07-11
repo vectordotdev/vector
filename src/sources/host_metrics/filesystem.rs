@@ -3,18 +3,25 @@ use futures::{stream, StreamExt};
 use heim::units::information::byte;
 #[cfg(not(target_os = "windows"))]
 use heim::units::ratio::ratio;
-use serde::{Deserialize, Serialize};
 use vector_common::btreemap;
+use vector_config::configurable_component;
 
 use super::{filter_result, FilterList, HostMetrics};
 use crate::event::metric::Metric;
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+/// Options for the “filesystem” metrics collector.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
 pub struct FilesystemConfig {
+    /// Lists of device name patterns to include or exclude.
     #[serde(default)]
     devices: FilterList,
+
+    /// Lists of filesystem name patterns to include or exclude.
     #[serde(default)]
     filesystems: FilterList,
+
+    /// Lists of mount point path patterns to include or exclude.
     #[serde(default)]
     mountpoints: FilterList,
 }

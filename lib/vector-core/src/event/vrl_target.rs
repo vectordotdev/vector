@@ -1,8 +1,8 @@
-use std::{collections::BTreeMap, convert::TryFrom, sync::Arc};
+use std::{collections::BTreeMap, convert::TryFrom, marker::PhantomData};
 
 use lookup::{LookupBuf, SegmentBuf};
 use snafu::Snafu;
-use vrl_lib::{prelude::VrlValueConvert, ProgramInfo};
+use vrl_lib::{prelude::VrlValueConvert, MetadataTarget, ProgramInfo, SecretTarget};
 
 use super::{Event, EventMetadata, LogEvent, Metric, MetricKind, TraceEvent, Value};
 use crate::config::log_schema;
@@ -29,12 +29,62 @@ pub enum VrlTarget {
     Trace(Value, EventMetadata),
 }
 
+pub enum TargetEvents {
+    One(Event),
+    Logs(TargetIter<LogEvent>),
+    Traces(TargetIter<TraceEvent>),
+}
+
+pub struct TargetIter<T> {
+    iter: std::vec::IntoIter<Value>,
+    metadata: EventMetadata,
+    _marker: PhantomData<T>,
+}
+
+impl Iterator for TargetIter<LogEvent> {
+    type Item = Event;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next().map(|v| {
+            match v {
+                value @ Value::Object(_) => LogEvent::from_parts(value, self.metadata.clone()),
+                value => {
+                    let mut log = LogEvent::new_with_metadata(self.metadata.clone());
+                    log.insert(log_schema().message_key(), value);
+                    log
+                }
+            }
+            .into()
+        })
+    }
+}
+
+impl Iterator for TargetIter<TraceEvent> {
+    type Item = Event;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next().map(|v| {
+            match v {
+                value @ Value::Object(_) => {
+                    TraceEvent::from(LogEvent::from_parts(value, self.metadata.clone()))
+                }
+                value => {
+                    let mut log = LogEvent::new_with_metadata(self.metadata.clone());
+                    log.insert(log_schema().message_key(), value);
+                    TraceEvent::from(log)
+                }
+            }
+            .into()
+        })
+    }
+}
+
 impl VrlTarget {
     pub fn new(event: Event, info: &ProgramInfo) -> Self {
         match event {
             Event::Log(event) => {
-                let (fields, metadata) = event.into_parts();
-                VrlTarget::LogEvent(Value::Object(fields), metadata)
+                let (value, metadata) = event.into_parts();
+                VrlTarget::LogEvent(value, metadata)
             }
             Event::Metric(metric) => {
                 // We pre-generate [`Value`] types for the metric fields accessed in
@@ -55,19 +105,58 @@ impl VrlTarget {
     ///
     /// This returns an iterator of events as one event can be turned into multiple by assigning an
     /// array to `.` in VRL.
-    pub fn into_events(self) -> impl Iterator<Item = Event> {
+    pub fn into_events(self) -> TargetEvents {
         match self {
-            VrlTarget::LogEvent(value, metadata) => {
-                Box::new(value_into_logevents(value, metadata).map(Event::Log))
-                    as Box<dyn Iterator<Item = Event>>
-            }
-            VrlTarget::Metric { metric, .. } => {
-                Box::new(std::iter::once(Event::Metric(metric))) as Box<dyn Iterator<Item = Event>>
-            }
-            VrlTarget::Trace(value, metadata) => Box::new(
-                value_into_logevents(value, metadata)
-                    .map(|log| Event::Trace(TraceEvent::from(log))),
-            ) as Box<dyn Iterator<Item = Event>>,
+            VrlTarget::LogEvent(value, metadata) => match value {
+                value @ Value::Object(_) => {
+                    TargetEvents::One(LogEvent::from_parts(value, metadata).into())
+                }
+
+                Value::Array(values) => TargetEvents::Logs(TargetIter {
+                    iter: values.into_iter(),
+                    metadata,
+                    _marker: PhantomData,
+                }),
+
+                v => {
+                    let mut log = LogEvent::new_with_metadata(metadata);
+                    log.insert(log_schema().message_key(), v);
+                    TargetEvents::One(log.into())
+                }
+            },
+            VrlTarget::Trace(value, metadata) => match value {
+                value @ Value::Object(_) => {
+                    let log = LogEvent::from_parts(value, metadata);
+                    TargetEvents::One(TraceEvent::from(log).into())
+                }
+
+                Value::Array(values) => TargetEvents::Traces(TargetIter {
+                    iter: values.into_iter(),
+                    metadata,
+                    _marker: PhantomData,
+                }),
+
+                v => {
+                    let mut log = LogEvent::new_with_metadata(metadata);
+                    log.insert(log_schema().message_key(), v);
+                    TargetEvents::One(log.into())
+                }
+            },
+            VrlTarget::Metric { metric, .. } => TargetEvents::One(Event::Metric(metric)),
+        }
+    }
+
+    fn metadata(&self) -> &EventMetadata {
+        match self {
+            VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
+            VrlTarget::Metric { metric, .. } => metric.metadata(),
+        }
+    }
+
+    fn metadata_mut(&mut self) -> &mut EventMetadata {
+        match self {
+            VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
+            VrlTarget::Metric { metric, .. } => metric.metadata_mut(),
         }
     }
 }
@@ -76,7 +165,8 @@ impl vrl_lib::Target for VrlTarget {
     fn target_insert(&mut self, path: &LookupBuf, value: ::value::Value) -> Result<(), String> {
         match self {
             VrlTarget::LogEvent(ref mut log, _) | VrlTarget::Trace(ref mut log, _) => {
-                log.target_insert(path, value)
+                log.insert_by_path(path, value);
+                Ok(())
             }
             VrlTarget::Metric {
                 ref mut metric,
@@ -149,14 +239,14 @@ impl vrl_lib::Target for VrlTarget {
     #[allow(clippy::redundant_closure_for_method_calls)] // false positive
     fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
         match self {
-            VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => log.target_get(path),
+            VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => Ok(log.get_by_path(path)),
             VrlTarget::Metric { value, .. } => target_get_metric(path, value),
         }
     }
 
     fn target_get_mut(&mut self, path: &LookupBuf) -> Result<Option<&mut Value>, String> {
         match self {
-            VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => log.target_get_mut(path),
+            VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => Ok(log.get_by_path_mut(path)),
             VrlTarget::Metric { value, .. } => target_get_mut_metric(path, value),
         }
     }
@@ -168,7 +258,7 @@ impl vrl_lib::Target for VrlTarget {
     ) -> Result<Option<::value::Value>, String> {
         match self {
             VrlTarget::LogEvent(ref mut log, _) | VrlTarget::Trace(ref mut log, _) => {
-                log.target_remove(path, compact)
+                Ok(log.remove_by_path(path, compact))
             }
             VrlTarget::Metric {
                 ref mut metric,
@@ -206,153 +296,36 @@ impl vrl_lib::Target for VrlTarget {
             }
         }
     }
+}
 
-    fn get_metadata(&self, key: &str) -> Result<Option<::value::Value>, String> {
-        let metadata = match self {
-            VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
-            VrlTarget::Metric { metric, .. } => metric.metadata(),
-        };
-
-        match key {
-            "datadog_api_key" => Ok(metadata
-                .datadog_api_key()
-                .as_ref()
-                .map(|api_key| ::value::Value::from(api_key.to_string()))),
-            "splunk_hec_token" => Ok(metadata
-                .splunk_hec_token()
-                .as_ref()
-                .map(|token| ::value::Value::from(token.to_string()))),
-            _ => Err(format!("key {} not available", key)),
-        }
+impl MetadataTarget for VrlTarget {
+    fn get_metadata(&self, path: &LookupBuf) -> Result<Option<::value::Value>, String> {
+        let value = self.metadata().value().get_by_path(path).cloned();
+        Ok(value)
     }
 
-    fn set_metadata(&mut self, key: &str, value: String) -> Result<(), String> {
-        let metadata = match self {
-            VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
-            VrlTarget::Metric { metric, .. } => metric.metadata_mut(),
-        };
-
-        match key {
-            "datadog_api_key" => {
-                metadata.set_datadog_api_key(Some(Arc::from(value.as_str())));
-                Ok(())
-            }
-            "splunk_hec_token" => {
-                metadata.set_splunk_hec_token(Some(Arc::from(value.as_str())));
-                Ok(())
-            }
-            _ => Err(format!("key {} not available", key)),
-        }
+    fn set_metadata(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
+        self.metadata_mut().value_mut().insert_by_path(path, value);
+        Ok(())
     }
 
-    fn remove_metadata(&mut self, key: &str) -> Result<(), String> {
-        let metadata = match self {
-            VrlTarget::LogEvent(_, metadata) | VrlTarget::Trace(_, metadata) => metadata,
-            VrlTarget::Metric { metric, .. } => metric.metadata_mut(),
-        };
-
-        match key {
-            "datadog_api_key" => {
-                metadata.set_datadog_api_key(None);
-                Ok(())
-            }
-            "splunk_hec_token" => {
-                metadata.set_splunk_hec_token(None);
-                Ok(())
-            }
-            _ => Err(format!("key {} not available", key)),
-        }
+    fn remove_metadata(&mut self, path: &LookupBuf) -> Result<(), String> {
+        self.metadata_mut().value_mut().remove_by_path(path, false);
+        Ok(())
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum VrlImmutableTarget<'a> {
-    LogEvent(&'a Value, &'a EventMetadata),
-    Metric { metric: &'a Metric, value: Value },
-    Trace(&'a Value, &'a EventMetadata),
-}
-
-impl<'a> VrlImmutableTarget<'a> {
-    pub fn new(event: &'a Event, info: &ProgramInfo) -> Self {
-        match event {
-            Event::Log(event) => {
-                let value = event.value();
-                let metadata = event.metadata();
-
-                VrlImmutableTarget::LogEvent(value, metadata)
-            }
-            Event::Metric(metric) => {
-                // We pre-generate [`Value`] types for the metric fields accessed in
-                // the event. This allows us to then return references to those
-                // values, even if the field is accessed more than once.
-                let value = precompute_metric_value(metric, info);
-
-                VrlImmutableTarget::Metric { metric, value }
-            }
-            Event::Trace(event) => {
-                let value = event.value();
-                let metadata = event.metadata();
-
-                VrlImmutableTarget::Trace(value, metadata)
-            }
-        }
-    }
-}
-
-impl<'a> vrl_lib::Target for VrlImmutableTarget<'a> {
-    fn target_insert(&mut self, _path: &LookupBuf, _value: ::value::Value) -> Result<(), String> {
-        Err("cannot modify immutable target".to_string())
+impl SecretTarget for VrlTarget {
+    fn get_secret(&self, key: &str) -> Option<&str> {
+        self.metadata().secrets().get_secret(key)
     }
 
-    #[allow(clippy::redundant_closure_for_method_calls)] // false positive
-    fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
-        match self {
-            VrlImmutableTarget::LogEvent(log, _) | VrlImmutableTarget::Trace(log, _) => {
-                log.target_get(path)
-            }
-            VrlImmutableTarget::Metric { value, .. } => target_get_metric(path, value),
-        }
+    fn insert_secret(&mut self, key: &str, value: &str) {
+        self.metadata_mut().secrets_mut().insert_secret(key, value);
     }
 
-    fn target_get_mut(&mut self, _path: &LookupBuf) -> Result<Option<&mut Value>, String> {
-        Err("cannot modify immutable target".to_string())
-    }
-
-    fn target_remove(
-        &mut self,
-        _path: &LookupBuf,
-        _compact: bool,
-    ) -> Result<Option<::value::Value>, String> {
-        Err("cannot modify immutable target".to_string())
-    }
-
-    fn get_metadata(&self, key: &str) -> Result<Option<::value::Value>, String> {
-        let metadata = match self {
-            VrlImmutableTarget::LogEvent(_, metadata) | VrlImmutableTarget::Trace(_, metadata) => {
-                metadata
-            }
-            VrlImmutableTarget::Metric { metric, .. } => metric.metadata(),
-        };
-
-        match key {
-            "datadog_api_key" => Ok(metadata
-                .datadog_api_key()
-                .as_ref()
-                .map(|api_key| ::value::Value::from(api_key.to_string()))),
-            "splunk_hec_token" => Ok(metadata
-                .splunk_hec_token()
-                .as_ref()
-                .map(|token| ::value::Value::from(token.to_string()))),
-            _ => Err(format!("key {} not available", key)),
-        }
-    }
-
-    fn set_metadata(&mut self, _key: &str, _value: String) -> Result<(), String> {
-        Err("cannot modify immutable target".to_string())
-    }
-
-    fn remove_metadata(&mut self, _key: &str) -> Result<(), String> {
-        Err("cannot modify immutable target".to_string())
+    fn remove_secret(&mut self, key: &str) {
+        self.metadata_mut().secrets_mut().remove_secret(key);
     }
 }
 
@@ -535,32 +508,6 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo) -> Value {
     map.into()
 }
 
-// Turn a `Value` back into `LogEvents`:
-// * In the common case, where `.` is a map, just create an event using it as the event fields.
-// * If `.` is an array, map over all of the values to create log events:
-//   * If an element is an object, create an event using that as fields.
-//   * If an element is anything else, assign to the `message` key.
-// * If `.` is anything else, assign to the `message` key.
-fn value_into_logevents(value: Value, metadata: EventMetadata) -> impl Iterator<Item = LogEvent> {
-    match value {
-        Value::Object(object) => Box::new(std::iter::once(LogEvent::from_parts(object, metadata)))
-            as Box<dyn Iterator<Item = LogEvent>>,
-        Value::Array(values) => Box::new(values.into_iter().map(move |v| match v {
-            Value::Object(object) => LogEvent::from_parts(object, metadata.clone()),
-            v => {
-                let mut log = LogEvent::new_with_metadata(metadata.clone());
-                log.insert(log_schema().message_key(), v);
-                log
-            }
-        })) as Box<dyn Iterator<Item = LogEvent>>,
-        v => {
-            let mut log = LogEvent::new_with_metadata(metadata);
-            log.insert(log_schema().message_key(), v);
-            Box::new(std::iter::once(log)) as Box<dyn Iterator<Item = LogEvent>>
-        }
-    }
-}
-
 #[derive(Debug, Snafu)]
 enum MetricPathError<'a> {
     #[snafu(display("cannot set root path"))]
@@ -588,19 +535,19 @@ mod test {
         use vector_common::btreemap;
 
         let cases = vec![
-            (btreemap! {}, vec![], Ok(Some(btreemap! {}.into()))),
+            (BTreeMap::new(), vec![], Ok(Some(BTreeMap::new().into()))),
             (
-                btreemap! { "foo" => "bar" },
+                BTreeMap::from([("foo".into(), "bar".into())]),
                 vec![],
-                Ok(Some(btreemap! { "foo" => "bar" }.into())),
+                Ok(Some(BTreeMap::from([("foo".into(), "bar".into())]).into())),
             ),
             (
-                btreemap! { "foo" => "bar" },
+                BTreeMap::from([("foo".into(), "bar".into())]),
                 vec![SegmentBuf::from("foo")],
                 Ok(Some("bar".into())),
             ),
             (
-                btreemap! { "foo" => "bar" },
+                BTreeMap::from([("foo".into(), "bar".into())]),
                 vec![SegmentBuf::from("bar")],
                 Ok(None),
             ),
@@ -650,21 +597,21 @@ mod test {
 
         let cases = vec![
             (
-                btreemap! { "foo" => "bar" },
+                BTreeMap::from([("foo".into(), "bar".into())]),
                 vec![],
                 btreemap! { "baz" => "qux" }.into(),
                 btreemap! { "baz" => "qux" },
                 Ok(()),
             ),
             (
-                btreemap! { "foo" => "bar" },
+                BTreeMap::from([("foo".into(), "bar".into())]),
                 vec![SegmentBuf::from("foo")],
                 "baz".into(),
                 btreemap! { "foo" => "baz" },
                 Ok(()),
             ),
             (
-                btreemap! { "foo" => "bar" },
+                BTreeMap::from([("foo".into(), "bar".into())]),
                 vec![
                     SegmentBuf::from("foo"),
                     SegmentBuf::from(2),
@@ -701,7 +648,7 @@ mod test {
                 Ok(()),
             ),
             (
-                btreemap! { "foo" => "bar" },
+                BTreeMap::from([("foo".into(), "bar".into())]),
                 vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
                 "baz".into(),
                 btreemap! { "foo" => vec!["baz"] },
@@ -758,7 +705,17 @@ mod test {
                 vrl_lib::Target::target_get(&target, &path).map(Option::<&Value>::cloned),
                 Ok(Some(value))
             );
-            assert_eq!(target.into_events().next().unwrap(), Event::Log(expect));
+            assert_eq!(
+                match target.into_events() {
+                    TargetEvents::One(event) => vec![event],
+                    TargetEvents::Logs(events) => events.collect::<Vec<_>>(),
+                    TargetEvents::Traces(events) => events.collect::<Vec<_>>(),
+                }
+                .first()
+                .cloned()
+                .unwrap(),
+                Event::Log(expect)
+            );
         }
     }
 
@@ -769,31 +726,31 @@ mod test {
 
         let cases = vec![
             (
-                btreemap! { "foo" => "bar" },
+                BTreeMap::from([("foo".into(), "bar".into())]),
                 vec![SegmentBuf::from("foo")],
                 false,
-                Some(btreemap! {}.into()),
+                Some(BTreeMap::new().into()),
             ),
             (
-                btreemap! { "foo" => "bar" },
+                BTreeMap::from([("foo".into(), "bar".into())]),
                 vec![SegmentBuf::from(vec![
                     FieldBuf::from(r#""foo bar""#),
                     FieldBuf::from("foo"),
                 ])],
                 false,
-                Some(btreemap! {}.into()),
+                Some(BTreeMap::new().into()),
             ),
             (
                 btreemap! { "foo" => "bar", "baz" => "qux" },
                 vec![],
                 false,
-                Some(btreemap! {}.into()),
+                Some(BTreeMap::new().into()),
             ),
             (
                 btreemap! { "foo" => "bar", "baz" => "qux" },
                 vec![],
                 true,
-                Some(btreemap! {}.into()),
+                Some(BTreeMap::new().into()),
             ),
             (
                 btreemap! { "foo" => vec![0] },
@@ -805,7 +762,7 @@ mod test {
                 btreemap! { "foo" => vec![0] },
                 vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
                 true,
-                Some(btreemap! {}.into()),
+                Some(BTreeMap::new().into()),
             ),
             (
                 btreemap! {
@@ -916,10 +873,14 @@ mod test {
             ::vrl_lib::Target::target_insert(&mut target, &LookupBuf::root(), value).unwrap();
 
             assert_eq!(
-                target.into_events().collect::<Vec<_>>(),
+                match target.into_events() {
+                    TargetEvents::One(event) => vec![event],
+                    TargetEvents::Logs(events) => events.collect::<Vec<_>>(),
+                    TargetEvents::Traces(events) => events.collect::<Vec<_>>(),
+                },
                 expect
                     .into_iter()
-                    .map(|v| Event::Log(LogEvent::from_parts(v, metadata.clone())))
+                    .map(|v| Event::Log(LogEvent::from_map(v, metadata.clone())))
                     .collect::<Vec<_>>()
             );
         }

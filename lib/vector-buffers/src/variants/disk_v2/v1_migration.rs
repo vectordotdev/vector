@@ -7,7 +7,7 @@ use crate::{
         disk_v2::{build_disk_v2_buffer, get_disk_v2_data_dir_path},
         DiskV1Buffer,
     },
-    Acker, Bufferable, WhenFull,
+    Acker, Bufferable,
 };
 
 pub async fn try_disk_v1_migration<T>(base_data_dir: &Path, id: &str) -> Result<(), String>
@@ -16,7 +16,7 @@ where
 {
     // Set both buffers to an essentially unlimited size so we can ensure that whatever is in the
     // source buffer can be written to the destination buffer.
-    let usage_handle = BufferUsageHandle::noop(WhenFull::Block);
+    let usage_handle = BufferUsageHandle::noop();
     let buffer_max_size = NonZeroU64::new(u64::MAX).expect("cannot fail");
 
     // Try and build the disk v1 buffer without creating it if it is missing, so that we only open

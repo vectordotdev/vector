@@ -2,8 +2,8 @@ use std::{fmt, net::SocketAddr};
 
 use codecs::decoding::{DeserializerConfig, FramingConfig};
 use futures::FutureExt;
-use serde::{Deserialize, Serialize};
 use tracing::Span;
+use vector_config::configurable_component;
 use warp::Filter;
 
 use crate::{
@@ -21,27 +21,65 @@ mod filters;
 mod handlers;
 mod models;
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `aws_kinesis_firehose` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
 pub struct AwsKinesisFirehoseConfig {
+    /// The address to listen for connections on.
     address: SocketAddr,
+
+    /// An optional access key to authenticate requests against.
+    ///
+    /// AWS Kinesis Firehose can be configured to pass along a user-configurable access key with each request. If
+    /// configured, `access_key` should be set to the same value. Otherwise, all requests will be allowed.
     access_key: Option<String>,
-    tls: Option<TlsEnableableConfig>,
+
+    /// The compression scheme to use for decompressing records within the Firehose message.
+    ///
+    /// Some services, like AWS CloudWatch Logs, will [compress the events with
+    /// gzip](\(urls.aws_cloudwatch_logs_firehose)), before sending them AWS Kinesis Firehose. This option can be used
+    /// to automatically decompress them before forwarding them to the next component.
+    ///
+    /// Note that this is different from [Content encoding option](\(urls.aws_kinesis_firehose_http_protocol)) of the
+    /// Firehose HTTP endpoint destination. That option controls the content encoding of the entire HTTP request.
     record_compression: Option<Compression>,
+
+    #[configurable(derived)]
+    tls: Option<TlsEnableableConfig>,
+
+    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     framing: FramingConfig,
+
+    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     decoding: DeserializerConfig,
+
+    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
 }
 
-#[derive(Derivative, Copy, Clone, Debug, Deserialize, Serialize, PartialEq)]
+/// Compression scheme for records in a Firehose message.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Derivative, PartialEq)]
 #[serde(rename_all = "lowercase")]
 #[derivative(Default)]
 pub enum Compression {
+    /// Automatically attempt to determine the compression scheme.
+    ///
+    /// Vector will try to determine the compression scheme of the object by looking at its file signature, also known
+    /// as [magic bytes](\(urls.magic_bytes)).
+    ///
+    /// Given that determining the encoding using magic bytes is not a perfect check, if the record fails to decompress
+    /// with the discovered format, the record will be forwarded as-is. Thus, if you know the records will always be
+    /// gzip encoded (for example if they are coming from AWS CloudWatch Logs) then you should prefer to set `gzip` here
+    /// to have Vector reject any records that are not-gziped.
     #[derivative(Default)]
     Auto,
+    /// Uncompressed.
     None,
+    /// GZIP.
     Gzip,
 }
 

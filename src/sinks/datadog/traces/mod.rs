@@ -15,6 +15,15 @@ mod config;
 mod request_builder;
 mod service;
 mod sink;
+mod stats;
+
+pub(crate) mod ddsketch_full {
+    include!(concat!(env!("OUT_DIR"), "/ddsketch_full.rs"));
+}
+
+pub(crate) mod dd_proto {
+    include!(concat!(env!("OUT_DIR"), "/dd_trace.rs"));
+}
 
 use crate::{config::SinkDescription, sinks::datadog::traces::config::DatadogTracesConfig};
 

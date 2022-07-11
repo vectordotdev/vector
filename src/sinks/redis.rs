@@ -4,20 +4,21 @@ use std::{
 };
 
 use bytes::{Bytes, BytesMut};
-use codecs::{encoding::SerializerConfig, JsonSerializerConfig, RawMessageSerializerConfig};
+use codecs::{encoding::SerializerConfig, JsonSerializerConfig, TextSerializerConfig};
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt, StreamExt};
 use redis::{aio::ConnectionManager, RedisError, RedisResult};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};
-use vector_common::internal_event::EventsSent;
+use vector_common::internal_event::BytesSent;
 use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::Encoder,
     config::{
-        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+        self, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
+        SinkDescription,
     },
     event::Event,
     internal_events::{RedisSendEventError, TemplateRenderingError},
@@ -101,15 +102,15 @@ impl EncodingConfigMigrator for EncodingMigrator {
 
     fn migrate(codec: &Self::Codec) -> SerializerConfig {
         match codec {
-            Encoding::Text => RawMessageSerializerConfig::new().into(),
+            Encoding::Text => TextSerializerConfig::new().into(),
             Encoding::Json => JsonSerializerConfig::new().into(),
         }
     }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct RedisSinkConfig {
-    #[serde(flatten)]
     encoding: EncodingConfigAdapter<EncodingConfig<Encoding>, EncodingMigrator>,
     #[serde(default)]
     data_type: DataTypeConfig,
@@ -162,7 +163,7 @@ impl SinkConfig for RedisSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(self.encoding.config().input_type())
+        Input::new(self.encoding.config().input_type() & config::DataType::Log)
     }
 
     fn sink_type(&self) -> &'static str {
@@ -188,7 +189,7 @@ impl RedisSinkConfig {
         let key = Template::try_from(self.key.clone()).context(KeyTemplateSnafu)?;
 
         let transformer = self.encoding.transformer();
-        let serializer = self.encoding.encoding();
+        let serializer = self.encoding.encoding()?;
         let mut encoder = Encoder::<()>::new(serializer);
 
         let method = self.list_option.map(|option| option.method);
@@ -226,6 +227,7 @@ impl RedisSinkConfig {
         trace!("Get Redis connection success.");
         conn
     }
+
     async fn healthcheck(mut conn: ConnectionManager) -> crate::Result<()> {
         redis::cmd("PING")
             .query_async(&mut conn)
@@ -269,7 +271,7 @@ fn encode_event(
         })
         .ok()?;
 
-    let byte_size = event.size_of();
+    let event_byte_size = event.size_of();
 
     transformer.transform(&mut event);
 
@@ -277,7 +279,7 @@ fn encode_event(
     encoder.encode(event, &mut bytes).ok()?;
     let value = bytes.freeze();
 
-    let event = EncodedEvent::new(RedisKvEntry { key, value }, byte_size);
+    let event = EncodedEvent::new(RedisKvEntry { key, value }, event_byte_size);
     Some(event)
 }
 
@@ -364,10 +366,9 @@ impl Service<Vec<RedisKvEntry>> for RedisSink {
             match &result {
                 Ok(res) => {
                     if res.is_successful() {
-                        emit!(EventsSent {
-                            count,
+                        emit!(BytesSent {
                             byte_size,
-                            output: None
+                            protocol: "tcp",
                         });
                     } else {
                         warn!("Batch sending was not all successful and will be retried.")
@@ -384,7 +385,8 @@ impl Service<Vec<RedisKvEntry>> for RedisSink {
 mod tests {
     use std::{collections::HashMap, convert::TryFrom};
 
-    use codecs::{JsonSerializer, RawMessageSerializer};
+    use codecs::{JsonSerializer, TextSerializer};
+    use vector_core::event::LogEvent;
 
     use super::*;
     use crate::config::log_schema;
@@ -397,10 +399,10 @@ mod tests {
     #[test]
     fn redis_event_json() {
         let msg = "hello_world".to_owned();
-        let mut evt = Event::from(msg.clone());
-        evt.as_mut_log().insert("key", "value");
+        let mut evt = LogEvent::from(msg.clone());
+        evt.insert("key", "value");
         let result = encode_event(
-            evt,
+            evt.into(),
             &Template::try_from("key").unwrap(),
             &Default::default(),
             &mut Encoder::<()>::new(JsonSerializer::new().into()),
@@ -415,12 +417,12 @@ mod tests {
     #[test]
     fn redis_event_text() {
         let msg = "hello_world".to_owned();
-        let evt = Event::from(msg.clone());
+        let evt = LogEvent::from(msg.clone());
         let event = encode_event(
-            evt,
+            evt.into(),
             &Template::try_from("key").unwrap(),
             &Default::default(),
-            &mut Encoder::<()>::new(RawMessageSerializer::new().into()),
+            &mut Encoder::<()>::new(TextSerializer::new().into()),
         )
         .unwrap()
         .item
@@ -431,11 +433,11 @@ mod tests {
     #[test]
     fn redis_encode_event() {
         let msg = "hello_world";
-        let mut evt = Event::from(msg);
-        evt.as_mut_log().insert("key", "value");
+        let mut evt = LogEvent::from(msg);
+        evt.insert("key", "value");
 
         let result = encode_event(
-            evt,
+            evt.into(),
             &Template::try_from("key").unwrap(),
             &Transformer::new(None, Some(vec!["key".into()]), None).unwrap(),
             &mut Encoder::<()>::new(JsonSerializer::new().into()),
@@ -452,11 +454,16 @@ mod tests {
 #[cfg(feature = "redis-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
+    use futures::stream;
     use rand::Rng;
     use redis::AsyncCommands;
+    use vector_core::event::LogEvent;
 
     use super::*;
-    use crate::test_util::{random_lines_with_stream, random_string, trace_init};
+    use crate::test_util::{
+        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        random_lines_with_stream, random_string, trace_init,
+    };
 
     fn redis_server() -> String {
         std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379/0".to_owned())
@@ -497,11 +504,11 @@ mod integration_tests {
         let mut events: Vec<Event> = Vec::new();
         for i in 0..num_events {
             let s: String = i.to_string();
-            let e = Event::from(s);
-            events.push(e);
+            let e = LogEvent::from(s);
+            events.push(e.into());
         }
 
-        sink.run_events(events.clone()).await.unwrap();
+        run_and_assert_sink_compliance(sink, stream::iter(events.clone()), &SINK_TAGS).await;
 
         let mut conn = cnf.build_client().await.unwrap();
 
@@ -555,8 +562,8 @@ mod integration_tests {
         let mut events: Vec<Event> = Vec::new();
         for i in 0..num_events {
             let s: String = i.to_string();
-            let e = Event::from(s);
-            events.push(e);
+            let e = LogEvent::from(s);
+            events.push(e.into());
         }
 
         sink.run_events(events.clone()).await.unwrap();

@@ -98,6 +98,31 @@ impl InternalEvent for KubernetesLogsEventNamespaceAnnotationError<'_> {
 }
 
 #[derive(Debug)]
+pub(crate) struct KubernetesLogsEventNodeAnnotationError<'a> {
+    pub event: &'a Event,
+}
+
+impl InternalEvent for KubernetesLogsEventNodeAnnotationError<'_> {
+    fn emit(self) {
+        error!(
+            message = "Failed to annotate event with node metadata.",
+            event = ?self.event,
+            error_code = ANNOTATION_FAILED,
+            error_type = error_type::READER_FAILED,
+            stage = error_stage::PROCESSING,
+            rate_limit_secs = 10,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => ANNOTATION_FAILED,
+            "error_type" => error_type::READER_FAILED,
+            "stage" => error_stage::PROCESSING,
+        );
+        counter!("k8s_event_node_annotation_failures_total", 1);
+    }
+}
+
+#[derive(Debug)]
 pub struct KubernetesLogsFormatPickerEdgeCase {
     pub what: &'static str,
 }

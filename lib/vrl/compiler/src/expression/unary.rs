@@ -3,7 +3,6 @@ use std::fmt;
 use crate::{
     expression::{Not, Resolved},
     state::{ExternalEnv, LocalEnv},
-    vm::Vm,
     Context, Expression, TypeDef,
 };
 
@@ -13,6 +12,7 @@ pub struct Unary {
 }
 
 impl Unary {
+    #[must_use]
     pub fn new(variant: Variant) -> Self {
         Self { variant }
     }
@@ -25,7 +25,7 @@ pub enum Variant {
 
 impl Expression for Unary {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        use Variant::*;
+        use Variant::Not;
 
         match &self.variant {
             Not(v) => v.resolve(ctx),
@@ -33,31 +33,17 @@ impl Expression for Unary {
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
-        use Variant::*;
+        use Variant::Not;
 
         match &self.variant {
             Not(v) => v.type_def(state),
         }
     }
-
-    fn compile_to_vm(
-        &self,
-        vm: &mut Vm,
-        state: (&mut LocalEnv, &mut ExternalEnv),
-    ) -> std::result::Result<(), String> {
-        match &self.variant {
-            Variant::Not(v) => {
-                v.compile_to_vm(vm, state)?;
-            }
-        }
-
-        Ok(())
-    }
 }
 
 impl fmt::Display for Unary {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Variant::*;
+        use Variant::Not;
 
         match &self.variant {
             Not(v) => v.fmt(f),

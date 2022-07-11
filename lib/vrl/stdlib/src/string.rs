@@ -51,11 +51,6 @@ impl Function for String {
 
         Ok(Box::new(StringFn { value }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Resolved {
-        let value = arguments.required("value");
-        string(value)
-    }
 }
 
 #[derive(Debug, Clone)]

@@ -455,7 +455,7 @@ mod tests {
 
     async fn replace_sender_in_fanout(
         control: &UnboundedSender<ControlMessage>,
-        receivers: &mut Vec<BufferReceiver<EventArray>>,
+        receivers: &mut [BufferReceiver<EventArray>],
         sender_id: usize,
         capacity: usize,
     ) -> BufferReceiver<EventArray> {
@@ -481,7 +481,7 @@ mod tests {
 
     async fn start_sender_replace(
         control: &UnboundedSender<ControlMessage>,
-        receivers: &mut Vec<BufferReceiver<EventArray>>,
+        receivers: &mut [BufferReceiver<EventArray>],
         sender_id: usize,
         capacity: usize,
     ) -> (BufferReceiver<EventArray>, BufferSender<EventArray>) {

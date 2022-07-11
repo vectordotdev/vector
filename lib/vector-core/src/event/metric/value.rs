@@ -28,7 +28,7 @@ pub enum MetricValue {
     /// It also contains the total count of all observations and their sum to allow calculating the mean.
     AggregatedHistogram {
         buckets: Vec<Bucket>,
-        count: u32,
+        count: u64,
         sum: f64,
     },
     /// A set of observations which are represented by quantiles.
@@ -37,7 +37,7 @@ pub enum MetricValue {
     /// observations and their sum to allow calculating the mean.
     AggregatedSummary {
         quantiles: Vec<Quantile>,
-        count: u32,
+        count: u64,
         sum: f64,
     },
     /// A data structure that can answer questions about the cumulative distribution of the contained samples in
@@ -554,7 +554,7 @@ impl ByteSizeOf for Sample {
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
 pub struct Bucket {
     pub upper_limit: f64,
-    pub count: u32,
+    pub count: u64,
 }
 
 impl ByteSizeOf for Bucket {

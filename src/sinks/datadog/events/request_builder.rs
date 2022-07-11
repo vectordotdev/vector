@@ -8,6 +8,7 @@ use crate::{
     event::{EventFinalizers, Finalizable, LogEvent},
     sinks::util::{
         encoding::{EncodingConfigFixed, StandardJsonEncoding, TimestampFormat},
+        request_builder::EncodeResult,
         Compression, ElementCount, RequestBuilder,
     },
 };
@@ -80,14 +81,21 @@ impl RequestBuilder<LogEvent> for DatadogEventsRequestBuilder {
     fn split_input(&self, mut log: LogEvent) -> (Self::Metadata, Self::Events) {
         let metadata = Metadata {
             finalizers: log.take_finalizers(),
-            api_key: log.metadata_mut().datadog_api_key().clone(),
+            api_key: log.metadata_mut().datadog_api_key(),
             event_byte_size: log.size_of(),
         };
         (metadata, log)
     }
 
-    fn build_request(&self, metadata: Self::Metadata, body: Self::Payload) -> Self::Request {
-        DatadogEventsRequest { body, metadata }
+    fn build_request(
+        &self,
+        metadata: Self::Metadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
+        DatadogEventsRequest {
+            body: payload.into_payload(),
+            metadata,
+        }
     }
 }
 

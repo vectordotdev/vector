@@ -61,11 +61,6 @@ impl Function for ParseRubyHash {
             required: true,
         }]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        parse_ruby_hash(value)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -268,7 +263,7 @@ fn parse(input: &str) -> Result<Value> {
                 // Create a descriptive error message if possible.
                 nom::error::convert_error(input, err)
             }
-            _ => err.to_string(),
+            nom::Err::Incomplete(_) => err.to_string(),
         })
         .and_then(|(rest, result)| {
             rest.trim()

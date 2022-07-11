@@ -173,3 +173,29 @@ impl InternalEvent for KafkaHeaderExtractionError<'_> {
         counter!("kafka_header_extraction_failures_total", 1);
     }
 }
+
+pub struct KafkaNegativeAcknowledgmentError<'a> {
+    pub topic: &'a str,
+    pub partition: i32,
+    pub offset: i64,
+}
+
+impl InternalEvent for KafkaNegativeAcknowledgmentError<'_> {
+    fn emit(self) {
+        error!(
+            message = "Event received a negative acknowledgment, topic has been stopped.",
+            error_code = "negative_acknowledgement",
+            error_type = error_type::ACKNOWLEDGMENT_FAILED,
+            stage = error_stage::SENDING,
+            topic = self.topic,
+            partition = self.partition,
+            offset = self.offset,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "negative_acknowledgment",
+            "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
+            "stage" => error_stage::SENDING,
+        );
+    }
+}

@@ -14,7 +14,6 @@ use crate::Test;
 /// This mostly consists of functions that have a non-deterministic result.
 const SKIP_FUNCTION_EXAMPLES: &[&str] = &[
     "type_def", // Not supported on VM runtime
-    "encrypt",  // uses random_bytes for the IV
     "random_bytes",
     "uuid_v4",
     "strip_ansi_escape_codes",
@@ -194,6 +193,8 @@ impl Test {
             result,
             result_approx: false,
             skip,
+            read_only_paths: vec![],
+            read_only_metadata_paths: vec![],
         }
     }
 }

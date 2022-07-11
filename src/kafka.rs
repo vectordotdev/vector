@@ -3,8 +3,9 @@ use std::path::{Path, PathBuf};
 use rdkafka::{consumer::ConsumerContext, ClientConfig, ClientContext, Statistics};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use vector_config::configurable_component;
 
-use crate::{internal_events::KafkaStatisticsReceived, tls::TlsConfig};
+use crate::{internal_events::KafkaStatisticsReceived, tls::TlsEnableableConfig};
 
 #[derive(Debug, Snafu)]
 enum KafkaError {
@@ -24,25 +25,40 @@ pub(crate) enum KafkaCompression {
     Zstd,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+/// Kafka authentication configuration.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct KafkaAuthConfig {
+    #[configurable(derived)]
     pub(crate) sasl: Option<KafkaSaslConfig>,
-    pub(crate) tls: Option<KafkaTlsConfig>,
+
+    #[configurable(derived)]
+    pub(crate) tls: Option<TlsEnableableConfig>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+/// Configuration for SASL authentication when interacting with Kafka.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct KafkaSaslConfig {
+    /// Enables SASL authentication.
+    ///
+    /// Only `PLAIN` and `SCRAM`-based mechanisms are supported when configuring SASL authentication via `sasl.*`. For
+    /// other mechanisms, `librdkafka_options.*` must be used directly to configure other `librdkafka`-specific values
+    /// i.e. `sasl.kerberos.*` and so on.
+    ///
+    /// See the [librdkafka documentation](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for details.
+    ///
+    /// SASL authentication is not supported on Windows.
     pub(crate) enabled: Option<bool>,
-    pub(crate) username: Option<String>,
-    pub(crate) password: Option<String>,
-    pub(crate) mechanism: Option<String>,
-}
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub(crate) struct KafkaTlsConfig {
-    pub(crate) enabled: Option<bool>,
-    #[serde(flatten)]
-    pub(crate) options: TlsConfig,
+    /// The SASL username.
+    pub(crate) username: Option<String>,
+
+    /// The SASL password.
+    pub(crate) password: Option<String>,
+
+    /// The SASL mechanism to use.
+    pub(crate) mechanism: Option<String>,
 }
 
 impl KafkaAuthConfig {

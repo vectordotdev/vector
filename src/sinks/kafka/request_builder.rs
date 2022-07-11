@@ -112,6 +112,7 @@ mod tests {
     use rdkafka::message::Headers;
 
     use super::*;
+    use crate::event::LogEvent;
 
     #[test]
     fn kafka_get_headers() {
@@ -120,7 +121,7 @@ mod tests {
         header_values.insert("a-key".to_string(), Value::Bytes(Bytes::from("a-value")));
         header_values.insert("b-key".to_string(), Value::Bytes(Bytes::from("b-value")));
 
-        let mut event = Event::from("hello");
+        let mut event = Event::Log(LogEvent::from("hello"));
         event.as_mut_log().insert(headers_key, header_values);
 
         let headers = get_headers(&event, &Some(headers_key.to_string())).unwrap();

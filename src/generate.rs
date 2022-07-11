@@ -23,7 +23,7 @@ pub struct Opts {
     #[clap(short, long)]
     fragment: bool,
 
-    /// Generate expression, e.g. 'stdin/json_parser,add_fields/console'
+    /// Generate expression, e.g. 'stdin/remap,filter/console'
     ///
     /// Three comma-separated lists of sources, transforms and sinks, divided by
     /// forward slashes. If subsequent component types are not needed then
@@ -31,7 +31,7 @@ pub struct Opts {
     ///
     /// For example:
     ///
-    /// `/json_parser` prints a `json_parser` transform.
+    /// `/filter` prints a `filter` transform.
     ///
     /// `//file,http` prints a `file` and `http` sink.
     ///
@@ -42,8 +42,8 @@ pub struct Opts {
     /// can optionally specify the names of components by prefixing them with
     /// `<name>:`, e.g.:
     ///
-    /// `foo:stdin/bar:regex_parser/baz:http` prints a `stdin` source called
-    /// `foo`, a `regex_parser` transform called `bar`, and an `http` sink
+    /// `foo:stdin/bar:basic_transform/baz:http` prints a `stdin` source called
+    /// `foo`, a `basic_transform` transform called `bar`, and an `http` sink
     /// called `baz`.
     ///
     /// Vector makes a best attempt at constructing a sensible topology. The
@@ -82,10 +82,27 @@ pub struct Config {
     pub sinks: Option<IndexMap<String, SinkOuter>>,
 }
 
-fn generate_example(
+/// Controls how the resulting transform topology is wired up. This is not
+/// user-configurable.
+pub(crate) enum TransformInputsStrategy {
+    /// Default.
+    ///
+    /// The first transform generated will consume from all sources and
+    /// subsequent transforms will consume from their predecessor.
+    Auto,
+    /// Used for property testing `vector config`.
+    ///
+    /// All transforms use a list of all sources as inputs.
+    #[cfg(test)]
+    #[allow(dead_code)]
+    All,
+}
+
+pub(crate) fn generate_example(
     include_globals: bool,
     expression: &str,
     file: &Option<PathBuf>,
+    transform_inputs_strategy: TransformInputsStrategy,
 ) -> Result<String, Vec<String>> {
     let components: Vec<Vec<_>> = expression
         .split(|c| c == '|' || c == '/')
@@ -176,13 +193,19 @@ fn generate_example(
             };
             transform_names.push(name.clone());
 
-            let targets = if i == 0 {
-                source_names.clone()
-            } else {
-                vec![transform_names
-                    .get(i - 1)
-                    .unwrap_or(&"component-id".to_owned())
-                    .to_owned()]
+            let targets = match transform_inputs_strategy {
+                TransformInputsStrategy::Auto => {
+                    if i == 0 {
+                        source_names.clone()
+                    } else {
+                        vec![transform_names
+                            .get(i - 1)
+                            .unwrap_or(&"component-id".to_owned())
+                            .to_owned()]
+                    }
+                }
+                #[cfg(test)]
+                TransformInputsStrategy::All => source_names.clone(),
             };
 
             let mut example = match TransformDescription::example(&transform_type) {
@@ -347,7 +370,12 @@ fn generate_example(
 }
 
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
-    match generate_example(!opts.fragment, &opts.expression, &opts.file) {
+    match generate_example(
+        !opts.fragment,
+        &opts.expression,
+        &opts.file,
+        TransformInputsStrategy::Auto,
+    ) {
         Ok(s) => {
             #[allow(clippy::print_stdout)]
             {
@@ -365,7 +393,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     }
 }
 
-fn write_config(filepath: &Path, body: &str) -> Result<usize, crate::Error> {
+fn write_config(filepath: &Path, body: &str) -> Result<(), crate::Error> {
     if filepath.exists() {
         // If the file exists, we don't want to overwrite, that's just rude.
         Err(format!("{:?} already exists", &filepath).into())
@@ -374,16 +402,13 @@ fn write_config(filepath: &Path, body: &str) -> Result<usize, crate::Error> {
             create_dir_all(directory)?;
         }
         File::create(filepath)
-            .and_then(|mut file| file.write(body.as_bytes()))
+            .and_then(|mut file| file.write_all(body.as_bytes()))
             .map_err(Into::into)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    #[cfg(all(feature = "transforms-json_parser", feature = "sinks-console"))]
-    use indoc::indoc;
-
     use super::*;
 
     #[test]
@@ -392,7 +417,7 @@ mod tests {
 
         for name in SourceDescription::types() {
             let param = format!("{}//", name);
-            let cfg = generate_example(true, &param, &None).unwrap();
+            let cfg = generate_example(true, &param, &None, TransformInputsStrategy::Auto).unwrap();
             if let Err(error) = toml::from_str::<crate::config::ConfigBuilder>(&cfg) {
                 errors.push((param, error));
             }
@@ -400,7 +425,7 @@ mod tests {
 
         for name in TransformDescription::types() {
             let param = format!("/{}/", name);
-            let cfg = generate_example(true, &param, &None).unwrap();
+            let cfg = generate_example(true, &param, &None, TransformInputsStrategy::Auto).unwrap();
             if let Err(error) = toml::from_str::<crate::config::ConfigBuilder>(&cfg) {
                 errors.push((param, error));
             }
@@ -408,7 +433,7 @@ mod tests {
 
         for name in SinkDescription::types() {
             let param = format!("//{}", name);
-            let cfg = generate_example(true, &param, &None).unwrap();
+            let cfg = generate_example(true, &param, &None, TransformInputsStrategy::Auto).unwrap();
             if let Err(error) = toml::from_str::<crate::config::ConfigBuilder>(&cfg) {
                 errors.push((param, error));
             }
@@ -423,11 +448,7 @@ mod tests {
         assert!(errors.is_empty());
     }
 
-    #[cfg(all(
-        feature = "sources-stdin",
-        feature = "transforms-json_parser",
-        feature = "sinks-console"
-    ))]
+    #[cfg(all(feature = "sources-stdin", feature = "sinks-console"))]
     #[test]
     fn generate_configfile() {
         use std::fs;
@@ -436,7 +457,12 @@ mod tests {
 
         let tempdir = tempdir().expect("Unable to create tempdir for config");
         let filepath = tempdir.path().join("./config.example.toml");
-        let cfg = generate_example(true, "stdin/json_parser/console", &Some(filepath.clone()));
+        let cfg = generate_example(
+            true,
+            "stdin/basic_transform/console",
+            &Some(filepath.clone()),
+            TransformInputsStrategy::Auto,
+        );
         let filecontents = fs::read_to_string(
             fs::canonicalize(&filepath).expect("Could not return canonicalized filepath"),
         )
@@ -445,18 +471,17 @@ mod tests {
         assert_eq!(cfg.unwrap(), filecontents)
     }
 
-    #[cfg(all(
-        feature = "sources-stdin",
-        feature = "transforms-add_fields",
-        feature = "transforms-json_parser",
-        feature = "transforms-remove_fields",
-        feature = "sinks-console"
-    ))]
+    #[cfg(all(feature = "sources-stdin", feature = "sinks-console"))]
     #[test]
     fn generate_basic() {
         assert_eq!(
-            generate_example(true, "stdin/json_parser/console", &None),
-            Ok(indoc! {r#"data_dir = "/var/lib/vector/"
+            generate_example(
+                true,
+                "stdin/basic_transform/console",
+                &None,
+                TransformInputsStrategy::Auto
+            ),
+            Ok(indoc::indoc! {r#"data_dir = "/var/lib/vector/"
 
                 [sources.source0]
                 max_length = 102400
@@ -467,9 +492,9 @@ mod tests {
 
                 [transforms.transform0]
                 inputs = ["source0"]
-                drop_field = true
-                drop_invalid = false
-                type = "json_parser"
+                increase = 0.0
+                suffix = ""
+                type = "basic_transform"
 
                 [sinks.sink0]
                 inputs = ["transform0"]
@@ -491,8 +516,13 @@ mod tests {
         );
 
         assert_eq!(
-            generate_example(true, "stdin|json_parser|console", &None),
-            Ok(indoc! {r#"data_dir = "/var/lib/vector/"
+            generate_example(
+                true,
+                "stdin|basic_transform|console",
+                &None,
+                TransformInputsStrategy::Auto
+            ),
+            Ok(indoc::indoc! {r#"data_dir = "/var/lib/vector/"
 
                 [sources.source0]
                 max_length = 102400
@@ -503,9 +533,9 @@ mod tests {
 
                 [transforms.transform0]
                 inputs = ["source0"]
-                drop_field = true
-                drop_invalid = false
-                type = "json_parser"
+                increase = 0.0
+                suffix = ""
+                type = "basic_transform"
 
                 [sinks.sink0]
                 inputs = ["transform0"]
@@ -527,8 +557,8 @@ mod tests {
         );
 
         assert_eq!(
-            generate_example(true, "stdin//console", &None),
-            Ok(indoc! {r#"data_dir = "/var/lib/vector/"
+            generate_example(true, "stdin//console", &None, TransformInputsStrategy::Auto),
+            Ok(indoc::indoc! {r#"data_dir = "/var/lib/vector/"
 
                 [sources.source0]
                 max_length = 102400
@@ -557,8 +587,8 @@ mod tests {
         );
 
         assert_eq!(
-            generate_example(true, "//console", &None),
-            Ok(indoc! {r#"data_dir = "/var/lib/vector/"
+            generate_example(true, "//console", &None, TransformInputsStrategy::Auto),
+            Ok(indoc::indoc! {r#"data_dir = "/var/lib/vector/"
 
                 [sinks.sink0]
                 inputs = ["component-id"]
@@ -580,51 +610,61 @@ mod tests {
         );
 
         assert_eq!(
-            generate_example(true, "/add_fields,json_parser,remove_fields", &None),
-            Ok(indoc! {r#"data_dir = "/var/lib/vector/"
+            generate_example(
+                true,
+                "/basic_transform,basic_transform,basic_transform",
+                &None,
+                TransformInputsStrategy::Auto
+            ),
+            Ok(indoc::indoc! {r#"data_dir = "/var/lib/vector/"
 
                 [transforms.transform0]
                 inputs = []
-                type = "add_fields"
-
-                [transforms.transform0.fields]
-                name = "field_name"
+                increase = 0.0
+                suffix = ""
+                type = "basic_transform"
 
                 [transforms.transform1]
                 inputs = ["transform0"]
-                drop_field = true
-                drop_invalid = false
-                type = "json_parser"
+                increase = 0.0
+                suffix = ""
+                type = "basic_transform"
 
                 [transforms.transform2]
                 inputs = ["transform1"]
-                fields = []
-                type = "remove_fields"
+                increase = 0.0
+                suffix = ""
+                type = "basic_transform"
             "#}
             .to_string())
         );
 
         assert_eq!(
-            generate_example(false, "/add_fields,json_parser,remove_fields", &None),
-            Ok(indoc! {r#"
+            generate_example(
+                false,
+                "/basic_transform,basic_transform,basic_transform",
+                &None,
+                TransformInputsStrategy::Auto
+            ),
+            Ok(indoc::indoc! {r#"
 
                 [transforms.transform0]
                 inputs = []
-                type = "add_fields"
-
-                [transforms.transform0.fields]
-                name = "field_name"
+                increase = 0.0
+                suffix = ""
+                type = "basic_transform"
 
                 [transforms.transform1]
                 inputs = ["transform0"]
-                drop_field = true
-                drop_invalid = false
-                type = "json_parser"
+                increase = 0.0
+                suffix = ""
+                type = "basic_transform"
 
                 [transforms.transform2]
                 inputs = ["transform1"]
-                fields = []
-                type = "remove_fields"
+                increase = 0.0
+                suffix = ""
+                type = "basic_transform"
             "#}
             .to_string())
         );

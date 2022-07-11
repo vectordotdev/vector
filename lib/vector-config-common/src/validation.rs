@@ -142,24 +142,23 @@ pub enum Validation {
     /// When used for strings, applies to the number of characters. When used for arrays, applies to the number of
     /// items. When used for objects, applies to the number of properties.
     Length {
-        #[darling(rename = "min")]
+        #[darling(default, rename = "min")]
         minimum: Option<u32>,
-        #[darling(rename = "max")]
+        #[darling(default, rename = "max")]
         maximum: Option<u32>,
     },
     /// A minimum and/or maximum range, or bound.
     ///
     /// Can only be used for numbers.
     Range {
-        #[darling(rename = "min", with = "maybe_float_or_int")]
+        #[darling(default, rename = "min", with = "maybe_float_or_int")]
         minimum: Option<f64>,
-        #[darling(rename = "max", with = "maybe_float_or_int")]
+        #[darling(default, rename = "max", with = "maybe_float_or_int")]
         maximum: Option<f64>,
     },
     /// A regular expression pattern.
     ///
     /// Can only be used for strings.
-    //#[darling(with = "from_lit_str")]
     Pattern(String),
 }
 

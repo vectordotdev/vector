@@ -3,27 +3,53 @@ use std::collections::HashSet;
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use crate::event::{LogEvent, Value};
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+/// Strategies for merging events.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum MergeStrategy {
+    /// Discard all but the first value found.
     Discard,
+
+    /// Discard all but the last value found.
+    ///
+    /// Works as a way to coalesce by not retaining `null`.
     Retain,
+
+    /// Sum all numeric values.
     Sum,
+
+    /// Keep the maximum numeric value seen.
     Max,
+
+    /// Keep the minimum numeric value seen.
     Min,
+
+    /// Append each value to an array.
     Array,
+
+    /// Concatenate each string value, delimited with a space.
     Concat,
+
+    /// Concatenate each string value, delimited with a newline.
     ConcatNewline,
+
+    /// Concatenate each string, without a delimiter.
+    ConcatRaw,
+
+    /// Keep the shortest array seen.
     ShortestArray,
+
+    /// Keep the longest array seen.
     LongestArray,
+
+    /// Create a flattened array of all unique values.
     FlatUnique,
 }
-
-//------------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
 struct DiscardMerger {
@@ -46,8 +72,6 @@ impl ReduceValueMerger for DiscardMerger {
         Ok(())
     }
 }
-
-//------------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
 struct RetainMerger {
@@ -75,16 +99,17 @@ impl ReduceValueMerger for RetainMerger {
     }
 }
 
-//------------------------------------------------------------------------------
-
 #[derive(Debug, Clone)]
 struct ConcatMerger {
     v: BytesMut,
-    join_by: char,
+    join_by: Option<Vec<u8>>,
 }
 
 impl ConcatMerger {
-    fn new(v: Bytes, join_by: char) -> Self {
+    fn new(v: Bytes, join_by: Option<char>) -> Self {
+        // We need to get the resulting bytes for this character in case it's actually a multi-byte character.
+        let join_by = join_by.map(|c| c.to_string().into_bytes());
+
         Self {
             v: BytesMut::from(&v[..]),
             join_by,
@@ -95,7 +120,9 @@ impl ConcatMerger {
 impl ReduceValueMerger for ConcatMerger {
     fn add(&mut self, v: Value) -> Result<(), String> {
         if let Value::Bytes(b) = v {
-            self.v.extend(&[self.join_by as u8]);
+            if let Some(buf) = self.join_by.as_ref() {
+                self.v.extend(&buf[..]);
+            }
             self.v.extend_from_slice(&b);
             Ok(())
         } else {
@@ -111,8 +138,6 @@ impl ReduceValueMerger for ConcatMerger {
         Ok(())
     }
 }
-
-//------------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
 struct ConcatArrayMerger {
@@ -141,8 +166,6 @@ impl ReduceValueMerger for ConcatArrayMerger {
     }
 }
 
-//------------------------------------------------------------------------------
-
 #[derive(Debug, Clone)]
 struct ArrayMerger {
     v: Vec<Value>,
@@ -165,8 +188,6 @@ impl ReduceValueMerger for ArrayMerger {
         Ok(())
     }
 }
-
-//------------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
 struct LongestArrayMerger {
@@ -200,8 +221,6 @@ impl ReduceValueMerger for LongestArrayMerger {
     }
 }
 
-//------------------------------------------------------------------------------
-
 #[derive(Debug, Clone)]
 struct ShortestArrayMerger {
     v: Vec<Value>,
@@ -234,7 +253,6 @@ impl ReduceValueMerger for ShortestArrayMerger {
     }
 }
 
-//------------------------------------------------------------------------------
 #[derive(Debug, Clone)]
 struct FlatUniqueMerger {
     v: HashSet<Value>,
@@ -280,8 +298,6 @@ impl ReduceValueMerger for FlatUniqueMerger {
     }
 }
 
-//------------------------------------------------------------------------------
-
 #[derive(Debug, Clone)]
 struct TimestampWindowMerger {
     started: DateTime<Utc>,
@@ -317,8 +333,6 @@ impl ReduceValueMerger for TimestampWindowMerger {
     }
 }
 
-//------------------------------------------------------------------------------
-
 #[derive(Debug, Clone)]
 enum NumberMergerValue {
     Int(i64),
@@ -336,8 +350,6 @@ impl From<NotNan<f64>> for NumberMergerValue {
         NumberMergerValue::Float(v)
     }
 }
-
-//------------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
 struct AddNumbersMerger {
@@ -383,8 +395,6 @@ impl ReduceValueMerger for AddNumbersMerger {
         Ok(())
     }
 }
-
-//------------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
 struct MaxNumberMerger {
@@ -445,8 +455,6 @@ impl ReduceValueMerger for MaxNumberMerger {
     }
 }
 
-//------------------------------------------------------------------------------
-
 #[derive(Debug, Clone)]
 struct MinNumberMerger {
     v: NumberMergerValue,
@@ -506,8 +514,6 @@ impl ReduceValueMerger for MinNumberMerger {
     }
 }
 
-//------------------------------------------------------------------------------
-
 pub trait ReduceValueMerger: std::fmt::Debug + Send + Sync {
     fn add(&mut self, v: Value) -> Result<(), String>;
     fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String>;
@@ -559,7 +565,7 @@ pub(crate) fn get_value_merger(
             )),
         },
         MergeStrategy::Concat => match v {
-            Value::Bytes(b) => Ok(Box::new(ConcatMerger::new(b, ' '))),
+            Value::Bytes(b) => Ok(Box::new(ConcatMerger::new(b, Some(' ')))),
             Value::Array(a) => Ok(Box::new(ConcatArrayMerger::new(a))),
             _ => Err(format!(
                 "expected string or array value, found: '{}'",
@@ -567,7 +573,14 @@ pub(crate) fn get_value_merger(
             )),
         },
         MergeStrategy::ConcatNewline => match v {
-            Value::Bytes(b) => Ok(Box::new(ConcatMerger::new(b, '\n'))),
+            Value::Bytes(b) => Ok(Box::new(ConcatMerger::new(b, Some('\n')))),
+            _ => Err(format!(
+                "expected string value, found: '{}'",
+                v.to_string_lossy()
+            )),
+        },
+        MergeStrategy::ConcatRaw => match v {
+            Value::Bytes(b) => Ok(Box::new(ConcatMerger::new(b, None))),
             _ => Err(format!(
                 "expected string value, found: '{}'",
                 v.to_string_lossy()
@@ -599,7 +612,7 @@ mod test {
     use serde_json::json;
 
     use super::*;
-    use crate::event::Event;
+    use crate::event::LogEvent;
 
     #[test]
     fn initial_values() {
@@ -612,6 +625,8 @@ mod test {
         assert!(get_value_merger("foo".into(), &MergeStrategy::LongestArray).is_err());
         assert!(get_value_merger("foo".into(), &MergeStrategy::ShortestArray).is_err());
         assert!(get_value_merger("foo".into(), &MergeStrategy::Concat).is_ok());
+        assert!(get_value_merger("foo".into(), &MergeStrategy::ConcatNewline).is_ok());
+        assert!(get_value_merger("foo".into(), &MergeStrategy::ConcatRaw).is_ok());
         assert!(get_value_merger("foo".into(), &MergeStrategy::FlatUnique).is_ok());
 
         assert!(get_value_merger(42.into(), &MergeStrategy::Discard).is_ok());
@@ -624,6 +639,7 @@ mod test {
         assert!(get_value_merger(42.into(), &MergeStrategy::ShortestArray).is_err());
         assert!(get_value_merger(42.into(), &MergeStrategy::Concat).is_err());
         assert!(get_value_merger(42.into(), &MergeStrategy::ConcatNewline).is_err());
+        assert!(get_value_merger(42.into(), &MergeStrategy::ConcatRaw).is_err());
         assert!(get_value_merger(42.into(), &MergeStrategy::FlatUnique).is_ok());
 
         assert!(get_value_merger(42.into(), &MergeStrategy::Discard).is_ok());
@@ -636,6 +652,7 @@ mod test {
         assert!(get_value_merger(4.2.into(), &MergeStrategy::ShortestArray).is_err());
         assert!(get_value_merger(4.2.into(), &MergeStrategy::Concat).is_err());
         assert!(get_value_merger(4.2.into(), &MergeStrategy::ConcatNewline).is_err());
+        assert!(get_value_merger(4.2.into(), &MergeStrategy::ConcatRaw).is_err());
         assert!(get_value_merger(4.2.into(), &MergeStrategy::FlatUnique).is_ok());
 
         assert!(get_value_merger(true.into(), &MergeStrategy::Discard).is_ok());
@@ -648,6 +665,7 @@ mod test {
         assert!(get_value_merger(true.into(), &MergeStrategy::ShortestArray).is_err());
         assert!(get_value_merger(true.into(), &MergeStrategy::Concat).is_err());
         assert!(get_value_merger(true.into(), &MergeStrategy::ConcatNewline).is_err());
+        assert!(get_value_merger(true.into(), &MergeStrategy::ConcatRaw).is_err());
         assert!(get_value_merger(true.into(), &MergeStrategy::FlatUnique).is_ok());
 
         assert!(get_value_merger(Utc::now().into(), &MergeStrategy::Discard).is_ok());
@@ -660,6 +678,7 @@ mod test {
         assert!(get_value_merger(Utc::now().into(), &MergeStrategy::ShortestArray).is_err());
         assert!(get_value_merger(Utc::now().into(), &MergeStrategy::Concat).is_err());
         assert!(get_value_merger(Utc::now().into(), &MergeStrategy::ConcatNewline).is_err());
+        assert!(get_value_merger(Utc::now().into(), &MergeStrategy::ConcatRaw).is_err());
         assert!(get_value_merger(Utc::now().into(), &MergeStrategy::Discard).is_ok());
         assert!(get_value_merger(Utc::now().into(), &MergeStrategy::FlatUnique).is_ok());
 
@@ -673,6 +692,7 @@ mod test {
         assert!(get_value_merger(json!([]).into(), &MergeStrategy::ShortestArray).is_ok());
         assert!(get_value_merger(json!([]).into(), &MergeStrategy::Concat).is_ok());
         assert!(get_value_merger(json!([]).into(), &MergeStrategy::ConcatNewline).is_err());
+        assert!(get_value_merger(json!([]).into(), &MergeStrategy::ConcatRaw).is_err());
         assert!(get_value_merger(json!([]).into(), &MergeStrategy::FlatUnique).is_ok());
 
         assert!(get_value_merger(json!({}).into(), &MergeStrategy::Discard).is_ok());
@@ -685,6 +705,7 @@ mod test {
         assert!(get_value_merger(json!({}).into(), &MergeStrategy::ShortestArray).is_err());
         assert!(get_value_merger(json!({}).into(), &MergeStrategy::Concat).is_err());
         assert!(get_value_merger(json!({}).into(), &MergeStrategy::ConcatNewline).is_err());
+        assert!(get_value_merger(json!({}).into(), &MergeStrategy::ConcatRaw).is_err());
         assert!(get_value_merger(json!({}).into(), &MergeStrategy::FlatUnique).is_ok());
 
         assert!(get_value_merger(json!(null).into(), &MergeStrategy::Discard).is_ok());
@@ -697,6 +718,7 @@ mod test {
         assert!(get_value_merger(json!(null).into(), &MergeStrategy::ShortestArray).is_err());
         assert!(get_value_merger(json!(null).into(), &MergeStrategy::Concat).is_err());
         assert!(get_value_merger(json!(null).into(), &MergeStrategy::ConcatNewline).is_err());
+        assert!(get_value_merger(json!(null).into(), &MergeStrategy::ConcatRaw).is_err());
         assert!(get_value_merger(json!(null).into(), &MergeStrategy::FlatUnique).is_ok());
     }
 
@@ -717,6 +739,14 @@ mod test {
         assert_eq!(
             merge("foo".into(), "bar".into(), &MergeStrategy::Concat),
             Ok("foo bar".into())
+        );
+        assert_eq!(
+            merge("foo".into(), "bar".into(), &MergeStrategy::ConcatNewline),
+            Ok("foo\nbar".into())
+        );
+        assert_eq!(
+            merge("foo".into(), "bar".into(), &MergeStrategy::ConcatRaw),
+            Ok("foobar".into())
         );
         assert!(merge("foo".into(), 42.into(), &MergeStrategy::Concat).is_err());
         assert!(merge("foo".into(), 4.2.into(), &MergeStrategy::Concat).is_err());
@@ -842,9 +872,8 @@ mod test {
     fn merge(initial: Value, additional: Value, strategy: &MergeStrategy) -> Result<Value, String> {
         let mut merger = get_value_merger(initial, strategy)?;
         merger.add(additional)?;
-        let mut output = Event::new_empty_log();
-        let output = output.as_mut_log();
-        merger.insert_into("out".into(), output)?;
+        let mut output = LogEvent::default();
+        merger.insert_into("out".into(), &mut output)?;
         Ok(output.remove("out").unwrap())
     }
 }

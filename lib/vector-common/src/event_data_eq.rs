@@ -7,6 +7,7 @@ pub trait EventDataEq<Rhs: ?Sized = Self> {
     fn event_data_eq(&self, other: &Rhs) -> bool;
 }
 
+#[allow(clippy::module_name_repetitions)] // full name is better since this macro is typically imported
 #[macro_export]
 macro_rules! assert_event_data_eq {
     ($left:expr, $right:expr, $message:expr) => {{
@@ -30,6 +31,7 @@ macro_rules! assert_event_data_eq {
     };
 }
 
+#[allow(clippy::module_name_repetitions)] // full name is better since this macro is typically imported
 #[macro_export]
 macro_rules! impl_event_data_eq {
     ($type:ty) => {

@@ -74,13 +74,6 @@ impl Function for Round {
 
         Ok(Box::new(RoundFn { value, precision }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let precision = args.optional("precision").unwrap_or_else(|| value!(0));
-
-        round(precision, value)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -144,10 +137,10 @@ mod tests {
         }
 
         huge {
-             args: func_args![value: 9876543210123456789098765432101234567890987654321.987654321,
+             args: func_args![value: 9_876_543_210_123_456_789_098_765_432_101_234_567_890_987_654_321.987_654_321,
                               precision: 5
              ],
-             want: Ok(9876543210123456789098765432101234567890987654321.98765),
+             want: Ok(9_876_543_210_123_456_789_098_765_432_101_234_567_890_987_654_321.987_65),
              tdef: TypeDef::integer().infallible(),
          }
     ];

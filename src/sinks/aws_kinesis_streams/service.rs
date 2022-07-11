@@ -5,15 +5,12 @@ use aws_sdk_kinesis::output::PutRecordsOutput;
 use aws_sdk_kinesis::types::SdkError;
 use aws_sdk_kinesis::Client as KinesisClient;
 use aws_types::region::Region;
-use futures::{future::BoxFuture, TryFutureExt};
+use futures::future::BoxFuture;
 use tower::Service;
 use tracing::Instrument;
 use vector_core::{internal_event::EventsSent, stream::DriverResponse};
 
-use crate::{
-    event::EventStatus, internal_events::AwsBytesSent,
-    sinks::aws_kinesis_streams::request_builder::KinesisRequest,
-};
+use crate::{event::EventStatus, sinks::aws_kinesis_streams::request_builder::KinesisRequest};
 
 #[derive(Clone)]
 pub struct KinesisService {
@@ -56,16 +53,6 @@ impl Service<Vec<KinesisRequest>> for KinesisService {
             events = %requests.len(),
         );
 
-        let processed_bytes_total = requests
-            .iter()
-            .map(|req| {
-                req.put_records_request
-                    .data
-                    .as_ref()
-                    .map(|data| data.as_ref().len())
-                    .unwrap_or(0)
-            })
-            .sum();
         let events_byte_size = requests.iter().map(|req| req.event_byte_size).sum();
         let count = requests.len();
 
@@ -76,7 +63,6 @@ impl Service<Vec<KinesisRequest>> for KinesisService {
 
         let client = self.client.clone();
 
-        let region = self.region.clone();
         let stream_name = self.stream_name.clone();
         Box::pin(async move {
             let _response: PutRecordsOutput = client
@@ -84,12 +70,6 @@ impl Service<Vec<KinesisRequest>> for KinesisService {
                 .set_records(Some(records))
                 .stream_name(stream_name)
                 .send()
-                .inspect_ok(|_| {
-                    emit!(AwsBytesSent {
-                        byte_size: processed_bytes_total,
-                        region,
-                    });
-                })
                 .instrument(info_span!("request").or_current())
                 .await?;
 

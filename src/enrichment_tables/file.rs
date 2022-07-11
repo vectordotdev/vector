@@ -521,7 +521,6 @@ impl std::fmt::Debug for File {
 #[cfg(test)]
 mod tests {
     use chrono::TimeZone;
-    use vector_common::btreemap;
 
     use super::*;
 
@@ -624,10 +623,10 @@ mod tests {
         };
 
         assert_eq!(
-            Ok(btreemap! {
-                "field1" => "zirp",
-                "field2" => "zurp",
-            }),
+            Ok(BTreeMap::from([
+                (String::from("field1"), Value::from("zirp")),
+                (String::from("field2"), Value::from("zurp")),
+            ])),
             file.find_table_row(Case::Sensitive, &[condition], None, None)
         );
     }
@@ -692,10 +691,10 @@ mod tests {
         };
 
         assert_eq!(
-            Ok(btreemap! {
-                "field1" => "zirp",
-                "field2" => "zurp",
-            }),
+            Ok(BTreeMap::from([
+                (String::from("field1"), Value::from("zirp")),
+                (String::from("field2"), Value::from("zurp")),
+            ])),
             file.find_table_row(Case::Sensitive, &[condition], None, Some(handle))
         );
     }
@@ -717,14 +716,14 @@ mod tests {
 
         assert_eq!(
             Ok(vec![
-                btreemap! {
-                    "field1" => "zip",
-                    "field2" => "zup",
-                },
-                btreemap! {
-                    "field1" => "zip",
-                    "field2" => "zoop",
-                }
+                BTreeMap::from([
+                    (String::from("field1"), Value::from("zip")),
+                    (String::from("field2"), Value::from("zup")),
+                ]),
+                BTreeMap::from([
+                    (String::from("field1"), Value::from("zip")),
+                    (String::from("field2"), Value::from("zoop")),
+                ]),
             ]),
             file.find_table_rows(
                 Case::Sensitive,
@@ -777,14 +776,14 @@ mod tests {
 
         assert_eq!(
             Ok(vec![
-                btreemap! {
-                    "field1" => "zip",
-                    "field3" => "zoop",
-                },
-                btreemap! {
-                    "field1" => "zip",
-                    "field3" => "zibble",
-                }
+                BTreeMap::from([
+                    (String::from("field1"), Value::from("zip")),
+                    (String::from("field3"), Value::from("zoop")),
+                ]),
+                BTreeMap::from([
+                    (String::from("field1"), Value::from("zip")),
+                    (String::from("field3"), Value::from("zibble")),
+                ]),
             ]),
             file.find_table_rows(
                 Case::Sensitive,
@@ -812,14 +811,14 @@ mod tests {
 
         assert_eq!(
             Ok(vec![
-                btreemap! {
-                    "field1" => "zip",
-                    "field2" => "zup",
-                },
-                btreemap! {
-                    "field1" => "zip",
-                    "field2" => "zoop",
-                }
+                BTreeMap::from([
+                    (String::from("field1"), Value::from("zip")),
+                    (String::from("field2"), Value::from("zup")),
+                ]),
+                BTreeMap::from([
+                    (String::from("field1"), Value::from("zip")),
+                    (String::from("field2"), Value::from("zoop")),
+                ]),
             ]),
             file.find_table_rows(
                 Case::Insensitive,
@@ -834,14 +833,14 @@ mod tests {
 
         assert_eq!(
             Ok(vec![
-                btreemap! {
-                    "field1" => "zip",
-                    "field2" => "zup",
-                },
-                btreemap! {
-                    "field1" => "zip",
-                    "field2" => "zoop",
-                }
+                BTreeMap::from([
+                    (String::from("field1"), Value::from("zip")),
+                    (String::from("field2"), Value::from("zup")),
+                ]),
+                BTreeMap::from([
+                    (String::from("field1"), Value::from("zip")),
+                    (String::from("field2"), Value::from("zoop")),
+                ]),
             ]),
             file.find_table_rows(
                 Case::Insensitive,
@@ -888,10 +887,13 @@ mod tests {
         ];
 
         assert_eq!(
-            Ok(btreemap! {
-                "field1" => "zip",
-                "field2" => Value::Timestamp(chrono::Utc.ymd(2016, 12, 7).and_hms(0, 0, 0)),
-            }),
+            Ok(BTreeMap::from([
+                (String::from("field1"), Value::from("zip")),
+                (
+                    String::from("field2"),
+                    Value::Timestamp(chrono::Utc.ymd(2016, 12, 7).and_hms(0, 0, 0))
+                )
+            ])),
             file.find_table_row(Case::Sensitive, &conditions, None, Some(handle))
         );
     }

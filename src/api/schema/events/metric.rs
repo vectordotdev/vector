@@ -129,7 +129,7 @@ impl Metric {
                 let json = serde_json::to_value(&self.event)
                     .expect("logfmt serialization of metric event failed: conversion to serde Value failed. Please report.");
                 match json {
-                    Value::Object(map) => encode_logfmt::to_string(
+                    Value::Object(map) => encode_logfmt::encode_map(
                         &map.into_iter().collect::<BTreeMap<String, Value>>(),
                     )
                     .expect("logfmt serialization of metric event failed. Please report."),

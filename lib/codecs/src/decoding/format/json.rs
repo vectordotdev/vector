@@ -31,7 +31,7 @@ impl JsonDeserializerConfig {
     /// The schema produced by the deserializer.
     pub fn schema_definition(&self) -> schema::Definition {
         schema::Definition::empty()
-            .required_field(
+            .with_field(
                 log_schema().timestamp_key(),
                 // The JSON decoder will try to insert a new `timestamp`-type value into the
                 // "timestamp_key" field, but only if that field doesn't already exist.

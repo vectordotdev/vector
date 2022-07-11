@@ -114,11 +114,6 @@ impl Function for ParseGlog {
             required: true,
         }]
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        parse_glog(value)
-    }
 }
 
 #[derive(Debug, Clone)]

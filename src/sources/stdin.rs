@@ -8,8 +8,8 @@ use codecs::{
     StreamDecodingError,
 };
 use futures::{channel::mpsc, executor, SinkExt, StreamExt};
-use serde::{Deserialize, Serialize};
 use tokio_util::{codec::FramedRead, io::StreamReader};
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -20,14 +20,28 @@ use crate::{
     shutdown::ShutdownSignal,
     SourceSender,
 };
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `stdin` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct StdinConfig {
+    /// The maximum buffer size, in bytes, of incoming messages.
+    ///
+    /// Messages larger than this are truncated.
     #[serde(default = "crate::serde::default_max_length")]
     pub max_length: usize,
+
+    /// Overrides the name of the log field used to add the current hostname to each event.
+    ///
+    /// The value will be the current hostname for wherever Vector is running.
+    ///
+    /// By default, the [global `host_key` option](https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key) is used.
     pub host_key: Option<String>,
+
+    #[configurable(derived)]
     pub framing: Option<FramingConfig>,
+
+    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     pub decoding: DeserializerConfig,
 }

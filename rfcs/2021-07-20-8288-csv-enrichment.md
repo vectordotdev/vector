@@ -250,7 +250,7 @@ New records could simply be streamed in by appending to the file, but modified
 data could only be updated if we ensured the data also had some form of primary
 key.
 
-Because of these, it is felt the Join transform dosn't fit the exact problem of
+Because of these, it is felt the Join transform doesn't fit the exact problem of
 enrichment we are currently solving, however there are many other scenarios
 where this could be useful. In future, we can create a new enrichment table type
 that can accept an input from a Vector source which would provide all the
@@ -304,11 +304,11 @@ asynchronously.
 
 ## Plan Of Attack
 
-- [ ] Add support for enrichmetn tables. Any table sections will load the data
+- [ ] Add support for enrichment tables. Any table sections will load the data
       at boot time and will prevent Vector from starting up if the source file
       cannot be found or is incorrectly formatted.
 - [ ] Wire up the topology so Transforms have access to the enrichment tables.
 - [ ] Update VRL to allow the Remap Transform and Conditions to pass any tables
       into the program. VRL needs the tables at compile time to ensure the named
-      table is availailble and at run time to access the data.
+      table is available and at run time to access the data.
 - [ ] Implement `find_table_row` VRL function.

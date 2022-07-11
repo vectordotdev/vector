@@ -1,12 +1,12 @@
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::{btree_map::Entry, BTreeMap},
     pin::Pin,
     time::Duration,
 };
 
 use async_stream::stream;
 use futures::{Stream, StreamExt};
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use crate::{
     config::{DataType, Input, Output, TransformConfig, TransformContext, TransformDescription},
@@ -16,10 +16,14 @@ use crate::{
     transforms::{TaskTransform, Transform},
 };
 
-#[derive(Deserialize, Serialize, Debug, Default, Clone)]
+/// Configuration for the `aggregate` transform.
+#[configurable_component(transform)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct AggregateConfig {
-    /// The interval between flushes in milliseconds.
+    /// The interval between flushes, in milliseconds.
+    ///
+    /// Over this period metrics with the same series data (name, namespace, tags, …) will be aggregated.
     #[serde(default = "default_interval_ms")]
     pub interval_ms: u64,
 }
@@ -56,19 +60,17 @@ impl TransformConfig for AggregateConfig {
 
 type MetricEntry = (metric::MetricData, EventMetadata);
 
-//------------------------------------------------------------------------------
-
 #[derive(Debug)]
 pub struct Aggregate {
     interval: Duration,
-    map: HashMap<metric::MetricSeries, MetricEntry>,
+    map: BTreeMap<metric::MetricSeries, MetricEntry>,
 }
 
 impl Aggregate {
     pub fn new(config: &AggregateConfig) -> crate::Result<Self> {
         Ok(Self {
             interval: Duration::from_millis(config.interval_ms),
-            map: HashMap::new(),
+            map: BTreeMap::new(),
         })
     }
 
@@ -101,7 +103,8 @@ impl Aggregate {
     }
 
     fn flush_into(&mut self, output: &mut Vec<Event>) {
-        for (series, entry) in self.map.drain() {
+        let map = std::mem::take(&mut self.map);
+        for (series, entry) in map.into_iter() {
             let metric = metric::Metric::from_parts(series, entry.0, entry.1);
             output.push(Event::Metric(metric));
         }

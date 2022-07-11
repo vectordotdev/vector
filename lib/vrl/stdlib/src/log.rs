@@ -145,20 +145,9 @@ impl Function for Log {
             Ok(None)
         }
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let info = args
-            .required_any("level")
-            .downcast_ref::<LogInfo>()
-            .unwrap();
-        let rate_limit_secs = args
-            .optional("rate_limit_secs")
-            .unwrap_or_else(|| value!(1));
-        log(rate_limit_secs, &info.level, value, info.span)
-    }
 }
 
+#[allow(unused)] // will be used by LLVM runtime
 #[derive(Debug)]
 struct LogInfo {
     level: Bytes,

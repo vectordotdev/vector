@@ -2,7 +2,7 @@ use std::task::{Context, Poll};
 
 use aws_sdk_s3::error::PutObjectError;
 use aws_sdk_s3::types::{ByteStream, SdkError};
-use aws_sdk_s3::{Client as S3Client, Region};
+use aws_sdk_s3::Client as S3Client;
 use bytes::Bytes;
 use futures::future::BoxFuture;
 use md5::Digest;
@@ -16,7 +16,6 @@ use vector_core::{
 };
 
 use super::config::S3Options;
-use crate::internal_events::AwsBytesSent;
 
 #[derive(Debug, Clone)]
 pub struct S3Request {
@@ -76,12 +75,11 @@ impl DriverResponse for S3Response {
 #[derive(Clone)]
 pub struct S3Service {
     client: S3Client,
-    region: Option<Region>,
 }
 
 impl S3Service {
-    pub const fn new(client: S3Client, region: Option<Region>) -> S3Service {
-        S3Service { client, region }
+    pub const fn new(client: S3Client) -> S3Service {
+        S3Service { client }
     }
 
     pub fn client(&self) -> S3Client {
@@ -121,12 +119,10 @@ impl Service<S3Request> for S3Service {
         let count = request.metadata.count;
         let events_byte_size = request.metadata.byte_size;
 
-        let request_size = request.body.len();
         let client = self.client.clone();
 
-        let region = self.region.clone();
         Box::pin(async move {
-            let result = client
+            let request = client
                 .put_object()
                 .body(bytes_to_bytestream(request.body))
                 .bucket(request.bucket)
@@ -142,20 +138,13 @@ impl Service<S3Request> for S3Service {
                 .set_ssekms_key_id(options.ssekms_key_id)
                 .set_storage_class(options.storage_class.map(Into::into))
                 .set_tagging(tagging)
-                .content_md5(content_md5)
-                .send()
-                .in_current_span()
-                .await;
+                .content_md5(content_md5);
 
-            result.map(|_inner| {
-                emit!(AwsBytesSent {
-                    byte_size: request_size,
-                    region,
-                });
-                S3Response {
-                    count,
-                    events_byte_size,
-                }
+            let result = request.send().in_current_span().await;
+
+            result.map(|_| S3Response {
+                count,
+                events_byte_size,
             })
         })
     }

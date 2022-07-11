@@ -1,10 +1,11 @@
+use ::value::Value;
 use bytes::Bytes;
 use vrl::prelude::*;
 
-fn uuid_v4() -> Resolved {
+fn uuid_v4() -> Value {
     let mut buf = [0; 36];
     let uuid = uuid::Uuid::new_v4().hyphenated().encode_lower(&mut buf);
-    Ok(Bytes::copy_from_slice(uuid.as_bytes()).into())
+    Bytes::copy_from_slice(uuid.as_bytes()).into()
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -31,10 +32,6 @@ impl Function for UuidV4 {
     ) -> Compiled {
         Ok(Box::new(UuidV4Fn))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, _args: &mut VmArgumentList) -> Resolved {
-        uuid_v4()
-    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -42,7 +39,7 @@ struct UuidV4Fn;
 
 impl Expression for UuidV4Fn {
     fn resolve(&self, _: &mut Context) -> Resolved {
-        uuid_v4()
+        Ok(uuid_v4())
     }
 
     fn type_def(&self, _: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
@@ -52,6 +49,8 @@ impl Expression for UuidV4Fn {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use ::value::Value;
     use vector_common::TimeZone;
 
@@ -65,7 +64,7 @@ mod tests {
     #[test]
     fn uuid_v4() {
         let mut state = vrl::state::Runtime::default();
-        let mut object: Value = map![].into();
+        let mut object: Value = Value::Object(BTreeMap::new());
         let tz = TimeZone::default();
         let mut ctx = Context::new(&mut object, &mut state, &tz);
         let value = UuidV4Fn.resolve(&mut ctx).unwrap();
