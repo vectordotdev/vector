@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use tonic::{Request, Response, Status};
 use vector_core::{
+    config::LogNamespace,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
     ByteSizeOf,
 };
@@ -71,7 +72,7 @@ impl SourceConfig for OpentelemetryConfig {
         Ok(Box::pin(source))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         if self.multiple_outputs {
             vec![Output::default(DataType::Log).with_port(LOGS)]
         } else {
