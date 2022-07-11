@@ -31,16 +31,13 @@ configure_permissions() {
   fi
 
   # Own and RW restrict Vector data directory
-  chown -R vector:vector /var/lib/vector
-  chmod 740 /var/lib/vector
+  install --group vector --owner vector --mode 740 --directory /var/lib/vector
 
   # Own and RW restrict Vector config directory
-  chown -R vector:vector /etc/vector
-  chmod 740 /etc/vector
+  install --group vector --owner vector --mode 740 --directory /etc/vector
 
   # Own and RW restrict SystemD default EnvironmentFile
-  chown vector:vector /etc/default/vector
-  chmod 640 /etc/default/vector
+  install --group vector --owner vector --mode 640 --directory /etc/default/vector
 }
 
 case "$1" in
