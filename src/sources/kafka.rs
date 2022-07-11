@@ -19,8 +19,11 @@ use rdkafka::{
 };
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
-use vector_common::{byte_size_of::ByteSizeOf, finalizer::OrderedFinalizer};
+
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
+
+use vector_common::{byte_size_of::ByteSizeOf, finalizer::OrderedFinalizer};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -205,7 +208,12 @@ impl_generate_config_from_default!(KafkaSourceConfig);
 impl SourceConfig for KafkaSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let consumer = create_consumer(self)?;
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
+        let decoder = DecodingConfig::new(
+            self.framing.clone(),
+            self.decoding.clone(),
+            LogNamespace::Legacy,
+        )
+        .build();
         let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
 
         Ok(Box::pin(kafka_source(
@@ -218,7 +226,7 @@ impl SourceConfig for KafkaSourceConfig {
         )))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.decoding.output_type())]
     }
 

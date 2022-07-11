@@ -41,8 +41,11 @@ pub mod stream;
 mod test_util;
 pub mod time;
 pub mod transform;
+mod vrl;
 
 use std::path::PathBuf;
+
+pub use vrl::compile_vrl;
 
 pub use vector_buffers as buffers;
 #[cfg(any(test, feature = "test"))]

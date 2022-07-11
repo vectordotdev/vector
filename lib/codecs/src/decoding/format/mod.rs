@@ -11,8 +11,6 @@ mod native_json;
 #[cfg(feature = "syslog")]
 mod syslog;
 
-use std::fmt::Debug;
-
 use ::bytes::Bytes;
 use dyn_clone::DynClone;
 pub use gelf::{GelfDeserializer, GelfDeserializerConfig};
@@ -20,6 +18,8 @@ pub use json::{JsonDeserializer, JsonDeserializerConfig};
 pub use native::{NativeDeserializer, NativeDeserializerConfig};
 pub use native_json::{NativeJsonDeserializer, NativeJsonDeserializerConfig};
 use smallvec::SmallVec;
+use std::fmt::Debug;
+use vector_core::config::LogNamespace;
 use vector_core::event::Event;
 
 pub use self::bytes::{BytesDeserializer, BytesDeserializerConfig};
@@ -34,7 +34,11 @@ pub trait Deserializer: DynClone + Debug + Send + Sync {
     /// frame can potentially hold multiple events, e.g. when parsing a JSON
     /// array. However, we optimize the most common case of emitting one event
     /// by not requiring heap allocations for it.
-    fn parse(&self, bytes: Bytes) -> vector_core::Result<SmallVec<[Event; 1]>>;
+    fn parse(
+        &self,
+        bytes: Bytes,
+        log_namespace: LogNamespace,
+    ) -> vector_core::Result<SmallVec<[Event; 1]>>;
 }
 
 dyn_clone::clone_trait_object!(Deserializer);

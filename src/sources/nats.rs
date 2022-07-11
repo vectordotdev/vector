@@ -5,6 +5,8 @@ use futures::{pin_mut, stream, Stream, StreamExt};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
+
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -90,7 +92,12 @@ impl GenerateConfig for NatsSourceConfig {
 impl SourceConfig for NatsSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let (connection, subscription) = create_subscription(self).await?;
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
+        let decoder = DecodingConfig::new(
+            self.framing.clone(),
+            self.decoding.clone(),
+            LogNamespace::Legacy,
+        )
+        .build();
 
         Ok(Box::pin(nats_source(
             connection,
@@ -101,7 +108,7 @@ impl SourceConfig for NatsSourceConfig {
         )))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.decoding.output_type())]
     }
 
@@ -238,7 +245,12 @@ mod integration_tests {
 
         let events = assert_source_compliance(&SOURCE_TAGS, async move {
             let (tx, rx) = SourceSender::new_test();
-            let decoder = DecodingConfig::new(conf.framing.clone(), conf.decoding.clone()).build();
+            let decoder = DecodingConfig::new(
+                conf.framing.clone(),
+                conf.decoding.clone(),
+                LogNamespace::Legacy,
+            )
+            .build();
             tokio::spawn(nats_source(nc, sub, decoder, ShutdownSignal::noop(), tx));
             nc_pub.publish(&subject, msg).await.unwrap();
 

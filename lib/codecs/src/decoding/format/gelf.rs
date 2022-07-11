@@ -4,7 +4,9 @@ use lookup::path;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use std::collections::HashMap;
+use value::kind::Collection;
 use value::Kind;
+use vector_core::config::LogNamespace;
 use vector_core::{
     config::{log_schema, DataType},
     event::Event,
@@ -37,8 +39,8 @@ impl GelfDeserializerConfig {
     }
 
     /// The schema produced by the deserializer.
-    pub fn schema_definition(&self) -> schema::Definition {
-        schema::Definition::empty()
+    pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
+        schema::Definition::new(Kind::object(Collection::empty()), [log_namespace])
             .with_field(VERSION, Kind::bytes(), None)
             .with_field(HOST, Kind::bytes(), None)
             .with_field(SHORT_MESSAGE, Kind::bytes(), None)
@@ -75,7 +77,7 @@ impl GelfDeserializer {
     /// Builds a LogEvent from the parsed GelfMessage.
     /// The logic follows strictly the documented GELF standard.
     fn message_to_event(&self, parsed: &GelfMessage) -> vector_core::Result<Event> {
-        let mut log = LogEvent::from(parsed.short_message.to_string());
+        let mut log = LogEvent::from_str_legacy(parsed.short_message.to_string());
 
         // GELF spec defines the version as 1.1 which has not changed since 2013
         if parsed.version != GELF_VERSION {
@@ -184,7 +186,11 @@ struct GelfMessage {
 }
 
 impl Deserializer for GelfDeserializer {
-    fn parse(&self, bytes: Bytes) -> vector_core::Result<SmallVec<[Event; 1]>> {
+    fn parse(
+        &self,
+        bytes: Bytes,
+        _log_namespace: LogNamespace,
+    ) -> vector_core::Result<SmallVec<[Event; 1]>> {
         let line = std::str::from_utf8(&bytes)?;
         let line = line.trim();
 
@@ -213,7 +219,7 @@ mod tests {
         let config = GelfDeserializerConfig;
         let deserializer = config.build();
         let buffer = Bytes::from(serde_json::to_vec(&input).unwrap());
-        deserializer.parse(buffer)
+        deserializer.parse(buffer, LogNamespace::Legacy)
     }
 
     /// Validates all the spec'd fields of GELF are deserialized correctly.

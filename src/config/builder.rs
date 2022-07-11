@@ -320,6 +320,18 @@ impl ConfigBuilder {
 
         self.global.proxy = self.global.proxy.merge(&with.global.proxy);
 
+        if self.schema.log_namespace.is_some()
+            && with.schema.log_namespace.is_some()
+            && self.schema.log_namespace != with.schema.log_namespace
+        {
+            errors.push(
+                format!("conflicting values for 'log_namespace' found. Both {:?} and {:?} used in the same component",
+                                self.schema.log_namespace(), with.schema.log_namespace())
+            );
+        }
+
+        self.schema.log_namespace = self.schema.log_namespace.or(with.schema.log_namespace);
+
         if self.global.data_dir.is_none() || self.global.data_dir == default_data_dir() {
             self.global.data_dir = with.global.data_dir;
         } else if with.global.data_dir != default_data_dir()
@@ -462,7 +474,7 @@ mod tests {
     /// should ideally be able to fix so that the original hash passes!
     fn version_hash_match() {
         assert_eq!(
-            "84112522217c90260692863950365f9149f87b723ceea7930eec863653d697c8",
+            "53dff3cdc4bcf9ac23a04746b253b2f3ba8b1120e483e13d586b3643a4e066de",
             ConfigBuilder::default().sha256_hash()
         );
     }
