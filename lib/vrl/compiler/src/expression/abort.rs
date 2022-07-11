@@ -16,6 +16,7 @@ use crate::{
 pub struct Abort {
     span: Span,
     message: Option<Box<Expr>>,
+    messages: Vec<Option<String>>,
 }
 
 impl Abort {
@@ -49,7 +50,11 @@ impl Abort {
             })
             .transpose()?;
 
-        Ok(Self { span, message })
+        Ok(Self {
+            span,
+            message,
+            messages: vec![],
+        })
     }
 }
 
@@ -69,32 +74,35 @@ impl Expression for Abort {
         })
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        let messages: Vec<_> = if let Some(expr) = &self.message {
-            expr.resolve_batch(ctx);
-            ctx.resolved_values_mut()
-                .iter_mut()
-                .map(|resolved| {
-                    let resolved = {
-                        let mut moved = Ok(Value::Null);
-                        std::mem::swap(resolved, &mut moved);
-                        moved
-                    };
-                    (|| -> Result<_, ExpressionError> {
-                        Ok(Some(resolved?.try_bytes_utf8_lossy()?.to_string()))
-                    })()
-                })
-                .collect()
-        } else {
-            ctx.resolved_values_mut().iter().map(|_| Ok(None)).collect()
-        };
+    fn resolve_batch(&mut self, ctx: &mut BatchContext, selection_vector: &[usize]) {
+        self.messages.resize(selection_vector.len(), None);
 
-        for (resolved, message) in ctx.resolved_values_mut().iter_mut().zip(messages) {
-            *resolved = message.and_then(|message| {
-                Err(ExpressionError::Abort {
-                    span: self.span,
-                    message,
-                })
+        if let Some(expr) = &mut self.message {
+            expr.resolve_batch(ctx, selection_vector);
+
+            for index in selection_vector {
+                let index = *index;
+                let resolved = &mut ctx.resolved_values[index];
+                let resolved = {
+                    let mut moved = Ok(Value::Null);
+                    std::mem::swap(resolved, &mut moved);
+                    moved
+                };
+
+                self.messages[index] = (|| -> Result<_, ExpressionError> {
+                    Ok(Some(resolved?.try_bytes_utf8_lossy()?.to_string()))
+                })()
+                .unwrap_or(None);
+            }
+        }
+
+        for index in selection_vector {
+            let index = *index;
+            let message = self.messages[index].take();
+
+            ctx.resolved_values[index] = Err(ExpressionError::Abort {
+                span: self.span,
+                message,
             });
         }
     }

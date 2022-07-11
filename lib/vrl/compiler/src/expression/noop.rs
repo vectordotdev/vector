@@ -16,9 +16,9 @@ impl Expression for Noop {
         Ok(Value::Null)
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        for resolved in ctx.resolved_values_mut() {
-            *resolved = Ok(Value::Null);
+    fn resolve_batch(&mut self, ctx: &mut BatchContext, selection_vector: &[usize]) {
+        for index in selection_vector {
+            ctx.resolved_values[*index] = Ok(Value::Null);
         }
     }
 

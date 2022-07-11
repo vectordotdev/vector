@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use value::Value;
 use vector_common::TimeZone;
-use vrl::{diagnostic::Formatter, Program, Runtime, VrlRuntime};
+use vrl::{diagnostic::Formatter, Program, Runtime, Terminate, VrlRuntime};
 
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription, Conditional},
@@ -88,7 +88,9 @@ impl Vrl {
         // TODO: use timezone from remap config
         let timezone = TimeZone::default();
 
-        let result = Runtime::default().resolve(&mut target, &self.program, &timezone);
+        let result = Runtime::default()
+            .resolve(&mut target, &self.program, &timezone)
+            .map_err(Terminate::from);
         let original_event = match target.into_events() {
             TargetEvents::One(event) => event,
             _ => panic!("Event was modified in a condition. This is an internal compiler error."),
@@ -105,7 +107,9 @@ impl Vrl {
             .into_events()
             .map(|event| {
                 let mut target = VrlTarget::new(event, program_info);
-                let result = Runtime::default().resolve(&mut target, &self.program, &timezone);
+                let result = Runtime::default()
+                    .resolve(&mut target, &self.program, &timezone)
+                    .map_err(Terminate::from);
                 let original_event = match target.into_events() {
                     TargetEvents::One(event) => event,
                     _ => panic!(

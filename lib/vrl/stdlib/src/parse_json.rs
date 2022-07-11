@@ -199,9 +199,12 @@ impl Expression for ParseJsonFn {
         parse_json(value)
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        self.value.resolve_batch(ctx);
-        for resolved in ctx.resolved_values_mut() {
+    fn resolve_batch(&mut self, ctx: &mut BatchContext, selection_vector: &[usize]) {
+        self.value.resolve_batch(ctx, selection_vector);
+
+        for index in selection_vector {
+            let index = *index;
+            let resolved = &mut ctx.resolved_values[index];
             let temp = {
                 let mut moved = Ok(Value::Null);
                 std::mem::swap(resolved, &mut moved);

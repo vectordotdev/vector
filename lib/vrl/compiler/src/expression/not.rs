@@ -42,9 +42,11 @@ impl Expression for Not {
         Ok((!self.inner.resolve(ctx)?.try_boolean()?).into())
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        self.inner.resolve_batch(ctx);
-        for resolved in ctx.resolved_values_mut() {
+    fn resolve_batch(&mut self, ctx: &mut BatchContext, selection_vector: &[usize]) {
+        self.inner.resolve_batch(ctx, selection_vector);
+
+        for index in selection_vector {
+            let resolved = &mut ctx.resolved_values[*index];
             let temp = {
                 let mut moved = Ok(Value::Null);
                 std::mem::swap(resolved, &mut moved);

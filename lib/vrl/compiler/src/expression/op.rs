@@ -16,6 +16,8 @@ pub struct Op {
     pub(crate) lhs: Box<Expr>,
     pub(crate) rhs: Box<Expr>,
     pub(crate) opcode: ast::Opcode,
+    selection_vector_ok: Vec<usize>,
+    resolved_values_rhs: Vec<Resolved>,
 }
 
 impl Op {
@@ -73,6 +75,8 @@ impl Op {
             lhs: Box::new(lhs),
             rhs: Box::new(rhs),
             opcode,
+            selection_vector_ok: vec![],
+            resolved_values_rhs: vec![],
         })
     }
 }
@@ -121,25 +125,29 @@ impl Expression for Op {
         .map_err(Into::into)
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        use ast::Opcode::*;
-        use value::Value::*;
+    fn resolve_batch(&mut self, ctx: &mut BatchContext, selection_vector: &[usize]) {
+        use ast::Opcode::{Add, And, Div, Eq, Err, Ge, Gt, Le, Lt, Merge, Mul, Ne, Or, Rem, Sub};
+        use value::Value::{Boolean, Null};
 
         match self.opcode {
             Err => {
-                return for (_, resolved, target, state, timezone) in ctx.iter_mut() {
-                    let target = &mut *(*target).borrow_mut();
-                    let state = &mut *(*state).borrow_mut();
-                    let mut ctx = Context::new(target, state, &timezone);
+                return for index in selection_vector {
+                    let index = *index;
+                    let target = &mut *ctx.targets[index];
+                    let state = &mut ctx.states[index];
+                    let resolved = &mut ctx.resolved_values[index];
+                    let mut ctx = Context::new(target, state, &ctx.timezone);
                     let ctx = &mut ctx;
                     *resolved = self.lhs.resolve(ctx).or_else(|_| self.rhs.resolve(ctx));
                 }
             }
             Or => {
-                return for (_, resolved, target, state, timezone) in ctx.iter_mut() {
-                    let target = &mut *(*target).borrow_mut();
-                    let state = &mut *(*state).borrow_mut();
-                    let mut ctx = Context::new(target, state, &timezone);
+                return for index in selection_vector {
+                    let index = *index;
+                    let target = &mut *ctx.targets[index];
+                    let state = &mut ctx.states[index];
+                    let resolved = &mut ctx.resolved_values[index];
+                    let mut ctx = Context::new(target, state, &ctx.timezone);
                     let ctx = &mut ctx;
                     *resolved = (|| {
                         self.lhs
@@ -150,10 +158,12 @@ impl Expression for Op {
                 }
             }
             And => {
-                return for (_, resolved, target, state, timezone) in ctx.iter_mut() {
-                    let target = &mut *(*target).borrow_mut();
-                    let state = &mut *(*state).borrow_mut();
-                    let mut ctx = Context::new(target, state, &timezone);
+                return for index in selection_vector {
+                    let index = *index;
+                    let target = &mut *ctx.targets[index];
+                    let state = &mut ctx.states[index];
+                    let resolved = &mut ctx.resolved_values[index];
+                    let mut ctx = Context::new(target, state, &ctx.timezone);
                     let ctx = &mut ctx;
                     *resolved = (|| match self.lhs.resolve(ctx)? {
                         Null | Boolean(false) => Ok(false.into()),
@@ -164,127 +174,288 @@ impl Expression for Op {
             _ => (),
         }
 
-        self.lhs.resolve_batch(ctx);
-        let ctx_lhs_err = ctx.drain_filter(|resolved| resolved.is_err());
-        let lhs = {
-            let mut moved = vec![Ok(Value::Null); ctx.len()];
-            std::mem::swap(ctx.resolved_values_mut(), &mut moved);
-            moved
-        };
-        self.rhs.resolve_batch(ctx);
-        let mut ctx_rhs_ok_resolved_values = Vec::with_capacity(ctx.len());
-        let mut ctx_rhs_ok_targets = Vec::with_capacity(ctx.len());
-        let mut ctx_rhs_ok_states = Vec::with_capacity(ctx.len());
-        let mut ctx_rhs_err_indices = Vec::new();
-        let mut ctx_rhs_err_resolved_values = Vec::new();
-        let mut ctx_rhs_err_targets = Vec::new();
-        let mut ctx_rhs_err_states = Vec::new();
+        self.lhs.resolve_batch(ctx, selection_vector);
 
-        for ((rhs_index, rhs, target, state, _), lhs) in ctx.iter_mut().zip(lhs) {
-            if rhs.is_err() {
-                let rhs = {
-                    let mut moved = Ok(Value::Null);
-                    std::mem::swap(rhs, &mut moved);
-                    moved
-                };
+        self.selection_vector_ok.resize(selection_vector.len(), 0);
+        self.selection_vector_ok.copy_from_slice(selection_vector);
 
-                ctx_rhs_err_indices.push(rhs_index);
-                ctx_rhs_err_resolved_values.push(rhs);
-                ctx_rhs_err_targets.push(target);
-                ctx_rhs_err_states.push(state);
+        let mut len = self.selection_vector_ok.len();
+        let mut i = 0;
+        loop {
+            if i >= len {
+                break;
+            }
+
+            let index = self.selection_vector_ok[i];
+            if ctx.resolved_values[index].is_err() {
+                len -= 1;
+                self.selection_vector_ok.swap(i, len);
             } else {
-                ctx_rhs_ok_resolved_values.push((lhs, rhs));
-                ctx_rhs_ok_targets.push(target);
-                ctx_rhs_ok_states.push(state);
+                i += 1;
             }
         }
+        self.selection_vector_ok.truncate(len);
 
-        let values = ctx_rhs_ok_resolved_values.into_iter().map(|(lhs, rhs)| {
-            let resolved = rhs;
-            let lhs = lhs.expect("is not an error");
-            let rhs = {
-                let mut moved = Ok(Value::Null);
-                std::mem::swap(resolved, &mut moved);
-                moved
+        self.resolved_values_rhs.truncate(0);
+        self.resolved_values_rhs
+            .resize(ctx.resolved_values.len(), Ok(Value::Null));
+
+        std::mem::swap(ctx.resolved_values, &mut self.resolved_values_rhs);
+        self.rhs.resolve_batch(ctx, &self.selection_vector_ok);
+        std::mem::swap(ctx.resolved_values, &mut self.resolved_values_rhs);
+
+        let mut len = self.selection_vector_ok.len();
+        let mut i = 0;
+        loop {
+            if i >= len {
+                break;
             }
-            .expect("is not an error");
-            (resolved, lhs, rhs)
-        });
+
+            let index = self.selection_vector_ok[i];
+            if self.resolved_values_rhs[index].is_err() {
+                len -= 1;
+                self.selection_vector_ok.swap(i, len);
+                std::mem::swap(
+                    &mut self.resolved_values_rhs[index],
+                    &mut ctx.resolved_values[index],
+                )
+            } else {
+                i += 1;
+            }
+        }
+        self.selection_vector_ok.truncate(len);
 
         match self.opcode {
             Mul => {
-                values.for_each(|(resolved, lhs, rhs)| {
+                for index in &self.selection_vector_ok {
+                    let index = *index;
+                    let resolved = &mut ctx.resolved_values[index];
+                    let lhs = {
+                        let mut moved = Ok(Value::Null);
+                        std::mem::swap(resolved, &mut moved);
+                        moved
+                    }
+                    .expect("value is not an error");
+                    let rhs = {
+                        let mut moved = Ok(Value::Null);
+                        std::mem::swap(&mut self.resolved_values_rhs[index], &mut moved);
+                        moved
+                    }
+                    .expect("value is not an error");
                     *resolved = lhs.try_mul(rhs).map_err(Into::into);
-                });
+                }
             }
             Div => {
-                values.for_each(|(resolved, lhs, rhs)| {
+                for index in &self.selection_vector_ok {
+                    let index = *index;
+                    let resolved = &mut ctx.resolved_values[index];
+                    let lhs = {
+                        let mut moved = Ok(Value::Null);
+                        std::mem::swap(resolved, &mut moved);
+                        moved
+                    }
+                    .expect("value is not an error");
+                    let rhs = {
+                        let mut moved = Ok(Value::Null);
+                        std::mem::swap(&mut self.resolved_values_rhs[index], &mut moved);
+                        moved
+                    }
+                    .expect("value is not an error");
                     *resolved = lhs.try_div(rhs).map_err(Into::into);
-                });
+                }
             }
             Add => {
-                values.for_each(|(resolved, lhs, rhs)| {
+                for index in &self.selection_vector_ok {
+                    let index = *index;
+                    let resolved = &mut ctx.resolved_values[index];
+                    let lhs = {
+                        let mut moved = Ok(Value::Null);
+                        std::mem::swap(resolved, &mut moved);
+                        moved
+                    }
+                    .expect("value is not an error");
+                    let rhs = {
+                        let mut moved = Ok(Value::Null);
+                        std::mem::swap(&mut self.resolved_values_rhs[index], &mut moved);
+                        moved
+                    }
+                    .expect("value is not an error");
                     *resolved = lhs.try_add(rhs).map_err(Into::into);
-                });
+                }
             }
             Sub => {
-                values.for_each(|(resolved, lhs, rhs)| {
+                for index in &self.selection_vector_ok {
+                    let index = *index;
+                    let resolved = &mut ctx.resolved_values[index];
+                    let lhs = {
+                        let mut moved = Ok(Value::Null);
+                        std::mem::swap(resolved, &mut moved);
+                        moved
+                    }
+                    .expect("value is not an error");
+                    let rhs = {
+                        let mut moved = Ok(Value::Null);
+                        std::mem::swap(&mut self.resolved_values_rhs[index], &mut moved);
+                        moved
+                    }
+                    .expect("value is not an error");
                     *resolved = lhs.try_sub(rhs).map_err(Into::into);
-                });
+                }
             }
             Rem => {
-                values.for_each(|(resolved, lhs, rhs)| {
+                for index in &self.selection_vector_ok {
+                    let index = *index;
+                    let resolved = &mut ctx.resolved_values[index];
+                    let lhs = {
+                        let mut moved = Ok(Value::Null);
+                        std::mem::swap(resolved, &mut moved);
+                        moved
+                    }
+                    .expect("value is not an error");
+                    let rhs = {
+                        let mut moved = Ok(Value::Null);
+                        std::mem::swap(&mut self.resolved_values_rhs[index], &mut moved);
+                        moved
+                    }
+                    .expect("value is not an error");
                     *resolved = lhs.try_rem(rhs).map_err(Into::into);
-                });
+                }
             }
             Eq => {
-                values.for_each(|(resolved, lhs, rhs)| {
+                for index in &self.selection_vector_ok {
+                    let index = *index;
+                    let resolved = &mut ctx.resolved_values[index];
+                    let lhs = {
+                        let mut moved = Ok(Value::Null);
+                        std::mem::swap(resolved, &mut moved);
+                        moved
+                    }
+                    .expect("value is not an error");
+                    let rhs = {
+                        let mut moved = Ok(Value::Null);
+                        std::mem::swap(&mut self.resolved_values_rhs[index], &mut moved);
+                        moved
+                    }
+                    .expect("value is not an error");
                     *resolved = Ok(lhs.eq_lossy(&rhs).into());
-                });
+                }
             }
             Ne => {
-                values.for_each(|(resolved, lhs, rhs)| {
+                for index in &self.selection_vector_ok {
+                    let index = *index;
+                    let resolved = &mut ctx.resolved_values[index];
+                    let lhs = {
+                        let mut moved = Ok(Value::Null);
+                        std::mem::swap(resolved, &mut moved);
+                        moved
+                    }
+                    .expect("value is not an error");
+                    let rhs = {
+                        let mut moved = Ok(Value::Null);
+                        std::mem::swap(&mut self.resolved_values_rhs[index], &mut moved);
+                        moved
+                    }
+                    .expect("value is not an error");
                     *resolved = Ok((!lhs.eq_lossy(&rhs)).into());
-                });
+                }
             }
             Gt => {
-                values.for_each(|(resolved, lhs, rhs)| {
+                for index in &self.selection_vector_ok {
+                    let index = *index;
+                    let resolved = &mut ctx.resolved_values[index];
+                    let lhs = {
+                        let mut moved = Ok(Value::Null);
+                        std::mem::swap(resolved, &mut moved);
+                        moved
+                    }
+                    .expect("value is not an error");
+                    let rhs = {
+                        let mut moved = Ok(Value::Null);
+                        std::mem::swap(&mut self.resolved_values_rhs[index], &mut moved);
+                        moved
+                    }
+                    .expect("value is not an error");
                     *resolved = lhs.try_gt(rhs).map_err(Into::into);
-                });
+                }
             }
             Ge => {
-                values.for_each(|(resolved, lhs, rhs)| {
+                for index in &self.selection_vector_ok {
+                    let index = *index;
+                    let resolved = &mut ctx.resolved_values[index];
+                    let lhs = {
+                        let mut moved = Ok(Value::Null);
+                        std::mem::swap(resolved, &mut moved);
+                        moved
+                    }
+                    .expect("value is not an error");
+                    let rhs = {
+                        let mut moved = Ok(Value::Null);
+                        std::mem::swap(&mut self.resolved_values_rhs[index], &mut moved);
+                        moved
+                    }
+                    .expect("value is not an error");
                     *resolved = lhs.try_ge(rhs).map_err(Into::into);
-                });
+                }
             }
             Lt => {
-                values.for_each(|(resolved, lhs, rhs)| {
+                for index in &self.selection_vector_ok {
+                    let index = *index;
+                    let resolved = &mut ctx.resolved_values[index];
+                    let lhs = {
+                        let mut moved = Ok(Value::Null);
+                        std::mem::swap(resolved, &mut moved);
+                        moved
+                    }
+                    .expect("value is not an error");
+                    let rhs = {
+                        let mut moved = Ok(Value::Null);
+                        std::mem::swap(&mut self.resolved_values_rhs[index], &mut moved);
+                        moved
+                    }
+                    .expect("value is not an error");
                     *resolved = lhs.try_lt(rhs).map_err(Into::into);
-                });
+                }
             }
             Le => {
-                values.for_each(|(resolved, lhs, rhs)| {
+                for index in &self.selection_vector_ok {
+                    let index = *index;
+                    let resolved = &mut ctx.resolved_values[index];
+                    let lhs = {
+                        let mut moved = Ok(Value::Null);
+                        std::mem::swap(resolved, &mut moved);
+                        moved
+                    }
+                    .expect("value is not an error");
+                    let rhs = {
+                        let mut moved = Ok(Value::Null);
+                        std::mem::swap(&mut self.resolved_values_rhs[index], &mut moved);
+                        moved
+                    }
+                    .expect("value is not an error");
                     *resolved = lhs.try_le(rhs).map_err(Into::into);
-                });
+                }
             }
             Merge => {
-                values.for_each(|(resolved, lhs, rhs)| {
+                for index in &self.selection_vector_ok {
+                    let index = *index;
+                    let resolved = &mut ctx.resolved_values[index];
+                    let lhs = {
+                        let mut moved = Ok(Value::Null);
+                        std::mem::swap(resolved, &mut moved);
+                        moved
+                    }
+                    .expect("value is not an error");
+                    let rhs = {
+                        let mut moved = Ok(Value::Null);
+                        std::mem::swap(&mut self.resolved_values_rhs[index], &mut moved);
+                        moved
+                    }
+                    .expect("value is not an error");
                     *resolved = lhs.try_merge(rhs).map_err(Into::into);
-                });
+                }
             }
             And | Or | Err => unreachable!(),
         }
-
-        let ctx_rhs_err = BatchContext::new(
-            ctx_rhs_err_indices,
-            ctx_rhs_err_resolved_values,
-            ctx_rhs_err_targets,
-            ctx_rhs_err_states,
-            ctx.timezone(),
-        );
-
-        ctx.extend(ctx_lhs_err);
-        ctx.extend(ctx_rhs_err);
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
@@ -584,6 +755,8 @@ mod tests {
             lhs: Box::new(lhs.into()),
             rhs: Box::new(rhs.into()),
             opcode,
+            selection_vector_ok: vec![],
+            resolved_values_rhs: vec![],
         }
     }
 
@@ -757,6 +930,8 @@ mod tests {
                 lhs: Box::new(Literal::from(true).into()),
                 rhs: Box::new(Literal::from(NotNan::new(1.0).unwrap()).into()),
                 opcode: Div,
+                selection_vector_ok: vec![],
+                resolved_values_rhs: vec![],
             },
             want: TypeDef::float().fallible(),
         }
@@ -772,6 +947,8 @@ mod tests {
                     lhs: Box::new(Literal::from(1).into()),
                     rhs: Box::new(Variable::new(Span::default(), Ident::new("foo"), local).unwrap().into()),
                     opcode: Div,
+                    selection_vector_ok: vec![],
+                    resolved_values_rhs: vec![],
                 }
             },
             want: TypeDef::float().fallible(),
@@ -918,9 +1095,13 @@ mod tests {
                     lhs: Box::new(Literal::from("foo").into()),
                     rhs: Box::new(Literal::from(1).into()),
                     opcode: Div,
+                    selection_vector_ok: vec![],
+                    resolved_values_rhs: vec![],
                 }.into()),
                 rhs: Box::new(Literal::from(true).into()),
                 opcode: Err,
+                selection_vector_ok: vec![],
+                resolved_values_rhs: vec![],
             },
             want: TypeDef::float().add_boolean(),
         }
@@ -931,13 +1112,19 @@ mod tests {
                     lhs: Box::new(Literal::from("foo").into()),
                     rhs: Box::new(Literal::from(NotNan::new(0.0).unwrap()).into()),
                     opcode: Div,
+                    selection_vector_ok: vec![],
+                    resolved_values_rhs: vec![],
                 }.into()),
                 rhs: Box::new(Op {
                     lhs: Box::new(Literal::from(true).into()),
                     rhs: Box::new(Literal::from(NotNan::new(0.0).unwrap()).into()),
                     opcode: Div,
+                    selection_vector_ok: vec![],
+                    resolved_values_rhs: vec![],
                 }.into()),
                 opcode: Err,
+                selection_vector_ok: vec![],
+                resolved_values_rhs: vec![],
             },
             want: TypeDef::float().fallible(),
         }
@@ -948,17 +1135,25 @@ mod tests {
                     lhs: Box::new(Literal::from("foo").into()),
                     rhs: Box::new(Literal::from(1).into()),
                     opcode: Div,
+                    selection_vector_ok: vec![],
+                    resolved_values_rhs: vec![],
                 }.into()),
                 rhs: Box::new(Op {
                     lhs: Box::new(Op {
                         lhs: Box::new(Literal::from(true).into()),
                         rhs: Box::new(Literal::from(1).into()),
                         opcode: Div,
+                        selection_vector_ok: vec![],
+                        resolved_values_rhs: vec![],
                     }.into()),
                     rhs: Box::new(Literal::from("foo").into()),
                     opcode: Err,
+                    selection_vector_ok: vec![],
+                    resolved_values_rhs: vec![],
                 }.into()),
                 opcode: Err,
+                selection_vector_ok: vec![],
+                resolved_values_rhs: vec![],
             },
             want: TypeDef::float().add_bytes(),
         }
@@ -966,13 +1161,16 @@ mod tests {
         or_nullable {
             expr: |_| Op {
                 lhs: Box::new(
-                    IfStatement {
-                        predicate: Predicate::new_unchecked(vec![Literal::from(true).into()]),
-                        consequent: Block::new(vec![Literal::from("string").into()], LocalEnv::default()),
-                        alternative: None,
-                    }.into()),
+                    IfStatement::new(
+                        Predicate::new_unchecked(vec![Literal::from(true).into()]),
+                        Block::new(vec![Literal::from("string").into()], LocalEnv::default()),
+                        None
+                    ).into()
+                ),
                 rhs: Box::new(Literal::from("another string").into()),
                 opcode: Or,
+                selection_vector_ok: vec![],
+                resolved_values_rhs: vec![],
             },
             want: TypeDef::bytes(),
         }
@@ -980,13 +1178,16 @@ mod tests {
         or_not_nullable {
             expr: |_| Op {
                 lhs: Box::new(
-                    IfStatement {
-                        predicate: Predicate::new_unchecked(vec![Literal::from(true).into()]),
-                        consequent: Block::new(vec![Literal::from("string").into()], LocalEnv::default()),
-                        alternative:  Some(Block::new(vec![Literal::from(42).into()], LocalEnv::default()))
-                }.into()),
+                    IfStatement::new(
+                        Predicate::new_unchecked(vec![Literal::from(true).into()]),
+                        Block::new(vec![Literal::from("string").into()], LocalEnv::default()),
+                        Some(Block::new(vec![Literal::from(42).into()], LocalEnv::default()))
+                    ).into()
+                ),
                 rhs: Box::new(Literal::from("another string").into()),
                 opcode: Or,
+                selection_vector_ok: vec![],
+                resolved_values_rhs: vec![],
             },
             want: TypeDef::bytes().add_integer(),
         }
