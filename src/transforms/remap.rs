@@ -1,5 +1,3 @@
-use std::cell::RefCell;
-use std::rc::Rc;
 use std::sync::Arc;
 use std::{
     collections::BTreeMap,
@@ -10,10 +8,11 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use value::Kind;
+use value::{Kind, Value};
 use vector_common::TimeZone;
 use vector_core::event::{EventArray, EventContainer};
 use vector_vrl_functions::set_semantic_meaning::MeaningList;
+use vrl::prelude::Resolved;
 use vrl::{
     diagnostic::{Formatter, Note},
     prelude::{DiagnosticMessage, ExpressionError},
@@ -223,6 +222,7 @@ where
     reroute_dropped: bool,
     default_schema_definition: Arc<schema::Definition>,
     dropped_schema_definition: Arc<schema::Definition>,
+    values: Vec<Resolved>,
     runner: Runner,
 }
 
@@ -234,12 +234,13 @@ pub trait VrlRunner {
         timezone: &TimeZone,
     ) -> std::result::Result<value::Value, Terminate>;
 
-    fn run_batch(
-        &mut self,
-        targets: Vec<Rc<RefCell<dyn Target>>>,
-        program: &Program,
+    fn run_batch<'a>(
+        &'a mut self,
+        values: &'a mut Vec<Resolved>,
+        targets: &'a mut [&'a mut dyn Target],
+        program: &mut Program,
         timezone: TimeZone,
-    ) -> Vec<std::result::Result<value::Value, Terminate>>;
+    );
 }
 
 #[derive(Debug)]
@@ -264,25 +265,20 @@ impl VrlRunner for AstRunner {
     ) -> std::result::Result<value::Value, Terminate> {
         let result = self.runtime.resolve(target, program, timezone);
         self.runtime.clear();
-        result
+        result.map_err(Terminate::from)
     }
 
-    fn run_batch(
-        &mut self,
-        targets: Vec<Rc<RefCell<dyn Target>>>,
-        program: &Program,
+    fn run_batch<'a>(
+        &'a mut self,
+        values: &'a mut Vec<Resolved>,
+        targets: &'a mut [&'a mut dyn Target],
+        program: &mut Program,
         timezone: TimeZone,
-    ) -> Vec<std::result::Result<value::Value, Terminate>> {
-        targets
-            .into_iter()
-            .map(|target| {
-                let result = self
-                    .runtime
-                    .resolve(&mut *target.borrow_mut(), program, &timezone);
-                self.runtime.clear();
-                result
-            })
-            .collect()
+    ) {
+        for i in 0..targets.len() {
+            values[i] = self.runtime.resolve(targets[i], program, &timezone);
+            self.runtime.clear();
+        }
     }
 }
 
@@ -306,12 +302,14 @@ impl Remap<AstRunner> {
 #[derive(Debug)]
 pub struct AstBatchRunner {
     runtime: BatchRuntime,
+    states: Vec<vrl::state::Runtime>,
 }
 
 impl Clone for AstBatchRunner {
     fn clone(&self) -> Self {
         Self {
             runtime: BatchRuntime::default(),
+            states: vec![],
         }
     }
 }
@@ -324,16 +322,25 @@ impl VrlRunner for AstBatchRunner {
         timezone: &TimeZone,
     ) -> std::result::Result<value::Value, Terminate> {
         let mut runtime = Runtime::default();
-        runtime.resolve(target, program, timezone)
+        runtime
+            .resolve(target, program, timezone)
+            .map_err(Terminate::from)
     }
 
-    fn run_batch(
-        &mut self,
-        targets: Vec<Rc<RefCell<dyn Target>>>,
-        program: &Program,
+    fn run_batch<'a>(
+        &'a mut self,
+        values: &'a mut Vec<Resolved>,
+        targets: &'a mut [&'a mut dyn Target],
+        program: &mut Program,
         timezone: TimeZone,
-    ) -> Vec<std::result::Result<value::Value, Terminate>> {
-        self.runtime.resolve_batch(targets, program, timezone)
+    ) {
+        for state in &mut self.states {
+            state.clear();
+        }
+        self.states
+            .resize_with(targets.len(), vrl::state::Runtime::default);
+        self.runtime
+            .resolve_batch(values, targets, &mut self.states, program, timezone);
     }
 }
 
@@ -349,6 +356,7 @@ impl Remap<AstBatchRunner> {
 
         let runner = AstBatchRunner {
             runtime: BatchRuntime::default(),
+            states: vec![],
         };
 
         Self::new(config, context, program, runner).map(|remap| (remap, warnings))
@@ -388,6 +396,7 @@ where
             default_schema_definition: Arc::new(default_schema_definition),
             dropped_schema_definition: Arc::new(dropped_schema_definition),
             runner,
+            values: vec![],
         })
     }
 
@@ -396,7 +405,11 @@ where
         &self.runner
     }
 
-    fn anotate_data(&self, reason: &str, error: ExpressionError) -> serde_json::Value {
+    fn annotate_data(
+        component_key: &Option<ComponentKey>,
+        reason: &str,
+        error: ExpressionError,
+    ) -> serde_json::Value {
         let message = error
             .notes()
             .iter()
@@ -408,19 +421,24 @@ where
             "dropped": {
                 "reason": reason,
                 "message": message,
-                "component_id": self.component_key,
+                "component_id": component_key,
                 "component_type": "remap",
                 "component_kind": "transform",
             }
         })
     }
 
-    fn annotate_dropped(&self, event: &mut Event, reason: &str, error: ExpressionError) {
+    fn annotate_dropped(
+        component_key: &Option<ComponentKey>,
+        event: &mut Event,
+        reason: &str,
+        error: ExpressionError,
+    ) {
         match event {
             Event::Log(ref mut log) => {
                 log.insert(
                     log_schema().metadata_key(),
-                    self.anotate_data(reason, error),
+                    Self::annotate_data(component_key, reason, error),
                 );
             }
             Event::Metric(ref mut metric) => {
@@ -428,7 +446,7 @@ where
                 metric.insert_tag(format!("{}.dropped.reason", m), reason.into());
                 metric.insert_tag(
                     format!("{}.dropped.component_id", m),
-                    self.component_key
+                    component_key
                         .as_ref()
                         .map(ToString::to_string)
                         .unwrap_or_else(String::new),
@@ -439,7 +457,7 @@ where
             Event::Trace(ref mut trace) => {
                 trace.insert(
                     log_schema().metadata_key(),
-                    self.anotate_data(reason, error),
+                    Self::annotate_data(component_key, reason, error),
                 );
             }
         }
@@ -449,11 +467,10 @@ where
         self.runner.run(target, &self.program, &self.timezone)
     }
 
-    fn run_vrl_batch(
-        &mut self,
-        targets: Vec<Rc<RefCell<dyn Target>>>,
-    ) -> Vec<std::result::Result<value::Value, Terminate>> {
-        self.runner.run_batch(targets, &self.program, self.timezone)
+    fn run_vrl_batch<'a>(&'a mut self, targets: &'a mut [&'a mut dyn Target]) {
+        self.values.resize(targets.len(), Ok(Value::Null));
+        self.runner
+            .run_batch(&mut self.values, targets, &mut self.program, self.timezone);
     }
 }
 
@@ -521,7 +538,7 @@ where
                 } else if self.reroute_dropped {
                     let mut event = original_event.expect("event will be set");
 
-                    self.annotate_dropped(&mut event, reason, error);
+                    Self::annotate_dropped(&self.component_key, &mut event, reason, error);
                     push_dropped(event, output, &self.dropped_schema_definition);
                 }
             }
@@ -552,23 +569,24 @@ where
         };
 
         let program_info = self.program.info();
-        let targets = events
+        let mut targets = events
             .into_events()
-            .map(|event| Rc::new(RefCell::new(VrlTarget::new(event, program_info))))
+            .map(|event| VrlTarget::new(event, program_info))
             .collect::<Vec<_>>();
-        let batch_targets = targets
-            .clone()
-            .into_iter()
-            .map(|target| target as Rc<RefCell<dyn Target>>)
-            .collect();
+        let mut batch_targets = targets
+            .iter_mut()
+            .map(|target| target as &mut dyn Target)
+            .collect::<Vec<_>>();
 
-        let results = self.run_vrl_batch(batch_targets);
+        self.run_vrl_batch(&mut batch_targets);
 
-        for (i, (target, result)) in targets.into_iter().zip(results).enumerate() {
-            let target = Rc::try_unwrap(target)
-                .expect("unique ownership of target")
-                .into_inner();
-
+        for (i, (target, value)) in targets.into_iter().zip(self.values.iter_mut()).enumerate() {
+            let result = {
+                let mut moved = Ok(Value::Null);
+                std::mem::swap(value, &mut moved);
+                moved
+            }
+            .map_err(Terminate::from);
             match result {
                 Ok(_) => match target.into_events() {
                     TargetEvents::One(event) => {
@@ -627,7 +645,7 @@ where
                             }
                         };
 
-                        self.annotate_dropped(&mut event, reason, error);
+                        Self::annotate_dropped(&self.component_key, &mut event, reason, error);
                         push_dropped(event, output, &self.dropped_schema_definition);
                     }
                 }

@@ -24,8 +24,8 @@ impl Expression for Group {
         self.inner.resolve(ctx)
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        self.inner.resolve_batch(ctx);
+    fn resolve_batch(&mut self, ctx: &mut BatchContext, selection_vector: &[usize]) {
+        self.inner.resolve_batch(ctx, selection_vector);
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {

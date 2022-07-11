@@ -11,9 +11,24 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct IfStatement {
-    pub predicate: Predicate,
-    pub consequent: Block,
-    pub alternative: Option<Block>,
+    predicate: Predicate,
+    consequent: Block,
+    alternative: Option<Block>,
+    selection_vector_if: Vec<usize>,
+    selection_vector_else: Vec<usize>,
+}
+
+impl IfStatement {
+    #[must_use]
+    pub fn new(predicate: Predicate, consequent: Block, alternative: Option<Block>) -> Self {
+        Self {
+            predicate,
+            consequent,
+            alternative,
+            selection_vector_if: vec![],
+            selection_vector_else: vec![],
+        }
+    }
 }
 
 impl Expression for IfStatement {
@@ -33,27 +48,62 @@ impl Expression for IfStatement {
         }
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        self.predicate.resolve_batch(ctx);
+    fn resolve_batch(&mut self, ctx: &mut BatchContext, selection_vector: &[usize]) {
+        self.predicate.resolve_batch(ctx, selection_vector);
 
-        let ctx_predicate_err = ctx.drain_filter(|resolved| resolved.is_err());
+        self.selection_vector_if.resize(selection_vector.len(), 0);
+        self.selection_vector_if.copy_from_slice(selection_vector);
 
-        let mut ctx_false = ctx.drain_filter(|resolved| match resolved {
-            Ok(Value::Boolean(predicate)) => !*predicate,
-            _ => unreachable!("predicate has been checked for error and must be boolean"),
-        });
+        let mut len = self.selection_vector_if.len();
+        let mut i = 0;
+        loop {
+            if i >= len {
+                break;
+            }
 
-        self.consequent.resolve_batch(ctx);
-        if let Some(alternative) = &self.alternative {
-            alternative.resolve_batch(&mut ctx_false);
-        } else {
-            for resolved in ctx_false.resolved_values_mut() {
-                *resolved = Ok(Value::Null);
+            let index = self.selection_vector_if[i];
+            if ctx.resolved_values[index].is_err() {
+                len -= 1;
+                self.selection_vector_if.swap(i, len);
+            } else {
+                i += 1;
             }
         }
+        self.selection_vector_if.truncate(len);
 
-        ctx.extend(ctx_false);
-        ctx.extend(ctx_predicate_err);
+        self.selection_vector_else.truncate(0);
+
+        let mut len = self.selection_vector_if.len();
+        let mut i = 0;
+        loop {
+            if i >= len {
+                break;
+            }
+
+            let index = self.selection_vector_if[i];
+            let predicate = match ctx.resolved_values.get(index) {
+                Some(Ok(Value::Boolean(predicate))) => *predicate,
+                _ => unreachable!("predicate has been checked for error and must be boolean"),
+            };
+            if predicate {
+                i += 1;
+            } else {
+                len -= 1;
+                self.selection_vector_if.swap(i, len);
+                self.selection_vector_else.push(index);
+            }
+        }
+        self.selection_vector_if.truncate(len);
+
+        self.consequent
+            .resolve_batch(ctx, &self.selection_vector_if);
+        if let Some(alternative) = &mut self.alternative {
+            alternative.resolve_batch(ctx, &self.selection_vector_else);
+        } else {
+            for index in &self.selection_vector_else {
+                ctx.resolved_values[*index] = Ok(Value::Null);
+            }
+        }
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {

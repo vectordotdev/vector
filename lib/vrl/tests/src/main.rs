@@ -3,7 +3,7 @@
 
 mod test_enrichment;
 
-use std::{cell::RefCell, rc::Rc, str::FromStr, time::Instant};
+use std::{str::FromStr, time::Instant};
 
 use ::value::Value;
 use ansi_term::Colour;
@@ -15,8 +15,8 @@ use value::Secrets;
 use vector_common::TimeZone;
 use vrl::{
     diagnostic::Formatter,
-    prelude::{BTreeMap, VrlValueConvert},
-    state, BatchRuntime, Runtime, SecretTarget, Target, TargetValueRef, Terminate, VrlRuntime,
+    prelude::{BTreeMap, ExpressionError, VrlValueConvert},
+    state, BatchRuntime, Runtime, SecretTarget, Target, TargetValueRef, VrlRuntime,
 };
 use vrl_tests::{docs, Test};
 
@@ -204,7 +204,7 @@ fn main() {
         test_enrichment.finish_load();
 
         match program {
-            Ok((program, warnings)) if warnings.is_empty() => {
+            Ok((mut program, warnings)) if warnings.is_empty() => {
                 let run_start = Instant::now();
 
                 let mut metadata = vec![Value::from(BTreeMap::new())];
@@ -228,13 +228,23 @@ fn main() {
                         runtime.resolve(&mut targets[0], &program, &timezone)
                     }
                     VrlRuntime::AstBatch => {
-                        let runtime = BatchRuntime::new();
-                        let targets = targets
-                            .into_iter()
-                            .map(|target| Rc::new(RefCell::new(target)) as Rc<RefCell<dyn Target>>)
-                            .collect();
-                        let mut results = runtime.resolve_batch(targets, &program, timezone);
-                        results.pop().expect("one element")
+                        let mut runtime = BatchRuntime::new();
+                        let mut values = vec![Ok(Value::Null); targets.len()];
+                        let mut states = (0..targets.len())
+                            .map(|_| vrl::state::Runtime::default())
+                            .collect::<Vec<_>>();
+                        let mut batch_targets = targets
+                            .iter_mut()
+                            .map(|target| target as &mut dyn Target)
+                            .collect::<Vec<_>>();
+                        runtime.resolve_batch(
+                            &mut values,
+                            &mut batch_targets,
+                            &mut states,
+                            &mut program,
+                            timezone,
+                        );
+                        values.pop().expect("one element")
                     }
                 };
 
@@ -317,7 +327,7 @@ fn main() {
                                 || got == want
                             {
                                 println!("{}{}", Colour::Green.bold().paint("OK"), timings);
-                            } else if matches!(err, Terminate::Abort { .. }) {
+                            } else if matches!(err, ExpressionError::Abort { .. }) {
                                 let want =
                                     match serde_json::from_str::<'_, serde_json::Value>(&want) {
                                         Ok(want) => want,

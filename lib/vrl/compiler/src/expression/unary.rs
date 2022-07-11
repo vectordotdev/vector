@@ -32,11 +32,11 @@ impl Expression for Unary {
         }
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        use Variant::*;
+    fn resolve_batch(&mut self, ctx: &mut BatchContext, selection_vector: &[usize]) {
+        use Variant::Not;
 
-        match &self.variant {
-            Not(v) => v.resolve_batch(ctx),
+        match &mut self.variant {
+            Not(v) => v.resolve_batch(ctx, selection_vector),
         }
     }
 

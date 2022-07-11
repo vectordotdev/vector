@@ -51,20 +51,13 @@ impl Expression for Variable {
             .unwrap_or(Value::Null))
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        let variables = ctx
-            .states()
-            .map(|state| {
-                state
-                    .borrow_mut()
-                    .variable(&self.ident)
-                    .cloned()
-                    .unwrap_or(Value::Null)
-            })
-            .collect::<Vec<_>>();
-
-        for (resolved, variable) in ctx.resolved_values_mut().iter_mut().zip(variables) {
-            *resolved = Ok(variable);
+    fn resolve_batch(&mut self, ctx: &mut BatchContext, selection_vector: &[usize]) {
+        for index in selection_vector {
+            let index = *index;
+            ctx.resolved_values[index] = Ok(ctx.states[index]
+                .variable(&self.ident)
+                .cloned()
+                .unwrap_or(Value::Null));
         }
     }
 

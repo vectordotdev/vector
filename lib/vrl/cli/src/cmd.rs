@@ -1,12 +1,10 @@
 use core::TargetValueRef;
 use std::{
-    cell::RefCell,
     collections::BTreeMap,
     fs::File,
     io::{self, Read},
     iter::IntoIterator,
     path::PathBuf,
-    rc::Rc,
 };
 
 use ::value::Value;
@@ -122,9 +120,10 @@ fn run(opts: &Opts) -> Result<(), Error> {
     } else {
         let mut objects = opts.read_into_objects()?;
         let source = opts.read_program()?;
-        let (program, warnings) = vrl::compile(&source, &stdlib::all()).map_err(|diagnostics| {
-            Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
-        })?;
+        let (mut program, warnings) =
+            vrl::compile(&source, &stdlib::all()).map_err(|diagnostics| {
+                Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
+            })?;
 
         #[allow(clippy::print_stderr)]
         if opts.print_warnings {
@@ -138,7 +137,7 @@ fn run(opts: &Opts) -> Result<(), Error> {
             .collect::<Vec<_>>();
         let mut secrets = objects.iter().map(|_| Secrets::new()).collect::<Vec<_>>();
 
-        let targets = objects
+        let mut targets = objects
             .iter_mut()
             .zip(metadata.iter_mut())
             .zip(secrets.iter_mut())
@@ -146,7 +145,8 @@ fn run(opts: &Opts) -> Result<(), Error> {
                 value,
                 metadata,
                 secrets,
-            });
+            })
+            .collect::<Vec<_>>();
 
         match opts.runtime {
             VrlRuntime::Ast => {
@@ -162,6 +162,7 @@ fn run(opts: &Opts) -> Result<(), Error> {
                                 v.to_string()
                             }
                         })
+                        .map_err(vrl::Terminate::from)
                         .map_err(Error::Runtime);
 
                     #[allow(clippy::print_stdout)]
@@ -173,23 +174,24 @@ fn run(opts: &Opts) -> Result<(), Error> {
                 }
             }
             VrlRuntime::AstBatch => {
-                let runtime = BatchRuntime::new();
-                let targets = targets
-                    .into_iter()
-                    .map(|target| Rc::new(RefCell::new(target)))
+                let mut runtime = BatchRuntime::new();
+                let mut values = vec![Ok(Value::Null); targets.len()];
+                let mut states = (0..targets.len())
+                    .map(|_| vrl::state::Runtime::default())
                     .collect::<Vec<_>>();
-                let batch_targets = targets
-                    .clone()
-                    .into_iter()
-                    .map(|target| target as Rc<RefCell<dyn Target>>)
-                    .collect();
-                let results = runtime.resolve_batch(batch_targets, &program, tz);
+                let mut batch_targets = targets
+                    .iter_mut()
+                    .map(|target| target as &mut dyn Target)
+                    .collect::<Vec<_>>();
+                runtime.resolve_batch(
+                    &mut values,
+                    &mut batch_targets,
+                    &mut states,
+                    &mut program,
+                    tz,
+                );
 
-                for (target, result) in targets.into_iter().zip(results) {
-                    let target = Rc::try_unwrap(target)
-                        .expect("unique ownership of target")
-                        .into_inner();
-
+                for (target, result) in targets.into_iter().zip(values) {
                     let result = result
                         .map(|value| {
                             if opts.print_object {
@@ -198,6 +200,7 @@ fn run(opts: &Opts) -> Result<(), Error> {
                                 value.to_string()
                             }
                         })
+                        .map_err(vrl::Terminate::from)
                         .map_err(Error::Runtime);
 
                     #[allow(clippy::print_stdout)]
