@@ -37,7 +37,7 @@ use vector::{
     test_util::{temp_dir, temp_file},
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
-use vector_buffers::{topology::channel::LimitedReceiver, Acker};
+use vector_buffers::topology::channel::LimitedReceiver;
 use vector_common::finalization::Finalizable;
 use vector_core::config::LogNamespace;
 
