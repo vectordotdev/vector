@@ -176,7 +176,7 @@ mod test {
         ))
         .take(100_000);
 
-        let _ = buffered
+        buffered
             .sink_map_err(drop)
             .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item, 0))))
             .await

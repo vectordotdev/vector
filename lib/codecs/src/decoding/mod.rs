@@ -10,9 +10,9 @@ use std::fmt::Debug;
 use bytes::{Bytes, BytesMut};
 pub use error::StreamDecodingError;
 pub use format::{
-    BoxedDeserializer, BytesDeserializer, BytesDeserializerConfig, JsonDeserializer,
-    JsonDeserializerConfig, NativeDeserializer, NativeDeserializerConfig, NativeJsonDeserializer,
-    NativeJsonDeserializerConfig,
+    BoxedDeserializer, BytesDeserializer, BytesDeserializerConfig, GelfDeserializer,
+    GelfDeserializerConfig, JsonDeserializer, JsonDeserializerConfig, NativeDeserializer,
+    NativeDeserializerConfig, NativeJsonDeserializer, NativeJsonDeserializerConfig,
 };
 #[cfg(feature = "syslog")]
 pub use format::{SyslogDeserializer, SyslogDeserializerConfig};
@@ -232,6 +232,8 @@ pub enum DeserializerConfig {
     Native,
     /// Configures the `NativeJsonDeserializer`.
     NativeJson,
+    /// Configures the `GelfDeserializer`.
+    Gelf,
 }
 
 impl From<BytesDeserializerConfig> for DeserializerConfig {
@@ -253,6 +255,12 @@ impl From<SyslogDeserializerConfig> for DeserializerConfig {
     }
 }
 
+impl From<GelfDeserializerConfig> for DeserializerConfig {
+    fn from(_: GelfDeserializerConfig) -> Self {
+        Self::Gelf
+    }
+}
+
 impl DeserializerConfig {
     /// Build the `Deserializer` from this configuration.
     pub fn build(&self) -> Deserializer {
@@ -265,6 +273,7 @@ impl DeserializerConfig {
             DeserializerConfig::NativeJson => {
                 Deserializer::NativeJson(NativeJsonDeserializerConfig.build())
             }
+            DeserializerConfig::Gelf => Deserializer::Gelf(GelfDeserializerConfig.build()),
         }
     }
 
@@ -274,6 +283,7 @@ impl DeserializerConfig {
             DeserializerConfig::Native => FramingConfig::LengthDelimited,
             DeserializerConfig::Bytes
             | DeserializerConfig::Json
+            | DeserializerConfig::Gelf
             | DeserializerConfig::NativeJson => FramingConfig::NewlineDelimited {
                 newline_delimited: Default::default(),
             },
@@ -293,6 +303,7 @@ impl DeserializerConfig {
             DeserializerConfig::Syslog => SyslogDeserializerConfig.output_type(),
             DeserializerConfig::Native => NativeDeserializerConfig.output_type(),
             DeserializerConfig::NativeJson => NativeJsonDeserializerConfig.output_type(),
+            DeserializerConfig::Gelf => GelfDeserializerConfig.output_type(),
         }
     }
 
@@ -305,6 +316,7 @@ impl DeserializerConfig {
             DeserializerConfig::Syslog => SyslogDeserializerConfig.schema_definition(),
             DeserializerConfig::Native => NativeDeserializerConfig.schema_definition(),
             DeserializerConfig::NativeJson => NativeJsonDeserializerConfig.schema_definition(),
+            DeserializerConfig::Gelf => GelfDeserializerConfig.schema_definition(),
         }
     }
 }
@@ -325,6 +337,8 @@ pub enum Deserializer {
     NativeJson(NativeJsonDeserializer),
     /// Uses an opaque `Deserializer` implementation for deserialization.
     Boxed(BoxedDeserializer),
+    /// Uses a `GelfDeserializer` for deserialization.
+    Gelf(GelfDeserializer),
 }
 
 impl format::Deserializer for Deserializer {
@@ -337,6 +351,7 @@ impl format::Deserializer for Deserializer {
             Deserializer::Native(deserializer) => deserializer.parse(bytes),
             Deserializer::NativeJson(deserializer) => deserializer.parse(bytes),
             Deserializer::Boxed(deserializer) => deserializer.parse(bytes),
+            Deserializer::Gelf(deserializer) => deserializer.parse(bytes),
         }
     }
 }

@@ -17,7 +17,6 @@ use crate::{
 pub struct WebSocketSinkConfig {
     pub uri: String,
     pub tls: Option<TlsEnableableConfig>,
-    #[serde(flatten)]
     pub encoding:
         EncodingConfigAdapter<EncodingConfig<StandardEncodings>, StandardEncodingsMigrator>,
     pub ping_interval: Option<u64>,

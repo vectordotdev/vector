@@ -17,7 +17,7 @@ use tokio::runtime::Builder;
 use crate::{
     buffer_usage_data::BufferUsageHandle,
     encoding::FixedEncodable,
-    test::common::install_tracing_helpers,
+    test::install_tracing_helpers,
     variants::disk_v2::{
         common::MAX_FILE_ID, record::RECORD_HEADER_LEN, writer::RecordWriter, Buffer,
         DiskBufferConfig, WriterError,
