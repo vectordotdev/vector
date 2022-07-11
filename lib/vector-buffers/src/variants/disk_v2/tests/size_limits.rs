@@ -161,7 +161,7 @@ async fn writer_waits_when_buffer_is_full() {
                 .was_closed()
                 .finalize();
 
-            let mut second_record_read = spawn(async { read_next(&mut reader).await });
+            let mut second_record_read = spawn(read_next(&mut reader));
 
             assert!(!got_past_wait_for_waiter.try_assert());
             assert!(!notified_waiting_writers.try_assert());

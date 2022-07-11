@@ -40,7 +40,7 @@ async fn pending_read_returns_none_when_writer_closed_with_unflushed_write() {
                 .was_entered()
                 .finalize();
 
-            let mut blocked_read = spawn(async move { read_next(&mut reader).await });
+            let mut blocked_read = spawn(read_next(&mut reader));
             while !waiting_for_writer.try_assert() {
                 assert_pending!(blocked_read.poll());
             }

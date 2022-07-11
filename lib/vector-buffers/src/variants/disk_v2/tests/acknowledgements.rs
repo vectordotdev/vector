@@ -1,13 +1,20 @@
 use std::sync::Arc;
 
 use tokio_test::{assert_pending, assert_ready, task::spawn};
-use vector_common::finalization::BatchNotifier;
+use vector_common::finalization::{BatchNotifier, EventFinalizer, EventStatus};
 
 use crate::{
     buffer_usage_data::BufferUsageHandle,
     test::with_temp_dir,
     variants::disk_v2::{ledger::Ledger, DiskBufferConfigBuilder},
 };
+
+pub(crate) async fn acknowledge(batch: BatchNotifier) {
+    let finalizer = EventFinalizer::new(batch);
+    finalizer.update_status(EventStatus::Delivered);
+    drop(finalizer); // This sends the status update
+    tokio::task::yield_now().await;
+}
 
 #[tokio::test]
 async fn ack_updates_ledger_correctly() {
@@ -33,8 +40,7 @@ async fn ack_updates_ledger_correctly() {
             // Now make sure it updates pending acks.
             let (batch, receiver) = BatchNotifier::new_with_receiver();
             finalizer.add(42, receiver);
-            drop(batch);
-            tokio::task::yield_now().await;
+            acknowledge(batch).await;
             assert_eq!(ledger.consume_pending_acks(), 42);
             assert_eq!(ledger.consume_pending_acks(), 0);
         }
@@ -69,8 +75,7 @@ async fn ack_wakes_reader() {
             // Now fire off an acknowledgement, and make sure our call woke up and can complete.
             let (batch, receiver) = BatchNotifier::new_with_receiver();
             finalizer.add(1, receiver);
-            drop(batch);
-            tokio::task::yield_now().await;
+            acknowledge(batch).await;
 
             assert!(wait_for_writer.is_woken());
             assert_ready!(wait_for_writer.poll());
