@@ -38,15 +38,18 @@ LABEL org.opencontainers.image.source="https://github.com/vectordotdev/vector" \
 # Copy root filesystem from staging
 COPY --from=staging /staging/rootfs/ /
 
+# Prepare a user/group for running Vector
+ARG VECTOR_USER=vector
+ARG VECTOR_GROUP=vector
 RUN apk --no-cache add \
         ca-certificates \
         tini \
         tzdata \
-    && addgroup -S vector \
+    && addgroup -S "${VECTOR_GROUP}" \
     && adduser -S -H \
         -s /sbin/nologin \
-        -G vector vector \
-    && chown vector /etc/vector /var/lib/vector
+        -G "${VECTOR_GROUP}" "${VECTOR_USER}" \
+    && chown -r "${VECTOR_USER}":"${VECTOR_GROUP}" /etc/vector /var/lib/vector
 
 # Configure the image entrypoint
 ENTRYPOINT ["tini", "--", "docker-entrypoint.sh"]
