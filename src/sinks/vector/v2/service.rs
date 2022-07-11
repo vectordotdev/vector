@@ -7,7 +7,7 @@ use hyper_openssl::HttpsConnector;
 use hyper_proxy::ProxyConnector;
 use prost::Message;
 use proto_event::EventWrapper;
-use tonic::{body::BoxBody, IntoRequest, codec::CompressionEncoding};
+use tonic::{body::BoxBody, codec::CompressionEncoding, IntoRequest};
 use vector_core::{
     buffers::Ackable, event::proto as proto_event, internal_event::EventsSent,
     stream::DriverResponse,
