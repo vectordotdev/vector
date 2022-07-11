@@ -84,13 +84,14 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     /// This method is executed at runtime.
     ///
     /// An expression is allowed to fail, which aborts the running program.
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        for (_, resolved, target, state, timezone) in ctx.iter_mut() {
-            let target = &mut *(*target).borrow_mut();
-            let state = &mut *(*state).borrow_mut();
-            let mut ctx = Context::new(target, state, &timezone);
+    fn resolve_batch(&mut self, ctx: &mut BatchContext, selection_vector: &[usize]) {
+        for index in selection_vector {
+            let index = *index;
+            let target = &mut *ctx.targets[index];
+            let state = &mut ctx.states[index];
+            let mut context = Context::new(target, state, &ctx.timezone);
 
-            *resolved = self.resolve(&mut ctx);
+            ctx.resolved_values[index] = self.resolve(&mut context);
         }
     }
 
@@ -274,7 +275,7 @@ impl Expression for Expr {
         }
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
+    fn resolve_batch(&mut self, ctx: &mut BatchContext, selection_vector: &[usize]) {
         use Expr::{
             Abort, Assignment, Container, FunctionCall, IfStatement, Literal, Noop, Op, Query,
             Unary, Variable,
@@ -282,24 +283,24 @@ impl Expression for Expr {
 
         match self {
             #[cfg(feature = "expr-literal")]
-            Literal(v) => v.resolve_batch(ctx),
-            Container(v) => v.resolve_batch(ctx),
+            Literal(v) => v.resolve_batch(ctx, selection_vector),
+            Container(v) => v.resolve_batch(ctx, selection_vector),
             #[cfg(feature = "expr-if_statement")]
-            IfStatement(v) => v.resolve_batch(ctx),
+            IfStatement(v) => v.resolve_batch(ctx, selection_vector),
             #[cfg(feature = "expr-op")]
-            Op(v) => v.resolve_batch(ctx),
+            Op(v) => v.resolve_batch(ctx, selection_vector),
             #[cfg(feature = "expr-assignment")]
-            Assignment(v) => v.resolve_batch(ctx),
+            Assignment(v) => v.resolve_batch(ctx, selection_vector),
             #[cfg(feature = "expr-query")]
-            Query(v) => v.resolve_batch(ctx),
+            Query(v) => v.resolve_batch(ctx, selection_vector),
             #[cfg(feature = "expr-function_call")]
-            FunctionCall(v) => v.resolve_batch(ctx),
-            Variable(v) => v.resolve_batch(ctx),
-            Noop(v) => v.resolve_batch(ctx),
+            FunctionCall(v) => v.resolve_batch(ctx, selection_vector),
+            Variable(v) => v.resolve_batch(ctx, selection_vector),
+            Noop(v) => v.resolve_batch(ctx, selection_vector),
             #[cfg(feature = "expr-unary")]
-            Unary(v) => v.resolve_batch(ctx),
+            Unary(v) => v.resolve_batch(ctx, selection_vector),
             #[cfg(feature = "expr-abort")]
-            Abort(v) => v.resolve_batch(ctx),
+            Abort(v) => v.resolve_batch(ctx, selection_vector),
         }
     }
 

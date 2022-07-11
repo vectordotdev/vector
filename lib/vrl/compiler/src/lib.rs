@@ -45,7 +45,7 @@ pub use core::{
 };
 use std::{fmt::Display, str::FromStr};
 
-pub use context::{BatchContext, BatchContextIterMut, Context};
+pub use context::{BatchContext, Context};
 use diagnostic::DiagnosticList;
 pub(crate) use diagnostic::Span;
 pub use expression::Expression;

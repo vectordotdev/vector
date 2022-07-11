@@ -105,30 +105,28 @@ impl Expression for Query {
             .unwrap_or(Value::Null))
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
+    fn resolve_batch(&mut self, ctx: &mut BatchContext, selection_vector: &[usize]) {
         use Target::{Container, External, FunctionCall, Internal};
 
-        match &self.target {
+        match &mut self.target {
             External => {
-                let targets = ctx.targets().collect::<Vec<_>>();
-                return ctx.resolved_values_mut().iter_mut().zip(targets).for_each(
-                    |(resolved, target)| {
-                        let target = &mut *(*target).borrow_mut();
-                        *resolved = Ok(target
-                            .target_get(&self.path)
-                            .ok()
-                            .flatten()
-                            .cloned()
-                            .unwrap_or(Value::Null));
-                    },
-                );
+                return for index in selection_vector {
+                    let index = *index;
+                    ctx.resolved_values[index] = Ok(ctx.targets[index]
+                        .target_get(&self.path)
+                        .ok()
+                        .flatten()
+                        .cloned()
+                        .unwrap_or(Value::Null));
+                };
             }
-            Internal(variable) => variable.resolve_batch(ctx),
-            FunctionCall(call) => call.resolve_batch(ctx),
-            Container(container) => container.resolve_batch(ctx),
+            Internal(variable) => variable.resolve_batch(ctx, selection_vector),
+            FunctionCall(call) => call.resolve_batch(ctx, selection_vector),
+            Container(container) => container.resolve_batch(ctx, selection_vector),
         };
 
-        for resolved_value in ctx.resolved_values_mut() {
+        for index in selection_vector {
+            let resolved_value = &mut ctx.resolved_values[*index];
             let resolved = {
                 let mut moved = Ok(Value::Null);
                 std::mem::swap(resolved_value, &mut moved);

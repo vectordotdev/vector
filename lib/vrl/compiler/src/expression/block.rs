@@ -16,12 +16,17 @@ pub struct Block {
     /// environment, but once the block ends, the environment is reset to the
     /// state of the parent expression of the block.
     pub(crate) local_env: LocalEnv,
+    selection_vector: Vec<usize>,
 }
 
 impl Block {
     #[must_use]
     pub fn new(inner: Vec<Expr>, local_env: LocalEnv) -> Self {
-        Self { inner, local_env }
+        Self {
+            inner,
+            local_env,
+            selection_vector: vec![],
+        }
     }
 
     #[must_use]
@@ -52,17 +57,30 @@ impl Expression for Block {
         last.resolve(ctx)
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        let mut ctx_err = BatchContext::empty_with_timezone(ctx.timezone());
+    fn resolve_batch(&mut self, ctx: &mut BatchContext, selection_vector: &[usize]) {
+        self.selection_vector.resize(selection_vector.len(), 0);
+        self.selection_vector.copy_from_slice(selection_vector);
 
-        for block in &self.inner {
-            block.resolve_batch(ctx);
+        for block in &mut self.inner {
+            block.resolve_batch(ctx, &self.selection_vector);
 
-            let ctx_err_new = ctx.drain_filter(|resolved| resolved.is_err());
-            ctx_err.extend(ctx_err_new);
+            let mut len = self.selection_vector.len();
+            let mut i = 0;
+            loop {
+                if i >= len {
+                    break;
+                }
+
+                let index = self.selection_vector[i];
+                if ctx.resolved_values[index].is_err() {
+                    len -= 1;
+                    self.selection_vector.swap(i, len);
+                } else {
+                    i += 1;
+                }
+            }
+            self.selection_vector.truncate(len);
         }
-
-        ctx.extend(ctx_err);
     }
 
     /// If an expression has a "never" type, it is considered a "terminating" expression.

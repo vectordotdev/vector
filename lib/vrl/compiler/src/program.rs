@@ -43,8 +43,8 @@ impl Program {
     }
 
     /// Resolve the program to its final [`Value`]s.
-    pub fn resolve_batch(&self, ctx: &mut BatchContext) {
-        self.expressions.resolve_batch(ctx);
+    pub fn resolve_batch(&mut self, ctx: &mut BatchContext, selection_vector: &[usize]) {
+        self.expressions.resolve_batch(ctx, selection_vector);
     }
 }
 

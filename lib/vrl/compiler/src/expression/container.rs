@@ -38,14 +38,14 @@ impl Expression for Container {
         }
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
+    fn resolve_batch(&mut self, ctx: &mut BatchContext, selection_vector: &[usize]) {
         use Variant::{Array, Block, Group, Object};
 
-        match &self.variant {
-            Group(v) => v.resolve_batch(ctx),
-            Block(v) => v.resolve_batch(ctx),
-            Array(v) => v.resolve_batch(ctx),
-            Object(v) => v.resolve_batch(ctx),
+        match &mut self.variant {
+            Group(v) => v.resolve_batch(ctx, selection_vector),
+            Block(v) => v.resolve_batch(ctx, selection_vector),
+            Array(v) => v.resolve_batch(ctx, selection_vector),
+            Object(v) => v.resolve_batch(ctx, selection_vector),
         }
     }
 

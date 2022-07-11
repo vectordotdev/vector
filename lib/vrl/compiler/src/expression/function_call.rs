@@ -614,9 +614,11 @@ impl Expression for FunctionCall {
         })
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
-        self.expr.resolve_batch(ctx);
-        for resolved in ctx.resolved_values_mut().iter_mut() {
+    fn resolve_batch(&mut self, ctx: &mut BatchContext, selection_vector: &[usize]) {
+        self.expr.resolve_batch(ctx, selection_vector);
+
+        for index in selection_vector {
+            let resolved = &mut ctx.resolved_values[*index];
             let temp = {
                 let mut moved = Ok(Value::Null);
                 std::mem::swap(resolved, &mut moved);
@@ -1187,7 +1189,7 @@ mod tests {
             unimplemented!()
         }
 
-        fn resolve_batch(&self, _ctx: &mut BatchContext) {
+        fn resolve_batch(&mut self, _ctx: &mut BatchContext, _selection_vector: &[usize]) {
             unimplemented!()
         }
 

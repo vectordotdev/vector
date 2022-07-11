@@ -51,10 +51,11 @@ impl Expression for Literal {
         Ok(self.to_value())
     }
 
-    fn resolve_batch(&self, ctx: &mut BatchContext) {
+    fn resolve_batch(&mut self, ctx: &mut BatchContext, selection_vector: &[usize]) {
         let value = self.to_value();
-        for resolved in ctx.resolved_values_mut() {
-            *resolved = Ok(value.clone());
+
+        for index in selection_vector {
+            ctx.resolved_values[*index] = Ok(value.clone());
         }
     }
 
