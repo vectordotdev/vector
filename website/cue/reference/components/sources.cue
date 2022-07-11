@@ -86,7 +86,7 @@ components: sources: [Name=string]: {
 								enum: {
 									bytes:               "Byte frames are passed through as-is according to the underlying I/O boundaries (e.g. split between messages or stream segments)."
 									character_delimited: "Byte frames which are delimited by a chosen character."
-									length_delimited:    "Byte frames which are prefixed by an unsized big-endian 32-bit integer indicating the length."
+									length_delimited:    "Byte frames which are prefixed by an unsigned big-endian 32-bit integer indicating the length."
 									newline_delimited:   "Byte frames which are delimited by a newline character."
 									octet_counting:      "Byte frames according to the [octet counting](\(urls.rfc_6587_3_4_1)) format."
 								}
