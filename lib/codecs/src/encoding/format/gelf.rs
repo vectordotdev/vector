@@ -158,8 +158,8 @@ fn coerce_required_fields(mut log: LogEvent) -> vector_core::Result<LogEvent> {
 /// Validates rules for field names and value types, coercing in some cases.
 fn coerce_field_names_and_values(
     mut log: LogEvent,
-    missing_prefix: &mut Vec<String>,
-) -> vector_core::Result<LogEvent> {
+) -> vector_core::Result<(LogEvent, Vec<String>)> {
+    let mut missing_prefix = vec![];
     if let Some(event_data) = log.as_map_mut() {
         for (field, value) in event_data.iter_mut() {
             match field.as_str() {
@@ -207,14 +207,13 @@ fn coerce_field_names_and_values(
             }
         }
     }
-    Ok(log)
+    Ok((log, missing_prefix))
 }
 
 /// Validate the input log event is valid GELF, potentially coercing the event into valid GELF
 fn to_gelf_event(log: LogEvent) -> vector_core::Result<LogEvent> {
-    let mut missing_prefix = vec![];
     let log = coerce_required_fields(log).and_then(|log| {
-        coerce_field_names_and_values(log, &mut missing_prefix).map(|mut log| {
+        coerce_field_names_and_values(log).map(|(mut log, missing_prefix)| {
             // rename additional fields that were flagged as missing the underscore prefix
             for field in missing_prefix {
                 log.rename_key(path!(field.as_str()), &*format!("_{}", &field));
