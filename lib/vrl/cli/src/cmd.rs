@@ -191,6 +191,7 @@ fn repl(objects: Vec<Value>, timezone: TimeZone, vrl_runtime: VrlRuntime) -> Res
 }
 
 #[cfg(not(feature = "repl"))]
+#[allow(clippy::needless_pass_by_value)]
 fn repl(_objects: Vec<Value>, _timezone: TimeZone, _vrl_runtime: VrlRuntime) -> Result<(), Error> {
     Err(Error::ReplFeature)
 }

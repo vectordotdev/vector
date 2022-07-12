@@ -983,9 +983,9 @@ dependencies = [
 
 [[package]]
 name = "axum"
-version = "0.5.11"
+version = "0.5.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2cc6e8e8c993cb61a005fab8c1e5093a29199b7253b05a6883999312935c1ff"
+checksum = "d16705af05732b7d3258ec0f7b73c03a658a28925e050d8852d5b568ee8bcf4e"
 dependencies = [
  "async-trait",
  "axum-core",
@@ -1012,9 +1012,9 @@ dependencies = [
 
 [[package]]
 name = "axum-core"
-version = "0.2.6"
+version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf4d047478b986f14a13edad31a009e2e05cb241f9805d0d75e4cba4e129ad4d"
+checksum = "e4f44a0e6200e9d11a1cdc989e4b358f6e3d354fbf48478f345a17f4e43f8635"
 dependencies = [
  "async-trait",
  "bytes 1.1.0",
@@ -4296,9 +4296,9 @@ checksum = "2dffe52ecf27772e601905b7522cb4ef790d2cc203488bbd0e2fe85fcb74566d"
 
 [[package]]
 name = "memmap2"
-version = "0.5.4"
+version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d5172b50c23043ff43dd53e51392f36519d9b35a8f3a410d30ece5d1aedd58ae"
+checksum = "3a79b39c93a7a5a27eeaf9a23b5ff43f1b9e0ad6b1cdd441140ae53c35613fc7"
 dependencies = [
  "libc",
 ]
@@ -4583,9 +4583,9 @@ dependencies = [
 
 [[package]]
 name = "nats"
-version = "0.21.0"
+version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1fdfb3fb75f20d8a9ff93e4f5ad7f9e2c61f722b0e71daa62bd2b28f515a2a78"
+checksum = "4f42b51fc2560ec17f242ca715a3ece4e97704e6d798162b91f99c3cabef8980"
 dependencies = [
  "base64",
  "base64-url",
@@ -5071,9 +5071,9 @@ dependencies = [
 
 [[package]]
 name = "openssl"
-version = "0.10.40"
+version = "0.10.41"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb81a6430ac911acb25fe5ac8f1d2af1b4ea8a4fdfda0f1ee4292af2e2d8eb0e"
+checksum = "618febf65336490dfcf20b73f885f5651a0c89c64c2d4a8c3662585a70bf5bd0"
 dependencies = [
  "bitflags",
  "cfg-if 1.0.0",
@@ -5112,9 +5112,9 @@ dependencies = [
 
 [[package]]
 name = "openssl-sys"
-version = "0.9.73"
+version = "0.9.75"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d5fd19fb3e0a8191c1e34935718976a3e70c112ab9a24af6d7cadccd9d90bc0"
+checksum = "e5f9bd0c2710541a3cda73d6f9ac4f1b240de4ae261065d309dbe73d9dceb42f"
 dependencies = [
  "autocfg",
  "cc",
@@ -6664,9 +6664,9 @@ checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 
 [[package]]
 name = "serde"
-version = "1.0.138"
+version = "1.0.139"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1578c6245786b9d168c5447eeacfb96856573ca56c9d68fdcf394be134882a47"
+checksum = "0171ebb889e45aa68b44aee0859b3eede84c6f5f5c228e6f140c0b2a0a46cad6"
 dependencies = [
  "serde_derive",
 ]
@@ -6733,9 +6733,9 @@ dependencies = [
 
 [[package]]
 name = "serde_derive"
-version = "1.0.138"
+version = "1.0.139"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "023e9b1467aef8a10fb88f25611870ada9800ef7e22afce356bb0d2387b6f27c"
+checksum = "dc1d3230c1de7932af58ad8ffbe1d784bd55efd5a9d84ac24f69c72d83543dfb"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -8169,9 +8169,9 @@ checksum = "dcf81ac59edc17cc8697ff311e8f5ef2d99fcbd9817b34cec66f90b6c3dfd987"
 
 [[package]]
 name = "typetag"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "36afde536989c95b0c35d2b6720618ed268b271a002fa1ebd97e821cf9ff28c6"
+checksum = "62a3f3e32f68a8a611e8b98a14e058954f1b81d6eb6af50e2349bf322ae4062b"
 dependencies = [
  "erased-serde",
  "inventory 0.3.0",
@@ -8182,9 +8182,9 @@ dependencies = [
 
 [[package]]
 name = "typetag-impl"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c935ee7eb11a684e863c6a3332ff17caa2a46fc855719a90c6493aee213852b"
+checksum = "762400b16d1815702b6a22e71764f5936ef5d2c4dcff95497f874c53594d59fd"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -8391,7 +8391,7 @@ checksum = "f1bddf1187be692e79c5ffeab891132dfb0f236ed36a43c7ed39f1165ee20191"
 
 [[package]]
 name = "vector"
-version = "0.23.0"
+version = "0.24.0"
 dependencies = [
  "approx",
  "arc-swap",
