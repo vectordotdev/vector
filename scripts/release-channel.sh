@@ -13,7 +13,7 @@
 set -eu
 
 # if this is a git tag, assume a real release
-if git describe --exact-match --tags HEAD 2> /dev/null ; then
+if git describe --exact-match --tags HEAD > /dev/null 2> /dev/null ; then
   echo "latest"
 else
   echo "nightly"

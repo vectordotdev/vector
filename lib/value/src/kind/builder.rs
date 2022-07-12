@@ -218,6 +218,12 @@ impl Kind {
             object: Some(collection.into()),
         }
     }
+
+    /// An object that can have any fields.
+    #[must_use]
+    pub fn any_object() -> Self {
+        Self::object(Collection::any())
+    }
 }
 
 // `or_*` methods to extend the state of a type using a builder-like API.

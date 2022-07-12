@@ -19,6 +19,7 @@ use pretty_assertions::assert_eq;
 use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use value::Kind;
+use vector_core::config::LogNamespace;
 
 use crate::{
     common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
@@ -31,8 +32,8 @@ use crate::{
     schema,
     serde::{default_decoding, default_framing_message_based},
     sources::datadog::agent::{
-        logs::decode_log_body, metrics::DatadogSeriesRequest, DatadogAgentConfig,
-        DatadogAgentSource, LogMsg, LOGS, METRICS, TRACES,
+        ddmetric_proto, ddtrace_proto, logs::decode_log_body, metrics::DatadogSeriesRequest,
+        DatadogAgentConfig, DatadogAgentSource, LogMsg, LOGS, METRICS, TRACES,
     },
     test_util::{
         components::{assert_source_compliance, HTTP_PUSH_SOURCE_TAGS},
@@ -41,16 +42,8 @@ use crate::{
     SourceSender,
 };
 
-mod dd_metrics_proto {
-    include!(concat!(env!("OUT_DIR"), "/datadog.agentpayload.rs"));
-}
-
-mod dd_traces_proto {
-    include!(concat!(env!("OUT_DIR"), "/dd_trace.rs"));
-}
-
 fn test_logs_schema_definition() -> schema::Definition {
-    schema::Definition::empty().with_field(
+    schema::Definition::empty_legacy_namespace().with_field(
         "a log field",
         Kind::integer().or_bytes(),
         Some("log field"),
@@ -58,7 +51,11 @@ fn test_logs_schema_definition() -> schema::Definition {
 }
 
 fn test_metrics_schema_definition() -> schema::Definition {
-    schema::Definition::empty().with_field("a schema tag", Kind::boolean().or_null(), Some("tag"))
+    schema::Definition::empty_legacy_namespace().with_field(
+        "a schema tag",
+        Kind::boolean().or_null(),
+        Some("tag"),
+    )
 }
 
 impl Arbitrary for LogMsg {
@@ -95,6 +92,7 @@ fn test_decode_log_body() {
             "http",
             test_logs_schema_definition(),
             test_metrics_schema_definition(),
+            LogNamespace::Legacy,
         );
 
         let events = decode_log_body(body, api_key, &source).unwrap();
@@ -652,7 +650,7 @@ async fn ignores_api_key() {
 }
 
 #[tokio::test]
-async fn decode_series_endpoints() {
+async fn decode_series_endpoint_v1() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
         let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false).await;
 
@@ -849,12 +847,12 @@ async fn decode_sketches() {
         );
 
         let mut buf = Vec::new();
-        let sketch = dd_metrics_proto::sketch_payload::Sketch {
+        let sketch = ddmetric_proto::sketch_payload::Sketch {
             metric: "dd_sketch".to_string(),
             tags: vec!["foo:bar".to_string(), "foobar".to_string()],
             host: "a_host".to_string(),
             distributions: Vec::new(),
-            dogsketches: vec![dd_metrics_proto::sketch_payload::sketch::Dogsketch {
+            dogsketches: vec![ddmetric_proto::sketch_payload::sketch::Dogsketch {
                 ts: 1542182950,
                 cnt: 2,
                 min: 16.0,
@@ -866,7 +864,7 @@ async fn decode_sketches() {
             }],
         };
 
-        let sketch_payload = dd_metrics_proto::SketchPayload {
+        let sketch_payload = ddmetric_proto::SketchPayload {
             metadata: None,
             sketches: vec![sketch],
         };
@@ -947,7 +945,7 @@ async fn decode_traces() {
 
         let mut buf_v1 = Vec::new();
 
-        let span = dd_traces_proto::Span {
+        let span = ddtrace_proto::Span {
             service: "a_service".to_string(),
             name: "a_name".to_string(),
             resource: "a_resource".to_string(),
@@ -963,14 +961,14 @@ async fn decode_traces() {
             meta_struct: BTreeMap::new(),
         };
 
-        let trace = dd_traces_proto::ApiTrace {
+        let trace = ddtrace_proto::ApiTrace {
             trace_id: 123u64,
             spans: vec![span.clone()],
             start_time: 1_431_648_000_000_001i64,
             end_time: 1_431_649_000_000_001i64,
         };
 
-        let payload_v1 = dd_traces_proto::TracePayload {
+        let payload_v1 = ddtrace_proto::TracePayload {
             host_name: "a_hostname".to_string(),
             env: "an_environment".to_string(),
             traces: vec![trace],
@@ -987,7 +985,7 @@ async fn decode_traces() {
 
         let mut buf_v2 = Vec::new();
 
-        let chunk = dd_traces_proto::TraceChunk {
+        let chunk = ddtrace_proto::TraceChunk {
             priority: 42i32,
             origin: "an_origin".to_string(),
             dropped_trace: false,
@@ -995,7 +993,7 @@ async fn decode_traces() {
             tags: BTreeMap::from_iter([("a".to_string(), "tag".to_string())].into_iter()),
         };
 
-        let tracer_payload = dd_traces_proto::TracerPayload {
+        let tracer_payload = ddtrace_proto::TracerPayload {
             container_id: "an_id".to_string(),
             language_name: "plop".to_string(),
             language_version: "v33".to_string(),
@@ -1005,7 +1003,7 @@ async fn decode_traces() {
             app_version: "v314".to_string(),
         };
 
-        let payload_v2 = dd_traces_proto::TracePayload {
+        let payload_v2 = ddtrace_proto::TracePayload {
             host_name: "a_hostname".to_string(),
             env: "env".to_string(),
             traces: vec![],
@@ -1310,7 +1308,7 @@ fn test_config_outputs() {
                 want: HashMap::from([(
                     None,
                     Some(
-                        schema::Definition::empty()
+                        schema::Definition::empty_legacy_namespace()
                             .with_field("message", Kind::bytes(), Some("message"))
                             .with_field("status", Kind::bytes(), Some("severity"))
                             .with_field("timestamp", Kind::timestamp(), Some("timestamp"))
@@ -1330,7 +1328,7 @@ fn test_config_outputs() {
                 want: HashMap::from([(
                     None,
                     Some(
-                        schema::Definition::empty()
+                        schema::Definition::empty_legacy_namespace()
                             .with_field("message", Kind::bytes(), Some("message"))
                             .with_field("status", Kind::bytes(), Some("severity"))
                             .with_field("timestamp", Kind::timestamp(), Some("timestamp"))
@@ -1351,7 +1349,7 @@ fn test_config_outputs() {
                     (
                         Some(LOGS),
                         Some(
-                            schema::Definition::empty()
+                            schema::Definition::empty_legacy_namespace()
                                 .with_field("message", Kind::bytes(), Some("message"))
                                 .with_field("status", Kind::bytes(), Some("severity"))
                                 .with_field("timestamp", Kind::timestamp(), Some("timestamp"))
@@ -1374,7 +1372,7 @@ fn test_config_outputs() {
                 want: HashMap::from([(
                     None,
                     Some(
-                        schema::Definition::empty()
+                        schema::Definition::empty_legacy_namespace()
                             .with_field("timestamp", Kind::json().or_timestamp(), Some("timestamp"))
                             .unknown_fields(Kind::json()),
                     ),
@@ -1390,7 +1388,7 @@ fn test_config_outputs() {
                     (
                         Some(LOGS),
                         Some(
-                            schema::Definition::empty()
+                            schema::Definition::empty_legacy_namespace()
                                 .with_field(
                                     "timestamp",
                                     Kind::json().or_timestamp(),
@@ -1413,7 +1411,7 @@ fn test_config_outputs() {
                 want: HashMap::from([(
                     None,
                     Some(
-                        schema::Definition::empty()
+                        schema::Definition::empty_legacy_namespace()
                             .with_field("message", Kind::bytes(), Some("message"))
                             .optional_field("timestamp", Kind::timestamp(), Some("timestamp"))
                             .optional_field("hostname", Kind::bytes(), None)
@@ -1440,7 +1438,7 @@ fn test_config_outputs() {
                     (
                         Some(LOGS),
                         Some(
-                            schema::Definition::empty()
+                            schema::Definition::empty_legacy_namespace()
                                 .with_field("message", Kind::bytes(), Some("message"))
                                 .optional_field("timestamp", Kind::timestamp(), Some("timestamp"))
                                 .optional_field("hostname", Kind::bytes(), None)
@@ -1472,10 +1470,11 @@ fn test_config_outputs() {
             disable_logs: false,
             disable_metrics: false,
             disable_traces: false,
+            log_namespace: Some(false),
         };
 
         let mut outputs = config
-            .outputs()
+            .outputs(LogNamespace::Legacy)
             .into_iter()
             .map(|output| (output.port, output.log_schema_definition))
             .collect::<HashMap<_, _>>();
@@ -1488,4 +1487,204 @@ fn test_config_outputs() {
             assert_eq!(got, want, "{}", title);
         }
     }
+}
+
+#[tokio::test]
+async fn decode_series_endpoint_v2() {
+    assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+        let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false).await;
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "dd-api-key",
+            "12345678abcdefgh12345678abcdefgh".parse().unwrap(),
+        );
+
+        let series = vec![
+            ddmetric_proto::metric_payload::MetricSeries {
+                resources: vec![ddmetric_proto::metric_payload::Resource {
+                    r#type: "host".to_string(),
+                    name: "random_host".to_string(),
+                }],
+                metric: "namespace.dd_gauge".to_string(),
+                tags: vec!["foo:bar".to_string()],
+                points: vec![
+                    ddmetric_proto::metric_payload::MetricPoint {
+                        value: 3.14,
+                        timestamp: 1542182950,
+                    },
+                    ddmetric_proto::metric_payload::MetricPoint {
+                        value: 3.1415,
+                        timestamp: 1542182951,
+                    },
+                ],
+                r#type: ddmetric_proto::metric_payload::MetricType::Gauge as i32,
+                unit: "".to_string(),
+                source_type_name: "a_random_source_type_name".to_string(),
+                interval: 0,
+            },
+            ddmetric_proto::metric_payload::MetricSeries {
+                resources: vec![ddmetric_proto::metric_payload::Resource {
+                    r#type: "host".to_string(),
+                    name: "another_random_host".to_string(),
+                }],
+                metric: "another_namespace.dd_rate".to_string(),
+                tags: vec!["foo:bar:baz".to_string()],
+                points: vec![ddmetric_proto::metric_payload::MetricPoint {
+                    value: 3.14,
+                    timestamp: 1542182950,
+                }],
+                r#type: ddmetric_proto::metric_payload::MetricType::Rate as i32,
+                unit: "".to_string(),
+                source_type_name: "another_random_source_type_name".to_string(),
+                interval: 10,
+            },
+            ddmetric_proto::metric_payload::MetricSeries {
+                resources: vec![ddmetric_proto::metric_payload::Resource {
+                    r#type: "host".to_string(),
+                    name: "a_host".to_string(),
+                }],
+                metric: "dd_count".to_string(),
+                tags: vec!["foobar".to_string()],
+                points: vec![ddmetric_proto::metric_payload::MetricPoint {
+                    value: 16777216_f64,
+                    timestamp: 1542182955,
+                }],
+                r#type: ddmetric_proto::metric_payload::MetricType::Count as i32,
+                unit: "".to_string(),
+                source_type_name: "a_very_random_source_type_name".to_string(),
+                interval: 0,
+            },
+        ];
+
+        let series_payload = ddmetric_proto::MetricPayload { series };
+
+        let mut buf = Vec::new();
+        series_payload.encode(&mut buf).unwrap();
+
+        let events = spawn_collect_n(
+            async move {
+                assert_eq!(
+                    200,
+                    send_with_path(
+                        addr,
+                        unsafe { str::from_utf8_unchecked(&buf) },
+                        headers,
+                        "/api/v2/series"
+                    )
+                    .await
+                );
+            },
+            rx,
+            4,
+        )
+        .await;
+
+        {
+            let mut metric = events[0].as_metric();
+            assert_eq!(metric.name(), "dd_gauge");
+            assert_eq!(
+                metric.timestamp(),
+                Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 10))
+            );
+            assert_eq!(metric.kind(), MetricKind::Absolute);
+            assert_eq!(*metric.value(), MetricValue::Gauge { value: 3.14 });
+            assert_eq!(metric.tags().unwrap()["host"], "random_host".to_string());
+            assert_eq!(metric.tags().unwrap()["foo"], "bar".to_string());
+            assert_eq!(
+                metric.tags().unwrap()["source_type_name"],
+                "a_random_source_type_name".to_string()
+            );
+            assert_eq!(metric.namespace(), Some("namespace"));
+
+            assert_eq!(
+                &events[0].metadata().datadog_api_key().as_ref().unwrap()[..],
+                "12345678abcdefgh12345678abcdefgh"
+            );
+
+            metric = events[1].as_metric();
+            assert_eq!(metric.name(), "dd_gauge");
+            assert_eq!(
+                metric.timestamp(),
+                Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 11))
+            );
+            assert_eq!(metric.kind(), MetricKind::Absolute);
+            assert_eq!(*metric.value(), MetricValue::Gauge { value: 3.1415 });
+            assert_eq!(metric.tags().unwrap()["host"], "random_host".to_string());
+            assert_eq!(metric.tags().unwrap()["foo"], "bar".to_string());
+            assert_eq!(
+                metric.tags().unwrap()["source_type_name"],
+                "a_random_source_type_name".to_string()
+            );
+            assert_eq!(metric.namespace(), Some("namespace"));
+
+            assert_eq!(
+                &events[1].metadata().datadog_api_key().as_ref().unwrap()[..],
+                "12345678abcdefgh12345678abcdefgh"
+            );
+
+            metric = events[2].as_metric();
+            assert_eq!(metric.name(), "dd_rate");
+            assert_eq!(
+                metric.timestamp(),
+                Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 10))
+            );
+            assert_eq!(metric.kind(), MetricKind::Incremental);
+            assert_eq!(
+                *metric.value(),
+                MetricValue::Counter {
+                    value: 3.14 * (10_f64)
+                }
+            );
+            assert_eq!(
+                metric.tags().unwrap()["host"],
+                "another_random_host".to_string()
+            );
+            assert_eq!(metric.tags().unwrap()["foo"], "bar:baz".to_string());
+            assert_eq!(
+                metric.tags().unwrap()["source_type_name"],
+                "another_random_source_type_name".to_string()
+            );
+            assert_eq!(metric.namespace(), Some("another_namespace"));
+
+            assert_eq!(
+                &events[2].metadata().datadog_api_key().as_ref().unwrap()[..],
+                "12345678abcdefgh12345678abcdefgh"
+            );
+
+            metric = events[3].as_metric();
+            assert_eq!(metric.name(), "dd_count");
+            assert_eq!(
+                metric.timestamp(),
+                Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 15))
+            );
+            assert_eq!(metric.kind(), MetricKind::Incremental);
+            assert_eq!(
+                *metric.value(),
+                MetricValue::Counter {
+                    value: 16777216_f64
+                }
+            );
+            assert_eq!(metric.tags().unwrap()["host"], "a_host".to_string());
+            assert_eq!(metric.tags().unwrap()["foobar"], "".to_string());
+            assert_eq!(
+                metric.tags().unwrap()["source_type_name"],
+                "a_very_random_source_type_name".to_string()
+            );
+            assert_eq!(metric.namespace(), None);
+
+            assert_eq!(
+                &events[3].metadata().datadog_api_key().as_ref().unwrap()[..],
+                "12345678abcdefgh12345678abcdefgh"
+            );
+
+            for event in events {
+                assert_eq!(
+                    event.metadata().schema_definition(),
+                    &test_metrics_schema_definition()
+                );
+            }
+        }
+    })
+    .await;
 }

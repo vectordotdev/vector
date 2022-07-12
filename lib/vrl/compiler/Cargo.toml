@@ -32,6 +32,8 @@ diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 parser = { package = "vrl-parser", path = "../parser" }
 lookup = { path = "../../lookup" }
 vector_common = { path = "../../vector-common", default-features = false, features = ["conversion", "serde"] }
+vector_config = { path = "../../vector-config" }
+vector_config_macros = { path = "../../vector-config-macros" }
 value = { path = "../../value" }
 
 bytes = { version = "1.1.0", default-features = false }

@@ -18,7 +18,8 @@ use vector_core::event::{EventFinalizers, Finalizable};
 use crate::{
     codecs::Encoder,
     config::{
-        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
+        SinkDescription,
     },
     event::Event,
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
@@ -148,7 +149,7 @@ impl SinkConfig for GcsSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(self.encoding.config().1.input_type())
+        Input::new(self.encoding.config().1.input_type() & DataType::Log)
     }
 
     fn sink_type(&self) -> &'static str {
@@ -352,6 +353,7 @@ mod tests {
     use futures_util::{future::ready, stream};
     use vector_core::partition::Partitioner;
 
+    use crate::event::LogEvent;
     use crate::test_util::{
         components::{run_and_assert_sink_compliance, SINK_TAGS},
         http::{always_200_response, spawn_blackhole_http_server},
@@ -384,7 +386,7 @@ mod tests {
             )
             .expect("failed to build sink");
 
-        let event = Event::from("simple message");
+        let event = Event::Log(LogEvent::from("simple message"));
         run_and_assert_sink_compliance(sink, stream::once(ready(event)), &SINK_TAGS).await;
     }
 
@@ -393,8 +395,8 @@ mod tests {
         crate::test_util::trace_init();
 
         let message = "hello world".to_string();
-        let mut event = Event::from(message);
-        event.as_mut_log().insert("key", "value");
+        let mut event = LogEvent::from(message);
+        event.insert("key", "value");
 
         let sink_config = GcsSinkConfig {
             key_prefix: Some("key: {{ key }}".into()),
@@ -403,7 +405,7 @@ mod tests {
         let key = sink_config
             .key_partitioner()
             .unwrap()
-            .partition(&event)
+            .partition(&Event::Log(event))
             .expect("key wasn't provided");
 
         assert_eq!(key, "key: value");
@@ -414,7 +416,6 @@ mod tests {
     }
 
     fn build_request(extension: Option<&str>, uuid: bool, compression: Compression) -> GcsRequest {
-        let log = Event::new_empty_log();
         let sink_config = GcsSinkConfig {
             key_prefix: Some("key/".into()),
             filename_time_format: Some("date".into()),
@@ -423,6 +424,7 @@ mod tests {
             compression,
             ..default_config(StandardEncodings::Ndjson)
         };
+        let log = LogEvent::default().into();
         let key = sink_config
             .key_partitioner()
             .unwrap()

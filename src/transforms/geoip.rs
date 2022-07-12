@@ -1,6 +1,7 @@
 use std::{str::FromStr, sync::Arc};
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
+use vector_config::configurable_component;
 
 use crate::{
     config::{
@@ -14,13 +15,36 @@ use crate::{
     Result,
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `geoip` transform.
+#[configurable_component(transform)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct GeoipConfig {
+    /// The field name that contains the IP address.
+    ///
+    /// This field should contain a valid IPv4 or IPv6 address.
     pub source: String,
+
+    /// Path to the [MaxMind GeoIP2](https://dev.maxmind.com/geoip/geoip2/downloadable) or [GeoLite2 binary city
+    /// database file](https://dev.maxmind.com/geoip/geoip2/geolite2/#Download_Access) (**GeoLite2-City.mmdb**).
+    ///
+    /// Other databases, such as the country database, are not supported.
     pub database: String,
+
+    /// The default field to insert the resulting GeoIP data into.
+    ///
+    /// See output for more info.
     #[serde(default = "default_geoip_target_field")]
     pub target: String,
+
+    /// The locale to use when querying the database.
+    ///
+    /// MaxMind includes localized versions of some of the fields within their database, such as country name. This
+    /// setting can control which of those localized versions are returned by the transform.
+    ///
+    /// More information on which portions of the geolocation data are localized, and what languages are available, can
+    /// be found
+    /// [here](https://support.maxmind.com/hc/en-us/articles/4414877149467-IP-Geolocation-Data#h_01FRRGRYTGZB29ERDBZCX3MR8Q).
     #[serde(default = "default_locale")]
     pub locale: String,
 }
@@ -256,19 +280,14 @@ impl FunctionTransform for Geoip {
     }
 }
 
-#[cfg(feature = "transforms-json_parser")]
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
 
+    use vector_core::event::LogEvent;
+
     use super::*;
-    use crate::{
-        event::Event,
-        transforms::{
-            json_parser::{JsonParser, JsonParserConfig},
-            test::transform_one,
-        },
-    };
+    use crate::{event::Event, transforms::test::transform_one};
 
     #[test]
     fn generate_config() {
@@ -277,10 +296,11 @@ mod tests {
 
     #[test]
     fn geoip_city_lookup_success() {
-        let new_event = parse_one(
-            r#"{"remote_addr": "2.125.160.216", "request_path": "foo/bar"}"#,
-            "tests/data/GeoIP2-City-Test.mmdb",
-        );
+        let mut log = LogEvent::default();
+        let _ = log.insert("remote_addr", "2.125.160.216");
+        let _ = log.insert("request_path", "foo/bar");
+
+        let new_event = parse_one(log.into(), "tests/data/GeoIP2-City-Test.mmdb");
 
         let mut exp_geoip_attr = HashMap::new();
         exp_geoip_attr.insert("city_name", "Boxford");
@@ -308,10 +328,11 @@ mod tests {
 
     #[test]
     fn geoip_city_lookup_partial_results() {
-        let new_event = parse_one(
-            r#"{"remote_addr": "67.43.156.9", "request_path": "foo/bar"}"#,
-            "tests/data/GeoIP2-City-Test.mmdb",
-        );
+        let mut log = LogEvent::default();
+        let _ = log.insert("remote_addr", "67.43.156.9");
+        let _ = log.insert("request_path", "foo/bar");
+
+        let new_event = parse_one(log.into(), "tests/data/GeoIP2-City-Test.mmdb");
 
         let mut exp_geoip_attr = HashMap::new();
         exp_geoip_attr.insert("city_name", "");
@@ -339,10 +360,11 @@ mod tests {
 
     #[test]
     fn geoip_city_lookup_no_results() {
-        let new_event = parse_one(
-            r#"{"remote_addr": "10.1.12.1", "request_path": "foo/bar"}"#,
-            "tests/data/GeoIP2-City-Test.mmdb",
-        );
+        let mut log = LogEvent::default();
+        let _ = log.insert("remote_addr", "10.1.12.1");
+        let _ = log.insert("request_path", "foo/bar");
+
+        let new_event = parse_one(log.into(), "tests/data/GeoIP2-City-Test.mmdb");
 
         let mut exp_geoip_attr = HashMap::new();
         exp_geoip_attr.insert("city_name", "");
@@ -370,10 +392,11 @@ mod tests {
 
     #[test]
     fn geoip_isp_lookup_success() {
-        let new_event = parse_one(
-            r#"{"remote_addr": "208.192.1.2", "request_path": "foo/bar"}"#,
-            "tests/data/GeoIP2-ISP-Test.mmdb",
-        );
+        let mut log = LogEvent::default();
+        let _ = log.insert("remote_addr", "208.192.1.2");
+        let _ = log.insert("request_path", "foo/bar");
+
+        let new_event = parse_one(log.into(), "tests/data/GeoIP2-ISP-Test.mmdb");
 
         let mut exp_geoip_attr = HashMap::new();
         exp_geoip_attr.insert("autonomous_system_number", "701");
@@ -397,10 +420,11 @@ mod tests {
 
     #[test]
     fn geoip_isp_lookup_partial_results() {
-        let new_event = parse_one(
-            r#"{"remote_addr": "2600:7000::1", "request_path": "foo/bar"}"#,
-            "tests/data/GeoLite2-ASN-Test.mmdb",
-        );
+        let mut log = LogEvent::default();
+        let _ = log.insert("remote_addr", "2600:7000::1");
+        let _ = log.insert("request_path", "foo/bar");
+
+        let new_event = parse_one(log.into(), "tests/data/GeoLite2-ASN-Test.mmdb");
 
         let mut exp_geoip_attr = HashMap::new();
         exp_geoip_attr.insert("autonomous_system_number", "6939");
@@ -421,10 +445,11 @@ mod tests {
 
     #[test]
     fn geoip_isp_lookup_no_results() {
-        let new_event = parse_one(
-            r#"{"remote_addr": "10.1.12.1", "request_path": "foo/bar"}"#,
-            "tests/data/GeoLite2-ASN-Test.mmdb",
-        );
+        let mut log = LogEvent::default();
+        let _ = log.insert("remote_addr", "10.1.12.1");
+        let _ = log.insert("request_path", "foo/bar");
+
+        let new_event = parse_one(log.into(), "tests/data/GeoLite2-ASN-Test.mmdb");
 
         let mut exp_geoip_attr = HashMap::new();
         exp_geoip_attr.insert("autonomous_system_number", "0");
@@ -443,13 +468,7 @@ mod tests {
         }
     }
 
-    fn parse_one(text: &str, database: &str) -> Event {
-        let mut parser = JsonParser::from(JsonParserConfig::default());
-        let event = Event::from(text);
-        let metadata = event.metadata().clone();
-        let event = transform_one(&mut parser, event).unwrap();
-        assert_eq!(event.metadata(), &metadata);
-
+    fn parse_one(event: Event, database: &str) -> Event {
         let mut augment = Geoip::new(
             database.to_string(),
             "remote_addr".to_string(),
@@ -457,8 +476,6 @@ mod tests {
             "en".to_string(),
         )
         .unwrap();
-        let result = transform_one(&mut augment, event).unwrap();
-        assert_eq!(result.metadata(), &metadata);
-        result
+        transform_one(&mut augment, event).unwrap()
     }
 }

@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use crate::{
     conditions::{AnyCondition, Condition},
@@ -12,11 +13,24 @@ use crate::{
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `sample` transform.
+#[configurable_component(transform)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct SampleConfig {
+    /// The rate at which events will be forwarded, expressed as `1/N`.
+    ///
+    /// For example, `rate = 10` means 1 out of every 10 events will be forwarded and the rest will be dropped.
     pub rate: u64,
+
+    /// The name of the log field whose value will be hashed to determine if the event should be passed.
+    ///
+    /// Consistently samples the same events. Actual rate of sampling may differ from the configured one if values in
+    /// the field are not uniformly distributed. If left unspecified, or if the event doesn’t have `key_field`, events
+    /// will be count rated.
     pub key_field: Option<String>,
+
+    /// A logical condition used to exclude events from sampling.
     pub exclude: Option<AnyCondition>,
 }
 
@@ -156,20 +170,22 @@ mod tests {
 
     use super::*;
     use crate::{
-        conditions::{ConditionConfig, VrlConfig},
+        conditions::{Condition, ConditionalConfig, VrlConfig},
         config::log_schema,
-        event::Event,
+        event::{Event, LogEvent},
         test_util::random_lines,
         transforms::test::transform_one,
     };
 
     fn condition_contains(key: &str, needle: &str) -> Condition {
-        VrlConfig {
+        let vrl_config = VrlConfig {
             source: format!(r#"contains!(."{}", "{}")"#, key, needle),
             runtime: Default::default(),
-        }
-        .build(&Default::default())
-        .unwrap()
+        };
+
+        vrl_config
+            .build(&Default::default())
+            .expect("should not fail to build VRL condition")
     }
 
     #[test]
@@ -251,7 +267,7 @@ mod tests {
     #[test]
     fn always_passes_events_matching_pass_list() {
         for key_field in &[None, Some(log_schema().message_key().into())] {
-            let event = Event::from("i am important");
+            let event = Event::Log(LogEvent::from("i am important"));
             let mut sampler = Sample::new(
                 0,
                 key_field.clone(),
@@ -271,7 +287,7 @@ mod tests {
     #[test]
     fn handles_key_field() {
         for key_field in &[None, Some("other_field".into())] {
-            let mut event = Event::from("nananana");
+            let mut event = Event::Log(LogEvent::from("nananana"));
             let log = event.as_mut_log();
             log.insert("other_field", "foo");
             let mut sampler = Sample::new(
@@ -333,13 +349,16 @@ mod tests {
                 key_field.clone(),
                 Some(condition_contains(log_schema().message_key(), "na")),
             );
-            let event = Event::from("nananana");
+            let event = Event::Log(LogEvent::from("nananana"));
             let passing = transform_one(&mut sampler, event).unwrap();
             assert!(passing.as_log().get("sample_rate").is_none());
         }
     }
 
     fn random_events(n: usize) -> Vec<Event> {
-        random_lines(10).take(n).map(Event::from).collect()
+        random_lines(10)
+            .take(n)
+            .map(|e| Event::Log(LogEvent::from(e)))
+            .collect()
     }
 }

@@ -6,8 +6,8 @@ use syslog::{Facility, Formatter3164, LogFormat, Severity};
 use crate::{
     codecs::Encoder,
     config::{
-        log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
-        SinkDescription,
+        log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig,
+        SinkContext, SinkDescription,
     },
     event::Event,
     internal_events::TemplateRenderingError,
@@ -108,7 +108,7 @@ impl SinkConfig for PapertrailConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(self.encoding.config().input_type())
+        Input::new(self.encoding.config().input_type() & DataType::Log)
     }
 
     fn sink_type(&self) -> &'static str {
@@ -189,6 +189,7 @@ mod tests {
     use codecs::JsonSerializer;
     use futures::{future::ready, stream};
     use tokio_util::codec::Encoder as _;
+    use vector_core::event::{Event, LogEvent};
 
     use crate::test_util::{
         components::{run_and_assert_sink_compliance, SINK_TAGS},
@@ -215,13 +216,13 @@ mod tests {
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
 
-        let event = Event::from("simple message");
+        let event = Event::Log(LogEvent::from("simple message"));
         run_and_assert_sink_compliance(sink, stream::once(ready(event)), &SINK_TAGS).await;
     }
 
     #[test]
     fn encode_event_apply_rules() {
-        let mut evt = Event::from("vector");
+        let mut evt = Event::Log(LogEvent::from("vector"));
         evt.as_mut_log().insert("magic", "key");
         evt.as_mut_log().insert("process", "foo");
 

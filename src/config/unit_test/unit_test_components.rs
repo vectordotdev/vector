@@ -3,6 +3,7 @@ use std::sync::Arc;
 use futures_util::{future, stream::BoxStream, FutureExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{oneshot, Mutex};
+use vector_core::config::LogNamespace;
 use vector_core::{
     config::{DataType, Input, Output},
     event::Event,
@@ -38,7 +39,7 @@ impl SourceConfig for UnitTestSourceConfig {
         }))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::all())]
     }
 

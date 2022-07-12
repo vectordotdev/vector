@@ -118,8 +118,8 @@ fn format_radix(x: i64, radix: u32) -> String {
     };
 
     loop {
-        let m = (x % radix as u64) as u32; // max of 35
-        x /= radix as u64;
+        let m = (x % u64::from(radix)) as u32; // max of 35
+        x /= u64::from(radix);
 
         result.push_front(std::char::from_digit(m, radix).unwrap());
         if x == 0 {

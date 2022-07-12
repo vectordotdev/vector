@@ -32,8 +32,8 @@ components: sinks: gcp_cloud_storage: {
 				enabled: true
 				codec: {
 					enabled: true
-					batched: true
-					enum: ["ndjson", "text"]
+					framing: true
+					enum: ["json", "text"]
 				}
 			}
 			proxy: enabled: true

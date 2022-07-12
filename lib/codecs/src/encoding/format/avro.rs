@@ -76,15 +76,15 @@ mod tests {
     use bytes::BytesMut;
     use indoc::indoc;
     use vector_common::btreemap;
-    use vector_core::event::Value;
+    use vector_core::event::{LogEvent, Value};
 
     use super::*;
 
     #[test]
     fn serialize_avro() {
-        let event = Event::from(btreemap! {
+        let event = Event::Log(LogEvent::from(btreemap! {
             "foo" => Value::from("bar")
-        });
+        }));
         let schema = indoc! {r#"
             {
                 "type": "record",

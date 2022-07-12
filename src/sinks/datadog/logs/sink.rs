@@ -255,7 +255,7 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for LogRequestBuilder {
 
         // Now just compress it like normal.
         let mut compressor = Compressor::from(self.compression);
-        let _ = compressor.write_all(&buf)?;
+        compressor.write_all(&buf)?;
         let bytes = compressor.into_inner().freeze();
 
         if self.compression.is_compressed() {
@@ -339,7 +339,7 @@ impl RequestBuilder<(Option<Arc<str>>, Vec<Event>)> for SemanticLogRequestBuilde
 
         // Now just compress it like normal.
         let mut compressor = Compressor::from(self.compression);
-        let _ = compressor.write_all(&buf)?;
+        compressor.write_all(&buf)?;
         let bytes = compressor.into_inner().freeze();
 
         if self.compression.is_compressed() {

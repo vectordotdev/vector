@@ -283,7 +283,7 @@ enum Redactor {
 
 impl Redactor {
     fn pattern(&self) -> &str {
-        use Redactor::*;
+        use Redactor::Full;
 
         match self {
             Full => "[REDACTED]",
@@ -301,7 +301,7 @@ impl FromStr for Redactor {
     type Err = &'static str;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        use Redactor::*;
+        use Redactor::Full;
 
         match s {
             "full" => Ok(Full),

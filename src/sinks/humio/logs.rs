@@ -3,7 +3,8 @@ use serde::{Deserialize, Serialize};
 use super::host_key;
 use crate::{
     config::{
-        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
+        SinkDescription,
     },
     sinks::{
         splunk_hec::{
@@ -99,7 +100,7 @@ impl SinkConfig for HumioLogsConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(self.encoding.config().input_type())
+        Input::new(self.encoding.config().input_type() & DataType::Log)
     }
 
     fn sink_type(&self) -> &'static str {

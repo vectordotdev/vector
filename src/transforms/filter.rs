@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 
 use crate::{
     conditions::{AnyCondition, Condition},
@@ -14,9 +14,12 @@ use crate::{
     transforms::{FunctionTransform, OutputBuffer, Transform},
 };
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+/// Configuration for the `filter` transform.
+#[configurable_component(transform)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct FilterConfig {
+    #[configurable(derived)]
     condition: AnyCondition,
 }
 
@@ -107,11 +110,8 @@ impl FunctionTransform for Filter {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        conditions::{is_log::IsLogConfig, ConditionConfig},
-        event::Event,
-        transforms::test::transform_one,
-    };
+    use crate::event::{Event, LogEvent};
+    use crate::{conditions::Condition, transforms::test::transform_one};
 
     #[test]
     fn generate_config() {
@@ -120,8 +120,8 @@ mod test {
 
     #[test]
     fn passes_metadata() {
-        let mut filter = Filter::new(IsLogConfig {}.build(&Default::default()).unwrap());
-        let event = Event::from("message");
+        let mut filter = Filter::new(Condition::IsLog);
+        let event = Event::from(LogEvent::from("message"));
         let metadata = event.metadata().clone();
         let result = transform_one(&mut filter, event).unwrap();
         assert_eq!(result.metadata(), &metadata);

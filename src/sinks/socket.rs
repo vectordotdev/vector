@@ -9,7 +9,8 @@ use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
     codecs::Encoder,
     config::{
-        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
+        SinkDescription,
     },
     sinks::util::{
         encoding::{
@@ -112,7 +113,7 @@ impl SinkConfig for SocketSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(self.encoding.config().1.input_type())
+        Input::new(self.encoding.config().1.input_type() & DataType::Log)
     }
 
     fn sink_type(&self) -> &'static str {
@@ -144,7 +145,7 @@ mod test {
     use super::*;
     use crate::{
         config::SinkContext,
-        event::Event,
+        event::{Event, LogEvent},
         test_util::{
             components::{run_and_assert_sink_compliance, SINK_TAGS},
             next_addr, next_addr_v6, random_lines_with_stream, trace_init, CountReceiver,
@@ -169,7 +170,7 @@ mod test {
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
 
-        let event = Event::from("raw log line");
+        let event = Event::Log(LogEvent::from("raw log line"));
         run_and_assert_sink_compliance(sink, stream::once(ready(event)), &SINK_TAGS).await;
 
         let mut buf = [0; 256];
@@ -361,7 +362,7 @@ mod test {
 
         let (_, mut events) = random_lines_with_stream(10, 10, None);
         while let Some(event) = events.next().await {
-            let _ = sender.send(Some(event)).await.unwrap();
+            sender.send(Some(event)).await.unwrap();
         }
 
         // Loop and check for 10 events, we should always get 10 events. Once,
@@ -383,13 +384,13 @@ mod test {
         // Send another 10 events
         let (_, mut events) = random_lines_with_stream(10, 10, None);
         while let Some(event) = events.next().await {
-            let _ = sender.send(Some(event)).await.unwrap();
+            sender.send(Some(event)).await.unwrap();
         }
 
         // Wait for server task to be complete.
-        let _ = sender.send(None).await.unwrap();
-        let _ = jh1.await.unwrap();
-        let _ = jh2.await.unwrap();
+        sender.send(None).await.unwrap();
+        jh1.await.unwrap();
+        jh2.await.unwrap();
 
         // Check that there are exactly 20 events.
         assert_eq!(msg_counter.load(Ordering::SeqCst), 20);

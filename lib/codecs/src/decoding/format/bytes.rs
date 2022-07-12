@@ -1,7 +1,9 @@
 use bytes::Bytes;
+use lookup::LookupBuf;
 use serde::{Deserialize, Serialize};
 use smallvec::{smallvec, SmallVec};
 use value::Kind;
+use vector_core::config::LogNamespace;
 use vector_core::{
     config::{log_schema, DataType},
     event::{Event, LogEvent},
@@ -31,12 +33,16 @@ impl BytesDeserializerConfig {
     }
 
     /// The schema produced by the deserializer.
-    pub fn schema_definition(&self) -> schema::Definition {
-        schema::Definition::empty().with_field(
-            log_schema().message_key(),
-            Kind::bytes(),
-            Some("message"),
-        )
+    pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
+        match log_namespace {
+            LogNamespace::Legacy => schema::Definition::empty_legacy_namespace().with_field(
+                log_schema().message_key(),
+                Kind::bytes(),
+                Some("message"),
+            ),
+            LogNamespace::Vector => schema::Definition::new(Kind::bytes(), [log_namespace])
+                .with_meaning(LookupBuf::root(), "message"),
+        }
     }
 }
 
@@ -46,6 +52,7 @@ impl BytesDeserializerConfig {
 /// further decoding has been specified.
 #[derive(Debug, Clone)]
 pub struct BytesDeserializer {
+    // Only used with the "Legacy" namespace. The "Vector" namespace decodes the data at the root of the event.
     log_schema_message_key: &'static str,
 }
 
@@ -65,25 +72,36 @@ impl BytesDeserializer {
 }
 
 impl Deserializer for BytesDeserializer {
-    fn parse(&self, bytes: Bytes) -> vector_core::Result<SmallVec<[Event; 1]>> {
-        let mut log = LogEvent::default();
-        log.insert(self.log_schema_message_key, bytes);
+    fn parse(
+        &self,
+        bytes: Bytes,
+        log_namespace: LogNamespace,
+    ) -> vector_core::Result<SmallVec<[Event; 1]>> {
+        let log = match log_namespace {
+            LogNamespace::Vector => log_namespace.new_log_from_data(bytes),
+            LogNamespace::Legacy => {
+                let mut log = LogEvent::default();
+                log.insert(self.log_schema_message_key, bytes);
+                log
+            }
+        };
         Ok(smallvec![log.into()])
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use value::Value;
     use vector_core::config::log_schema;
 
     use super::*;
 
     #[test]
-    fn deserialize_bytes() {
+    fn deserialize_bytes_legacy_namespace() {
         let input = Bytes::from("foo");
         let deserializer = BytesDeserializer::new();
 
-        let events = deserializer.parse(input).unwrap();
+        let events = deserializer.parse(input, LogNamespace::Legacy).unwrap();
         let mut events = events.into_iter();
 
         {
@@ -93,5 +111,16 @@ mod tests {
         }
 
         assert_eq!(events.next(), None);
+    }
+
+    #[test]
+    fn deserialize_bytes_vector_namespace() {
+        let input = Bytes::from("foo");
+        let deserializer = BytesDeserializer::new();
+
+        let events = deserializer.parse(input, LogNamespace::Vector).unwrap();
+        assert_eq!(events.len(), 1);
+
+        assert_eq!(events[0].as_log().get(".").unwrap(), &Value::from("foo"));
     }
 }

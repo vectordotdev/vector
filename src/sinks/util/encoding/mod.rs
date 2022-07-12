@@ -401,9 +401,8 @@ mod tests {
     fn test_except() {
         let config: TestConfig = toml::from_str(TOML_EXCEPT_FIELD).unwrap();
         config.encoding.validate().unwrap();
-        let mut event = Event::new_empty_log();
+        let mut log = LogEvent::default();
         {
-            let log = event.as_mut_log();
             log.insert("a", 1);
             log.insert("a.b", 1);
             log.insert("a.b.c", 1);
@@ -416,6 +415,7 @@ mod tests {
             log.insert("e.a", 1);
             log.insert("e.b", 1);
         }
+        let mut event = Event::from(log);
         config.encoding.apply_rules(&mut event);
         assert!(!event.as_mut_log().contains("a.b.c"));
         assert!(!event.as_mut_log().contains("b"));
@@ -437,9 +437,8 @@ mod tests {
     fn test_only() {
         let config: TestConfig = toml::from_str(TOML_ONLY_FIELD).unwrap();
         config.encoding.validate().unwrap();
-        let mut event = Event::new_empty_log();
+        let mut log = LogEvent::default();
         {
-            let log = event.as_mut_log();
             log.insert("a", 1);
             log.insert("a.b", 1);
             log.insert("a.b.c", 1);
@@ -457,6 +456,7 @@ mod tests {
             log.insert("h", BTreeMap::new());
             log.insert("i", Vec::<Value>::new());
         }
+        let mut event = Event::from(log);
         config.encoding.apply_rules(&mut event);
         assert!(event.as_mut_log().contains("a.b.c"));
         assert!(event.as_mut_log().contains("b"));
@@ -482,7 +482,7 @@ mod tests {
     fn test_timestamp() {
         let config: TestConfig = toml::from_str(TOML_TIMESTAMP_FORMAT).unwrap();
         config.encoding.validate().unwrap();
-        let mut event = Event::from("Demo");
+        let mut event = Event::Log(LogEvent::from("Demo"));
         let timestamp = event
             .as_mut_log()
             .get(log_schema().timestamp_key())
@@ -545,10 +545,10 @@ mod tests {
         let mut writer = Vec::new();
         let written = encoding
             .encode_input(
-                vec![Event::from(BTreeMap::from([(
+                vec![Event::Log(LogEvent::from(BTreeMap::from([(
                     String::from("key"),
                     Value::from("value"),
-                )]))],
+                )])))],
                 &mut writer,
             )
             .unwrap();
@@ -571,18 +571,18 @@ mod tests {
         let written = encoding
             .encode_input(
                 vec![
-                    Event::from(BTreeMap::from([(
+                    Event::Log(LogEvent::from(BTreeMap::from([(
                         String::from("key"),
                         Value::from("value1"),
-                    )])),
-                    Event::from(BTreeMap::from([(
+                    )]))),
+                    Event::Log(LogEvent::from(BTreeMap::from([(
                         String::from("key"),
                         Value::from("value2"),
-                    )])),
-                    Event::from(BTreeMap::from([(
+                    )]))),
+                    Event::Log(LogEvent::from(BTreeMap::from([(
                         String::from("key"),
                         Value::from("value3"),
-                    )])),
+                    )]))),
                 ],
                 &mut writer,
             )
@@ -625,10 +625,10 @@ mod tests {
         let mut writer = Vec::new();
         let written = encoding
             .encode_input(
-                vec![Event::from(BTreeMap::from([(
+                vec![Event::Log(LogEvent::from(BTreeMap::from([(
                     String::from("key"),
                     Value::from("value"),
-                )]))],
+                )])))],
                 &mut writer,
             )
             .unwrap();
@@ -651,18 +651,18 @@ mod tests {
         let written = encoding
             .encode_input(
                 vec![
-                    Event::from(BTreeMap::from([(
+                    Event::Log(LogEvent::from(BTreeMap::from([(
                         String::from("key"),
                         Value::from("value1"),
-                    )])),
-                    Event::from(BTreeMap::from([(
+                    )]))),
+                    Event::Log(LogEvent::from(BTreeMap::from([(
                         String::from("key"),
                         Value::from("value2"),
-                    )])),
-                    Event::from(BTreeMap::from([(
+                    )]))),
+                    Event::Log(LogEvent::from(BTreeMap::from([(
                         String::from("key"),
                         Value::from("value3"),
-                    )])),
+                    )]))),
                 ],
                 &mut writer,
             )
@@ -685,10 +685,10 @@ mod tests {
         let mut writer = Vec::new();
         let written = encoding
             .encode_input(
-                Event::from(BTreeMap::from([(
+                Event::Log(LogEvent::from(BTreeMap::from([(
                     String::from("key"),
                     Value::from("value"),
-                )])),
+                )]))),
                 &mut writer,
             )
             .unwrap();
@@ -707,10 +707,10 @@ mod tests {
         let mut writer = Vec::new();
         let written = encoding
             .encode_input(
-                Event::from(BTreeMap::from([(
+                Event::Log(LogEvent::from(BTreeMap::from([(
                     String::from("message"),
                     Value::from("value"),
-                )])),
+                )]))),
                 &mut writer,
             )
             .unwrap();

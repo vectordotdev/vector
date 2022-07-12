@@ -17,7 +17,7 @@ use crate::aws::{AwsAuthentication, RegionOrEndpoint};
 use crate::sinks::aws_cloudwatch_logs::config::CloudwatchLogsClientBuilder;
 use crate::{
     config::{log_schema, ProxyConfig, SinkConfig, SinkContext},
-    event::{Event, Value},
+    event::{Event, LogEvent, Value},
     sinks::util::{
         encoding::{EncodingConfig, StandardEncodings},
         BatchConfig,
@@ -187,11 +187,9 @@ async fn cloudwatch_insert_out_of_range_timestamp() {
 
     let mut add_event = |offset: chrono::Duration| {
         let line = input_lines.next().unwrap();
-        let mut event = Event::from(line.clone());
-        event
-            .as_mut_log()
-            .insert(log_schema().timestamp_key(), now + offset);
-        events.push(event);
+        let mut event = LogEvent::from(line.clone());
+        event.insert(log_schema().timestamp_key(), now + offset);
+        events.push(Event::Log(event));
         line
     };
 
@@ -368,10 +366,10 @@ async fn cloudwatch_insert_log_event_partitioned() {
         .into_iter()
         .enumerate()
         .map(|(i, e)| {
-            let mut event = Event::from(e);
+            let mut event = LogEvent::from(e);
             let stream = (i % 2).to_string();
-            event.as_mut_log().insert("key", stream);
-            event
+            event.insert("key", stream);
+            Event::Log(event)
         })
         .collect::<Vec<_>>();
     run_and_assert_sink_compliance(sink, stream::iter(events), &AWS_SINK_TAGS).await;

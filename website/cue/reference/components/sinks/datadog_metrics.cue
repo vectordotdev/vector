@@ -54,10 +54,10 @@ components: sinks: datadog_metrics: {
 	support: sinks._datadog.support
 
 	configuration: {
-		api_key:  sinks._datadog.configuration.api_key
-		endpoint: sinks._datadog.configuration.endpoint
-		region:   sinks._datadog.configuration.region
-		site:     sinks._datadog.configuration.site
+		default_api_key: sinks._datadog.configuration.default_api_key
+		endpoint:        sinks._datadog.configuration.endpoint
+		region:          sinks._datadog.configuration.region
+		site:            sinks._datadog.configuration.site
 		default_namespace: {
 			common: false
 			description: """

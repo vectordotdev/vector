@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use bytes::{Buf, Bytes};
@@ -56,6 +57,7 @@ impl RetryLogic for DatadogMetricsRetryLogic {
 /// Generalized request for sending metrics to the Datadog metrics endpoints.
 #[derive(Debug, Clone)]
 pub struct DatadogMetricsRequest {
+    pub api_key: Option<Arc<str>>,
     pub payload: Bytes,
     pub uri: Uri,
     pub content_type: &'static str,
@@ -72,6 +74,13 @@ impl DatadogMetricsRequest {
     /// If any of the header names or values are invalid, or if the URI is invalid, an error variant
     /// will be returned.
     pub fn into_http_request(self, api_key: HeaderValue) -> http::Result<Request<Body>> {
+        // use the API key from the incoming event if it is provided
+        let api_key = self.api_key.map_or_else(
+            || api_key,
+            |key| {
+                HeaderValue::from_str(&key).expect("API key should be only valid ASCII characters")
+            },
+        );
         // Requests to the metrics endpoints can be compressed, and there's almost no reason to
         // _not_ compress them given tha t metric data, when encoded, is very repetitive.  Thus,
         // here and through the sink code, we always compress requests.  Datadog also only supports

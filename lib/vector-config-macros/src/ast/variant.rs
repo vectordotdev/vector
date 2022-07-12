@@ -1,10 +1,11 @@
 use darling::{error::Accumulator, util::Flag, FromAttributes};
 use serde_derive_internals::ast as serde_ast;
 use syn::spanned::Spanned;
+use vector_config_common::attributes::CustomAttribute;
 
 use super::{
     util::{try_extract_doc_title_description, DarlingResultIterator},
-    Field, Style, Tagging,
+    Field, Metadata, Style, Tagging,
 };
 
 pub struct Variant<'a> {
@@ -20,6 +21,7 @@ impl<'a> Variant<'a> {
     pub fn from_ast(
         serde: &serde_ast::Variant<'a>,
         tagging: Tagging,
+        is_virtual_newtype: bool,
     ) -> darling::Result<Variant<'a>> {
         let original = serde.original;
         let name = serde.attrs.name().deserialize_name();
@@ -32,7 +34,7 @@ impl<'a> Variant<'a> {
         let fields = serde
             .fields
             .iter()
-            .map(Field::from_ast)
+            .map(|field| Field::from_ast(field, is_virtual_newtype))
             .collect_darling_results(&mut accumulator);
 
         let variant = Variant {
@@ -77,6 +79,14 @@ impl<'a> Variant<'a> {
     pub fn visible(&self) -> bool {
         self.attrs.visible
     }
+
+    pub fn metadata(&self) -> impl Iterator<Item = CustomAttribute> {
+        self.attrs
+            .metadata
+            .clone()
+            .into_iter()
+            .flat_map(|metadata| metadata.attributes())
+    }
 }
 
 impl<'a> Spanned for Variant<'a> {
@@ -93,6 +103,8 @@ struct Attributes {
     deprecated: Flag,
     #[darling(skip)]
     visible: bool,
+    #[darling(multiple)]
+    metadata: Vec<Metadata>,
 }
 
 impl Attributes {

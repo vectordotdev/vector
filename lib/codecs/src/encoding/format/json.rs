@@ -69,15 +69,15 @@ impl Encoder<Event> for JsonSerializer {
 mod tests {
     use bytes::BytesMut;
     use vector_common::btreemap;
-    use vector_core::event::Value;
+    use vector_core::event::{LogEvent, Value};
 
     use super::*;
 
     #[test]
     fn serialize_json() {
-        let event = Event::from(btreemap! {
+        let event = Event::Log(LogEvent::from(btreemap! {
             "foo" => Value::from("bar")
-        });
+        }));
         let mut serializer = JsonSerializer::new();
         let mut bytes = BytesMut::new();
 
@@ -88,9 +88,9 @@ mod tests {
 
     #[test]
     fn serialize_equals_to_json_value() {
-        let event = Event::from(btreemap! {
+        let event = Event::Log(LogEvent::from(btreemap! {
             "foo" => Value::from("bar")
-        });
+        }));
         let mut serializer = JsonSerializer::new();
         let mut bytes = BytesMut::new();
 

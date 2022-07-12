@@ -263,7 +263,7 @@ fn parse(input: &str) -> Result<Value> {
                 // Create a descriptive error message if possible.
                 nom::error::convert_error(input, err)
             }
-            _ => err.to_string(),
+            nom::Err::Incomplete(_) => err.to_string(),
         })
         .and_then(|(rest, result)| {
             rest.trim()
