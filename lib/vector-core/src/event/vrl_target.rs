@@ -165,7 +165,7 @@ impl vrl_lib::Target for VrlTarget {
     fn target_insert(&mut self, path: &LookupBuf, value: ::value::Value) -> Result<(), String> {
         match self {
             VrlTarget::LogEvent(ref mut log, _) | VrlTarget::Trace(ref mut log, _) => {
-                log.insert_by_path(path, value);
+                log.insert(path, value);
                 Ok(())
             }
             VrlTarget::Metric {
@@ -222,7 +222,7 @@ impl vrl_lib::Target for VrlTarget {
                         }
                     }
 
-                    metric_value.insert_by_path(path, value);
+                    metric_value.insert(path, value);
 
                     return Ok(());
                 }
@@ -239,14 +239,14 @@ impl vrl_lib::Target for VrlTarget {
     #[allow(clippy::redundant_closure_for_method_calls)] // false positive
     fn target_get(&self, path: &LookupBuf) -> Result<Option<&Value>, String> {
         match self {
-            VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => Ok(log.get_by_path(path)),
+            VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => Ok(log.get(path)),
             VrlTarget::Metric { value, .. } => target_get_metric(path, value),
         }
     }
 
     fn target_get_mut(&mut self, path: &LookupBuf) -> Result<Option<&mut Value>, String> {
         match self {
-            VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => Ok(log.get_by_path_mut(path)),
+            VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => Ok(log.get_mut(path)),
             VrlTarget::Metric { value, .. } => target_get_mut_metric(path, value),
         }
     }
@@ -258,7 +258,7 @@ impl vrl_lib::Target for VrlTarget {
     ) -> Result<Option<::value::Value>, String> {
         match self {
             VrlTarget::LogEvent(ref mut log, _) | VrlTarget::Trace(ref mut log, _) => {
-                Ok(log.remove_by_path(path, compact))
+                Ok(log.remove(path, compact))
             }
             VrlTarget::Metric {
                 ref mut metric,
@@ -287,7 +287,7 @@ impl vrl_lib::Target for VrlTarget {
                         }
                     };
 
-                    value.remove_by_path(path, false);
+                    value.remove(path, false);
 
                     return Ok(removed_value);
                 }
@@ -300,17 +300,17 @@ impl vrl_lib::Target for VrlTarget {
 
 impl MetadataTarget for VrlTarget {
     fn get_metadata(&self, path: &LookupBuf) -> Result<Option<::value::Value>, String> {
-        let value = self.metadata().value().get_by_path(path).cloned();
+        let value = self.metadata().value().get(path).cloned();
         Ok(value)
     }
 
     fn set_metadata(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
-        self.metadata_mut().value_mut().insert_by_path(path, value);
+        self.metadata_mut().value_mut().insert(path, value);
         Ok(())
     }
 
     fn remove_metadata(&mut self, path: &LookupBuf) -> Result<(), String> {
-        self.metadata_mut().value_mut().remove_by_path(path, false);
+        self.metadata_mut().value_mut().remove(path, false);
         Ok(())
     }
 }
@@ -345,7 +345,7 @@ fn target_get_metric<'a>(path: &LookupBuf, value: &'a Value) -> Result<Option<&'
         return Ok(Some(value));
     }
 
-    let value = value.get_by_path(path);
+    let value = value.get(path);
 
     for paths in path.to_alternative_components(MAX_METRIC_PATH_DEPTH) {
         match paths.as_slice() {
@@ -378,7 +378,7 @@ fn target_get_mut_metric<'a>(
         return Ok(Some(value));
     }
 
-    let value = value.get_by_path_mut(path);
+    let value = value.get_mut(path);
 
     for paths in path.to_alternative_components(MAX_METRIC_PATH_DEPTH) {
         match paths.as_slice() {

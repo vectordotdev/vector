@@ -619,7 +619,7 @@ mod tests {
 
         let buffered = BatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT, acker);
 
-        let _ = buffered
+        buffered
             .sink_map_err(drop)
             .send_all(&mut stream::iter(0..22).map(|item| Ok(EncodedEvent::new(item, 0))))
             .await
@@ -786,7 +786,7 @@ mod tests {
         batch_settings.size.events = 10;
         let buffered = BatchSink::new(svc, VecBuffer::new(batch_settings.size), TIMEOUT, acker);
 
-        let _ = buffered
+        buffered
             .sink_map_err(drop)
             .send_all(&mut stream::iter(0..22).map(|item| Ok(EncodedEvent::new(item, 0))))
             .await

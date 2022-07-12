@@ -37,7 +37,7 @@ impl<'a> Container<'a> {
             Some(serde) => {
                 // This `serde_derive_internals` helper will panic if `check` isn't _always_ called, so we also have to
                 // call it on the success path.
-                let _ = context
+                context
                     .check()
                     .expect("should not have errors if container was parsed successfully");
                 Ok(serde)

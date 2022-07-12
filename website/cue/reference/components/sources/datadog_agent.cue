@@ -61,7 +61,7 @@ components: sources: datadog_agent: {
 		multiple_outputs: {
 			common: false
 			description: """
-				If this setting is set to `true` logs, metrics and traces will be sent to different ouputs. For a source
+				If this setting is set to `true` logs, metrics and traces will be sent to different outputs. For a source
 				component named `agent` the received logs, metrics, and traces can then be accessed by specifying
 				`agent.logs`, `agent.metrics`, and `agent.traces`, respectively, as the input to another component.
 				"""
@@ -156,7 +156,7 @@ components: sources: datadog_agent: {
 					}
 				}
 				ddtags: {
-					description: "The coma separated tags list extracted from the event."
+					description: "The comma separated tags list extracted from the event."
 					required:    true
 					type: string: {
 						examples: ["env:prod,region:ap-east-1"]

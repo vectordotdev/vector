@@ -2,6 +2,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use futures::{stream, StreamExt};
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -61,7 +62,7 @@ impl SourceConfig for InternalLogsConfig {
         )))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 

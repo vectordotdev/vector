@@ -1,4 +1,5 @@
 mod borrowed;
+mod compat;
 mod concat;
 mod jit;
 mod owned;

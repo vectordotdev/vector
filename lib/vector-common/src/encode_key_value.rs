@@ -278,10 +278,7 @@ impl<'a> Serializer for KeyValueSerializer<'a> {
         self.process(Data::None)
     }
 
-    fn serialize_some<T: ?Sized>(self, value: &T) -> Result<Self::Ok, Self::Error>
-    where
-        T: Serialize,
-    {
+    fn serialize_some<T: Serialize + ?Sized>(self, value: &T) -> Result<Self::Ok, Self::Error> {
         value.serialize(self)
     }
 
@@ -302,27 +299,21 @@ impl<'a> Serializer for KeyValueSerializer<'a> {
         self.descend(name).descend(variant).process(Data::None)
     }
 
-    fn serialize_newtype_struct<T: ?Sized>(
+    fn serialize_newtype_struct<T: Serialize + ?Sized>(
         self,
         name: &'static str,
         value: &T,
-    ) -> Result<Self::Ok, Self::Error>
-    where
-        T: Serialize,
-    {
+    ) -> Result<Self::Ok, Self::Error> {
         value.serialize(self.descend(name))
     }
 
-    fn serialize_newtype_variant<T: ?Sized>(
+    fn serialize_newtype_variant<T: Serialize + ?Sized>(
         self,
         name: &'static str,
         _: u32,
         variant: &'static str,
         value: &T,
-    ) -> Result<Self::Ok, Self::Error>
-    where
-        T: Serialize,
-    {
+    ) -> Result<Self::Ok, Self::Error> {
         value.serialize(self.descend(name).descend(variant))
     }
 
@@ -378,14 +369,11 @@ impl<'a> Serializer for KeyValueSerializer<'a> {
 impl<'a> SerializeStruct for KeyValueSerializer<'a> {
     type Ok = ();
     type Error = EncodingError;
-    fn serialize_field<T: ?Sized>(
+    fn serialize_field<T: Serialize + ?Sized>(
         &mut self,
         key: &'static str,
         value: &T,
-    ) -> Result<(), Self::Error>
-    where
-        T: Serialize,
-    {
+    ) -> Result<(), Self::Error> {
         value.serialize(self.child(key))
     }
 
@@ -397,14 +385,11 @@ impl<'a> SerializeStruct for KeyValueSerializer<'a> {
 impl<'a> SerializeStructVariant for KeyValueSerializer<'a> {
     type Ok = ();
     type Error = EncodingError;
-    fn serialize_field<T: ?Sized>(
+    fn serialize_field<T: Serialize + ?Sized>(
         &mut self,
         key: &'static str,
         value: &T,
-    ) -> Result<(), Self::Error>
-    where
-        T: Serialize,
-    {
+    ) -> Result<(), Self::Error> {
         value.serialize(self.child(key))
     }
 
@@ -430,10 +415,7 @@ impl<'a> SerializeTuple for IndexedKeyValueSerializer<'a> {
     type Ok = ();
     type Error = EncodingError;
 
-    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
-    where
-        T: Serialize,
-    {
+    fn serialize_element<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<(), Self::Error> {
         self.process(value)
     }
 
@@ -446,10 +428,7 @@ impl<'a> SerializeSeq for IndexedKeyValueSerializer<'a> {
     type Ok = ();
     type Error = EncodingError;
 
-    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
-    where
-        T: Serialize,
-    {
+    fn serialize_element<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<(), Self::Error> {
         self.process(value)
     }
 
@@ -462,10 +441,7 @@ impl<'a> SerializeTupleStruct for IndexedKeyValueSerializer<'a> {
     type Ok = ();
     type Error = EncodingError;
 
-    fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
-    where
-        T: Serialize,
-    {
+    fn serialize_field<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<(), Self::Error> {
         self.process(value)
     }
 
@@ -478,10 +454,7 @@ impl<'a> SerializeTupleVariant for IndexedKeyValueSerializer<'a> {
     type Ok = ();
     type Error = EncodingError;
 
-    fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
-    where
-        T: Serialize,
-    {
+    fn serialize_field<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<(), Self::Error> {
         self.process(value)
     }
 
@@ -498,10 +471,7 @@ struct KeyedKeyValueSerializer<'a> {
 impl<'a> SerializeMap for KeyedKeyValueSerializer<'a> {
     type Ok = ();
     type Error = EncodingError;
-    fn serialize_key<T: ?Sized>(&mut self, key: &T) -> Result<(), Self::Error>
-    where
-        T: Serialize,
-    {
+    fn serialize_key<T: Serialize + ?Sized>(&mut self, key: &T) -> Result<(), Self::Error> {
         use serde_json::{to_value, Value};
         match to_value(key) {
             Ok(Value::String(key)) => {
@@ -512,10 +482,7 @@ impl<'a> SerializeMap for KeyedKeyValueSerializer<'a> {
         }
     }
 
-    fn serialize_value<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
-    where
-        T: Serialize,
-    {
+    fn serialize_value<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<(), Self::Error> {
         let key = self.key.take().expect("Key must be present.");
         value.serialize(self.ser.child(key))
     }

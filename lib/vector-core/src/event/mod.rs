@@ -4,6 +4,7 @@ use std::{
     fmt::Debug,
 };
 
+use crate::ByteSizeOf;
 pub use ::value::Value;
 pub use array::{into_event_stream, EventArray, EventContainer, LogArray, MetricArray, TraceArray};
 pub use finalization::{
@@ -20,8 +21,6 @@ use vector_buffers::EventCount;
 use vector_common::{finalization, EventDataEq};
 #[cfg(feature = "vrl")]
 pub use vrl_target::{TargetEvents, VrlTarget};
-
-use crate::ByteSizeOf;
 
 pub mod array;
 pub mod discriminant;
