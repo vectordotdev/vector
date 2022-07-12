@@ -77,7 +77,7 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
     } = builder;
 
     let str_expansions = to_string_expansions(&expansions);
-    let graph = match Graph::new(&sources, &transforms, &sinks, &str_expansions) {
+    let graph = match Graph::new(&sources, &transforms, &sinks, &str_expansions, schema) {
         Ok(graph) => graph,
         Err(graph_errors) => {
             errors.extend(graph_errors);
@@ -178,14 +178,17 @@ pub(crate) fn expand_globs(config: &mut ConfigBuilder) {
         .sources
         .iter()
         .flat_map(|(key, s)| {
-            s.inner.outputs().into_iter().map(|output| OutputId {
-                component: key.clone(),
-                port: output.port,
-            })
+            s.inner
+                .outputs(config.schema.log_namespace())
+                .into_iter()
+                .map(|output| OutputId {
+                    component: key.clone(),
+                    port: output.port,
+                })
         })
         .chain(config.transforms.iter().flat_map(|(key, t)| {
             t.inner
-                .outputs(&schema::Definition::empty())
+                .outputs(&schema::Definition::any())
                 .into_iter()
                 .map(|output| OutputId {
                     component: key.clone(),
@@ -248,6 +251,7 @@ fn expand_globs_inner(inputs: &mut Vec<String>, id: &str, candidates: &IndexSet<
 mod test {
     use async_trait::async_trait;
     use serde::{Deserialize, Serialize};
+    use vector_core::config::LogNamespace;
 
     use super::*;
     use crate::{
@@ -280,7 +284,7 @@ mod test {
             "mock"
         }
 
-        fn outputs(&self) -> Vec<Output> {
+        fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
             vec![Output::default(DataType::all())]
         }
 

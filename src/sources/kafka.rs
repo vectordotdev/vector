@@ -20,8 +20,11 @@ use rdkafka::{
 };
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
-use vector_common::{byte_size_of::ByteSizeOf, finalizer::OrderedFinalizer};
+
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
+
+use vector_common::{byte_size_of::ByteSizeOf, finalizer::OrderedFinalizer};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -206,7 +209,12 @@ impl_generate_config_from_default!(KafkaSourceConfig);
 impl SourceConfig for KafkaSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let consumer = create_consumer(self)?;
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
+        let decoder = DecodingConfig::new(
+            self.framing.clone(),
+            self.decoding.clone(),
+            LogNamespace::Legacy,
+        )
+        .build();
         let acknowledgements = cx.do_acknowledgements(&self.acknowledgements);
 
         Ok(Box::pin(kafka_source(
@@ -219,7 +227,7 @@ impl SourceConfig for KafkaSourceConfig {
         )))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.decoding.output_type())]
     }
 
@@ -248,7 +256,7 @@ async fn kafka_source(
         consumer
             .context()
             .finalizer
-            .set(Arc::clone(&finalizer))
+            .set(Arc::clone(finalizer))
             .expect("Finalizer is only set once");
     }
 
@@ -732,24 +740,12 @@ mod integration_test {
 
         let topic = format!("test-topic-{}", random_string(10));
         let group_id = format!("test-group-{}", random_string(10));
-        let now = Utc::now();
+        let config = make_config(&topic, &group_id);
 
         let now = send_events(topic.clone(), 10).await;
 
-        send_events(
-            &topic,
-            SEND_COUNT,
-            "my key",
-            "my message",
-            now.timestamp_millis(),
-            "my header",
-            "my header value",
-        )
-        .await;
-
         let events = assert_source_compliance(&["protocol", "topic", "partition"], async move {
             let (tx, rx) = SourceSender::new_test_error_after(receive_count);
-            let consumer = create_consumer(&config).unwrap();
             let (trigger_shutdown, shutdown_done) = spawn_kafka(tx, config, acknowledgements);
             let events = collect_n(rx, SEND_COUNT).await;
             // Yield to the finalization task to let it collect the
@@ -949,8 +945,7 @@ mod integration_test {
         let mut all_events = events1
             .into_iter()
             .chain(events2.into_iter())
-            .map(map_logs)
-            .flatten()
+            .flat_map(map_logs)
             .collect::<Vec<String>>();
         all_events.sort();
 

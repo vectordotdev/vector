@@ -6,6 +6,7 @@ use codecs::{
 use prost::Message;
 use smallvec::{smallvec, SmallVec};
 use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -119,7 +120,11 @@ impl VectorConfig {
 struct VectorDeserializer;
 
 impl decoding::format::Deserializer for VectorDeserializer {
-    fn parse(&self, bytes: Bytes) -> crate::Result<SmallVec<[Event; 1]>> {
+    fn parse(
+        &self,
+        bytes: Bytes,
+        _log_namespace: LogNamespace,
+    ) -> crate::Result<SmallVec<[Event; 1]>> {
         let byte_size = bytes.len();
         emit!(BytesReceived {
             byte_size,
@@ -307,6 +312,7 @@ mod test {
                 proxy: Default::default(),
                 acknowledgements: false,
                 schema_definitions: HashMap::default(),
+                schema: Default::default(),
             })
             .await
             .unwrap();
@@ -346,6 +352,7 @@ mod test {
                 proxy: Default::default(),
                 acknowledgements: false,
                 schema_definitions: HashMap::default(),
+                schema: Default::default(),
             })
             .await
             .unwrap();

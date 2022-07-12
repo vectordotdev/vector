@@ -956,7 +956,8 @@ mod test {
             "tags" => Kind::object(BTreeMap::new()),
         }));
         assert!(
-            vrl::compile_with_state(vrl.as_str(), vrl_stdlib::all().as_ref(), &mut state).is_ok()
+            vrl::compile_with_external(vrl.as_str(), vrl_stdlib::all().as_ref(), &mut state)
+                .is_ok()
         );
     }
 

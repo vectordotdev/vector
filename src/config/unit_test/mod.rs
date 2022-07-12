@@ -15,6 +15,8 @@ use tokio::sync::{
     Mutex,
 };
 use uuid::Uuid;
+use value::Kind;
+use vector_core::config::LogNamespace;
 
 use self::unit_test_components::{
     UnitTestSinkCheck, UnitTestSinkConfig, UnitTestSinkResult, UnitTestSourceConfig,
@@ -179,7 +181,7 @@ impl UnitTestBuildMetadata {
             .flat_map(|(key, transform)| {
                 transform
                     .inner
-                    .outputs(&schema::Definition::empty())
+                    .outputs(&schema::Definition::any())
                     .into_iter()
                     .map(|output| OutputId {
                         component: key.clone(),
@@ -365,6 +367,7 @@ async fn build_unit_test(
         &transform_only_config.transforms,
         &transform_only_config.sinks,
         &expansions,
+        transform_only_config.schema,
     );
     let test = test.resolve_outputs(&transform_only_graph, &expansions)?;
 
@@ -387,6 +390,7 @@ async fn build_unit_test(
         &expanded_config.transforms,
         &expanded_config.sinks,
         &expansions,
+        expanded_config.schema,
     );
 
     let mut valid_components = get_relevant_test_components(
@@ -418,6 +422,7 @@ async fn build_unit_test(
         &config_builder.transforms,
         &config_builder.sinks,
         &expansions,
+        config_builder.schema,
     );
     let valid_inputs = graph.input_map()?;
     for (_, transform) in config_builder.transforms.iter_mut() {
@@ -457,7 +462,10 @@ fn get_loose_end_outputs_sink(config: &ConfigBuilder) -> Option<SinkOuter<String
     let transform_ids = config.transforms.iter().flat_map(|(key, transform)| {
         transform
             .inner
-            .outputs(&schema::Definition::empty())
+            .outputs(&schema::Definition::new(
+                Kind::any(),
+                [LogNamespace::Legacy, LogNamespace::Vector],
+            ))
             .iter()
             .map(|output| {
                 if let Some(port) = &output.port {
@@ -576,12 +584,12 @@ fn build_outputs(
 fn build_input_event(input: &TestInput) -> Result<Event, String> {
     match input.type_str.as_ref() {
         "raw" => match input.value.as_ref() {
-            Some(v) => Ok(Event::Log(LogEvent::from(v.clone()))),
+            Some(v) => Ok(Event::Log(LogEvent::from_str_legacy(v.clone()))),
             None => Err("input type 'raw' requires the field 'value'".to_string()),
         },
         "log" => {
             if let Some(log_fields) = &input.log_fields {
-                let mut event = LogEvent::from("");
+                let mut event = LogEvent::from_str_legacy("");
                 for (path, value) in log_fields {
                     let value: Value = match value {
                         TestInputValue::String(s) => Value::from(s.to_owned()),

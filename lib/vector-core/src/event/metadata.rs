@@ -4,10 +4,11 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
-use value::{Secrets, Value};
+use value::{Kind, Secrets, Value};
 use vector_common::EventDataEq;
 
 use super::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus};
+use crate::config::LogNamespace;
 use crate::{schema, ByteSizeOf};
 
 const DATADOG_API_KEY: &str = "datadog_api_key";
@@ -95,7 +96,10 @@ impl Default for EventMetadata {
 }
 
 fn default_schema_definition() -> Arc<schema::Definition> {
-    Arc::new(schema::Definition::empty())
+    Arc::new(schema::Definition::new(
+        Kind::any(),
+        [LogNamespace::Legacy, LogNamespace::Vector],
+    ))
 }
 
 impl ByteSizeOf for EventMetadata {
