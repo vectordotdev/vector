@@ -163,17 +163,7 @@ where
             let mut sink = self.connect().await;
             let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
 
-            let result = match sink
-                .send_all_peekable(
-                    &mut (&mut input)
-                        .map(|item| {
-                            drop(item.finalizers);
-                            item.item
-                        })
-                        .peekable(),
-                )
-                .await
-            {
+            let result = match sink.send_all_peekable(&mut (&mut input).peekable()).await {
                 Ok(()) => sink.close().await,
                 Err(error) => Err(error),
             };

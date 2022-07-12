@@ -12,6 +12,7 @@ use tokio::io::AsyncWrite;
 use tokio_util::codec::{BytesCodec, FramedWrite};
 use vector_common::finalization::EventFinalizers;
 
+use super::EncodedEvent;
 use crate::internal_events::{SocketEventsSent, SocketMode};
 
 const MAX_PENDING_ITEMS: usize = 1_000;
@@ -88,7 +89,7 @@ where
     }
 }
 
-impl<T> Sink<Bytes> for BytesSink<T>
+impl<T> Sink<EncodedEvent<Bytes>> for BytesSink<T>
 where
     T: AsyncWrite + Unpin,
 {
@@ -105,11 +106,12 @@ where
         <FramedWrite<T, BytesCodec> as Sink<Bytes>>::poll_ready(inner, cx)
     }
 
-    fn start_send(self: Pin<&mut Self>, item: Bytes) -> Result<(), Self::Error> {
+    fn start_send(self: Pin<&mut Self>, item: EncodedEvent<Bytes>) -> Result<(), Self::Error> {
         let pinned = self.project();
+        pinned.finalizers.push(item.finalizers);
         *pinned.events_total += 1;
-        *pinned.bytes_total += item.len();
-        pinned.inner.start_send(item)
+        *pinned.bytes_total += item.byte_size;
+        pinned.inner.start_send(item.item)
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {

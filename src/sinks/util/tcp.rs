@@ -277,8 +277,6 @@ where
             let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
 
             let mut mapped_input = stream::once(ready(item)).chain(&mut input).map(|event| {
-                drop(event.finalizers);
-
                 emit!(EventsSent {
                     count: 1,
                     byte_size: event.byte_size,
@@ -290,7 +288,7 @@ where
                     protocol: "tcp",
                 });
 
-                Ok(event.item)
+                Ok(event)
             });
 
             let result = match sink.send_all(&mut mapped_input).await {
