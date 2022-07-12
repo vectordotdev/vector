@@ -132,11 +132,7 @@ impl From<Metric> for event::Metric {
             .timestamp
             .map(|ts| chrono::Utc.timestamp(ts.seconds, ts.nanos as u32));
 
-        let interval_ms = if metric.interval_ms == 0 {
-            None
-        } else {
-            Some(metric.interval_ms)
-        };
+        let interval_ms = (metric.interval_ms != 0).then(|| metric.interval_ms);
 
         let tags = if metric.tags.is_empty() {
             None

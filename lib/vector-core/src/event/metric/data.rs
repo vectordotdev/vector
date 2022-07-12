@@ -96,7 +96,7 @@ impl MetricData {
                 .and_then(|ts| {
                     other
                         .timestamp
-                        .map(|other_ts| (ts.timestamp_millis() - other_ts.timestamp_millis().abs()))
+                        .map(|other_ts| ts.timestamp_millis().abs_diff(other_ts.timestamp_millis()))
                 })
                 .unwrap_or(0) as u64;
 
