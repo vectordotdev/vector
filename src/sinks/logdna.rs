@@ -8,13 +8,13 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::{
+    codecs::Transformer,
     config::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
     },
     event::Event,
     http::{Auth, HttpClient},
     sinks::util::{
-        encoding::Transformer,
         http::{HttpEventEncoder, HttpSink, PartitionHttpSink},
         BatchConfig, BoxedRawValue, JsonArrayBuffer, PartitionBuffer, PartitionInnerBuffer,
         RealtimeSizeBasedDefaultBatchSettings, TowerRequestConfig, UriSerde,

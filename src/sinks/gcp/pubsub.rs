@@ -9,7 +9,7 @@ use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
 
 use crate::{
-    codecs::Encoder,
+    codecs::{Encoder, EncodingConfig, Transformer},
     config::{
         AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
         SinkDescription,
@@ -20,10 +20,6 @@ use crate::{
     sinks::{
         gcs_common::config::healthcheck_response,
         util::{
-            encoding::{
-                EncodingConfig, EncodingConfigAdapter, StandardEncodings,
-                StandardEncodingsMigrator, Transformer,
-            },
             http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
             BatchConfig, BoxedRawValue, JsonArrayBuffer, SinkBatchSettings, TowerRequestConfig,
         },
@@ -63,7 +59,7 @@ pub struct PubsubConfig {
     pub batch: BatchConfig<PubsubDefaultBatchSettings>,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    encoding: EncodingConfigAdapter<EncodingConfig<StandardEncodings>, StandardEncodingsMigrator>,
+    encoding: EncodingConfig,
 
     #[serde(default)]
     pub tls: Option<TlsConfig>,
@@ -155,7 +151,7 @@ impl PubsubSink {
         );
 
         let transformer = config.encoding.transformer();
-        let serializer = config.encoding.encoding()?;
+        let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
 
         Ok(Self {
@@ -253,6 +249,7 @@ mod tests {
 
 #[cfg(all(test, feature = "gcp-pubsub-integration-tests"))]
 mod integration_tests {
+    use codecs::JsonSerializerConfig;
     use reqwest::{Client, Method, Response};
     use serde_json::{json, Value};
     use vector_core::event::{BatchNotifier, BatchStatus};
@@ -277,7 +274,7 @@ mod integration_tests {
             },
             batch: Default::default(),
             request: Default::default(),
-            encoding: EncodingConfig::from(StandardEncodings::Json).into(),
+            encoding: JsonSerializerConfig::new().into(),
             tls: Default::default(),
             acknowledgements: Default::default(),
         }

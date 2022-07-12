@@ -36,7 +36,7 @@ use vector_core::{
 };
 
 use crate::{
-    codecs::Encoder,
+    codecs::{Encoder, Transformer},
     dns, emit,
     event::{Event, EventStatus, Finalizable},
     internal_events::{
@@ -44,7 +44,7 @@ use crate::{
         WsConnectionFailedError, WsConnectionShutdown,
     },
     sinks::util::{retries::ExponentialBackoff, StreamSink},
-    sinks::{util::encoding::Transformer, websocket::config::WebSocketSinkConfig},
+    sinks::websocket::config::WebSocketSinkConfig,
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsError},
 };
 
@@ -198,7 +198,7 @@ impl WebSocketSink {
         acker: Acker,
     ) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
-        let serializer = config.encoding.encoding()?;
+        let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
 
         Ok(Self {
@@ -375,71 +375,24 @@ const fn is_closed(error: &WsError) -> bool {
 mod tests {
     use std::net::SocketAddr;
 
+    use codecs::JsonSerializerConfig;
     use futures::{future, FutureExt, StreamExt};
     use serde_json::Value as JsonValue;
     use tokio::time::timeout;
     use tokio_tungstenite::{
         accept_async,
-        tungstenite::{
-            error::{Error as WsError, ProtocolError},
-            Message,
-        },
+        tungstenite::error::{Error as WsError, ProtocolError},
     };
 
     use super::*;
     use crate::{
         config::{SinkConfig, SinkContext},
-        event::{Event, LogEvent, Value as EventValue},
-        sinks::util::encoding::{
-            EncodingConfig, EncodingConfigAdapter, StandardEncodings, StandardEncodingsMigrator,
-        },
         test_util::{
             components::{run_and_assert_sink_compliance, SINK_TAGS},
             next_addr, random_lines_with_stream, trace_init, CountReceiver,
         },
         tls::{self, TlsConfig, TlsEnableableConfig},
     };
-
-    fn encode_event(
-        mut event: Event,
-        encoding: EncodingConfigAdapter<
-            EncodingConfig<StandardEncodings>,
-            StandardEncodingsMigrator,
-        >,
-    ) -> crate::Result<Message> {
-        let transformer = encoding.transformer();
-        let serializer = encoding.encoding()?;
-        let mut encoder = Encoder::<()>::new(serializer);
-
-        let mut bytes = BytesMut::new();
-        transformer.transform(&mut event);
-        encoder.encode(event, &mut bytes)?;
-        Ok(Message::text(String::from_utf8_lossy(&bytes)))
-    }
-
-    #[test]
-    fn encodes_raw_logs() {
-        let event = Event::Log(LogEvent::from("foo"));
-        assert_eq!(
-            Message::text("foo"),
-            encode_event(event, EncodingConfig::from(StandardEncodings::Text).into()).unwrap()
-        );
-    }
-
-    #[test]
-    fn encodes_log_events() {
-        let mut log = LogEvent::default();
-
-        log.insert("str", EventValue::from("bar"));
-        log.insert("num", EventValue::from(10));
-
-        let encoded = encode_event(
-            log.into(),
-            EncodingConfig::from(StandardEncodings::Json).into(),
-        );
-        let expected = Message::text(r#"{"num":10,"str":"bar"}"#);
-        assert_eq!(expected, encoded.unwrap());
-    }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_websocket() {
@@ -449,7 +402,7 @@ mod tests {
         let config = WebSocketSinkConfig {
             uri: format!("ws://{}", addr),
             tls: None,
-            encoding: EncodingConfig::from(StandardEncodings::Json).into(),
+            encoding: JsonSerializerConfig::new().into(),
             ping_interval: None,
             ping_timeout: None,
             acknowledgements: Default::default(),
@@ -478,7 +431,7 @@ mod tests {
                     ..Default::default()
                 },
             }),
-            encoding: EncodingConfig::from(StandardEncodings::Json).into(),
+            encoding: JsonSerializerConfig::new().into(),
             ping_timeout: None,
             ping_interval: None,
             acknowledgements: Default::default(),
@@ -495,7 +448,7 @@ mod tests {
         let config = WebSocketSinkConfig {
             uri: format!("ws://{}", addr),
             tls: None,
-            encoding: EncodingConfig::from(StandardEncodings::Json).into(),
+            encoding: JsonSerializerConfig::new().into(),
             ping_interval: None,
             ping_timeout: None,
             acknowledgements: Default::default(),

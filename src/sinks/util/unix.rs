@@ -10,6 +10,7 @@ use tokio_util::codec::Encoder;
 use vector_core::{buffers::Acker, ByteSizeOf};
 
 use crate::{
+    codecs::Transformer,
     config::SinkContext,
     event::{Event, Finalizable},
     internal_events::{
@@ -19,7 +20,6 @@ use crate::{
     sink::VecSinkExt,
     sinks::{
         util::{
-            encoding::Transformer,
             retries::ExponentialBackoff,
             socket_bytes_sink::{BytesSink, ShutdownCheck},
             EncodedEvent, StreamSink,

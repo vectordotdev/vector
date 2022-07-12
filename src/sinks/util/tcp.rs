@@ -22,6 +22,7 @@ use vector_common::internal_event::{BytesSent, EventsSent};
 use vector_core::{buffers::Acker, ByteSizeOf};
 
 use crate::{
+    codecs::Transformer,
     config::SinkContext,
     dns,
     event::Event,
@@ -31,7 +32,6 @@ use crate::{
     },
     sinks::{
         util::{
-            encoding::Transformer,
             retries::ExponentialBackoff,
             socket_bytes_sink::{BytesSink, ShutdownCheck},
             EncodedEvent, SinkBuildError, StreamSink,

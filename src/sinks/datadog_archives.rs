@@ -33,7 +33,7 @@ use vector_core::{
 
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
-    codecs::Encoder,
+    codecs::{Encoder, Transformer},
     config::{GenerateConfig, Input, SinkConfig, SinkContext},
     gcp::{GcpAuthConfig, GcpAuthenticator},
     http::HttpClient,
@@ -60,7 +60,6 @@ use crate::{
             sink::S3Sink,
         },
         util::{
-            encoding::Transformer,
             metadata::{RequestMetadata, RequestMetadataBuilder},
             partitioner::KeyPartitioner,
             request_builder::EncodeResult,

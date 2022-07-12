@@ -8,5 +8,7 @@ mod encoding;
 mod ready_frames;
 
 pub use decoding::{Decoder, DecodingConfig};
-pub use encoding::{Encoder, EncodingConfig, EncodingConfigWithFraming};
+pub use encoding::{
+    Encoder, EncodingConfig, EncodingConfigWithFraming, TimestampFormat, Transformer,
+};
 pub use ready_frames::ReadyFrames;

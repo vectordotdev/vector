@@ -1,22 +1,15 @@
 use codecs::{
-    encoding::{Framer, Serializer},
-    LengthDelimitedEncoder, NewlineDelimitedEncoder,
+    encoding::{Framer, FramingConfig, Serializer},
+    JsonSerializerConfig, LengthDelimitedEncoder, NewlineDelimitedEncoder,
 };
 use futures::{future, FutureExt};
 use serde::{Deserialize, Serialize};
 use tokio::io;
 
 use crate::{
-    codecs::Encoder,
+    codecs::{Encoder, EncodingConfigWithFraming},
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
-    sinks::{
-        console::sink::WriterSink,
-        util::encoding::{
-            EncodingConfig, EncodingConfigWithFramingAdapter, StandardEncodings,
-            StandardEncodingsWithFramingMigrator,
-        },
-        Healthcheck, VectorSink,
-    },
+    sinks::{console::sink::WriterSink, Healthcheck, VectorSink},
 };
 
 #[derive(Debug, Derivative, Deserialize, Serialize)]
@@ -34,10 +27,7 @@ pub struct ConsoleSinkConfig {
     #[serde(default)]
     pub target: Target,
     #[serde(flatten)]
-    pub encoding: EncodingConfigWithFramingAdapter<
-        EncodingConfig<StandardEncodings>,
-        StandardEncodingsWithFramingMigrator,
-    >,
+    pub encoding: EncodingConfigWithFraming,
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -50,7 +40,7 @@ impl GenerateConfig for ConsoleSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             target: Target::Stdout,
-            encoding: EncodingConfig::from(StandardEncodings::Json).into(),
+            encoding: (None::<FramingConfig>, JsonSerializerConfig::new()).into(),
             acknowledgements: Default::default(),
         })
         .unwrap()
@@ -62,7 +52,7 @@ impl GenerateConfig for ConsoleSinkConfig {
 impl SinkConfig for ConsoleSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let transformer = self.encoding.transformer();
-        let (framer, serializer) = self.encoding.encoding()?;
+        let (framer, serializer) = self.encoding.build()?;
         let framer = match (framer, &serializer) {
             (Some(framer), _) => framer,
             (

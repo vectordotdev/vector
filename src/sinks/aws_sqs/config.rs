@@ -1,7 +1,6 @@
 use std::convert::TryFrom;
 
 use aws_sdk_sqs::Client as SqsClient;
-use codecs::{encoding::SerializerConfig, JsonSerializerConfig, TextSerializerConfig};
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -9,15 +8,13 @@ use snafu::{ResultExt, Snafu};
 use crate::{
     aws::create_client,
     aws::{AwsAuthentication, RegionOrEndpoint},
+    codecs::EncodingConfig,
     common::sqs::SqsClientBuilder,
     config::{
         AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
         SinkContext,
     },
-    sinks::util::{
-        encoding::{EncodingConfig, EncodingConfigAdapter, EncodingConfigMigrator},
-        TowerRequestConfig,
-    },
+    sinks::util::TowerRequestConfig,
     template::{Template, TemplateParseError},
     tls::TlsConfig,
 };
@@ -34,27 +31,13 @@ pub(super) enum BuildError {
     MessageDeduplicationIdTemplate { source: TemplateParseError },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EncodingMigrator;
-
-impl EncodingConfigMigrator for EncodingMigrator {
-    type Codec = Encoding;
-
-    fn migrate(codec: &Self::Codec) -> SerializerConfig {
-        match codec {
-            Encoding::Text => TextSerializerConfig::new().into(),
-            Encoding::Json => JsonSerializerConfig::new().into(),
-        }
-    }
-}
-
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct SqsSinkConfig {
     pub queue_url: String,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    pub encoding: EncodingConfigAdapter<EncodingConfig<Encoding>, EncodingMigrator>,
+    pub encoding: EncodingConfig,
     pub message_group_id: Option<String>,
     pub message_deduplication_id: Option<String>,
     #[serde(default)]

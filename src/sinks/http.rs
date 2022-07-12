@@ -1,11 +1,7 @@
 use std::io::Write;
 
 use bytes::{BufMut, Bytes, BytesMut};
-use codecs::encoding::{
-    CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig, Framer, FramingConfig,
-    JsonSerializerConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig, Serializer,
-    SerializerConfig, TextSerializerConfig,
-};
+use codecs::encoding::{CharacterDelimitedEncoder, Framer, NewlineDelimitedEncoder, Serializer};
 use flate2::write::{GzEncoder, ZlibEncoder};
 use futures::{future, FutureExt, SinkExt};
 use http::{
@@ -19,7 +15,7 @@ use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
 
 use crate::{
-    codecs::Encoder,
+    codecs::{Encoder, EncodingConfigWithFraming, Transformer},
     config::{
         AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
         SinkDescription,
@@ -28,10 +24,6 @@ use crate::{
     http::{Auth, HttpClient, MaybeAuth},
     sinks::util::{
         self,
-        encoding::{
-            EncodingConfig, EncodingConfigWithFramingAdapter, EncodingConfigWithFramingMigrator,
-            Transformer,
-        },
         http::{BatchedHttpSink, HttpEventEncoder, RequestConfig},
         BatchConfig, Buffer, Compression, RealtimeSizeBasedDefaultBatchSettings,
         TowerRequestConfig, UriSerde,
@@ -53,27 +45,6 @@ enum BuildError {
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Migrator;
-
-impl EncodingConfigWithFramingMigrator for Migrator {
-    type Codec = Encoding;
-
-    fn migrate(codec: &Self::Codec) -> (Option<FramingConfig>, SerializerConfig) {
-        match codec {
-            Encoding::Text => (None, TextSerializerConfig::new().into()),
-            Encoding::Ndjson => (
-                Some(NewlineDelimitedEncoderConfig::new().into()),
-                JsonSerializerConfig::new().into(),
-            ),
-            Encoding::Json => (
-                Some(CharacterDelimitedEncoderConfig::new(b',').into()),
-                JsonSerializerConfig::new().into(),
-            ),
-        }
-    }
-}
-
 #[derive(Deserialize, Serialize, Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct HttpSinkConfig {
@@ -85,7 +56,7 @@ pub struct HttpSinkConfig {
     #[serde(default)]
     pub compression: Compression,
     #[serde(flatten)]
-    pub encoding: EncodingConfigWithFramingAdapter<EncodingConfig<Encoding>, Migrator>,
+    pub encoding: EncodingConfigWithFraming,
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
     #[serde(default)]
@@ -112,14 +83,6 @@ pub enum HttpMethod {
     Options,
     Trace,
     Patch,
-}
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
-#[serde(rename_all = "snake_case")]
-pub enum Encoding {
-    Text,
-    Ndjson,
-    Json,
 }
 
 inventory::submit! {
@@ -155,12 +118,8 @@ struct HttpSink {
 }
 
 #[cfg(test)]
-fn default_sink(encoding: Encoding) -> HttpSink {
-    let encoding = EncodingConfigWithFramingAdapter::<EncodingConfig<Encoding>, Migrator>::legacy(
-        encoding.into(),
-    )
-    .encoding()
-    .unwrap();
+fn default_sink(encoding: EncodingConfigWithFraming) -> HttpSink {
+    let encoding = encoding.build().unwrap();
     let framing = encoding
         .0
         .unwrap_or_else(|| NewlineDelimitedEncoder::new().into());
@@ -199,7 +158,7 @@ impl SinkConfig for HttpSinkConfig {
         request.add_old_option(self.headers.clone());
         validate_headers(&request.headers, &self.auth)?;
 
-        let encoding = self.encoding.encoding()?;
+        let encoding = self.encoding.build()?;
         let framing = encoding
             .0
             .unwrap_or_else(|| NewlineDelimitedEncoder::new().into());
@@ -405,6 +364,10 @@ mod tests {
     };
 
     use bytes::{Buf, Bytes};
+    use codecs::{
+        encoding::FramingConfig, JsonSerializerConfig, NewlineDelimitedEncoderConfig,
+        TextSerializerConfig,
+    };
     use flate2::read::MultiGzDecoder;
     use futures::{channel::mpsc, stream, StreamExt};
     use headers::{Authorization, HeaderMapExt};
@@ -433,7 +396,7 @@ mod tests {
     fn http_encode_event_text() {
         let event = Event::Log(LogEvent::from("hello world"));
 
-        let sink = default_sink(Encoding::Text);
+        let sink = default_sink((None::<FramingConfig>, TextSerializerConfig::new()).into());
         let mut encoder = sink.build_encoder();
         let bytes = encoder.encode_event(event).unwrap();
 
@@ -444,7 +407,13 @@ mod tests {
     fn http_encode_event_ndjson() {
         let event = Event::Log(LogEvent::from("hello world"));
 
-        let sink = default_sink(Encoding::Ndjson);
+        let sink = default_sink(
+            (
+                Some(NewlineDelimitedEncoderConfig::new()),
+                JsonSerializerConfig::new(),
+            )
+                .into(),
+        );
         let mut encoder = sink.build_encoder();
         let bytes = encoder.encode_event(event).unwrap();
 

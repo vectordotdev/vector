@@ -1,17 +1,19 @@
 use std::convert::TryInto;
 
 use aws_sdk_s3::Client as S3Client;
-use codecs::encoding::{Framer, Serializer};
-use codecs::{CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder};
+use codecs::encoding::{Framer, FramingConfig, Serializer};
+use codecs::{
+    CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder,
+    TextSerializerConfig,
+};
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
 use vector_core::sink::VectorSink;
 
 use super::sink::S3RequestOptions;
 use crate::aws::{AwsAuthentication, RegionOrEndpoint};
-use crate::sinks::util::encoding::EncodingConfigWithFramingAdapter;
 use crate::{
-    codecs::Encoder,
+    codecs::{Encoder, EncodingConfigWithFraming},
     config::{
         AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
         SinkContext,
@@ -24,10 +26,8 @@ use crate::{
             sink::S3Sink,
         },
         util::{
-            encoding::{EncodingConfig, StandardEncodings, StandardEncodingsWithFramingMigrator},
-            partitioner::KeyPartitioner,
-            BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, ServiceBuilderExt,
-            TowerRequestConfig,
+            partitioner::KeyPartitioner, BatchConfig, BulkSizeBasedDefaultBatchSettings,
+            Compression, ServiceBuilderExt, TowerRequestConfig,
         },
         Healthcheck,
     },
@@ -51,10 +51,7 @@ pub struct S3SinkConfig {
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     #[serde(flatten)]
-    pub encoding: EncodingConfigWithFramingAdapter<
-        EncodingConfig<StandardEncodings>,
-        StandardEncodingsWithFramingMigrator,
-    >,
+    pub encoding: EncodingConfigWithFraming,
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
     #[serde(default)]
@@ -82,7 +79,7 @@ impl GenerateConfig for S3SinkConfig {
             filename_extension: None,
             options: S3Options::default(),
             region: RegionOrEndpoint::default(),
-            encoding: EncodingConfig::from(StandardEncodings::Text).into(),
+            encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
             compression: Compression::gzip_default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
@@ -153,7 +150,7 @@ impl S3SinkConfig {
             .unwrap_or(DEFAULT_FILENAME_APPEND_UUID);
 
         let transformer = self.encoding.transformer();
-        let (framer, serializer) = self.encoding.encoding()?;
+        let (framer, serializer) = self.encoding.build()?;
         let framer = match (framer, &serializer) {
             (Some(framer), _) => framer,
             (None, Serializer::Json(_)) => CharacterDelimitedEncoder::new(b',').into(),

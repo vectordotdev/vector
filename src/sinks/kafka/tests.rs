@@ -11,6 +11,7 @@ mod integration_test {
     };
 
     use bytes::Bytes;
+    use codecs::TextSerializerConfig;
     use futures::StreamExt;
     use rdkafka::{
         consumer::{BaseConsumer, Consumer},
@@ -31,10 +32,7 @@ mod integration_test {
                 sink::KafkaSink,
                 *,
             },
-            util::{
-                encoding::{EncodingConfig, StandardEncodings},
-                BatchConfig, NoDefaultsBatchSettings,
-            },
+            util::{BatchConfig, NoDefaultsBatchSettings},
             VectorSink,
         },
         test_util::{
@@ -62,7 +60,7 @@ mod integration_test {
             bootstrap_servers: kafka_address(9091),
             topic: topic.clone(),
             key_field: None,
-            encoding: EncodingConfig::from(StandardEncodings::Text).into(),
+            encoding: TextSerializerConfig::new().into(),
             batch: BatchConfig::default(),
             compression: KafkaCompression::None,
             auth: KafkaAuthConfig::default(),
@@ -114,7 +112,7 @@ mod integration_test {
             bootstrap_servers: kafka_address(9091),
             topic: format!("{}-%Y%m%d", topic),
             compression: KafkaCompression::None,
-            encoding: EncodingConfig::from(StandardEncodings::Text).into(),
+            encoding: TextSerializerConfig::new().into(),
             key_field: None,
             auth: KafkaAuthConfig {
                 sasl: None,
@@ -249,7 +247,7 @@ mod integration_test {
             bootstrap_servers: server.clone(),
             topic: format!("{}-%Y%m%d", topic),
             key_field: None,
-            encoding: EncodingConfig::from(StandardEncodings::Text).into(),
+            encoding: TextSerializerConfig::new().into(),
             batch: BatchConfig::default(),
             compression,
             auth: kafka_auth.clone(),

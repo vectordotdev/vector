@@ -3,27 +3,23 @@ use std::{convert::TryInto, sync::Arc};
 use azure_storage_blobs::prelude::*;
 use codecs::{
     encoding::{Framer, Serializer},
-    CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder,
+    CharacterDelimitedEncoder, JsonSerializerConfig, LengthDelimitedEncoder,
+    NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
 };
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
 
 use super::request_builder::AzureBlobRequestOptions;
 use crate::{
-    codecs::Encoder,
+    codecs::{Encoder, EncodingConfigWithFraming},
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::{
         azure_common::{
             self, config::AzureBlobRetryLogic, service::AzureBlobService, sink::AzureBlobSink,
         },
         util::{
-            encoding::{
-                EncodingConfig, EncodingConfigWithFramingAdapter, StandardEncodings,
-                StandardEncodingsWithFramingMigrator,
-            },
-            partitioner::KeyPartitioner,
-            BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, ServiceBuilderExt,
-            TowerRequestConfig,
+            partitioner::KeyPartitioner, BatchConfig, BulkSizeBasedDefaultBatchSettings,
+            Compression, ServiceBuilderExt, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -40,10 +36,7 @@ pub struct AzureBlobSinkConfig {
     pub blob_time_format: Option<String>,
     pub blob_append_uuid: Option<bool>,
     #[serde(flatten)]
-    pub encoding: EncodingConfigWithFramingAdapter<
-        EncodingConfig<StandardEncodings>,
-        StandardEncodingsWithFramingMigrator,
-    >,
+    pub encoding: EncodingConfigWithFraming,
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
     #[serde(default)]
@@ -67,7 +60,7 @@ impl GenerateConfig for AzureBlobSinkConfig {
             blob_prefix: Some(String::from("blob")),
             blob_time_format: Some(String::from("%s")),
             blob_append_uuid: Some(true),
-            encoding: EncodingConfig::from(StandardEncodings::Ndjson).into(),
+            encoding: (Some(NewlineDelimitedEncoderConfig::new()), JsonSerializerConfig::new()).into(),
             compression: Compression::gzip_default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
@@ -139,7 +132,7 @@ impl AzureBlobSinkConfig {
             .unwrap_or(DEFAULT_FILENAME_APPEND_UUID);
 
         let transformer = self.encoding.transformer();
-        let (framer, serializer) = self.encoding.clone().encoding()?;
+        let (framer, serializer) = self.encoding.build()?;
         let framer = match (framer, &serializer) {
             (Some(framer), _) => framer,
             (None, Serializer::Json(_)) => CharacterDelimitedEncoder::new(b',').into(),

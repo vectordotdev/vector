@@ -3,10 +3,9 @@ use vector_core::buffers::Ackable;
 use vector_core::ByteSizeOf;
 
 use super::config::SqsSinkConfig;
-use crate::codecs::Encoder;
+use crate::codecs::{Encoder, Transformer};
 use crate::event::{Event, EventFinalizers, Finalizable};
 use crate::internal_events::TemplateRenderingError;
-use crate::sinks::util::encoding::Transformer;
 use crate::sinks::util::request_builder::EncodeResult;
 use crate::sinks::util::{Compression, EncodedLength, RequestBuilder};
 use crate::template::Template;
@@ -30,7 +29,7 @@ pub(crate) struct SqsRequestBuilder {
 impl SqsRequestBuilder {
     pub fn new(config: SqsSinkConfig) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
-        let serializer = config.encoding.encoding()?;
+        let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
 
         Ok(Self {

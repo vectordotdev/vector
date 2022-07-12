@@ -10,11 +10,11 @@ use tower::ServiceBuilder;
 
 use crate::{
     aws::RegionOrEndpoint,
+    codecs::Transformer,
     config::{log_schema, AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext},
     event::{EventRef, LogEvent, Value},
     http::HttpClient,
     internal_events::TemplateRenderingError,
-    sinks::util::encoding::Transformer,
     sinks::{
         elasticsearch::{
             retry::ElasticsearchRetryLogic,

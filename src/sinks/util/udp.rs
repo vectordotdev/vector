@@ -18,6 +18,7 @@ use vector_core::ByteSizeOf;
 
 use super::SinkBuildError;
 use crate::{
+    codecs::Transformer,
     config::SinkContext,
     dns,
     event::{Event, Finalizable},
@@ -26,7 +27,7 @@ use crate::{
         UdpSocketConnectionEstablished, UdpSocketError,
     },
     sinks::{
-        util::{encoding::Transformer, retries::ExponentialBackoff, StreamSink},
+        util::{retries::ExponentialBackoff, StreamSink},
         Healthcheck, VectorSink,
     },
     udp,
