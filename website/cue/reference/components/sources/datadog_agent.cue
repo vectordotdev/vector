@@ -156,7 +156,7 @@ components: sources: datadog_agent: {
 					}
 				}
 				ddtags: {
-					description: "The coma separated tags list extracted from the event."
+					description: "The comma separated tags list extracted from the event."
 					required:    true
 					type: string: {
 						examples: ["env:prod,region:ap-east-1"]
