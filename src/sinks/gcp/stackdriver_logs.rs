@@ -33,7 +33,7 @@ enum HealthcheckError {
     NotFound,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct StackdriverConfig {
     #[serde(skip, default = "default_endpoint")]

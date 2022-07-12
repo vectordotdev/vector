@@ -173,7 +173,6 @@ pub trait EncodingConfigWithFramingMigrator {
 /// `FramingConfig`/`SerializerConfig` encoding configuration while keeping backwards-compatibility.
 #[configurable_component(no_deser)]
 #[derive(Clone, Debug)]
-//#[serde(deny_unknown_fields)]
 pub struct EncodingConfigWithFramingAdapter<LegacyEncodingConfig, Migrator>
 where
     LegacyEncodingConfig: EncodingConfiguration + Configurable + Serialize + 'static,

@@ -16,8 +16,8 @@ pub const GZIP_FAST: u32 = 1;
 pub const GZIP_DEFAULT: u32 = 6;
 pub const GZIP_BEST: u32 = 9;
 
-// NOTE: The resulting schema for `Compress` is not going to look right, because of how we do the customized "string or
-// map" stuff. We've done a bunch of work here to get us half-way towards generating a valid schema for it, including
+// NOTE: The resulting schema for `Compression` is not going to look right, because of how we do the customized "string
+// or map" stuff. We've done a bunch of work here to get us half-way towards generating a valid schema for it, including
 // add in the `CompressionLevel` type and doing a custom `Configurable` implementation for it... but the real meat of
 // the change would be doing so for `Compression` because of it being an enum and all the boilerplate involved there.
 //
@@ -289,6 +289,16 @@ impl<'de> de::Deserialize<'de> for CompressionLevel {
                 }
             }
 
+            fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Err(de::Error::invalid_value(
+                    de::Unexpected::Other(&v.to_string()),
+                    &"0, 1, 2, 3, 4, 5, 6, 7, 8 or 9",
+                ))
+            }
+
             fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
             where
                 E: de::Error,
@@ -297,7 +307,7 @@ impl<'de> de::Deserialize<'de> for CompressionLevel {
                     Ok(CompressionLevel(flate2::Compression::new(v as u32)))
                 } else {
                     return Err(de::Error::invalid_value(
-                        de::Unexpected::Other(&v.to_string()),
+                        de::Unexpected::Unsigned(v),
                         &"0, 1, 2, 3, 4, 5, 6, 7, 8 or 9",
                     ));
                 }
@@ -428,15 +438,15 @@ mod test {
             ),
             (
                 r#"{"algorithm": "gzip", "level": -1}"#,
-                r#"invalid value: -1, expected 0, 1, 2, 3, 4, 5, 6, 7, 8 or 9 at line 1 column 34"#,
+                r#"invalid value: -1, expected 0, 1, 2, 3, 4, 5, 6, 7, 8 or 9 at line 1 column 33"#,
             ),
             (
                 r#"{"algorithm": "gzip", "level": "good"}"#,
-                r#"invalid value: string "good", expected "none", "fast", "best" or "default" at line 1 column 38"#,
+                r#"invalid value: string "good", expected "none", "fast", "best" or "default" at line 1 column 37"#,
             ),
             (
                 r#"{"algorithm": "gzip", "level": {}}"#,
-                r#"invalid type: {}, expected integer or string at line 1 column 34"#,
+                r#"invalid type: map, expected number or string at line 1 column 33"#,
             ),
             (
                 r#"{"algorithm": "gzip", "level": "default", "key": 42}"#,

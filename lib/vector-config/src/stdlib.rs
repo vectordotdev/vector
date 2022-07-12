@@ -49,9 +49,10 @@ where
     }
 
     fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<Self>) -> SchemaObject {
-        // TODO: I'm pretty sure it makes sense to sever the link here so that we don't push metadata for `Option<T>`
-        // down to `T` itself... but we should double check our mental math on that.
-        let mut schema = generate_optional_schema(gen, Metadata::<T>::default());
+        let mut inner_metadata = T::metadata();
+        inner_metadata.set_transparent();
+
+        let mut schema = generate_optional_schema(gen, inner_metadata);
         finalize_schema(gen, &mut schema, overrides);
         schema
     }

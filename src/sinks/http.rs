@@ -1,7 +1,10 @@
 use std::io::Write;
 
 use bytes::{BufMut, Bytes, BytesMut};
-use codecs::encoding::{CharacterDelimitedEncoder, Framer, NewlineDelimitedEncoder, Serializer};
+use codecs::{
+    encoding::{CharacterDelimitedEncoder, Framer, NewlineDelimitedEncoder, Serializer},
+    CharacterDelimitedEncoderConfig, JsonSerializerConfig, TextSerializerConfig,
+};
 use flate2::write::{GzEncoder, ZlibEncoder};
 use futures::{future, FutureExt, SinkExt};
 use http::{
@@ -21,6 +24,7 @@ use crate::{
         SinkDescription,
     },
     event::Event,
+    generate_custom_encoding_configuration,
     http::{Auth, HttpClient, MaybeAuth},
     sinks::util::{
         self,
@@ -31,8 +35,6 @@ use crate::{
     },
     tls::{TlsConfig, TlsSettings},
 };
-
-use super::util::encoding::{StandardEncodings, StandardEncodingsWithFramingMigrator};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -48,6 +50,17 @@ enum BuildError {
     },
 }
 
+generate_custom_encoding_configuration!(HttpEncoding {
+    // We don't want newline-delimited plaintext.
+    Text => (None, TextSerializerConfig::new().into()),
+
+    // We delimit our JSON objects with a comma because we explicitly add opening and closing brackets to the request
+    // body, turning the overall request body into an array of JSON objects.
+    Json => (Some(CharacterDelimitedEncoderConfig::new(b',').into()), JsonSerializerConfig::new().into()),
+
+    Ndjson,
+});
+
 #[derive(Deserialize, Serialize, Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct HttpSinkConfig {
@@ -60,8 +73,8 @@ pub struct HttpSinkConfig {
     pub compression: Compression,
     #[serde(flatten)]
     pub encoding: EncodingConfigWithFramingAdapter<
-        EncodingConfig<StandardEncodings>,
-        StandardEncodingsWithFramingMigrator,
+        EncodingConfig<HttpEncoding>,
+        HttpEncodingWithFramingMigrator,
     >,
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
@@ -124,7 +137,7 @@ struct HttpSink {
 }
 
 #[cfg(test)]
-fn default_sink(encoding: StandardEncodings) -> HttpSink {
+fn default_sink(encoding: HttpEncoding) -> HttpSink {
     let (maybe_framing, serializer) = encoding.as_framed_config_adapter().encoding().unwrap();
     let framing = maybe_framing.unwrap_or_else(|| NewlineDelimitedEncoder::new().into());
     let encoder = Encoder::<Framer>::new(framing, serializer);
@@ -395,7 +408,7 @@ mod tests {
     fn http_encode_event_text() {
         let event = Event::Log(LogEvent::from("hello world"));
 
-        let sink = default_sink(StandardEncodings::Text);
+        let sink = default_sink(HttpEncoding::Text);
         let mut encoder = sink.build_encoder();
         let bytes = encoder.encode_event(event).unwrap();
 
@@ -406,7 +419,7 @@ mod tests {
     fn http_encode_event_ndjson() {
         let event = Event::Log(LogEvent::from("hello world"));
 
-        let sink = default_sink(StandardEncodings::Ndjson);
+        let sink = default_sink(HttpEncoding::Ndjson);
         let mut encoder = sink.build_encoder();
         let bytes = encoder.encode_event(event).unwrap();
 

@@ -18,8 +18,9 @@ use crate::{
 
 use super::util::encoding::{StandardEncodings, StandardEncodingsWithFramingMigrator};
 
-/// Configuration for the `socket` sink.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
+// `#[serde(deny_unknown_fields)]` doesn't work when flattening internally tagged enums, see
+// https://github.com/serde-rs/serde/issues/1358.
 pub struct SocketSinkConfig {
     #[serde(flatten)]
     pub mode: Mode,
@@ -31,17 +32,11 @@ pub struct SocketSinkConfig {
     >,
 }
 
-/// Socket mode.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum Mode {
-    /// TCP.
     Tcp(TcpSinkConfig),
-
-    /// UDP.
     Udp(UdpSinkConfig),
-
-    /// Unix Domain Socket.
     #[cfg(unix)]
     Unix(UnixSinkConfig),
 }

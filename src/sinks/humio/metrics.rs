@@ -25,7 +25,7 @@ use crate::{
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct HumioMetricsConfig {
+struct HumioMetricsConfig {
     #[serde(flatten)]
     transform: MetricToLogConfig,
     token: String,

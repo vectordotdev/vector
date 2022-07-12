@@ -43,7 +43,7 @@ enum Errors {
     SetMetricInvalid,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct RemoteWriteConfig {
     pub endpoint: String,

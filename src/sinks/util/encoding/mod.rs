@@ -61,6 +61,7 @@ mod adapter;
 mod codec;
 mod config;
 mod fixed;
+mod macros;
 mod with_default;
 
 use std::{fmt::Debug, io};

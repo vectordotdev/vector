@@ -1,5 +1,5 @@
-pub mod logs;
-pub mod metrics;
+mod logs;
+mod metrics;
 
 use serde::{Deserialize, Serialize};
 

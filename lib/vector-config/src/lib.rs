@@ -87,7 +87,6 @@
 use core::fmt;
 
 use num::ConfigurableNumber;
-//use serde::{Deserialize, Serialize};
 
 pub mod schema;
 

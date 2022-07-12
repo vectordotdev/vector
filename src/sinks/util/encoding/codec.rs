@@ -301,9 +301,9 @@ impl BasicEncodings {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
 /// Migrate the legacy `BasicEncodings` to the new `SerializerConfig` based
 /// encoding system.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BasicEncodingsMigrator;
 
 impl EncodingConfigMigrator for BasicEncodingsMigrator {
