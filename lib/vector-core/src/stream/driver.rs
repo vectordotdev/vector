@@ -7,7 +7,7 @@ use tower::Service;
 use tracing::Instrument;
 use vector_common::internal_event::BytesSent;
 
-use super::FuturesUnorderedChunked;
+use super::FuturesUnorderedCount;
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_event::{emit, EventsSent},
@@ -66,7 +66,7 @@ where
     /// The return type is mostly to simplify caller code.
     /// An error is currently only returned if a service returns an error from `poll_ready`
     pub async fn run(self) -> Result<(), ()> {
-        let mut in_flight = FuturesUnorderedChunked::new(1024);
+        let mut in_flight = FuturesUnorderedCount::new();
         let mut next_batch: Option<VecDeque<St::Item>> = None;
         let mut seq_num = 0usize;
 
@@ -102,7 +102,7 @@ where
                 biased;
 
                 // One or more of our service calls have completed.
-                Some(_acks) = in_flight.next(), if !in_flight.is_empty() => {}
+                Some(_count) = in_flight.next(), if !in_flight.is_empty() => {}
 
                 // We've got an input batch to process and the service is ready to accept a request.
                 maybe_ready = poll_fn(|cx| service.poll_ready(cx)), if next_batch.is_some() => {
