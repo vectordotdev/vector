@@ -35,7 +35,7 @@ impl SinkBatchSettings for StackdriverMetricsDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct StackdriverConfig {
     pub project_id: String,
     pub resource: gcp::GcpTypedResource,

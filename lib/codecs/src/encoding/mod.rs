@@ -18,7 +18,7 @@ pub use framing::{
     CharacterDelimitedEncoderConfig, CharacterDelimitedEncoderOptions, LengthDelimitedEncoder,
     LengthDelimitedEncoderConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
 };
-use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 use vector_core::{config::DataType, event::Event, schema};
 
 /// An error that occurred while building an encoder.
@@ -50,23 +50,29 @@ impl From<std::io::Error> for Error {
     }
 }
 
-/// Configuration for building a `Framer`.
+/// Framing configuration.
 // Unfortunately, copying options of the nested enum variants is necessary
 // since `serde` doesn't allow `flatten`ing these:
 // https://github.com/serde-rs/serde/issues/1402.
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[configurable_component]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(tag = "method", rename_all = "snake_case")]
 pub enum FramingConfig {
-    /// Configures the `BytesEncoder`.
+    /// Event data is not delimited at all.
+    ///
+    /// This implies that all data received in a single I/O operation will be treated as a single event.
     Bytes,
-    /// Configures the `CharacterDelimitedEncoder`.
+
+    /// Event data is delimited by a single 8-bit character.
     CharacterDelimited {
         /// Options for the character delimited encoder.
         character_delimited: CharacterDelimitedEncoderOptions,
     },
-    /// Configures the `LengthDelimitedEncoder`.
+
+    /// Event data is prefixed with its length in bytes.
     LengthDelimited,
-    /// Configures the `NewlineDelimitedEncoder`.
+
+    /// Event data is delimited by a newline (LF) character.
     NewlineDelimited,
 }
 
@@ -182,25 +188,34 @@ impl tokio_util::codec::Encoder<()> for Framer {
 // Unfortunately, copying options of the nested enum variants is necessary
 // since `serde` doesn't allow `flatten`ing these:
 // https://github.com/serde-rs/serde/issues/1402.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(tag = "codec", rename_all = "snake_case")]
 pub enum SerializerConfig {
-    /// Configures the `AvroSerializer`.
+    /// Apache Avro serialization.
     Avro {
-        /// Options for the avro serializer.
+        /// Apache Avro serializer options.
         avro: AvroSerializerOptions,
     },
-    /// Configures the `JsonSerializer`.
+
+    /// JSON serialization.
     Json,
-    /// Configures the `LogfmtSerializer`.
+
+    /// Logfmt serialization.
     Logfmt,
-    /// Configures the `NativeSerializer`.
+
+    /// Native Vector serialization based on Protocol Buffers.
     Native,
-    /// Configures the `NativeJsonSerializer`.
+
+    /// Native Vector serialization based on JSON.
     NativeJson,
-    /// Configures the `RawMessageSerializer`.
+
+    /// No serialization.
+    ///
+    /// This emits the raw bytes for a given input.
     RawMessage,
-    /// Configures the `TextSerializer`.
+
+    /// Plaintext serialization.
     Text,
 }
 

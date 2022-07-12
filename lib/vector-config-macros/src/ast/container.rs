@@ -1,6 +1,8 @@
+use std::collections::HashSet;
+
 use darling::{error::Accumulator, util::Flag, FromAttributes};
 use serde_derive_internals::{ast as serde_ast, Ctxt, Derive};
-use syn::{DeriveInput, ExprPath, Generics, Ident, Type};
+use syn::{DeriveInput, ExprPath, Generics, Ident, Type, TypeParam};
 use vector_config_common::attributes::CustomAttribute;
 
 use super::{
@@ -263,6 +265,37 @@ impl<'a> Container<'a> {
             .clone()
             .into_iter()
             .flat_map(|metadata| metadata.attributes())
+    }
+
+    pub fn generic_field_types(&self) -> Vec<TypeParam> {
+        let mut generic_types = Vec::new();
+
+        let field_types = match &self.data {
+            Data::Struct(_, fields) => fields
+                .iter()
+                .filter_map(|f| match f.ty() {
+                    Type::Path(tp) => tp.path.get_ident().cloned(),
+                    _ => None,
+                })
+                .collect::<HashSet<_>>(),
+            Data::Enum(variants) => variants
+                .iter()
+                .map(|v| v.fields().iter())
+                .flatten()
+                .filter_map(|f| match f.ty() {
+                    Type::Path(tp) => tp.path.get_ident().cloned(),
+                    _ => None,
+                })
+                .collect::<HashSet<_>>(),
+        };
+
+        for type_param in self.original.generics.type_params() {
+            if field_types.contains(&type_param.ident) {
+                generic_types.push(type_param.clone());
+            }
+        }
+
+        generic_types
     }
 }
 

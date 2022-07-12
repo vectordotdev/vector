@@ -3,11 +3,7 @@ use std::time::{Duration, Instant};
 use async_compression::tokio::write::GzipEncoder;
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
-use codecs::{
-    encoding::{Framer, FramingConfig, SerializerConfig},
-    JsonSerializerConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
-    TextSerializerConfig,
-};
+use codecs::{encoding::Framer, NewlineDelimitedEncoder};
 use futures::{
     future,
     stream::{BoxStream, StreamExt},
@@ -32,8 +28,8 @@ use crate::{
     internal_events::{FileBytesSent, FileIoError, FileOpen, TemplateRenderingError},
     sinks::util::{
         encoding::{
-            EncodingConfig, EncodingConfigWithFramingAdapter, EncodingConfigWithFramingMigrator,
-            Transformer,
+            EncodingConfig, EncodingConfigWithFramingAdapter, StandardEncodings,
+            StandardEncodingsWithFramingMigrator, Transformer,
         },
         StreamSink,
     },
@@ -44,30 +40,16 @@ use std::convert::TryFrom;
 
 use bytes_path::BytesPath;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EncodingMigrator;
-
-impl EncodingConfigWithFramingMigrator for EncodingMigrator {
-    type Codec = Encoding;
-
-    fn migrate(codec: &Self::Codec) -> (Option<FramingConfig>, SerializerConfig) {
-        match codec {
-            Encoding::Text => (None, TextSerializerConfig::new().into()),
-            Encoding::Ndjson => (
-                Some(NewlineDelimitedEncoderConfig::new().into()),
-                JsonSerializerConfig::new().into(),
-            ),
-        }
-    }
-}
-
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct FileSinkConfig {
     pub path: Template,
     pub idle_timeout_secs: Option<u64>,
     #[serde(flatten)]
-    pub encoding: EncodingConfigWithFramingAdapter<EncodingConfig<Encoding>, EncodingMigrator>,
+    pub encoding: EncodingConfigWithFramingAdapter<
+        EncodingConfig<StandardEncodings>,
+        StandardEncodingsWithFramingMigrator,
+    >,
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
@@ -90,19 +72,12 @@ impl GenerateConfig for FileSinkConfig {
         toml::Value::try_from(Self {
             path: Template::try_from("/tmp/vector-%Y-%m-%d.log").unwrap(),
             idle_timeout_secs: None,
-            encoding: EncodingConfig::from(Encoding::Text).into(),
+            encoding: StandardEncodings::Text.as_framed_config_adapter(),
             compression: Default::default(),
             acknowledgements: Default::default(),
         })
         .unwrap()
     }
-}
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
-#[serde(rename_all = "snake_case")]
-pub enum Encoding {
-    Text,
-    Ndjson,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Copy)]
@@ -448,7 +423,7 @@ mod tests {
         let config = FileSinkConfig {
             path: template.clone().try_into().unwrap(),
             idle_timeout_secs: None,
-            encoding: EncodingConfig::from(Encoding::Text).into(),
+            encoding: StandardEncodings::Text.as_framed_config_adapter(),
             compression: Compression::None,
             acknowledgements: Default::default(),
         };
@@ -484,7 +459,7 @@ mod tests {
         let config = FileSinkConfig {
             path: template.clone().try_into().unwrap(),
             idle_timeout_secs: None,
-            encoding: EncodingConfig::from(Encoding::Text).into(),
+            encoding: StandardEncodings::Text.as_framed_config_adapter(),
             compression: Compression::Gzip,
             acknowledgements: Default::default(),
         };
@@ -525,7 +500,7 @@ mod tests {
         let config = FileSinkConfig {
             path: template.try_into().unwrap(),
             idle_timeout_secs: None,
-            encoding: EncodingConfig::from(Encoding::Text).into(),
+            encoding: StandardEncodings::Text.as_framed_config_adapter(),
             compression: Compression::None,
             acknowledgements: Default::default(),
         };
@@ -610,7 +585,7 @@ mod tests {
         let config = FileSinkConfig {
             path: template.clone().try_into().unwrap(),
             idle_timeout_secs: Some(1),
-            encoding: EncodingConfig::from(Encoding::Text).into(),
+            encoding: StandardEncodings::Text.as_framed_config_adapter(),
             compression: Compression::None,
             acknowledgements: Default::default(),
         };

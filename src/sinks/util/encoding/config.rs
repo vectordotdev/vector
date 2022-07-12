@@ -8,6 +8,7 @@ use serde::{
     de::{self, DeserializeOwned, IntoDeserializer, MapAccess, Visitor},
     Deserialize, Deserializer, Serialize,
 };
+use vector_config::configurable_component;
 
 use crate::{
     serde::skip_serializing_if_default,
@@ -20,21 +21,31 @@ use crate::{
 ///
 /// This structure **does not** assume that there is a default format. Consider
 /// `EncodingConfigWithDefault<E>` instead if `E: Default`.
-#[derive(Serialize, Debug, Eq, PartialEq, Clone)]
+#[configurable_component(no_deser)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
-pub struct EncodingConfig<E> {
+pub struct EncodingConfig<E: Clone> {
+    /// The codec to use.
     pub(crate) codec: E,
+
+    /// The schema to use.
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     pub(crate) schema: Option<String>,
+
+    /// List of fields that will be included in the encoded event.
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     pub(crate) only_fields: Option<Vec<OwnedPath>>,
+
+    /// List of fields that will be excluded from the encoded event.
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     pub(crate) except_fields: Option<Vec<String>>,
+
+    /// Format used for timestamp fields.
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     pub(crate) timestamp_format: Option<TimestampFormat>,
 }
 
-impl<E> EncodingConfiguration for EncodingConfig<E> {
+impl<E: Clone> EncodingConfiguration for EncodingConfig<E> {
     type Codec = E;
 
     fn codec(&self) -> &Self::Codec {
@@ -58,7 +69,7 @@ impl<E> EncodingConfiguration for EncodingConfig<E> {
     }
 }
 
-impl<E> From<EncodingConfigWithDefault<E>> for EncodingConfig<E>
+impl<E: Clone> From<EncodingConfigWithDefault<E>> for EncodingConfig<E>
 where
     E: Default + PartialEq,
 {
@@ -73,7 +84,7 @@ where
     }
 }
 
-impl<E> From<E> for EncodingConfig<E> {
+impl<E: Clone> From<E> for EncodingConfig<E> {
     fn from(codec: E) -> Self {
         Self {
             codec,

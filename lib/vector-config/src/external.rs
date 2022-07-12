@@ -1,4 +1,5 @@
 use schemars::{gen::SchemaGenerator, schema::SchemaObject};
+use serde::Serialize;
 
 use crate::{
     schema::{finalize_schema, generate_array_schema, generate_map_schema, generate_string_schema},
@@ -29,7 +30,7 @@ impl Configurable for &'static encoding_rs::Encoding {
 
 impl<V> Configurable for indexmap::IndexMap<String, V>
 where
-    V: Configurable,
+    V: Configurable + Serialize,
 {
     fn is_optional() -> bool {
         // A hashmap with required fields would be... an object.  So if you want that, make a struct

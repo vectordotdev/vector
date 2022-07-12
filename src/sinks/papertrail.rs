@@ -1,5 +1,4 @@
 use bytes::{BufMut, BytesMut};
-use codecs::{encoding::SerializerConfig, JsonSerializerConfig, TextSerializerConfig};
 use serde::{Deserialize, Serialize};
 use syslog::{Facility, Formatter3164, LogFormat, Severity};
 
@@ -12,34 +11,23 @@ use crate::{
     event::Event,
     internal_events::TemplateRenderingError,
     sinks::util::{
-        encoding::{EncodingConfig, EncodingConfigAdapter, EncodingConfigMigrator, Transformer},
+        encoding::{
+            BasicEncodings, BasicEncodingsMigrator, EncodingConfig, EncodingConfigAdapter,
+            Transformer,
+        },
         tcp::TcpSinkConfig,
-        Encoding, UriSerde,
+        UriSerde,
     },
     tcp::TcpKeepaliveConfig,
     template::Template,
     tls::TlsEnableableConfig,
 };
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EncodingMigrator;
-
-impl EncodingConfigMigrator for EncodingMigrator {
-    type Codec = Encoding;
-
-    fn migrate(codec: &Self::Codec) -> SerializerConfig {
-        match codec {
-            Encoding::Text => TextSerializerConfig::new().into(),
-            Encoding::Json => JsonSerializerConfig::new().into(),
-        }
-    }
-}
-
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct PapertrailConfig {
     endpoint: UriSerde,
-    encoding: EncodingConfigAdapter<EncodingConfig<Encoding>, EncodingMigrator>,
+    encoding: EncodingConfigAdapter<EncodingConfig<BasicEncodings>, BasicEncodingsMigrator>,
     keepalive: Option<TcpKeepaliveConfig>,
     tls: Option<TlsEnableableConfig>,
     send_buffer_bytes: Option<usize>,

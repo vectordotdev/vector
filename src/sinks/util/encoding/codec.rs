@@ -5,10 +5,14 @@ use codecs::{
     JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
 };
 use serde::{Deserialize, Serialize};
+use vector_config::configurable_component;
 use vector_core::config::log_schema;
 use vector_core::event::{Event, LogEvent, TraceEvent};
 
-use super::{Encoder, EncodingConfigMigrator, EncodingConfigWithFramingMigrator};
+use super::{
+    Encoder, EncodingConfig, EncodingConfigAdapter, EncodingConfigMigrator,
+    EncodingConfigWithFramingAdapter, EncodingConfigWithFramingMigrator,
+};
 
 static DEFAULT_TEXT_ENCODER: StandardTextEncoding = StandardTextEncoding;
 static DEFAULT_JSON_ENCODER: StandardJsonEncoding = StandardJsonEncoding;
@@ -22,15 +26,29 @@ static DEFAULT_JSON_ENCODER: StandardJsonEncoding = StandardJsonEncoding;
 /// These encodings are meant to cover the most common use cases, so if there is a need for
 /// specialization, you should prefer to use your own encoding enum with suitable implementations of
 /// the [`Encoder`] trait.
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum StandardEncodings {
+    /// Plaintext encoding.
     Text,
+
+    /// JSON encoding.
     Json,
+
+    /// Newline-delimited JSON encoding.
     Ndjson,
 }
 
 impl StandardEncodings {
+    pub fn as_framed_config_adapter(
+        &self,
+    ) -> EncodingConfigWithFramingAdapter<EncodingConfig<Self>, StandardEncodingsWithFramingMigrator>
+    {
+        let legacy_config: EncodingConfig<Self> = self.clone().into();
+        legacy_config.into()
+    }
+
     pub const fn content_type(&self) -> &str {
         match self {
             StandardEncodings::Text => "text/plain",
@@ -176,7 +194,7 @@ impl EncodingConfigMigrator for StandardEncodingsMigrator {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 /// Migrate the legacy `StandardEncodings` to the new `FramingConfig`/
 /// `SerializerConfig` based encoding system.
 pub struct StandardEncodingsWithFramingMigrator;
@@ -255,6 +273,62 @@ impl Encoder<Event> for StandardTextEncoding {
                 writer.write_all(&message).map(|()| message.len())
             }
             Event::Trace(_) => panic!("standard text encoding cannot be used for traces"),
+        }
+    }
+}
+
+/// A restricted set of standard encodings.
+///
+/// A subset of `StandardEncodings` is provided -- text and JSON, specifically -- as many services and APIs cannot
+/// accept NDJSON data.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum BasicEncodings {
+    /// Plaintext encoding.
+    Text,
+
+    /// JSON encoding.
+    Json,
+}
+
+impl BasicEncodings {
+    pub fn as_config_adapter(
+        &self,
+    ) -> EncodingConfigAdapter<EncodingConfig<Self>, BasicEncodingsMigrator> {
+        let legacy_config: EncodingConfig<Self> = self.clone().into();
+        legacy_config.into()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Migrate the legacy `BasicEncodings` to the new `SerializerConfig` based
+/// encoding system.
+pub struct BasicEncodingsMigrator;
+
+impl EncodingConfigMigrator for BasicEncodingsMigrator {
+    type Codec = BasicEncodings;
+
+    fn migrate(codec: &Self::Codec) -> SerializerConfig {
+        match codec {
+            BasicEncodings::Text => TextSerializerConfig::new().into(),
+            BasicEncodings::Json => JsonSerializerConfig::new().into(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+/// Migrate the legacy `BasicEncodings` to the new `FramingConfig`/
+/// `SerializerConfig` based encoding system.
+pub struct BasicEncodingsWithFramingMigrator;
+
+impl EncodingConfigWithFramingMigrator for BasicEncodingsWithFramingMigrator {
+    type Codec = BasicEncodings;
+
+    fn migrate(codec: &Self::Codec) -> (Option<FramingConfig>, SerializerConfig) {
+        match codec {
+            BasicEncodings::Text => (None, TextSerializerConfig::new().into()),
+            BasicEncodings::Json => (None, JsonSerializerConfig::new().into()),
         }
     }
 }

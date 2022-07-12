@@ -1,6 +1,5 @@
 use std::{hash::Hash, marker::PhantomData, sync::Arc, time::Duration};
 
-use serde::{Deserialize, Serialize};
 use tower::{
     layer::{util::Stack, Layer},
     limit::RateLimit,
@@ -9,6 +8,7 @@ use tower::{
     Service, ServiceBuilder,
 };
 use vector_buffers::Acker;
+use vector_config::configurable_component;
 
 pub use crate::sinks::util::service::{
     concurrency::{concurrency_is_none, Concurrency},
@@ -64,18 +64,38 @@ impl<L> ServiceBuilderExt<L> for ServiceBuilder<L> {
     }
 }
 
-/// Tower Request based configuration
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+/// Reliability-related settings for outbound requests i.e. concurrency and rate limits, timeouts, etc.
+#[configurable_component]
+#[derive(Clone, Copy, Debug)]
 pub struct TowerRequestConfig {
+    #[configurable(derived)]
     #[serde(default)]
     #[serde(skip_serializing_if = "concurrency_is_none")]
-    pub concurrency: Concurrency, // adaptive
-    pub timeout_secs: Option<u64>,             // 1 minute
-    pub rate_limit_duration_secs: Option<u64>, // 1 second
-    pub rate_limit_num: Option<u64>,           // i64::MAX
-    pub retry_attempts: Option<usize>,         // isize::MAX
+    pub concurrency: Concurrency,
+
+    /// The maximum time a request can take before being aborted. It is highly recommended that you do not lower this value below the service’s internal timeout, as this could create orphaned requests, pile on retries, and result in duplicate data downstream.
+    pub timeout_secs: Option<u64>,
+
+    /// The time window, in seconds, used for the `rate_limit_num` option.
+    pub rate_limit_duration_secs: Option<u64>,
+
+    /// The maximum number of requests allowed within the `rate_limit_duration_secs` time window.
+    pub rate_limit_num: Option<u64>,
+
+    /// The maximum number of retries to make for failed requests.
+    ///
+    /// The default, for all intents and purposes, represents an infinite number of retries.
+    pub retry_attempts: Option<usize>,
+
+    /// The maximum amount of time, in seconds, to wait between retries.
     pub retry_max_duration_secs: Option<u64>,
-    pub retry_initial_backoff_secs: Option<u64>, // 1
+
+    /// The amount of time to wait before attempting the first retry for a failed request.
+    ///
+    /// After the first retry has failed, the fibonacci sequence will be used to select future backoffs.
+    pub retry_initial_backoff_secs: Option<u64>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub adaptive_concurrency: AdaptiveConcurrencySettings,
 }

@@ -8,6 +8,7 @@ use schemars::{
         SchemaObject, SingleOrVec, SubschemaValidation,
     },
 };
+use serde::Serialize;
 use serde_json::{Map, Value};
 
 use crate::{num::ConfigurableNumber, Configurable, CustomAttribute, Metadata};
@@ -29,7 +30,7 @@ pub fn finalize_schema<T>(
     schema: &mut SchemaObject,
     metadata: Metadata<T>,
 ) where
-    T: Configurable,
+    T: Configurable + Serialize,
 {
     // If the type that this schema represents is referencable, check to see if it's been defined
     // before, and if not, then go ahead and define it.
@@ -59,7 +60,7 @@ pub fn finalize_schema<T>(
 /// patterns, etc), as well as actual arbitrary key/value data.
 pub fn apply_metadata<T>(schema: &mut SchemaObject, metadata: Metadata<T>)
 where
-    T: Configurable,
+    T: Serialize,
 {
     // Set the title/description of this schema.
     //

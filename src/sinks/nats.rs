@@ -2,7 +2,6 @@ use std::convert::TryFrom;
 
 use async_trait::async_trait;
 use bytes::BytesMut;
-use codecs::{encoding::SerializerConfig, JsonSerializerConfig, TextSerializerConfig};
 use futures::{stream::BoxStream, FutureExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -21,7 +20,10 @@ use crate::{
     internal_events::{NatsEventSendError, TemplateRenderingError},
     nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
     sinks::util::{
-        encoding::{EncodingConfig, EncodingConfigAdapter, EncodingConfigMigrator, Transformer},
+        encoding::{
+            BasicEncodings, BasicEncodingsMigrator, EncodingConfig, EncodingConfigAdapter,
+            Transformer,
+        },
         StreamSink,
     },
     template::{Template, TemplateParseError},
@@ -41,21 +43,6 @@ enum BuildError {
     #[snafu(display("NATS Connect Error: {}", source))]
     Connect { source: std::io::Error },
 }
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EncodingMigrator;
-
-impl EncodingConfigMigrator for EncodingMigrator {
-    type Codec = Encoding;
-
-    fn migrate(codec: &Self::Codec) -> SerializerConfig {
-        match codec {
-            Encoding::Text => TextSerializerConfig::new().into(),
-            Encoding::Json => JsonSerializerConfig::new().into(),
-        }
-    }
-}
-
 /**
  * Code dealing with the SinkConfig struct.
  */
@@ -63,7 +50,7 @@ impl EncodingConfigMigrator for EncodingMigrator {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct NatsSinkConfig {
-    encoding: EncodingConfigAdapter<EncodingConfig<Encoding>, EncodingMigrator>,
+    encoding: EncodingConfigAdapter<EncodingConfig<BasicEncodings>, BasicEncodingsMigrator>,
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -99,7 +86,7 @@ impl GenerateConfig for NatsSinkConfig {
             acknowledgements: Default::default(),
             auth: None,
             connection_name: "vector".into(),
-            encoding: EncodingConfig::from(Encoding::Json).into(),
+            encoding: BasicEncodings::Json.as_config_adapter(),
             subject: "from.vector".into(),
             tls: None,
             url: "nats://127.0.0.1:4222".into(),

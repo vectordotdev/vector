@@ -50,7 +50,7 @@ impl SinkBatchSettings for PubsubDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct PubsubConfig {
     pub project: String,
     pub topic: String,

@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use codecs::{encoding::SerializerConfig, JsonSerializerConfig, TextSerializerConfig};
 use futures_util::FutureExt;
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
@@ -19,7 +18,9 @@ use crate::{
             timestamp_key, EndpointTarget, SplunkHecDefaultBatchSettings,
         },
         util::{
-            encoding::{EncodingConfig, EncodingConfigAdapter, EncodingConfigMigrator},
+            encoding::{
+                BasicEncodings, BasicEncodingsMigrator, EncodingConfig, EncodingConfigAdapter,
+            },
             http::HttpRetryLogic,
             BatchConfig, Compression, ServiceBuilderExt, TowerRequestConfig,
         },
@@ -28,27 +29,6 @@ use crate::{
     template::Template,
     tls::TlsConfig,
 };
-
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum HecEncoding {
-    Json,
-    Text,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HecEncodingMigrator;
-
-impl EncodingConfigMigrator for HecEncodingMigrator {
-    type Codec = HecEncoding;
-
-    fn migrate(codec: &Self::Codec) -> SerializerConfig {
-        match codec {
-            HecEncoding::Text => TextSerializerConfig::new().into(),
-            HecEncoding::Json => JsonSerializerConfig::new().into(),
-        }
-    }
-}
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -64,7 +44,7 @@ pub struct HecLogsSinkConfig {
     pub index: Option<Template>,
     pub sourcetype: Option<Template>,
     pub source: Option<Template>,
-    pub encoding: EncodingConfigAdapter<EncodingConfig<HecEncoding>, HecEncodingMigrator>,
+    pub encoding: EncodingConfigAdapter<EncodingConfig<BasicEncodings>, BasicEncodingsMigrator>,
     #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
@@ -96,7 +76,7 @@ impl GenerateConfig for HecLogsSinkConfig {
             index: None,
             sourcetype: None,
             source: None,
-            encoding: EncodingConfig::from(HecEncoding::Text).into(),
+            encoding: BasicEncodings::Text.as_config_adapter(),
             compression: Compression::default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),

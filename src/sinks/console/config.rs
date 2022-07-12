@@ -28,7 +28,7 @@ pub enum Target {
     Stderr,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ConsoleSinkConfig {
     #[serde(default)]

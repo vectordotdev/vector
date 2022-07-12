@@ -8,21 +8,17 @@ use vector_core::{
     event::{Event, LogEvent, Value},
 };
 
-use super::{config::HecEncodingMigrator, sink::HecProcessedEvent};
+use super::sink::HecProcessedEvent;
 use crate::{
     codecs::Encoder,
     config::{SinkConfig, SinkContext},
     sinks::{
         splunk_hec::{
             common::{timestamp_key, EndpointTarget},
-            logs::{
-                config::{HecEncoding, HecLogsSinkConfig},
-                encoder::HecLogsEncoder,
-                sink::process_log,
-            },
+            logs::{config::HecLogsSinkConfig, encoder::HecLogsEncoder, sink::process_log},
         },
         util::{
-            encoding::{Encoder as _, EncodingConfig, EncodingConfigAdapter},
+            encoding::{BasicEncodings, Encoder as _},
             test::build_test_server,
             Compression,
         },
@@ -124,9 +120,8 @@ fn splunk_process_log_event() {
     assert!(metadata.fields.contains("event_field2"));
 }
 
-fn hec_encoder(encoding: HecEncoding) -> HecLogsEncoder {
-    let encoding: EncodingConfigAdapter<EncodingConfig<HecEncoding>, HecEncodingMigrator> =
-        EncodingConfig::from(encoding).into();
+fn hec_encoder(encoding: BasicEncodings) -> HecLogsEncoder {
+    let encoding = encoding.as_config_adapter();
     let transformer = encoding.transformer();
     let serializer = encoding.encoding().unwrap();
     let encoder = Encoder::<()>::new(serializer);
@@ -139,7 +134,7 @@ fn hec_encoder(encoding: HecEncoding) -> HecLogsEncoder {
 #[test]
 fn splunk_encode_log_event_json() {
     let processed_event = get_processed_event();
-    let encoder = hec_encoder(HecEncoding::Json);
+    let encoder = hec_encoder(BasicEncodings::Json);
     let mut bytes = Vec::new();
     encoder
         .encode_input(vec![processed_event], &mut bytes)
@@ -174,7 +169,7 @@ fn splunk_encode_log_event_json() {
 #[test]
 fn splunk_encode_log_event_text() {
     let processed_event = get_processed_event();
-    let encoder = hec_encoder(HecEncoding::Text);
+    let encoder = hec_encoder(BasicEncodings::Text);
     let mut bytes = Vec::new();
     encoder
         .encode_input(vec![processed_event], &mut bytes)
@@ -204,7 +199,7 @@ async fn splunk_passthrough_token() {
         index: None,
         sourcetype: None,
         source: None,
-        encoding: EncodingConfig::from(HecEncoding::Json).into(),
+        encoding: BasicEncodings::Json.as_config_adapter(),
         compression: Compression::None,
         batch: Default::default(),
         request: Default::default(),
@@ -255,7 +250,7 @@ fn splunk_encode_log_event_json_timestamps() {
         timestamp_key: &str,
     ) -> HecEventJson {
         let processed_event = get_processed_event_timestamp(timestamp, timestamp_key);
-        let encoder = hec_encoder(HecEncoding::Json);
+        let encoder = hec_encoder(BasicEncodings::Json);
         let mut bytes = Vec::new();
         encoder
             .encode_input(vec![processed_event], &mut bytes)

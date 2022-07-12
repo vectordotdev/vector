@@ -1,7 +1,8 @@
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
-use syn::{parse_macro_input, parse_quote, DeriveInput, ExprPath, Ident, Type};
+use syn::parse_quote;
+use syn::{parse_macro_input, DeriveInput, ExprPath, Ident, Type};
 use vector_config_common::{attributes::CustomAttribute, validation::Validation};
 
 use crate::ast::{Container, Data, Field, Style, Tagging, Variant};
@@ -21,17 +22,25 @@ pub fn derive_configurable_impl(input: TokenStream) -> TokenStream {
         }
     };
 
-    let (impl_generics, ty_generics, where_clause) = container.generics().split_for_impl();
+    let mut generics = container.generics().clone();
 
-    let where_clause = where_clause.map(|clause| clause.clone()).map(|mut clause| {
-        for typ in container.generics().type_params() {
-            let ty = typ.ident;
-            let predicate = parse_quote! { for<'de> #ty: ::serde::Deserialize<'de> };
+    // We need to construct an updated where clause that properly constrains any generic types which are used as fields
+    // on the container. We _only_ care about fields that are pure types, because anything that's a concrete type --
+    // Foo<T> -- will be checked immediately, but we want generic types to be able to be resolved for compatibility at
+    // the point of usage, not the point of definition.
+    let generic_field_types = container.generic_field_types();
+    if !generic_field_types.is_empty() {
+        let where_clause = generics.make_where_clause();
+        for typ in generic_field_types {
+            let ty = &typ.ident;
+            let predicate =
+                parse_quote! { #ty: ::vector_config::Configurable + ::serde::Serialize };
 
-            // TODO: make the lifetime unique by generating it per loop iteration, and add the predicate to the
-            // where clause
+            where_clause.predicates.push(predicate);
         }
-    });
+    }
+
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
     // Now we can go ahead and actually generate the method bodies for our `Configurable` impl,
     // which are varied based on whether we have a struct or enum container.

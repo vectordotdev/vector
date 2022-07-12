@@ -9,6 +9,7 @@ use std::{
 };
 
 use schemars::{gen::SchemaGenerator, schema::SchemaObject};
+use serde::Serialize;
 use vector_config_common::validation::Validation;
 
 use crate::{
@@ -30,7 +31,7 @@ impl Configurable for () {
 // Null and boolean.
 impl<'de, T> Configurable for Option<T>
 where
-    T: Configurable,
+    T: Configurable + Serialize,
 {
     fn is_optional() -> bool {
         true
@@ -44,12 +45,13 @@ where
         // To wit, this allows callers to use `#[configurable(derived)]` on a field of `Option<T>` so long as `T` has a
         // description, and both the optional field and the schema for `T` will get the description... but the
         // description for the optional field can still be overridden independently, etc.
-        T::metadata().map_default_value(|default| Some(default))
+        T::metadata().convert()
     }
 
     fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<Self>) -> SchemaObject {
-        let inner_metadata = overrides.clone().flatten_default();
-        let mut schema = generate_optional_schema(gen, inner_metadata);
+        // TODO: I'm pretty sure it makes sense to sever the link here so that we don't push metadata for `Option<T>`
+        // down to `T` itself... but we should double check our mental math on that.
+        let mut schema = generate_optional_schema(gen, Metadata::<T>::default());
         finalize_schema(gen, &mut schema, overrides);
         schema
     }
@@ -96,7 +98,7 @@ impl_configuable_numeric!(
 // Arrays and maps.
 impl<'de, T> Configurable for Vec<T>
 where
-    T: Configurable,
+    T: Configurable + Serialize,
 {
     fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<Self>) -> SchemaObject {
         // We set `T` to be "transparent", which means that during schema finalization, we will relax the rules we
@@ -114,7 +116,7 @@ where
 
 impl<'de, V> Configurable for HashMap<String, V>
 where
-    V: Configurable,
+    V: Configurable + Serialize,
 {
     fn is_optional() -> bool {
         // A hashmap with required fields would be... an object.  So if you want that, make a struct
@@ -143,7 +145,7 @@ where
 
 impl<'de, V> Configurable for HashSet<V>
 where
-    V: Configurable + Eq + std::hash::Hash,
+    V: Configurable + Serialize + Eq + std::hash::Hash,
 {
     fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<Self>) -> SchemaObject {
         // We explicitly do not pass anything from the override metadata, because there's nothing to reasonably pass: if

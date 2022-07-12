@@ -71,16 +71,17 @@ pub use adapter::{
 };
 use bytes::BytesMut;
 pub use codec::{
-    as_tracked_write, StandardEncodings, StandardEncodingsMigrator,
-    StandardEncodingsWithFramingMigrator, StandardJsonEncoding, StandardTextEncoding,
+    as_tracked_write, BasicEncodings, BasicEncodingsMigrator, BasicEncodingsWithFramingMigrator,
+    StandardEncodings, StandardEncodingsMigrator, StandardEncodingsWithFramingMigrator,
+    StandardJsonEncoding, StandardTextEncoding,
 };
 use codecs::encoding::Framer;
 pub use config::EncodingConfig;
 pub use fixed::EncodingConfigFixed;
 use lookup::lookup_v2::{parse_path, OwnedPath};
 use lookup::path;
-use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder as _;
+use vector_config::configurable_component;
 pub use with_default::EncodingConfigWithDefault;
 
 use crate::{
@@ -325,10 +326,19 @@ where
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq)]
+/// Timestamp format.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum TimestampFormat {
+    /// Unix timestamp.
+    ///
+    /// This is equal to the number of seconds elapsed since the Unix epoch. (January 1st, 1970)
     Unix,
+
+    /// RFC3339 format.
+    ///
+    /// This includes separate date and time components, with the potential for a timezone, and looks like `2019-10-12T07:20:50.52Z`.
     Rfc3339,
 }
 
@@ -340,6 +350,7 @@ mod tests {
         CharacterDelimitedEncoder, JsonSerializer, NewlineDelimitedEncoder, TextSerializer,
     };
     use indoc::indoc;
+    use serde::{Deserialize, Serialize};
 
     use super::*;
     use crate::{config::log_schema, sinks::util::encoding::Transformer};

@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 use codecs::encoding::{Framer, FramingConfig, Serializer, SerializerConfig};
 use lookup::lookup_v2::OwnedPath;
 use serde::{Deserialize, Deserializer, Serialize};
-use vector_config::configurable_component;
+use vector_config::{configurable_component, Configurable};
 
 use super::{validate_fields, EncodingConfiguration, TimestampFormat};
 use crate::{event::Event, serde::skip_serializing_if_default};
@@ -22,33 +22,39 @@ pub trait EncodingConfigMigrator {
     fn migrate(codec: &Self::Codec) -> SerializerConfig;
 }
 
-/// This adapter serves to migrate sinks from the old sink-specific `EncodingConfig<T>` to the new
-/// `SerializerConfig` encoding configuration while keeping backwards-compatibility.
-#[derive(Debug, Clone, Serialize)]
+/// Encoding configuration.
+///
+/// Note: When data in encoding is malformed, currently only a very generic error “data did not match any variant of
+/// untagged enum EncodingConfig” is reported. Follow this issue to track progress on improving these error messages.
+#[configurable_component(no_deser)]
+#[derive(Clone, Debug)]
 pub struct EncodingConfigAdapter<LegacyEncodingConfig, Migrator>(
-    EncodingWithTransformationConfig<LegacyEncodingConfig, Migrator>,
-);
+    // This adapter serves to migrate sinks from the old sink-specific `EncodingConfig<T>` to the new
+    // `SerializerConfig` encoding configuration while keeping backwards-compatibility.
+    #[configurable(transparent)] EncodingWithTransformationConfig<LegacyEncodingConfig, Migrator>,
+)
+where
+    LegacyEncodingConfig: Serialize,
+    Migrator: Serialize;
 
 impl<'de, LegacyEncodingConfig, Migrator> Deserialize<'de>
     for EncodingConfigAdapter<LegacyEncodingConfig, Migrator>
 where
-    LegacyEncodingConfig: EncodingConfiguration + Deserialize<'de> + Debug + Clone + 'static,
-    LegacyEncodingConfig::Codec: Deserialize<'de> + Debug + Clone,
-    Migrator: EncodingConfigMigrator<Codec = LegacyEncodingConfig::Codec>
-        + Deserialize<'de>
-        + Debug
-        + Clone,
+    LegacyEncodingConfig: EncodingConfiguration + Deserialize<'de> + Serialize + 'static,
+    LegacyEncodingConfig::Codec: Deserialize<'de>,
+    Migrator:
+        EncodingConfigMigrator<Codec = LegacyEncodingConfig::Codec> + Deserialize<'de> + Serialize,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        #[derive(Debug, Clone, Deserialize)]
+        #[derive(Debug, Deserialize)]
         #[serde(untagged)]
         enum EncodingConfig<LegacyEncodingConfig, Migrator>
         where
-            LegacyEncodingConfig: EncodingConfiguration + Debug + Clone + 'static,
-            Migrator: EncodingConfigMigrator<Codec = LegacyEncodingConfig::Codec> + Debug + Clone,
+            LegacyEncodingConfig: EncodingConfiguration + 'static,
+            Migrator: EncodingConfigMigrator<Codec = LegacyEncodingConfig::Codec>,
         {
             /// The legacy sink-specific encoding configuration.
             LegacyEncodingConfig(LegacyEncodingConfig),
@@ -79,8 +85,8 @@ where
 impl<LegacyEncodingConfig, Migrator> From<LegacyEncodingConfig>
     for EncodingConfigAdapter<LegacyEncodingConfig, Migrator>
 where
-    LegacyEncodingConfig: EncodingConfiguration + Debug + Clone + 'static,
-    Migrator: EncodingConfigMigrator<Codec = LegacyEncodingConfig::Codec> + Debug + Clone,
+    LegacyEncodingConfig: EncodingConfiguration + Configurable + Serialize + 'static,
+    Migrator: EncodingConfigMigrator<Codec = LegacyEncodingConfig::Codec> + Serialize,
 {
     fn from(encoding: LegacyEncodingConfig) -> Self {
         Self(
@@ -97,8 +103,8 @@ where
 
 impl<LegacyEncodingConfig, Migrator> EncodingConfigAdapter<LegacyEncodingConfig, Migrator>
 where
-    LegacyEncodingConfig: EncodingConfiguration + Debug + Clone + 'static,
-    Migrator: EncodingConfigMigrator<Codec = LegacyEncodingConfig::Codec> + Debug + Clone,
+    LegacyEncodingConfig: EncodingConfiguration + Configurable + Serialize + 'static,
+    Migrator: EncodingConfigMigrator<Codec = LegacyEncodingConfig::Codec> + Serialize,
 {
     /// Create a new encoding configuration.
     pub const fn new(encoding: SerializerConfig) -> Self {
@@ -167,11 +173,11 @@ pub trait EncodingConfigWithFramingMigrator {
 /// `FramingConfig`/`SerializerConfig` encoding configuration while keeping backwards-compatibility.
 #[configurable_component(no_deser)]
 #[derive(Clone, Debug)]
-#[serde(deny_unknown_fields)]
+//#[serde(deny_unknown_fields)]
 pub struct EncodingConfigWithFramingAdapter<LegacyEncodingConfig, Migrator>
 where
-    LegacyEncodingConfig: EncodingConfiguration + Clone + 'static,
-    Migrator: EncodingConfigWithFramingMigrator<Codec = LegacyEncodingConfig::Codec> + Clone,
+    LegacyEncodingConfig: EncodingConfiguration + Configurable + Serialize + 'static,
+    Migrator: EncodingConfigWithFramingMigrator<Codec = LegacyEncodingConfig::Codec> + Serialize,
 {
     /// Framing scheme.
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
@@ -184,11 +190,11 @@ where
 impl<'de, LegacyEncodingConfig, Migrator> Deserialize<'de>
     for EncodingConfigWithFramingAdapter<LegacyEncodingConfig, Migrator>
 where
-    LegacyEncodingConfig: EncodingConfiguration + Deserialize<'de> + Clone + 'static,
-    LegacyEncodingConfig::Codec: Deserialize<'de>,
+    LegacyEncodingConfig:
+        EncodingConfiguration + Configurable + Deserialize<'de> + Serialize + 'static,
     Migrator: EncodingConfigWithFramingMigrator<Codec = LegacyEncodingConfig::Codec>
         + Deserialize<'de>
-        + Clone,
+        + Serialize,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -249,8 +255,8 @@ where
 impl<LegacyEncodingConfig, Migrator> From<LegacyEncodingConfig>
     for EncodingConfigWithFramingAdapter<LegacyEncodingConfig, Migrator>
 where
-    LegacyEncodingConfig: EncodingConfiguration + Clone + 'static,
-    Migrator: EncodingConfigWithFramingMigrator<Codec = LegacyEncodingConfig::Codec> + Clone,
+    LegacyEncodingConfig: EncodingConfiguration + Configurable + Serialize + 'static,
+    Migrator: EncodingConfigWithFramingMigrator<Codec = LegacyEncodingConfig::Codec> + Serialize,
 {
     fn from(config: LegacyEncodingConfig) -> Self {
         let (framing, encoding) = Migrator::migrate(config.codec());
@@ -270,8 +276,8 @@ where
 impl<LegacyEncodingConfig, Migrator>
     EncodingConfigWithFramingAdapter<LegacyEncodingConfig, Migrator>
 where
-    LegacyEncodingConfig: EncodingConfiguration + Clone + 'static,
-    Migrator: EncodingConfigWithFramingMigrator<Codec = LegacyEncodingConfig::Codec> + Clone,
+    LegacyEncodingConfig: EncodingConfiguration + Configurable + Serialize + 'static,
+    Migrator: EncodingConfigWithFramingMigrator<Codec = LegacyEncodingConfig::Codec> + Serialize,
 {
     /// Create a new encoding configuration.
     pub const fn new(framing: Option<FramingConfig>, encoding: SerializerConfig) -> Self {
@@ -334,16 +340,25 @@ where
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+/// Encoding configuration with transformation.
+#[configurable_component(no_deser)]
+#[derive(Clone, Debug)]
 struct EncodingWithTransformationConfig<LegacyEncodingConfig, Migrator> {
     #[serde(flatten)]
     encoding: SerializerConfig,
+
+    /// List of fields that will be included in the encoded event.
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     only_fields: Option<Vec<OwnedPath>>,
+
+    /// List of fields that will be excluded from the encoded event.
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     except_fields: Option<Vec<String>>,
+
+    /// Format used for timestamp fields.
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     timestamp_format: Option<TimestampFormat>,
+
     #[serde(skip)]
     _marker: PhantomData<(LegacyEncodingConfig, Migrator)>,
 }
@@ -493,9 +508,12 @@ mod tests {
     use super::*;
     use crate::sinks::util::encoding::EncodingConfig;
 
-    #[derive(Debug, Copy, Clone, PartialEq, Eq, Deserialize, Serialize)]
+    /// A silly legacy encoding.
+    #[configurable_component]
+    #[derive(Copy, Clone, Debug, Eq, PartialEq)]
     #[serde(rename_all = "snake_case")]
     enum FooLegacyEncoding {
+        /// Foo codec.
         Foo,
     }
 

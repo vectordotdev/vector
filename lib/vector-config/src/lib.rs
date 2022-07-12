@@ -87,7 +87,7 @@
 use core::fmt;
 
 use num::ConfigurableNumber;
-use serde::{Deserialize, Serialize};
+//use serde::{Deserialize, Serialize};
 
 pub mod schema;
 
@@ -118,10 +118,7 @@ pub mod validation {
 }
 
 #[derive(Clone)]
-pub struct Metadata<T>
-where
-    T: Configurable,
-{
+pub struct Metadata<T> {
     title: Option<&'static str>,
     description: Option<&'static str>,
     default_value: Option<T>,
@@ -129,10 +126,9 @@ where
     deprecated: bool,
     transparent: bool,
     validations: Vec<validation::Validation>,
-    //_de: PhantomData<&'de ()>,
 }
 
-impl<T: Configurable> Metadata<T> {
+impl<T> Metadata<T> {
     pub fn with_title(title: &'static str) -> Self {
         Self {
             title: Some(title),
@@ -171,6 +167,10 @@ impl<T: Configurable> Metadata<T> {
         self.description = None;
     }
 
+    pub fn default_value(&self) -> Option<&T> {
+        self.default_value.as_ref()
+    }
+
     pub fn with_default_value(default: T) -> Self {
         Self {
             default_value: Some(default),
@@ -178,16 +178,12 @@ impl<T: Configurable> Metadata<T> {
         }
     }
 
-    pub fn default_value(&self) -> Option<T> {
-        self.default_value.clone()
-    }
-
     pub fn set_default_value(&mut self, default_value: T) {
         self.default_value = Some(default_value);
     }
 
-    pub fn clear_default_value(&mut self) {
-        self.default_value = None;
+    pub fn consume_default_value(&mut self) -> Option<T> {
+        self.default_value.take()
     }
 
     pub fn map_default_value<F, U>(self, f: F) -> Metadata<U>
@@ -203,7 +199,6 @@ impl<T: Configurable> Metadata<T> {
             deprecated: self.deprecated,
             transparent: self.transparent,
             validations: self.validations,
-            //_de: PhantomData,
         }
     }
 
@@ -267,14 +262,13 @@ impl<T: Configurable> Metadata<T> {
             deprecated: other.deprecated,
             transparent: other.transparent,
             validations: self.validations,
-            //_de: PhantomData,
         }
     }
 
     /// Converts this metadata from holding a default value of `T` to `U`.
     ///
     /// If a default value was present before, it is dropped.
-    pub fn convert<U: Configurable>(self) -> Metadata<U> {
+    pub fn convert<U>(self) -> Metadata<U> {
         Metadata {
             title: self.title,
             description: self.description,
@@ -283,7 +277,6 @@ impl<T: Configurable> Metadata<T> {
             deprecated: self.deprecated,
             transparent: self.transparent,
             validations: self.validations,
-            //_de: PhantomData,
         }
     }
 
@@ -295,7 +288,6 @@ impl<T: Configurable> Metadata<T> {
         Self {
             title: self.title,
             description: self.description,
-            default_value: self.default_value.clone(),
             custom_attributes: Vec::new(),
             transparent: self.transparent,
             ..Default::default()
@@ -303,7 +295,7 @@ impl<T: Configurable> Metadata<T> {
     }
 }
 
-impl<T: Configurable> Metadata<Option<T>> {
+impl<T> Metadata<Option<T>> {
     pub fn flatten_default(self) -> Metadata<T> {
         Metadata {
             title: self.title,
@@ -313,12 +305,11 @@ impl<T: Configurable> Metadata<Option<T>> {
             deprecated: self.deprecated,
             transparent: self.transparent,
             validations: self.validations,
-            //_de: PhantomData,
         }
     }
 }
 
-impl<T: Configurable> Default for Metadata<T> {
+impl<T> Default for Metadata<T> {
     fn default() -> Self {
         Self {
             title: None,
@@ -328,12 +319,11 @@ impl<T: Configurable> Default for Metadata<T> {
             deprecated: false,
             transparent: false,
             validations: Vec::new(),
-            //_de: PhantomData,
         }
     }
 }
 
-impl<T: Configurable> fmt::Debug for Metadata<T> {
+impl<T> fmt::Debug for Metadata<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Metadata")
             .field("title", &self.title)
@@ -364,7 +354,7 @@ impl<T: Configurable> fmt::Debug for Metadata<T> {
 /// some root type.
 pub trait Configurable
 where
-    for<'de> Self: Serialize + Deserialize<'de> + Clone + Sized,
+    Self: Sized,
 {
     /// Gets the referencable name of this value, if any.
     ///
