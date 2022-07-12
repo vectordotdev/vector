@@ -37,7 +37,7 @@ releases: "0.23.0": {
 		  highlight](/highlights/2022-07-07-secrets-management) for details.
 		- Support for new encoding options to all sinks that support codecs, that mirror the decoding options available
 		  on sources. This allows for more codecs (like `json` and `logfmt`) and framings (like newline-delimited and
-		  length-delimited) to be used on more sinks. See the [release highlight](highlights/2022-07-07-sink-codecs)
+		  length-delimited) to be used on more sinks. See the [release highlight](/highlights/2022-07-07-sink-codecs)
 		  for details.
 		"""
 
@@ -437,7 +437,7 @@ releases: "0.23.0": {
 			scopes: ["gcp_pubsub source"]
 			description: """
 				The performance of the `gcp_pubsub` source has been improved by automatically scaling up the number of
-				internal consumers within Vector to a maximum of the newly added `max_concurrency` option (defaults to
+				consumers within Vector to a maximum of the newly added `max_concurrency` option (defaults to
 				10).
 				"""
 			pr_numbers: [13240]
