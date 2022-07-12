@@ -244,7 +244,7 @@ fn generate_record_cache(min: usize, max: usize) -> Vec<VariableMessage> {
 
 async fn generate_buffer<T>(buffer_type: &str) -> (BufferSender<T>, BufferReceiver<T>)
 where
-    T: Bufferable + Clone,
+    T: Bufferable + Clone + Finalizable,
 {
     let data_dir = PathBuf::from("/tmp/vector");
     let id = format!("{}-buffer-perf-testing", buffer_type);

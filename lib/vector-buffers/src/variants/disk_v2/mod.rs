@@ -146,6 +146,7 @@ use std::{
 
 use async_trait::async_trait;
 use snafu::{ResultExt, Snafu};
+use vector_common::finalization::Finalizable;
 
 mod backed_archive;
 mod common;
@@ -282,7 +283,7 @@ impl DiskV2Buffer {
 #[async_trait]
 impl<T> IntoBuffer<T> for DiskV2Buffer
 where
-    T: Bufferable + Clone,
+    T: Bufferable + Clone + Finalizable,
 {
     fn provides_instrumentation(&self) -> bool {
         true

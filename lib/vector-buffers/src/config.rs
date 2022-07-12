@@ -7,6 +7,7 @@ use std::{
 use serde::{de, ser, Deserialize, Deserializer, Serialize, Serializer};
 use snafu::{ResultExt, Snafu};
 use tracing::Span;
+use vector_common::finalization::Finalizable;
 
 use crate::{
     topology::{
@@ -250,7 +251,7 @@ impl BufferType {
         id: String,
     ) -> Result<(), BufferBuildError>
     where
-        T: Bufferable + Clone,
+        T: Bufferable + Clone + Finalizable,
     {
         match *self {
             BufferType::Memory {
@@ -339,7 +340,7 @@ impl BufferConfig {
         span: Span,
     ) -> Result<(BufferSender<T>, BufferReceiver<T>), BufferBuildError>
     where
-        T: Bufferable + Clone,
+        T: Bufferable + Clone + Finalizable,
     {
         let mut builder = TopologyBuilder::default();
 

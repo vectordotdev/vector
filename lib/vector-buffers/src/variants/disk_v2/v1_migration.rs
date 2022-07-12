@@ -1,4 +1,6 @@
-use std::{io, num::NonZeroU64, path::Path};
+use std::{io, mem::ManuallyDrop, num::NonZeroU64, path::Path};
+
+use vector_common::finalization::{EventStatus, Finalizable};
 
 use crate::{
     buffer_usage_data::BufferUsageHandle,
@@ -12,7 +14,7 @@ use crate::{
 
 pub async fn try_disk_v1_migration<T>(base_data_dir: &Path, id: &str) -> Result<(), String>
 where
-    T: Bufferable + Clone,
+    T: Bufferable + Clone + Finalizable,
 {
     // Set both buffers to an essentially unlimited size so we can ensure that whatever is in the
     // source buffer can be written to the destination buffer.
@@ -70,10 +72,12 @@ where
     info!("Detected old `disk_v1`-based buffer for the `{}` sink. Automatically migrating to `disk_v2`.", id);
 
     let mut migrated_records = 0;
-    while let Some(old_record) = src_reader.next().await {
+    while let Some(mut old_record) = src_reader.next().await {
         let old_record_event_count = old_record.event_count();
+        let finalizers = ManuallyDrop::new(old_record.take_finalizers());
 
         dst_writer.write_record(old_record).await.map_err(|e| {
+            finalizers.update_status(EventStatus::Errored);
             format!(
                 "failed writing record {} to the new disk v2 buffer: {}",
                 migrated_records, e,
@@ -81,12 +85,15 @@ where
         })?;
 
         dst_writer.flush().await.map_err(|e| {
+            finalizers.update_status(EventStatus::Errored);
             format!(
                 "failed flushing record {} to the new disk v2 buffer: {}",
                 migrated_records, e,
             )
         })?;
 
+        finalizers.update_status(EventStatus::Delivered);
+        drop(ManuallyDrop::into_inner(finalizers));
         migrated_records += old_record_event_count;
     }
 

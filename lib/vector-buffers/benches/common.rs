@@ -14,7 +14,7 @@ use vector_buffers::{
     BufferType, EventCount,
 };
 use vector_common::byte_size_of::ByteSizeOf;
-use vector_common::finalization::{AddBatchNotifier, BatchNotifier};
+use vector_common::finalization::{AddBatchNotifier, BatchNotifier, EventFinalizers, Finalizable};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Message<const N: usize> {
@@ -46,6 +46,12 @@ impl<const N: usize> ByteSizeOf for Message<N> {
 impl<const N: usize> EventCount for Message<N> {
     fn event_count(&self) -> usize {
         1
+    }
+}
+
+impl<const N: usize> Finalizable for Message<N> {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        Default::default() // This benchmark doesn't need finalization
     }
 }
 
