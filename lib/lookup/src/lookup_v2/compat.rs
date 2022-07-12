@@ -25,30 +25,32 @@ impl<'a> Iterator for LookupBufPathIter<'a> {
     type Item = BorrowedSegment<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.buf.segments.get(self.segment_i) {
-            Some(SegmentBuf::Field(field)) => {
-                self.segment_i += 1;
-                Some(BorrowedSegment::Field(Cow::Borrowed(&field.name)))
-            }
-            Some(SegmentBuf::Index(index)) => {
-                self.segment_i += 1;
-                Some(BorrowedSegment::Index(*index))
-            }
-            Some(SegmentBuf::Coalesce(fields)) => match fields.get(self.coalesce_i) {
-                Some(field) => {
+        self.buf
+            .segments
+            .get(self.segment_i)
+            .map(|segment| match segment {
+                SegmentBuf::Field(field) => {
+                    self.segment_i += 1;
+                    BorrowedSegment::Field(Cow::Borrowed(&field.name))
+                }
+                SegmentBuf::Index(index) => {
+                    self.segment_i += 1;
+                    BorrowedSegment::Index(*index)
+                }
+                SegmentBuf::Coalesce(fields) => {
+                    let field = fields
+                        .get(self.coalesce_i)
+                        .expect("coalesce fields must not be empty");
                     if self.coalesce_i == fields.len() - 1 {
                         self.coalesce_i = 0;
                         self.segment_i += 1;
-                        Some(BorrowedSegment::CoalesceEnd(Cow::Borrowed(&field.name)))
+                        BorrowedSegment::CoalesceEnd(Cow::Borrowed(&field.name))
                     } else {
                         self.coalesce_i += 1;
-                        Some(BorrowedSegment::CoalesceField(Cow::Borrowed(&field.name)))
+                        BorrowedSegment::CoalesceField(Cow::Borrowed(&field.name))
                     }
                 }
-                None => unreachable!(),
-            },
-            None => None,
-        }
+            })
     }
 }
 
@@ -72,7 +74,7 @@ mod test {
         for test in tests {
             let lookup_buf = LookupBuf::from_str(test).unwrap();
             if !Path::eq(&test, &lookup_buf) {
-                panic!("Equality failed.");
+                panic!("Equality failed. Path={:?}", test);
             }
         }
     }
