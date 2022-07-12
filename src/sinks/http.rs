@@ -434,7 +434,7 @@ mod tests {
     fn http_validates_normal_headers() {
         let config = r#"
         uri = "http://$IN_ADDR/frames"
-        encoding = "text"
+        encoding.codec = "text"
         [request.headers]
         Auth = "token:thing_and-stuff"
         X-Custom-Nonsense = "_%_{}_-_&_._`_|_~_!_#_&_$_"
@@ -448,7 +448,7 @@ mod tests {
     fn http_catches_bad_header_names() {
         let config = r#"
         uri = "http://$IN_ADDR/frames"
-        encoding = "text"
+        encoding.codec = "text"
         [request.headers]
         "\u0001" = "bad"
         "#;
@@ -468,7 +468,7 @@ mod tests {
     async fn http_headers_auth_conflict() {
         let config = r#"
         uri = "http://$IN_ADDR/"
-        encoding = "text"
+        encoding.codec = "text"
         [request.headers]
         Authorization = "Basic base64encodedstring"
         [auth]
@@ -661,7 +661,7 @@ mod tests {
         let config = r#"
         uri = "http://$IN_ADDR/frames"
         compression = "gzip"
-        encoding = "json"
+        encoding.codec = "json"
 
         [auth]
         strategy = "basic"
@@ -752,7 +752,8 @@ mod tests {
             r#"
                 uri = "http://{addr}/frames"
                 compression = "gzip"
-                encoding = "ndjson"
+                framing.method = "newline_delimited"
+                encoding.codec = "json"
                 {extras}
             "#,
             addr = in_addr,

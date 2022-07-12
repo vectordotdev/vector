@@ -37,7 +37,7 @@ To represent the CSV file we have a new top level configuration option.
 ```toml
 [enrichment_tables.csv_file]
   type = "file"
-  encoding = "csv"
+  encoding.codec = "csv"
   path = "\path_to_csv"
   delimiter = ","
 ```

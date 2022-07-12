@@ -116,7 +116,8 @@ impl GenerateConfig for GcsSinkConfig {
         toml::from_str(indoc! {r#"
             bucket = "my-bucket"
             credentials_path = "/path/to/credentials.json"
-            encoding.codec = "ndjson"
+            framing.method = "newline_delimited"
+            encoding.codec = "json"
         "#})
         .unwrap()
     }

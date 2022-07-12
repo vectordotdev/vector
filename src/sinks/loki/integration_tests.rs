@@ -21,19 +21,19 @@ fn loki_address() -> String {
     std::env::var("LOKI_ADDRESS").unwrap_or_else(|_| "http://localhost:3100".into())
 }
 
-async fn build_sink(encoding: &str) -> (uuid::Uuid, VectorSink) {
+async fn build_sink(codec: &str) -> (uuid::Uuid, VectorSink) {
     let stream = uuid::Uuid::new_v4();
 
     let config = format!(
         r#"
             endpoint = "{}"
             labels = {{test_name = "placeholder"}}
-            encoding = "{}"
+            encoding.codec = "{}"
             remove_timestamp = false
             tenant_id = "default"
         "#,
         loki_address(),
-        encoding
+        codec
     );
 
     let (mut config, cx) = load_sink::<LokiConfig>(&config).unwrap();
@@ -149,7 +149,7 @@ async fn many_streams() {
     let config = format!("endpoint = \"{}\"", loki_address())
         + r#"
             labels = {test_name = "{{ stream_id }}"}
-            encoding = "text"
+            encoding.codec = "text"
             tenant_id = "default"
         "#;
     let (config, cx) = load_sink::<LokiConfig>(config.as_str()).unwrap();
@@ -209,7 +209,7 @@ async fn interpolate_stream_key() {
     let config = format!("endpoint = \"{}\"", loki_address())
         + r#"
             labels = {"{{ stream_key }}" = "placeholder"}
-            encoding = "text"
+            encoding.codec = "text"
             tenant_id = "default"
         "#;
     let (mut config, cx) = load_sink::<LokiConfig>(config.as_str()).unwrap();
@@ -256,7 +256,7 @@ async fn many_tenants() {
     let config = format!("endpoint = \"{}\"", loki_address())
         + r#"
             labels = {test_name = "placeholder"}
-            encoding = "text"
+            encoding.codec = "text"
             tenant_id = "{{ tenant_id }}"
         "#;
     let (mut config, cx) = load_sink::<LokiConfig>(config.as_str()).unwrap();
@@ -443,7 +443,7 @@ async fn test_out_of_order_events(
     let config = format!("endpoint = \"{}\"", loki_address())
         + r#"
             labels = {test_name = "placeholder"}
-            encoding = "text"
+            encoding.codec = "text"
             tenant_id = "default"
         "#;
     let (mut config, cx) = load_sink::<LokiConfig>(config.as_str()).unwrap();
