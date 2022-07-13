@@ -14,7 +14,6 @@ use tower::Service;
 use tracing::Instrument;
 use vector_common::internal_event::BytesSent;
 use vector_core::{
-    buffers::Ackable,
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_event::EventsSent,
     stream::DriverResponse,
@@ -47,12 +46,6 @@ pub struct LogApiRequest {
     pub finalizers: EventFinalizers,
     pub events_byte_size: usize,
     pub uncompressed_size: usize,
-}
-
-impl Ackable for LogApiRequest {
-    fn ack_size(&self) -> usize {
-        self.batch_size
-    }
 }
 
 impl Finalizable for LogApiRequest {

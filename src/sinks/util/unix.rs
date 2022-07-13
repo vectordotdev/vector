@@ -7,10 +7,9 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::{net::UnixStream, time::sleep};
 use tokio_util::codec::Encoder;
-use vector_core::{buffers::Acker, ByteSizeOf};
+use vector_core::ByteSizeOf;
 
 use crate::{
-    config::SinkContext,
     event::{Event, Finalizable},
     internal_events::{
         ConnectionOpen, OpenGauge, SocketMode, UnixSocketConnectionError,
@@ -46,12 +45,11 @@ impl UnixSinkConfig {
 
     pub fn build(
         &self,
-        cx: SinkContext,
         transformer: Transformer,
         encoder: impl Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync + 'static,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let connector = UnixConnector::new(self.path.clone());
-        let sink = UnixSink::new(connector.clone(), cx.acker(), transformer, encoder);
+        let sink = UnixSink::new(connector.clone(), transformer, encoder);
         Ok((
             VectorSink::from_event_streamsink(sink),
             Box::pin(async move { connector.healthcheck().await }),
@@ -109,7 +107,6 @@ where
     E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
 {
     connector: UnixConnector,
-    acker: Acker,
     transformer: Transformer,
     encoder: E,
 }
@@ -118,15 +115,9 @@ impl<E> UnixSink<E>
 where
     E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
 {
-    pub const fn new(
-        connector: UnixConnector,
-        acker: Acker,
-        transformer: Transformer,
-        encoder: E,
-    ) -> Self {
+    pub const fn new(connector: UnixConnector, transformer: Transformer, encoder: E) -> Self {
         Self {
             connector,
-            acker,
             transformer,
             encoder,
         }
@@ -134,12 +125,7 @@ where
 
     async fn connect(&mut self) -> BytesSink<UnixStream> {
         let stream = self.connector.connect_backoff().await;
-        BytesSink::new(
-            stream,
-            |_| ShutdownCheck::Alive,
-            self.acker.clone(),
-            SocketMode::Unix,
-        )
+        BytesSink::new(stream, |_| ShutdownCheck::Alive, SocketMode::Unix)
     }
 }
 
@@ -177,18 +163,7 @@ where
             let mut sink = self.connect().await;
             let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
 
-            let result = match sink
-                .send_all_peekable(
-                    &mut (&mut input)
-                        .map(|item| {
-                            drop(item.finalizers);
-                            self.acker.ack(1);
-                            item.item
-                        })
-                        .peekable(),
-                )
-                .await
-            {
+            let result = match sink.send_all_peekable(&mut (&mut input).peekable()).await {
                 Ok(()) => sink.close().await,
                 Err(error) => Err(error),
             };
@@ -225,11 +200,7 @@ mod tests {
         let good_path = temp_uds_path("valid_uds");
         let _listener = UnixListener::bind(&good_path).unwrap();
         assert!(UnixSinkConfig::new(good_path)
-            .build(
-                SinkContext::new_test(),
-                Default::default(),
-                Encoder::<Framer>::default()
-            )
+            .build(Default::default(), Encoder::<Framer>::default())
             .unwrap()
             .1
             .await
@@ -237,11 +208,7 @@ mod tests {
 
         let bad_path = temp_uds_path("no_one_listening");
         assert!(UnixSinkConfig::new(bad_path)
-            .build(
-                SinkContext::new_test(),
-                Default::default(),
-                Encoder::<Framer>::default()
-            )
+            .build(Default::default(), Encoder::<Framer>::default())
             .unwrap()
             .1
             .await
@@ -258,9 +225,8 @@ mod tests {
 
         // Set up Sink
         let config = UnixSinkConfig::new(out_path);
-        let cx = SinkContext::new_test();
         let (sink, _healthcheck) = config
-            .build(cx, Default::default(), Encoder::<Framer>::default())
+            .build(Default::default(), Encoder::<Framer>::default())
             .unwrap();
 
         // Send the test data

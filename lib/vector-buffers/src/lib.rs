@@ -13,9 +13,6 @@
 #[macro_use]
 extern crate tracing;
 
-mod acknowledgements;
-pub use acknowledgements::{Ackable, Acker};
-
 mod buffer_usage_data;
 
 pub mod config;

@@ -17,7 +17,7 @@ use indexmap::IndexMap;
 use pin_project::pin_project;
 use serde::{Deserialize, Serialize};
 use tower::Service;
-use vector_core::{buffers::Acker, ByteSizeOf};
+use vector_core::ByteSizeOf;
 
 use super::{
     retries::{RetryAction, RetryLogic},
@@ -91,7 +91,6 @@ where
         request_settings: TowerRequestSettings,
         batch_timeout: Duration,
         client: HttpClient,
-        acker: Acker,
     ) -> Self {
         Self::with_logic(
             sink,
@@ -100,7 +99,6 @@ where
             request_settings,
             batch_timeout,
             client,
-            acker,
         )
     }
 }
@@ -119,7 +117,6 @@ where
         request_settings: TowerRequestSettings,
         batch_timeout: Duration,
         client: HttpClient,
-        acker: Acker,
     ) -> Self {
         let sink = Arc::new(sink);
 
@@ -130,7 +127,7 @@ where
         };
 
         let svc = HttpBatchService::new(client, request_builder);
-        let inner = request_settings.batch_sink(retry_logic, svc, batch, batch_timeout, acker);
+        let inner = request_settings.batch_sink(retry_logic, svc, batch, batch_timeout);
         let encoder = sink.build_encoder();
 
         Self {
@@ -233,7 +230,6 @@ where
         request_settings: TowerRequestSettings,
         batch_timeout: Duration,
         client: HttpClient,
-        acker: Acker,
     ) -> Self {
         Self::with_retry_logic(
             sink,
@@ -242,7 +238,6 @@ where
             request_settings,
             batch_timeout,
             client,
-            acker,
         )
     }
 }
@@ -263,7 +258,6 @@ where
         request_settings: TowerRequestSettings,
         batch_timeout: Duration,
         client: HttpClient,
-        acker: Acker,
     ) -> Self {
         let sink = Arc::new(sink);
 
@@ -274,7 +268,7 @@ where
         };
 
         let svc = HttpBatchService::new(client, request_builder);
-        let inner = request_settings.partition_sink(retry_logic, svc, batch, batch_timeout, acker);
+        let inner = request_settings.partition_sink(retry_logic, svc, batch, batch_timeout);
         let encoder = sink.build_encoder();
 
         Self {

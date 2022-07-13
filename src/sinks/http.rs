@@ -188,7 +188,7 @@ impl SinkConfig for HttpSinkConfig {
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let client = self.build_http_client(&cx)?;
 
-        let healthcheck = match cx.healthcheck.uri.clone() {
+        let healthcheck = match cx.healthcheck.uri {
             Some(healthcheck_uri) => {
                 healthcheck(healthcheck_uri, self.auth.clone(), client.clone()).boxed()
             }
@@ -229,7 +229,6 @@ impl SinkConfig for HttpSinkConfig {
             request,
             batch.timeout,
             client,
-            cx.acker(),
         )
         .sink_map_err(|error| error!(message = "Fatal HTTP sink error.", %error));
 

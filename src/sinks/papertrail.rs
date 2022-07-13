@@ -65,7 +65,7 @@ impl GenerateConfig for PapertrailConfig {
 impl SinkConfig for PapertrailConfig {
     async fn build(
         &self,
-        cx: SinkContext,
+        _cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let host = self
             .endpoint
@@ -96,7 +96,6 @@ impl SinkConfig for PapertrailConfig {
         let encoder = Encoder::<()>::new(serializer);
 
         sink_config.build(
-            cx,
             Transformer::default(),
             PapertrailEncoder {
                 pid,

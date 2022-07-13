@@ -93,7 +93,7 @@ impl SocketSinkConfig {
 impl SinkConfig for SocketSinkConfig {
     async fn build(
         &self,
-        cx: SinkContext,
+        _cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let transformer = self.encoding.transformer();
         let (framer, serializer) = self.encoding.encoding()?;
@@ -105,10 +105,10 @@ impl SinkConfig for SocketSinkConfig {
         });
         let encoder = Encoder::<Framer>::new(framer, serializer);
         match &self.mode {
-            Mode::Tcp(config) => config.build(cx, transformer, encoder),
-            Mode::Udp(config) => config.build(cx, transformer, encoder),
+            Mode::Tcp(config) => config.build(transformer, encoder),
+            Mode::Udp(config) => config.build(transformer, encoder),
             #[cfg(unix)]
-            Mode::Unix(config) => config.build(cx, transformer, encoder),
+            Mode::Unix(config) => config.build(transformer, encoder),
         }
     }
 

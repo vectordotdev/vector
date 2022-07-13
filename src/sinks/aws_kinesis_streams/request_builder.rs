@@ -3,7 +3,7 @@ use std::io;
 use aws_sdk_kinesis::model::PutRecordsRequestEntry;
 use aws_sdk_kinesis::types::Blob;
 use bytes::Bytes;
-use vector_core::{buffers::Ackable, ByteSizeOf};
+use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::Encoder,
@@ -30,12 +30,6 @@ pub struct KinesisRequest {
     pub put_records_request: PutRecordsRequestEntry,
     pub finalizers: EventFinalizers,
     pub event_byte_size: usize,
-}
-
-impl Ackable for KinesisRequest {
-    fn ack_size(&self) -> usize {
-        1
-    }
 }
 
 impl Finalizable for KinesisRequest {

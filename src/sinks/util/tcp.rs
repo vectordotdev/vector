@@ -19,10 +19,9 @@ use tokio::{
 };
 use tokio_util::codec::Encoder;
 use vector_common::internal_event::{BytesSent, EventsSent};
-use vector_core::{buffers::Acker, ByteSizeOf};
+use vector_core::ByteSizeOf;
 
 use crate::{
-    config::SinkContext,
     dns,
     event::Event,
     internal_events::{
@@ -88,7 +87,6 @@ impl TcpSinkConfig {
 
     pub fn build(
         &self,
-        cx: SinkContext,
         transformer: Transformer,
         encoder: impl Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync + 'static,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
@@ -97,7 +95,7 @@ impl TcpSinkConfig {
         let port = uri.port_u16().ok_or(SinkBuildError::MissingPort)?;
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
         let connector = TcpConnector::new(host, port, self.keepalive, tls, self.send_buffer_bytes);
-        let sink = TcpSink::new(connector.clone(), cx.acker(), transformer, encoder);
+        let sink = TcpSink::new(connector.clone(), transformer, encoder);
 
         Ok((
             VectorSink::from_event_streamsink(sink),
@@ -202,7 +200,6 @@ where
     E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
 {
     connector: TcpConnector,
-    acker: Acker,
     transformer: Transformer,
     encoder: E,
 }
@@ -211,15 +208,9 @@ impl<E> TcpSink<E>
 where
     E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync + 'static,
 {
-    const fn new(
-        connector: TcpConnector,
-        acker: Acker,
-        transformer: Transformer,
-        encoder: E,
-    ) -> Self {
+    const fn new(connector: TcpConnector, transformer: Transformer, encoder: E) -> Self {
         Self {
             connector,
-            acker,
             transformer,
             encoder,
         }
@@ -227,12 +218,7 @@ where
 
     async fn connect(&self) -> BytesSink<MaybeTlsStream<TcpStream>> {
         let stream = self.connector.connect_backoff().await;
-        BytesSink::new(
-            stream,
-            Self::shutdown_check,
-            self.acker.clone(),
-            SocketMode::Tcp,
-        )
+        BytesSink::new(stream, Self::shutdown_check, SocketMode::Tcp)
     }
 
     fn shutdown_check(stream: &mut MaybeTlsStream<TcpStream>) -> ShutdownCheck {
@@ -291,9 +277,6 @@ where
             let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
 
             let mut mapped_input = stream::once(ready(item)).chain(&mut input).map(|event| {
-                drop(event.finalizers);
-                self.acker.ack(1);
-
                 emit!(EventsSent {
                     count: 1,
                     byte_size: event.byte_size,
@@ -305,7 +288,7 @@ where
                     protocol: "tcp",
                 });
 
-                Ok(event.item)
+                Ok(event)
             });
 
             let result = match sink.send_all(&mut mapped_input).await {

@@ -3,7 +3,6 @@ use std::{fmt, num::NonZeroUsize};
 use async_trait::async_trait;
 use futures::{stream::BoxStream, StreamExt};
 use tower::Service;
-use vector_buffers::Acker;
 use vector_core::stream::DriverResponse;
 
 use crate::{
@@ -18,7 +17,6 @@ use crate::{
 
 pub struct DatadogEventsSink<S> {
     pub(super) service: S,
-    pub acker: Acker,
 }
 
 impl<S> DatadogEventsSink<S>
@@ -47,7 +45,7 @@ where
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(self.service, self.acker);
+            .into_driver(self.service);
         driver.run().await
     }
 }
