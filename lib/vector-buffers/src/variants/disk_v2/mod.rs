@@ -206,18 +206,33 @@ impl<T> Buffer<T>
 where
     T: Bufferable,
 {
+    /// Creates a new disk buffer from the given [`DiskBufferConfig`].
+    ///
+    /// If successful, a [`Writer`] and [`Reader`] value, representing the write/read sides of the
+    /// buffer, respectively, will be returned, along with a reference to the [`Ledger`]. Records
+    /// are considered durably processed and able to be deleted from the buffer when they are
+    /// dropped by the reader, via event finalization.
+    ///
+    /// # Errors
+    ///
+    /// If an error occurred during the creation or loading of the disk buffer, an error variant
+    /// will be returned describing the error.
     #[cfg_attr(test, instrument(skip(config, usage_handle), level = "trace"))]
-    pub(crate) async fn from_config_inner<FS>(
+    pub async fn from_config_inner<FS>(
         config: DiskBufferConfig<FS>,
         usage_handle: BufferUsageHandle,
+        must_exist: bool,
     ) -> Result<(Writer<T, FS>, Reader<T, FS>, Arc<Ledger<FS>>), BufferError<T>>
     where
         FS: Filesystem + fmt::Debug + Clone + 'static,
         FS::File: Unpin,
     {
-        let ledger = Ledger::load_or_create(config, usage_handle)
-            .await
-            .context(LedgerSnafu)?;
+        let ledger = if must_exist {
+            Ledger::load(config, usage_handle, must_exist).await
+        } else {
+            Ledger::load_or_create(config, usage_handle).await
+        }
+        .context(LedgerSnafu)?;
         let ledger = Arc::new(ledger);
 
         let mut writer = Writer::new(Arc::clone(&ledger));
@@ -258,7 +273,7 @@ where
         FS: Filesystem + fmt::Debug + Clone + 'static,
         FS::File: Unpin,
     {
-        let (writer, reader, _) = Self::from_config_inner(config, usage_handle).await?;
+        let (writer, reader, _) = Self::from_config_inner(config, usage_handle, false).await?;
 
         Ok((writer, reader))
     }

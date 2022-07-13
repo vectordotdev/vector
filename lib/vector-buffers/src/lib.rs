@@ -38,7 +38,9 @@ use serde::{Deserialize, Serialize};
 use vector_common::{byte_size_of::ByteSizeOf, finalization::AddBatchNotifier};
 
 pub mod disk_v2 {
-    pub use crate::variants::disk_v2::{ledger::Ledger, DiskBufferConfig, DiskBufferConfigBuilder};
+    pub use crate::variants::disk_v2::{Buffer, ProductionFilesystem};
+    pub type DiskBufferConfigBuilder =
+        crate::variants::disk_v2::DiskBufferConfigBuilder<ProductionFilesystem>;
 }
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Copy, Clone)]

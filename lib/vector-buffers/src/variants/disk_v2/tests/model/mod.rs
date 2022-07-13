@@ -874,7 +874,7 @@ proptest! {
 
             let usage_handle = BufferUsageHandle::noop();
             let (writer, reader, ledger) =
-                Buffer::<Record>::from_config_inner(config, usage_handle)
+                Buffer::<Record>::from_config_inner(config, usage_handle,false)
                     .await
                     .expect("should not fail to build buffer");
 

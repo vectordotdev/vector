@@ -166,7 +166,7 @@ impl ArchivedLedgerState {
         self.reader_last_record_id.load(Ordering::Acquire)
     }
 
-    pub fn increment_last_reader_record_id(&self, amount: u64) {
+    pub(super) fn increment_last_reader_record_id(&self, amount: u64) {
         self.reader_last_record_id
             .fetch_add(amount, Ordering::AcqRel);
     }

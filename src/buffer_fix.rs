@@ -1,10 +1,12 @@
-use std::path::PathBuf;
+use std::{mem::ManuallyDrop, path::PathBuf};
 
 use clap::Parser;
 use vector_buffers::{
-    disk_v2::{DiskBufferConfigBuilder, Ledger},
-    BufferUsageHandle,
+    disk_v2::{Buffer, DiskBufferConfigBuilder},
+    BufferUsageHandle, EventCount as _,
 };
+use vector_common::finalization::Finalizable;
+use vector_core::event::{EventArray, EventStatus};
 
 #[derive(Parser, Debug)]
 #[clap(rename_all = "kebab-case")]
@@ -27,15 +29,21 @@ pub(crate) async fn cmd(opts: &Opts) -> exitcode::ExitCode {
         }
     };
 
-    let ledger = match Ledger::load(config, BufferUsageHandle::noop(), true).await {
-        Ok(ledger) => ledger,
+    let (_writer, mut reader, ledger) = match Buffer::<EventArray>::from_config_inner(
+        config,
+        BufferUsageHandle::noop(),
+        true,
+    )
+    .await
+    {
+        Ok(buffer) => buffer,
         Err(error) => {
-            eprintln!("Could not open disk buffer ledger: {}", error);
-            return exitcode::CONFIG;
+            eprintln!("Could not open disk buffer: {}", error);
+            return exitcode::IOERR;
         }
     };
-    let state = ledger.state();
 
+    let state = ledger.state();
     println!(
         "Next writer record ID: {}",
         state.get_next_writer_record_id()
@@ -45,12 +53,25 @@ pub(crate) async fn cmd(opts: &Opts) -> exitcode::ExitCode {
         state.get_last_reader_record_id()
     );
 
-    if opts.doit {
-        state.increment_last_reader_record_id(1);
-        println!(
-            "Last reader record ID advanced to {}",
-            state.get_last_reader_record_id()
-        );
+    match reader.next().await {
+        Ok(Some(record)) => {
+            let mut record = ManuallyDrop::new(record);
+            let count = record.event_count();
+            println!("Next record size: {} events", count);
+
+            if opts.doit {
+                record
+                    .take_finalizers()
+                    .update_status(EventStatus::Delivered);
+                drop(ManuallyDrop::into_inner(record));
+                println!("Marked record as delivered");
+            }
+        }
+        Ok(None) => println!("Buffer has no more records to read."),
+        Err(error) => {
+            eprintln!("Error reading next record from the buffer: {}", error);
+            return exitcode::IOERR;
+        }
     }
 
     exitcode::OK
