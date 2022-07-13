@@ -568,6 +568,14 @@ where
             .await
             .context(IoSnafu)?;
 
+        Self::load(config, usage_handle, false).await
+    }
+
+    pub async fn load(
+        config: DiskBufferConfig<FS>,
+        usage_handle: BufferUsageHandle,
+        must_exist: bool,
+    ) -> Result<Ledger<FS>, LedgerLoadCreateError> {
         // Acquire an exclusive lock on our lock file, which prevents another Vector process from
         // loading this buffer and clashing with us.  Specifically, though: this does _not_ prevent
         // another process from messing with our ledger files, or any of the data files, etc.
@@ -583,11 +591,15 @@ where
 
         // Open the ledger file, which may involve creating it if it doesn't yet exist.
         let ledger_path = config.data_dir.join("buffer.db");
-        let mut ledger_handle = config
-            .filesystem
-            .open_file_writable_create(&ledger_path)
-            .await
-            .context(IoSnafu)?;
+        let mut ledger_handle = if must_exist {
+            config.filesystem.open_file_writable(&ledger_path).await
+        } else {
+            config
+                .filesystem
+                .open_file_writable_create(&ledger_path)
+                .await
+        }
+        .context(IoSnafu)?;
 
         // If we just created the ledger file, then we need to create the default ledger state, and
         // then serialize and write to the file, before trying to load it as a memory-mapped file.
