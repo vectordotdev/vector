@@ -166,7 +166,7 @@ components: sources: opentelemetry: {
 					}
 				}
 				timestamp: {
-					description: "log generated timestamp in nano seconds"
+					description: "Time when the event occurred measured in nanoseconds."
 					required:    true
 					type: uint: {
 						unit: null
