@@ -1,17 +1,14 @@
 use std::path::PathBuf;
 
-use anyhow::{Context, Result};
 use clap::Parser;
-//use tracing::{span, Level};
-
 use vector_buffers::{
     disk_v2::{DiskBufferConfigBuilder, Ledger},
     BufferUsageHandle,
 };
 
-#[derive(Debug, Parser)]
-#[clap(version)]
-struct Args {
+#[derive(Parser, Debug)]
+#[clap(rename_all = "kebab-case")]
+pub struct Opts {
     /// Actually bump the read record ID by one. Without this option, this program just outputs the
     /// current ledger state.
     #[clap(long)]
@@ -20,16 +17,23 @@ struct Args {
     data_dir: PathBuf,
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    let args = Args::parse();
+#[allow(clippy::print_stdout, clippy::print_stderr)]
+pub(crate) async fn cmd(opts: &Opts) -> exitcode::ExitCode {
+    let config = match DiskBufferConfigBuilder::from_path(&opts.data_dir).build() {
+        Ok(config) => config,
+        Err(error) => {
+            eprintln!("Could not build disk buffer config: {}", error);
+            return exitcode::CONFIG;
+        }
+    };
 
-    let config = DiskBufferConfigBuilder::from_path(args.data_dir)
-        .build()
-        .context("Could not build disk buffer config")?;
-    let ledger = Ledger::load(config, BufferUsageHandle::noop(), true)
-        .await
-        .context("Could not open disk buffer ledger")?;
+    let ledger = match Ledger::load(config, BufferUsageHandle::noop(), true).await {
+        Ok(ledger) => ledger,
+        Err(error) => {
+            eprintln!("Could not open disk buffer ledger: {}", error);
+            return exitcode::CONFIG;
+        }
+    };
     let state = ledger.state();
 
     println!(
@@ -41,7 +45,7 @@ async fn main() -> Result<()> {
         state.get_last_reader_record_id()
     );
 
-    if args.doit {
+    if opts.doit {
         state.increment_last_reader_record_id(1);
         println!(
             "Last reader record ID advanced to {}",
@@ -49,5 +53,5 @@ async fn main() -> Result<()> {
         );
     }
 
-    Ok(())
+    exitcode::OK
 }

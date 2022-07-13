@@ -22,6 +22,7 @@ use crate::service;
 #[cfg(feature = "api")]
 use crate::{api, internal_events::ApiStarted};
 use crate::{
+    buffer_fix,
     cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand},
     config::{self},
     generate, graph, heartbeat, list,
@@ -144,6 +145,7 @@ impl Application {
 
                 if let Some(s) = sub_command {
                     let code = match s {
+                        SubCommand::BufferFix(b) => buffer_fix::cmd(&b).await,
                         SubCommand::Generate(g) => generate::cmd(&g),
                         SubCommand::Graph(g) => graph::cmd(&g),
                         SubCommand::Config(c) => config::cmd(&c),

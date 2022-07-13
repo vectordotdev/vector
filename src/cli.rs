@@ -8,7 +8,7 @@ use crate::service;
 use crate::tap;
 #[cfg(feature = "api-client")]
 use crate::top;
-use crate::{config, generate, get_version, graph, list, unit_test, validate};
+use crate::{buffer_fix, config, generate, get_version, graph, list, unit_test, validate};
 
 #[derive(Parser, Debug)]
 #[clap(rename_all = "kebab-case")]
@@ -208,6 +208,9 @@ pub enum SubCommand {
     /// Vector Remap Language CLI
     #[cfg(feature = "vrl-cli")]
     Vrl(vrl_cli::Opts),
+
+    /// Manipulate the buffer ledger.
+    BufferFix(buffer_fix::Opts),
 }
 
 #[derive(Debug, Clone, PartialEq)]
