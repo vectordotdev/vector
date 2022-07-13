@@ -64,7 +64,9 @@ impl<L> ServiceBuilderExt<L> for ServiceBuilder<L> {
     }
 }
 
-/// Reliability-related settings for outbound requests i.e. concurrency and rate limits, timeouts, etc.
+/// Middleware settings for outbound requests.
+///
+/// Various settings can be configured, such as concurrency and rate limits, timeouts, etc.
 #[configurable_component]
 #[derive(Clone, Copy, Debug)]
 pub struct TowerRequestConfig {

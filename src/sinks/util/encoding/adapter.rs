@@ -25,7 +25,10 @@ pub trait EncodingConfigMigrator {
 /// Encoding configuration.
 ///
 /// Note: When data in encoding is malformed, currently only a very generic error “data did not match any variant of
-/// untagged enum EncodingConfig” is reported. Follow this issue to track progress on improving these error messages.
+/// untagged enum EncodingConfig” is reported. Follow this [issue][gh] to track progress on improving these error
+/// messages.
+///
+/// [gh]: https://github.com/vectordotdev/vector/issues/12162
 #[configurable_component(no_deser)]
 #[derive(Clone, Debug)]
 pub struct EncodingConfigAdapter<LegacyEncodingConfig, Migrator>(

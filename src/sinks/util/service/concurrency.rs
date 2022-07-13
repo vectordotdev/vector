@@ -11,7 +11,9 @@ use serde::{
 #[configurable_component(no_ser, no_deser)]
 #[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 pub enum Concurrency {
-    /// No concurrency allowed.
+    /// A fixed concurrency of 1.
+    ///
+    /// In other words, only one request can be outstanding at any given time.
     None,
 
     /// Concurrency will be managed by Vector's [adaptive concurrency][arc] feature.

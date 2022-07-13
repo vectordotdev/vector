@@ -31,6 +31,7 @@ pub struct AdaptiveConcurrencySettings {
     /// when latency increases.
     ///
     /// Note that the new limit is rounded down after applying this ratio.
+    #[configurable(validation(range(min = 0.0, max = 1.0)))]
     pub(super) decrease_ratio: f64,
 
     /// The weighting of new measurements compared to older measurements.
@@ -40,6 +41,7 @@ pub struct AdaptiveConcurrencySettings {
     /// ARC uses an exponentially weighted moving average (EWMA) of past RTT measurements as a reference to compare with
     /// the current RTT. Smaller values cause this reference to adjust more slowly, which may be useful if a service has
     /// unusually high response variability.
+    #[configurable(validation(range(min = 0.0, max = 1.0)))]
     pub(super) ewma_alpha: f64,
 
     /// Scale of RTT deviations which are not considered anomalous.
@@ -50,6 +52,7 @@ pub struct AdaptiveConcurrencySettings {
     /// those values are. We use that deviation when comparing the past RTT average to the current measurements, so we
     /// can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to
     /// an appropriate range.  Larger values cause the algorithm to ignore larger increases in the RTT.
+    #[configurable(validation(range(min = 0.0)))]
     pub(super) rtt_deviation_scale: f64,
 }
 

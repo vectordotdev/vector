@@ -1,8 +1,7 @@
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
-use syn::parse_quote;
-use syn::{parse_macro_input, DeriveInput, ExprPath, Ident, Type};
+use syn::{parse_macro_input, parse_quote, DeriveInput, ExprPath, Ident, Type};
 use vector_config_common::{attributes::CustomAttribute, validation::Validation};
 
 use crate::ast::{Container, Data, Field, Style, Tagging, Variant};

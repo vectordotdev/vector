@@ -216,6 +216,11 @@ pub enum SerializerConfig {
     RawMessage,
 
     /// Plaintext serialization.
+    ///
+    /// This encoding, specifically, will only encode the `message` field of a log event. Users should take care if
+    /// they're modifying their log events (such as by using a `remap` transform, etc) and removing the message field
+    /// while doing additional parsing on it, as this could lead to the encoding emitting empty strings for the given
+    /// event.
     Text,
 }
 

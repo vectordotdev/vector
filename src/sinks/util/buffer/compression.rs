@@ -16,11 +16,11 @@ use vector_config::{
 // add in the `CompressionLevel` type and doing a custom `Configurable` implementation for it... but the real meat of
 // the change would be doing so for `Compression` because of it being an enum and all the boilerplate involved there.
 //
-// It'd be nice to find a a succinct way to allow expression these constraints, possibly through a declarative macro
-// that helps build the manual `Configurable` implementation such that, while still leaving the developer responsible
-// for generating a correct schema, it would be far closer to a human-readable description of the schema i.e. "this
-// schema can be X or Y, and if X, it can only be these values, or if Y, the value must fall within this specific range"
-// and so on, with methods for describing enum variants, etc.
+// It'd be nice to find a succinct way to allow the expression of these constraints, possibly through a declarative
+// macro that helps build the manual `Configurable` implementation such that, while still leaving the developer
+// responsible for generating a correct schema, it would be far closer to a human-readable description of the schema
+// i.e. "this schema can be X or Y, and if X, it can only be these values, or if Y, the value must fall within this
+// specific range" and so on, with methods for describing enum variants, etc.
 //
 // Another complication is that we can _almost_ sort of get there with the existing primitives but `serde` itself has no
 // way to express an enum that functions like what we're doing here i.e. the variant name is parsed from the value,
