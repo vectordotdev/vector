@@ -151,7 +151,7 @@ use vector_common::finalization::Finalizable;
 mod backed_archive;
 mod common;
 mod io;
-mod ledger;
+pub mod ledger;
 mod reader;
 mod record;
 mod ser;

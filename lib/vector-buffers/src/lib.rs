@@ -14,6 +14,7 @@
 extern crate tracing;
 
 mod buffer_usage_data;
+pub use buffer_usage_data::BufferUsageHandle;
 
 pub mod config;
 pub use config::{BufferConfig, BufferType};
@@ -35,6 +36,10 @@ use std::fmt::Debug;
 use quickcheck::{Arbitrary, Gen};
 use serde::{Deserialize, Serialize};
 use vector_common::{byte_size_of::ByteSizeOf, finalization::AddBatchNotifier};
+
+pub mod disk_v2 {
+    pub use crate::variants::disk_v2::{ledger::Ledger, DiskBufferConfig, DiskBufferConfigBuilder};
+}
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Copy, Clone)]
 #[serde(rename_all = "snake_case")]

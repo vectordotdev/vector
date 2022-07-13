@@ -132,7 +132,7 @@ impl ArchivedLedgerState {
             .store(self.get_next_writer_file_id(), Ordering::Release);
     }
 
-    pub(super) fn get_next_writer_record_id(&self) -> u64 {
+    pub fn get_next_writer_record_id(&self) -> u64 {
         self.writer_next_record_id.load(Ordering::Acquire)
     }
 
@@ -162,11 +162,11 @@ impl ArchivedLedgerState {
         value
     }
 
-    pub(super) fn get_last_reader_record_id(&self) -> u64 {
+    pub fn get_last_reader_record_id(&self) -> u64 {
         self.reader_last_record_id.load(Ordering::Acquire)
     }
 
-    pub(super) fn increment_last_reader_record_id(&self, amount: u64) {
+    pub fn increment_last_reader_record_id(&self, amount: u64) {
         self.reader_last_record_id
             .fetch_add(amount, Ordering::AcqRel);
     }
@@ -205,7 +205,7 @@ impl ArchivedLedgerState {
 }
 
 /// Tracks the internal state of the buffer.
-pub(crate) struct Ledger<FS>
+pub struct Ledger<FS>
 where
     FS: Filesystem,
 {

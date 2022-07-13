@@ -89,7 +89,7 @@ impl BufferUsageHandle {
     /// Creates a no-op [`BufferUsageHandle`] handle.
     ///
     /// No usage data is written or stored.
-    pub(crate) fn noop() -> Self {
+    pub fn noop() -> Self {
         BufferUsageHandle {
             state: Arc::new(BufferUsageData::new(0)),
         }

@@ -8586,6 +8586,7 @@ dependencies = [
 name = "vector_buffers"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-recursion",
  "async-stream",
  "async-trait",

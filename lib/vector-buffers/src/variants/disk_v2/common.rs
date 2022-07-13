@@ -177,7 +177,7 @@ where
 }
 
 impl DiskBufferConfigBuilder {
-    pub fn from_path<P>(data_dir: P) -> DiskBufferConfigBuilder
+    pub fn from_path<P>(data_dir: P) -> Self
     where
         P: AsRef<Path>,
     {
