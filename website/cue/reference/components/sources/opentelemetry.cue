@@ -120,7 +120,7 @@ components: sources: opentelemetry: {
 					}
 				}
 				trace_id: {
-					description: "trace_id"
+					description: "Request trace id as defined in W3C Trace Context. Can be set for logs that are part of request processing and have an assigned trace id."
 					required:    false
 					common:      true
 					type: string: {
