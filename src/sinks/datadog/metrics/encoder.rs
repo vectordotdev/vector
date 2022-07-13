@@ -430,7 +430,9 @@ fn generate_series_metrics(
     let device = tags.remove("device");
     let ts = encode_timestamp(metric.timestamp());
     let tags = Some(encode_tags(&tags));
-    let interval = last_sent.map(|then| then.elapsed()).map(|d| d.as_secs());
+    let interval = last_sent
+        .map(|then| then.elapsed())
+        .map(|d| d.as_secs() as u32);
 
     let results = match (metric.value(), metric.interval_ms()) {
         (MetricValue::Counter { value }, None) => vec![DatadogSeriesMetric {
@@ -446,8 +448,8 @@ fn generate_series_metrics(
         (MetricValue::Counter { value }, Some(i)) => vec![DatadogSeriesMetric {
             metric: name,
             r#type: DatadogMetricType::Rate,
-            interval: Some(i / 1000),
-            points: vec![DatadogPoint(ts, (*value) * 1000.0 / (i as f64))],
+            interval: Some(i.get() / 1000),
+            points: vec![DatadogPoint(ts, (*value) * 1000.0 / (i.get() as f64))],
             tags,
             host,
             source_type_name,

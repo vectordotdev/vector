@@ -4,6 +4,7 @@ use std::{
     collections::{btree_map, BTreeMap},
     convert::AsRef,
     fmt::{self, Display, Formatter},
+    num::NonZeroU32,
 };
 
 use chrono::{DateTime, Utc};
@@ -64,8 +65,10 @@ impl Metric {
                 tags: None,
             },
             data: MetricData {
-                timestamp: None,
-                interval_ms: None,
+                time: MetricTime {
+                    timestamp: None,
+                    interval_ms: None,
+                },
                 kind,
                 value,
             },
@@ -93,15 +96,15 @@ impl Metric {
     #[inline]
     #[must_use]
     pub fn with_timestamp(mut self, timestamp: Option<DateTime<Utc>>) -> Self {
-        self.data.timestamp = timestamp;
+        self.data.time.timestamp = timestamp;
         self
     }
 
     /// Consumes this metric, returning it with an updated interval.
     #[inline]
     #[must_use]
-    pub fn with_interval_ms(mut self, interval_ms: Option<u64>) -> Self {
-        self.data.interval_ms = interval_ms;
+    pub fn with_interval_ms(mut self, interval_ms: Option<NonZeroU32>) -> Self {
+        self.data.time.interval_ms = interval_ms;
         self
     }
 
@@ -197,13 +200,13 @@ impl Metric {
     /// Gets a reference to the timestamp of this metric, if it exists.
     #[inline]
     pub fn timestamp(&self) -> Option<DateTime<Utc>> {
-        self.data.timestamp
+        self.data.time.timestamp
     }
 
     /// Gets a reference to the interval (in milliseconds) coverred by this metric, if it exists.
     #[inline]
-    pub fn interval_ms(&self) -> Option<u64> {
-        self.data.interval_ms
+    pub fn interval_ms(&self) -> Option<NonZeroU32> {
+        self.data.time.interval_ms
     }
 
     /// Gets a reference to the value of this metric.
@@ -216,6 +219,12 @@ impl Metric {
     #[inline]
     pub fn kind(&self) -> MetricKind {
         self.data.kind
+    }
+
+    /// Gets the time information of this metric.
+    #[inline]
+    pub fn time(&self) -> MetricTime {
+        self.data.time
     }
 
     /// Decomposes a `Metric` into its individual parts.
@@ -399,7 +408,7 @@ impl Display for Metric {
     /// 2020-08-12T20:23:37.248661343Z vector_processed_bytes_total{component_kind="sink",component_type="blackhole"} = 6391
     /// ```
     fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
-        if let Some(timestamp) = &self.data.timestamp {
+        if let Some(timestamp) = &self.data.time.timestamp {
             write!(fmt, "{:?} ", timestamp)?;
         }
         let kind = match self.data.kind {

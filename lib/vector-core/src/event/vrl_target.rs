@@ -208,7 +208,7 @@ impl vrl_lib::Target for VrlTarget {
                         }
                         ["timestamp"] => {
                             let value = value.clone().try_timestamp().map_err(|e| e.to_string())?;
-                            metric.data.timestamp = Some(value);
+                            metric.data.time.timestamp = Some(value);
                         }
                         ["kind"] => {
                             metric.data.kind = MetricKind::try_from(value.clone())?;
@@ -271,7 +271,7 @@ impl vrl_lib::Target for VrlTarget {
                 if let Some(paths) = path.to_alternative_components(MAX_METRIC_PATH_DEPTH).get(0) {
                     let removed_value = match paths.as_slice() {
                         ["namespace"] => metric.series.name.namespace.take().map(Into::into),
-                        ["timestamp"] => metric.data.timestamp.take().map(Into::into),
+                        ["timestamp"] => metric.data.time.timestamp.take().map(Into::into),
                         ["tags"] => metric.series.tags.take().map(|map| {
                             map.into_iter()
                                 .map(|(k, v)| (k, v.into()))
