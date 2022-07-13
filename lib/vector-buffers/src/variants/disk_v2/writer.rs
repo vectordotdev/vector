@@ -1085,7 +1085,7 @@ where
                         let data_file = self
                             .ledger
                             .filesystem()
-                            .open_file_writable(&data_file_path)
+                            .open_file_writable_create(&data_file_path)
                             .await?;
                         let metadata = data_file.metadata().await?;
                         let file_len = metadata.len();

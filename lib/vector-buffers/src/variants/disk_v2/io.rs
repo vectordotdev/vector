@@ -22,7 +22,7 @@ pub trait Filesystem: Send + Sync {
     type MemoryMap: ReadableMemoryMap;
     type MutableMemoryMap: WritableMemoryMap;
 
-    /// Opens a file for writing, creating it if it does not exist.
+    /// Opens a file for writing, failing if it does not exist.
     ///
     /// This opens the file in "append" mode, such that the starting position in the file will be
     /// set to the end of the file: the file will not be truncated.  Additionally, the file is
@@ -33,6 +33,18 @@ pub trait Filesystem: Send + Sync {
     /// If an I/O error occurred when attempting to open the file for writing, an error variant will
     /// be returned describing the underlying error.
     async fn open_file_writable(&self, path: &Path) -> io::Result<Self::File>;
+
+    /// Opens a file for writing, creating it if it does not exist.
+    ///
+    /// This opens the file in "append" mode, such that the starting position in the file will be
+    /// set to the end of the file: the file will not be truncated.  Additionally, the file is
+    /// readable.
+    ///
+    /// # Errors
+    ///
+    /// If an I/O error occurred when attempting to open the file for writing, an error variant will
+    /// be returned describing the underlying error.
+    async fn open_file_writable_create(&self, path: &Path) -> io::Result<Self::File>;
 
     /// Opens a file for writing, creating it if it does not already exist, but atomically.
     ///
@@ -129,6 +141,15 @@ impl Filesystem for ProductionFilesystem {
     type MutableMemoryMap = memmap2::MmapMut;
 
     async fn open_file_writable(&self, path: &Path) -> io::Result<Self::File> {
+        tokio::fs::OpenOptions::new()
+            .append(true)
+            .read(true)
+            .create(false)
+            .open(path)
+            .await
+    }
+
+    async fn open_file_writable_create(&self, path: &Path) -> io::Result<Self::File> {
         tokio::fs::OpenOptions::new()
             .append(true)
             .read(true)

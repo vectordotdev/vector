@@ -585,7 +585,7 @@ where
         let ledger_path = config.data_dir.join("buffer.db");
         let mut ledger_handle = config
             .filesystem
-            .open_file_writable(&ledger_path)
+            .open_file_writable_create(&ledger_path)
             .await
             .context(IoSnafu)?;
 

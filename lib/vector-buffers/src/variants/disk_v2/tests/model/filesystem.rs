@@ -232,7 +232,16 @@ struct FilesystemInner {
 
 impl FilesystemInner {
     #[instrument(skip(self), level = "debug")]
-    fn open_file_writable(&mut self, path: &Path) -> TestFile {
+    fn open_file_writable(&mut self, path: &Path) -> Option<TestFile> {
+        self.files.get(path).map(|file| {
+            let mut new_file = file.clone();
+            new_file.set_writable();
+            new_file
+        })
+    }
+
+    #[instrument(skip(self), level = "debug")]
+    fn open_file_writable_create(&mut self, path: &Path) -> TestFile {
         let file = self
             .files
             .entry(path.to_owned())
@@ -313,7 +322,14 @@ impl Filesystem for TestFilesystem {
 
     async fn open_file_writable(&self, path: &Path) -> io::Result<Self::File> {
         let mut inner = self.inner.lock();
-        Ok(inner.open_file_writable(path))
+        inner
+            .open_file_writable(path)
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "File not found"))
+    }
+
+    async fn open_file_writable_create(&self, path: &Path) -> io::Result<Self::File> {
+        let mut inner = self.inner.lock();
+        Ok(inner.open_file_writable_create(path))
     }
 
     async fn open_file_writable_atomic(&self, path: &Path) -> io::Result<Self::File> {
