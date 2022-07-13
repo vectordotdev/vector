@@ -330,7 +330,7 @@ fn timely_shutdown_http() {
         r#"
     type = "http"
     address = "${VECTOR_TEST_ADDRESS}"
-    encoding = "text""#,
+    decoding.codec = "bytes""#,
     ));
 }
 
