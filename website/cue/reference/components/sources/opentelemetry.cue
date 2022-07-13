@@ -157,7 +157,7 @@ components: sources: opentelemetry: {
 					}
 				}
 				flags: {
-					description: "trace flags defined in W3C Trace Context specification"
+					description: "Trace flag as defined in W3C Trace Context specification."
 					required:    false
 					common:      true
 					type: uint: {
