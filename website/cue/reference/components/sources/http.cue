@@ -151,7 +151,7 @@ components: sources: http: {
 			fields: {
 				message: {
 					description:   "The raw line line from the incoming payload."
-					relevant_when: "encoding.codec == \"text\""
+					relevant_when: "encoding == \"text\""
 					required:      true
 					type: string: {
 						examples: ["Hello world"]
@@ -173,7 +173,7 @@ components: sources: http: {
 				"*": {
 					common:        false
 					description:   "Any field contained in your JSON payload"
-					relevant_when: "encoding.codec != \"text\""
+					relevant_when: "encoding != \"text\""
 					required:      false
 					type: "*": {}
 				}

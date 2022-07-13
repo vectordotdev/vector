@@ -13,7 +13,7 @@ type = "internal_metrics"
 type = "http"
 address = "0.0.0.0:8282"
 framing.method = "newline_delimited"
-encoding.codec = "json"
+encoding = "json"
 
 ##
 ## Transforms
