@@ -2987,12 +2987,7 @@ checksum = "9b919933a397b79c37e33b77bb2aa3dc8eb6e165ad809e58ff75bc7db2e34574"
 [[package]]
 name = "goauth"
 version = "0.13.0"
-<<<<<<< HEAD
 source = "git+https://github.com/StephenWakely/rust-goauth.git?branch=malachite-ingestion#5b7cf3813cce3da155b090178385becfe0510cea"
-=======
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8457926bf7016133268f52fb6c0a636747fa2cccd8aa5afbef7347a01ca9b4e3"
->>>>>>> origin
 dependencies = [
  "arc-swap",
  "futures 0.3.21",

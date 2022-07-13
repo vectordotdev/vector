@@ -71,14 +71,8 @@ pub struct GcsRequestSettings {
 #[derive(Debug)]
 pub struct GcsResponse {
     pub inner: http::Response<Body>,
-<<<<<<< HEAD
-    pub count: usize,
-    pub events_byte_size: usize,
-    pub bytes_sent: Option<usize>,
-=======
     pub protocol: &'static str,
     pub metadata: RequestMetadata,
->>>>>>> origin
 }
 
 impl DriverResponse for GcsResponse {
@@ -95,15 +89,9 @@ impl DriverResponse for GcsResponse {
     }
 
     fn bytes_sent(&self) -> Option<BytesSent> {
-<<<<<<< HEAD
-        self.bytes_sent.map(|byte_size| BytesSent {
-            byte_size,
-            protocol: "http",
-=======
         Some(BytesSent {
             byte_size: self.metadata.request_encoded_size(),
             protocol: self.protocol,
->>>>>>> origin
         })
     }
 }
