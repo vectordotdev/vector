@@ -3,7 +3,7 @@ package metadata
 components: sources: opentelemetry: {
 	_port: 6788
 
-	title: "Opentelemetry"
+	title: "OpenTelemetry"
 
 	description: """
 		Collect OpenTelemetry data over gRPC (currently, only logs are supported).
