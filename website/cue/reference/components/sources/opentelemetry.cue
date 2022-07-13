@@ -138,7 +138,7 @@ components: sources: opentelemetry: {
 					}
 				}
 				severity_number: {
-					description: "severity_number"
+					description: "Numerical value of the severity. Smaller numerical values correspond to less severe events (such as debug events), larger numerical values correspond to more severe events (such as errors and critical events)."
 					required:    false
 					common:      true
 					type: uint: {
