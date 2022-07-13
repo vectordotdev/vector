@@ -8,7 +8,7 @@
 ///
 /// Here's a simple example of how to use the macro and what it will generate as a result:
 ///
-/// ```norun
+/// ```no_run
 /// // This macro invocation generates an enum called `MyEncoding` with two variants, `Text` and `Json`,
 /// // which map to newline-delimited plaintext and non-delimited JSON, repsectively.
 /// generate_custom_encoding_configuration!(MyEncoding {
@@ -19,7 +19,7 @@
 /// Additionally, and perhaps more important, we automatically generate implementations of `EncodingConfigMigrator`, and
 /// `EncodingConfigWithFramingMigrator`, which can then be used in the configuration of the sink like so:
 ///
-/// ```norun
+/// ```no_run
 /// struct SinkConfig {
 ///     // The name of the migrator type is always <name of enum> + `Migrator`.
 ///     framed_encoding: EncodingConfigWithFramingAdapter<EncodingConfig<MyEncoding>, MyEncodingMigrator>,
@@ -52,7 +52,7 @@
 /// framer/serializer unique to their sink. The macro supports specifying the framer and serializer to use for the codec
 /// in a familiar form:
 ///
-/// ```norun
+/// ```no_run
 /// // This is a special encoding that encodes to plaintext but doesn't want any delimiters at all.
 /// generate_custom_encoding_configuration!(MyEncoding {
 ///     RawText => (None, codecs::TextSerializerConfig::new().into())

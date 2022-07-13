@@ -55,7 +55,7 @@ mod configurable_component;
 /// (de)serialization implementations and do not need a standard derivation of those traits. In those cases, callers can
 /// mark the type as not needing automatic derivations in a piecemeal fashion with the `no_ser` and/or `no_deser` modifiers:
 ///
-/// ```norun
+/// ```no_run
 /// use vector_config::configurable_component;
 ///
 /// // This keeps the automatic derive for `Serialize` but doesn't bother deriving `Deserialize`:
