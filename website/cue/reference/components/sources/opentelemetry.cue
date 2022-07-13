@@ -173,7 +173,7 @@ components: sources: opentelemetry: {
 					}
 				}
 				observed_time_unix_nano: {
-					description: "timestamp in nano seconds when collector received the event"
+					description: "Time, in nanoseconds, when the event was observed by the collection system."
 					required:    true
 					type: uint: {
 						unit: null
