@@ -19,13 +19,13 @@ use vector_core::{
 ///   The exception is that if 'Additional fields' are found to be missing an underscore prefix and
 ///   are otherwise valid field names, we prepend the underscore.
 
-/// Errors that can occur during GELF serialization
+/// Errors that can occur during GELF serialization.
 #[derive(Debug, Snafu)]
 pub enum GelfSerializerError {
-    #[snafu(display("LogEvent does not contain required field: {}", field))]
+    #[snafu(display(r#"LogEvent does not contain required field: "{}""#, field))]
     MissingField { field: String },
     #[snafu(display(
-        "LogEvent contains a value with an invalid type. field = {} type = {} expected type = {}",
+        r#"LogEvent contains a value with an invalid type. field = "{}" type = "{}" expected type = "{}""#,
         field,
         actual_type,
         expected_type
@@ -35,7 +35,7 @@ pub enum GelfSerializerError {
         actual_type: String,
         expected_type: String,
     },
-    #[snafu(display("LogEvent contains an invalid field name. field = {}", field))]
+    #[snafu(display(r#"LogEvent contains an invalid field name. field = "{}""#, field))]
     InvalidFieldName { field: String },
 }
 
@@ -80,16 +80,9 @@ impl GelfSerializer {
 
     /// Encode event and represent it as JSON value.
     pub fn to_json_value(&self, event: Event) -> Result<serde_json::Value, vector_core::Error> {
-        match event {
-            Event::Log(log) => {
-                let log = to_gelf_event(log)?;
-                serde_json::to_value(&log)
-            }
-            Event::Metric(_) | Event::Trace(_) => {
-                panic!("GELF Serializer does not support Metric or Trace events.")
-            }
-        }
-        .map_err(|e| e.to_string().into())
+        // input_type() restricts the event type to LogEvents
+        let log = to_gelf_event(event.into_log())?;
+        serde_json::to_value(&log).map_err(|e| e.to_string().into())
     }
 }
 
@@ -110,7 +103,7 @@ impl Encoder<Event> for GelfSerializer {
     }
 }
 
-/// Returns Error for invalid type
+/// Returns Error for invalid type.
 fn err_invalid_type(
     field: &str,
     expected_type: &str,
@@ -184,14 +177,6 @@ fn coerce_field_names_and_values(
                     }
                 }
                 _ => {
-                    // Additional fields must be prefixed with underscores.
-                    // Prepending the underscore since vector adds fields such as 'source_type'
-                    // which would otherwise throw errors.
-                    if !field.is_empty() && !field.starts_with('_') {
-                        // flag the field as missing prefix to be modified later
-                        missing_prefix.push(field.to_string());
-                    }
-
                     // additional fields must be only word chars, dashes and periods.
                     if !VALID_FIELD_REGEX.is_match(field) {
                         return MissingFieldSnafu { field }
@@ -203,6 +188,14 @@ fn coerce_field_names_and_values(
                     if !(value.is_integer() || value.is_float() || value.is_bytes()) {
                         err_invalid_type(field, "string or number", value.kind_str())?;
                     }
+
+                    // Additional fields must be prefixed with underscores.
+                    // Prepending the underscore since vector adds fields such as 'source_type'
+                    // which would otherwise throw errors.
+                    if !field.is_empty() && !field.starts_with('_') {
+                        // flag the field as missing prefix to be modified later
+                        missing_prefix.push(field.to_string());
+                    }
                 }
             }
         }
@@ -210,13 +203,13 @@ fn coerce_field_names_and_values(
     Ok((log, missing_prefix))
 }
 
-/// Validate the input log event is valid GELF, potentially coercing the event into valid GELF
+/// Validate if the input log event is valid GELF, potentially coercing the event into valid GELF.
 fn to_gelf_event(log: LogEvent) -> vector_core::Result<LogEvent> {
     let log = coerce_required_fields(log).and_then(|log| {
         coerce_field_names_and_values(log).map(|(mut log, missing_prefix)| {
             // rename additional fields that were flagged as missing the underscore prefix
             for field in missing_prefix {
-                log.rename_key(path!(field.as_str()), &*format!("_{}", &field));
+                log.rename_key(path!(field.as_str()), format!("_{}", &field).as_str());
             }
             log
         })
@@ -234,7 +227,7 @@ mod tests {
     use super::*;
     use value::Value;
     use vector_common::btreemap;
-    use vector_core::event::{Event, EventMetadata, Metric, MetricKind, MetricValue, TraceEvent};
+    use vector_core::event::{Event, EventMetadata};
 
     fn do_serialize(
         expect_success: bool,
@@ -268,7 +261,7 @@ mod tests {
         };
 
         let log_event: Event = LogEvent::from_map(event_fields, EventMetadata::default()).into();
-        assert!(serializer.supports_json(&log_event));
+        assert!(serializer.supports_json());
         assert!(serializer.to_json_value(log_event).is_ok());
     }
 
@@ -277,30 +270,8 @@ mod tests {
         let serializer = SerializerConfig::Gelf.build().unwrap();
         let event_fields = btreemap! {};
         let log_event: Event = LogEvent::from_map(event_fields, EventMetadata::default()).into();
-        assert!(serializer.supports_json(&log_event));
+        assert!(serializer.supports_json());
         assert!(serializer.to_json_value(log_event).is_err());
-    }
-
-    #[test]
-    #[should_panic]
-    fn gelf_serde_json_to_value_metric_not_supported() {
-        let serializer = SerializerConfig::Gelf.build().unwrap();
-        let metric_event = Event::Metric(Metric::new(
-            "foo",
-            MetricKind::Absolute,
-            MetricValue::Counter { value: 0.0 },
-        ));
-        assert!(!serializer.supports_json(&metric_event));
-        serializer.to_json_value(metric_event).unwrap();
-    }
-
-    #[test]
-    #[should_panic]
-    fn gelf_serde_json_to_value_trace_not_supported() {
-        let serializer = SerializerConfig::Gelf.build().unwrap();
-        let trace_event = Event::Trace(TraceEvent::default());
-        assert!(!serializer.supports_json(&trace_event));
-        serializer.to_json_value(trace_event).unwrap();
     }
 
     #[test]
