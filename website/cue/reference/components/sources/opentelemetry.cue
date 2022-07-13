@@ -129,7 +129,7 @@ components: sources: opentelemetry: {
 					}
 				}
 				span_id: {
-					description: "span_id"
+					description: "Can be set for logs that are part of a particular processing span."
 					required:    false
 					common:      true
 					type: string: {
