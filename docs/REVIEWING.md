@@ -82,7 +82,7 @@ Vector currently offers 2 methods for performance testing:
    suite](https://github.com/vectordotdev/vector/tree/master/soaks) for complex
    integration and performance testing.
 
-For new integrations, consider whether the a new soak test should be added.
+For new integrations, consider whether a new soak test should be added.
 
 ## Single Concern
 
