@@ -6,7 +6,7 @@ components: sources: opentelemetry: {
 	title: "Opentelemetry"
 
 	description: """
-		Collect opentelemetry data over grpc (currently, only log is supported).
+		Collect OpenTelemetry data over gRPC (currently, only logs are supported).
 		"""
 
 	classes: {
