@@ -180,7 +180,7 @@ components: sources: opentelemetry: {
 					}
 				}
 				dropped_attributes_count: {
-					description: "dropped_attributes_count in opentelemetry spec"
+					description: "Counts for attributes dropped due to collection limits."
 					required:    true
 					type: uint: {
 						unit: null
