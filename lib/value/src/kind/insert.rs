@@ -549,7 +549,15 @@ impl Kind {
         while let Some(segment) = iter.next() {
             self_kind = match segment {
                 SimpleSegment::Field(field) => {
-                    let collection = self_kind.object.get_or_insert(Collection::empty());
+                    // field insertion converts the value to an object, so remove all other types
+                    *self_kind = Kind::object(
+                        self_kind
+                            .object
+                            .clone()
+                            .unwrap_or_else(|| Collection::empty()),
+                    );
+                    let collection = self_kind.object.as_mut().expect("object was just inserted");
+
                     match iter.peek() {
                         Some(segment) => match collection.known_mut().entry(field.into()) {
                             Entry::Occupied(entry) => entry.into_mut(),
@@ -562,29 +570,57 @@ impl Kind {
                     }
                 }
                 SimpleSegment::Index(index) => {
-                    let collection = self_kind.array.get_or_insert(Collection::empty());
+                    // array insertion converts the value to an array, so remove all other types
+                    *self_kind = Kind::array(
+                        self_kind
+                            .array
+                            .clone()
+                            .unwrap_or_else(|| Collection::empty()),
+                    );
+                    let collection = self_kind.array.as_mut().expect("array was just inserted");
+
                     if index >= 0 {
                         let index = index as usize;
                         match iter.peek() {
-                            Some(segment) => {
-                                unimplemented!()
-                            }
+                            Some(segment) => match collection.known_mut().entry(index.into()) {
+                                Entry::Occupied(entry) => entry.into_mut(),
+                                Entry::Vacant(entry) => entry.insert(create_inner_element(segment)),
+                            },
                             None => {
                                 collection.known_mut().insert(index.into(), kind);
-                                if let Some(unknown) = collection.unknown() {
-                                    unimplemented!()
-                                } else {
-                                    // all fields are known, so missing fields can be set to exactly "null"
-                                    for i in 0..index {
-                                        if !collection.known_mut().contains_key(&i.into()) {
-                                            collection.known_mut().insert(i.into(), Kind::null());
-                                        }
+
+                                // add "null" to all holes, adding it to the "unknown" if it exists
+                                let hole_type = collection
+                                    .unknown()
+                                    .map(|x| x.to_kind().into_owned())
+                                    .unwrap_or(Kind::never())
+                                    .or_null();
+
+                                for i in 0..index {
+                                    if !collection.known_mut().contains_key(&i.into()) {
+                                        collection.known_mut().insert(i.into(), hole_type.clone());
                                     }
                                 }
                                 return;
                             }
                         }
                     } else {
+                        // if index < 0 && collection.unknown().is_none() {
+                        //     // There is no unknown, so the exact position of the negative index can be determined
+                        //     let array_len = collection
+                        //         .known()
+                        //         .keys()
+                        //         .map(|i| i.to_usize())
+                        //         .max()
+                        //         .unwrap_or(0);
+                        //
+                        //     index += array_len as isize;
+                        //     if index < 0 {
+                        //         // array needs to be extended to fit
+                        //         index = 0;
+                        //     }
+                        // }
+
                         unimplemented!()
                     }
 
@@ -651,7 +687,7 @@ mod tests {
             this: Kind,
             path: OwnedPath,
             kind: Kind,
-            mutated: Kind,
+            expected: Kind,
         }
 
         for (
@@ -660,7 +696,7 @@ mod tests {
                 mut this,
                 path,
                 kind,
-                mutated,
+                expected,
             },
         ) in HashMap::from([
             (
@@ -669,7 +705,7 @@ mod tests {
                     this: Kind::bytes(),
                     path: owned_path!(),
                     kind: Kind::integer(),
-                    mutated: Kind::integer(),
+                    expected: Kind::integer(),
                 },
             ),
             (
@@ -678,7 +714,7 @@ mod tests {
                     this: Kind::bytes(),
                     path: owned_path!(),
                     kind: Kind::object(BTreeMap::from([("a".into(), Kind::integer())])),
-                    mutated: Kind::object(BTreeMap::from([("a".into(), Kind::integer())])),
+                    expected: Kind::object(BTreeMap::from([("a".into(), Kind::integer())])),
                 },
             ),
             (
@@ -687,7 +723,7 @@ mod tests {
                     this: Kind::object(Collection::empty()),
                     path: owned_path!("a"),
                     kind: Kind::integer(),
-                    mutated: Kind::object(BTreeMap::from([("a".into(), Kind::integer())])),
+                    expected: Kind::object(BTreeMap::from([("a".into(), Kind::integer())])),
                 },
             ),
             (
@@ -696,7 +732,7 @@ mod tests {
                     this: Kind::object(BTreeMap::from([("b".into(), Kind::bytes())])),
                     path: owned_path!("a"),
                     kind: Kind::integer(),
-                    mutated: Kind::object(BTreeMap::from([
+                    expected: Kind::object(BTreeMap::from([
                         ("a".into(), Kind::integer()),
                         ("b".into(), Kind::bytes()),
                     ])),
@@ -708,7 +744,7 @@ mod tests {
                     this: Kind::object(BTreeMap::from([("a".into(), Kind::bytes())])),
                     path: owned_path!("a"),
                     kind: Kind::integer(),
-                    mutated: Kind::object(BTreeMap::from([("a".into(), Kind::integer())])),
+                    expected: Kind::object(BTreeMap::from([("a".into(), Kind::integer())])),
                 },
             ),
             (
@@ -717,7 +753,7 @@ mod tests {
                     this: Kind::array(Collection::empty()),
                     path: owned_path!(0),
                     kind: Kind::integer(),
-                    mutated: Kind::array(BTreeMap::from([(0.into(), Kind::integer())])),
+                    expected: Kind::array(BTreeMap::from([(0.into(), Kind::integer())])),
                 },
             ),
             (
@@ -726,15 +762,63 @@ mod tests {
                     this: Kind::array(Collection::empty()),
                     path: owned_path!(1),
                     kind: Kind::integer(),
-                    mutated: Kind::array(BTreeMap::from([
+                    expected: Kind::array(BTreeMap::from([
                         (0.into(), Kind::null()),
                         (1.into(), Kind::integer()),
                     ])),
                 },
             ),
+            (
+                "set array index past the end with unknown",
+                TestCase {
+                    this: Kind::array(Collection::empty().with_unknown(Kind::integer())),
+                    path: owned_path!(1),
+                    kind: Kind::integer(),
+                    expected: Kind::array(
+                        Collection::from(BTreeMap::from([
+                            (0.into(), Kind::integer().or_null()),
+                            (1.into(), Kind::integer()),
+                        ]))
+                        .with_unknown(Kind::integer()),
+                    ),
+                },
+            ),
+            (
+                "set array index past the end with null unknown",
+                TestCase {
+                    this: Kind::array(Collection::empty().with_unknown(Kind::null())),
+                    path: owned_path!(1),
+                    kind: Kind::integer(),
+                    expected: Kind::array(
+                        Collection::from(BTreeMap::from([
+                            (0.into(), Kind::null()),
+                            (1.into(), Kind::integer()),
+                        ]))
+                        .with_unknown(Kind::null()),
+                    ),
+                },
+            ),
+            (
+                "set field on non-object",
+                TestCase {
+                    this: Kind::integer(),
+                    path: owned_path!("a"),
+                    kind: Kind::integer(),
+                    expected: Kind::object(BTreeMap::from([("a".into(), Kind::integer())])),
+                },
+            ),
+            (
+                "set array index on non-array",
+                TestCase {
+                    this: Kind::integer(),
+                    path: owned_path!(0),
+                    kind: Kind::integer(),
+                    expected: Kind::array(BTreeMap::from([(0.into(), Kind::integer())])),
+                },
+            ),
         ]) {
             this.insert(&path, kind);
-            assert_eq!(this, mutated, "{}", title);
+            assert_eq!(this, expected, "{}", title);
         }
     }
 

@@ -121,6 +121,12 @@ impl<T: Ord> Collection<T> {
         self.unknown = unknown.into().map(Into::into);
     }
 
+    /// Returns a new collection with the unknown set
+    pub fn with_unknown(mut self, unknown: impl Into<Option<Kind>>) -> Self {
+        self.set_unknown(unknown);
+        self
+    }
+
     /// Given a collection of known and unknown types, merge the known types with the unknown type,
     /// and remove a reference to the known types.
     ///
