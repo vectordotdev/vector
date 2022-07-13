@@ -8,10 +8,10 @@ use super::{MetricKind, MetricValue};
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct MetricData {
-    pub kind: MetricKind,
-
     #[serde(flatten)]
     pub time: MetricTime,
+
+    pub kind: MetricKind,
 
     #[serde(flatten)]
     pub value: MetricValue,
