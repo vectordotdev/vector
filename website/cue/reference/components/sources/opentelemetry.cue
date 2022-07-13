@@ -148,7 +148,7 @@ components: sources: opentelemetry: {
 					}
 				}
 				severity_text: {
-					description: "log level"
+					description: "Severity text (also known as log level)."
 					required:    false
 					common:      true
 					type: string: {
