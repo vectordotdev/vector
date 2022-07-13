@@ -5,7 +5,7 @@ mod service;
 mod sink;
 mod tests;
 
-use self::config::KinesisFirehoseSinkConfig;
+use config::KinesisFirehoseSinkConfig;
 
 use crate::config::SinkDescription;
 

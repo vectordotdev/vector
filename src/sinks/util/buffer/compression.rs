@@ -11,11 +11,6 @@ use vector_config::{
     Configurable, Metadata,
 };
 
-pub const GZIP_NONE: u32 = 0;
-pub const GZIP_FAST: u32 = 1;
-pub const GZIP_DEFAULT: u32 = 6;
-pub const GZIP_BEST: u32 = 9;
-
 // NOTE: The resulting schema for `Compression` is not going to look right, because of how we do the customized "string
 // or map" stuff. We've done a bunch of work here to get us half-way towards generating a valid schema for it, including
 // add in the `CompressionLevel` type and doing a custom `Configurable` implementation for it... but the real meat of

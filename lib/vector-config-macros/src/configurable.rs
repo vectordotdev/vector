@@ -25,9 +25,9 @@ pub fn derive_configurable_impl(input: TokenStream) -> TokenStream {
     let mut generics = container.generics().clone();
 
     // We need to construct an updated where clause that properly constrains any generic types which are used as fields
-    // on the container. We _only_ care about fields that are pure types, because anything that's a concrete type --
-    // Foo<T> -- will be checked immediately, but we want generic types to be able to be resolved for compatibility at
-    // the point of usage, not the point of definition.
+    // on the container. We _only_ care about fields that are pure generic types, because anything that's a concrete
+    // type -- Foo<T> -- will be checked when the schema is generated, but we want generic types to be able to be
+    // resolved for compatibility at the point of usage, not the point of definition.
     let generic_field_types = container.generic_field_types();
     if !generic_field_types.is_empty() {
         let where_clause = generics.make_where_clause();

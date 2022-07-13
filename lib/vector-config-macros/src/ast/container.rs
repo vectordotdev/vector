@@ -267,12 +267,21 @@ impl<'a> Container<'a> {
             .flat_map(|metadata| metadata.attributes())
     }
 
+    /// Gets the generic types that are used within fields or variants that are part of the schemas.
+    ///
+    /// In order to ensure we can allow for a maximally flexible `Configurable` trait, we add bounds to generic types that are
+    /// present on derived containers so that bounds don't need to be added on the actual container itself, essentially
+    /// avoiding declarations like `pub struct Foo<T> where T: Configurable {...}`.
+    ///
+    /// We contain this logic here as we only care about generic type parameters that are present on fields that will be
+    /// included in the schema, so skipped fields shouldn't have bounds added, and so on.
     pub fn generic_field_types(&self) -> Vec<TypeParam> {
         let mut generic_types = Vec::new();
 
         let field_types = match &self.data {
             Data::Struct(_, fields) => fields
                 .iter()
+                .filter(|f| f.visible())
                 .filter_map(|f| match f.ty() {
                     Type::Path(tp) => tp.path.get_ident().cloned(),
                     _ => None,
@@ -280,6 +289,7 @@ impl<'a> Container<'a> {
                 .collect::<HashSet<_>>(),
             Data::Enum(variants) => variants
                 .iter()
+                .filter(|v| v.visible())
                 .flat_map(|v| v.fields().iter())
                 .filter_map(|f| match f.ty() {
                     Type::Path(tp) => tp.path.get_ident().cloned(),

@@ -11,7 +11,7 @@ pub mod metrics;
 pub mod partition;
 pub mod vec;
 
-pub use compression::{Compression, GZIP_FAST};
+pub use compression::Compression;
 pub use partition::{Partition, PartitionBuffer, PartitionInnerBuffer};
 
 #[derive(Debug)]

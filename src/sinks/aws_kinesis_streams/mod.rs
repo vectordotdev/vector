@@ -4,7 +4,7 @@ mod request_builder;
 mod service;
 mod sink;
 
-use self::config::KinesisSinkConfig;
+use config::KinesisSinkConfig;
 
 use crate::config::SinkDescription;
 
