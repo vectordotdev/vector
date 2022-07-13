@@ -12,12 +12,10 @@ use crate::{
                 acknowledgements::HecClientAcknowledgementsConfig, timestamp_key, EndpointTarget,
                 SplunkHecDefaultBatchSettings,
             },
-            logs::config::HecLogsSinkConfig,
+            logs::config::{HecLogsEncoding, HecLogsEncodingMigrator, HecLogsSinkConfig},
         },
         util::{
-            encoding::{
-                BasicEncodings, BasicEncodingsMigrator, EncodingConfig, EncodingConfigAdapter,
-            },
+            encoding::{EncodingConfig, EncodingConfigAdapter},
             BatchConfig, Compression, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
@@ -37,7 +35,7 @@ pub struct HumioLogsConfig {
     pub(super) endpoint: Option<String>,
     pub(super) source: Option<Template>,
     pub(super) encoding:
-        EncodingConfigAdapter<EncodingConfig<BasicEncodings>, BasicEncodingsMigrator>,
+        EncodingConfigAdapter<EncodingConfig<HecLogsEncoding>, HecLogsEncodingMigrator>,
     pub(super) event_type: Option<Template>,
     #[serde(default = "host_key")]
     pub(super) host_key: String,
@@ -78,7 +76,7 @@ impl GenerateConfig for HumioLogsConfig {
             token: "${HUMIO_TOKEN}".to_owned(),
             endpoint: None,
             source: None,
-            encoding: BasicEncodings::Json.as_config_adapter(),
+            encoding: HecLogsEncoding::Json.as_config_adapter(),
             event_type: None,
             indexed_fields: vec![],
             index: None,
@@ -311,7 +309,7 @@ mod integration_tests {
             token: token.to_string(),
             endpoint: Some(humio_address()),
             source: None,
-            encoding: EncodingConfig::from(HecEncoding::Json).into(),
+            encoding: EncodingConfig::from(HecLogsEncoding::Json).into(),
             event_type: None,
             host_key: log_schema().host_key().to_string(),
             indexed_fields: vec![],

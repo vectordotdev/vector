@@ -72,9 +72,8 @@ pub use adapter::{
 };
 use bytes::BytesMut;
 pub use codec::{
-    as_tracked_write, BasicEncodings, BasicEncodingsMigrator, BasicEncodingsWithFramingMigrator,
-    StandardEncodings, StandardEncodingsMigrator, StandardEncodingsWithFramingMigrator,
-    StandardJsonEncoding, StandardTextEncoding,
+    as_tracked_write, StandardEncodings, StandardEncodingsMigrator,
+    StandardEncodingsWithFramingMigrator, StandardJsonEncoding, StandardTextEncoding,
 };
 use codecs::encoding::Framer;
 pub use config::EncodingConfig;

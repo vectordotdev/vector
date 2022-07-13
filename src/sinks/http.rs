@@ -50,14 +50,10 @@ enum BuildError {
     },
 }
 
+// We use a custom encoding enum as our usage of text/JSON doesn't use the same framing as most other sinks would use.
 generate_custom_encoding_configuration!(HttpEncoding {
-    // We don't want newline-delimited plaintext.
     Text => (None, TextSerializerConfig::new().into()),
-
-    // We delimit our JSON objects with a comma because we explicitly add opening and closing brackets to the request
-    // body, turning the overall request body into an array of JSON objects.
     Json => (Some(CharacterDelimitedEncoderConfig::new(b',').into()), JsonSerializerConfig::new().into()),
-
     Ndjson,
 });
 
@@ -72,10 +68,8 @@ pub struct HttpSinkConfig {
     #[serde(default)]
     pub compression: Compression,
     #[serde(flatten)]
-    pub encoding: EncodingConfigWithFramingAdapter<
-        EncodingConfig<HttpEncoding>,
-        HttpEncodingWithFramingMigrator,
-    >,
+    pub encoding:
+        EncodingConfigWithFramingAdapter<EncodingConfig<HttpEncoding>, HttpEncodingMigrator>,
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
     #[serde(default)]

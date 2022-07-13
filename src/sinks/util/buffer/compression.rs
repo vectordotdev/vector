@@ -221,7 +221,7 @@ impl ser::Serialize for Compression {
 }
 
 /// Compression level.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct CompressionLevel(flate2::Compression);
 
 impl CompressionLevel {
@@ -248,12 +248,6 @@ impl CompressionLevel {
 
     pub const fn as_flate2(self) -> flate2::Compression {
         self.0
-    }
-}
-
-impl Default for CompressionLevel {
-    fn default() -> Self {
-        Self(flate2::Compression::default())
     }
 }
 

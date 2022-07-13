@@ -9,12 +9,10 @@ use crate::{
         SinkContext, SinkDescription,
     },
     event::Event,
+    generate_custom_encoding_configuration,
     internal_events::TemplateRenderingError,
     sinks::util::{
-        encoding::{
-            BasicEncodings, BasicEncodingsMigrator, EncodingConfig, EncodingConfigAdapter,
-            Transformer,
-        },
+        encoding::{EncodingConfig, EncodingConfigAdapter, Transformer},
         tcp::TcpSinkConfig,
         UriSerde,
     },
@@ -23,11 +21,13 @@ use crate::{
     tls::TlsEnableableConfig,
 };
 
+generate_custom_encoding_configuration!(PapertrailEncoding { Text, Json });
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct PapertrailConfig {
     endpoint: UriSerde,
-    encoding: EncodingConfigAdapter<EncodingConfig<BasicEncodings>, BasicEncodingsMigrator>,
+    encoding: EncodingConfigAdapter<EncodingConfig<PapertrailEncoding>, PapertrailEncodingMigrator>,
     keepalive: Option<TcpKeepaliveConfig>,
     tls: Option<TlsEnableableConfig>,
     send_buffer_bytes: Option<usize>,

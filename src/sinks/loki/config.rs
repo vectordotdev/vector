@@ -1,13 +1,9 @@
 use std::collections::HashMap;
 
-use codecs::encoding::SerializerConfig;
-use codecs::{JsonSerializerConfig, LogfmtSerializerConfig, TextSerializerConfig};
 use futures::future::FutureExt;
 use serde::{Deserialize, Serialize};
-use vector_config::configurable_component;
 
 use super::{healthcheck::healthcheck, sink::LokiSink};
-use crate::sinks::util::encoding::{EncodingConfigAdapter, EncodingConfigMigrator};
 use crate::sinks::util::Compression;
 use crate::{
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
@@ -21,27 +17,15 @@ use crate::{
     template::Template,
     tls::{TlsConfig, TlsSettings},
 };
+use crate::{generate_custom_encoding_configuration, sinks::util::encoding::EncodingConfigAdapter};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EncodingMigrator;
-
-impl EncodingConfigMigrator for EncodingMigrator {
-    type Codec = Encoding;
-
-    fn migrate(codec: &Self::Codec) -> SerializerConfig {
-        match codec {
-            Encoding::Json => JsonSerializerConfig::new().into(),
-            Encoding::Text => TextSerializerConfig::new().into(),
-            Encoding::Logfmt => LogfmtSerializerConfig::new().into(),
-        }
-    }
-}
+generate_custom_encoding_configuration!(LokiEncoding { Text, Json, Logfmt });
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct LokiConfig {
     pub endpoint: UriSerde,
-    pub encoding: EncodingConfigAdapter<EncodingConfig<Encoding>, EncodingMigrator>,
+    pub encoding: EncodingConfigAdapter<EncodingConfig<LokiEncoding>, LokiEncodingMigrator>,
     pub tenant_id: Option<Template>,
     pub labels: HashMap<Template, Template>,
     #[serde(default = "crate::serde::default_false")]
@@ -83,21 +67,6 @@ pub enum OutOfOrderAction {
     Drop,
     RewriteTimestamp,
     Accept,
-}
-
-/// Loki-specific encodings.
-#[configurable_component]
-#[derive(Clone, Debug, Eq, PartialEq)]
-#[serde(rename_all = "snake_case")]
-pub enum Encoding {
-    /// JSON.
-    Json,
-
-    /// Plaintext.
-    Text,
-
-    /// Logfmt.
-    Logfmt,
 }
 
 impl GenerateConfig for LokiConfig {

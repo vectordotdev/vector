@@ -9,6 +9,7 @@ use super::{encoder::HecLogsEncoder, request_builder::HecLogsRequestBuilder, sin
 use crate::{
     codecs::Encoder,
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
+    generate_custom_encoding_configuration,
     http::HttpClient,
     sinks::{
         splunk_hec::common::{
@@ -18,9 +19,7 @@ use crate::{
             timestamp_key, EndpointTarget, SplunkHecDefaultBatchSettings,
         },
         util::{
-            encoding::{
-                BasicEncodings, BasicEncodingsMigrator, EncodingConfig, EncodingConfigAdapter,
-            },
+            encoding::{EncodingConfig, EncodingConfigAdapter},
             http::HttpRetryLogic,
             BatchConfig, Compression, ServiceBuilderExt, TowerRequestConfig,
         },
@@ -29,6 +28,8 @@ use crate::{
     template::Template,
     tls::TlsConfig,
 };
+
+generate_custom_encoding_configuration!(HecLogsEncoding { Text, Json });
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -44,7 +45,7 @@ pub struct HecLogsSinkConfig {
     pub index: Option<Template>,
     pub sourcetype: Option<Template>,
     pub source: Option<Template>,
-    pub encoding: EncodingConfigAdapter<EncodingConfig<BasicEncodings>, BasicEncodingsMigrator>,
+    pub encoding: EncodingConfigAdapter<EncodingConfig<HecLogsEncoding>, HecLogsEncodingMigrator>,
     #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
@@ -76,7 +77,7 @@ impl GenerateConfig for HecLogsSinkConfig {
             index: None,
             sourcetype: None,
             source: None,
-            encoding: BasicEncodings::Text.as_config_adapter(),
+            encoding: HecLogsEncoding::Text.as_config_adapter(),
             compression: Compression::default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),

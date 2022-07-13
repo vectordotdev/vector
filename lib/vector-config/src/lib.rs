@@ -394,7 +394,7 @@ where
 }
 
 #[doc(hidden)]
-pub fn __ensure_numeric_validation_bounds<'de, N>(metadata: &Metadata<N>)
+pub fn __ensure_numeric_validation_bounds<N>(metadata: &Metadata<N>)
 where
     N: Configurable + ConfigurableNumber,
 {

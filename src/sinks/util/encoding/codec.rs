@@ -10,8 +10,8 @@ use vector_core::config::log_schema;
 use vector_core::event::{Event, LogEvent, TraceEvent};
 
 use super::{
-    Encoder, EncodingConfig, EncodingConfigAdapter, EncodingConfigMigrator,
-    EncodingConfigWithFramingAdapter, EncodingConfigWithFramingMigrator,
+    Encoder, EncodingConfig, EncodingConfigMigrator, EncodingConfigWithFramingAdapter,
+    EncodingConfigWithFramingMigrator,
 };
 
 static DEFAULT_TEXT_ENCODER: StandardTextEncoding = StandardTextEncoding;
@@ -42,10 +42,10 @@ pub enum StandardEncodings {
 
 impl StandardEncodings {
     pub fn as_framed_config_adapter(
-        &self,
+        self,
     ) -> EncodingConfigWithFramingAdapter<EncodingConfig<Self>, StandardEncodingsWithFramingMigrator>
     {
-        let legacy_config: EncodingConfig<Self> = self.clone().into();
+        let legacy_config: EncodingConfig<Self> = self.into();
         legacy_config.into()
     }
 
@@ -273,62 +273,6 @@ impl Encoder<Event> for StandardTextEncoding {
                 writer.write_all(&message).map(|()| message.len())
             }
             Event::Trace(_) => panic!("standard text encoding cannot be used for traces"),
-        }
-    }
-}
-
-/// A restricted set of standard encodings.
-///
-/// A subset of `StandardEncodings` is provided -- text and JSON, specifically -- as many services and APIs cannot
-/// accept NDJSON data.
-#[configurable_component]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-#[serde(rename_all = "snake_case")]
-pub enum BasicEncodings {
-    /// Plaintext encoding.
-    Text,
-
-    /// JSON encoding.
-    Json,
-}
-
-impl BasicEncodings {
-    pub fn as_config_adapter(
-        &self,
-    ) -> EncodingConfigAdapter<EncodingConfig<Self>, BasicEncodingsMigrator> {
-        let legacy_config: EncodingConfig<Self> = self.clone().into();
-        legacy_config.into()
-    }
-}
-
-/// Migrate the legacy `BasicEncodings` to the new `SerializerConfig` based
-/// encoding system.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BasicEncodingsMigrator;
-
-impl EncodingConfigMigrator for BasicEncodingsMigrator {
-    type Codec = BasicEncodings;
-
-    fn migrate(codec: &Self::Codec) -> SerializerConfig {
-        match codec {
-            BasicEncodings::Text => TextSerializerConfig::new().into(),
-            BasicEncodings::Json => JsonSerializerConfig::new().into(),
-        }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-/// Migrate the legacy `BasicEncodings` to the new `FramingConfig`/
-/// `SerializerConfig` based encoding system.
-pub struct BasicEncodingsWithFramingMigrator;
-
-impl EncodingConfigWithFramingMigrator for BasicEncodingsWithFramingMigrator {
-    type Codec = BasicEncodings;
-
-    fn migrate(codec: &Self::Codec) -> (Option<FramingConfig>, SerializerConfig) {
-        match codec {
-            BasicEncodings::Text => (None, TextSerializerConfig::new().into()),
-            BasicEncodings::Json => (None, JsonSerializerConfig::new().into()),
         }
     }
 }

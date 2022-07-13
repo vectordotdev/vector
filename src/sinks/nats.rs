@@ -17,13 +17,11 @@ use crate::{
         SinkDescription,
     },
     event::{Event, EventStatus, Finalizable},
+    generate_custom_encoding_configuration,
     internal_events::{NatsEventSendError, TemplateRenderingError},
     nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
     sinks::util::{
-        encoding::{
-            BasicEncodings, BasicEncodingsMigrator, EncodingConfig, EncodingConfigAdapter,
-            Transformer,
-        },
+        encoding::{EncodingConfig, EncodingConfigAdapter, Transformer},
         StreamSink,
     },
     template::{Template, TemplateParseError},
@@ -43,6 +41,9 @@ enum BuildError {
     #[snafu(display("NATS Connect Error: {}", source))]
     Connect { source: std::io::Error },
 }
+
+generate_custom_encoding_configuration!(NatsEncoding { Text, Json });
+
 /**
  * Code dealing with the SinkConfig struct.
  */
@@ -50,7 +51,7 @@ enum BuildError {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct NatsSinkConfig {
-    encoding: EncodingConfigAdapter<EncodingConfig<BasicEncodings>, BasicEncodingsMigrator>,
+    encoding: EncodingConfigAdapter<EncodingConfig<NatsEncoding>, NatsEncodingMigrator>,
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -69,13 +70,6 @@ fn default_name() -> String {
     String::from("vector")
 }
 
-#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
-#[serde(rename_all = "snake_case")]
-pub enum Encoding {
-    Text,
-    Json,
-}
-
 inventory::submit! {
     SinkDescription::new::<NatsSinkConfig>("nats")
 }
@@ -86,7 +80,7 @@ impl GenerateConfig for NatsSinkConfig {
             acknowledgements: Default::default(),
             auth: None,
             connection_name: "vector".into(),
-            encoding: BasicEncodings::Json.as_config_adapter(),
+            encoding: NatsEncoding::Json.as_config_adapter(),
             subject: "from.vector".into(),
             tls: None,
             url: "nats://127.0.0.1:4222".into(),
@@ -308,7 +302,7 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: EncodingConfig::from(Encoding::Text).into(),
+            encoding: NatsEncoding::Text.as_config_adapter(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
@@ -334,7 +328,7 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: EncodingConfig::from(Encoding::Text).into(),
+            encoding: NatsEncoding::Text.as_config_adapter(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
@@ -362,7 +356,7 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: EncodingConfig::from(Encoding::Text).into(),
+            encoding: NatsEncoding::Text.as_config_adapter(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
@@ -393,7 +387,7 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: EncodingConfig::from(Encoding::Text).into(),
+            encoding: NatsEncoding::Text.as_config_adapter(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
@@ -423,7 +417,7 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: EncodingConfig::from(Encoding::Text).into(),
+            encoding: NatsEncoding::Text.as_config_adapter(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
@@ -453,7 +447,7 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: EncodingConfig::from(Encoding::Text).into(),
+            encoding: NatsEncoding::Text.as_config_adapter(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
@@ -484,7 +478,7 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: EncodingConfig::from(Encoding::Text).into(),
+            encoding: NatsEncoding::Text.as_config_adapter(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
@@ -515,7 +509,7 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: EncodingConfig::from(Encoding::Text).into(),
+            encoding: NatsEncoding::Text.as_config_adapter(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
@@ -547,7 +541,7 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: EncodingConfig::from(Encoding::Text).into(),
+            encoding: NatsEncoding::Text.as_config_adapter(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
@@ -573,7 +567,7 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: EncodingConfig::from(Encoding::Text).into(),
+            encoding: NatsEncoding::Text.as_config_adapter(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
@@ -607,7 +601,7 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: EncodingConfig::from(Encoding::Text).into(),
+            encoding: NatsEncoding::Text.as_config_adapter(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
@@ -639,7 +633,7 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: EncodingConfig::from(Encoding::Text).into(),
+            encoding: NatsEncoding::Text.as_config_adapter(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,
@@ -675,7 +669,7 @@ mod integration_tests {
 
         let conf = NatsSinkConfig {
             acknowledgements: Default::default(),
-            encoding: EncodingConfig::from(Encoding::Text).into(),
+            encoding: NatsEncoding::Text.as_config_adapter(),
             connection_name: "".to_owned(),
             subject: subject.clone(),
             url,

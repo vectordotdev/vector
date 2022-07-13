@@ -29,7 +29,7 @@ impl Configurable for () {
 }
 
 // Null and boolean.
-impl<'de, T> Configurable for Option<T>
+impl<T> Configurable for Option<T>
 where
     T: Configurable + Serialize,
 {
@@ -97,7 +97,7 @@ impl_configuable_numeric!(
 );
 
 // Arrays and maps.
-impl<'de, T> Configurable for Vec<T>
+impl<T> Configurable for Vec<T>
 where
     T: Configurable + Serialize,
 {
@@ -115,7 +115,7 @@ where
     }
 }
 
-impl<'de, V> Configurable for HashMap<String, V>
+impl<V> Configurable for HashMap<String, V>
 where
     V: Configurable + Serialize,
 {
@@ -144,7 +144,7 @@ where
     }
 }
 
-impl<'de, V> Configurable for HashSet<V>
+impl<V> Configurable for HashSet<V>
 where
     V: Configurable + Serialize + Eq + std::hash::Hash,
 {

@@ -280,8 +280,7 @@ impl<'a> Container<'a> {
                 .collect::<HashSet<_>>(),
             Data::Enum(variants) => variants
                 .iter()
-                .map(|v| v.fields().iter())
-                .flatten()
+                .flat_map(|v| v.fields().iter())
                 .filter_map(|f| match f.ty() {
                     Type::Path(tp) => tp.path.get_ident().cloned(),
                     _ => None,

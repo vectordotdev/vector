@@ -20,13 +20,11 @@ use crate::{
         SinkDescription,
     },
     event::Event,
+    generate_custom_encoding_configuration,
     internal_events::{RedisSendEventError, TemplateRenderingError},
     sinks::util::{
         batch::BatchConfig,
-        encoding::{
-            BasicEncodings, BasicEncodingsMigrator, EncodingConfig, EncodingConfigAdapter,
-            Transformer,
-        },
+        encoding::{EncodingConfig, EncodingConfigAdapter, Transformer},
         retries::{RetryAction, RetryLogic},
         sink::Response,
         BatchSink, Concurrency, EncodedEvent, EncodedLength, ServiceBuilderExt, SinkBatchSettings,
@@ -34,6 +32,8 @@ use crate::{
     },
     template::{Template, TemplateParseError},
 };
+
+generate_custom_encoding_configuration!(RedisEncoding { Text, Json });
 
 inventory::submit! {
     SinkDescription::new::<RedisSinkConfig>("redis")
@@ -92,7 +92,7 @@ impl SinkBatchSettings for RedisDefaultBatchSettings {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct RedisSinkConfig {
-    encoding: EncodingConfigAdapter<EncodingConfig<BasicEncodings>, BasicEncodingsMigrator>,
+    encoding: EncodingConfigAdapter<EncodingConfig<RedisEncoding>, RedisEncodingMigrator>,
     #[serde(default)]
     data_type: DataTypeConfig,
     #[serde(alias = "list")]
@@ -463,7 +463,7 @@ mod integration_tests {
         let cnf = RedisSinkConfig {
             url: redis_server(),
             key: key.clone(),
-            encoding: EncodingConfig::from(Encoding::Json).into(),
+            encoding: EncodingConfig::from(RedisEncoding::Json).into(),
             data_type: DataTypeConfig::List,
             list_option: Some(ListOption {
                 method: Method::LPush,
@@ -522,7 +522,7 @@ mod integration_tests {
         let cnf = RedisSinkConfig {
             url: redis_server(),
             key: key.clone(),
-            encoding: EncodingConfig::from(Encoding::Json).into(),
+            encoding: EncodingConfig::from(RedisEncoding::Json).into(),
             data_type: DataTypeConfig::List,
             list_option: Some(ListOption {
                 method: Method::RPush,
@@ -596,7 +596,7 @@ mod integration_tests {
         let cnf = RedisSinkConfig {
             url: redis_server(),
             key: key.clone(),
-            encoding: EncodingConfig::from(Encoding::Json).into(),
+            encoding: EncodingConfig::from(RedisEncoding::Json).into(),
             data_type: DataTypeConfig::Channel,
             list_option: None,
             batch: BatchConfig::default(),
