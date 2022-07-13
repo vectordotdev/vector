@@ -92,6 +92,11 @@ components: sources: apache_metrics: {
 				required:    true
 				examples: [_values.local_host]
 			}
+            source_type: {
+                description: "The name of the source type."
+                required:    true
+                examples: ["apache_metrics"]
+            }
 		}
 
 		access_total: {

@@ -169,6 +169,11 @@ components: sources: postgresql_metrics: {
 				required:    true
 				examples: [_values.local_host]
 			}
+            "source_type": {
+                description: "The name of the source type."
+                examples: ["postgresql_metrics"]
+                required: true
+            }
 		}
 		_postgresql_metrics_tags_with_db: _postgresql_metrics_tags & {
 			type: {

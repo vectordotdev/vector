@@ -414,6 +414,11 @@ components: sources: host_metrics: {
 				required:    true
 				examples: [_values.local_host]
 			}
+            "source_type": {
+                description: "The name of the source type."
+                examples: ["host_metrics"]
+                required: true
+            }
 		}
 
 		// Host CPU

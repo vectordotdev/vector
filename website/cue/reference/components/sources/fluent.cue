@@ -81,6 +81,13 @@ components: sources: fluent: {
 					examples: ["127.0.0.1"]
 				}
 			}
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["fluent"]
+				}
+			}
 			timestamp: {
 				description: "The timestamp extracted from the fluent message."
 				required:    true
@@ -112,10 +119,11 @@ components: sources: fluent: {
 				2021-05-20 16:23:03.021497000 -0400 dummy: {"message":"dummy"}
 				"""
 			output: log: {
-				host:      _values.remote_host
-				timestamp: "2021-05-20T20:23:03.021497Z"
-				tag:       "dummy"
-				message:   "dummy"
+				host:        _values.remote_host
+				timestamp:   "2021-05-20T20:23:03.021497Z"
+				tag:         "dummy"
+				message:     "dummy"
+                source_type: "fluent"
 			}
 		},
 		{
@@ -125,10 +133,11 @@ components: sources: fluent: {
 				dummy.0: [1621541848.161827000, {"message"=>"dummy"}]
 				"""
 			output: log: {
-				host:      _values.remote_host
-				timestamp: "2020-05-20T20:17:28.161827Z"
-				tag:       "dummy.0"
-				message:   "dummy"
+				host:        _values.remote_host
+				timestamp:   "2020-05-20T20:17:28.161827Z"
+				tag:         "dummy.0"
+				message:     "dummy"
+                source_type: "fluent"
 			}
 		},
 	]

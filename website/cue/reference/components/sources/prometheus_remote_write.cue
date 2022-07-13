@@ -61,8 +61,19 @@ components: sources: prometheus_remote_write: {
 	}
 
 	output: metrics: {
-		counter: output._passthrough_counter
-		gauge:   output._passthrough_gauge
+        _extra_tags: {
+            "source_type": {
+                description: "The name of the source type."
+                examples: ["prometheus_remote_write"]
+                required: true
+            }
+        }
+        counter: output._passthrough_counter & {
+            tags: _extra_tags
+        }
+        gauge: output._passthrough_gauge & {
+            tags: _extra_tags
+        }
 	}
 
 	how_it_works: {

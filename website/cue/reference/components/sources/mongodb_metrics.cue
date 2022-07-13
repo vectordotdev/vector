@@ -114,6 +114,11 @@ components: sources: mongodb_metrics: {
 				required:    true
 				examples: [_values.local_host]
 			}
+            source_type: {
+                description: "The name of the source type."
+                examples: ["mongodb_metrics"]
+                required: true
+            }
 		}
 
 		assets_total: {

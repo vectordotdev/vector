@@ -106,10 +106,31 @@ components: sources: statsd: {
 	}
 
 	output: metrics: {
+		_extra_tags: {
+            "source_type": {
+                description: "The name of the source type."
+                examples: ["statsd"]
+                required: true
+            }
+        }
+
 		counter:      output._passthrough_counter
 		distribution: output._passthrough_distribution
 		gauge:        output._passthrough_gauge
 		set:          output._passthrough_set
+
+		counter: output._passthrough_counter & {
+			tags: _extra_tags
+		}
+		distribution: output._passthrough_distribution & {
+			tags: _extra_tags
+		}
+		gauge: output._passthrough_gauge & {
+			tags: _extra_tags
+		}
+		set: output._passthrough_set & {
+			tags: _extra_tags
+		}
 	}
 
 	how_it_works: {
