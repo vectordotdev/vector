@@ -1,0 +1,42 @@
+version: "1"
+
+services:
+  chronicle-emulator:
+    image: chronicle-emulator:latest
+    ports:
+      - 3000:3000
+    volumes:
+      - /home/plertrood/src/rust/chronicle-emulator/public.txt:/public.txt
+    command: [ "-p", "/public.txt" ]
+  runner:
+    build:
+      context: ${PWD}
+      dockerfile: scripts/integration/Dockerfile
+      args:
+        - RUST_VERSION=${RUST_VERSION}
+    working_dir: /code
+    command:
+      - "cargo"
+      - "nextest"
+      - "run"
+      - "--no-fail-fast"
+      - "--no-default-features"
+      - "--features"
+      - "chronicle-integration-tests"
+      - "--lib"
+      - "${FILTER:-::chronicle_unstructured::}"
+      - "--"
+      - "--nocapture"
+    depends_on:
+      - chronicle-emulator
+    environment:
+      - CHRONICLE_ADDRESS=http://chronicle-emulator:3000
+    volumes:
+      - ${PWD}:/code
+      - cargogit:/usr/local/cargo/git
+      - cargoregistry:/usr/local/cargo/registry
+      - /home/plertrood/src/timber/confs/testchronicleauth.txt:/testchronicleauth.txt
+
+volumes:
+  cargogit: {}
+  cargoregistry: {}

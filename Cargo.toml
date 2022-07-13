@@ -705,6 +705,7 @@ nightly = []
 all-integration-tests = [
   "aws-integration-tests",
   "azure-integration-tests",
+  "chronicle-integration-tests",
   "clickhouse-integration-tests",
   "datadog-agent-integration-tests",
   "datadog-logs-integration-tests",
@@ -757,6 +758,7 @@ aws-kinesis-streams-integration-tests = ["sinks-aws_kinesis_streams"]
 aws-s3-integration-tests = ["sinks-aws_s3", "sources-aws_s3"]
 aws-sqs-integration-tests = ["sinks-aws_sqs", "sources-aws_sqs"]
 azure-blob-integration-tests = ["sinks-azure_blob"]
+chronicle-integration-tests = ["sinks-gcp"]
 clickhouse-integration-tests = ["sinks-clickhouse"]
 datadog-agent-integration-tests = ["sources-datadog_agent"]
 datadog-logs-integration-tests = ["sinks-datadog_logs"]

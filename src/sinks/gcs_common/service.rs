@@ -8,6 +8,7 @@ use http::{
 };
 use hyper::Body;
 use tower::Service;
+use vector_common::internal_event::BytesSent;
 use vector_core::{buffers::Ackable, internal_event::EventsSent, stream::DriverResponse};
 
 use crate::{
@@ -81,6 +82,7 @@ pub struct GcsResponse {
     pub inner: http::Response<Body>,
     pub count: usize,
     pub events_byte_size: usize,
+    pub bytes_sent: Option<usize>,
 }
 
 impl DriverResponse for GcsResponse {
@@ -94,6 +96,13 @@ impl DriverResponse for GcsResponse {
             byte_size: self.events_byte_size,
             output: None,
         }
+    }
+
+    fn bytes_sent(&self) -> Option<BytesSent> {
+        self.bytes_sent.map(|byte_size| BytesSent {
+            byte_size,
+            protocol: "http",
+        })
     }
 }
 
@@ -140,6 +149,7 @@ impl Service<GcsRequest> for GcsService {
                 inner,
                 count: request.metadata.count,
                 events_byte_size: request.metadata.byte_size,
+                bytes_sent: None,
             })
         })
     }

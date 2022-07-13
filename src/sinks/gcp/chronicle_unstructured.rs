@@ -7,7 +7,7 @@ use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use snafu::Snafu;
-use std::io;
+use std::io::{self, Write};
 use tower::{Service, ServiceBuilder};
 use vector_buffers::Ackable;
 use vector_core::{
@@ -32,8 +32,8 @@ use crate::{
                 StandardEncodingsWithFramingMigrator,
             },
             partitioner::KeyPartitioner,
-            BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, RequestBuilder,
-            TowerRequestConfig,
+            BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, Compressor,
+            RequestBuilder, TowerRequestConfig,
         },
         Healthcheck,
     },
@@ -78,7 +78,7 @@ impl Region {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
-pub struct GcsChronicleUnstructuredConfig {
+pub struct ChronicleUnstructuredConfig {
     pub endpoint: Option<String>,
     pub region: Option<Region>,
     pub customer_id: String,
@@ -112,10 +112,10 @@ const fn default_skip_authentication() -> bool {
 }
 
 inventory::submit! {
-    SinkDescription::new::<GcsChronicleUnstructuredConfig>(NAME)
+    SinkDescription::new::<ChronicleUnstructuredConfig>(NAME)
 }
 
-impl GenerateConfig for GcsChronicleUnstructuredConfig {
+impl GenerateConfig for ChronicleUnstructuredConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(indoc! {r#"
             credentials_path = "/path/to/credentials.json"
@@ -154,7 +154,7 @@ pub enum ChronicleError {
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_chronicle_unstructured")]
-impl SinkConfig for GcsChronicleUnstructuredConfig {
+impl SinkConfig for ChronicleUnstructuredConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let creds = if self.skip_authentication {
             None
@@ -191,7 +191,7 @@ impl SinkConfig for GcsChronicleUnstructuredConfig {
     }
 }
 
-impl GcsChronicleUnstructuredConfig {
+impl ChronicleUnstructuredConfig {
     fn build_sink(
         &self,
         client: HttpClient,
@@ -242,6 +242,7 @@ impl GcsChronicleUnstructuredConfig {
 pub struct ChronicleRequest {
     pub body: Bytes,
     pub metadata: GcsMetadata,
+    pub uncompressed_size: usize,
 }
 
 impl Ackable for ChronicleRequest {
@@ -314,13 +315,28 @@ struct RequestSettings {
     compression: Compression,
 }
 
+struct ChronicleRequestPayload {
+    bytes: Bytes,
+    uncompressed_size: usize,
+}
+
+impl From<Bytes> for ChronicleRequestPayload {
+    fn from(bytes: Bytes) -> Self {
+        let uncompressed_size = bytes.len();
+        Self {
+            bytes,
+            uncompressed_size,
+        }
+    }
+}
+
 impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
     type Metadata = GcsMetadata;
     type Events = (String, Vec<Event>);
     type Encoder = ChronicleEncoder;
-    type Payload = Bytes;
+    type Payload = ChronicleRequestPayload;
     type Request = ChronicleRequest;
-    type Error = io::Error; // TODO: this is ugly.
+    type Error = io::Error;
 
     fn compression(&self) -> Compression {
         self.compression
@@ -328,6 +344,20 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
 
     fn encoder(&self) -> &Self::Encoder {
         &self.encoder
+    }
+
+    fn encode_events(&self, events: Self::Events) -> Result<Self::Payload, Self::Error> {
+        let mut buf = Vec::new();
+        let _ = self.encoder().encode_input(events, &mut buf)?;
+        let uncompressed_size = buf.len();
+        let mut compressor = Compressor::from(self.compression());
+        let _ = compressor.write_all(&buf)?;
+
+        let bytes = compressor.into_inner().freeze();
+        Ok(ChronicleRequestPayload {
+            uncompressed_size,
+            bytes,
+        })
     }
 
     fn split_input(&self, input: (String, Vec<Event>)) -> (Self::Metadata, Self::Events) {
@@ -346,17 +376,18 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
     }
 
     fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
-        trace!(message = "Sending events.", bytes = ?payload.len(), events_len = ?metadata.count, key = ?metadata.key);
+        trace!(message = "Sending events.", bytes = ?payload.bytes.len(), events_len = ?metadata.count, key = ?metadata.key);
 
         ChronicleRequest {
-            body: payload,
+            body: payload.bytes,
+            uncompressed_size: payload.uncompressed_size,
             metadata,
         }
     }
 }
 
 impl RequestSettings {
-    fn new(config: &GcsChronicleUnstructuredConfig) -> crate::Result<Self> {
+    fn new(config: &ChronicleUnstructuredConfig) -> crate::Result<Self> {
         Ok(Self {
             compression: config.compression,
             encoder: ChronicleEncoder {
@@ -416,7 +447,104 @@ impl Service<ChronicleRequest> for ChronicleService {
                 inner,
                 count: request.metadata.count,
                 events_byte_size: request.metadata.byte_size,
+                bytes_sent: Some(request.uncompressed_size),
             })
         })
+    }
+}
+
+#[cfg(all(test, feature = "chronicle-integration-tests"))]
+mod integration_tests {
+    use reqwest::{Client, Method, Response};
+    use serde_json::{json, Value};
+    use vector_core::event::{BatchNotifier, BatchStatus};
+
+    use super::*;
+    use crate::test_util::{
+        components::{self, HTTP_SINK_TAGS},
+        random_events_with_stream, random_string, trace_init,
+    };
+
+    fn config(log_type: &str) -> ChronicleUnstructuredConfig {
+        let address = std::env::var("CHRONICLE_ADDRESS").unwrap();
+        let config = format!(
+            indoc! { r#"
+             endpoint = "{}"
+             customer_id = "customer id"
+             credentials_path = "/testchronicleauth.txt"
+             log_type = "{}"
+             encoding.codec = "text"
+        "# },
+            address,
+            log_type
+        );
+
+        let config: ChronicleUnstructuredConfig = toml::from_str(&config).unwrap();
+        config
+    }
+
+    async fn config_build(log_type: &str) -> (VectorSink, crate::sinks::Healthcheck) {
+        let cx = SinkContext::new_test();
+        config(log_type).build(cx).await.expect("Building sink failed")
+    }
+
+    pub const CHRONICLE_SINK_TAGS: [&str; 1] = ["protocol"];
+
+    #[tokio::test]
+    async fn publish_events() {
+        trace_init();
+
+        let log_type = random_string(10);
+        let (sink, healthcheck) = config_build(&log_type).await;
+
+        healthcheck.await.expect("Health check failed");
+
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (input, events) = random_events_with_stream(100, 100, Some(batch));
+        components::run_sink(sink, events, &CHRONICLE_SINK_TAGS).await;
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+        let response = pull_messages(&log_type).await;
+        let messages = response
+            .into_iter()
+            .map(|message| message.log_text)
+            .collect::<Vec<_>>();
+        assert_eq!(input.len(), messages.len());
+        for i in 0..input.len() {
+            let data = serde_json::to_value(&messages[i]).unwrap();
+            let expected = serde_json::to_value(input[i].as_log().get("message").unwrap()).unwrap();
+            assert_eq!(data, expected);
+        }
+    }
+
+    #[derive(Clone, Debug, Deserialize, Serialize)]
+    pub struct Log {
+        customer_id: String,
+        log_type: String,
+        log_text: String,
+        ts_rfc3339: String,
+    }
+
+    async fn request(method: Method, path: &str, log_type: &str) -> Response {
+        let address = std::env::var("CHRONICLE_ADDRESS").unwrap();
+        let url = format!("{}/{}", address, path);
+        Client::new()
+            .request(method.clone(), &url)
+            .query(&[("log_type", log_type)])
+            .send()
+            .await
+            .unwrap_or_else(|_| panic!("Sending {} request to {} failed", method, url))
+    }
+
+    async fn pull_messages(log_type: &str) -> Vec<Log> {
+        request(
+            Method::GET,
+            "logs",
+            log_type,
+        )
+        .await
+        .json::<Vec<Log>>()
+        .await
+        .expect("Extracting pull data failed")
     }
 }
