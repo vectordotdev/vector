@@ -103,7 +103,7 @@ components: sources: opentelemetry: {
 					}
 				}
 				resources: {
-					description: "resources for resourceLogs"
+					description: "Set of attributes that describe the resource."
 					required:    false
 					common:      true
 					type: object: {
