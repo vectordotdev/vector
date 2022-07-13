@@ -111,7 +111,7 @@ components: sources: opentelemetry: {
 					}
 				}
 				message: {
-					description: "log body"
+					description: "Contains the body of the log record."
 					required:    false
 					common:      true
 					type: string: {
