@@ -93,13 +93,13 @@ components: sources: logstash: {
 					`log_schema.timestamp_key`.
 					"""
 			}
-                        source_type: {
-                                description: "The name of the source type."
-                                required:    true
-                                type: string: {
-                                        examples: ["logstash"]
-                                }
-                        }
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["logstash"]
+				}
+			}
 			client_metadata: fields._client_metadata
 			"*": {
 				description: "In addition to the defined fields, all fields from the Logstash message are inserted as root level fields."
@@ -133,9 +133,9 @@ components: sources: logstash: {
 				```
 				"""
 			output: log: {
-				host: _values.remote_host
-				line: "2021-06-14T20:57:14.230Z c082bb583445 hello world"
-                                source_type: "logstash"
+				host:        _values.remote_host
+				line:        "2021-06-14T20:57:14.230Z c082bb583445 hello world"
+				source_type: "logstash"
 			}
 		},
 		{

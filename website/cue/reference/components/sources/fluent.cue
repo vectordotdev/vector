@@ -123,7 +123,7 @@ components: sources: fluent: {
 				timestamp:   "2021-05-20T20:23:03.021497Z"
 				tag:         "dummy"
 				message:     "dummy"
-                source_type: "fluent"
+				source_type: "fluent"
 			}
 		},
 		{
@@ -137,7 +137,7 @@ components: sources: fluent: {
 				timestamp:   "2020-05-20T20:17:28.161827Z"
 				tag:         "dummy.0"
 				message:     "dummy"
-                source_type: "fluent"
+				source_type: "fluent"
 			}
 		},
 	]

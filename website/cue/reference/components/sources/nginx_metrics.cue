@@ -111,11 +111,11 @@ components: sources: nginx_metrics: {
 				required:    true
 				examples: [_values.local_host]
 			}
-                        source_type: {
-                                description: "The name of the source type."
-                                required: true
-                                examples: ["nginx_metrics"]
-                        }
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				examples: ["nginx_metrics"]
+			}
 		}
 
 		up: {

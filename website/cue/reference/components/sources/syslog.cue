@@ -170,13 +170,13 @@ components: sources: syslog: {
 					examples: ["127.0.0.1"]
 				}
 			}
-                        source_type: {
-                                description: "The name of the source type."
-                                required:    true
-                                type: string: {
-                                        examples: ["syslog"]
-                                }
-                        }
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["syslog"]
+				}
+			}
 			timestamp: {
 				description: "The time extracted from the Syslog formatted line. If parsing fails, then the exact time the event was ingested into Vector is used."
 				required:    true

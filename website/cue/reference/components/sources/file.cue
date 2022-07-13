@@ -246,13 +246,13 @@ components: sources: file: {
 					examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
 				}
 			}
-            source_type: {
-                description: "The name of the source type."
-                required:    true
-                type: string: {
-                    examples: ["file"]
-                }
-            }
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["file"]
+				}
+			}
 			timestamp: fields._current_timestamp
 		}
 	}
@@ -271,7 +271,7 @@ components: sources: file: {
 				file:        _file
 				host:        _values.local_host
 				message:     _line
-                source_type: "file"
+				source_type: "file"
 				timestamp:   _values.current_timestamp
 			}
 		},

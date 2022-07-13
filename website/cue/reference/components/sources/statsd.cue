@@ -107,12 +107,12 @@ components: sources: statsd: {
 
 	output: metrics: {
 		_extra_tags: {
-                        "source_type": {
-                                description: "The name of the source type."
-                                examples: ["statsd"]
-                                required: true
-                        }
-                }
+			"source_type": {
+				description: "The name of the source type."
+				examples: ["statsd"]
+				required: true
+			}
+		}
 
 		counter:      output._passthrough_counter
 		distribution: output._passthrough_distribution
