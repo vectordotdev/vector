@@ -17,10 +17,7 @@ mod integration_test {
         message::Headers,
         Message, Offset, TopicPartitionList,
     };
-    use vector_core::{
-        buffers::Acker,
-        event::{BatchNotifier, BatchStatus},
-    };
+    use vector_core::event::{BatchNotifier, BatchStatus};
 
     use crate::{
         event::Value,
@@ -127,11 +124,10 @@ mod integration_test {
             headers_key: None,
             acknowledgements: Default::default(),
         };
-        let (acker, _ack_counter) = Acker::basic();
         config.clone().to_rdkafka(KafkaRole::Consumer)?;
         config.clone().to_rdkafka(KafkaRole::Producer)?;
         self::sink::healthcheck(config.clone()).await?;
-        KafkaSink::new(config, acker)
+        KafkaSink::new(config)
     }
 
     #[tokio::test]
@@ -261,8 +257,7 @@ mod integration_test {
         };
         let topic = format!("{}-{}", topic, chrono::Utc::now().format("%Y%m%d"));
         println!("Topic name generated in test: {:?}", topic);
-        let (acker, ack_counter) = Acker::basic();
-        let sink = KafkaSink::new(config, acker).unwrap();
+        let sink = KafkaSink::new(config).unwrap();
         let sink = VectorSink::from_event_streamsink(sink);
 
         let num_events = 1000;
@@ -341,10 +336,5 @@ mod integration_test {
 
         assert_eq!(out.len(), input.len());
         assert_eq!(out, input);
-
-        assert_eq!(
-            ack_counter.load(std::sync::atomic::Ordering::Relaxed),
-            num_events
-        );
     }
 }

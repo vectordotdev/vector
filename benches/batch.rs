@@ -11,7 +11,6 @@ use vector::{
     },
     test_util::{random_lines, runtime},
 };
-use vector_buffers::Acker;
 
 fn benchmark_batch(c: &mut Criterion) {
     let event_len: usize = 100;
@@ -42,7 +41,6 @@ fn benchmark_batch(c: &mut Criterion) {
             b.iter_batched(
                 || {
                     let rt = runtime();
-                    let (acker, _) = Acker::basic();
                     let mut batch = BatchSettings::default();
                     batch.size.bytes = *batch_size;
                     batch.size.events = num_events;
@@ -51,7 +49,6 @@ fn benchmark_batch(c: &mut Criterion) {
                         tower::service_fn(|_| future::ok::<_, Infallible>(())),
                         PartitionedBuffer::new(batch.size, *compression),
                         Duration::from_secs(1),
-                        acker,
                     )
                     .sink_map_err(|error| panic!("{}", error));
 
@@ -76,7 +73,6 @@ fn benchmark_batch(c: &mut Criterion) {
                 b.iter_batched(
                     || {
                         let rt = runtime();
-                        let (acker, _) = Acker::basic();
                         let mut batch = BatchSettings::default();
                         batch.size.bytes = *batch_size;
                         batch.size.events = num_events;
@@ -85,7 +81,6 @@ fn benchmark_batch(c: &mut Criterion) {
                             tower::service_fn(|_| future::ok::<_, Infallible>(())),
                             Buffer::new(batch.size, *compression),
                             Duration::from_secs(1),
-                            acker,
                         )
                         .sink_map_err(|error| panic!("{}", error));
 

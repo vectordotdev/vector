@@ -16,7 +16,7 @@ async fn ensure_write_offset_valid_after_reload_with_multievent() {
             //
             // The sizes are different so that we can assert that we got back the expected record at
             // each read we perform.
-            let (mut writer, reader, _) =
+            let (mut writer, reader) =
                 create_default_buffer_v1_with_max_buffer_size(data_dir.clone(), 100);
             let first_write_size = 92;
             let second_write_size = 96;

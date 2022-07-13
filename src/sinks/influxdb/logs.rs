@@ -142,7 +142,6 @@ impl SinkConfig for InfluxDbLogsConfig {
             request,
             batch.timeout,
             client,
-            cx.acker(),
         )
         .sink_map_err(|error| error!(message = "Fatal influxdb_logs sink error.", %error));
 
