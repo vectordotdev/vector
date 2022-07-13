@@ -119,9 +119,7 @@ struct HttpSink {
 
 #[cfg(test)]
 fn default_sink(encoding: EncodingConfigWithFraming) -> HttpSink {
-    let (framing, serializer) = encoding
-        .build(crate::codecs::SinkType::MessageBased)
-        .unwrap();
+    let (framing, serializer) = encoding.build(SinkType::MessageBased).unwrap();
     let encoder = Encoder::<Framer>::new(framing, serializer);
 
     HttpSink {
