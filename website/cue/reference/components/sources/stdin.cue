@@ -69,13 +69,13 @@ components: sources: stdin: {
 			host:      fields._local_host
 			message:   fields._raw_line
 			timestamp: fields._current_timestamp
-            source_type: {
-                description: "The name of the source type."
-                required:    true
-                type: string: {
-                    examples: ["stdin"]
-                }
-            }
+                        source_type: {
+                                description: "The name of the source type."
+                                required:    true
+                                type: string: {
+                                        examples: ["stdin"]
+                                }
+                        }
 		}
 	}
 
@@ -91,7 +91,7 @@ components: sources: stdin: {
 				timestamp:   _values.current_timestamp
 				message:     _line
 				host:        _values.local_host
-                source_type: "stdin"
+                                source_type: "stdin"
 			}
 		},
 	]
