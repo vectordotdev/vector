@@ -106,8 +106,8 @@ components: sources: vector: {
 				}
 			}
 		}
-		metrics: {
-		    _extra_tags: {
+        metrics: {
+            _extra_tags: {
                 "source_type": {
                     description: "The name of the source type."
                     examples: ["vector"]
@@ -129,7 +129,7 @@ components: sources: vector: {
             set: output._passthrough_set & {
                 tags: _extra_tags
             }
-		}
+        }
 	}
 
 	telemetry: metrics: {
