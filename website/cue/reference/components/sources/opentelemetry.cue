@@ -56,7 +56,7 @@ components: sources: opentelemetry: {
 		acknowledgements: configuration._source_acknowledgements
 		address: {
 			description: """
-				The grpc address to listen for connections on. It _must_ include a port.
+				The gRPC address to listen for connections on. It _must_ include a port.
 				"""
 			required: true
 			type: string: {
