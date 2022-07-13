@@ -1,11 +1,11 @@
 //! All types related to inserting one [`Kind`] into another.
 
+use lookup::lookup_v2::{Path, SimpleSegment};
+use lookup::{Field, Lookup, Segment};
 use std::collections::{btree_map::Entry, BTreeMap, VecDeque};
 
-use lookup::{Field, Lookup, Segment};
-
 use super::Kind;
-use crate::kind::merge;
+use crate::kind::{merge, Collection};
 
 /// The strategy to use when an inner segment in a path does not match the actual `Kind`
 /// present.
@@ -490,16 +490,253 @@ impl Kind {
 
         Ok(())
     }
+
+    /// Insert the `Kind` at the given `path` within `self`.
+    /// This has the same behavior as setting a value at a given path at runtime.
+    pub fn insert<'a>(&'a mut self, path: impl Path<'a>, kind: Self) {
+        // need to re-bind self to make a mutable reference
+        let mut self_kind = self;
+
+        let mut iter = match path.simple_segment_iter() {
+            Ok(iter) => iter.peekable(),
+            Err(_) => {
+                // an invalid path does not modify the value
+                return;
+            }
+        };
+
+        fn create_inner_element(segment: &SimpleSegment) -> Kind {
+            match segment {
+                SimpleSegment::Field(_) | SimpleSegment::Coalesce(_) => {
+                    Kind::object(Collection::empty())
+                }
+                SimpleSegment::Index(_) => Kind::array(Collection::empty()),
+            }
+        }
+
+        // let create_inner_element = |segment: Option<&&SimpleSegment>| -> Self {
+        //     match segment {
+        //         // The next segment is a field, so we'll insert an object to
+        //         // accommodate.
+        //         Some(segment) if segment || segment.is_coalesce() => {
+        //             Self::object(BTreeMap::default())
+        //         }
+        //
+        //         // The next segment is an index, so we'll insert an array.
+        //         Some(_) => Self::array(BTreeMap::default()),
+        //
+        //         // There is no next segment, so we'll insert the new `Kind`.
+        //         None => kind.clone(),
+        //     }
+        // };
+
+        // let get_inner_object = |kind: &'a mut Self, field: &'a String| -> &'a mut Self {
+        //     kind.as_object_mut()
+        //         .unwrap()
+        //         .known_mut()
+        //         .get_mut(&(field.into()))
+        //         .unwrap()
+        // };
+        //
+        // let get_inner_array = |kind: &'a mut Self, index: usize| -> &'a mut Self {
+        //     kind.as_array_mut()
+        //         .unwrap()
+        //         .known_mut()
+        //         .get_mut(&(index.into()))
+        //         .unwrap()
+        // };
+
+        while let Some(segment) = iter.next() {
+            self_kind = match segment {
+                SimpleSegment::Field(field) => {
+                    let collection = self_kind.object.get_or_insert(Collection::empty());
+                    match iter.peek() {
+                        Some(segment) => match collection.known_mut().entry(field.into()) {
+                            Entry::Occupied(entry) => entry.into_mut(),
+                            Entry::Vacant(entry) => entry.insert(create_inner_element(segment)),
+                        },
+                        None => {
+                            collection.known_mut().insert(field.into(), kind);
+                            return;
+                        }
+                    }
+                }
+                SimpleSegment::Index(index) => {
+                    let collection = self_kind.array.get_or_insert(Collection::empty());
+                    if index >= 0 {
+                        let index = index as usize;
+                        match iter.peek() {
+                            Some(segment) => {
+                                unimplemented!()
+                            }
+                            None => {
+                                collection.known_mut().insert(index.into(), kind);
+                                if let Some(unknown) = collection.unknown() {
+                                    unimplemented!()
+                                } else {
+                                    // all fields are known, so missing fields can be set to exactly "null"
+                                    for i in 0..index {
+                                        if !collection.known_mut().contains_key(&i.into()) {
+                                            collection.known_mut().insert(i.into(), Kind::null());
+                                        }
+                                    }
+                                }
+                                return;
+                            }
+                        }
+                    } else {
+                        unimplemented!()
+                    }
+
+                    // match self_kind.array {
+                    //     Some(ref mut collection) => match collection.known_mut().entry(
+                    //         usize::try_from(*index)
+                    //             .map_err(|_| Error::InvalidIndex)?
+                    //             .into(),
+                    //     ) {
+                    //         Entry::Occupied(entry) => match iter.peek() {
+                    //             Some(_) => entry.into_mut(),
+                    //             None => {
+                    //                 *(entry.into_mut()) = kind;
+                    //                 return;
+                    //             }
+                    //         },
+                    //         Entry::Vacant(entry) => entry.insert(create_inner_element(iter.peek())),
+                    //     },
+                    //     None => {
+                    //         let index = usize::try_from(*index).map_err(|_| Error::InvalidIndex)?;
+                    //
+                    //         *self_kind = Self::array(BTreeMap::from([(
+                    //             index.into(),
+                    //             create_inner_element(iter.peek()),
+                    //         )]));
+                    //
+                    //         *self_kind = Self::array(BTreeMap::default());
+                    //         get_inner_array(self_kind, index)
+                    //     }
+                    // },
+                }
+                SimpleSegment::Coalesce(fields) => {
+                    unimplemented!()
+                    // for field in fields {
+                    //     let mut segments = iter.clone().cloned().collect::<VecDeque<_>>();
+                    //     segments.push_front(Segment::Field(field.clone()));
+                    //     let path = Lookup::from(segments);
+                    //
+                    //     self_kind.insert(&path, kind.clone());
+                    // }
+                    // return;
+                }
+            };
+        }
+        *self_kind = kind;
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use lookup::lookup_v2::OwnedPath;
+    use lookup::owned_path;
     use std::collections::HashMap;
 
     use lookup::LookupBuf;
 
     use super::*;
     use crate::kind::Collection;
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn test_insert() {
+        struct TestCase {
+            this: Kind,
+            path: OwnedPath,
+            kind: Kind,
+            mutated: Kind,
+        }
+
+        for (
+            title,
+            TestCase {
+                mut this,
+                path,
+                kind,
+                mutated,
+            },
+        ) in HashMap::from([
+            (
+                "root insert",
+                TestCase {
+                    this: Kind::bytes(),
+                    path: owned_path!(),
+                    kind: Kind::integer(),
+                    mutated: Kind::integer(),
+                },
+            ),
+            (
+                "root insert object",
+                TestCase {
+                    this: Kind::bytes(),
+                    path: owned_path!(),
+                    kind: Kind::object(BTreeMap::from([("a".into(), Kind::integer())])),
+                    mutated: Kind::object(BTreeMap::from([("a".into(), Kind::integer())])),
+                },
+            ),
+            (
+                "empty object insert field",
+                TestCase {
+                    this: Kind::object(Collection::empty()),
+                    path: owned_path!("a"),
+                    kind: Kind::integer(),
+                    mutated: Kind::object(BTreeMap::from([("a".into(), Kind::integer())])),
+                },
+            ),
+            (
+                "non-empty object insert field",
+                TestCase {
+                    this: Kind::object(BTreeMap::from([("b".into(), Kind::bytes())])),
+                    path: owned_path!("a"),
+                    kind: Kind::integer(),
+                    mutated: Kind::object(BTreeMap::from([
+                        ("a".into(), Kind::integer()),
+                        ("b".into(), Kind::bytes()),
+                    ])),
+                },
+            ),
+            (
+                "object overwrite field",
+                TestCase {
+                    this: Kind::object(BTreeMap::from([("a".into(), Kind::bytes())])),
+                    path: owned_path!("a"),
+                    kind: Kind::integer(),
+                    mutated: Kind::object(BTreeMap::from([("a".into(), Kind::integer())])),
+                },
+            ),
+            (
+                "set array index on empty array",
+                TestCase {
+                    this: Kind::array(Collection::empty()),
+                    path: owned_path!(0),
+                    kind: Kind::integer(),
+                    mutated: Kind::array(BTreeMap::from([(0.into(), Kind::integer())])),
+                },
+            ),
+            (
+                "set array index past the end without unknown",
+                TestCase {
+                    this: Kind::array(Collection::empty()),
+                    path: owned_path!(1),
+                    kind: Kind::integer(),
+                    mutated: Kind::array(BTreeMap::from([
+                        (0.into(), Kind::null()),
+                        (1.into(), Kind::integer()),
+                    ])),
+                },
+            ),
+        ]) {
+            this.insert(&path, kind);
+            assert_eq!(this, mutated, "{}", title);
+        }
+    }
 
     #[test]
     #[allow(clippy::too_many_lines)]
