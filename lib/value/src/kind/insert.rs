@@ -569,7 +569,7 @@ impl Kind {
                         }
                     }
                 }
-                SimpleSegment::Index(index) => {
+                SimpleSegment::Index(mut index) => {
                     // array insertion converts the value to an array, so remove all other types
                     *self_kind = Kind::array(
                         self_kind
@@ -578,6 +578,58 @@ impl Kind {
                             .unwrap_or_else(|| Collection::empty()),
                     );
                     let collection = self_kind.array.as_mut().expect("array was just inserted");
+
+                    // add "null" to all holes, adding it to the "unknown" if it exists
+                    let hole_type = collection
+                        .unknown()
+                        .map(|x| x.to_kind().into_owned())
+                        .unwrap_or(Kind::never())
+                        .or_null();
+
+                    if index < 0 {
+                        let largest_known_index =
+                            collection.known().keys().map(|i| i.to_usize()).max();
+                        let len_required = -index as usize;
+
+                        if let Some(unknown) = collection.unknown() {
+                            // the array may be larger, but this is the largest we can prove the array is from the type information
+                            let min_length = largest_known_index + 1;
+                            if len_required > min_length {
+                                // we can't prove the array is large enough, so holes need to be filled in
+                                for i in min_length..len_required {
+                                    collection.known_mut().insert(i.into(), hole_type.clone());
+                                }
+                            }
+
+                            let min_index = (min_length - index).max(0) as usize;
+
+                            // indices less than the minimum possible index won't change. Set
+                            // it to the current "unknown" type, since that _will_ change.
+                            for i in 0..min_index {
+                                todo!()
+                            }
+                            // TODO: update known indices >= min_index to include the set kind
+                            // TODO: update unknown to include the set kind, without altering the "infinite" part of an unknown
+
+                            unimplemented!()
+                        } else {
+                            // If there is no unknown, the exact position of the negative index can be determined
+                            if collection.unknown().is_none() {
+                                let exact_array_len = largest_known_index
+                                    .map(|max_index| max_index + 1)
+                                    .unwrap_or(0);
+
+                                if len_required > exact_array_len {
+                                    // fill in holes from extending to fit a negative index
+                                    for i in exact_array_len..len_required {
+                                        // there is no unknown, so the exact type "null" can be inserted
+                                        collection.known_mut().insert(i.into(), Kind::null());
+                                    }
+                                }
+                                index += (len_required as isize).max(array_len as isize);
+                            }
+                        }
+                    }
 
                     if index >= 0 {
                         let index = index as usize;
@@ -589,13 +641,6 @@ impl Kind {
                             None => {
                                 collection.known_mut().insert(index.into(), kind);
 
-                                // add "null" to all holes, adding it to the "unknown" if it exists
-                                let hole_type = collection
-                                    .unknown()
-                                    .map(|x| x.to_kind().into_owned())
-                                    .unwrap_or(Kind::never())
-                                    .or_null();
-
                                 for i in 0..index {
                                     if !collection.known_mut().contains_key(&i.into()) {
                                         collection.known_mut().insert(i.into(), hole_type.clone());
@@ -605,22 +650,7 @@ impl Kind {
                             }
                         }
                     } else {
-                        // if index < 0 && collection.unknown().is_none() {
-                        //     // There is no unknown, so the exact position of the negative index can be determined
-                        //     let array_len = collection
-                        //         .known()
-                        //         .keys()
-                        //         .map(|i| i.to_usize())
-                        //         .max()
-                        //         .unwrap_or(0);
-                        //
-                        //     index += array_len as isize;
-                        //     if index < 0 {
-                        //         // array needs to be extended to fit
-                        //         index = 0;
-                        //     }
-                        // }
-
+                        // the case where there is no unknown was already handled
                         unimplemented!()
                     }
 
@@ -814,6 +844,33 @@ mod tests {
                     path: owned_path!(0),
                     kind: Kind::integer(),
                     expected: Kind::array(BTreeMap::from([(0.into(), Kind::integer())])),
+                },
+            ),
+            (
+                "set negative array index (no unknown)",
+                TestCase {
+                    this: Kind::array(BTreeMap::from([
+                        (0.into(), Kind::integer()),
+                        (1.into(), Kind::integer()),
+                    ])),
+                    path: owned_path!(-1),
+                    kind: Kind::bytes(),
+                    expected: Kind::array(BTreeMap::from([
+                        (0.into(), Kind::integer()),
+                        (1.into(), Kind::bytes()),
+                    ])),
+                },
+            ),
+            (
+                "set negative array index past the end (no unknown)",
+                TestCase {
+                    this: Kind::array(BTreeMap::from([(0.into(), Kind::integer())])),
+                    path: owned_path!(-2),
+                    kind: Kind::bytes(),
+                    expected: Kind::array(BTreeMap::from([
+                        (0.into(), Kind::bytes()),
+                        (1.into(), Kind::null()),
+                    ])),
                 },
             ),
         ]) {
