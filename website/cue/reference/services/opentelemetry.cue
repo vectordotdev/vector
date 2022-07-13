@@ -1,7 +1,7 @@
 package metadata
 
 services: opentelemetry: {
-	name:     "Opentelemetry"
+	name:     "OpenTelemetry"
 	thing:    "an \(name) client"
 	url:      urls.opentelemetry
 	versions: null
