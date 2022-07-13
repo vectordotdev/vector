@@ -21,7 +21,8 @@ use tokio_util::codec::Encoder as _;
 use crate::{
     codecs::Encoder,
     config::{
-        AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
+        AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
+        SinkDescription,
     },
     event::Event,
     http::{Auth, HttpClient, MaybeAuth},
@@ -238,7 +239,7 @@ impl SinkConfig for HttpSinkConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(self.encoding.config().1.input_type())
+        Input::new(self.encoding.config().1.input_type() & DataType::Log)
     }
 
     fn sink_type(&self) -> &'static str {
@@ -410,7 +411,7 @@ mod tests {
     use http::request::Parts;
     use hyper::{Method, Response, StatusCode};
     use serde::Deserialize;
-    use vector_core::event::{BatchNotifier, BatchStatus};
+    use vector_core::event::{BatchNotifier, BatchStatus, LogEvent};
 
     use super::*;
     use crate::{
@@ -430,7 +431,7 @@ mod tests {
 
     #[test]
     fn http_encode_event_text() {
-        let event = Event::from("hello world");
+        let event = Event::Log(LogEvent::from("hello world"));
 
         let sink = default_sink(Encoding::Text);
         let mut encoder = sink.build_encoder();
@@ -441,7 +442,7 @@ mod tests {
 
     #[test]
     fn http_encode_event_ndjson() {
-        let event = Event::from("hello world");
+        let event = Event::Log(LogEvent::from("hello world"));
 
         let sink = default_sink(Encoding::Ndjson);
         let mut encoder = sink.build_encoder();

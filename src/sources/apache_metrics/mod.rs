@@ -30,6 +30,7 @@ use crate::{
 mod parser;
 
 pub use parser::ParseError;
+use vector_core::config::LogNamespace;
 
 /// Configuration for the `apache_metrics` source.
 #[configurable_component(source)]
@@ -95,7 +96,7 @@ impl SourceConfig for ApacheMetricsConfig {
         ))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(config::DataType::Metric)]
     }
 

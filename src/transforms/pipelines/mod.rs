@@ -140,6 +140,10 @@ pub struct PipelinesConfig {
     /// Configuration for the metrics-specific side of the pipeline.
     #[serde(default)]
     metrics: EventTypeConfig,
+
+    /// Configuration for the traces-specific side of the pipeline.
+    #[serde(default)]
+    traces: EventTypeConfig,
 }
 
 #[cfg(test)]
@@ -153,6 +157,11 @@ impl PipelinesConfig {
     pub(crate) const fn metrics(&self) -> &EventTypeConfig {
         &self.metrics
     }
+
+    #[allow(dead_code)] // for some small subset of feature flags this code is dead
+    pub(crate) const fn traces(&self) -> &EventTypeConfig {
+        &self.traces
+    }
 }
 
 impl PipelinesConfig {
@@ -160,6 +169,7 @@ impl PipelinesConfig {
         let parents = &[self.transform_type()].into_iter().collect::<HashSet<_>>();
         self.logs.validate_nesting(parents)?;
         self.metrics.validate_nesting(parents)?;
+        self.traces.validate_nesting(parents)?;
         Ok(())
     }
 }
@@ -211,6 +221,20 @@ impl TransformConfig for PipelinesConfig {
             let inner_topology = self
                 .metrics
                 .expand(&metrics_route, &metrics_inputs)?
+                .ok_or("Unable to expand pipeline stream")?;
+            result.inner.extend(inner_topology.inner.into_iter());
+            result.outputs.extend(inner_topology.outputs.into_iter());
+        }
+        if !self.traces.is_empty() {
+            let traces_route = name.join("traces");
+            conditions.insert(
+                "traces".to_string(),
+                AnyCondition::from(ConditionConfig::IsMetric),
+            );
+            let traces_inputs = vec![router_name.port("traces")];
+            let inner_topology = self
+                .traces
+                .expand(&traces_route, &traces_inputs)?
                 .ok_or("Unable to expand pipeline stream")?;
             result.inner.extend(inner_topology.inner.into_iter());
             result.outputs.extend(inner_topology.outputs.into_iter());

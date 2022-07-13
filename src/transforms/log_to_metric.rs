@@ -498,7 +498,7 @@ mod tests {
         config::log_schema,
         event::{
             metric::{Metric, MetricKind, MetricValue, StatisticKind},
-            Event,
+            Event, LogEvent,
         },
         transforms::test::transform_one,
     };
@@ -517,7 +517,7 @@ mod tests {
     }
 
     fn create_event(key: &str, value: impl Into<Value> + std::fmt::Debug) -> Event {
-        let mut log = Event::from("i am a log");
+        let mut log = Event::Log(LogEvent::from("i am a log"));
         log.as_mut_log().insert(key, value);
         log.as_mut_log().insert(log_schema().timestamp_key(), ts());
         log
@@ -792,7 +792,7 @@ mod tests {
             "#,
         );
 
-        let mut event = Event::from("i am a log");
+        let mut event = Event::Log(LogEvent::from("i am a log"));
         event
             .as_mut_log()
             .insert(log_schema().timestamp_key(), ts());
@@ -845,7 +845,7 @@ mod tests {
             "#,
         );
 
-        let mut event = Event::from("i am a log");
+        let mut event = Event::Log(LogEvent::from("i am a log"));
         event
             .as_mut_log()
             .insert(log_schema().timestamp_key(), ts());

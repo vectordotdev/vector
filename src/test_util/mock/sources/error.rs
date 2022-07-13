@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use futures_util::{future::err, FutureExt};
 use serde::{Deserialize, Serialize};
+use vector_core::config::LogNamespace;
 use vector_core::{
     config::{DataType, Output},
     source::Source,
@@ -27,7 +28,7 @@ impl SourceConfig for ErrorSourceConfig {
         Ok(err(()).boxed())
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 

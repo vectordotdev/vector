@@ -6,8 +6,13 @@ mod global_options;
 mod log_schema;
 pub mod proxy;
 
+use crate::event::LogEvent;
 pub use global_options::GlobalOptions;
 pub use log_schema::{init_log_schema, log_schema, LogSchema};
+use lookup::lookup_v2::Path;
+use lookup::path;
+use serde::{Deserialize, Serialize};
+use value::Value;
 pub use vector_common::config::ComponentKey;
 use vector_config::configurable_component;
 
@@ -105,7 +110,7 @@ pub struct Output {
     /// The `None` variant of a schema definition has two distinct meanings for a source component
     /// versus a transform component:
     ///
-    /// For *sources*, a `None` schema is identical to a `Some(Definition::undefined())` schema.
+    /// For *sources*, a `None` schema is identical to a `Some(Definition::source_default())`.
     ///
     /// For a *transform*, a `None` schema means the transform inherits the merged [`Definition`]
     /// of its inputs, without modifying the schema further.
@@ -169,5 +174,95 @@ impl From<Option<bool>> for AcknowledgementsConfig {
 impl From<bool> for AcknowledgementsConfig {
     fn from(enabled: bool) -> Self {
         Some(enabled).into()
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize, PartialOrd, Ord, Eq)]
+pub enum LogNamespace {
+    /// Vector native namespacing
+    ///
+    /// Deserialized data is placed in the root of the event.
+    /// Extra data is placed in "event metadata"
+    Vector,
+
+    /// This is the legacy namespacing.
+    ///
+    /// All data is set in the root of the event. Since this can lead
+    /// to collisions, deserialized data has priority over metadata
+    Legacy,
+}
+
+/// The user-facing config for log namespace is a bool (enabling or disabling the "Log Namespacing" feature).
+/// Internally, this is converted to a enum.
+impl From<bool> for LogNamespace {
+    fn from(x: bool) -> Self {
+        if x {
+            LogNamespace::Vector
+        } else {
+            LogNamespace::Legacy
+        }
+    }
+}
+
+impl Default for LogNamespace {
+    fn default() -> Self {
+        Self::Legacy
+    }
+}
+
+impl LogNamespace {
+    /// Vector: This is added to "event metadata", nested under the source name.
+    ///
+    /// Legacy: This is stored on the event root, only if a field with that name doesn't already exist.
+    pub fn insert_source_metadata<'a>(
+        &self,
+        source_name: &'a str,
+        log: &mut LogEvent,
+        key: impl Path<'a>,
+        value: impl Into<Value>,
+    ) {
+        match self {
+            LogNamespace::Vector => {
+                log.metadata_mut()
+                    .value_mut()
+                    .insert(path!(source_name).concat(key), value);
+            }
+            LogNamespace::Legacy => {
+                log.try_insert(key, value);
+            }
+        }
+    }
+
+    /// Vector: This is added to the "event metadata", nested under the name "vector". This data
+    /// will be marked as read-only in VRL.
+    ///
+    /// Legacy: This is stored on the event root, only if a field with that name doesn't already exist.
+    pub fn insert_vector_metadata<'a>(
+        &self,
+        log: &mut LogEvent,
+        legacy_key: impl Path<'a>,
+        metadata_key: impl Path<'a>,
+        value: impl Into<Value>,
+    ) {
+        match self {
+            LogNamespace::Vector => {
+                log.metadata_mut()
+                    .value_mut()
+                    .insert(path!("vector").concat(metadata_key), value);
+            }
+            LogNamespace::Legacy => log.try_insert(legacy_key, value),
+        }
+    }
+
+    pub fn new_log_from_data(&self, value: impl Into<Value>) -> LogEvent {
+        match self {
+            LogNamespace::Vector | LogNamespace::Legacy => LogEvent::from(value.into()),
+        }
+    }
+
+    // combine a global (self) and local value to get the actual namespace
+    #[must_use]
+    pub fn merge(&self, override_value: Option<impl Into<LogNamespace>>) -> LogNamespace {
+        override_value.map_or(*self, Into::into)
     }
 }

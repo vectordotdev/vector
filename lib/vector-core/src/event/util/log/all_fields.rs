@@ -1,5 +1,6 @@
 use std::{
     collections::{btree_map, BTreeMap},
+    fmt::Write as _,
     iter, slice,
 };
 
@@ -93,7 +94,9 @@ impl<'a> FieldsIter<'a> {
                         res.push_str(key);
                     }
                 }
-                Some(PathComponent::Index(index)) => res.push_str(&format!("[{}]", index)),
+                Some(PathComponent::Index(index)) => {
+                    write!(res, "[{}]", index).expect("write to String never fails");
+                }
             }
             if let Some(PathComponent::Key(_)) = path_iter.peek() {
                 res.push('.');

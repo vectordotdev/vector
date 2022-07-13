@@ -124,6 +124,12 @@ components: sinks: prometheus_exporter: {
 			required:    false
 			type: bool: default: false
 		}
+		suppress_timestamp: {
+			common:      false
+			description: "Whether or not to strip metric timestamp in the response."
+			required:    false
+			type: bool: default: true
+		}
 	}
 
 	input: {

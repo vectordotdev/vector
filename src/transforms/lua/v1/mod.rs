@@ -303,7 +303,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::from("program me");
+        let event = Event::Log(LogEvent::from("program me"));
 
         let event = transform.transform_one(event).unwrap();
 
@@ -323,7 +323,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::from("Hello, my name is Bob.");
+        let event = Event::Log(LogEvent::from("Hello, my name is Bob."));
 
         let event = transform.transform_one(event).unwrap();
 

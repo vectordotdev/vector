@@ -18,12 +18,12 @@ mod test {
     use super::check_is_metric;
     use crate::event::{
         metric::{Metric, MetricKind, MetricValue},
-        Event,
+        Event, LogEvent,
     };
 
     #[test]
     fn is_metric_basic() {
-        assert!(!check_is_metric(Event::from("just a log")).0);
+        assert!(!check_is_metric(Event::from(LogEvent::from("just a log"))).0);
         assert!(
             check_is_metric(Event::from(Metric::new(
                 "test metric",

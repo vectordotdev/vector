@@ -574,7 +574,7 @@ impl Conditional for CheckFields {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::event::Event;
+    use crate::event::{Event, LogEvent};
 
     #[test]
     fn generate_config() {
@@ -645,7 +645,7 @@ mod test {
             .build(&Default::default())
             .unwrap();
 
-        let mut event = Event::from("neither");
+        let mut event = Event::Log(LogEvent::from("neither"));
         assert!(!cond.check(event.clone()).0);
         assert_eq!(
             cond.check_with_context(event.clone()).0,
@@ -699,7 +699,7 @@ mod test {
             .build(&Default::default())
             .unwrap();
 
-        let mut event = Event::from("neither");
+        let mut event = Event::Log(LogEvent::from("neither"));
         assert!(!cond.check(event.clone()).0);
         assert_eq!(
             cond.check_with_context(event.clone()).0,
@@ -758,7 +758,7 @@ mod test {
             .build(&Default::default())
             .unwrap();
 
-        let mut event = Event::from("neither");
+        let mut event = Event::Log(LogEvent::from("neither"));
         assert!(!cond.check(event.clone()).0);
         assert_eq!(
             cond.check_with_context(event.clone()).0,
@@ -807,7 +807,7 @@ mod test {
             .build(&Default::default())
             .unwrap();
 
-        let mut event = Event::from("neither");
+        let mut event = Event::Log(LogEvent::from("neither"));
         assert!(!cond.check(event.clone()).0);
         assert_eq!(
             cond.check_with_context(event.clone()).0,
@@ -872,7 +872,7 @@ mod test {
             .build(&Default::default())
             .unwrap();
 
-        let mut event = Event::from("neither");
+        let mut event = Event::Log(LogEvent::from("neither"));
         assert!(!cond.check(event.clone()).0);
         assert_eq!(
             cond.check_with_context(event.clone()).0,
@@ -933,7 +933,7 @@ mod test {
             .build(&Default::default())
             .unwrap();
 
-        let mut event = Event::from("not foo");
+        let mut event = Event::Log(LogEvent::from("not foo"));
         assert!(!cond.check(event.clone()).0);
         assert_eq!(
             cond.check_with_context(event.clone()).0,
@@ -996,7 +996,7 @@ mod test {
             .build(&Default::default())
             .unwrap();
 
-        let mut event = Event::from("starts with a bang");
+        let mut event = Event::Log(LogEvent::from("starts with a bang"));
         assert!(!cond.check(event.clone()).0);
         assert_eq!(
             cond.check_with_context(event.clone()).0,
@@ -1041,7 +1041,7 @@ mod test {
             .build(&Default::default())
             .unwrap();
 
-        let mut event = Event::from("ignored message");
+        let mut event = Event::Log(LogEvent::from("ignored message"));
         assert!(!cond.check(event.clone()).0);
         assert_eq!(
             cond.check_with_context(event.clone()).0,
@@ -1091,7 +1091,7 @@ mod test {
             .build(&Default::default())
             .unwrap();
 
-        let mut event = Event::from("ignored field");
+        let mut event = Event::Log(LogEvent::from("ignored field"));
         assert!(!cond.check(event.clone()).0);
         assert_eq!(
             cond.check_with_context(event.clone()).0,
@@ -1120,7 +1120,7 @@ mod test {
             .build(&Default::default())
             .unwrap();
 
-        let mut event = Event::from("");
+        let mut event = Event::Log(LogEvent::from(""));
         assert!(!cond.check(event.clone()).0);
         assert_eq!(
             cond.check_with_context(event.clone()).0,
@@ -1150,7 +1150,7 @@ mod test {
             .build(&Default::default())
             .unwrap();
 
-        let mut event = Event::from("ignored field");
+        let mut event = Event::Log(LogEvent::from("ignored field"));
         assert!(cond.check(event.clone()).0);
         assert_eq!(cond.check_with_context(event.clone()).0, Ok(()));
 

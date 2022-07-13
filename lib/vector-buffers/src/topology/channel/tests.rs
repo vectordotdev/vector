@@ -15,23 +15,24 @@ use crate::{
 
 async fn assert_send_ok_with_capacities<T>(
     sender: &mut BufferSender<T>,
-    value: T,
+    value: impl Into<T>,
     base_expected: Option<usize>,
     overflow_expected: Option<usize>,
 ) where
     T: Bufferable,
 {
-    assert!(sender.send(value).await.is_ok());
+    assert!(sender.send(value.into()).await.is_ok());
     assert_current_send_capacity(sender, base_expected, overflow_expected);
 }
 
-async fn blocking_send_and_drain_receiver<T>(
+async fn blocking_send_and_drain_receiver<T, V>(
     mut sender: BufferSender<T>,
     receiver: BufferReceiver<T>,
-    send_value: T,
-) -> Vec<T>
+    send_value: V,
+) -> Vec<V>
 where
     T: Bufferable,
+    V: Into<T> + From<T> + Send + 'static,
 {
     // We can likely replace this with `tokio_test`-related helpers to avoid the sleeping.
     let send_baton = Arc::new(Barrier::new(2));
@@ -48,7 +49,7 @@ where
 
         // Grab all messages and then return the results.
         while let Some(msg) = receiver.next().await {
-            results.push(msg);
+            results.push(msg.into());
         }
         results
     });
@@ -58,7 +59,7 @@ where
     // had no more messages to send, waiting for-ev-er for the next one.
     let start = Instant::now();
     let _ = send_baton.wait().await;
-    assert!(sender.send(send_value).await.is_ok());
+    assert!(sender.send(send_value.into()).await.is_ok());
     let send_delay = start.elapsed();
     assert!(send_delay > recv_delay);
     drop(sender);
@@ -66,9 +67,10 @@ where
     handle.await.expect("receiver task should not panic")
 }
 
-async fn drain_receiver<T>(sender: BufferSender<T>, receiver: BufferReceiver<T>) -> Vec<T>
+async fn drain_receiver<T, V>(sender: BufferSender<T>, receiver: BufferReceiver<T>) -> Vec<V>
 where
     T: Bufferable,
+    V: From<T> + Send + 'static,
 {
     drop(sender);
     let handle = tokio::spawn(async move {
@@ -77,7 +79,7 @@ where
 
         // Grab all messages and then return the results.
         while let Some(msg) = receiver.next().await {
-            results.push(msg);
+            results.push(msg.into());
         }
         results
     });
@@ -127,7 +129,7 @@ async fn test_sender_drop_newest() {
 
     // Then, when we collect all of the messages from the receiver, we should only get back the
     // first three of them.
-    let mut results = drain_receiver(tx, rx).await;
+    let mut results: Vec<u64> = drain_receiver(tx, rx).await;
     results.sort_unstable();
     assert_eq!(results, vec![1, 2, 3]);
 }
@@ -180,7 +182,7 @@ async fn test_sender_overflow_drop_newest() {
 
     // Then, when we collect all of the messages from the receiver, we should only get back the
     // first four of them.
-    let mut results = drain_receiver(tx, rx).await;
+    let mut results: Vec<u64> = drain_receiver(tx, rx).await;
     results.sort_unstable();
     assert_eq!(results, vec![1, 2, 7, 8]);
 }
@@ -202,7 +204,7 @@ async fn test_buffer_metrics_normal() {
     assert_eq!(0, snapshot.dropped_event_count_intentional);
 
     // Then, when we collect all of the messages from the receiver, the metrics should also reflect that.
-    let mut results = drain_receiver(tx, rx).await;
+    let mut results: Vec<u64> = drain_receiver(tx, rx).await;
     results.sort_unstable();
     assert_eq!(results, vec![2, 7, 8]);
 
@@ -229,7 +231,7 @@ async fn test_buffer_metrics_drop_newest() {
     assert_eq!(1, snapshot.dropped_event_count_intentional);
 
     // Then, when we collect all of the messages from the receiver, the metrics should also reflect that.
-    let mut results = drain_receiver(tx, rx).await;
+    let mut results: Vec<u64> = drain_receiver(tx, rx).await;
     results.sort_unstable();
     assert_eq!(results, vec![7, 8]);
 

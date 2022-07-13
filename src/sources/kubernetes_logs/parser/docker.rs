@@ -206,7 +206,11 @@ pub mod tests {
     fn test_parsing() {
         trace_init();
 
-        test_util::test_parser(|| Transform::function(Docker), Event::from, cases());
+        test_util::test_parser(
+            || Transform::function(Docker),
+            |s| Event::Log(LogEvent::from(s)),
+            cases(),
+        );
     }
 
     #[test]
@@ -239,9 +243,9 @@ pub mod tests {
         ];
 
         for message in cases {
-            let input = Event::from(message);
+            let input = LogEvent::from(message);
             let mut output = OutputBuffer::default();
-            Docker.transform(&mut output, input);
+            Docker.transform(&mut output, input.into());
             assert!(output.is_empty(), "Expected no events: {:?}", output);
         }
     }
