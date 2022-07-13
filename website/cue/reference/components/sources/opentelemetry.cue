@@ -95,7 +95,7 @@ components: sources: opentelemetry: {
 			description: "An individual event from a batch of events received through a gRPC request sent by OpenTelemetry SDK"
 			fields: {
 				attributes: {
-					description: "attributes for each log record"
+					description: "Attributes that describe the specific event occurrence."
 					required:    false
 					common:      true
 					type: object: {
