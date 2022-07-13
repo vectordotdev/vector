@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use ::value::Value;
 use vrl::prelude::*;
 
 use crate::log_util;
@@ -124,14 +125,6 @@ impl Function for ParseApacheLog {
             },
         ]
     }
-
-    fn call_by_vm(&self, ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let format = args.required_any("format").downcast_ref::<Bytes>().unwrap();
-        let timestamp_format = args.optional("timestamp_format");
-
-        parse_apache_log(value, timestamp_format, format, ctx)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -165,55 +158,46 @@ impl Expression for ParseApacheLogFn {
 }
 
 fn kind_common() -> BTreeMap<Field, Kind> {
-    map! {
-         "host": Kind::bytes() | Kind::null(),
-         "identity": Kind::bytes() | Kind::null(),
-         "user": Kind::bytes() | Kind::null(),
-         "timestamp": Kind::timestamp() | Kind::null(),
-         "message": Kind::bytes() | Kind::null(),
-         "method": Kind::bytes() | Kind::null(),
-         "path": Kind::bytes() | Kind::null(),
-         "protocol": Kind::bytes() | Kind::null(),
-         "status": Kind::integer() | Kind::null(),
-         "size": Kind::integer() | Kind::null(),
-    }
-    .into_iter()
-    .map(|(key, kind): (&str, _)| (key.into(), kind))
-    .collect()
+    BTreeMap::from([
+        (Field::from("host"), Kind::bytes() | Kind::null()),
+        (Field::from("identity"), Kind::bytes() | Kind::null()),
+        (Field::from("user"), Kind::bytes() | Kind::null()),
+        (Field::from("timestamp"), Kind::timestamp() | Kind::null()),
+        (Field::from("message"), Kind::bytes() | Kind::null()),
+        (Field::from("method"), Kind::bytes() | Kind::null()),
+        (Field::from("path"), Kind::bytes() | Kind::null()),
+        (Field::from("protocol"), Kind::bytes() | Kind::null()),
+        (Field::from("status"), Kind::integer() | Kind::null()),
+        (Field::from("size"), Kind::integer() | Kind::null()),
+    ])
 }
 
 fn kind_combined() -> BTreeMap<Field, Kind> {
-    map! {
-        "host": Kind::bytes() | Kind::null(),
-        "identity": Kind::bytes() | Kind::null(),
-        "user": Kind::bytes() | Kind::null(),
-        "timestamp": Kind::timestamp() | Kind::null(),
-        "message": Kind::bytes() | Kind::null(),
-        "method": Kind::bytes() | Kind::null(),
-        "path": Kind::bytes() | Kind::null(),
-        "protocol": Kind::bytes() | Kind::null(),
-        "status": Kind::integer() | Kind::null(),
-        "size": Kind::integer() | Kind::null(),
-        "referrer": Kind::bytes() | Kind::null(),
-        "agent": Kind::bytes() | Kind::null(),
-    }
-    .into_iter()
-    .map(|(key, kind): (&str, _)| (key.into(), kind))
-    .collect()
+    BTreeMap::from([
+        (Field::from("host"), Kind::bytes() | Kind::null()),
+        (Field::from("identity"), Kind::bytes() | Kind::null()),
+        (Field::from("user"), Kind::bytes() | Kind::null()),
+        (Field::from("timestamp"), Kind::timestamp() | Kind::null()),
+        (Field::from("message"), Kind::bytes() | Kind::null()),
+        (Field::from("method"), Kind::bytes() | Kind::null()),
+        (Field::from("path"), Kind::bytes() | Kind::null()),
+        (Field::from("protocol"), Kind::bytes() | Kind::null()),
+        (Field::from("status"), Kind::integer() | Kind::null()),
+        (Field::from("size"), Kind::integer() | Kind::null()),
+        (Field::from("referrer"), Kind::bytes() | Kind::null()),
+        (Field::from("agent"), Kind::bytes() | Kind::null()),
+    ])
 }
 
 fn kind_error() -> BTreeMap<Field, Kind> {
-    map! {
-         "timestamp": Kind::timestamp() | Kind::null(),
-         "module": Kind::bytes() | Kind::null(),
-         "severity": Kind::bytes() | Kind::null(),
-         "thread": Kind::bytes() | Kind::null(),
-         "port": Kind::bytes() | Kind::null(),
-         "message": Kind::bytes() | Kind::null(),
-    }
-    .into_iter()
-    .map(|(key, kind): (&str, _)| (key.into(), kind))
-    .collect()
+    BTreeMap::from([
+        (Field::from("timestamp"), Kind::timestamp() | Kind::null()),
+        (Field::from("module"), Kind::bytes() | Kind::null()),
+        (Field::from("severity"), Kind::bytes() | Kind::null()),
+        (Field::from("thread"), Kind::bytes() | Kind::null()),
+        (Field::from("port"), Kind::bytes() | Kind::null()),
+        (Field::from("message"), Kind::bytes() | Kind::null()),
+    ])
 }
 
 #[cfg(test)]
@@ -348,7 +332,7 @@ mod tests {
             args: func_args![value: "- - - - - - -",
                              format: "common",
             ],
-            want: Ok(btreemap! {}),
+            want: Ok(BTreeMap::new()),
             tdef: TypeDef::object(kind_common()).fallible(),
             tz: vector_common::TimeZone::default(),
         }
@@ -357,7 +341,7 @@ mod tests {
             args: func_args![value: r#"- - - [-] "-" - -"#,
                              format: "common",
             ],
-            want: Ok(btreemap! {}),
+            want: Ok(BTreeMap::new()),
             tdef: TypeDef::object(kind_common()).fallible(),
             tz: vector_common::TimeZone::default(),
         }

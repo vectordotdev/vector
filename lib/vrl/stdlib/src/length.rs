@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn length(value: Value) -> Resolved {
@@ -60,11 +61,6 @@ impl Function for Length {
         let value = arguments.required("value");
 
         Ok(Box::new(LengthFn { value }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        length(value)
     }
 }
 

@@ -358,8 +358,9 @@ impl BufferConfig {
 
 #[cfg(test)]
 mod test {
-    use crate::{BufferConfig, BufferType, WhenFull};
     use std::num::{NonZeroU64, NonZeroUsize};
+
+    use crate::{BufferConfig, BufferType, WhenFull};
 
     fn check_single_stage(source: &str, expected: BufferType) {
         let config: BufferConfig = serde_yaml::from_str(source).unwrap();

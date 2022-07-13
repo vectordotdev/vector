@@ -2,10 +2,11 @@ use std::fmt;
 
 use diagnostic::{DiagnosticMessage, Label, Note};
 use dyn_clone::{clone_trait_object, DynClone};
+use value::Value;
 
 use crate::{
     state::{ExternalEnv, LocalEnv},
-    vm, Context, Span, TypeDef, Value,
+    Context, Span, TypeDef,
 };
 
 #[cfg(feature = "expr-abort")]
@@ -39,6 +40,8 @@ pub(crate) mod predicate;
 #[cfg(feature = "expr-query")]
 pub(crate) mod query;
 
+pub use core::{ExpressionError, Resolved};
+
 #[cfg(feature = "expr-abort")]
 pub use abort::Abort;
 pub use array::Array;
@@ -46,7 +49,6 @@ pub use array::Array;
 pub use assignment::Assignment;
 pub use block::Block;
 pub use container::{Container, Variant};
-pub use core::{ExpressionError, Resolved};
 pub use function_argument::FunctionArgument;
 #[cfg(feature = "expr-function_call")]
 pub use function_call::FunctionCall;
@@ -76,15 +78,6 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     ///
     /// An expression is allowed to fail, which aborts the running program.
     fn resolve(&self, ctx: &mut Context) -> Resolved;
-
-    /// Compile the expression to bytecode that can be interpreted by the VM.
-    fn compile_to_vm(
-        &self,
-        _vm: &mut vm::Vm,
-        _state: (&mut LocalEnv, &mut ExternalEnv),
-    ) -> Result<(), String> {
-        Ok(())
-    }
 
     /// Resolve an expression to a value without any context, if possible.
     ///
@@ -145,8 +138,11 @@ pub enum Expr {
 
 impl Expr {
     pub fn as_str(&self) -> &str {
-        use container::Variant::*;
-        use Expr::*;
+        use container::Variant::{Array, Block, Group, Object};
+        use Expr::{
+            Abort, Assignment, Container, FunctionCall, IfStatement, Literal, Noop, Op, Query,
+            Unary, Variable,
+        };
 
         match self {
             #[cfg(feature = "expr-literal")]
@@ -235,7 +231,10 @@ impl Expr {
 
 impl Expression for Expr {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        use Expr::*;
+        use Expr::{
+            Abort, Assignment, Container, FunctionCall, IfStatement, Literal, Noop, Op, Query,
+            Unary, Variable,
+        };
 
         match self {
             #[cfg(feature = "expr-literal")]
@@ -261,7 +260,10 @@ impl Expression for Expr {
     }
 
     fn as_value(&self) -> Option<Value> {
-        use Expr::*;
+        use Expr::{
+            Abort, Assignment, Container, FunctionCall, IfStatement, Literal, Noop, Op, Query,
+            Unary, Variable,
+        };
 
         match self {
             #[cfg(feature = "expr-literal")]
@@ -287,7 +289,10 @@ impl Expression for Expr {
     }
 
     fn type_def(&self, state: (&LocalEnv, &ExternalEnv)) -> TypeDef {
-        use Expr::*;
+        use Expr::{
+            Abort, Assignment, Container, FunctionCall, IfStatement, Literal, Noop, Op, Query,
+            Unary, Variable,
+        };
 
         match self {
             #[cfg(feature = "expr-literal")]
@@ -311,42 +316,14 @@ impl Expression for Expr {
             Abort(v) => v.type_def(state),
         }
     }
-
-    fn compile_to_vm(
-        &self,
-        vm: &mut crate::vm::Vm,
-        state: (&mut LocalEnv, &mut ExternalEnv),
-    ) -> Result<(), String> {
-        use Expr::*;
-
-        // Pass the call on to the contained expression.
-        match self {
-            #[cfg(feature = "expr-literal")]
-            Literal(v) => v.compile_to_vm(vm, state),
-            Container(v) => v.compile_to_vm(vm, state),
-            #[cfg(feature = "expr-if_statement")]
-            IfStatement(v) => v.compile_to_vm(vm, state),
-            #[cfg(feature = "expr-op")]
-            Op(v) => v.compile_to_vm(vm, state),
-            #[cfg(feature = "expr-assignment")]
-            Assignment(v) => v.compile_to_vm(vm, state),
-            #[cfg(feature = "expr-query")]
-            Query(v) => v.compile_to_vm(vm, state),
-            #[cfg(feature = "expr-function_call")]
-            FunctionCall(v) => v.compile_to_vm(vm, state),
-            Variable(v) => v.compile_to_vm(vm, state),
-            Noop(v) => v.compile_to_vm(vm, state),
-            #[cfg(feature = "expr-unary")]
-            Unary(v) => v.compile_to_vm(vm, state),
-            #[cfg(feature = "expr-abort")]
-            Abort(v) => v.compile_to_vm(vm, state),
-        }
-    }
 }
 
 impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Expr::*;
+        use Expr::{
+            Abort, Assignment, Container, FunctionCall, IfStatement, Literal, Noop, Op, Query,
+            Unary, Variable,
+        };
 
         match self {
             #[cfg(feature = "expr-literal")]
@@ -452,7 +429,8 @@ impl From<Abort> for Expr {
 impl From<Value> for Expr {
     fn from(value: Value) -> Self {
         use std::collections::BTreeMap;
-        use Value::*;
+
+        use value::Value::{Array, Boolean, Bytes, Float, Integer, Null, Object, Regex, Timestamp};
 
         match value {
             Bytes(v) => Literal::from(v).into(),
@@ -502,7 +480,7 @@ pub enum Error {
 
 impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
-        use Error::*;
+        use Error::{Fallible, Missing};
 
         match self {
             Fallible { .. } => 100,
@@ -511,7 +489,7 @@ impl DiagnosticMessage for Error {
     }
 
     fn labels(&self) -> Vec<Label> {
-        use Error::*;
+        use Error::{Fallible, Missing};
 
         match self {
             Fallible { span } => vec![
@@ -529,7 +507,7 @@ impl DiagnosticMessage for Error {
     }
 
     fn notes(&self) -> Vec<Note> {
-        use Error::*;
+        use Error::{Fallible, Missing};
 
         match self {
             Fallible { .. } => vec![Note::SeeErrorDocs],

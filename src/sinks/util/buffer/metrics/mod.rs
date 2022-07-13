@@ -1,3 +1,5 @@
+pub mod sort;
+
 use std::cmp::Ordering;
 
 use vector_core::event::metric::{Metric, MetricValue, Sample};
@@ -174,7 +176,7 @@ pub(self) mod tests {
         num: usize,
         kind: MetricKind,
         bpower: f64,
-        cfactor: u32,
+        cfactor: u64,
         sum: f64,
     ) -> Metric {
         Metric::new(
@@ -202,7 +204,7 @@ pub(self) mod tests {
                     0.5 => factor * 2.0,
                     1.0 => factor * 4.0
                 ],
-                count: factor as u32 * 10,
+                count: factor as u64 * 10,
                 sum: factor * 7.0,
             },
         )
@@ -598,7 +600,7 @@ pub(self) mod tests {
                 i,
                 Absolute,
                 1.0,
-                i as u32,
+                i as u64,
                 i as f64 * 10.0,
             ));
         }

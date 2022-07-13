@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use ::value::Value;
 use vrl::prelude::*;
 
 use crate::util::Base64Charset;
@@ -64,13 +65,6 @@ impl Function for DecodeBase64 {
             source: r#"decode_base64!("c29tZSBzdHJpbmcgdmFsdWU=")"#,
             result: Ok(r#"some string value"#),
         }]
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let charset = args.optional("charset");
-
-        decode_base64(charset, value)
     }
 }
 

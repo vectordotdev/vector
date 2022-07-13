@@ -7,7 +7,7 @@ use tracing::Instrument;
 use super::create_default_buffer_v2;
 use crate::{
     assert_buffer_is_empty, assert_buffer_records,
-    test::common::{install_tracing_helpers, with_temp_dir, MultiEventRecord, SizedRecord},
+    test::{install_tracing_helpers, with_temp_dir, MultiEventRecord, SizedRecord},
     variants::disk_v2::{tests::create_default_buffer_v2_with_usage, writer::RecordWriter},
     EventCount,
 };
@@ -26,7 +26,7 @@ async fn basic_read_write_loop() {
                 .into_iter()
                 .cycle()
                 .take(10)
-                .map(SizedRecord)
+                .map(SizedRecord::new)
                 .collect::<Vec<_>>();
             let input_items = expected_items.clone();
 
@@ -80,7 +80,7 @@ async fn reader_exits_cleanly_when_writer_done_and_in_flight_acks() {
 
             // Now write a single value and close the writer.
             writer
-                .write_record(SizedRecord(32))
+                .write_record(SizedRecord::new(32))
                 .await
                 .expect("write should not fail");
             writer.flush().await.expect("writer flush should not fail");
@@ -89,7 +89,7 @@ async fn reader_exits_cleanly_when_writer_done_and_in_flight_acks() {
 
             // And read that single value.
             let first_read = reader.next().await.expect("read should not fail");
-            assert_eq!(first_read, Some(SizedRecord(32)));
+            assert_eq!(first_read, Some(SizedRecord::new(32)));
             assert_buffer_records!(ledger, 1);
 
             // Now, we haven't acknowledged that read yet, so our next read should see the writer as

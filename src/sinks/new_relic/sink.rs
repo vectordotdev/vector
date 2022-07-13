@@ -1,23 +1,28 @@
-use super::{
-    Encoding, EventsApiModel, LogsApiModel, MetricsApiModel, NewRelicApi, NewRelicApiModel,
-    NewRelicApiRequest, NewRelicCredentials,
-};
-use crate::{
-    event::Event,
-    sinks::util::{
-        builder::SinkBuilderExt, encoding::EncodingConfigFixed, Compression, RequestBuilder,
-        StreamSink,
-    },
-};
+use std::{convert::TryFrom, fmt::Debug, num::NonZeroUsize, sync::Arc};
+
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::stream::{BoxStream, StreamExt};
-use std::{convert::TryFrom, fmt::Debug, num::NonZeroUsize, sync::Arc};
 use tower::Service;
 use vector_core::{
     buffers::Acker,
     event::{EventFinalizers, Finalizable},
     stream::{BatcherSettings, DriverResponse},
+};
+
+use super::{
+    EventsApiModel, LogsApiModel, MetricsApiModel, NewRelicApi, NewRelicApiModel,
+    NewRelicApiRequest, NewRelicCredentials, NewRelicEncoder,
+};
+use crate::{
+    event::Event,
+    sinks::util::{
+        builder::SinkBuilderExt,
+        encoding::Transformer,
+        metadata::{RequestMetadata, RequestMetadataBuilder},
+        request_builder::EncodeResult,
+        Compression, RequestBuilder, StreamSink,
+    },
 };
 
 #[derive(Debug)]
@@ -64,15 +69,16 @@ impl From<NewRelicSinkError> for std::io::Error {
 }
 
 struct NewRelicRequestBuilder {
-    encoding: EncodingConfigFixed<Encoding>,
+    transformer: Transformer,
+    encoder: NewRelicEncoder,
     compression: Compression,
     credentials: Arc<NewRelicCredentials>,
 }
 
 impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
-    type Metadata = (Arc<NewRelicCredentials>, usize, EventFinalizers);
+    type Metadata = (EventFinalizers, RequestMetadataBuilder);
     type Events = Result<NewRelicApiModel, Self::Error>;
-    type Encoder = EncodingConfigFixed<Encoding>;
+    type Encoder = NewRelicEncoder;
     type Payload = Bytes;
     type Request = NewRelicApiRequest;
     type Error = NewRelicSinkError;
@@ -82,11 +88,16 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
     }
 
     fn encoder(&self) -> &Self::Encoder {
-        &self.encoding
+        &self.encoder
     }
 
     fn split_input(&self, mut input: Vec<Event>) -> (Self::Metadata, Self::Events) {
-        let events_len = input.len();
+        for event in input.iter_mut() {
+            self.transformer.transform(event);
+        }
+
+        let metadata_builder = RequestMetadata::builder(&input);
+
         let finalizers = input.take_finalizers();
         let api_model = || -> Result<NewRelicApiModel, Self::Error> {
             match self.credentials.api {
@@ -99,17 +110,23 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
                 NewRelicApi::Logs => Ok(NewRelicApiModel::Logs(LogsApiModel::try_from(input)?)),
             }
         }();
-        let metadata = (Arc::clone(&self.credentials), events_len, finalizers);
-        (metadata, api_model)
+
+        ((finalizers, metadata_builder), api_model)
     }
 
-    fn build_request(&self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {
-        let (_credentials, events_len, finalizers) = metadata;
+    fn build_request(
+        &self,
+        metadata: Self::Metadata,
+        payload: EncodeResult<Self::Payload>,
+    ) -> Self::Request {
+        let (finalizers, metadata_builder) = metadata;
+        let metadata = metadata_builder.build(&payload);
+
         NewRelicApiRequest {
-            batch_size: events_len,
+            metadata,
             finalizers,
             credentials: Arc::clone(&self.credentials),
-            payload,
+            payload: payload.into_payload(),
             compression: self.compression,
         }
     }
@@ -118,7 +135,8 @@ impl RequestBuilder<Vec<Event>> for NewRelicRequestBuilder {
 pub struct NewRelicSink<S> {
     pub service: S,
     pub acker: Acker,
-    pub encoding: EncodingConfigFixed<Encoding>,
+    pub transformer: Transformer,
+    pub encoder: NewRelicEncoder,
     pub credentials: Arc<NewRelicCredentials>,
     pub compression: Compression,
     pub batcher_settings: BatcherSettings,
@@ -134,7 +152,8 @@ where
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let builder_limit = NonZeroUsize::new(64);
         let request_builder = NewRelicRequestBuilder {
-            encoding: self.encoding,
+            transformer: self.transformer,
+            encoder: self.encoder,
             compression: self.compression,
             credentials: Arc::clone(&self.credentials),
         };

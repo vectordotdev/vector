@@ -10,7 +10,6 @@ remap: functions: parse_logfmt: {
 		* As per this [logfmt specification](\(urls.logfmt_specs)), the `parse_logfmt` function
 		  accepts standalone keys and assigns them a Boolean value of `true`.
 		"""
-	notices:     functions.encode_key_value.notices
 
 	arguments: [
 		{

@@ -1,9 +1,8 @@
-use std::time::Instant;
-
-use super::prelude::{error_stage, error_type};
-use metrics::{counter, histogram};
+use metrics::counter;
 use mongodb::{bson, error::Error as MongoError};
 use vector_core::internal_event::InternalEvent;
+
+use super::prelude::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct MongoDbMetricsEventsReceived<'a> {
@@ -33,20 +32,6 @@ impl<'a> InternalEvent for MongoDbMetricsEventsReceived<'a> {
             "events_in_total", self.count as u64,
             "endpoint" => self.endpoint.to_owned(),
         );
-    }
-}
-
-#[derive(Debug)]
-pub struct MongoDbMetricsCollectCompleted {
-    pub start: Instant,
-    pub end: Instant,
-}
-
-impl InternalEvent for MongoDbMetricsCollectCompleted {
-    fn emit(self) {
-        debug!(message = "Collection completed.");
-        counter!("collect_completed_total", 1);
-        histogram!("collect_duration_seconds", self.end - self.start);
     }
 }
 

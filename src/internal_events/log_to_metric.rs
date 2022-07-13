@@ -1,9 +1,9 @@
 use std::num::ParseFloatError;
 
-use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
+use super::prelude::{error_stage, error_type};
 use crate::template::TemplateParseError;
 
 pub struct LogToMetricFieldNullError<'a> {

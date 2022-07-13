@@ -2,11 +2,11 @@ version: "3"
 
 services:
   zookeeper:
-    image: wurstmeister/zookeeper
+    image: docker.io/wurstmeister/zookeeper
     ports:
       - 2181:2181
   kafka:
-    image: wurstmeister/kafka:2.13-2.6.0
+    image: docker.io/wurstmeister/kafka:2.13-2.6.0
     depends_on:
       - zookeeper
     environment:
@@ -48,20 +48,20 @@ services:
       - "shutdown-tests"
       - "--test"
       - "shutdown"
-      - "--"
       - "--test-threads"
       - "4"
-      - "--nocapture"
     depends_on:
       - kafka
     environment:
       - KAFKA_HOST=kafka
     volumes:
       - ${PWD}:/code
+      - target:/code/target
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - cargogit:/usr/local/cargo/git
       - cargoregistry:/usr/local/cargo/registry
 
 volumes:
+  target: {}
   cargogit: {}
   cargoregistry: {}

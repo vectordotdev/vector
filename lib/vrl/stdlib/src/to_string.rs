@@ -1,8 +1,9 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn to_string(value: Value) -> Resolved {
     use chrono::SecondsFormat;
-    use Value::*;
+    use Value::{Boolean, Bytes, Float, Integer, Null, Timestamp};
     let value = match value {
         v @ Bytes(_) => v,
         Integer(v) => v.to_string().into(),
@@ -101,12 +102,6 @@ impl Function for ToString {
         let value = arguments.required("value");
 
         Ok(Box::new(ToStringFn { value }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-
-        to_string(value)
     }
 }
 

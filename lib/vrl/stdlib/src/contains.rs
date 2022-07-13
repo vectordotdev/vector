@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn contains(value: Value, substring: Value, case_sensitive: bool) -> Resolved {
@@ -79,17 +80,6 @@ impl Function for Contains {
                 result: Ok(r#"true"#),
             },
         ]
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let substring = args.required("substring");
-        let case_sensitive = args
-            .optional("case_sensitive")
-            .map(|value| value.try_boolean().unwrap_or(true))
-            .unwrap_or(true);
-
-        contains(value, substring, case_sensitive)
     }
 }
 

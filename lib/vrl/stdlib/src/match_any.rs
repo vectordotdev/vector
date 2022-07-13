@@ -1,3 +1,4 @@
+use ::value::Value;
 use regex::bytes::RegexSet;
 use vrl::prelude::*;
 
@@ -102,16 +103,6 @@ impl Function for MatchAny {
             }
             _ => Ok(None),
         }
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let pattern = args
-            .required_any("patterns")
-            .downcast_ref::<RegexSet>()
-            .unwrap();
-
-        match_any(value, pattern)
     }
 }
 

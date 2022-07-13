@@ -90,7 +90,7 @@ impl Acker {
     pub fn ack(&self, num: usize) {
         if num > 0 {
             if let Some(inner) = self.inner.as_ref() {
-                (&*inner)(num);
+                (*inner)(num);
             }
         }
     }

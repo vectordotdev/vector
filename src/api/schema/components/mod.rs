@@ -3,15 +3,17 @@ pub mod source;
 pub mod state;
 pub mod transform;
 
-use async_graphql::{Enum, InputObject, Interface, Object, Subscription};
-use once_cell::sync::Lazy;
 use std::{
     cmp,
     collections::{HashMap, HashSet},
 };
+
+use async_graphql::{Enum, InputObject, Interface, Object, Subscription};
+use once_cell::sync::Lazy;
 use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
 use vector_core::internal_event::DEFAULT_OUTPUT;
 
+use crate::topology::schema::merged_definition;
 use crate::{
     api::schema::{
         components::state::component_by_component_key,
@@ -19,7 +21,7 @@ use crate::{
         relay, sort,
     },
     config::{ComponentKey, Config},
-    filter_check, schema,
+    filter_check,
 };
 
 #[derive(Debug, Clone, Interface)]
@@ -251,6 +253,7 @@ impl ComponentsSubscription {
 
 /// Update the 'global' configuration that will be consumed by component queries
 pub fn update_config(config: &Config) {
+    let mut cache = HashMap::new();
     let mut new_components = HashMap::new();
 
     // Sources
@@ -263,10 +266,15 @@ pub fn update_config(config: &Config) {
                 // TODO(#10745): This is obviously wrong, but there are a lot of assumptions in the
                 // API modules about `output_type` as it's a sortable field, etc. This is a stopgap
                 // until we decide how we want to change the rest of the usages.
-                output_type: source.inner.outputs().pop().unwrap().ty,
+                output_type: source
+                    .inner
+                    .outputs(config.schema.log_namespace())
+                    .pop()
+                    .unwrap()
+                    .ty,
                 outputs: source
                     .inner
-                    .outputs()
+                    .outputs(config.schema.log_namespace())
                     .into_iter()
                     .map(|output| output.port.unwrap_or_else(|| DEFAULT_OUTPUT.to_string()))
                     .collect(),
@@ -284,7 +292,7 @@ pub fn update_config(config: &Config) {
                 inputs: transform.inputs.clone(),
                 outputs: transform
                     .inner
-                    .outputs(&schema::Definition::empty())
+                    .outputs(&merged_definition(&transform.inputs, config, &mut cache))
                     .into_iter()
                     .map(|output| output.port.unwrap_or_else(|| DEFAULT_OUTPUT.to_string()))
                     .collect(),

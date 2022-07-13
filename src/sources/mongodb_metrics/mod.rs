@@ -11,23 +11,24 @@ use mongodb::{
     options::ClientOptions,
     Client,
 };
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
     config::{self, Output, SourceConfig, SourceContext, SourceDescription},
     event::metric::{Metric, MetricKind, MetricValue},
     internal_events::{
-        EndpointBytesReceived, MongoDbMetricsBsonParseError, MongoDbMetricsCollectCompleted,
+        CollectionCompleted, EndpointBytesReceived, MongoDbMetricsBsonParseError,
         MongoDbMetricsEventsReceived, MongoDbMetricsRequestError, StreamClosedError,
     },
 };
 
 mod types;
 use types::{CommandBuildInfo, CommandIsMaster, CommandServerStatus, NodeType};
+use vector_core::config::LogNamespace;
 
 macro_rules! tags {
     ($tags:expr) => { $tags.clone() };
@@ -72,12 +73,25 @@ enum CollectError {
     Bson(bson::de::Error),
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default)]
+/// Configuration for the `mongodb_metrics` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
-struct MongoDbMetricsConfig {
+pub struct MongoDbMetricsConfig {
+    /// A list of MongoDB instances to scrape.
+    ///
+    /// Each endpoint must be in the [Connection String URI Format](https://www.mongodb.com/docs/manual/reference/connection-string/).
     endpoints: Vec<String>,
+
+    /// The interval between scrapes, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
+
+    /// Overrides the default namespace for the metrics emitted by the source.
+    ///
+    /// If set to an empty string, no namespace is added to the metrics.
+    ///
+    /// By default, `mongodb` is used.
     #[serde(default = "default_namespace")]
     namespace: String,
 }
@@ -125,7 +139,7 @@ impl SourceConfig for MongoDbMetricsConfig {
                 let start = Instant::now();
                 let metrics = join_all(sources.iter().map(|mongodb| mongodb.collect())).await;
                 let count = metrics.len();
-                emit!(MongoDbMetricsCollectCompleted {
+                emit!(CollectionCompleted {
                     start,
                     end: Instant::now()
                 });
@@ -142,7 +156,7 @@ impl SourceConfig for MongoDbMetricsConfig {
         }))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(config::DataType::Metric)]
     }
 

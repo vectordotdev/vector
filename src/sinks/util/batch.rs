@@ -138,11 +138,11 @@ impl<D: SinkBatchSettings> BatchConfig<D, Unmerged> {
 }
 
 impl<D: SinkBatchSettings> BatchConfig<D, Merged> {
-    pub fn validate(self) -> Result<BatchConfig<D, Merged>, BatchError> {
+    pub const fn validate(self) -> Result<BatchConfig<D, Merged>, BatchError> {
         Ok(self)
     }
 
-    pub fn disallow_max_bytes(self) -> Result<Self, BatchError> {
+    pub const fn disallow_max_bytes(self) -> Result<Self, BatchError> {
         // Sinks that used `max_size` for an event count cannot count
         // bytes, so err if `max_bytes` is set.
         match self.max_bytes {
@@ -151,14 +151,14 @@ impl<D: SinkBatchSettings> BatchConfig<D, Merged> {
         }
     }
 
-    pub fn limit_max_bytes(self, limit: usize) -> Result<Self, BatchError> {
+    pub const fn limit_max_bytes(self, limit: usize) -> Result<Self, BatchError> {
         match self.max_bytes {
             Some(n) if n > limit => Err(BatchError::MaxBytesExceeded { limit }),
             _ => Ok(self),
         }
     }
 
-    pub fn limit_max_events(self, limit: usize) -> Result<Self, BatchError> {
+    pub const fn limit_max_events(self, limit: usize) -> Result<Self, BatchError> {
         match self.max_events {
             Some(n) if n > limit => Err(BatchError::MaxEventsExceeded { limit }),
             _ => Ok(self),

@@ -1,12 +1,14 @@
-use std::{io::Read, sync::Arc};
+use std::io::Read;
 
 use bytes::Bytes;
 use chrono::Utc;
 use codecs::StreamDecodingError;
 use flate2::read::MultiGzDecoder;
 use futures::StreamExt;
+use lookup::path;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
+use vector_common::finalization::AddBatchNotifier;
 use vector_core::{event::BatchNotifier, ByteSizeOf};
 use warp::reject;
 
@@ -65,7 +67,7 @@ pub async fn firehose(
 
                     for event in &mut events {
                         if let Some(batch) = &batch {
-                            event.add_batch_notifier(Arc::clone(batch));
+                            event.add_batch_notifier(batch.clone());
                         }
                         if let Event::Log(ref mut log) = event {
                             log.try_insert(
@@ -73,8 +75,8 @@ pub async fn firehose(
                                 Bytes::from("aws_kinesis_firehose"),
                             );
                             log.try_insert(log_schema().timestamp_key(), request.timestamp);
-                            log.try_insert_flat("request_id", request_id.to_string());
-                            log.try_insert_flat("source_arn", source_arn.to_string());
+                            log.try_insert(path!("request_id"), request_id.to_string());
+                            log.try_insert(path!("source_arn"), source_arn.to_string());
                         }
                     }
 

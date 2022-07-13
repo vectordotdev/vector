@@ -31,6 +31,18 @@ pub struct EncodingConfigFixed<E: Default + PartialEq> {
     pub(crate) timestamp_format: Option<TimestampFormat>,
 }
 
+impl<E: Default + PartialEq> EncodingConfigFixed<E> {
+    pub fn map<F: Default + PartialEq>(self) -> EncodingConfigFixed<F> {
+        EncodingConfigFixed {
+            codec: F::default(),
+            schema: self.schema,
+            only_fields: self.only_fields,
+            except_fields: self.except_fields,
+            timestamp_format: self.timestamp_format,
+        }
+    }
+}
+
 impl<E: Default + PartialEq> EncodingConfiguration for EncodingConfigFixed<E> {
     type Codec = E;
 

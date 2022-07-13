@@ -167,6 +167,24 @@ components: sources: kubernetes_logs: {
 				}
 			}
 		}
+		node_annotation_fields: {
+			common:      false
+			description: "Configuration for how the events are annotated with Node metadata."
+			required:    false
+			type: object: {
+				examples: []
+				options: {
+					node_labels: {
+						common:      false
+						description: "Event field for Node labels."
+						required:    false
+						type: string: {
+							default: "kubernetes.node_labels"
+						}
+					}
+				}
+			}
+		}
 		auto_partial_merge: {
 			common:      false
 			description: "Automatically merge partial messages into a single event. Partial here is in respect to messages that were split by the Kubernetes Container Runtime log driver."
@@ -255,7 +273,7 @@ components: sources: kubernetes_logs: {
 		}
 		max_line_bytes: {
 			common:      false
-			description: "The maximum number of a bytes a line can contain before being discarded. This protects against malformed lines or tailing incorrect files."
+			description: "The maximum number of bytes a line can contain before being discarded. This protects against malformed lines or tailing incorrect files."
 			required:    false
 			type: uint: {
 				default: 32_768
@@ -646,8 +664,8 @@ components: sources: kubernetes_logs: {
 			body:  """
 				Vector requires access to the Kubernetes API.
 				Specifically, the [`kubernetes_logs` source](\(urls.vector_kubernetes_logs_source))
-				uses the `/api/v1/pods` endpoint to "watch" the pods from
-				all namespaces.
+				uses the `/api/v1/pods`, `/api/v1/namespaces`, and `/api/v1/nodes` endpoints
+				to "list" and "watch" resources we use to enrich events with additional metadata.
 
 				Modern Kubernetes clusters run with RBAC (role-based access control)
 				scheme. RBAC-enabled clusters require some configuration to grant Vector
@@ -664,8 +682,8 @@ components: sources: kubernetes_logs: {
 				Clusters using legacy ABAC scheme are not officially supported
 				(although Vector might work if you configure access properly) -
 				we encourage switching to RBAC. If you use a custom access control
-				scheme - make sure Vector `Pod`/`ServiceAccount` is granted access to
-				the `/api/v1/pods` resource.
+				scheme - make sure Vector `Pod`/`ServiceAccount` is granted "list" and "watch" access
+				to the `/api/v1/pods`, `/api/v1/namespaces`, and `/api/v1/nodes` resources.
 				"""
 		}
 	}

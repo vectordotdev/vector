@@ -13,7 +13,7 @@ components: sinks: prometheus_remote_write: {
 	}
 
 	features: {
-		acknowledgements: false
+		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
 			batch: {

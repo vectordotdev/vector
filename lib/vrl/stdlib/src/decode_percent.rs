@@ -1,3 +1,4 @@
+use ::value::Value;
 use percent_encoding::percent_decode;
 use vrl::prelude::*;
 
@@ -42,12 +43,6 @@ impl Function for DecodePercent {
             source: r#"decode_percent("foo%20bar%3F")"#,
             result: Ok(r#"foo bar?"#),
         }]
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-
-        decode_percent(value)
     }
 }
 

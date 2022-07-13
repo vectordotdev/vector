@@ -1,5 +1,6 @@
 use std::collections::btree_map;
 
+use ::value::Value;
 use vrl::prelude::*;
 
 fn flatten(value: Value) -> Resolved {
@@ -59,11 +60,6 @@ impl Function for Flatten {
     ) -> Compiled {
         let value = arguments.required("value");
         Ok(Box::new(FlattenFn { value }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        flatten(value)
     }
 }
 

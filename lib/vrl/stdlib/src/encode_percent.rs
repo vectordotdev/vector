@@ -1,3 +1,4 @@
+use ::value::Value;
 use percent_encoding::{utf8_percent_encode, AsciiSet};
 use vrl::prelude::*;
 
@@ -147,16 +148,6 @@ impl Function for EncodePercent {
             ("ascii_set", None) => Ok(Some(Box::new(Bytes::from("NON_ALPHANUMERIC")) as _)),
             _ => Ok(None),
         }
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let ascii_set = args
-            .required_any("ascii_set")
-            .downcast_ref::<Bytes>()
-            .expect("should be AsciiSet");
-
-        encode_percent(value, ascii_set)
     }
 }
 

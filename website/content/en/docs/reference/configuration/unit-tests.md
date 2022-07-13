@@ -37,12 +37,6 @@ You can also specify multiple configuration files to test:
 vector test /etc/vector/pipeline1.toml /etc/vector/pipeline2.toml
 ```
 
-Glob patterns are also supported:
-
-```bash
-vector test /etc/vector/*.toml
-```
-
 Specifying multiple files is useful if you want to, for example, keep your unit tests in a separate
 file from your pipeline configuration. Vector always treats multiple files as a single, unified
 configuration.
@@ -223,7 +217,7 @@ Inside each test definition, you need to specify two things:
 
 ### Inputs
 
-In in the `inputs` array for the test, you have these options:
+In the `inputs` array for the test, you have these options:
 
 Parameter | Type | Description
 :---------|:-----|:-----------
@@ -250,7 +244,7 @@ message = "<102>1 2020-12-22T15:22:31.111Z vector-user.biz su 2666 ID389 - Somet
 
 ### Outputs
 
-In the `outputs` array of your unit testing configuration you specify two things:
+In the `outputs` array of your unit testing configuration, you specify two things:
 
 Parameter | Type | Description
 :---------|:-----|:-----------
@@ -297,7 +291,7 @@ no_outputs_from = ["log_filter", "metric_filter"]
 ```
 
 In this test configuration, Vector would expect that the `log_filter` and `metric_filter` transforms
-dont't output _any_ events.
+not to output _any_ events.
 
 Some examples of use cases for `no_outputs_from`:
 
@@ -343,8 +337,8 @@ There are currently two event types that you can unit test in Vector:
 
 #### Logs
 
-As explained in the section on [inputs](#inputs) above, when testing log events you have can specify
-either a structured event [object] or a raw [string].
+As explained in the section on [inputs](#inputs) above, when testing log events, you can specify
+either a structured event [object](#object) or a raw [string](#raw-string-value).
 
 ##### Object
 
@@ -380,6 +374,22 @@ type = "metric"
 name = "count"
 kind = "absolute"
 counter = { value = 1 }
+```
+
+Aggregated metrics are a little different:
+
+```yaml
+tests:
+  inputs:
+    insert_at: my_aggregate_metrics_transform
+    type: metric
+    metric:
+      name: http_rtt
+      kind: incremental
+      aggregated_histogram:
+        buckets: []
+        sum: 0
+        count: 0
 ```
 
 Here's a full end-to-end example of unit testing a metric through a transform:

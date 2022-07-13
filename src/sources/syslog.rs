@@ -2,7 +2,6 @@ use std::net::SocketAddr;
 #[cfg(unix)]
 use std::path::PathBuf;
 
-use crate::codecs::Decoder;
 use bytes::Bytes;
 use chrono::Utc;
 use codecs::{
@@ -10,11 +9,13 @@ use codecs::{
     BytesDecoder, OctetCountingDecoder, SyslogDeserializer,
 };
 use futures::StreamExt;
-use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use tokio::net::UdpSocket;
 use tokio_util::udp::UdpFramed;
+use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 
+use crate::codecs::Decoder;
 #[cfg(unix)]
 use crate::sources::util::build_unix_stream_source;
 use crate::{
@@ -27,39 +28,80 @@ use crate::{
     shutdown::ShutdownSignal,
     sources::util::{SocketListenAddr, TcpNullAcker, TcpSource},
     tcp::TcpKeepaliveConfig,
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
+    tls::{MaybeTlsSettings, TlsSourceConfig},
     udp, SourceSender,
 };
 
-#[derive(Deserialize, Serialize, Debug)]
-// TODO: add back when serde-rs/serde#1358 is addressed
-// #[serde(deny_unknown_fields)]
+/// Configuration for the `syslog` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
 pub struct SyslogConfig {
     #[serde(flatten)]
     mode: Mode,
+
+    /// The maximum buffer size of incoming messages, in bytes.
+    ///
+    /// Messages larger than this are truncated.
     #[serde(default = "crate::serde::default_max_length")]
     max_length: usize,
-    /// The host key of the log. (This differs from `hostname`)
+
+    /// Overrides the name of the log field used to add the peer host to each event.
+    ///
+    /// If using TCP or UDP, the value will be the peer host's address, including the port i.e. `1.2.3.4:9000`. If using
+    /// UDS, the value will be the socket path itself.
+    ///
+    /// By default, the [global `host_key` option](https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key) is used.
     host_key: Option<String>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Listener mode for the `syslog` source.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum Mode {
+    /// Listen on TCP.
     Tcp {
+        /// The address to listen for connections on.
         address: SocketListenAddr,
+
+        #[configurable(derived)]
         keepalive: Option<TcpKeepaliveConfig>,
-        tls: Option<TlsEnableableConfig>,
+
+        #[configurable(derived)]
+        tls: Option<TlsSourceConfig>,
+
+        /// The size, in bytes, of the receive buffer used for each connection.
+        ///
+        /// This should not typically needed to be changed.
         receive_buffer_bytes: Option<usize>,
+
+        /// The maximum number of TCP connections that will be allowed at any given time.
         connection_limit: Option<u32>,
     },
+
+    /// Listen on UDP.
     Udp {
+        /// The address to listen for messages on.
         address: SocketAddr,
+
+        /// The size, in bytes, of the receive buffer used for the listening socket.
+        ///
+        /// This should not typically needed to be changed.
         receive_buffer_bytes: Option<usize>,
     },
+
+    /// Listen on UDS. (Unix domain socket)
     #[cfg(unix)]
     Unix {
+        /// The Unix socket path.
+        ///
+        /// This should be an absolute path.
         path: PathBuf,
+
+        /// Unix file mode bits to be applied to the unix socket file as its designated file permissions.
+        ///
+        /// Note that the file mode value can be specified in any numeric format supported by your configuration
+        /// language, but it is most intuitive to use an octal number.
         socket_file_mode: Option<u32>,
     },
 }
@@ -117,12 +159,16 @@ impl SourceConfig for SyslogConfig {
                     host_key,
                 };
                 let shutdown_secs = 30;
-                let tls = MaybeTlsSettings::from_config(&tls, true)?;
+                let tls_config = tls.as_ref().map(|tls| tls.tls_config.clone());
+                let tls_client_metadata_key =
+                    tls.as_ref().and_then(|tls| tls.client_metadata_key.clone());
+                let tls = MaybeTlsSettings::from_config(&tls_config, true)?;
                 source.run(
                     address,
                     keepalive,
                     shutdown_secs,
                     tls,
+                    tls_client_metadata_key,
                     receive_buffer_bytes,
                     cx,
                     false.into(),
@@ -164,7 +210,7 @@ impl SourceConfig for SyslogConfig {
         }
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(DataType::Log)]
     }
 
@@ -314,6 +360,7 @@ fn enrich_syslog_event(event: &mut Event, host_key: &str, default_host: Option<B
 
 #[cfg(test)]
 mod test {
+    use lookup::path;
     use std::{
         collections::{BTreeMap, HashMap},
         fmt,
@@ -323,6 +370,7 @@ mod test {
     use chrono::prelude::*;
     use codecs::decoding::format::Deserializer;
     use rand::{thread_rng, Rng};
+    use serde::Deserialize;
     use tokio::time::{sleep, Duration, Instant};
     use tokio_util::codec::BytesCodec;
     use value::Value;
@@ -332,7 +380,7 @@ mod test {
     use super::*;
     use crate::{
         config::log_schema,
-        event::Event,
+        event::{Event, LogEvent},
         test_util::{
             components::{assert_source_compliance, SOCKET_PUSH_SOURCE_TAGS},
             next_addr, random_maps, random_string, send_encodable, send_lines, wait_for_tcp,
@@ -346,7 +394,7 @@ mod test {
         bytes: Bytes,
     ) -> Option<Event> {
         let parser = SyslogDeserializer;
-        let mut events = parser.parse(bytes).ok()?;
+        let mut events = parser.parse(bytes, LogNamespace::Legacy).ok()?;
         handle_events(&mut events, host_key, default_host);
         Some(events.remove(0))
     }
@@ -511,7 +559,7 @@ mod test {
             msg
         );
 
-        let mut expected = Event::from(msg);
+        let mut expected = Event::Log(LogEvent::from(msg));
 
         {
             let expected = expected.as_mut_log();
@@ -550,7 +598,7 @@ mod test {
             r#"[incorrect x]"#, msg
         );
 
-        let mut expected = Event::from(msg);
+        let mut expected = Event::Log(LogEvent::from(msg));
         {
             let expected = expected.as_mut_log();
             expected.insert(
@@ -584,9 +632,9 @@ mod test {
         fn there_is_map_called_empty(event: Event) -> bool {
             event
                 .as_log()
-                .all_fields()
-                .find(|(key, _)| (&key[..]).starts_with("empty"))
-                == None
+                .get("empty")
+                .expect("empty exists")
+                .is_object()
         }
 
         let msg = format!(
@@ -619,7 +667,7 @@ mod test {
         );
 
         let event = event_from_bytes("host", None, msg.into()).unwrap();
-        assert!(!there_is_map_called_empty(event));
+        assert!(there_is_map_called_empty(event));
     }
 
     #[test]
@@ -637,12 +685,23 @@ mod test {
     }
 
     #[test]
+    fn handles_dots_in_sdata() {
+        let raw =
+            r#"<190>Feb 13 21:31:56 74794bfb6795 liblogging-stdlog:  [origin foo.bar="baz"] hello"#;
+        let event = event_from_bytes("host", None, raw.to_owned().into()).unwrap();
+        assert_eq!(
+            event.as_log().get(r#"origin."foo.bar""#),
+            Some(&Value::from("baz"))
+        );
+    }
+
+    #[test]
     fn syslog_ng_default_network() {
         let msg = "i am foobar";
         let raw = format!(r#"<13>Feb 13 20:07:26 74794bfb6795 root[8539]: {}"#, msg);
         let event = event_from_bytes("host", None, raw.into()).unwrap();
 
-        let mut expected = Event::from(msg);
+        let mut expected = Event::Log(LogEvent::from(msg));
         {
             let value = event.as_log().get("timestamp").unwrap();
             let year = value.as_timestamp().unwrap().naive_local().year();
@@ -672,7 +731,7 @@ mod test {
         );
         let event = event_from_bytes("host", None, raw.into()).unwrap();
 
-        let mut expected = Event::from(msg);
+        let mut expected = Event::Log(LogEvent::from(msg));
         {
             let value = event.as_log().get("timestamp").unwrap();
             let year = value.as_timestamp().unwrap().naive_local().year();
@@ -689,8 +748,8 @@ mod test {
             expected.insert("appname", "liblogging-stdlog");
             expected.insert("origin.software", "rsyslogd");
             expected.insert("origin.swVersion", "8.24.0");
-            expected.insert("origin.x-pid", "8979");
-            expected.insert("origin.x-info", "http://www.rsyslog.com");
+            expected.insert(path!("origin", "x-pid"), "8979");
+            expected.insert(path!("origin", "x-info"), "http://www.rsyslog.com");
         }
 
         assert_event_data_eq!(event, expected);
@@ -704,7 +763,7 @@ mod test {
             msg
         );
 
-        let mut expected = Event::from(msg);
+        let mut expected = Event::Log(LogEvent::from(msg));
         {
             let expected = expected.as_mut_log();
             expected.insert(
@@ -721,8 +780,8 @@ mod test {
             expected.insert("appname", "liblogging-stdlog");
             expected.insert("origin.software", "rsyslogd");
             expected.insert("origin.swVersion", "8.24.0");
-            expected.insert("origin.x-pid", "9043");
-            expected.insert("origin.x-info", "http://www.rsyslog.com");
+            expected.insert(path!("origin", "x-pid"), "9043");
+            expected.insert(path!("origin", "x-info"), "http://www.rsyslog.com");
         }
 
         assert_event_data_eq!(
@@ -1017,7 +1076,8 @@ mod test {
 
     impl From<Event> for SyslogMessageRfc5424 {
         fn from(e: Event) -> Self {
-            let (mut fields, _) = e.into_log().into_parts();
+            let (value, _) = e.into_log().into_parts();
+            let mut fields = value.into_object().unwrap();
 
             Self {
                 msgid: fields.remove("msgid").map(value_to_string).unwrap(),
@@ -1100,8 +1160,12 @@ mod test {
                 "notice" => Some(Self::LOG_NOTICE),
                 "info" => Some(Self::LOG_INFO),
                 "debug" => Some(Self::LOG_DEBUG),
+
                 x => {
-                    println!("converting severity str, got {}", x);
+                    #[allow(clippy::print_stdout)]
+                    {
+                        println!("converting severity str, got {}", x);
+                    }
                     None
                 }
             }

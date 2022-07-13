@@ -1,3 +1,4 @@
+use ::value::Value;
 use rand::{thread_rng, RngCore};
 use vrl::prelude::*;
 
@@ -58,11 +59,6 @@ impl Function for RandomBytes {
         }
 
         Ok(Box::new(RandomBytesFn { length }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let length = args.required("length");
-        random_bytes(length)
     }
 }
 

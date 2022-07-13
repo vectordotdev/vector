@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn encode_json(value: Value) -> Resolved {
@@ -41,11 +42,6 @@ impl Function for EncodeJson {
             source: r#"encode_json({"field": "value", "another": [1,2,3]})"#,
             result: Ok(r#"s'{"another":[1,2,3],"field":"value"}'"#),
         }]
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        encode_json(value)
     }
 }
 
@@ -100,7 +96,7 @@ mod tests {
         }
 
         map {
-            args: func_args![value: map!["field": "value"]],
+            args: func_args![value: Value::from(BTreeMap::from([(String::from("field"), Value::from("value"))]))],
             want: Ok(r#"{"field":"value"}"#),
             tdef: TypeDef::bytes().infallible(),
         }

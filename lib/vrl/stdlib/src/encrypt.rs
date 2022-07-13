@@ -1,13 +1,13 @@
-use aes::cipher::block_padding::{AnsiX923, Iso10126, Iso7816, Pkcs7};
-use aes::cipher::generic_array::GenericArray;
-use aes::cipher::{AsyncStreamCipher, BlockEncryptMut};
+use ::value::Value;
+use aes::cipher::{
+    block_padding::{AnsiX923, Iso10126, Iso7816, Pkcs7},
+    generic_array::GenericArray,
+    AsyncStreamCipher, BlockEncryptMut, KeyIvInit, StreamCipher,
+};
 use cfb_mode::Encryptor as Cfb;
 use ctr::Ctr64LE;
 use ofb::Ofb;
 use vrl::prelude::*;
-
-use aes::cipher::KeyIvInit;
-use aes::cipher::StreamCipher;
 
 type Aes128Cbc = cbc::Encryptor<aes::Aes128>;
 type Aes192Cbc = cbc::Encryptor<aes::Aes192>;
@@ -211,14 +211,6 @@ impl Function for Encrypt {
             key,
             iv,
         }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let plaintext = args.required("plaintext");
-        let algorithm = args.required("algorithm");
-        let key = args.required("key");
-        let iv = args.required("iv");
-        encrypt(plaintext, algorithm, key, iv)
     }
 }
 

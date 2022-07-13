@@ -1,3 +1,4 @@
+use ::value::Value;
 use sha_3::{Digest, Sha3_224, Sha3_256, Sha3_384, Sha3_512};
 use vrl::prelude::*;
 
@@ -95,16 +96,6 @@ impl Function for Sha3 {
             ("variant", None) => Ok(Some(Box::new(Bytes::from("SHA3-512")) as _)),
             _ => Ok(None),
         }
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let variant = args
-            .required_any("variant")
-            .downcast_ref::<Bytes>()
-            .unwrap();
-
-        sha3(value, variant)
     }
 }
 

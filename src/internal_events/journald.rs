@@ -1,24 +1,7 @@
-use super::prelude::{error_stage, error_type};
 use metrics::counter;
 use vector_core::internal_event::InternalEvent;
 
-#[derive(Debug)]
-pub struct JournaldEventsReceived {
-    pub count: usize,
-    pub byte_size: usize,
-}
-
-impl InternalEvent for JournaldEventsReceived {
-    fn emit(self) {
-        trace!(message = "Events received.", count = %self.count, byte_size = %self.byte_size);
-        counter!("component_received_events_total", self.count as u64);
-        counter!(
-            "component_received_event_bytes_total",
-            self.byte_size as u64
-        );
-        counter!("events_in_total", self.count as u64); // deprecated
-    }
-}
+use super::prelude::{error_stage, error_type};
 
 #[derive(Debug)]
 pub struct JournaldInvalidRecordError {
@@ -42,5 +25,27 @@ impl InternalEvent for JournaldInvalidRecordError {
         );
         counter!("invalid_record_total", 1); // deprecated
         counter!("invalid_record_bytes_total", self.text.len() as u64); // deprecated
+    }
+}
+
+pub struct JournaldNegativeAcknowledgmentError<'a> {
+    pub cursor: &'a str,
+}
+
+impl InternalEvent for JournaldNegativeAcknowledgmentError<'_> {
+    fn emit(self) {
+        error!(
+            message = "Event received a negative acknowledgment, journal has been stopped.",
+            error_code = "negative_acknowledgement",
+            error_type = error_type::ACKNOWLEDGMENT_FAILED,
+            stage = error_stage::SENDING,
+            cursor = self.cursor,
+        );
+        counter!(
+            "component_errors_total", 1,
+            "error_code" => "negative_acknowledgment",
+            "error_type" => error_type::ACKNOWLEDGMENT_FAILED,
+            "stage" => error_stage::SENDING,
+        );
     }
 }

@@ -15,7 +15,7 @@ pub struct ErrorMessage {
     feature = "sources-datadog_agent"
 ))]
 impl ErrorMessage {
-    #[allow(unused)] // triggered by cargo-hack
+    #[allow(unused)] // triggered by check-component-features
     pub fn new(code: http::StatusCode, message: String) -> Self {
         ErrorMessage {
             code: code.as_u16(),
@@ -23,7 +23,7 @@ impl ErrorMessage {
         }
     }
 
-    #[allow(unused)] // triggered by cargo-hack
+    #[allow(unused)] // triggered by check-component-features
     pub fn status_code(&self) -> http::StatusCode {
         http::StatusCode::from_u16(self.code).unwrap_or(http::StatusCode::INTERNAL_SERVER_ERROR)
     }

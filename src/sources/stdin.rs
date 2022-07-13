@@ -8,26 +8,41 @@ use codecs::{
     StreamDecodingError,
 };
 use futures::{channel::mpsc, executor, SinkExt, StreamExt};
-use serde::{Deserialize, Serialize};
 use tokio_util::{codec::FramedRead, io::StreamReader};
+use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::DecodingConfig,
     config::{log_schema, Output, Resource, SourceConfig, SourceContext, SourceDescription},
-    internal_events::{BytesReceived, StdinEventsReceived, StreamClosedError},
+    internal_events::{BytesReceived, OldEventsReceived, StreamClosedError},
     serde::default_decoding,
     shutdown::ShutdownSignal,
     SourceSender,
 };
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `stdin` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct StdinConfig {
+    /// The maximum buffer size, in bytes, of incoming messages.
+    ///
+    /// Messages larger than this are truncated.
     #[serde(default = "crate::serde::default_max_length")]
     pub max_length: usize,
+
+    /// Overrides the name of the log field used to add the current hostname to each event.
+    ///
+    /// The value will be the current hostname for wherever Vector is running.
+    ///
+    /// By default, the [global `host_key` option](https://vector.dev/docs/reference/configuration//global-options#log_schema.host_key) is used.
     pub host_key: Option<String>,
+
+    #[configurable(derived)]
     pub framing: Option<FramingConfig>,
+
+    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     pub decoding: DeserializerConfig,
 }
@@ -61,7 +76,7 @@ impl SourceConfig for StdinConfig {
         )
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.decoding.output_type())]
     }
 
@@ -95,7 +110,7 @@ where
     let framing = config
         .framing
         .unwrap_or_else(|| config.decoding.default_stream_framing());
-    let decoder = DecodingConfig::new(framing, config.decoding).build();
+    let decoder = DecodingConfig::new(framing, config.decoding, LogNamespace::Legacy).build();
 
     let (mut sender, receiver) = mpsc::channel(1024);
 
@@ -133,7 +148,7 @@ where
                     Ok((events, byte_size)) => {
                         emit!(BytesReceived { byte_size, protocol: "none" });
 
-                        emit!(StdinEventsReceived {
+                        emit!(OldEventsReceived {
                             byte_size: events.size_of(),
                             count: events.len()
                         });

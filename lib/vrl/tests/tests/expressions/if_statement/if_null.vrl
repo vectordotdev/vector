@@ -1,5 +1,7 @@
-# result: null
+# result: true
 
-if null == true {
+result = if false {
     "yes"
 }
+assert!(result == null)
+assert!(type_def(result) == {"bytes": true, "null": true})

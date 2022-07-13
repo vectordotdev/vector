@@ -1,3 +1,4 @@
+use ::value::Value;
 use csv::ReaderBuilder;
 use vrl::prelude::*;
 
@@ -70,15 +71,6 @@ impl Function for ParseCsv {
                 required: false,
             },
         ]
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let delimiter = args
-            .optional("delimiter")
-            .unwrap_or_else(|| Value::from(","));
-
-        parse_csv(value, delimiter)
     }
 }
 

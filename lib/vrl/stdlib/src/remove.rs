@@ -1,3 +1,4 @@
+use ::value::Value;
 use lookup_lib::{LookupBuf, SegmentBuf};
 use vrl::prelude::*;
 
@@ -35,7 +36,7 @@ fn remove(path: Value, compact: Value, mut value: Value) -> Resolved {
         }
     };
     let compact = compact.try_boolean()?;
-    value.target_remove(&path, compact)?;
+    value.remove_by_path(&path, compact);
     Ok(value)
 }
 
@@ -156,14 +157,6 @@ impl Function for Remove {
             compact,
         }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let path = args.required("path");
-        let compact = args.optional("compact").unwrap_or_else(|| value!(false));
-
-        remove(path, compact, value)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -185,7 +178,7 @@ impl Expression for RemoveFn {
     fn type_def(&self, state: (&state::LocalEnv, &state::ExternalEnv)) -> TypeDef {
         let value_td = self.value.type_def(state);
 
-        let mut td = TypeDef::from(Kind::empty()).fallible();
+        let mut td = TypeDef::from(Kind::never()).fallible();
 
         if value_td.is_array() {
             td = td.add_array(Collection::any())

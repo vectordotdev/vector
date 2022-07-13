@@ -175,6 +175,7 @@ components: sources: socket: {
 					examples: [2838]
 				}
 			}
+			client_metadata: fields._client_metadata
 		}
 	}
 

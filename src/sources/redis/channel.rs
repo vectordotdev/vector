@@ -1,9 +1,15 @@
-use super::{handle_line, ConnectionInfo};
-use crate::{
-    codecs, config::SourceContext, internal_events::RedisReceiveEventError, sources::Source,
-};
 use futures_util::StreamExt;
 use snafu::{ResultExt, Snafu};
+
+use crate::{
+    codecs,
+    config::SourceContext,
+    internal_events::RedisReceiveEventError,
+    sources::{
+        redis::{handle_line, ConnectionInfo},
+        Source,
+    },
+};
 
 #[derive(Debug, Snafu)]
 enum BuildError {

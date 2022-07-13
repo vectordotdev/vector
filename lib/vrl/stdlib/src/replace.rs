@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn replace(value: Value, with_value: Value, count: Value, pattern: Value) -> Resolved {
@@ -113,15 +114,6 @@ impl Function for Replace {
             with,
             count,
         }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let pattern = args.required("pattern");
-        let with = args.required("with");
-        let count = args.optional("count").unwrap_or_else(|| value!(-1));
-
-        replace(value, with, count, pattern)
     }
 }
 

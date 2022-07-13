@@ -3,8 +3,9 @@ use std::time::Duration;
 use futures::{FutureExt, StreamExt};
 use http::Uri;
 use hyper::{Body, Request};
-use serde::{Deserialize, Serialize};
 use tokio_stream::wrappers::IntervalStream;
+use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
 use self::types::Stats;
@@ -12,20 +13,29 @@ use crate::{
     config::{self, Output, SourceConfig, SourceContext, SourceDescription},
     http::HttpClient,
     internal_events::{
-        BytesReceived, EventStoreDbMetricsEventsReceived, EventStoreDbMetricsHttpError,
-        EventStoreDbStatsParsingError, StreamClosedError,
+        BytesReceived, EventStoreDbMetricsHttpError, EventStoreDbStatsParsingError,
+        OldEventsReceived, StreamClosedError,
     },
     tls::TlsSettings,
 };
 
 pub mod types;
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default)]
-struct EventStoreDbConfig {
+/// Configuration for the `eventstoredb_metrics` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug, Default)]
+pub struct EventStoreDbConfig {
+    /// Endpoints to scrape stats from.
     #[serde(default = "default_endpoint")]
     endpoint: String,
+
+    /// The interval between scrapes, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
+
+    /// Overrides the default namespace for the metrics emitted by the source.
+    ///
+    /// By default, `eventstoredb` is used.
     default_namespace: Option<String>,
 }
 
@@ -55,7 +65,7 @@ impl SourceConfig for EventStoreDbConfig {
         )
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(config::DataType::Metric)]
     }
 
@@ -122,7 +132,7 @@ fn eventstoredb(
                                 let count = metrics.len();
                                 let byte_size = metrics.size_of();
 
-                                emit!(EventStoreDbMetricsEventsReceived { count, byte_size });
+                                emit!(OldEventsReceived { count, byte_size });
 
                                 if let Err(error) = cx.out.send_batch(metrics).await {
                                     emit!(StreamClosedError { count, error });

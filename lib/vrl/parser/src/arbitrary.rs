@@ -4,6 +4,10 @@
 //! compiler which rejects invalid scripts. This prevents us from imposing too much structure on the
 //! code that builds in assumptions we have made about the code which gives the fuzzer more freedom
 //! to find areas of nodes that we haven't thought of.
+use arbitrary::{Arbitrary, Unstructured};
+use diagnostic::Span;
+use lookup::LookupBuf;
+
 use crate::{
     arbitrary_depth::ArbitraryDepth,
     ast::{
@@ -14,9 +18,6 @@ use crate::{
     template_string::{StringSegment, TemplateString},
     Literal, Program,
 };
-use arbitrary::{Arbitrary, Unstructured};
-use diagnostic::Span;
-use lookup::LookupBuf;
 
 const DEPTH: isize = 4;
 

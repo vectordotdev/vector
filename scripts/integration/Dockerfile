@@ -1,5 +1,5 @@
 ARG RUST_VERSION
-FROM rust:${RUST_VERSION}-slim-bullseye
+FROM docker.io/rust:${RUST_VERSION}-slim-bullseye
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -13,4 +13,4 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zlib1g-dev \
   && rm -rf /var/lib/apt/lists/*
 
-RUN rustup run "${RUST_VERSION}" cargo install cargo-nextest --version 0.9.8
+RUN rustup run "${RUST_VERSION}" cargo install cargo-nextest --version 0.9.18

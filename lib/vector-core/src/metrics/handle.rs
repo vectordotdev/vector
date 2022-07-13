@@ -87,7 +87,7 @@ impl Handle {
 #[derive(Debug)]
 pub struct Histogram {
     buckets: Box<[(f64, AtomicU32); 20]>,
-    count: AtomicU32,
+    count: AtomicU64,
     sum: AtomicF64,
 }
 
@@ -125,7 +125,7 @@ impl Histogram {
         ]);
         Self {
             buckets,
-            count: AtomicU32::new(0),
+            count: AtomicU64::new(0),
             sum: AtomicF64::new(0.0),
         }
     }
@@ -144,7 +144,7 @@ impl Histogram {
             .fetch_update(Ordering::AcqRel, Ordering::Relaxed, |cur| Some(cur + value));
     }
 
-    pub fn count(&self) -> u32 {
+    pub fn count(&self) -> u64 {
         self.count.load(Ordering::Relaxed)
     }
 
@@ -260,7 +260,7 @@ mod test {
     fn histogram() {
         fn inner(values: Vec<f64>) -> TestResult {
             let sut = Histogram::new();
-            let mut model_count: u32 = 0;
+            let mut model_count: u64 = 0;
             let mut model_sum: f64 = 0.0;
 
             for val in &values {

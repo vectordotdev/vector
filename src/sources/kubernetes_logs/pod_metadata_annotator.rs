@@ -7,26 +7,51 @@ use k8s_openapi::{
     apimachinery::pkg::apis::meta::v1::ObjectMeta,
 };
 use kube::runtime::reflector::{store::Store, ObjectRef};
-use serde::{Deserialize, Serialize};
+use lookup::lookup_v2::{parse_path, OwnedSegment};
+use vector_config::configurable_component;
 
 use super::path_helpers::{parse_log_file_path, LogFileInfo};
 use crate::event::{Event, LogEvent};
-use lookup::lookup_v2::{parse_path, OwnedSegment};
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for how the events are annotated with `Pod` metadata.
+#[configurable_component]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, default)]
 pub struct FieldsSpec {
+    /// Event field for Pod name.
     pub pod_name: String,
+
+    /// Event field for Pod namespace.
     pub pod_namespace: String,
+
+    /// Event field for Pod uid.
     pub pod_uid: String,
+
+    /// Event field for Pod IPv4 address.
     pub pod_ip: String,
+
+    /// Event field for Pod IPv4 and IPv6 addresses.
     pub pod_ips: String,
+
+    /// Event field for Pod labels.
     pub pod_labels: String,
+
+    /// Event field for Pod annotations.
     pub pod_annotations: String,
+
+    /// Event field for Pod node_name.
     pub pod_node_name: String,
+
+    /// Event field for Pod owner reference.
     pub pod_owner: String,
+
+    /// Event field for container name.
     pub container_name: String,
+
+    /// Event field for container ID.
     pub container_id: String,
+
+    /// Event field for container image.
     pub container_image: String,
 }
 

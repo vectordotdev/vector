@@ -1,12 +1,13 @@
+use std::time::Duration;
+
 use bytes::{BufMut, BytesMut};
 use codecs::{encoding::Framer, JsonSerializer, NewlineDelimitedEncoder};
 use criterion::{
     criterion_group, measurement::WallTime, BatchSize, BenchmarkGroup, Criterion, SamplingMode,
     Throughput,
 };
-use std::time::Duration;
 use tokio_util::codec::Encoder;
-use vector::event::Event;
+use vector::event::{Event, LogEvent};
 use vector_common::{btreemap, byte_size_of::ByteSizeOf};
 
 #[derive(Debug, Clone)]
@@ -41,12 +42,11 @@ fn encoder(c: &mut Criterion) {
     let mut group: BenchmarkGroup<WallTime> = c.benchmark_group("encoder");
     group.sampling_mode(SamplingMode::Auto);
 
-    let input: Event = btreemap! {
+    let input: Event = Event::Log(LogEvent::from(btreemap! {
         "key1" => "value1",
         "key2" => "value2",
         "key3" => "value3"
-    }
-    .into();
+    }));
 
     group.throughput(Throughput::Bytes(input.size_of() as u64));
     group.bench_with_input("vector::sinks::util::encode_log", &(), |b, ()| {

@@ -1,3 +1,4 @@
+use ::value::Value;
 use vector_common::tokenize;
 use vrl::prelude::*;
 
@@ -49,11 +50,6 @@ impl Function for ParseTokens {
             kind: kind::BYTES,
             required: true,
         }]
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        parse_tokens(value)
     }
 }
 

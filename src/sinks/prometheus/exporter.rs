@@ -35,7 +35,7 @@ use crate::{
     },
     event::{
         metric::{Metric, MetricData, MetricKind, MetricValue},
-        Event,
+        {Event, Finalizable},
     },
     internal_events::PrometheusServerRequestComplete,
     sinks::{
@@ -75,6 +75,8 @@ pub struct PrometheusExporterConfig {
     #[serde(default = "default_flush_period_secs")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     pub flush_period_secs: Duration,
+    #[serde(default)]
+    pub suppress_timestamp: bool,
 }
 
 impl Default for PrometheusExporterConfig {
@@ -87,6 +89,7 @@ impl Default for PrometheusExporterConfig {
             quantiles: super::default_summary_quantiles(),
             distributions_as_summaries: default_distributions_as_summaries(),
             flush_period_secs: default_flush_period_secs(),
+            suppress_timestamp: default_suppress_timestamp(),
         }
     }
 }
@@ -103,6 +106,10 @@ const fn default_distributions_as_summaries() -> bool {
 
 const fn default_flush_period_secs() -> Duration {
     Duration::from_secs(60)
+}
+
+const fn default_suppress_timestamp() -> bool {
+    false
 }
 
 inventory::submit! {
@@ -440,7 +447,7 @@ impl PrometheusExporter {
             #[allow(clippy::print_stderr)]
             Server::builder(hyper::server::accept::from_stream(listener.accept_stream()))
                 .serve(new_service)
-                .with_graceful_shutdown(tripwire.then(crate::stream::tripwire_handler))
+                .with_graceful_shutdown(tripwire.then(crate::shutdown::tripwire_handler))
                 .instrument(span)
                 .await
                 .map_err(|error| eprintln!("Server error: {}", error))?;
@@ -464,7 +471,7 @@ impl StreamSink<Event> for PrometheusExporter {
             buckets: self.config.buckets.clone(),
         });
 
-        while let Some(event) = input.next().await {
+        while let Some(mut event) = input.next().await {
             // If we've exceed our flush interval, go through all of the metrics we're currently
             // tracking and remove any which have exceeded the flush interval in terms of not
             // having been updated within that long of a time.
@@ -490,9 +497,16 @@ impl StreamSink<Event> for PrometheusExporter {
                 }
             }
 
+            let finalizers = event.take_finalizers();
             // Now process the metric we got.
             let metric = event.into_metric();
             if let Some(normalized) = normalizer.normalize(metric) {
+                let normalized = if self.config.suppress_timestamp {
+                    normalized.with_timestamp(None)
+                } else {
+                    normalized
+                };
+
                 // We have a normalized metric, in absolute form.  If we're already aware of this
                 // metric, update its expiration deadline, otherwise, start tracking it.
                 let mut metrics = self.metrics.write().unwrap();
@@ -509,6 +523,7 @@ impl StreamSink<Event> for PrometheusExporter {
                 }
             }
 
+            drop(finalizers);
             self.acker.ack(1);
         }
 
@@ -519,6 +534,7 @@ impl StreamSink<Event> for PrometheusExporter {
 #[cfg(test)]
 mod tests {
     use chrono::{Duration, Utc};
+    use futures::stream;
     use indoc::indoc;
     use pretty_assertions::assert_eq;
     use tokio::{sync::mpsc, time};
@@ -562,7 +578,7 @@ mod tests {
         let event2 = Event::from(event2.into_metric().with_timestamp(Some(timestamp2)));
         let events = vec![event1, event2];
 
-        let body = export_and_fetch(None, events).await;
+        let body = export_and_fetch(None, events, false).await;
         let timestamp = timestamp2.timestamp_millis();
         assert_eq!(
             body,
@@ -578,9 +594,31 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn suppress_timestamp() {
+        let timestamp = Utc::now();
+        let (name, event) = create_metric_gauge(None, 123.4);
+        let event = Event::from(event.into_metric().with_timestamp(Some(timestamp)));
+        let events = vec![event];
+
+        let body = export_and_fetch(None, events, true).await;
+        assert_eq!(
+            body,
+            format!(
+                indoc! {r#"
+                    # HELP {name} {name}
+                    # TYPE {name} gauge
+                    {name}{{some_tag="some_value"}} 123.4
+                "#},
+                name = name,
+            )
+        );
+    }
+
     async fn export_and_fetch(
         tls_config: Option<TlsEnableableConfig>,
         events: Vec<Event>,
+        suppress_timestamp: bool,
     ) -> String {
         trace_init();
 
@@ -591,14 +629,18 @@ mod tests {
         let config = PrometheusExporterConfig {
             address,
             tls: tls_config,
+            suppress_timestamp,
             ..Default::default()
         };
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
-        tokio::spawn(sink.run(Box::pin(UnboundedReceiverStream::new(rx))));
+        let input_events = UnboundedReceiverStream::new(rx);
+
+        let input_events = input_events.map(Into::into);
+        let sink_handle = tokio::spawn(async move { sink.run(input_events).await.unwrap() });
 
         for event in events {
-            tx.send(event.into()).expect("Failed to send event.");
+            tx.send(event).expect("Failed to send event.");
         }
 
         time::sleep(time::Duration::from_millis(100)).await;
@@ -619,7 +661,12 @@ mod tests {
         let bytes = hyper::body::to_bytes(body)
             .await
             .expect("Reading body failed");
-        String::from_utf8(bytes.to_vec()).unwrap()
+        let result = String::from_utf8(bytes.to_vec()).unwrap();
+
+        drop(tx);
+        sink_handle.await.unwrap();
+
+        result
     }
 
     async fn export_and_fetch_simple(tls_config: Option<TlsEnableableConfig>) {
@@ -627,7 +674,7 @@ mod tests {
         let (name2, event2) = tests::create_metric_set(None, vec!["0", "1", "2"]);
         let events = vec![event1, event2];
 
-        let body = export_and_fetch(tls_config, events).await;
+        let body = export_and_fetch(tls_config, events, false).await;
 
         assert!(body.contains(&format!(
             indoc! {r#"
@@ -681,7 +728,7 @@ mod tests {
         };
         let cx = SinkContext::new_test();
 
-        let sink = Box::new(PrometheusExporter::new(config, cx.acker()));
+        let sink = PrometheusExporter::new(config, cx.acker());
 
         let m1 = Metric::new(
             "absolute",
@@ -700,7 +747,7 @@ mod tests {
                 .collect(),
         ));
 
-        let metrics = vec![
+        let events = vec![
             Event::Metric(m1.clone().with_value(MetricValue::Counter { value: 32. })),
             Event::Metric(m2.clone().with_value(MetricValue::Counter { value: 33. })),
             Event::Metric(m1.clone().with_value(MetricValue::Counter { value: 40. })),
@@ -708,9 +755,9 @@ mod tests {
 
         let metrics_handle = Arc::clone(&sink.metrics);
 
-        sink.run(Box::pin(futures::stream::iter(metrics)))
-            .await
-            .unwrap();
+        let sink = VectorSink::from_event_streamsink(sink);
+        let input_events = stream::iter(events).map(Into::into);
+        sink.run(input_events).await.unwrap();
 
         let metrics_after = metrics_handle.read().unwrap();
 
@@ -744,7 +791,7 @@ mod tests {
         let buckets = config.buckets.clone();
         let cx = SinkContext::new_test();
 
-        let sink = Box::new(PrometheusExporter::new(config, cx.acker()));
+        let sink = PrometheusExporter::new(config, cx.acker());
 
         // Define a series of incremental distribution updates.
         let base_summary_metric = Metric::new(
@@ -820,9 +867,10 @@ mod tests {
             .cloned()
             .map(Event::Metric)
             .collect::<Vec<_>>();
-        sink.run(Box::pin(futures::stream::iter(events)))
-            .await
-            .unwrap();
+
+        let sink = VectorSink::from_event_streamsink(sink);
+        let input_events = stream::iter(events).map(Into::into);
+        sink.run(input_events).await.unwrap();
 
         let metrics_after = metrics_handle.read().unwrap();
 
@@ -863,7 +911,7 @@ mod tests {
         };
         let cx = SinkContext::new_test();
 
-        let sink = Box::new(PrometheusExporter::new(config, cx.acker()));
+        let sink = PrometheusExporter::new(config, cx.acker());
 
         // Define a series of incremental distribution updates.
         let base_summary_metric = Metric::new(
@@ -936,9 +984,10 @@ mod tests {
             .cloned()
             .map(Event::Metric)
             .collect::<Vec<_>>();
-        sink.run(Box::pin(futures::stream::iter(events)))
-            .await
-            .unwrap();
+
+        let sink = VectorSink::from_event_streamsink(sink);
+        let input_events = stream::iter(events).map(Into::into);
+        sink.run(input_events).await.unwrap();
 
         let metrics_after = metrics_handle.read().unwrap();
 
@@ -1038,10 +1087,13 @@ mod integration_tests {
         };
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
-        tokio::spawn(sink.run(Box::pin(UnboundedReceiverStream::new(rx))));
+        let input_events = UnboundedReceiverStream::new(rx);
+
+        let input_events = input_events.map(Into::into);
+        let sink_handle = tokio::spawn(async move { sink.run(input_events).await.unwrap() });
 
         let (name, event) = tests::create_metric_gauge(None, 123.4);
-        tx.send(event.into()).expect("Failed to send.");
+        tx.send(event).expect("Failed to send.");
 
         // Wait a bit for the prometheus server to scrape the metrics
         time::sleep(time::Duration::from_secs(2)).await;
@@ -1061,6 +1113,9 @@ mod integration_tests {
         );
         assert!(data["value"][0].as_f64().unwrap() >= start as f64);
         assert_eq!(data["value"][1], Value::String("123.4".into()));
+
+        drop(tx);
+        sink_handle.await.unwrap();
     }
 
     async fn reset_on_flush_period() {
@@ -1071,13 +1126,16 @@ mod integration_tests {
         };
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
-        tokio::spawn(sink.run(Box::pin(UnboundedReceiverStream::new(rx))));
+        let input_events = UnboundedReceiverStream::new(rx);
+
+        let input_events = input_events.map(Into::into);
+        let sink_handle = tokio::spawn(async move { sink.run(input_events).await.unwrap() });
 
         // Create two sets with different names but the same size.
         let (name1, event) = tests::create_metric_set(None, vec!["0", "1", "2"]);
-        tx.send(event.into()).expect("Failed to send.");
+        tx.send(event).expect("Failed to send.");
         let (name2, event) = tests::create_metric_set(None, vec!["3", "4", "5"]);
-        tx.send(event.into()).expect("Failed to send.");
+        tx.send(event).expect("Failed to send.");
 
         // Wait for the Prometheus server to scrape them, and then query it to ensure both metrics
         // have their correct set size value.
@@ -1101,7 +1159,7 @@ mod integration_tests {
         time::sleep(time::Duration::from_secs(3)).await;
 
         let (name2, event) = tests::create_metric_set(Some(name2), vec!["8", "9"]);
-        tx.send(event.into()).expect("Failed to send.");
+        tx.send(event).expect("Failed to send.");
 
         // Again, wait for the Prometheus server to scrape the metrics, and then query it again.
         time::sleep(time::Duration::from_secs(2)).await;
@@ -1112,6 +1170,9 @@ mod integration_tests {
             result["data"]["result"][0]["value"][1],
             Value::String("2".into())
         );
+
+        drop(tx);
+        sink_handle.await.unwrap();
     }
 
     async fn expire_on_flush_period() {
@@ -1122,13 +1183,16 @@ mod integration_tests {
         };
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
-        tokio::spawn(sink.run(Box::pin(UnboundedReceiverStream::new(rx))));
+        let input_events = UnboundedReceiverStream::new(rx);
+
+        let input_events = input_events.map(Into::into);
+        let sink_handle = tokio::spawn(async move { sink.run(input_events).await.unwrap() });
 
         // metrics that will not be updated for a full flush period and therefore should expire
         let (name1, event) = tests::create_metric_set(None, vec!["42"]);
-        tx.send(event.into()).expect("Failed to send.");
+        tx.send(event).expect("Failed to send.");
         let (name2, event) = tests::create_metric_gauge(None, 100.0);
-        tx.send(event.into()).expect("Failed to send.");
+        tx.send(event).expect("Failed to send.");
 
         // Wait a bit for the sink to process the events
         time::sleep(time::Duration::from_secs(1)).await;
@@ -1142,7 +1206,7 @@ mod integration_tests {
         for _ in 0..7 {
             // Update the first metric, ensuring it doesn't expire
             let (_, event) = tests::create_metric_set(Some(name1.clone()), vec!["43"]);
-            tx.send(event.into()).expect("Failed to send.");
+            tx.send(event).expect("Failed to send.");
 
             // Wait a bit for time to pass
             time::sleep(time::Duration::from_secs(1)).await;
@@ -1152,5 +1216,8 @@ mod integration_tests {
         let body = fetch_exporter_body().await;
         assert!(body.contains(&name1));
         assert!(!body.contains(&name2));
+
+        drop(tx);
+        sink_handle.await.unwrap();
     }
 }

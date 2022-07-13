@@ -1,13 +1,15 @@
-use aes::cipher::block_padding::{AnsiX923, Iso10126, Iso7816, Pkcs7};
-use aes::cipher::generic_array::GenericArray;
-use aes::cipher::{AsyncStreamCipher, BlockDecryptMut, StreamCipher};
+use ::value::Value;
+use aes::cipher::{
+    block_padding::{AnsiX923, Iso10126, Iso7816, Pkcs7},
+    generic_array::GenericArray,
+    AsyncStreamCipher, BlockDecryptMut, KeyIvInit, StreamCipher,
+};
 use cfb_mode::Decryptor as Cfb;
 use ctr::Ctr64LE;
 use ofb::Ofb;
 use vrl::prelude::*;
 
 use crate::encrypt::{get_iv_bytes, get_key_bytes, is_valid_algorithm};
-use aes::cipher::KeyIvInit;
 
 type Aes128Cbc = cbc::Decryptor<aes::Aes128>;
 type Aes192Cbc = cbc::Decryptor<aes::Aes192>;
@@ -150,14 +152,6 @@ impl Function for Decrypt {
             key,
             iv,
         }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let ciphertext = args.required("ciphertext");
-        let algorithm = args.required("algorithm");
-        let key = args.required("key");
-        let iv = args.required("iv");
-        decrypt(ciphertext, algorithm, key, iv)
     }
 }
 

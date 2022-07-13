@@ -1,21 +1,17 @@
 # Reviewing
 
-<!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
-
-1. [Checklist](#checklist)
-1. [Expectations](#expectations)
-1. [Backward Compatibility](#backward-compatibility)
-1. [Code Of Conduct](#code-of-conduct)
-1. [Dependencies](#dependencies)
-1. [Documentation](#documentation)
-1. [Performance Testing](#performance-testing)
-1. [Single Concern](#single-concern)
-1. [Readability](#readability)
-1. [Safe Code](#safe-code)
-1. [Security](#security)
-1. [Testing](#testing)
-
-<!-- /MarkdownTOC -->
+- [Checklist](#checklist)
+- [Expectations](#expectations)
+- [Backward Compatibility](#backward-compatibility)
+- [Code Of Conduct](#code-of-conduct)
+- [Dependencies](#dependencies)
+- [Documentation](#documentation)
+- [Performance Testing](#performance-testing)
+- [Single Concern](#single-concern)
+- [Readability](#readability)
+- [Safe Code](#safe-code)
+- [Security](#security)
+- [Testing](#testing)
 
 ## Checklist
 

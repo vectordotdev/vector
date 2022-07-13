@@ -8,9 +8,21 @@ use futures::{stream, Stream};
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 use vector_buffers::EventCount;
+use vector_common::finalization::{AddBatchNotifier, BatchNotifier};
 
-use super::{Event, EventDataEq, EventMutRef, EventRef, LogEvent, Metric, TraceEvent};
+use super::{
+    Event, EventDataEq, EventFinalizer, EventMutRef, EventRef, LogEvent, Metric, TraceEvent,
+};
 use crate::ByteSizeOf;
+
+/// The type alias for an array of `LogEvent` elements.
+pub type LogArray = Vec<LogEvent>;
+
+/// The type alias for an array of `TraceEvent` elements.
+pub type TraceArray = Vec<TraceEvent>;
+
+/// The type alias for an array of `Metric` elements.
+pub type MetricArray = Vec<Metric>;
 
 /// The core trait to abstract over any type that may work as an array
 /// of events. This is effectively the same as the standard
@@ -89,12 +101,6 @@ impl EventContainer for Metric {
     }
 }
 
-/// The type alias for an array of `LogEvent` elements.
-pub type LogArray = Vec<LogEvent>;
-
-/// The type alias for an array of `TraceEvent` elements.
-pub type TraceArray = Vec<TraceEvent>;
-
 impl EventContainer for LogArray {
     type IntoIter = iter::Map<vec::IntoIter<LogEvent>, fn(LogEvent) -> Event>;
 
@@ -106,9 +112,6 @@ impl EventContainer for LogArray {
         self.into_iter().map(Into::into)
     }
 }
-
-/// The type alias for an array of `Metric` elements.
-pub type MetricArray = Vec<Metric>;
 
 impl EventContainer for MetricArray {
     type IntoIter = iter::Map<vec::IntoIter<Metric>, fn(Metric) -> Event>;
@@ -184,6 +187,24 @@ impl From<Event> for EventArray {
     }
 }
 
+impl From<LogEvent> for EventArray {
+    fn from(log: LogEvent) -> Self {
+        Event::from(log).into()
+    }
+}
+
+impl From<Metric> for EventArray {
+    fn from(metric: Metric) -> Self {
+        Event::from(metric).into()
+    }
+}
+
+impl From<TraceEvent> for EventArray {
+    fn from(trace: TraceEvent) -> Self {
+        Event::from(trace).into()
+    }
+}
+
 impl From<LogArray> for EventArray {
     fn from(array: LogArray) -> Self {
         Self::Logs(array)
@@ -193,6 +214,22 @@ impl From<LogArray> for EventArray {
 impl From<MetricArray> for EventArray {
     fn from(array: MetricArray) -> Self {
         Self::Metrics(array)
+    }
+}
+
+impl AddBatchNotifier for EventArray {
+    fn add_batch_notifier(&mut self, batch: BatchNotifier) {
+        match self {
+            Self::Logs(array) => array
+                .iter_mut()
+                .for_each(|item| item.add_finalizer(EventFinalizer::new(batch.clone()))),
+            Self::Metrics(array) => array
+                .iter_mut()
+                .for_each(|item| item.add_finalizer(EventFinalizer::new(batch.clone()))),
+            Self::Traces(array) => array
+                .iter_mut()
+                .for_each(|item| item.add_finalizer(EventFinalizer::new(batch.clone()))),
+        }
     }
 }
 

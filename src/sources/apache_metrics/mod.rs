@@ -8,9 +8,9 @@ use chrono::Utc;
 use futures::{stream, FutureExt, StreamExt, TryFutureExt};
 use http::uri::Scheme;
 use hyper::{Body, Request};
-use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use tokio_stream::wrappers::IntervalStream;
+use vector_config::configurable_component;
 use vector_core::ByteSizeOf;
 
 use crate::{
@@ -21,7 +21,7 @@ use crate::{
     http::HttpClient,
     internal_events::{
         ApacheMetricsEventsReceived, ApacheMetricsHttpError, ApacheMetricsParseError,
-        ApacheMetricsRequestCompleted, ApacheMetricsResponseError, EndpointBytesReceived,
+        ApacheMetricsResponseError, EndpointBytesReceived, RequestCompleted,
     },
     shutdown::ShutdownSignal,
     SourceSender,
@@ -30,12 +30,22 @@ use crate::{
 mod parser;
 
 pub use parser::ParseError;
+use vector_core::config::LogNamespace;
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
-struct ApacheMetricsConfig {
+/// Configuration for the `apache_metrics` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
+pub struct ApacheMetricsConfig {
+    /// The list of `mod_status` endpoints to scrape metrics from.
     endpoints: Vec<String>,
+
+    /// The interval between scrapes, in seconds.
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
+
+    /// The namespace of the metric.
+    ///
+    /// Disabled if empty.
     #[serde(default = "default_namespace")]
     namespace: String,
 }
@@ -86,7 +96,7 @@ impl SourceConfig for ApacheMetricsConfig {
         ))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(config::DataType::Metric)]
     }
 
@@ -180,7 +190,7 @@ fn apache_metrics(
                     .filter_map(move |response| {
                         ready(match response {
                             Ok((header, body)) if header.status == hyper::StatusCode::OK => {
-                                emit!(ApacheMetricsRequestCompleted {
+                                emit!(RequestCompleted {
                                     start,
                                     end: Instant::now()
                                 });

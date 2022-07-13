@@ -1,9 +1,13 @@
-use super::{handle_line, ConnectionInfo, Method};
-use crate::{
-    codecs, config::SourceContext, internal_events::RedisReceiveEventError, sources::Source,
-};
 use redis::{aio::ConnectionManager, AsyncCommands, RedisResult};
 use snafu::{ResultExt, Snafu};
+
+use super::{handle_line, Method};
+use crate::{
+    codecs,
+    config::SourceContext,
+    internal_events::RedisReceiveEventError,
+    sources::{redis::ConnectionInfo, Source},
+};
 
 #[derive(Debug, Snafu)]
 enum BuildError {

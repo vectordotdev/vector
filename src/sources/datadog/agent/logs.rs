@@ -4,16 +4,16 @@ use bytes::{BufMut, Bytes, BytesMut};
 use chrono::Utc;
 use codecs::StreamDecodingError;
 use http::StatusCode;
-use serde::{Deserialize, Serialize};
+use lookup::path;
 use tokio_util::codec::Decoder;
 use vector_core::ByteSizeOf;
-use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter};
+use warp::{filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response, Filter};
 
 use crate::{
     event::Event,
     internal_events::EventsReceived,
     sources::{
-        datadog::agent::{self, handle_request, ApiKeyQueryParams, DatadogAgentSource},
+        datadog::agent::{self, handle_request, ApiKeyQueryParams, DatadogAgentSource, LogMsg},
         util::ErrorMessage,
     },
     SourceSender,
@@ -26,7 +26,7 @@ pub(crate) fn build_warp_filter(
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
     warp::post()
-        .and(path!("v1" / "input" / ..).or(path!("api" / "v2" / "logs" / ..)))
+        .and(warp_path!("v1" / "input" / ..).or(warp_path!("api" / "v2" / "logs" / ..)))
         .and(warp::path::full())
         .and(warp::header::optional::<String>("content-encoding"))
         .and(warp::header::optional::<String>("dd-api-key"))
@@ -87,28 +87,79 @@ pub(crate) fn decode_log_body(
     let now = Utc::now();
     let mut decoded = Vec::new();
 
-    for message in messages {
+    for LogMsg {
+        message,
+        status,
+        timestamp,
+        hostname,
+        service,
+        ddsource,
+        ddtags,
+    } in messages
+    {
         let mut decoder = source.decoder.clone();
         let mut buffer = BytesMut::new();
-        buffer.put(message.message);
+        buffer.put(message);
         loop {
             match decoder.decode_eof(&mut buffer) {
                 Ok(Some((events, _byte_size))) => {
                     for mut event in events {
                         if let Event::Log(ref mut log) = event {
-                            log.try_insert_flat("status", message.status.clone());
-                            log.try_insert_flat("timestamp", message.timestamp);
-                            log.try_insert_flat("hostname", message.hostname.clone());
-                            log.try_insert_flat("service", message.service.clone());
-                            log.try_insert_flat("ddsource", message.ddsource.clone());
-                            log.try_insert_flat("ddtags", message.ddtags.clone());
-                            log.try_insert_flat(
-                                source.log_schema_source_type_key,
+                            let namespace = &source.log_namespace;
+                            let source_name = "datadog_agent";
+
+                            namespace.insert_source_metadata(
+                                source_name,
+                                log,
+                                path!("status"),
+                                status.clone(),
+                            );
+                            namespace.insert_source_metadata(
+                                source_name,
+                                log,
+                                path!("timestamp"),
+                                timestamp,
+                            );
+                            namespace.insert_source_metadata(
+                                source_name,
+                                log,
+                                path!("hostname"),
+                                hostname.clone(),
+                            );
+                            namespace.insert_source_metadata(
+                                source_name,
+                                log,
+                                path!("service"),
+                                service.clone(),
+                            );
+                            namespace.insert_source_metadata(
+                                source_name,
+                                log,
+                                path!("ddsource"),
+                                ddsource.clone(),
+                            );
+                            namespace.insert_source_metadata(
+                                source_name,
+                                log,
+                                path!("ddtags"),
+                                ddtags.clone(),
+                            );
+
+                            namespace.insert_vector_metadata(
+                                log,
+                                path!(source.log_schema_source_type_key),
+                                path!("source_type"),
                                 Bytes::from("datadog_agent"),
                             );
-                            log.try_insert_flat(source.log_schema_timestamp_key, now);
+                            namespace.insert_vector_metadata(
+                                log,
+                                path!(source.log_schema_timestamp_key),
+                                path!("ingest_timestamp"),
+                                now,
+                            );
+
                             if let Some(k) = &api_key {
-                                log.metadata_mut().set_datadog_api_key(Some(Arc::clone(k)));
+                                log.metadata_mut().set_datadog_api_key(Arc::clone(k));
                             }
 
                             log.metadata_mut()
@@ -136,16 +187,4 @@ pub(crate) fn decode_log_body(
     });
 
     Ok(decoded)
-}
-
-// https://github.com/DataDog/datadog-agent/blob/a33248c2bc125920a9577af1e16f12298875a4ad/pkg/logs/processor/json.go#L23-L49
-#[derive(Deserialize, Clone, Serialize, Debug)]
-pub(crate) struct LogMsg {
-    pub message: Bytes,
-    pub status: Bytes,
-    pub timestamp: i64,
-    pub hostname: Bytes,
-    pub service: Bytes,
-    pub ddsource: Bytes,
-    pub ddtags: Bytes,
 }

@@ -1,3 +1,4 @@
+use ::value::Value;
 use tracing::warn;
 use vrl::prelude::*;
 
@@ -42,12 +43,6 @@ impl Function for ToRegex {
         warn!("`to_regex` is an expensive function that could impact throughput.");
         let value = arguments.required("value");
         Ok(Box::new(ToRegexFn { value }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-
-        to_regex(value)
     }
 }
 

@@ -1,4 +1,5 @@
 use ::sha1::Digest;
+use ::value::Value;
 use vrl::prelude::*;
 
 fn sha1(value: Value) -> Resolved {
@@ -39,11 +40,6 @@ impl Function for Sha1 {
         let value = arguments.required("value");
 
         Ok(Box::new(Sha1Fn { value }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        sha1(value)
     }
 }
 

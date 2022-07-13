@@ -98,7 +98,7 @@ impl BitOr for Exact {
 
 impl From<Exact> for Kind {
     fn from(exact: Exact) -> Self {
-        let mut kind = Self::empty();
+        let mut kind = Self::never();
 
         if exact.bytes {
             kind.add_bytes();

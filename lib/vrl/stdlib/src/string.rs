@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn string(value: Value) -> Resolved {
@@ -49,11 +50,6 @@ impl Function for String {
         let value = arguments.required("value");
 
         Ok(Box::new(StringFn { value }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, arguments: &mut VmArgumentList) -> Resolved {
-        let value = arguments.required("value");
-        string(value)
     }
 }
 

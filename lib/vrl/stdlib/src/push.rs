@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn push(list: Value, item: Value) -> Resolved {
@@ -55,13 +56,6 @@ impl Function for Push {
 
         Ok(Box::new(PushFn { value, item }))
     }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let list = args.required("value");
-        let item = args.required("item");
-
-        push(list, item)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -83,15 +77,19 @@ impl Expression for PushFn {
             0.into(),
             self.item.type_def(state).into(),
         )]));
-
-        self.value.type_def(state).merge_append(item).infallible()
+        self.value
+            .type_def(state)
+            .restrict_array()
+            .merge_append(item)
+            .infallible()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use vector_common::btreemap;
+
+    use super::*;
 
     test_function![
         push => Push;

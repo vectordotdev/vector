@@ -41,7 +41,7 @@ experience -- the purpose of this document.
 By nature of Vector's design, a data processing swiss army knife of sorts,
 we often get presented with many different creative use cases -- using Vector
 for analytics data, obscure IOT pipelines, synchronizing state between systems,
-or adding new langauges for data processing. It's tempting to entertain these
+or adding new languages for data processing. It's tempting to entertain these
 use cases, especially if a large, valuable user is inquiring about them, but we
 should refrain from doing so. Trying to be everything to everyone means we'll
 never be great at anything. Disparate use cases often have competing concerns
@@ -106,7 +106,7 @@ Examples:
 
 * Choosing a fast, yet more difficult, language, like Rust, to build
   Vector in.
-* Investing into performance-realted infrastructure for regression control and
+* Investing into performance-related infrastructure for regression control and
   analysis.
 * Creating ARC to eliminate a common real-world performance problem.
 
@@ -139,7 +139,7 @@ for the following reasons:
 2. Vector should be able to replace legacy pipelines without introducing
    downstream schema changes, something that would likely prevent the adoption
    of Vector.
-3. Deviation from the user's data mental model introduces uncessary friction.
+3. Deviation from the user's data mental model introduces unnecessary friction.
    Vector should not surprise users by moving their log fields around.
 4. Vector does not want to be in the business of maintaining log schemas. An
    exercise that has proven precarious with the proliferation of log schema

@@ -18,16 +18,18 @@ use warp::{
     Filter,
 };
 
+use crate::{
+    config::{AcknowledgementsConfig, SourceContext},
+    internal_events::{HttpBadRequest, HttpBytesReceived, HttpEventsReceived},
+    sources::http::HttpMethod,
+    tls::{MaybeTlsSettings, TlsEnableableConfig},
+    SourceSender,
+};
+
 use super::{
     auth::{HttpSourceAuth, HttpSourceAuthConfig},
     encoding::decode,
     error::ErrorMessage,
-};
-use crate::{
-    config::{AcknowledgementsConfig, SourceContext},
-    internal_events::{HttpBadRequest, HttpBytesReceived, HttpEventsReceived},
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
-    SourceSender,
 };
 
 #[async_trait]
@@ -45,6 +47,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         self,
         address: SocketAddr,
         path: &str,
+        method: HttpMethod,
         strict_path: bool,
         tls: &Option<TlsEnableableConfig>,
         auth: &Option<HttpSourceAuthConfig>,
@@ -58,7 +61,17 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         let acknowledgements = cx.do_acknowledgements(&acknowledgements);
         Ok(Box::pin(async move {
             let span = Span::current();
-            let mut filter: BoxedFilter<()> = warp::post().boxed();
+            let mut filter: BoxedFilter<()> = match method {
+                HttpMethod::Head => warp::head().boxed(),
+                HttpMethod::Get => warp::get().boxed(),
+                HttpMethod::Put => warp::put().boxed(),
+                HttpMethod::Post => warp::post().boxed(),
+                HttpMethod::Patch => warp::patch().boxed(),
+                HttpMethod::Delete => warp::delete().boxed(),
+            };
+
+            // https://github.com/rust-lang/rust-clippy/issues/8148
+            #[allow(clippy::unnecessary_to_owned)]
             for s in path.split('/').filter(|&x| !x.is_empty()) {
                 filter = filter.and(warp::path(s.to_string())).boxed()
             }
@@ -160,7 +173,7 @@ async fn handle_request(
 ) -> Result<impl warp::Reply, Rejection> {
     match events {
         Ok(mut events) => {
-            let receiver = BatchNotifier::maybe_apply_to_events(acknowledgements, &mut events);
+            let receiver = BatchNotifier::maybe_apply_to(acknowledgements, &mut events);
 
             out.send_batch(events)
                 .map_err(move |error: crate::source_sender::ClosedError| {

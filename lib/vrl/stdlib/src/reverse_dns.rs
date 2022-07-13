@@ -1,5 +1,6 @@
 use std::net::IpAddr;
 
+use ::value::Value;
 use dns_lookup::lookup_addr;
 use vrl::prelude::*;
 
@@ -46,11 +47,6 @@ impl Function for ReverseDns {
         let value = arguments.required("value");
 
         Ok(Box::new(ReverseDnsFn { value }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        reverse_dns(value)
     }
 }
 

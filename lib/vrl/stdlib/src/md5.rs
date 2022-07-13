@@ -1,3 +1,4 @@
+use ::value::Value;
 use md5::Digest;
 use vrl::prelude::*;
 
@@ -39,11 +40,6 @@ impl Function for Md5 {
         let value = arguments.required("value");
 
         Ok(Box::new(Md5Fn { value }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        md5(value)
     }
 }
 

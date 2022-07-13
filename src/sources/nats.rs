@@ -2,16 +2,18 @@ use bytes::Bytes;
 use chrono::Utc;
 use codecs::decoding::{DeserializerConfig, FramingConfig, StreamDecodingError};
 use futures::{pin_mut, stream, Stream, StreamExt};
-use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
+use vector_config::configurable_component;
+use vector_core::config::LogNamespace;
+
 use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{log_schema, GenerateConfig, Output, SourceConfig, SourceContext, SourceDescription},
     event::Event,
-    internal_events::{BytesReceived, NatsEventsReceived, StreamClosedError},
+    internal_events::{BytesReceived, OldEventsReceived, StreamClosedError},
     nats::{from_tls_auth_config, NatsAuthConfig, NatsConfigError},
     serde::{default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
@@ -29,20 +31,41 @@ enum BuildError {
     Subscribe { source: std::io::Error },
 }
 
-#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
+/// Configuration for the `nats` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
-struct NatsSourceConfig {
+pub struct NatsSourceConfig {
+    /// The NATS URL to connect to.
+    ///
+    /// The URL must take the form of `nats://server:port`.
     url: String,
+
+    /// A name assigned to the NATS connection.
     #[serde(alias = "name")]
     connection_name: String,
+
+    /// The NATS subject to publish messages to.
+    // TODO: We will eventually be able to add metadata on a per-field basis, such that we can add metadata for marking
+    // this field as being capable of using Vector's templating syntax.
     subject: String,
+
+    /// NATS Queue Group to join.
     queue: Option<String>,
+
+    #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
+
+    #[configurable(derived)]
     auth: Option<NatsAuthConfig>,
+
+    #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
     #[derivative(Default(value = "default_framing_message_based()"))]
     framing: FramingConfig,
+
+    #[configurable(derived)]
     #[serde(default = "default_decoding")]
     #[derivative(Default(value = "default_decoding()"))]
     decoding: DeserializerConfig,
@@ -69,7 +92,12 @@ impl GenerateConfig for NatsSourceConfig {
 impl SourceConfig for NatsSourceConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let (connection, subscription) = create_subscription(self).await?;
-        let decoder = DecodingConfig::new(self.framing.clone(), self.decoding.clone()).build();
+        let decoder = DecodingConfig::new(
+            self.framing.clone(),
+            self.decoding.clone(),
+            LogNamespace::Legacy,
+        )
+        .build();
 
         Ok(Box::pin(nats_source(
             connection,
@@ -80,7 +108,7 @@ impl SourceConfig for NatsSourceConfig {
         )))
     }
 
-    fn outputs(&self) -> Vec<Output> {
+    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
         vec![Output::default(self.decoding.output_type())]
     }
 
@@ -136,7 +164,7 @@ async fn nats_source(
             match next {
                 Ok((events, _byte_size)) => {
                     let count = events.len();
-                    emit!(NatsEventsReceived {
+                    emit!(OldEventsReceived {
                         byte_size: events.size_of(),
                         count
                     });
@@ -217,7 +245,12 @@ mod integration_tests {
 
         let events = assert_source_compliance(&SOURCE_TAGS, async move {
             let (tx, rx) = SourceSender::new_test();
-            let decoder = DecodingConfig::new(conf.framing.clone(), conf.decoding.clone()).build();
+            let decoder = DecodingConfig::new(
+                conf.framing.clone(),
+                conf.decoding.clone(),
+                LogNamespace::Legacy,
+            )
+            .build();
             tokio::spawn(nats_source(nc, sub, decoder, ShutdownSignal::noop(), tx));
             nc_pub.publish(&subject, msg).await.unwrap();
 
@@ -233,11 +266,13 @@ mod integration_tests {
     #[tokio::test]
     async fn nats_no_auth() {
         let subject = format!("test-{}", random_string(10));
+        let url =
+            std::env::var("NATS_ADDRESS").unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSourceConfig {
             connection_name: "".to_owned(),
             subject: subject.clone(),
-            url: "nats://127.0.0.1:4222".to_owned(),
+            url,
             queue: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
@@ -256,11 +291,13 @@ mod integration_tests {
     #[tokio::test]
     async fn nats_userpass_auth_valid() {
         let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_USERPASS_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSourceConfig {
             connection_name: "".to_owned(),
             subject: subject.clone(),
-            url: "nats://127.0.0.1:4223".to_owned(),
+            url,
             queue: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
@@ -284,11 +321,13 @@ mod integration_tests {
     #[tokio::test]
     async fn nats_userpass_auth_invalid() {
         let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_USERPASS_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSourceConfig {
             connection_name: "".to_owned(),
             subject: subject.clone(),
-            url: "nats://127.0.0.1:4223".to_owned(),
+            url,
             queue: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
@@ -312,11 +351,13 @@ mod integration_tests {
     #[tokio::test]
     async fn nats_token_auth_valid() {
         let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_TOKEN_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSourceConfig {
             connection_name: "".to_owned(),
             subject: subject.clone(),
-            url: "nats://127.0.0.1:4224".to_owned(),
+            url,
             queue: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
@@ -339,11 +380,13 @@ mod integration_tests {
     #[tokio::test]
     async fn nats_token_auth_invalid() {
         let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_TOKEN_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSourceConfig {
             connection_name: "".to_owned(),
             subject: subject.clone(),
-            url: "nats://127.0.0.1:4224".to_owned(),
+            url,
             queue: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
@@ -366,11 +409,13 @@ mod integration_tests {
     #[tokio::test]
     async fn nats_nkey_auth_valid() {
         let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_NKEY_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSourceConfig {
             connection_name: "".to_owned(),
             subject: subject.clone(),
-            url: "nats://127.0.0.1:4225".to_owned(),
+            url,
             queue: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
@@ -394,11 +439,13 @@ mod integration_tests {
     #[tokio::test]
     async fn nats_nkey_auth_invalid() {
         let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_NKEY_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSourceConfig {
             connection_name: "".to_owned(),
             subject: subject.clone(),
-            url: "nats://127.0.0.1:4225".to_owned(),
+            url,
             queue: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
@@ -422,18 +469,20 @@ mod integration_tests {
     #[tokio::test]
     async fn nats_tls_valid() {
         let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_TLS_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSourceConfig {
             connection_name: "".to_owned(),
             subject: subject.clone(),
-            url: "nats://localhost:4227".to_owned(),
+            url,
             queue: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
             tls: Some(TlsEnableableConfig {
                 enabled: Some(true),
                 options: TlsConfig {
-                    ca_file: Some("tests/data/mkcert_rootCA.pem".into()),
+                    ca_file: Some("tests/data/nats/rootCA.pem".into()),
                     ..Default::default()
                 },
             }),
@@ -451,11 +500,13 @@ mod integration_tests {
     #[tokio::test]
     async fn nats_tls_invalid() {
         let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_TLS_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSourceConfig {
             connection_name: "".to_owned(),
             subject: subject.clone(),
-            url: "nats://localhost:4227".to_owned(),
+            url,
             queue: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
@@ -474,20 +525,22 @@ mod integration_tests {
     #[tokio::test]
     async fn nats_tls_client_cert_valid() {
         let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_TLS_CLIENT_CERT_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSourceConfig {
             connection_name: "".to_owned(),
             subject: subject.clone(),
-            url: "nats://localhost:4228".to_owned(),
+            url,
             queue: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
             tls: Some(TlsEnableableConfig {
                 enabled: Some(true),
                 options: TlsConfig {
-                    ca_file: Some("tests/data/mkcert_rootCA.pem".into()),
-                    crt_file: Some("tests/data/nats_client_cert.pem".into()),
-                    key_file: Some("tests/data/nats_client_key.pem".into()),
+                    ca_file: Some("tests/data/nats/rootCA.pem".into()),
+                    crt_file: Some("tests/data/nats/nats-client.pem".into()),
+                    key_file: Some("tests/data/nats/nats-client.key".into()),
                     ..Default::default()
                 },
             }),
@@ -505,18 +558,20 @@ mod integration_tests {
     #[tokio::test]
     async fn nats_tls_client_cert_invalid() {
         let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_TLS_CLIENT_CERT_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSourceConfig {
             connection_name: "".to_owned(),
             subject: subject.clone(),
-            url: "nats://localhost:4228".to_owned(),
+            url,
             queue: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
             tls: Some(TlsEnableableConfig {
                 enabled: Some(true),
                 options: TlsConfig {
-                    ca_file: Some("tests/data/mkcert_rootCA.pem".into()),
+                    ca_file: Some("tests/data/nats/rootCA.pem".into()),
                     ..Default::default()
                 },
             }),
@@ -534,24 +589,26 @@ mod integration_tests {
     #[tokio::test]
     async fn nats_tls_jwt_auth_valid() {
         let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_JWT_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSourceConfig {
             connection_name: "".to_owned(),
             subject: subject.clone(),
-            url: "nats://localhost:4229".to_owned(),
+            url,
             queue: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
             tls: Some(TlsEnableableConfig {
                 enabled: Some(true),
                 options: TlsConfig {
-                    ca_file: Some("tests/data/mkcert_rootCA.pem".into()),
+                    ca_file: Some("tests/data/nats/rootCA.pem".into()),
                     ..Default::default()
                 },
             }),
             auth: Some(NatsAuthConfig::CredentialsFile {
                 credentials_file: NatsAuthCredentialsFile {
-                    path: "tests/data/nats.creds".into(),
+                    path: "tests/data/nats/nats.creds".into(),
                 },
             }),
         };
@@ -567,24 +624,26 @@ mod integration_tests {
     #[tokio::test]
     async fn nats_tls_jwt_auth_invalid() {
         let subject = format!("test-{}", random_string(10));
+        let url = std::env::var("NATS_JWT_ADDRESS")
+            .unwrap_or_else(|_| String::from("nats://localhost:4222"));
 
         let conf = NatsSourceConfig {
             connection_name: "".to_owned(),
             subject: subject.clone(),
-            url: "nats://localhost:4229".to_owned(),
+            url,
             queue: None,
             framing: default_framing_message_based(),
             decoding: default_decoding(),
             tls: Some(TlsEnableableConfig {
                 enabled: Some(true),
                 options: TlsConfig {
-                    ca_file: Some("tests/data/mkcert_rootCA.pem".into()),
+                    ca_file: Some("tests/data/nats/rootCA.pem".into()),
                     ..Default::default()
                 },
             }),
             auth: Some(NatsAuthConfig::CredentialsFile {
                 credentials_file: NatsAuthCredentialsFile {
-                    path: "tests/data/nats-bad.creds".into(),
+                    path: "tests/data/nats/nats-bad.creds".into(),
                 },
             }),
         };

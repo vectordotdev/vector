@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use bytes::Bytes;
 use datadog_filter::{
     build_matcher,
@@ -6,19 +8,17 @@ use datadog_filter::{
 };
 use datadog_search_syntax::parse;
 use datadog_search_syntax::{Comparison, ComparisonValue, Field};
-use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
+use vector_config::configurable_component;
 use vector_core::event::{Event, LogEvent, Value};
 
-use crate::conditions::{Condition, ConditionConfig, ConditionDescription, Conditional};
+use crate::conditions::{Condition, Conditional, ConditionalConfig};
 
-#[derive(Deserialize, Serialize, Debug, Default, Clone, PartialEq)]
-pub(crate) struct DatadogSearchConfig {
+/// A condition that uses the [Datadog Search](https://docs.datadoghq.com/logs/explorer/search_syntax/) query syntax against an event.
+#[configurable_component]
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct DatadogSearchConfig {
+    /// The query string.
     source: String,
-}
-
-inventory::submit! {
-    ConditionDescription::new::<DatadogSearchConfig>("datadog_search")
 }
 
 impl_generate_config_from_default!(DatadogSearchConfig);
@@ -31,13 +31,13 @@ pub struct DatadogSearchRunner {
 }
 
 impl Conditional for DatadogSearchRunner {
-    fn check(&self, e: &Event) -> bool {
-        self.matcher.run(e)
+    fn check(&self, e: Event) -> (bool, Event) {
+        let result = self.matcher.run(&e);
+        (result, e)
     }
 }
 
-#[typetag::serde(name = "datadog_search")]
-impl ConditionConfig for DatadogSearchConfig {
+impl ConditionalConfig for DatadogSearchConfig {
     fn build(&self, _enrichment_tables: &enrichment::TableRegistry) -> crate::Result<Condition> {
         let node = parse(&self.source)?;
         let matcher = as_log(build_matcher(&node, &EventFilter::default()));
@@ -53,8 +53,6 @@ fn as_log(matcher: Box<dyn Matcher<LogEvent>>) -> Box<dyn Matcher<Event>> {
         _ => false,
     })
 }
-
-//------------------------------------------------------------------------------
 
 #[derive(Default, Clone)]
 struct EventFilter;
@@ -312,17 +310,15 @@ where
     })
 }
 
-//------------------------------------------------------------------------------
-
 #[cfg(test)]
 mod test {
-    use super::*;
-
-    use crate::log_event;
     use datadog_filter::{build_matcher, Filter, Resolver};
     use datadog_search_syntax::parse;
     use serde_json::json;
     use vector_core::event::Event;
+
+    use super::*;
+    use crate::log_event;
 
     /// Returns the following: Datadog Search Syntax source (to be parsed), an `Event` that
     /// should pass when matched against the compiled source, and an `Event` that should fail.
@@ -1064,14 +1060,14 @@ mod test {
                 .unwrap_or_else(|_| panic!("build failed: {}", source));
 
             assert!(
-                cond.check_with_context(&pass).is_ok(),
+                cond.check_with_context(pass.clone()).0.is_ok(),
                 "should pass: {}\nevent: {:?}",
                 source,
                 pass.as_log()
             );
 
             assert!(
-                cond.check_with_context(&fail).is_err(),
+                cond.check_with_context(fail.clone()).0.is_err(),
                 "should fail: {}\nevent: {:?}",
                 source,
                 fail.as_log()

@@ -3,18 +3,24 @@
 
 #![deny(missing_docs)]
 
+mod avro;
 mod json;
+mod logfmt;
 mod native;
 mod native_json;
 mod raw_message;
+mod text;
 
+use std::fmt::Debug;
+
+pub use avro::{AvroSerializer, AvroSerializerConfig, AvroSerializerOptions};
+use dyn_clone::DynClone;
 pub use json::{JsonSerializer, JsonSerializerConfig};
+pub use logfmt::{LogfmtSerializer, LogfmtSerializerConfig};
 pub use native::{NativeSerializer, NativeSerializerConfig};
 pub use native_json::{NativeJsonSerializer, NativeJsonSerializerConfig};
 pub use raw_message::{RawMessageSerializer, RawMessageSerializerConfig};
-
-use dyn_clone::DynClone;
-use std::fmt::Debug;
+pub use text::{TextSerializer, TextSerializerConfig};
 use vector_core::event::Event;
 
 /// Serialize a structured event into a byte frame.

@@ -1,9 +1,11 @@
-use super::NewRelicSinkError;
-use crate::event::{Event, MetricValue, Value};
+use std::{collections::HashMap, convert::TryFrom, fmt::Debug, time::SystemTime};
+
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, convert::TryFrom, fmt::Debug, time::SystemTime};
+
+use super::NewRelicSinkError;
+use crate::event::{Event, MetricValue, Value};
 
 #[derive(Debug)]
 pub enum NewRelicApiModel {
@@ -111,7 +113,7 @@ impl TryFrom<Vec<Event>> for EventsApiModel {
         for buf_event in buf_events {
             if let Event::Log(log) = buf_event {
                 let mut event_model = KeyValData::new();
-                for (k, v) in log.all_fields() {
+                for (k, v) in log.convert_to_fields() {
                     event_model.insert(k, v.clone());
                 }
 
@@ -184,7 +186,7 @@ impl TryFrom<Vec<Event>> for LogsApiModel {
         for buf_event in buf_events {
             if let Event::Log(log) = buf_event {
                 let mut log_model = KeyValData::new();
-                for (k, v) in log.all_fields() {
+                for (k, v) in log.convert_to_fields() {
                     log_model.insert(k, v.clone());
                 }
                 if log.get("message").is_none() {

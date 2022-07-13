@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn to_syslog_severity(level: Value) -> Resolved {
@@ -59,11 +60,6 @@ impl Function for ToSyslogSeverity {
         let value = arguments.required("value");
 
         Ok(Box::new(ToSyslogSeverityFn { value }))
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        to_syslog_severity(value)
     }
 }
 

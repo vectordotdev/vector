@@ -1,9 +1,30 @@
-#![deny(clippy::all)]
-#![deny(unreachable_pub)]
-#![deny(unused_allocation)]
-#![deny(unused_extern_crates)]
-#![deny(unused_assignments)]
-#![deny(unused_comparisons)]
+#![deny(
+    warnings,
+    clippy::all,
+    clippy::pedantic,
+    unreachable_pub,
+    unused_allocation,
+    unused_extern_crates,
+    unused_assignments,
+    unused_comparisons
+)]
+#![allow(
+    clippy::cast_possible_truncation, // allowed in initial deny commit
+    clippy::cast_precision_loss, // allowed in initial deny commit
+    clippy::cast_sign_loss, // allowed in initial deny commit
+    clippy::default_trait_access, // allowed in initial deny commit
+    clippy::doc_markdown, // allowed in initial deny commit
+    clippy::inefficient_to_string, // allowed in initial deny commit
+    clippy::match_bool, // allowed in initial deny commit
+    clippy::match_same_arms, // allowed in initial deny commit
+    clippy::needless_pass_by_value, // allowed in initial deny commit
+    clippy::semicolon_if_nothing_returned,  // allowed in initial deny commit
+    clippy::similar_names, // allowed in initial deny commit
+    clippy::single_match_else, // allowed in initial deny commit
+    clippy::struct_excessive_bools,  // allowed in initial deny commit
+    clippy::too_many_lines, // allowed in initial deny commit
+    clippy::trivially_copy_pass_by_ref, // allowed in initial deny commit
+)]
 
 mod util;
 
@@ -49,6 +70,8 @@ mod encrypt;
 mod ends_with;
 #[cfg(feature = "exists")]
 mod exists;
+#[cfg(feature = "filter")]
+mod filter;
 #[cfg(feature = "find")]
 mod find;
 #[cfg(feature = "flatten")]
@@ -101,6 +124,8 @@ mod is_empty;
 mod is_float;
 #[cfg(feature = "is_integer")]
 mod is_integer;
+#[cfg(feature = "is_json")]
+mod is_json;
 #[cfg(feature = "is_null")]
 mod is_null;
 #[cfg(feature = "is_nullish")]
@@ -280,12 +305,6 @@ mod uuid_v4;
 
 // -----------------------------------------------------------------------------
 
-#[cfg(feature = "array")]
-pub use crate::array::Array;
-#[cfg(feature = "md5")]
-pub use crate::md5::Md5;
-#[cfg(feature = "sha1")]
-pub use crate::sha1::Sha1;
 #[cfg(feature = "append")]
 pub use append::Append;
 #[cfg(feature = "assert")]
@@ -326,6 +345,8 @@ pub use encrypt::Encrypt;
 pub use ends_with::EndsWith;
 #[cfg(feature = "exists")]
 pub use exists::Exists;
+#[cfg(feature = "filter")]
+pub use filter::Filter;
 #[cfg(feature = "find")]
 pub use find::Find;
 #[cfg(feature = "flatten")]
@@ -378,6 +399,8 @@ pub use is_empty::IsEmpty;
 pub use is_float::IsFloat;
 #[cfg(feature = "is_integer")]
 pub use is_integer::IsInteger;
+#[cfg(feature = "is_json")]
+pub use is_json::IsJson;
 #[cfg(feature = "is_null")]
 pub use is_null::IsNull;
 #[cfg(feature = "is_nullish")]
@@ -545,6 +568,14 @@ pub use upcase::Upcase;
 #[cfg(feature = "uuid_v4")]
 pub use uuid_v4::UuidV4;
 
+#[cfg(feature = "array")]
+pub use crate::array::Array;
+#[cfg(feature = "md5")]
+pub use crate::md5::Md5;
+#[cfg(feature = "sha1")]
+pub use crate::sha1::Sha1;
+
+#[must_use]
 pub fn all() -> Vec<Box<dyn vrl::Function>> {
     vec![
         #[cfg(feature = "append")]
@@ -589,6 +620,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(EndsWith),
         #[cfg(feature = "exists")]
         Box::new(Exists),
+        #[cfg(feature = "filter")]
+        Box::new(Filter),
         #[cfg(feature = "find")]
         Box::new(Find),
         #[cfg(feature = "flatten")]
@@ -641,6 +674,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(IsFloat),
         #[cfg(feature = "is_integer")]
         Box::new(IsInteger),
+        #[cfg(feature = "is_json")]
+        Box::new(IsJson),
         #[cfg(feature = "is_null")]
         Box::new(IsNull),
         #[cfg(feature = "is_nullish")]

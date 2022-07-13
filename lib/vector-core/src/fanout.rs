@@ -1,13 +1,13 @@
+use std::{collections::HashMap, fmt, task::Poll};
+
 use futures::{Stream, StreamExt};
 use futures_util::{pending, poll};
 use indexmap::IndexMap;
-use std::{collections::HashMap, fmt, task::Poll};
 use tokio::sync::mpsc;
 use tokio_util::sync::ReusableBoxFuture;
+use vector_buffers::topology::channel::BufferSender;
 
 use crate::{config::ComponentKey, event::EventArray};
-
-use vector_buffers::topology::channel::BufferSender;
 
 pub enum ControlMessage {
     Add(ComponentKey, BufferSender<EventArray>),
@@ -455,7 +455,7 @@ mod tests {
 
     async fn replace_sender_in_fanout(
         control: &UnboundedSender<ControlMessage>,
-        receivers: &mut Vec<BufferReceiver<EventArray>>,
+        receivers: &mut [BufferReceiver<EventArray>],
         sender_id: usize,
         capacity: usize,
     ) -> BufferReceiver<EventArray> {
@@ -481,7 +481,7 @@ mod tests {
 
     async fn start_sender_replace(
         control: &UnboundedSender<ControlMessage>,
-        receivers: &mut Vec<BufferReceiver<EventArray>>,
+        receivers: &mut [BufferReceiver<EventArray>],
         sender_id: usize,
         capacity: usize,
     ) -> (BufferReceiver<EventArray>, BufferSender<EventArray>) {

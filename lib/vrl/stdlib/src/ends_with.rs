@@ -1,3 +1,4 @@
+use ::value::Value;
 use vrl::prelude::*;
 
 fn ends_with(value: Value, substring: Value, case_sensitive: bool) -> Resolved {
@@ -84,18 +85,6 @@ impl Function for EndsWith {
                 result: Ok("false"),
             },
         ]
-    }
-
-    fn call_by_vm(&self, _ctx: &mut Context, args: &mut VmArgumentList) -> Resolved {
-        let value = args.required("value");
-        let substring = args.required("substring");
-        let case_sensitive = args
-            .optional("case_sensitive")
-            .map(|value| value.try_boolean())
-            .transpose()?
-            .unwrap_or(true);
-
-        ends_with(value, substring, case_sensitive)
     }
 }
 

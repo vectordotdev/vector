@@ -1,7 +1,9 @@
-use crate::Value;
-use lookup::{FieldBuf, LookupBuf, SegmentBuf};
 use std::collections::BTreeMap;
 use std::iter::Peekable;
+
+use lookup::{FieldBuf, LookupBuf, SegmentBuf};
+
+use crate::Value;
 
 impl Value {
     /// Get a reference to a value from a given path.
@@ -379,7 +381,7 @@ impl Value {
                 // replace an existing value, or insert to the front of the
                 // array.
                 if index.is_negative() {
-                    let abs = index.abs() as usize;
+                    let abs = index.unsigned_abs();
 
                     // left-padded with null values
                     for _ in 1..abs - array.len() {

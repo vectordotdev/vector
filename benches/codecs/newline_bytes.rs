@@ -1,3 +1,5 @@
+use std::{fmt, time::Duration};
+
 use bytes::BytesMut;
 use codecs::{
     self, decoding::Deserializer, decoding::Framer, BytesDeserializer, NewlineDelimitedDecoder,
@@ -6,7 +8,6 @@ use criterion::{
     criterion_group, measurement::WallTime, BatchSize, BenchmarkGroup, BenchmarkId, Criterion,
     SamplingMode, Throughput,
 };
-use std::{fmt, time::Duration};
 use tokio_util::codec::Decoder;
 
 #[derive(Debug)]

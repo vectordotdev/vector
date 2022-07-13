@@ -114,7 +114,7 @@ if (details, err = parse_url(.custom.http.url); err == null) {
 [[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
-if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
+if (details, err = parse_user_agent(.custom.http.useragent, mode: "fast"); err == null) {
   .custom.http.useragent_details = details
 }
 '''
@@ -1460,7 +1460,7 @@ if (details, err = parse_url(.custom.http.url); err == null) {
 [[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
-if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
+if (details, err = parse_user_agent(.custom.http.useragent, mode: "fast"); err == null) {
   .custom.http.useragent_details = details
 }
 '''
@@ -2770,7 +2770,7 @@ del(.custom.data.user_agent)
 [[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
-if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
+if (details, err = parse_user_agent(.custom.http.useragent, mode: "fast"); err == null) {
   .custom.http.useragent_details = details
 }
 '''
@@ -3069,7 +3069,7 @@ name = "aws_ecs-agent"
 filter.type = "datadog_search"
 filter.source = "source:amazon-ecs-agent"
 
-[[transforms.processing.logs.pipelines.aws_ecs-agent.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if match_datadog_query(., "@http.status_code:[200 TO 299]") {
@@ -3083,7 +3083,7 @@ if match_datadog_query(., "@http.status_code:[200 TO 299]") {
 }
 '''
 
-[[transforms.processing.logs.pipelines.aws_ecs-agent.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 status = string(.custom.http.status_category) ?? string(.custom.level) ?? ""
@@ -3113,7 +3113,7 @@ if status == "" {
 }
 '''
 
-[[transforms.processing.logs.pipelines.aws_ecs-agent.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.time) {
@@ -3121,7 +3121,7 @@ if exists(.custom.time) {
 }
 '''
 
-[[transforms.processing.logs.pipelines.aws_ecs-agent.transforms]]
+[[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
 if exists(.custom.msg) {
@@ -3254,7 +3254,7 @@ if (details, err = parse_url(.custom.http.url); err == null) {
 [[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
-if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
+if (details, err = parse_user_agent(.custom.http.useragent, mode: "fast"); err == null) {
   .custom.http.useragent_details = details
 }
 '''
@@ -3537,7 +3537,7 @@ if (err == null) {
 [[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
-if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
+if (details, err = parse_user_agent(.custom.http.useragent, mode: "fast"); err == null) {
   .custom.http.useragent_details = details
 }
 '''
@@ -3889,19 +3889,19 @@ if .custom.dd.env != null {
   }
 } else if .custom.dd_env != null {
   if (tag, err = "env:" + to_string(.custom.dd_env); err == null) {
-    .tags = push(.tags, tag)
+    .tags, err = push(.tags, tag)
   }
 } else if .custom.Properties.dd.env != null {
   if (tag, err = "env:" + to_string(.custom.Properties.dd.env); err == null) {
-    .tags = push(.tags, tag)
+    .tags, err = push(.tags, tag)
   }
 } else if .custom.properties.dd.env != null {
   if (tag, err = "env:" + to_string(.custom.properties.dd.env); err == null) {
-    .tags = push(.tags, tag)
+    .tags, err = push(.tags, tag)
   }
 } else if .custom.Properties.dd_env != null {
   if (tag, err = "env:" + to_string(.custom.Properties.dd_env); err == null) {
-    .tags = push(.tags, tag)
+    .tags, err = push(.tags, tag)
   }
 }
 del(.custom.dd.env)
@@ -3920,19 +3920,19 @@ if .custom.dd.version != null {
   }
 } else if .custom.dd_version != null {
   if (tag, err = "version:" + to_string(.custom.dd_version); err == null) {
-    .tags = push(.tags, tag)
+    .tags, err = push(.tags, tag)
   }
 } else if .custom.Properties.dd.version != null {
   if (tag, err = "version:" + to_string(.custom.Properties.dd.version); err == null) {
-    .tags = push(.tags, tag)
+    .tags, err = push(.tags, tag)
   }
 } else if .custom.properties.dd.version != null {
   if (tag, err = "version:" + to_string(.custom.properties.dd.version); err == null) {
-    .tags = push(.tags, tag)
+    .tags, err = push(.tags, tag)
   }
 } else if .custom.Properties.dd_version != null {
   if (tag, err = "version:" + to_string(.custom.Properties.dd_version); err == null) {
-    .tags = push(.tags, tag)
+    .tags, err = push(.tags, tag)
   }
 }
 del(.custom.dd.version)
@@ -3975,7 +3975,7 @@ if (details, err = parse_url(.custom.http.url); err == null) {
 [[transforms.processing.logs.transforms]]
 type = "remap"
 source = '''
-if (details, err = parse_user_agent(.custom.http.useragent, mode: "enriched"); err == null) {
+if (details, err = parse_user_agent(.custom.http.useragent, mode: "fast"); err == null) {
   .custom.http.useragent_details = details
 }
 '''

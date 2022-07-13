@@ -1,4 +1,13 @@
+use std::{
+    fmt::Debug,
+    io,
+    net::SocketAddr,
+    task::{Context, Poll},
+    time::{Duration, Instant},
+};
+
 use async_trait::async_trait;
+use bytes::BytesMut;
 use futures::{
     future::{self},
     pin_mut,
@@ -7,13 +16,6 @@ use futures::{
     Sink, Stream, StreamExt,
 };
 use snafu::{ResultExt, Snafu};
-use std::{
-    fmt::Debug,
-    io,
-    net::SocketAddr,
-    task::{Context, Poll},
-    time::{Duration, Instant},
-};
 use tokio::{net::TcpStream, time};
 use tokio_tungstenite::{
     client_async_with_config,
@@ -26,24 +28,23 @@ use tokio_tungstenite::{
     },
     WebSocketStream as WsStream,
 };
+use tokio_util::codec::Encoder as _;
 use vector_core::{
     buffers::Acker,
     internal_event::{BytesSent, EventsSent},
+    ByteSizeOf,
 };
 
 use crate::{
+    codecs::Encoder,
     dns, emit,
-    event::Event,
+    event::{Event, EventStatus, Finalizable},
     internal_events::{
         ConnectionOpen, OpenGauge, WsConnectionError, WsConnectionEstablished,
         WsConnectionFailedError, WsConnectionShutdown,
     },
-    sinks::util::{
-        encoding::{Encoder, EncodingConfig, StandardEncodings},
-        retries::ExponentialBackoff,
-        StreamSink,
-    },
-    sinks::websocket::config::WebSocketSinkConfig,
+    sinks::util::{retries::ExponentialBackoff, StreamSink},
+    sinks::{util::encoding::Transformer, websocket::config::WebSocketSinkConfig},
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsError},
 };
 
@@ -88,7 +89,7 @@ impl WebSocketConnector {
             .ok_or(WsError::Url(UrlError::NoHostName))?
             .to_string();
         let mode = uri_mode(request.uri())?;
-        let port = request.uri().port_u16().unwrap_or_else(|| match mode {
+        let port = request.uri().port_u16().unwrap_or(match mode {
             UriMode::Tls => 443,
             UriMode::Plain => 80,
         });
@@ -182,7 +183,8 @@ impl PingInterval {
 }
 
 pub struct WebSocketSink {
-    encoding: EncodingConfig<StandardEncodings>,
+    transformer: Transformer,
+    encoder: Encoder<()>,
     connector: WebSocketConnector,
     acker: Acker,
     ping_interval: Option<u64>,
@@ -190,14 +192,23 @@ pub struct WebSocketSink {
 }
 
 impl WebSocketSink {
-    pub fn new(config: &WebSocketSinkConfig, connector: WebSocketConnector, acker: Acker) -> Self {
-        Self {
-            encoding: config.encoding.clone(),
+    pub fn new(
+        config: &WebSocketSinkConfig,
+        connector: WebSocketConnector,
+        acker: Acker,
+    ) -> crate::Result<Self> {
+        let transformer = config.encoding.transformer();
+        let serializer = config.encoding.encoding()?;
+        let encoder = Encoder::<()>::new(serializer);
+
+        Ok(Self {
+            transformer,
+            encoder,
             connector,
             acker,
             ping_interval: config.ping_interval.filter(|v| *v > 0),
             ping_timeout: config.ping_timeout.filter(|v| *v > 0),
-        }
+        })
     }
 
     async fn create_sink_and_stream(
@@ -224,7 +235,7 @@ impl WebSocketSink {
     }
 
     async fn handle_events<I, WS, O>(
-        &self,
+        &mut self,
         input: &mut I,
         ws_stream: &mut WS,
         ws_sink: &mut O,
@@ -266,29 +277,45 @@ impl WebSocketSink {
                 },
 
                 event = input.next() => {
-                    if event.is_none() {
+                    let mut event = if let Some(event) = event {
+                        event
+                    } else {
                         break;
-                    }
-                    let log = encode_event(event.unwrap(), &self.encoding);
-                    let res = match log {
-                        Some(msg) => {
-                            let msg_len = msg.len();
-                            ws_sink.send(msg).await.map(|_| {
+                    };
+
+                    let finalizers = event.take_finalizers();
+
+                    self.transformer.transform(&mut event);
+
+                    let event_byte_size = event.size_of();
+
+                    let mut bytes = BytesMut::new();
+                    let res = match self.encoder.encode(event, &mut bytes) {
+                        Ok(()) => {
+                            finalizers.update_status(EventStatus::Delivered);
+
+                            let message = Message::text(String::from_utf8_lossy(&bytes));
+                            let message_len = message.len();
+
+                            ws_sink.send(message).await.map(|_| {
                                 emit!(EventsSent {
                                     count: 1,
-                                    byte_size: msg_len,
+                                    byte_size: event_byte_size,
                                     output: None
                                 });
                                 emit!(BytesSent {
-                                    byte_size: msg_len,
+                                    byte_size: message_len,
                                     protocol: "websocket"
                                 });
                             })
                         },
-                        None => {
+                        Err(_) => {
+                            // Error is handled by `Encoder`.
+                            finalizers.update_status(EventStatus::Errored);
                             Ok(())
                         }
                     };
+
                     self.acker.ack(1);
                     res
                 },
@@ -311,7 +338,7 @@ impl WebSocketSink {
 
 #[async_trait]
 impl StreamSink<Event> for WebSocketSink {
-    async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let input = input.fuse().peekable();
         pin_mut!(input);
 
@@ -344,16 +371,12 @@ const fn is_closed(error: &WsError) -> bool {
     )
 }
 
-fn encode_event(event: Event, encoding: &EncodingConfig<StandardEncodings>) -> Option<Message> {
-    let msg = encoding.encode_input_to_string(event).ok();
-    msg.map(Message::text)
-}
-
 #[cfg(all(test, feature = "sources-utils-tls"))]
 mod tests {
+    use std::net::SocketAddr;
+
     use futures::{future, FutureExt, StreamExt};
     use serde_json::Value as JsonValue;
-    use std::net::SocketAddr;
     use tokio::time::timeout;
     use tokio_tungstenite::{
         accept_async,
@@ -363,34 +386,57 @@ mod tests {
         },
     };
 
+    use super::*;
     use crate::{
         config::{SinkConfig, SinkContext},
-        event::{Event, Value as EventValue},
-        sinks::util::encoding::StandardEncodings,
-        test_util::{next_addr, random_lines_with_stream, trace_init, CountReceiver},
+        event::{Event, LogEvent, Value as EventValue},
+        sinks::util::encoding::{
+            EncodingConfig, EncodingConfigAdapter, StandardEncodings, StandardEncodingsMigrator,
+        },
+        test_util::{
+            components::{run_and_assert_sink_compliance, SINK_TAGS},
+            next_addr, random_lines_with_stream, trace_init, CountReceiver,
+        },
         tls::{self, TlsConfig, TlsEnableableConfig},
     };
 
-    use super::*;
+    fn encode_event(
+        mut event: Event,
+        encoding: EncodingConfigAdapter<
+            EncodingConfig<StandardEncodings>,
+            StandardEncodingsMigrator,
+        >,
+    ) -> crate::Result<Message> {
+        let transformer = encoding.transformer();
+        let serializer = encoding.encoding()?;
+        let mut encoder = Encoder::<()>::new(serializer);
+
+        let mut bytes = BytesMut::new();
+        transformer.transform(&mut event);
+        encoder.encode(event, &mut bytes)?;
+        Ok(Message::text(String::from_utf8_lossy(&bytes)))
+    }
 
     #[test]
     fn encodes_raw_logs() {
-        let event = Event::from("foo");
+        let event = Event::Log(LogEvent::from("foo"));
         assert_eq!(
             Message::text("foo"),
-            encode_event(event, &EncodingConfig::from(StandardEncodings::Text)).unwrap()
+            encode_event(event, EncodingConfig::from(StandardEncodings::Text).into()).unwrap()
         );
     }
 
     #[test]
     fn encodes_log_events() {
-        let mut event = Event::new_empty_log();
+        let mut log = LogEvent::default();
 
-        let log = event.as_mut_log();
         log.insert("str", EventValue::from("bar"));
         log.insert("num", EventValue::from(10));
 
-        let encoded = encode_event(event, &EncodingConfig::from(StandardEncodings::Json));
+        let encoded = encode_event(
+            log.into(),
+            EncodingConfig::from(StandardEncodings::Json).into(),
+        );
         let expected = Message::text(r#"{"num":10,"str":"bar"}"#);
         assert_eq!(expected, encoded.unwrap());
     }
@@ -403,9 +449,10 @@ mod tests {
         let config = WebSocketSinkConfig {
             uri: format!("ws://{}", addr),
             tls: None,
-            encoding: StandardEncodings::Json.into(),
+            encoding: EncodingConfig::from(StandardEncodings::Json).into(),
             ping_interval: None,
             ping_timeout: None,
+            acknowledgements: Default::default(),
         };
         let tls = MaybeTlsSettings::Raw(());
 
@@ -431,9 +478,10 @@ mod tests {
                     ..Default::default()
                 },
             }),
-            encoding: StandardEncodings::Json.into(),
+            encoding: EncodingConfig::from(StandardEncodings::Json).into(),
             ping_timeout: None,
             ping_interval: None,
+            acknowledgements: Default::default(),
         };
 
         send_events_and_assert(addr, config, tls).await;
@@ -447,9 +495,10 @@ mod tests {
         let config = WebSocketSinkConfig {
             uri: format!("ws://{}", addr),
             tls: None,
-            encoding: StandardEncodings::Json.into(),
+            encoding: EncodingConfig::from(StandardEncodings::Json).into(),
             ping_interval: None,
             ping_timeout: None,
+            acknowledgements: Default::default(),
         };
         let tls = MaybeTlsSettings::Raw(());
 
@@ -486,7 +535,7 @@ mod tests {
         let (sink, _healthcheck) = config.build(context).await.unwrap();
 
         let (lines, events) = random_lines_with_stream(10, 100, None);
-        sink.run(events).await.unwrap();
+        run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;
 
         receiver.connected().await;
 

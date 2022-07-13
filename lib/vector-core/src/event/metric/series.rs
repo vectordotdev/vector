@@ -6,7 +6,7 @@ use vector_common::byte_size_of::ByteSizeOf;
 
 use super::{write_list, write_word, MetricTags};
 
-#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, PartialOrd, Ord, Serialize)]
 pub struct MetricSeries {
     #[serde(flatten)]
     pub name: MetricName,
@@ -72,7 +72,7 @@ impl ByteSizeOf for MetricSeries {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, PartialOrd, Ord, Serialize)]
 pub struct MetricName {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]

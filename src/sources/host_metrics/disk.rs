@@ -1,14 +1,17 @@
 use chrono::Utc;
 use futures::{stream, StreamExt};
 use heim::units::information::byte;
-use serde::{Deserialize, Serialize};
 use vector_common::btreemap;
+use vector_config::configurable_component;
 
 use super::{filter_result, FilterList, HostMetrics};
 use crate::event::metric::Metric;
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+/// Options for the “disk” metrics collector.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
 pub struct DiskConfig {
+    /// Lists of device name patterns to include or exclude.
     #[serde(default)]
     devices: FilterList,
 }
