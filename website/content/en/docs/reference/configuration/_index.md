@@ -78,7 +78,7 @@ sources:
       - /var/log/apache2/*.log
     ignore_older: 86400
 transforms:
-  apache_parser:
+  remap:
     inputs:
       - apache_logs
     type: remap
@@ -125,7 +125,7 @@ sinks:
     }
   },
   "transforms": {
-    "apache_parser": {
+    "remap": {
       "inputs": [
         "apache_logs"
       ],
@@ -219,12 +219,17 @@ the following syntax:
 
 ```toml
 [transforms.add_host]
-type = "add_fields"
+type = "remap"
+source = '''
+# Basic usage. "$HOSTNAME" also works.
+.host = "${HOSTNAME}" # or "$HOSTNAME"
 
-[transforms.add_host.fields]
-host = "${HOSTNAME}" # or "$HOSTNAME"
-environment = "${ENV:-development}" # default value when not present
-tenant = "${TENANT:?tenant must be supplied}" # required environment variable
+# Setting a default value when not present.
+.environment = "${ENV:-development}"
+
+# Requiring an environment variable to be present.
+.tenant = "${TENANT:?tenant must be supplied}"
+'''
 ```
 
 #### Default values
@@ -324,7 +329,7 @@ source = '''
 ```toml
 # Sample the data to save on cost
 inputs = ["apache_parser"]
-type   = "sampler"
+type   = "sample"
 rate   = 50                   # only keep 50%
 . = parse_apache_log(.message)
 ```

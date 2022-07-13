@@ -114,6 +114,7 @@ components: transforms: reduce: {
 								shortest_array: "Retains the shortest array seen"
 								concat:         "Concatenate each string value (delimited with a space)."
 								concat_newline: "Concatenate each string value (delimited with a newline)."
+								concat_raw:     "Concatenate each string value (without any delimiter)."
 								discard:        "Discard all but the first value found."
 								retain:         "Discard all but the last value found. Works as a coalesce by not retaining null."
 								sum:            "Sum all numeric values."
