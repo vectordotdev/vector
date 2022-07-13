@@ -12,14 +12,12 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio::{net::UdpSocket, sync::oneshot, time::sleep};
 use tokio_util::codec::Encoder;
-use vector_buffers::Acker;
 use vector_common::internal_event::BytesSent;
 use vector_core::ByteSizeOf;
 
 use super::SinkBuildError;
 use crate::{
     codecs::Transformer,
-    config::SinkContext,
     dns,
     event::{Event, Finalizable},
     internal_events::{
@@ -63,15 +61,15 @@ impl UdpSinkConfig {
         }
     }
 
-    fn build_connector(&self, _cx: SinkContext) -> crate::Result<UdpConnector> {
+    fn build_connector(&self) -> crate::Result<UdpConnector> {
         let uri = self.address.parse::<http::Uri>()?;
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
         let port = uri.port_u16().ok_or(SinkBuildError::MissingPort)?;
         Ok(UdpConnector::new(host, port, self.send_buffer_bytes))
     }
 
-    pub fn build_service(&self, cx: SinkContext) -> crate::Result<(UdpService, Healthcheck)> {
-        let connector = self.build_connector(cx)?;
+    pub fn build_service(&self) -> crate::Result<(UdpService, Healthcheck)> {
+        let connector = self.build_connector()?;
         Ok((
             UdpService::new(connector.clone()),
             async move { connector.healthcheck().await }.boxed(),
@@ -80,12 +78,11 @@ impl UdpSinkConfig {
 
     pub fn build(
         &self,
-        cx: SinkContext,
         transformer: Transformer,
         encoder: impl Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync + 'static,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let connector = self.build_connector(cx.clone())?;
-        let sink = UdpSink::new(connector.clone(), cx.acker(), transformer, encoder);
+        let connector = self.build_connector()?;
+        let sink = UdpSink::new(connector.clone(), transformer, encoder);
         Ok((
             VectorSink::from_event_streamsink(sink),
             async move { connector.healthcheck().await }.boxed(),
@@ -250,7 +247,6 @@ where
     E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
 {
     connector: UdpConnector,
-    acker: Acker,
     transformer: Transformer,
     encoder: E,
 }
@@ -259,15 +255,9 @@ impl<E> UdpSink<E>
 where
     E: Encoder<Event, Error = codecs::encoding::Error> + Clone + Send + Sync,
 {
-    const fn new(
-        connector: UdpConnector,
-        acker: Acker,
-        transformer: Transformer,
-        encoder: E,
-    ) -> Self {
+    const fn new(connector: UdpConnector, transformer: Transformer, encoder: E) -> Self {
         Self {
             connector,
-            acker,
             transformer,
             encoder,
         }
@@ -293,8 +283,6 @@ where
                 let finalizers = event.take_finalizers();
                 let mut bytes = BytesMut::new();
                 if encoder.encode(event, &mut bytes).is_err() {
-                    self.acker.ack(1);
-
                     continue;
                 }
 
@@ -312,15 +300,12 @@ where
                         });
                     }
                     Err(error) => {
-                        self.acker.ack(1);
-
                         emit!(UdpSocketError { error });
                         break;
                     }
                 };
 
-                drop(finalizers);
-                self.acker.ack(1);
+                drop(finalizers); // Ensure we don't acknowledge until after the send
             }
         }
 

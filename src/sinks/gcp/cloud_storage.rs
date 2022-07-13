@@ -134,7 +134,7 @@ impl SinkConfig for GcsSinkConfig {
             base_url.clone(),
             auth.clone(),
         )?;
-        let sink = self.build_sink(client, base_url, auth, cx)?;
+        let sink = self.build_sink(client, base_url, auth)?;
 
         Ok((sink, healthcheck))
     }
@@ -158,7 +158,6 @@ impl GcsSinkConfig {
         client: HttpClient,
         base_url: String,
         auth: GcpAuthenticator,
-        cx: SinkContext,
     ) -> crate::Result<VectorSink> {
         let request = self.request.unwrap_with(&TowerRequestConfig {
             rate_limit_num: Some(1000),
@@ -175,7 +174,7 @@ impl GcsSinkConfig {
 
         let request_settings = RequestSettings::new(self)?;
 
-        let sink = GcsSink::new(cx, svc, request_settings, partitioner, batch_settings);
+        let sink = GcsSink::new(svc, request_settings, partitioner, batch_settings);
 
         Ok(VectorSink::from_event_streamsink(sink))
     }
@@ -357,12 +356,7 @@ mod tests {
 
         let config = default_config((None::<FramingConfig>, JsonSerializerConfig::new()).into());
         let sink = config
-            .build_sink(
-                client,
-                mock_endpoint.to_string(),
-                GcpAuthenticator::None,
-                context,
-            )
+            .build_sink(client, mock_endpoint.to_string(), GcpAuthenticator::None)
             .expect("failed to build sink");
 
         let event = Event::Log(LogEvent::from("simple message"));

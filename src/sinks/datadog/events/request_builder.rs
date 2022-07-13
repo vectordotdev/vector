@@ -3,7 +3,7 @@ use std::{io, sync::Arc};
 use bytes::Bytes;
 use codecs::JsonSerializer;
 use lookup::lookup_v2::OwnedSegment;
-use vector_core::{buffers::Ackable, ByteSizeOf};
+use vector_core::ByteSizeOf;
 
 use crate::{
     codecs::{Encoder, TimestampFormat, Transformer},
@@ -20,12 +20,6 @@ pub struct DatadogEventsRequest {
 impl Finalizable for DatadogEventsRequest {
     fn take_finalizers(&mut self) -> EventFinalizers {
         std::mem::take(&mut self.metadata.finalizers)
-    }
-}
-
-impl Ackable for DatadogEventsRequest {
-    fn ack_size(&self) -> usize {
-        self.element_count()
     }
 }
 

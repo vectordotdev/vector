@@ -146,8 +146,8 @@ use std::{
 
 use async_trait::async_trait;
 use snafu::{ResultExt, Snafu};
+use vector_common::finalization::Finalizable;
 
-mod acknowledgements;
 mod backed_archive;
 mod common;
 mod io;
@@ -161,9 +161,6 @@ mod writer;
 #[cfg(test)]
 mod tests;
 
-use self::{
-    acknowledgements::create_disk_v2_acker, ledger::Ledger, v1_migration::try_disk_v1_migration,
-};
 pub use self::{
     common::{DiskBufferConfig, DiskBufferConfigBuilder},
     io::{Filesystem, ProductionFilesystem},
@@ -171,13 +168,14 @@ pub use self::{
     reader::{Reader, ReaderError},
     writer::{Writer, WriterError},
 };
+use self::{ledger::Ledger, v1_migration::try_disk_v1_migration};
 use crate::{
     buffer_usage_data::BufferUsageHandle,
     topology::{
         builder::IntoBuffer,
         channel::{ReceiverAdapter, SenderAdapter},
     },
-    Acker, Bufferable,
+    Bufferable,
 };
 
 /// Error that occurred when creating/loading a disk buffer.
@@ -212,7 +210,7 @@ where
     pub(crate) async fn from_config_inner<FS>(
         config: DiskBufferConfig<FS>,
         usage_handle: BufferUsageHandle,
-    ) -> Result<(Writer<T, FS>, Reader<T, FS>, Acker, Arc<Ledger<FS>>), BufferError<T>>
+    ) -> Result<(Writer<T, FS>, Reader<T, FS>, Arc<Ledger<FS>>), BufferError<T>>
     where
         FS: Filesystem + fmt::Debug + Clone + 'static,
         FS::File: Unpin,
@@ -238,17 +236,14 @@ where
 
         ledger.synchronize_buffer_usage();
 
-        let acker = create_disk_v2_acker(Arc::clone(&ledger));
-
-        Ok((writer, reader, acker, ledger))
+        Ok((writer, reader, ledger))
     }
 
     /// Creates a new disk buffer from the given [`DiskBufferConfig`].
     ///
     /// If successful, a [`Writer`] and [`Reader`] value, representing the write/read sides of the
-    /// buffer, respectively, will be returned. Additionally, an [`Acker`] will be returned, which
-    /// must be used to indicate when records read from the [`Reader`] can be considered durably
-    /// processed and able to be deleted from the buffer.
+    /// buffer, respectively, will be returned. Records are considered durably processed and able
+    /// to be deleted from the buffer when they are dropped by the reader, via event finalization.
     ///
     /// # Errors
     ///
@@ -258,14 +253,14 @@ where
     pub async fn from_config<FS>(
         config: DiskBufferConfig<FS>,
         usage_handle: BufferUsageHandle,
-    ) -> Result<(Writer<T, FS>, Reader<T, FS>, Acker), BufferError<T>>
+    ) -> Result<(Writer<T, FS>, Reader<T, FS>), BufferError<T>>
     where
         FS: Filesystem + fmt::Debug + Clone + 'static,
         FS::File: Unpin,
     {
-        let (writer, reader, acker, _) = Self::from_config_inner(config, usage_handle).await?;
+        let (writer, reader, _) = Self::from_config_inner(config, usage_handle).await?;
 
-        Ok((writer, reader, acker))
+        Ok((writer, reader))
     }
 }
 
@@ -288,7 +283,7 @@ impl DiskV2Buffer {
 #[async_trait]
 impl<T> IntoBuffer<T> for DiskV2Buffer
 where
-    T: Bufferable + Clone,
+    T: Bufferable + Clone + Finalizable,
 {
     fn provides_instrumentation(&self) -> bool {
         true
@@ -297,14 +292,13 @@ where
     async fn into_buffer_parts(
         self: Box<Self>,
         usage_handle: BufferUsageHandle,
-    ) -> Result<(SenderAdapter<T>, ReceiverAdapter<T>, Option<Acker>), Box<dyn Error + Send + Sync>>
-    {
+    ) -> Result<(SenderAdapter<T>, ReceiverAdapter<T>), Box<dyn Error + Send + Sync>> {
         // Attempt to migrate a disk v1 buffer based on the same data directory and buffer ID if one
         // exists. If one doesn't exist, then this method does nothing.
         try_disk_v1_migration::<T>(self.data_dir.as_path(), self.id.as_str()).await?;
 
         // Now that we've handled any necessary migrations, go ahead and build the buffer.
-        let (writer, reader, acker) = build_disk_v2_buffer(
+        let (writer, reader) = build_disk_v2_buffer(
             usage_handle,
             &self.data_dir,
             self.id.as_str(),
@@ -312,7 +306,7 @@ where
         )
         .await?;
 
-        Ok((writer.into(), reader.into(), Some(acker)))
+        Ok((writer.into(), reader.into()))
     }
 }
 
@@ -325,7 +319,6 @@ async fn build_disk_v2_buffer<T>(
     (
         Writer<T, ProductionFilesystem>,
         Reader<T, ProductionFilesystem>,
-        Acker,
     ),
     Box<dyn Error + Send + Sync>,
 >

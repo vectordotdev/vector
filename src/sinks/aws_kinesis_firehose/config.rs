@@ -156,7 +156,7 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
 
         let sink = KinesisSink {
             batch_settings,
-            acker: cx.acker(),
+
             service,
             request_builder,
         };

@@ -57,7 +57,7 @@ mod integration_tests {
         config.key_prefix = Some("test-prefix".to_string());
         let prefix = config.key_prefix.clone();
         let service = config.create_service(&cx.globals.proxy).await.unwrap();
-        let sink = config.build_processor(service, cx).unwrap();
+        let sink = config.build_processor(service).unwrap();
 
         let (lines, events, receiver) = make_events_batch(100, 10);
         run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
@@ -91,7 +91,7 @@ mod integration_tests {
         config.key_prefix = Some("test-prefix/".to_string());
         let prefix = config.key_prefix.clone();
         let service = config.create_service(&cx.globals.proxy).await.unwrap();
-        let sink = config.build_processor(service, cx).unwrap();
+        let sink = config.build_processor(service).unwrap();
 
         let (lines, events, receiver) = make_events_batch(100, 10);
         run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
@@ -129,7 +129,7 @@ mod integration_tests {
         };
         let prefix = config.key_prefix.clone();
         let service = config.create_service(&cx.globals.proxy).await.unwrap();
-        let sink = config.build_processor(service, cx).unwrap();
+        let sink = config.build_processor(service).unwrap();
 
         let (lines, _events) = random_lines_with_stream(100, 30, None);
 
@@ -188,7 +188,7 @@ mod integration_tests {
 
         let prefix = config.key_prefix.clone();
         let service = config.create_service(&cx.globals.proxy).await.unwrap();
-        let sink = config.build_processor(service, cx).unwrap();
+        let sink = config.build_processor(service).unwrap();
 
         let (lines, events, receiver) = make_events_batch(100, batch_size * batch_multiplier);
         run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
@@ -250,7 +250,7 @@ mod integration_tests {
         let config = config(&bucket, 1000000);
         let prefix = config.key_prefix.clone();
         let service = config.create_service(&cx.globals.proxy).await.unwrap();
-        let sink = config.build_processor(service, cx).unwrap();
+        let sink = config.build_processor(service).unwrap();
 
         let (lines, events, receiver) = make_events_batch(100, 10);
         run_and_assert_sink_compliance(sink, events, &AWS_SINK_TAGS).await;
@@ -282,7 +282,7 @@ mod integration_tests {
         config.bucket = format!("BREAK{}IT", config.bucket);
         let prefix = config.key_prefix.clone();
         let service = config.create_service(&cx.globals.proxy).await.unwrap();
-        let sink = config.build_processor(service, cx).unwrap();
+        let sink = config.build_processor(service).unwrap();
 
         let (_lines, events, receiver) = make_events_batch(1, 1);
         sink.run(events).await.unwrap();

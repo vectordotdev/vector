@@ -96,7 +96,6 @@ impl SinkConfig for HoneycombConfig {
             request_settings,
             batch_settings.timeout,
             client.clone(),
-            cx.acker(),
         )
         .sink_map_err(|error| error!(message = "Fatal honeycomb sink error.", %error));
 

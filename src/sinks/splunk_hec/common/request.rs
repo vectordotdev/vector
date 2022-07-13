@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use vector_core::{
-    buffers::Ackable,
     event::{EventFinalizers, Finalizable},
     ByteSizeOf,
 };
@@ -30,12 +29,6 @@ impl ByteSizeOf for HecRequest {
 
 impl ElementCount for HecRequest {
     fn element_count(&self) -> usize {
-        self.events_count
-    }
-}
-
-impl Ackable for HecRequest {
-    fn ack_size(&self) -> usize {
         self.events_count
     }
 }

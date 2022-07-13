@@ -11,9 +11,7 @@ use futures::future::BoxFuture;
 use http::{Response, Uri};
 use hyper::{service::Service, Body, Request};
 use tower::ServiceExt;
-use vector_core::{
-    buffers::Ackable, internal_event::EventsSent, stream::DriverResponse, ByteSizeOf,
-};
+use vector_core::{internal_event::EventsSent, stream::DriverResponse, ByteSizeOf};
 
 use crate::sinks::elasticsearch::sign_request;
 use crate::{
@@ -42,12 +40,6 @@ impl ByteSizeOf for ElasticsearchRequest {
 
 impl ElementCount for ElasticsearchRequest {
     fn element_count(&self) -> usize {
-        self.batch_size
-    }
-}
-
-impl Ackable for ElasticsearchRequest {
-    fn ack_size(&self) -> usize {
         self.batch_size
     }
 }

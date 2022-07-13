@@ -17,7 +17,6 @@ use vector_core::ByteSizeOf;
 
 use super::config::AzureBlobSinkConfig;
 use crate::{
-    config::SinkContext,
     event::{Event, EventArray, LogEvent},
     sinks::{
         azure_common,
@@ -242,7 +241,6 @@ impl AzureBlobSinkConfig {
     }
 
     pub fn to_sink(&self) -> VectorSink {
-        let cx = SinkContext::new_test();
         let client = azure_common::config::build_client(
             self.connection_string.clone(),
             self.storage_account.clone(),
@@ -250,8 +248,7 @@ impl AzureBlobSinkConfig {
         )
         .expect("Failed to create client");
 
-        self.build_processor(client, cx)
-            .expect("Failed to create sink")
+        self.build_processor(client).expect("Failed to create sink")
     }
 
     pub async fn list_blobs(&self, prefix: &str) -> Vec<String> {

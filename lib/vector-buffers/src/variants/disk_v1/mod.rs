@@ -1,4 +1,3 @@
-mod acknowledgements;
 mod key;
 mod reader;
 mod writer;
@@ -33,7 +32,7 @@ use tokio::{sync::Notify, time::Instant};
 use vector_common::{finalizer::OrderedFinalizer, shutdown::ShutdownSignal};
 
 use self::key::Key;
-pub use self::{acknowledgements::create_disk_v1_acker, reader::Reader, writer::Writer};
+pub use self::{reader::Reader, writer::Writer};
 use crate::{
     buffer_usage_data::BufferUsageHandle,
     topology::{
@@ -41,7 +40,7 @@ use crate::{
         builder::IntoBuffer,
         channel::{ReceiverAdapter, SenderAdapter},
     },
-    Acker, Bufferable,
+    Bufferable,
 };
 
 /// How much of disk buffer needs to be deleted before we trigger compaction.
@@ -111,12 +110,11 @@ where
     async fn into_buffer_parts(
         self: Box<Self>,
         usage_handle: BufferUsageHandle,
-    ) -> Result<(SenderAdapter<T>, ReceiverAdapter<T>, Option<Acker>), Box<dyn Error + Send + Sync>>
-    {
+    ) -> Result<(SenderAdapter<T>, ReceiverAdapter<T>), Box<dyn Error + Send + Sync>> {
         usage_handle.set_buffer_limits(Some(self.max_size.get()), None);
 
         // Create the actual buffer subcomponents.
-        let (writer, reader, acker) = open(
+        let (writer, reader) = open(
             &self.data_dir,
             &self.id,
             self.max_size,
@@ -124,7 +122,7 @@ where
             usage_handle,
         )?;
 
-        Ok((writer.into(), reader.into(), Some(acker)))
+        Ok((writer.into(), reader.into()))
     }
 }
 
@@ -140,7 +138,7 @@ pub(self) fn open<T>(
     max_size: NonZeroU64,
     is_migrating: bool,
     usage_handle: BufferUsageHandle,
-) -> Result<(Writer<T>, Reader<T>, Acker), DataDirError>
+) -> Result<(Writer<T>, Reader<T>), DataDirError>
 where
     T: Bufferable + Clone,
 {
@@ -362,7 +360,7 @@ fn build<T: Bufferable>(
     max_size: NonZeroU64,
     is_migrating: bool,
     usage_handle: BufferUsageHandle,
-) -> Result<(Writer<T>, Reader<T>, Acker), DataDirError> {
+) -> Result<(Writer<T>, Reader<T>), DataDirError> {
     // New `max_size` of the buffer is used for storing the unacked events.
     // The rest is used as a buffer which when filled triggers compaction.
     let max_uncompacted_size = max_size.get() / MAX_UNCOMPACTED_DENOMINATOR;
@@ -390,7 +388,6 @@ fn build<T: Bufferable>(
     let read_waker = Arc::new(Notify::new());
     let write_waker = Arc::new(Notify::new());
     let ack_counter = Arc::new(AtomicUsize::new(0));
-    let acker = create_disk_v1_acker(&ack_counter, &read_waker);
     let (finalizer, mut stream) = OrderedFinalizer::<u64>::new(ShutdownSignal::noop());
     {
         let ack_counter = Arc::clone(&ack_counter);
@@ -439,7 +436,7 @@ fn build<T: Bufferable>(
         finalizer,
     };
 
-    Ok((writer, reader, acker))
+    Ok((writer, reader))
 }
 
 fn map_io_error<P>(e: io::Error, data_dir: P) -> DataDirError

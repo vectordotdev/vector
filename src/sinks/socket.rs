@@ -89,27 +89,27 @@ impl SocketSinkConfig {
 impl SinkConfig for SocketSinkConfig {
     async fn build(
         &self,
-        cx: SinkContext,
+        _cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         match &self.mode {
             Mode::Tcp(TcpMode { config, encoding }) => {
                 let transformer = encoding.transformer();
                 let (framer, serializer) = encoding.build(SinkType::StreamBased)?;
                 let encoder = Encoder::<Framer>::new(framer, serializer);
-                config.build(cx, transformer, encoder)
+                config.build(transformer, encoder)
             }
             Mode::Udp(UdpMode { config, encoding }) => {
                 let transformer = encoding.transformer();
                 let serializer = encoding.build()?;
                 let encoder = Encoder::<()>::new(serializer);
-                config.build(cx, transformer, encoder)
+                config.build(transformer, encoder)
             }
             #[cfg(unix)]
             Mode::Unix(UnixMode { config, encoding }) => {
                 let transformer = encoding.transformer();
                 let (framer, serializer) = encoding.build(SinkType::StreamBased)?;
                 let encoder = Encoder::<Framer>::new(framer, serializer);
-                config.build(cx, transformer, encoder)
+                config.build(transformer, encoder)
             }
         }
     }

@@ -80,7 +80,6 @@ impl SinkConfig for ClickhouseConfig {
             request,
             batch.timeout,
             client.clone(),
-            cx.acker(),
         )
         .sink_map_err(|error| error!(message = "Fatal clickhouse sink error.", %error));
 

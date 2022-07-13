@@ -290,7 +290,7 @@ impl LogEvent {
     }
 
     pub fn remove_prune<'a>(&mut self, path: impl Path<'a>, prune: bool) -> Option<Value> {
-        util::log::remove(self.value_mut(), path, prune)
+        self.value_mut().remove(path, prune)
     }
 
     pub fn keys(&self) -> Option<impl Iterator<Item = String> + '_> {

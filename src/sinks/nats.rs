@@ -7,7 +7,6 @@ use futures::{stream::BoxStream, FutureExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
-use vector_buffers::Acker;
 use vector_common::internal_event::{BytesSent, EventsSent};
 use vector_core::ByteSizeOf;
 
@@ -89,9 +88,9 @@ impl GenerateConfig for NatsSinkConfig {
 impl SinkConfig for NatsSinkConfig {
     async fn build(
         &self,
-        cx: SinkContext,
+        _cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let sink = NatsSink::new(self.clone(), cx.acker()).await?;
+        let sink = NatsSink::new(self.clone()).await?;
         let healthcheck = healthcheck(self.clone()).boxed();
         Ok((super::VectorSink::from_event_streamsink(sink), healthcheck))
     }
@@ -134,11 +133,10 @@ pub struct NatsSink {
     encoder: Encoder<()>,
     connection: nats::asynk::Connection,
     subject: Template,
-    acker: Acker,
 }
 
 impl NatsSink {
-    async fn new(config: NatsSinkConfig, acker: Acker) -> Result<Self, BuildError> {
+    async fn new(config: NatsSinkConfig) -> Result<Self, BuildError> {
         let connection = config.connect().await?;
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build().context(EncodingSnafu)?;
@@ -149,7 +147,6 @@ impl NatsSink {
             transformer,
             encoder,
             subject: Template::try_from(config.subject).context(SubjectTemplateSnafu)?,
-            acker,
         })
     }
 }
@@ -169,7 +166,6 @@ impl StreamSink<Event> for NatsSink {
                         drop_event: true,
                     });
                     finalizers.update_status(EventStatus::Errored);
-                    self.acker.ack(1);
                     continue;
                 }
             };
@@ -182,7 +178,6 @@ impl StreamSink<Event> for NatsSink {
             if self.encoder.encode(event, &mut bytes).is_err() {
                 // Error is handled by `Encoder`.
                 finalizers.update_status(EventStatus::Errored);
-                self.acker.ack(1);
                 continue;
             }
 
@@ -206,8 +201,6 @@ impl StreamSink<Event> for NatsSink {
                     });
                 }
             }
-
-            self.acker.ack(1);
         }
 
         Ok(())
@@ -246,8 +239,7 @@ mod integration_tests {
         // successfully published.
 
         // Create Sink
-        let (acker, ack_counter) = Acker::basic();
-        let sink = NatsSink::new(conf.clone(), acker).await?;
+        let sink = NatsSink::new(conf.clone()).await?;
         let sink = VectorSink::from_event_streamsink(sink);
 
         // Establish the consumer subscription.
@@ -279,11 +271,6 @@ mod integration_tests {
 
         assert_eq!(output.len(), input.len());
         assert_eq!(output, input);
-
-        assert_eq!(
-            ack_counter.load(std::sync::atomic::Ordering::Relaxed),
-            num_events
-        );
 
         Ok(())
     }

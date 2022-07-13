@@ -7,7 +7,6 @@ use regex::Regex;
 use snafu::Snafu;
 use tokio_util::codec::Encoder as _;
 use vector_core::{
-    buffers::Acker,
     event::{self, Event, EventFinalizers, Finalizable, Value},
     partition::Partitioner,
     sink::StreamSink,
@@ -22,7 +21,7 @@ use super::{
 };
 use crate::{
     codecs::{Encoder, Transformer},
-    config::{log_schema, SinkContext},
+    config::log_schema,
     http::HttpClient,
     internal_events::{
         LokiEventUnlabeled, LokiOutOfOrderEventDropped, LokiOutOfOrderEventRewritten,
@@ -313,7 +312,6 @@ impl RecordFilter {
 }
 
 pub struct LokiSink {
-    acker: Acker,
     request_builder: LokiRequestBuilder,
     pub(super) encoder: EventEncoder,
     batch_settings: BatcherSettings,
@@ -323,7 +321,7 @@ pub struct LokiSink {
 
 impl LokiSink {
     #[allow(clippy::missing_const_for_fn)] // const cannot run destructor
-    pub fn new(config: LokiConfig, client: HttpClient, cx: SinkContext) -> crate::Result<Self> {
+    pub fn new(config: LokiConfig, client: HttpClient) -> crate::Result<Self> {
         let compression = config.compression;
 
         // if Vector is configured to allow events with out of order timestamps, then then we can
@@ -352,7 +350,6 @@ impl LokiSink {
         let encoder = Encoder::<()>::new(serializer);
 
         Ok(Self {
-            acker: cx.acker(),
             request_builder: LokiRequestBuilder {
                 compression,
                 encoder: Default::default(),
@@ -421,7 +418,7 @@ impl LokiSink {
                     Ok(req) => Some(req),
                 }
             })
-            .into_driver(self.service, self.acker);
+            .into_driver(self.service);
 
         sink.run().await
     }
