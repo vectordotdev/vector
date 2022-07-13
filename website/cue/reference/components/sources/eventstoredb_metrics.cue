@@ -86,11 +86,11 @@ components: sources: eventstoredb_metrics: {
 				required:    false
 				examples: ["/foo/bar/baz"]
 			}
-            "source_type": {
-                description: "The name of the source type."
-                examples: ["eventstoredb_metrics"]
-                required: true
-            }
+			"source_type": {
+				description: "The name of the source type."
+				examples: ["eventstoredb_metrics"]
+				required: true
+			}
 		}
 
 		process_memory_used_bytes: {

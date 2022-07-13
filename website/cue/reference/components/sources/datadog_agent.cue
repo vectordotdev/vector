@@ -132,13 +132,13 @@ components: sources: datadog_agent: {
 						examples: ["Hi from erlang"]
 					}
 				}
-                source_type: {
-                    description: "The name of the source type."
-                    required:    true
-                    type: string: {
-                        examples: ["datadog_agent"]
-                    }
-                }
+				source_type: {
+					description: "The name of the source type."
+					required:    true
+					type: string: {
+						examples: ["datadog_agent"]
+					}
+				}
 				status: {
 					description: "The status field extracted from the event."
 					required:    true
@@ -172,22 +172,22 @@ components: sources: datadog_agent: {
 			}
 		}
 		metrics: {
-		    _extra_tags: {
-                "source_type": {
-                    description: "The name of the source type."
-                    examples: ["datadog_agent"]
-                    required: true
-                }
-            }
-            counter: output._passthrough_counter & {
-                tags: _extra_tags
-            }
-            distribution: output._passthrough_distribution & {
-                tags: _extra_tags
-            }
-            gauge: output._passthrough_gauge & {
-                tags: _extra_tags
-            }
+			_extra_tags: {
+				"source_type": {
+					description: "The name of the source type."
+					examples: ["datadog_agent"]
+					required: true
+				}
+			}
+			counter: output._passthrough_counter & {
+				tags: _extra_tags
+			}
+			distribution: output._passthrough_distribution & {
+				tags: _extra_tags
+			}
+			gauge: output._passthrough_gauge & {
+				tags: _extra_tags
+			}
 		}
 		traces: {
 			description: "A trace received through an HTTP POST request sent by a Datadog Trace Agent."
@@ -197,13 +197,13 @@ components: sources: datadog_agent: {
 					required:    true
 					type: array: items: type: object: options: {}
 				}
-                source_type: {
-                    description: "The name of the source type."
+				source_type: {
+					description: "The name of the source type."
 					required:    true
-                    type: string: {
-                        examples: ["datadog_agent"]
-                    }
-                }
+					type: string: {
+						examples: ["datadog_agent"]
+					}
+				}
 			}
 		}
 	}

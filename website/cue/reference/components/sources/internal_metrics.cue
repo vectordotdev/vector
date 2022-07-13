@@ -102,11 +102,11 @@ components: sources: internal_metrics: {
 				required:    false
 				examples: [_values.local_host]
 			}
-                        "source_type": {
-                                description: "The name of the source type."
-                                examples: ["internal_metrics"]
-                                required: true
-                        }
+			"source_type": {
+				description: "The name of the source type."
+				examples: ["internal_metrics"]
+				required: true
+			}
 		}
 
 		// Instance-level "process" metrics

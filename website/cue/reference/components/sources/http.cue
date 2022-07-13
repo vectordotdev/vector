@@ -164,13 +164,13 @@ components: sources: http: {
 						examples: ["/", "/logs/event712"]
 					}
 				}
-                                source_type: {
-                                        description: "The name of the source type."
-                                        required:    true
-                                        type: string: {
-                                                examples: ["http"]
-                                        }
-                                }
+				source_type: {
+					description: "The name of the source type."
+					required:    true
+					type: string: {
+						examples: ["http"]
+					}
+				}
 				timestamp: fields._current_timestamp
 			}
 		}

@@ -159,13 +159,13 @@ components: sources: exec: {
 					}
 				}
 			}
-            source_type: {
-                description: "The name of the source type."
-                required:    true
-                type: string: {
-                    examples: ["exec"]
-                }
-            }
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["exec"]
+				}
+			}
 		}
 	}
 

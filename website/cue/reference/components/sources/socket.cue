@@ -165,13 +165,13 @@ components: sources: socket: {
 			}
 			message:   fields._raw_line
 			timestamp: fields._current_timestamp
-                        source_type: {
-                                description: "The name of the source type."
-                                required:    true
-                                type: string: {
-                                        examples: ["socket"]
-                                }
-                        }
+			source_type: {
+				description: "The name of the source type."
+				required:    true
+				type: string: {
+					examples: ["socket"]
+				}
+			}
 			port: {
 				description: "The peer source port."
 				required:    false

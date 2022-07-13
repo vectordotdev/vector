@@ -116,11 +116,11 @@ components: sources: aws_ecs_metrics: {
 				required:    true
 				examples: ["myapp"]
 			}
-            "source_type": {
-                description: "The name of the source type."
-                examples: ["aws_ecs_metrics"]
-                required: true
-            }
+			"source_type": {
+				description: "The name of the source type."
+				examples: ["aws_ecs_metrics"]
+				required: true
+			}
 		}
 
 		_gauge: {
