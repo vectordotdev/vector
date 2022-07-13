@@ -207,7 +207,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use codecs::encoding::Framer;
+    use codecs::{encoding::Framer, NewlineDelimitedEncoder, TextSerializer};
     use tokio::net::UnixListener;
 
     use super::*;
@@ -228,7 +228,7 @@ mod tests {
             .build(
                 SinkContext::new_test(),
                 Default::default(),
-                Encoder::<Framer>::default()
+                Encoder::<()>::new(TextSerializer::new().into())
             )
             .unwrap()
             .1
@@ -240,7 +240,7 @@ mod tests {
             .build(
                 SinkContext::new_test(),
                 Default::default(),
-                Encoder::<Framer>::default()
+                Encoder::<()>::new(TextSerializer::new().into())
             )
             .unwrap()
             .1
@@ -260,7 +260,14 @@ mod tests {
         let config = UnixSinkConfig::new(out_path);
         let cx = SinkContext::new_test();
         let (sink, _healthcheck) = config
-            .build(cx, Default::default(), Encoder::<Framer>::default())
+            .build(
+                cx,
+                Default::default(),
+                Encoder::<Framer>::new(
+                    NewlineDelimitedEncoder::new().into(),
+                    TextSerializer::new().into(),
+                ),
+            )
             .unwrap();
 
         // Send the test data

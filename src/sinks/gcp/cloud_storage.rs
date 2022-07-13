@@ -2,10 +2,7 @@ use std::{collections::HashMap, convert::TryFrom, io};
 
 use bytes::Bytes;
 use chrono::Utc;
-use codecs::{
-    encoding::{Framer, Serializer},
-    CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder,
-};
+use codecs::encoding::Framer;
 use http::header::{HeaderName, HeaderValue};
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
@@ -16,7 +13,7 @@ use uuid::Uuid;
 use vector_core::event::{EventFinalizers, Finalizable};
 
 use crate::{
-    codecs::{Encoder, EncodingConfigWithFraming, Transformer},
+    codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
     config::{
         AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
         SinkDescription,
@@ -274,21 +271,7 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
 impl RequestSettings {
     fn new(config: &GcsSinkConfig) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
-        let (framer, serializer) = config.encoding.build()?;
-        let framer = match (framer, &serializer) {
-            (Some(framer), _) => framer,
-            (None, Serializer::Json(_)) => CharacterDelimitedEncoder::new(b',').into(),
-            (None, Serializer::Avro(_) | Serializer::Native(_)) => {
-                LengthDelimitedEncoder::new().into()
-            }
-            (
-                None,
-                Serializer::Logfmt(_)
-                | Serializer::NativeJson(_)
-                | Serializer::RawMessage(_)
-                | Serializer::Text(_),
-            ) => NewlineDelimitedEncoder::new().into(),
-        };
+        let (framer, serializer) = config.encoding.build(SinkType::MessageBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
         let acl = config
             .acl

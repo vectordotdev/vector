@@ -1,24 +1,21 @@
 use std::convert::TryInto;
 
 use aws_sdk_s3::Client as S3Client;
-use codecs::encoding::{Framer, FramingConfig, Serializer};
-use codecs::{
-    CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder,
-    TextSerializerConfig,
-};
+use codecs::encoding::{Framer, FramingConfig};
+use codecs::TextSerializerConfig;
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
 use vector_core::sink::VectorSink;
 
-use super::sink::S3RequestOptions;
-use crate::aws::{AwsAuthentication, RegionOrEndpoint};
 use crate::{
-    codecs::{Encoder, EncodingConfigWithFraming},
+    aws::{AwsAuthentication, RegionOrEndpoint},
+    codecs::{Encoder, EncodingConfigWithFraming, SinkType},
     config::{
         AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
         SinkContext,
     },
     sinks::{
+        aws_s3::sink::S3RequestOptions,
         s3_common::{
             self,
             config::{S3Options, S3RetryLogic},
@@ -150,21 +147,7 @@ impl S3SinkConfig {
             .unwrap_or(DEFAULT_FILENAME_APPEND_UUID);
 
         let transformer = self.encoding.transformer();
-        let (framer, serializer) = self.encoding.build()?;
-        let framer = match (framer, &serializer) {
-            (Some(framer), _) => framer,
-            (None, Serializer::Json(_)) => CharacterDelimitedEncoder::new(b',').into(),
-            (None, Serializer::Avro(_) | Serializer::Native(_)) => {
-                LengthDelimitedEncoder::new().into()
-            }
-            (
-                None,
-                Serializer::Logfmt(_)
-                | Serializer::NativeJson(_)
-                | Serializer::RawMessage(_)
-                | Serializer::Text(_),
-            ) => NewlineDelimitedEncoder::new().into(),
-        };
+        let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
 
         let request_options = S3RequestOptions {

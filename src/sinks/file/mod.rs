@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use codecs::{
     encoding::{Framer, FramingConfig},
-    NewlineDelimitedEncoder, TextSerializerConfig,
+    TextSerializerConfig,
 };
 use futures::{
     future,
@@ -21,7 +21,7 @@ use tokio_util::codec::Encoder as _;
 use vector_core::{buffers::Acker, internal_event::EventsSent, ByteSizeOf};
 
 use crate::{
-    codecs::{Encoder, EncodingConfigWithFraming, Transformer},
+    codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
     config::{
         AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
         SinkDescription,
@@ -170,8 +170,7 @@ pub struct FileSink {
 impl FileSink {
     pub fn new(config: &FileSinkConfig, acker: Acker) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
-        let (framer, serializer) = config.encoding.build()?;
-        let framer = framer.unwrap_or_else(|| NewlineDelimitedEncoder::new().into());
+        let (framer, serializer) = config.encoding.build(SinkType::StreamBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
 
         Ok(Self {

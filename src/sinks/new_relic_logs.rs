@@ -159,6 +159,7 @@ mod tests {
 
     use super::*;
     use crate::{
+        codecs::SinkType,
         config::SinkConfig,
         event::{Event, LogEvent},
         sinks::util::{service::RATE_LIMIT_NUM_DEFAULT, test::build_test_server, Concurrency},
@@ -199,7 +200,11 @@ mod tests {
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert!(matches!(
-            http_config.encoding.build().unwrap().1,
+            http_config
+                .encoding
+                .build(SinkType::MessageBased)
+                .unwrap()
+                .1,
             Serializer::Json(_)
         ));
         assert_eq!(http_config.batch.max_bytes, Some(MAX_PAYLOAD_SIZE));
@@ -241,7 +246,11 @@ mod tests {
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert!(matches!(
-            http_config.encoding.build().unwrap().1,
+            http_config
+                .encoding
+                .build(SinkType::MessageBased)
+                .unwrap()
+                .1,
             Serializer::Json(_)
         ));
         assert_eq!(http_config.batch.max_bytes, Some(MAX_PAYLOAD_SIZE));
@@ -281,7 +290,11 @@ mod tests {
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert!(matches!(
-            http_config.encoding.build().unwrap().1,
+            http_config
+                .encoding
+                .build(SinkType::MessageBased)
+                .unwrap()
+                .1,
             Serializer::Json(_)
         ));
         assert_eq!(http_config.batch.max_bytes, Some(838860));

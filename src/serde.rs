@@ -1,3 +1,5 @@
+use std::any::{Any, TypeId};
+
 use codecs::{
     decoding::{DeserializerConfig, FramingConfig},
     BytesDecoderConfig, BytesDeserializerConfig,
@@ -27,6 +29,11 @@ pub fn default_framing_message_based() -> FramingConfig {
 
 pub fn default_decoding() -> DeserializerConfig {
     BytesDeserializerConfig::new().into()
+}
+
+#[inline]
+pub fn skip_serializing_if_unit<T: ?Sized + Any>(_: &T) -> bool {
+    TypeId::of::<()>() == TypeId::of::<T>()
 }
 
 /// Utilities for the `serde_json` crate.

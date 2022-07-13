@@ -1,17 +1,13 @@
 use std::{convert::TryInto, sync::Arc};
 
 use azure_storage_blobs::prelude::*;
-use codecs::{
-    encoding::{Framer, Serializer},
-    CharacterDelimitedEncoder, JsonSerializerConfig, LengthDelimitedEncoder,
-    NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
-};
+use codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
 
 use super::request_builder::AzureBlobRequestOptions;
 use crate::{
-    codecs::{Encoder, EncodingConfigWithFraming},
+    codecs::{Encoder, EncodingConfigWithFraming, SinkType},
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::{
         azure_common::{
@@ -132,21 +128,7 @@ impl AzureBlobSinkConfig {
             .unwrap_or(DEFAULT_FILENAME_APPEND_UUID);
 
         let transformer = self.encoding.transformer();
-        let (framer, serializer) = self.encoding.build()?;
-        let framer = match (framer, &serializer) {
-            (Some(framer), _) => framer,
-            (None, Serializer::Json(_)) => CharacterDelimitedEncoder::new(b',').into(),
-            (None, Serializer::Avro(_) | Serializer::Native(_)) => {
-                LengthDelimitedEncoder::new().into()
-            }
-            (
-                None,
-                Serializer::Logfmt(_)
-                | Serializer::NativeJson(_)
-                | Serializer::RawMessage(_)
-                | Serializer::Text(_),
-            ) => NewlineDelimitedEncoder::new().into(),
-        };
+        let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
 
         let request_options = AzureBlobRequestOptions {

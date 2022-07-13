@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use bytes::{BufMut, Bytes, BytesMut};
-use codecs::encoding::{CharacterDelimitedEncoder, Framer, NewlineDelimitedEncoder, Serializer};
+use codecs::encoding::{CharacterDelimitedEncoder, Framer, Serializer};
 use flate2::write::{GzEncoder, ZlibEncoder};
 use futures::{future, FutureExt, SinkExt};
 use http::{
@@ -15,7 +15,7 @@ use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
 
 use crate::{
-    codecs::{Encoder, EncodingConfigWithFraming, Transformer},
+    codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
     config::{
         AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
         SinkDescription,
@@ -119,11 +119,9 @@ struct HttpSink {
 
 #[cfg(test)]
 fn default_sink(encoding: EncodingConfigWithFraming) -> HttpSink {
-    let encoding = encoding.build().unwrap();
-    let framing = encoding
-        .0
-        .unwrap_or_else(|| NewlineDelimitedEncoder::new().into());
-    let serializer = encoding.1;
+    let (framing, serializer) = encoding
+        .build(crate::codecs::SinkType::MessageBased)
+        .unwrap();
     let encoder = Encoder::<Framer>::new(framing, serializer);
 
     HttpSink {
@@ -158,12 +156,8 @@ impl SinkConfig for HttpSinkConfig {
         request.add_old_option(self.headers.clone());
         validate_headers(&request.headers, &self.auth)?;
 
-        let encoding = self.encoding.build()?;
-        let framing = encoding
-            .0
-            .unwrap_or_else(|| NewlineDelimitedEncoder::new().into());
-        let serializer = encoding.1;
-        let encoder = Encoder::<Framer>::new(framing, serializer);
+        let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
+        let encoder = Encoder::<Framer>::new(framer, serializer);
 
         let sink = HttpSink {
             uri: self.uri.with_default_parts(),

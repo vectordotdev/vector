@@ -1,13 +1,13 @@
 use codecs::{
-    encoding::{Framer, FramingConfig, Serializer},
-    JsonSerializerConfig, LengthDelimitedEncoder, NewlineDelimitedEncoder,
+    encoding::{Framer, FramingConfig},
+    JsonSerializerConfig,
 };
 use futures::{future, FutureExt};
 use serde::{Deserialize, Serialize};
 use tokio::io;
 
 use crate::{
-    codecs::{Encoder, EncodingConfigWithFraming},
+    codecs::{Encoder, EncodingConfigWithFraming, SinkType},
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::{console::sink::WriterSink, Healthcheck, VectorSink},
 };
@@ -52,21 +52,7 @@ impl GenerateConfig for ConsoleSinkConfig {
 impl SinkConfig for ConsoleSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let transformer = self.encoding.transformer();
-        let (framer, serializer) = self.encoding.build()?;
-        let framer = match (framer, &serializer) {
-            (Some(framer), _) => framer,
-            (
-                None,
-                Serializer::Text(_)
-                | Serializer::Json(_)
-                | Serializer::Logfmt(_)
-                | Serializer::NativeJson(_)
-                | Serializer::RawMessage(_),
-            ) => NewlineDelimitedEncoder::new().into(),
-            (None, Serializer::Avro(_) | Serializer::Native(_)) => {
-                LengthDelimitedEncoder::new().into()
-            }
-        };
+        let (framer, serializer) = self.encoding.build(SinkType::StreamBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
 
         let sink: VectorSink = match self.target {
