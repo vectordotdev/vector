@@ -86,7 +86,7 @@ components: sinks: [Name=string]: {
 					}
 					max_size: {
 						description: """
-							The maximum size of the buffer on the disk. Must be at least 256 megabytes (268435456 bytes).
+							The maximum size of the buffer on the disk. Must be at least ~256 megabytes (268435488 bytes).
 							"""
 						required:      true
 						relevant_when: "type = \"disk\""
