@@ -1654,6 +1654,7 @@ dependencies = [
  "serde",
  "serde_json",
  "smallvec",
+ "snafu",
  "syslog_loose",
  "tokio",
  "tokio-util 0.7.1",
