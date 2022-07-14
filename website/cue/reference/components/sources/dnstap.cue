@@ -359,13 +359,6 @@ components: sources: dnstap: {
 					unit: null
 				}
 			}
-			source_type: {
-				description: "The name of the source type."
-				required:    true
-				type: string: {
-					examples: ["dnstap"]
-				}
-			}
 			responseAddress: {
 				relevant_when: "dataType = Message"
 				description:   "The network address of the message responder."
@@ -977,7 +970,6 @@ components: sources: dnstap: {
 						"socketProtocol":  "UDP"
 						"sourceAddress":   "127.0.0.1"
 						"sourcePort":      52398
-						"source_type":     "dnstap"
 						"time":            1614781642516276825
 						"timePrecision":   "ns"
 					}
@@ -1047,7 +1039,6 @@ components: sources: dnstap: {
 						"sourceAddress":  "127.0.0.1"
 						"sourceId":       "421bce7d-b4e6-b705-6057-7039628a9847"
 						"sourcePort":     52398
-						"source_type":    "dnstap"
 						"time":           1614781642516276825
 						"timePrecision":  "ns"
 					}
@@ -1095,7 +1086,6 @@ components: sources: dnstap: {
 						"socketProtocol":  "UDP"
 						"sourceAddress":   "127.0.0.1"
 						"sourcePort":      53141
-						"source_type":     "dnstap"
 						"time":            1599832089886768480
 						"timePrecision":   "ns"
 						"requestData": {
@@ -1146,7 +1136,6 @@ components: sources: dnstap: {
 						"socketProtocol":  "UDP"
 						"sourceAddress":   "127.0.0.1"
 						"sourcePort":      53141
-						"source_type":     "dnstap"
 						"time":            1599832089890768466
 						"timePrecision":   "ns"
 						"responseData": {

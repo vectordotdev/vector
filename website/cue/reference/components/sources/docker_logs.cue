@@ -293,7 +293,7 @@ components: sources: docker_logs: {
 					description: "The name of the source type."
 					required:    true
 					type: string: {
-						examples: ["docker_logs"]
+						examples: ["docker"]
 					}
 				}
 				stream: {
@@ -349,7 +349,7 @@ components: sources: docker_logs: {
 				message:              _message
 				stream:               _stream
 				host:                 _values.local_host
-				source_type:          "docker_logs"
+				source_type:          "docker"
 			}
 		},
 	]

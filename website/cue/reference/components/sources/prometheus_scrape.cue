@@ -161,11 +161,6 @@ components: sources: prometheus_scrape: {
 				examples: ["http://localhost:9090/metrics"]
 				required: false
 			}
-			"source_type": {
-				description: "The name of the source type."
-				examples: ["prometheus_scrape"]
-				required: true
-			}
 		}
 
 		counter: output._passthrough_counter & {
