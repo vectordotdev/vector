@@ -12,7 +12,6 @@ use snafu::Snafu;
 use std::io;
 use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};
-use vector_buffers::Ackable;
 use vector_core::{
     config::{AcknowledgementsConfig, Input},
     event::{Event, EventFinalizers, Finalizable},
@@ -233,12 +232,6 @@ pub struct ChronicleRequest {
     pub body: Bytes,
     pub finalizers: EventFinalizers,
     pub metadata: RequestMetadata,
-}
-
-impl Ackable for ChronicleRequest {
-    fn ack_size(&self) -> usize {
-        self.metadata.event_count()
-    }
 }
 
 impl Finalizable for ChronicleRequest {
