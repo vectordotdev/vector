@@ -44,8 +44,6 @@ services:
       - "axiom-integration-tests"
       - "--lib"
       - "sinks::axiom::"
-      - "--"
-      - "--nocapture"
     environment:
       - AXIOM_URL=http://axiom-core
     depends_on:
