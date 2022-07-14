@@ -72,7 +72,7 @@ pub enum Region {
 
 impl Region {
     /// Each region has a it's own endpoint.
-    fn endpoint(self) -> &'static str {
+    const fn endpoint(self) -> &'static str {
         match self {
             Region::Eu => "https://europe-malachiteingestion-pa.googleapis.com",
             Region::Us => "https://malachiteingestion-pa.googleapis.com",
@@ -219,7 +219,7 @@ impl ChronicleUnstructuredConfig {
         Ok(format!(
             "{}/{}",
             match (&self.endpoint, self.region) {
-                (Some(endpoint), None) => endpoint.trim_end_matches("/"),
+                (Some(endpoint), None) => endpoint.trim_end_matches('/'),
                 (None, Some(region)) => region.endpoint(),
                 _ => return Err(ChronicleError::RegionOrEndpoint),
             },
@@ -289,7 +289,8 @@ impl Encoder<(String, Vec<Event>)> for ChronicleEncoder {
         });
 
         let body = crate::serde::json::to_bytes(&json)?.freeze();
-        writer.write(&body)
+        writer.write_all(&body)?;
+        Ok(body.len())
     }
 }
 
