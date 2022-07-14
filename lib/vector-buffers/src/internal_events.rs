@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use metrics::{counter, decrement_gauge, gauge, increment_gauge};
 use vector_common::internal_event::InternalEvent;
 
@@ -110,5 +112,25 @@ impl InternalEvent for BufferReadError {
             "error_type" => "reader_failed",
             "stage" => "processing",
         );
+    }
+}
+
+pub(crate) struct BufferStopping {
+    pub data_dir: PathBuf,
+    pub record_id: u64,
+}
+
+impl InternalEvent for BufferStopping {
+    fn emit(self) {
+        let Self {
+            data_dir,
+            record_id,
+        } = self;
+        error!(
+            message = "Disk buffer has received a negative acknowledgement, stopping processing.",
+            data_dir = ?data_dir,
+            record_id = %record_id,
+        );
+        info!("To correct this problem, run: `vector buffer-advance --record-id {record_id} {data_dir:?}`");
     }
 }
