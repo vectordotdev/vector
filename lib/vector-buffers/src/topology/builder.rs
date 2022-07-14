@@ -9,7 +9,7 @@ use crate::{
     buffer_usage_data::{BufferUsage, BufferUsageHandle},
     topology::channel::{BufferReceiver, BufferSender},
     variants::MemoryBuffer,
-    Acker, Bufferable, WhenFull,
+    Bufferable, WhenFull,
 };
 
 /// Value that can be used as a stage in a buffer topology.
@@ -32,7 +32,7 @@ pub trait IntoBuffer<T: Bufferable> {
     async fn into_buffer_parts(
         self: Box<Self>,
         usage_handle: BufferUsageHandle,
-    ) -> Result<(SenderAdapter<T>, ReceiverAdapter<T>, Option<Acker>), Box<dyn Error + Send + Sync>>;
+    ) -> Result<(SenderAdapter<T>, ReceiverAdapter<T>), Box<dyn Error + Send + Sync>>;
 }
 
 #[derive(Debug, Snafu)]
@@ -108,10 +108,9 @@ impl<T: Bufferable> TopologyBuilder<T> {
         self,
         buffer_id: String,
         span: Span,
-    ) -> Result<(BufferSender<T>, BufferReceiver<T>, Acker), TopologyError> {
+    ) -> Result<(BufferSender<T>, BufferReceiver<T>), TopologyError> {
         // We pop stages off in reverse order to build from the inside out.
         let mut buffer_usage = BufferUsage::from_span(span);
-        let mut current_acker = None;
         let mut current_stage = None;
 
         for (stage_idx, stage) in self.stages.into_iter().enumerate().rev() {
@@ -133,38 +132,16 @@ impl<T: Bufferable> TopologyBuilder<T> {
             };
 
             // Create the buffer usage handle for this stage and initialize it as we create the
-            // sender/receiver/acker.  This is slightly awkward since we just end up actually giving
+            // sender/receiver.  This is slightly awkward since we just end up actually giving
             // the handle to the `BufferSender`/`BufferReceiver` wrappers, but that's the price we
             // have to pay for letting each stage function in an opaque way when wrapped.
             let usage_handle = buffer_usage.add_stage(stage_idx);
             let provides_instrumentation = stage.untransformed.provides_instrumentation();
-            let (sender, receiver, acker) = stage
+            let (sender, receiver) = stage
                 .untransformed
                 .into_buffer_parts(usage_handle.clone())
                 .await
                 .context(FailedToBuildStageSnafu { stage_idx })?;
-
-            // Multiple components with "segmented" acknowledgements cannot be supported at the
-            // moment.  Segmented acknowledgements refers to stages which split the
-            // acknowledgement of a single event into two parts.
-            //
-            // As an example, the an in-memory stage would simply pass through an acknowledgement, as the event
-            // itself flows through untouched.  Other stages, like the disk stage, have to
-            // acknowledge an event when it is written to disk, as the acknowledgement data cannot
-            // be serialized to disk and rehydrated on deserialization.  However, the buffer still
-            // supports acknowledgments on the read side so that sinks can tell the buffer when a
-            // particular event in the buffer is safe to delete from disk, etc.
-            //
-            // In this way, the acknowledgements of an event for a disk buffer are "segmented".
-            // Since we don't have the information to track which stage in a topology has emitted an
-            // event to apply acknowledgements in the correct order, we don't support those
-            // configurations.
-            //
-            // In the future, we may opt to support such a configuration.
-            if current_acker.is_some() && acker.is_some() {
-                return Err(TopologyError::StackedAcks);
-            }
-            current_acker = acker;
 
             let (mut sender, mut receiver) = match current_stage.take() {
                 None => (
@@ -186,14 +163,13 @@ impl<T: Bufferable> TopologyBuilder<T> {
         }
 
         let (sender, receiver) = current_stage.ok_or(TopologyError::EmptyTopology)?;
-        let acker = current_acker.unwrap_or_else(Acker::passthrough);
 
         // Install the buffer usage handler since we successfully created the buffer topology.  This
         // spawns it in the background and periodically emits aggregated metrics about each of the
         // buffer stages.
         buffer_usage.install(buffer_id.as_str());
 
-        Ok((sender, receiver, acker))
+        Ok((sender, receiver))
     }
 }
 
@@ -214,7 +190,7 @@ impl<T: Bufferable> TopologyBuilder<T> {
         let usage_handle = BufferUsageHandle::noop();
 
         let memory_buffer = Box::new(MemoryBuffer::new(max_events));
-        let (sender, receiver, _) = memory_buffer
+        let (sender, receiver) = memory_buffer
             .into_buffer_parts(usage_handle.clone())
             .await
             .expect("should not fail to directly create a memory buffer");
@@ -249,7 +225,7 @@ impl<T: Bufferable> TopologyBuilder<T> {
         usage_handle: BufferUsageHandle,
     ) -> (BufferSender<T>, BufferReceiver<T>) {
         let memory_buffer = Box::new(MemoryBuffer::new(max_events));
-        let (sender, receiver, _) = memory_buffer
+        let (sender, receiver) = memory_buffer
             .into_buffer_parts(usage_handle.clone())
             .await
             .expect("should not fail to directly create a memory buffer");
@@ -298,7 +274,7 @@ mod tests {
         let result = builder.build(String::from("test"), Span::none()).await;
         assert!(result.is_ok());
 
-        let (mut sender, _, _) = result.unwrap();
+        let (mut sender, _) = result.unwrap();
         assert_current_send_capacity(&mut sender, Some(1), None);
     }
 
@@ -312,7 +288,7 @@ mod tests {
         let result = builder.build(String::from("test"), Span::none()).await;
         assert!(result.is_ok());
 
-        let (mut sender, _, _) = result.unwrap();
+        let (mut sender, _) = result.unwrap();
         assert_current_send_capacity(&mut sender, Some(1), None);
     }
 
@@ -381,7 +357,7 @@ mod tests {
         let result = builder.build(String::from("test"), Span::none()).await;
         assert!(result.is_ok());
 
-        let (mut sender, _, _) = result.unwrap();
+        let (mut sender, _) = result.unwrap();
         assert_current_send_capacity(&mut sender, Some(1), Some(1));
     }
 }

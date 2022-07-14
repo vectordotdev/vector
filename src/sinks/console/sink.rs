@@ -5,7 +5,6 @@ use futures::{stream::BoxStream, StreamExt};
 use tokio::{io, io::AsyncWriteExt};
 use tokio_util::codec::Encoder as _;
 use vector_core::{
-    buffers::Acker,
     internal_event::{BytesSent, EventsSent},
     ByteSizeOf,
 };
@@ -17,7 +16,6 @@ use crate::{
 };
 
 pub struct WriterSink<T> {
-    pub acker: Acker,
     pub output: T,
     pub transformer: Transformer,
     pub encoder: Encoder<Framer>,
@@ -50,7 +48,6 @@ where
                 }
                 Ok(()) => {
                     finalizers.update_status(EventStatus::Delivered);
-                    self.acker.ack(1);
 
                     emit!(EventsSent {
                         byte_size: event_byte_size,
@@ -119,7 +116,6 @@ mod test {
         let encoder = Encoder::<Framer>::new(NewlineDelimitedEncoder::new().into(), serializer);
 
         let sink = WriterSink {
-            acker: Acker::passthrough(),
             output: Vec::new(),
             transformer,
             encoder,

@@ -169,7 +169,7 @@ impl SinkConfig for KinesisSinkConfig {
 
         let sink = KinesisSink {
             batch_settings,
-            acker: cx.acker(),
+
             service,
             request_builder,
             partition_key_field: self.partition_key_field.clone(),

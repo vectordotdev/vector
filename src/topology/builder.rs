@@ -341,7 +341,7 @@ pub async fn build_pieces(
             };
         }
 
-        let (tx, rx, acker) = if let Some(buffer) = buffers.remove(key) {
+        let (tx, rx) = if let Some(buffer) = buffers.remove(key) {
             buffer
         } else {
             let buffer_type = match sink.buffer.stages().first().expect("cant ever be empty") {
@@ -365,12 +365,11 @@ pub async fn build_pieces(
                     errors.push(format!("Sink \"{}\": {}", key, error));
                     continue;
                 }
-                Ok((tx, rx, acker)) => (tx, Arc::new(Mutex::new(Some(rx.into_stream()))), acker),
+                Ok((tx, rx)) => (tx, Arc::new(Mutex::new(Some(rx.into_stream())))),
             }
         };
 
         let cx = SinkContext {
-            acker: acker.clone(),
             healthcheck,
             globals: config.global.clone(),
             proxy: ProxyConfig::merge_with_env(&config.global.proxy, sink.proxy()),
@@ -416,7 +415,7 @@ pub async fn build_pieces(
             .await
             .map(|_| {
                 debug!("Finished.");
-                TaskOutput::Sink(rx, acker)
+                TaskOutput::Sink(rx)
             })
         };
 

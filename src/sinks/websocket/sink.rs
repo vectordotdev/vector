@@ -30,7 +30,6 @@ use tokio_tungstenite::{
 };
 use tokio_util::codec::Encoder as _;
 use vector_core::{
-    buffers::Acker,
     internal_event::{BytesSent, EventsSent},
     ByteSizeOf,
 };
@@ -186,17 +185,12 @@ pub struct WebSocketSink {
     transformer: Transformer,
     encoder: Encoder<()>,
     connector: WebSocketConnector,
-    acker: Acker,
     ping_interval: Option<u64>,
     ping_timeout: Option<u64>,
 }
 
 impl WebSocketSink {
-    pub fn new(
-        config: &WebSocketSinkConfig,
-        connector: WebSocketConnector,
-        acker: Acker,
-    ) -> crate::Result<Self> {
+    pub fn new(config: &WebSocketSinkConfig, connector: WebSocketConnector) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.encoding()?;
         let encoder = Encoder::<()>::new(serializer);
@@ -205,7 +199,6 @@ impl WebSocketSink {
             transformer,
             encoder,
             connector,
-            acker,
             ping_interval: config.ping_interval.filter(|v| *v > 0),
             ping_timeout: config.ping_timeout.filter(|v| *v > 0),
         })
@@ -316,7 +309,6 @@ impl WebSocketSink {
                         }
                     };
 
-                    self.acker.ack(1);
                     res
                 },
                 else => break,

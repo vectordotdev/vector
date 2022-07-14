@@ -9,7 +9,7 @@ use http::{
 use hyper::Body;
 use tower::Service;
 use vector_common::internal_event::BytesSent;
-use vector_core::{buffers::Ackable, internal_event::EventsSent, stream::DriverResponse};
+use vector_core::{internal_event::EventsSent, stream::DriverResponse};
 
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
@@ -42,12 +42,6 @@ pub struct GcsRequest {
     pub settings: GcsRequestSettings,
     pub finalizers: EventFinalizers,
     pub metadata: RequestMetadata,
-}
-
-impl Ackable for GcsRequest {
-    fn ack_size(&self) -> usize {
-        self.metadata.event_count()
-    }
 }
 
 impl Finalizable for GcsRequest {

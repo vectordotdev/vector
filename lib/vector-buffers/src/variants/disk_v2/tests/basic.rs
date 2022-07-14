@@ -3,11 +3,12 @@ use std::io::Cursor;
 use futures::{stream, StreamExt};
 use tokio_test::{assert_pending, assert_ready, task::spawn};
 use tracing::Instrument;
+use vector_common::finalization::Finalizable;
 
-use super::create_default_buffer_v2;
+use super::{create_default_buffer_v2, read_next, read_next_some};
 use crate::{
     assert_buffer_is_empty, assert_buffer_records,
-    test::{install_tracing_helpers, with_temp_dir, MultiEventRecord, SizedRecord},
+    test::{acknowledge, install_tracing_helpers, with_temp_dir, MultiEventRecord, SizedRecord},
     variants::disk_v2::{tests::create_default_buffer_v2_with_usage, writer::RecordWriter},
     EventCount,
 };
@@ -19,7 +20,7 @@ async fn basic_read_write_loop() {
 
         async move {
             // Create a regular buffer, no customizations required.
-            let (mut writer, mut reader, acker, ledger) = create_default_buffer_v2(data_dir).await;
+            let (mut writer, mut reader, ledger) = create_default_buffer_v2(data_dir).await;
             assert_buffer_is_empty!(ledger);
 
             let expected_items = (512..768)
@@ -45,9 +46,9 @@ async fn basic_read_write_loop() {
 
             let read_task = tokio::spawn(async move {
                 let mut items = Vec::new();
-                while let Some(record) = reader.next().await.expect("reader should not fail") {
+                while let Some(mut record) = read_next(&mut reader).await {
+                    acknowledge(record.take_finalizers()).await;
                     items.push(record);
-                    acker.ack(1);
                 }
                 items
             });
@@ -75,7 +76,7 @@ async fn reader_exits_cleanly_when_writer_done_and_in_flight_acks() {
 
         async move {
             // Create a regular buffer, no customizations required.
-            let (mut writer, mut reader, acker, ledger) = create_default_buffer_v2(data_dir).await;
+            let (mut writer, mut reader, ledger) = create_default_buffer_v2(data_dir).await;
             assert_buffer_is_empty!(ledger);
 
             // Now write a single value and close the writer.
@@ -88,8 +89,8 @@ async fn reader_exits_cleanly_when_writer_done_and_in_flight_acks() {
             assert_buffer_records!(ledger, 1);
 
             // And read that single value.
-            let first_read = reader.next().await.expect("read should not fail");
-            assert_eq!(first_read, Some(SizedRecord::new(32)));
+            let first_read = read_next_some(&mut reader).await;
+            assert_eq!(first_read, SizedRecord::new(32));
             assert_buffer_records!(ledger, 1);
 
             // Now, we haven't acknowledged that read yet, so our next read should see the writer as
@@ -121,7 +122,7 @@ async fn reader_exits_cleanly_when_writer_done_and_in_flight_acks() {
             }
 
             // Now acknowledge the first read, which should wake up our blocked read.
-            acker.ack(1);
+            acknowledge(first_read).await;
 
             // Our blocked read should be woken up, and when we poll it, it should be also be ready,
             // albeit with a return value of `None`... because the writer is closed, and we read all
@@ -147,13 +148,13 @@ async fn initial_size_correct_with_multievents() {
 
         async move {
             // Create a regular buffer, no customizations required.
-            let (mut writer, _, _, _) = create_default_buffer_v2(data_dir.clone()).await;
+            let (mut writer, _, _) = create_default_buffer_v2(data_dir.clone()).await;
 
             let input_items = (512..768)
                 .into_iter()
                 .cycle()
                 .take(2000)
-                .map(MultiEventRecord)
+                .map(MultiEventRecord::new)
                 .collect::<Vec<_>>();
             let expected_records = input_items.len();
             let expected_events = input_items
@@ -168,7 +169,7 @@ async fn initial_size_correct_with_multievents() {
             // Technically, we aggregate the bytes written value from each write, but we also want
             // to verify that is accurate, so we record each record by hand to make sure our totals
             // are identical:
-            let expected_bytes = stream::iter(input_items.iter().copied())
+            let expected_bytes = stream::iter(input_items.iter().cloned())
                 .filter_map(|record| async move {
                     let mut record_writer =
                         RecordWriter::new(Cursor::new(Vec::new()), 0, 16_384, u64::MAX, usize::MAX);
@@ -203,7 +204,7 @@ async fn initial_size_correct_with_multievents() {
 
             // Now drop our buffer and reopen it.
             drop(writer);
-            let (writer, mut reader, acker, ledger, usage) =
+            let (writer, mut reader, ledger, usage) =
                 create_default_buffer_v2_with_usage::<_, MultiEventRecord>(data_dir).await;
             drop(writer);
 
@@ -218,10 +219,10 @@ async fn initial_size_correct_with_multievents() {
             // values from the source:
             let mut total_records_read = 0;
             let mut total_record_events = 0;
-            while let Some(record) = reader.next().await.expect("read should not fail") {
+            while let Some(record) = read_next(&mut reader).await {
                 total_records_read += 1;
                 let event_count = record.event_count();
-                acker.ack(event_count);
+                acknowledge(record).await;
                 total_record_events += event_count;
             }
 

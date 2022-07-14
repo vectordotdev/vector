@@ -1,5 +1,4 @@
 use bytes::Bytes;
-use vector_core::buffers::Ackable;
 use vector_core::ByteSizeOf;
 
 use super::config::SqsSinkConfig;
@@ -136,12 +135,6 @@ impl ByteSizeOf for SendMessageEntry {
 impl EncodedLength for SendMessageEntry {
     fn encoded_length(&self) -> usize {
         self.message_body.len()
-    }
-}
-
-impl Ackable for SendMessageEntry {
-    fn ack_size(&self) -> usize {
-        1
     }
 }
 

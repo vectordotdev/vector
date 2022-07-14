@@ -4,7 +4,6 @@ use async_trait::async_trait;
 use futures::{stream::BoxStream, StreamExt};
 use tower::Service;
 use vector_core::{
-    buffers::Acker,
     sink::StreamSink,
     stream::{BatcherSettings, DriverResponse},
 };
@@ -23,7 +22,6 @@ struct KinesisFirehoseRetryLogic;
 pub struct KinesisSink<S> {
     pub batch_settings: BatcherSettings,
     pub service: S,
-    pub acker: Acker,
     pub request_builder: KinesisRequestBuilder,
 }
 
@@ -53,7 +51,7 @@ where
                 }
             })
             .batched(self.batch_settings.into_byte_size_config())
-            .into_driver(self.service, self.acker);
+            .into_driver(self.service);
 
         sink.run().await
     }

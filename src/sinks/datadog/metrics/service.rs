@@ -12,7 +12,6 @@ use snafu::ResultExt;
 use tower::Service;
 use vector_common::internal_event::BytesSent;
 use vector_core::{
-    buffers::Ackable,
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_event::EventsSent,
     stream::DriverResponse,
@@ -103,12 +102,6 @@ impl DatadogMetricsRequest {
             .header(CONTENT_ENCODING, "deflate");
 
         request.body(Body::from(self.payload))
-    }
-}
-
-impl Ackable for DatadogMetricsRequest {
-    fn ack_size(&self) -> usize {
-        self.batch_size
     }
 }
 

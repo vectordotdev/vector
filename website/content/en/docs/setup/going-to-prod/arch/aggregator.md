@@ -93,7 +93,6 @@ Partitioning, or “topics” in Kafka terminology, refers to separating data in
 
 #### Recommendations
 
-- If you’re using your pub-sub system purely for durability, consider Vector’s external buffers, which buffers data on your pub-sub system while transparently handling data producing and consuming.
 - Use memory buffers with `buffers.when_full` set to `block`. This will ensure back pressure flows upstream to your pub-sub system, where durable buffering should occur.
 -  Enable [end-to-end acknowledgements](/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/) for your Vector pub-sub source (i.e., the `kafka` source) to ensure data is persisted downstream before removing the data from your pub-sub systems.
 
