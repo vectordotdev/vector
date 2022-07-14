@@ -8,7 +8,7 @@ use futures::{stream, Stream};
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 use vector_buffers::EventCount;
-use vector_common::finalization::{AddBatchNotifier, BatchNotifier};
+use vector_common::finalization::{AddBatchNotifier, BatchNotifier, EventFinalizers, Finalizable};
 
 use super::{
     Event, EventDataEq, EventFinalizer, EventMutRef, EventRef, LogEvent, Metric, TraceEvent,
@@ -280,6 +280,16 @@ impl EventDataEq for EventArray {
             (Self::Metrics(a), Self::Metrics(b)) => a.event_data_eq(b),
             (Self::Traces(a), Self::Traces(b)) => a.event_data_eq(b),
             _ => false,
+        }
+    }
+}
+
+impl Finalizable for EventArray {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        match self {
+            Self::Logs(a) => a.iter_mut().map(Finalizable::take_finalizers).collect(),
+            Self::Metrics(a) => a.iter_mut().map(Finalizable::take_finalizers).collect(),
+            Self::Traces(a) => a.iter_mut().map(Finalizable::take_finalizers).collect(),
         }
     }
 }

@@ -100,12 +100,12 @@ impl GenerateConfig for StatsdSinkConfig {
 impl SinkConfig for StatsdSinkConfig {
     async fn build(
         &self,
-        cx: SinkContext,
+        _cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let default_namespace = self.default_namespace.clone();
         let mut encoder = StatsdEncoder { default_namespace };
         match &self.mode {
-            Mode::Tcp(config) => config.build(cx, Default::default(), encoder),
+            Mode::Tcp(config) => config.build(Default::default(), encoder),
             Mode::Udp(config) => {
                 // 1432 bytes is a recommended packet size to fit into MTU
                 // https://github.com/statsd/statsd/blob/master/docs/metric_types.md#multi-metric-packets
@@ -113,13 +113,12 @@ impl SinkConfig for StatsdSinkConfig {
                 // Also one might keep an eye on server side limitations, like
                 // mentioned here https://github.com/DataDog/dd-agent/issues/2638
                 let batch = config.batch.into_batch_settings()?;
-                let (service, healthcheck) = config.udp.build_service(cx.clone())?;
+                let (service, healthcheck) = config.udp.build_service()?;
                 let service = StatsdSvc { inner: service };
                 let sink = BatchSink::new(
                     ServiceBuilder::new().service(service),
                     Buffer::new(batch.size, Compression::None),
                     batch.timeout,
-                    cx.acker(),
                 )
                 .sink_map_err(|error| error!(message = "Fatal statsd sink error.", %error))
                 .with_flat_map(move |event: Event| {
@@ -135,7 +134,7 @@ impl SinkConfig for StatsdSinkConfig {
                 Ok((super::VectorSink::from_event_sink(sink), healthcheck))
             }
             #[cfg(unix)]
-            Mode::Unix(config) => config.build(cx, Default::default(), encoder),
+            Mode::Unix(config) => config.build(Default::default(), encoder),
         }
     }
 

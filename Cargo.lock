@@ -1576,9 +1576,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "3.2.10"
+version = "3.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69c5a7f9997be616e47f0577ee38c91decb33392c5be4866494f34cdf329a9aa"
+checksum = "d646c7ade5eb07c4aa20e907a922750df0c448892513714fd3e4acbc7130829f"
 dependencies = [
  "atty",
  "bitflags",
@@ -3643,34 +3643,12 @@ dependencies = [
 
 [[package]]
 name = "inventory"
-version = "0.1.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0eb5160c60ba1e809707918ee329adb99d222888155835c6feedba19f6c3fd4"
-dependencies = [
- "ctor",
- "ghost",
- "inventory-impl",
-]
-
-[[package]]
-name = "inventory"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e0257e268c91daba296499206db5dd5a058875936bec3d8429b5f3e20ec9dc9a"
 dependencies = [
  "ctor",
  "ghost",
-]
-
-[[package]]
-name = "inventory-impl"
-version = "0.1.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e41b53715c6f0c4be49510bb82dee2c1e51c8586d885abe65396e82ed518548"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
@@ -7635,15 +7613,15 @@ dependencies = [
 
 [[package]]
 name = "tokio-tungstenite"
-version = "0.17.1"
+version = "0.17.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06cda1232a49558c46f8a504d5b93101d42c0bf7f911f12a105ba48168f821ae"
+checksum = "f714dd15bead90401d77e04243611caec13726c2408afd5b31901dfcdcb3b181"
 dependencies = [
  "futures-util",
  "log",
  "rustls 0.20.4",
  "tokio",
- "tungstenite 0.17.2",
+ "tungstenite 0.17.3",
 ]
 
 [[package]]
@@ -8111,9 +8089,9 @@ dependencies = [
 
 [[package]]
 name = "tungstenite"
-version = "0.17.2"
+version = "0.17.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d96a2dea40e7570482f28eb57afbe42d97551905da6a9400acc5c328d24004f5"
+checksum = "e27992fd6a8c29ee7eef28fc78349aa244134e10ad447ce3b9f0ac0ed0fa4ce0"
 dependencies = [
  "base64",
  "byteorder",
@@ -8173,7 +8151,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "62a3f3e32f68a8a611e8b98a14e058954f1b81d6eb6af50e2349bf322ae4062b"
 dependencies = [
  "erased-serde",
- "inventory 0.3.0",
+ "inventory",
  "once_cell",
  "serde",
  "typetag-impl",
@@ -8429,7 +8407,7 @@ dependencies = [
  "bytesize",
  "chrono",
  "cidr-utils",
- "clap 3.2.10",
+ "clap 3.2.11",
  "codecs",
  "colored",
  "console-subscriber",
@@ -8468,7 +8446,7 @@ dependencies = [
  "indexmap",
  "indoc",
  "infer 0.9.0",
- "inventory 0.1.11",
+ "inventory",
  "itertools 0.10.3",
  "k8s-openapi",
  "kube",
@@ -8541,7 +8519,7 @@ dependencies = [
  "tokio-postgres",
  "tokio-stream",
  "tokio-test",
- "tokio-tungstenite 0.17.1",
+ "tokio-tungstenite 0.17.2",
  "tokio-util 0.7.1",
  "toml",
  "tonic",
@@ -8591,7 +8569,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tokio-stream",
- "tokio-tungstenite 0.17.1",
+ "tokio-tungstenite 0.17.2",
  "url",
  "uuid 1.1.2",
 ]
@@ -8614,7 +8592,7 @@ dependencies = [
  "async-trait",
  "bytecheck",
  "bytes 1.1.0",
- "clap 3.2.10",
+ "clap 3.2.11",
  "crc32fast",
  "criterion",
  "crossbeam-queue",
@@ -8820,7 +8798,7 @@ dependencies = [
 name = "vrl-cli"
 version = "0.1.0"
 dependencies = [
- "clap 3.2.10",
+ "clap 3.2.11",
  "exitcode",
  "indoc",
  "lookup",
@@ -8958,7 +8936,7 @@ dependencies = [
  "ansi_term",
  "chrono",
  "chrono-tz",
- "clap 3.2.10",
+ "clap 3.2.11",
  "enrichment",
  "glob",
  "lookup",

@@ -14,7 +14,7 @@ use vector_buffers::{
     BufferType, EventCount,
 };
 use vector_common::byte_size_of::ByteSizeOf;
-use vector_common::finalization::{AddBatchNotifier, BatchNotifier};
+use vector_common::finalization::{AddBatchNotifier, BatchNotifier, EventFinalizers, Finalizable};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Message<const N: usize> {
@@ -46,6 +46,12 @@ impl<const N: usize> ByteSizeOf for Message<N> {
 impl<const N: usize> EventCount for Message<N> {
     fn event_count(&self) -> usize {
         1
+    }
+}
+
+impl<const N: usize> Finalizable for Message<N> {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        Default::default() // This benchmark doesn't need finalization
     }
 }
 
@@ -123,7 +129,7 @@ pub async fn setup<const N: usize>(
     variant
         .add_to_builder(&mut builder, data_dir, id)
         .expect("should not fail to add variant to builder");
-    let (tx, rx, _acker) = builder
+    let (tx, rx) = builder
         .build(String::from("benches"), Span::none())
         .await
         .expect("should not fail to build topology");

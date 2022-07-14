@@ -4,15 +4,14 @@ use indoc::indoc;
 use serde::{Deserialize, Serialize};
 
 use super::Region;
-use crate::sinks::elasticsearch::BulkConfig;
-use crate::sinks::util::encoding::Transformer;
 use crate::{
+    codecs::Transformer,
     config::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
     },
     event::EventArray,
     sinks::{
-        elasticsearch::ElasticsearchConfig,
+        elasticsearch::{BulkConfig, ElasticsearchConfig},
         util::{
             http::RequestConfig, BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings,
             StreamSink, TowerRequestConfig,

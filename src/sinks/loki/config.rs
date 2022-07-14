@@ -1,46 +1,26 @@
 use std::collections::HashMap;
 
-use codecs::encoding::SerializerConfig;
-use codecs::{JsonSerializerConfig, LogfmtSerializerConfig, TextSerializerConfig};
 use futures::future::FutureExt;
 use serde::{Deserialize, Serialize};
 
 use super::{healthcheck::healthcheck, sink::LokiSink};
-use crate::sinks::util::encoding::{EncodingConfigAdapter, EncodingConfigMigrator};
-use crate::sinks::util::Compression;
 use crate::{
+    codecs::EncodingConfig,
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
-        util::{
-            encoding::EncodingConfig, BatchConfig, SinkBatchSettings, TowerRequestConfig, UriSerde,
-        },
+        util::{BatchConfig, Compression, SinkBatchSettings, TowerRequestConfig, UriSerde},
         VectorSink,
     },
     template::Template,
     tls::{TlsConfig, TlsSettings},
 };
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EncodingMigrator;
-
-impl EncodingConfigMigrator for EncodingMigrator {
-    type Codec = Encoding;
-
-    fn migrate(codec: &Self::Codec) -> SerializerConfig {
-        match codec {
-            Encoding::Json => JsonSerializerConfig::new().into(),
-            Encoding::Text => TextSerializerConfig::new().into(),
-            Encoding::Logfmt => LogfmtSerializerConfig::new().into(),
-        }
-    }
-}
-
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct LokiConfig {
     pub endpoint: UriSerde,
-    pub encoding: EncodingConfigAdapter<EncodingConfig<Encoding>, EncodingMigrator>,
+    pub encoding: EncodingConfig,
     pub tenant_id: Option<Template>,
     pub labels: HashMap<Template, Template>,
     #[serde(default = "crate::serde::default_false")]
@@ -128,14 +108,14 @@ impl SinkConfig for LokiConfig {
             }
         }
 
-        let client = self.build_client(cx.clone())?;
+        let client = self.build_client(cx)?;
 
         let config = LokiConfig {
             auth: self.auth.choose_one(&self.endpoint.auth)?,
             ..self.clone()
         };
 
-        let sink = LokiSink::new(config.clone(), client.clone(), cx)?;
+        let sink = LokiSink::new(config.clone(), client.clone())?;
 
         let healthcheck = healthcheck(config, client).boxed();
 

@@ -873,7 +873,7 @@ proptest! {
             let mut model = BufferModel::from_config(&config);
 
             let usage_handle = BufferUsageHandle::noop();
-            let (writer, reader, _acker, ledger) =
+            let (writer, reader, ledger) =
                 Buffer::<Record>::from_config_inner(config, usage_handle)
                     .await
                     .expect("should not fail to build buffer");

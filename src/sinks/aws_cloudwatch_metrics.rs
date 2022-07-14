@@ -105,7 +105,7 @@ impl SinkConfig for CloudWatchMetricsSinkConfig {
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let client = self.create_client(&cx.proxy).await?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
-        let sink = CloudWatchMetricsSvc::new(self.clone(), client, cx)?;
+        let sink = CloudWatchMetricsSvc::new(self.clone(), client)?;
         Ok((sink, healthcheck))
     }
 
@@ -163,7 +163,6 @@ impl CloudWatchMetricsSvc {
     pub fn new(
         config: CloudWatchMetricsSinkConfig,
         client: CloudwatchClient,
-        cx: SinkContext,
     ) -> crate::Result<super::VectorSink> {
         let default_namespace = config.default_namespace.clone();
         let batch = config.batch.into_batch_settings()?;
@@ -178,13 +177,7 @@ impl CloudWatchMetricsSvc {
         let mut normalizer = MetricNormalizer::<AwsCloudwatchMetricNormalize>::default();
 
         let sink = request_settings
-            .partition_sink(
-                CloudWatchMetricsRetryLogic,
-                service,
-                buffer,
-                batch.timeout,
-                cx.acker(),
-            )
+            .partition_sink(CloudWatchMetricsRetryLogic, service, buffer, batch.timeout)
             .sink_map_err(|error| error!(message = "Fatal CloudwatchMetrics sink error.", %error))
             .with_flat_map(move |event: Event| {
                 stream::iter({
@@ -516,7 +509,7 @@ mod integration_tests {
         let cx = SinkContext::new_test();
         let config = config();
         let client = config.create_client(&cx.globals.proxy).await.unwrap();
-        let sink = CloudWatchMetricsSvc::new(config, client, cx).unwrap();
+        let sink = CloudWatchMetricsSvc::new(config, client).unwrap();
 
         let mut events = Vec::new();
 
@@ -576,7 +569,7 @@ mod integration_tests {
         let cx = SinkContext::new_test();
         let config = config();
         let client = config.create_client(&cx.globals.proxy).await.unwrap();
-        let sink = CloudWatchMetricsSvc::new(config, client, cx).unwrap();
+        let sink = CloudWatchMetricsSvc::new(config, client).unwrap();
 
         let mut events = Vec::new();
 

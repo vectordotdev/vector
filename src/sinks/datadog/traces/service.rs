@@ -11,7 +11,6 @@ use snafu::ResultExt;
 use tower::Service;
 use vector_common::internal_event::BytesSent;
 use vector_core::{
-    buffers::Ackable,
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_event::EventsSent,
     stream::DriverResponse,
@@ -72,12 +71,6 @@ impl TraceApiRequest {
             request = request.header(k, v);
         }
         request.body(Body::from(self.body))
-    }
-}
-
-impl Ackable for TraceApiRequest {
-    fn ack_size(&self) -> usize {
-        self.batch_size
     }
 }
 

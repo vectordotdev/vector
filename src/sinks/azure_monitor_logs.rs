@@ -13,12 +13,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 
 use crate::{
+    codecs::Transformer,
     config::{log_schema, AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
     http::HttpClient,
     sinks::{
         util::{
-            encoding::Transformer,
             http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
             BatchConfig, BoxedRawValue, JsonArrayBuffer, RealtimeSizeBasedDefaultBatchSettings,
             TowerRequestConfig,
@@ -119,7 +119,6 @@ impl SinkConfig for AzureMonitorLogsConfig {
             request_settings,
             batch_settings.timeout,
             client,
-            cx.acker(),
         )
         .sink_map_err(|error| error!(message = "Fatal azure_monitor_logs sink error.", %error));
 
@@ -372,7 +371,6 @@ mod tests {
             request_settings,
             Duration::from_secs(1),
             client,
-            context.acker(),
         )
         .sink_map_err(|error| error!(message = "Fatal azure_monitor_logs sink error.", %error));
 

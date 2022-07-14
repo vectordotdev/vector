@@ -5,7 +5,6 @@ use futures::{stream::BoxStream, StreamExt};
 use prost::Message;
 use tower::Service;
 use vector_core::{
-    buffers::Acker,
     stream::{BatcherSettings, DriverResponse},
     ByteSizeOf,
 };
@@ -27,7 +26,6 @@ struct EventData {
 pub struct VectorSink<S> {
     pub batch_settings: BatcherSettings,
     pub service: S,
-    pub acker: Acker,
 }
 
 impl<S> VectorSink<S>
@@ -52,7 +50,7 @@ where
                     req.events.push(item.wrapper);
                 },
             ))
-            .into_driver(self.service, self.acker)
+            .into_driver(self.service)
             .run()
             .await
     }

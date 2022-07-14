@@ -6,12 +6,10 @@ use tokio_util::codec::Encoder as _;
 
 use super::sink::HecProcessedEvent;
 use crate::{
+    codecs::Transformer,
     event::{Event, LogEvent},
     internal_events::SplunkEventEncodeError,
-    sinks::{
-        splunk_hec::common::EndpointTarget,
-        util::encoding::{Encoder, Transformer},
-    },
+    sinks::{splunk_hec::common::EndpointTarget, util::encoding::Encoder},
 };
 
 #[derive(Serialize, Debug)]

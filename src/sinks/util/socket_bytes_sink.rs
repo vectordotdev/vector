@@ -10,8 +10,9 @@ use futures::{ready, Sink};
 use pin_project::{pin_project, pinned_drop};
 use tokio::io::AsyncWrite;
 use tokio_util::codec::{BytesCodec, FramedWrite};
-use vector_buffers::Acker;
+use vector_common::finalization::EventFinalizers;
 
+use super::EncodedEvent;
 use crate::internal_events::{SocketEventsSent, SocketMode};
 
 const MAX_PENDING_ITEMS: usize = 1_000;
@@ -37,10 +38,10 @@ where
     #[pin]
     inner: FramedWrite<T, BytesCodec>,
     shutdown_check: Box<dyn Fn(&mut T) -> ShutdownCheck + Send>,
-    acker: Acker,
     socket_mode: SocketMode,
     events_total: usize,
     bytes_total: usize,
+    finalizers: Vec<EventFinalizers>,
 }
 
 impl<T> BytesSink<T>
@@ -50,7 +51,6 @@ where
     pub(crate) fn new(
         inner: T,
         shutdown_check: impl Fn(&mut T) -> ShutdownCheck + Send + 'static,
-        acker: Acker,
         socket_mode: SocketMode,
     ) -> Self {
         Self {
@@ -58,14 +58,14 @@ where
             shutdown_check: Box::new(shutdown_check),
             events_total: 0,
             bytes_total: 0,
-            acker,
             socket_mode,
+            finalizers: Vec::new(),
         }
     }
 
     fn ack(&mut self) {
         if self.events_total > 0 {
-            self.acker.ack(self.events_total);
+            drop(std::mem::take(&mut self.finalizers));
 
             emit!(SocketEventsSent {
                 mode: self.socket_mode,
@@ -89,7 +89,7 @@ where
     }
 }
 
-impl<T> Sink<Bytes> for BytesSink<T>
+impl<T> Sink<EncodedEvent<Bytes>> for BytesSink<T>
 where
     T: AsyncWrite + Unpin,
 {
@@ -106,11 +106,12 @@ where
         <FramedWrite<T, BytesCodec> as Sink<Bytes>>::poll_ready(inner, cx)
     }
 
-    fn start_send(self: Pin<&mut Self>, item: Bytes) -> Result<(), Self::Error> {
+    fn start_send(self: Pin<&mut Self>, item: EncodedEvent<Bytes>) -> Result<(), Self::Error> {
         let pinned = self.project();
+        pinned.finalizers.push(item.finalizers);
         *pinned.events_total += 1;
-        *pinned.bytes_total += item.len();
-        pinned.inner.start_send(item)
+        *pinned.bytes_total += item.byte_size;
+        pinned.inner.start_send(item.item)
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {

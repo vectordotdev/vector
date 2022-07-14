@@ -1,7 +1,9 @@
-use codecs::encoding::{FramingConfig, SerializerConfig};
+use crate::codecs::Transformer;
+use codecs::{
+    encoding::{Framer, FramingConfig, Serializer, SerializerConfig},
+    CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder,
+};
 use serde::{Deserialize, Serialize};
-
-use crate::sinks::util::encoding::Transformer;
 
 /// Config used to build an `Encoder`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -31,6 +33,23 @@ impl EncodingConfig {
     /// Get the encoding configuration.
     pub const fn config(&self) -> &SerializerConfig {
         &self.encoding
+    }
+
+    /// Build the `Serializer` for this config.
+    pub fn build(&self) -> crate::Result<Serializer> {
+        self.encoding.build()
+    }
+}
+
+impl<T> From<T> for EncodingConfig
+where
+    T: Into<SerializerConfig>,
+{
+    fn from(encoding: T) -> Self {
+        Self {
+            encoding: encoding.into(),
+            transformer: Default::default(),
+        }
     }
 }
 
@@ -70,6 +89,53 @@ impl EncodingConfigWithFraming {
     pub const fn config(&self) -> (&Option<FramingConfig>, &SerializerConfig) {
         (&self.framing, &self.encoding.encoding)
     }
+
+    /// Build the `Framer` and `Serializer` for this config.
+    pub fn build(&self, sink_type: SinkType) -> crate::Result<(Framer, Serializer)> {
+        let framer = self.framing.as_ref().map(|framing| framing.build());
+        let serializer = self.encoding.build()?;
+
+        let framer = match (framer, &serializer) {
+            (Some(framer), _) => framer,
+            (None, Serializer::Json(_)) => match sink_type {
+                SinkType::StreamBased => NewlineDelimitedEncoder::new().into(),
+                SinkType::MessageBased => CharacterDelimitedEncoder::new(b',').into(),
+            },
+            (None, Serializer::Avro(_) | Serializer::Native(_)) => {
+                LengthDelimitedEncoder::new().into()
+            }
+            (
+                None,
+                Serializer::Logfmt(_)
+                | Serializer::NativeJson(_)
+                | Serializer::RawMessage(_)
+                | Serializer::Text(_),
+            ) => NewlineDelimitedEncoder::new().into(),
+        };
+
+        Ok((framer, serializer))
+    }
+}
+
+/// The way a sink processes outgoing events.
+pub enum SinkType {
+    /// Events are sent in a continuous stream.
+    StreamBased,
+    /// Events are sent in a batch as a message.
+    MessageBased,
+}
+
+impl<F, S> From<(Option<F>, S)> for EncodingConfigWithFraming
+where
+    F: Into<FramingConfig>,
+    S: Into<SerializerConfig>,
+{
+    fn from((framing, encoding): (Option<F>, S)) -> Self {
+        Self {
+            framing: framing.map(Into::into),
+            encoding: encoding.into().into(),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -77,7 +143,7 @@ mod test {
     use lookup::lookup_v2::parse_path;
 
     use super::*;
-    use crate::sinks::util::encoding::{EncodingConfiguration, TimestampFormat};
+    use crate::codecs::encoding::TimestampFormat;
 
     #[test]
     fn deserialize_encoding_config() {
