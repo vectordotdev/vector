@@ -7,7 +7,6 @@ use tower::{
     timeout::Timeout,
     Service, ServiceBuilder,
 };
-use vector_buffers::Acker;
 use vector_config::configurable_component;
 
 pub use crate::sinks::util::service::{
@@ -228,7 +227,6 @@ impl TowerRequestSettings {
         service: S,
         batch: B,
         batch_timeout: Duration,
-        acker: Acker,
     ) -> TowerPartitionSink<S, B, RL, K>
     where
         RL: RetryLogic<Response = S::Response>,
@@ -244,7 +242,7 @@ impl TowerRequestSettings {
         let service = ServiceBuilder::new()
             .settings(self.clone(), retry_logic)
             .service(service);
-        PartitionBatchSink::new(service, batch, batch_timeout, acker)
+        PartitionBatchSink::new(service, batch, batch_timeout)
     }
 
     pub fn batch_sink<B, RL, S>(
@@ -253,7 +251,6 @@ impl TowerRequestSettings {
         service: S,
         batch: B,
         batch_timeout: Duration,
-        acker: Acker,
     ) -> TowerBatchedSink<S, B, RL>
     where
         RL: RetryLogic<Response = S::Response>,
@@ -267,7 +264,7 @@ impl TowerRequestSettings {
         let service = ServiceBuilder::new()
             .settings(self.clone(), retry_logic)
             .service(service);
-        BatchSink::new(service, batch, batch_timeout, acker)
+        BatchSink::new(service, batch, batch_timeout)
     }
 }
 
@@ -367,7 +364,6 @@ mod tests {
         };
         let settings = cfg.unwrap_with(&TowerRequestConfig::default());
 
-        let (acker, _) = Acker::basic();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = {
@@ -394,7 +390,6 @@ mod tests {
             svc,
             PartitionBuffer::new(VecBuffer::new(batch_settings.size)),
             TIMEOUT,
-            acker,
         );
         sink.ordered();
 

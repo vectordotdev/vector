@@ -3,7 +3,10 @@ use std::time::{Duration, Instant};
 use async_compression::tokio::write::GzipEncoder;
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
-use codecs::{encoding::Framer, NewlineDelimitedEncoder};
+use codecs::{
+    encoding::{Framer, FramingConfig},
+    TextSerializerConfig,
+};
 use futures::{
     future,
     stream::{BoxStream, StreamExt},
@@ -15,10 +18,10 @@ use tokio::{
     io::AsyncWriteExt,
 };
 use tokio_util::codec::Encoder as _;
-use vector_core::{buffers::Acker, internal_event::EventsSent, ByteSizeOf};
+use vector_core::{internal_event::EventsSent, ByteSizeOf};
 
 use crate::{
-    codecs::Encoder,
+    codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
     config::{
         AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
         SinkDescription,
@@ -26,13 +29,7 @@ use crate::{
     event::{Event, EventStatus, Finalizable},
     expiring_hash_map::ExpiringHashMap,
     internal_events::{FileBytesSent, FileIoError, FileOpen, TemplateRenderingError},
-    sinks::util::{
-        encoding::{
-            EncodingConfig, EncodingConfigWithFramingAdapter, StandardEncodings,
-            StandardEncodingsWithFramingMigrator, Transformer,
-        },
-        StreamSink,
-    },
+    sinks::util::StreamSink,
     template::Template,
 };
 mod bytes_path;
@@ -46,10 +43,7 @@ pub struct FileSinkConfig {
     pub path: Template,
     pub idle_timeout_secs: Option<u64>,
     #[serde(flatten)]
-    pub encoding: EncodingConfigWithFramingAdapter<
-        EncodingConfig<StandardEncodings>,
-        StandardEncodingsWithFramingMigrator,
-    >,
+    pub encoding: EncodingConfigWithFraming,
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
@@ -72,7 +66,7 @@ impl GenerateConfig for FileSinkConfig {
         toml::Value::try_from(Self {
             path: Template::try_from("/tmp/vector-%Y-%m-%d.log").unwrap(),
             idle_timeout_secs: None,
-            encoding: StandardEncodings::Text.as_framed_config_adapter(),
+            encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
             compression: Default::default(),
             acknowledgements: Default::default(),
         })
@@ -140,9 +134,9 @@ impl OutFile {
 impl SinkConfig for FileSinkConfig {
     async fn build(
         &self,
-        cx: SinkContext,
+        _cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let sink = FileSink::new(self, cx.acker())?;
+        let sink = FileSink::new(self)?;
         Ok((
             super::VectorSink::from_event_streamsink(sink),
             future::ok(()).boxed(),
@@ -164,7 +158,6 @@ impl SinkConfig for FileSinkConfig {
 
 #[derive(Debug)]
 pub struct FileSink {
-    acker: Acker,
     path: Template,
     transformer: Transformer,
     encoder: Encoder<Framer>,
@@ -174,14 +167,12 @@ pub struct FileSink {
 }
 
 impl FileSink {
-    pub fn new(config: &FileSinkConfig, acker: Acker) -> crate::Result<Self> {
+    pub fn new(config: &FileSinkConfig) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
-        let (framer, serializer) = config.encoding.encoding()?;
-        let framer = framer.unwrap_or_else(|| NewlineDelimitedEncoder::new().into());
+        let (framer, serializer) = config.encoding.build(SinkType::StreamBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
 
         Ok(Self {
-            acker,
             path: config.path.clone(),
             transformer,
             encoder,
@@ -220,10 +211,7 @@ impl FileSink {
             tokio::select! {
                 event = input.next() => {
                     match event {
-                        Some(event) => {
-                            self.process_event(event).await;
-                            self.acker.ack(1);
-                        },
+                        Some(event) => self.process_event(event).await,
                         None => {
                             // If we got `None` - terminate the processing.
                             debug!(message = "Receiver exhausted, terminating the processing loop.");
@@ -423,12 +411,12 @@ mod tests {
         let config = FileSinkConfig {
             path: template.clone().try_into().unwrap(),
             idle_timeout_secs: None,
-            encoding: StandardEncodings::Text.as_framed_config_adapter(),
+            encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
             compression: Compression::None,
             acknowledgements: Default::default(),
         };
 
-        let sink = FileSink::new(&config, Acker::passthrough()).unwrap();
+        let sink = FileSink::new(&config).unwrap();
         let (input, _events) = random_lines_with_stream(100, 64, None);
 
         let events = Box::pin(stream::iter(
@@ -459,12 +447,12 @@ mod tests {
         let config = FileSinkConfig {
             path: template.clone().try_into().unwrap(),
             idle_timeout_secs: None,
-            encoding: StandardEncodings::Text.as_framed_config_adapter(),
+            encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
             compression: Compression::Gzip,
             acknowledgements: Default::default(),
         };
 
-        let sink = FileSink::new(&config, Acker::passthrough()).unwrap();
+        let sink = FileSink::new(&config).unwrap();
         let (input, _) = random_lines_with_stream(100, 64, None);
 
         let events = Box::pin(stream::iter(
@@ -500,12 +488,12 @@ mod tests {
         let config = FileSinkConfig {
             path: template.try_into().unwrap(),
             idle_timeout_secs: None,
-            encoding: StandardEncodings::Text.as_framed_config_adapter(),
+            encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
             compression: Compression::None,
             acknowledgements: Default::default(),
         };
 
-        let sink = FileSink::new(&config, Acker::passthrough()).unwrap();
+        let sink = FileSink::new(&config).unwrap();
 
         let (mut input, _events) = random_events_with_stream(32, 8, None);
         input[0].as_mut_log().insert("date", "2019-26-07");
@@ -585,12 +573,12 @@ mod tests {
         let config = FileSinkConfig {
             path: template.clone().try_into().unwrap(),
             idle_timeout_secs: Some(1),
-            encoding: StandardEncodings::Text.as_framed_config_adapter(),
+            encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
             compression: Compression::None,
             acknowledgements: Default::default(),
         };
 
-        let sink = FileSink::new(&config, Acker::passthrough()).unwrap();
+        let sink = FileSink::new(&config).unwrap();
         let (mut input, _events) = random_lines_with_stream(10, 64, None);
 
         let (mut tx, rx) = futures::channel::mpsc::channel(0);

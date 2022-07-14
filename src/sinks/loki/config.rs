@@ -4,28 +4,23 @@ use futures::future::FutureExt;
 use serde::{Deserialize, Serialize};
 
 use super::{healthcheck::healthcheck, sink::LokiSink};
-use crate::sinks::util::Compression;
 use crate::{
+    codecs::EncodingConfig,
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
-        util::{
-            encoding::EncodingConfig, BatchConfig, SinkBatchSettings, TowerRequestConfig, UriSerde,
-        },
+        util::{BatchConfig, Compression, SinkBatchSettings, TowerRequestConfig, UriSerde},
         VectorSink,
     },
     template::Template,
     tls::{TlsConfig, TlsSettings},
 };
-use crate::{generate_custom_encoding_configuration, sinks::util::encoding::EncodingConfigAdapter};
-
-generate_custom_encoding_configuration!(LokiEncoding { Text, Json, Logfmt });
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct LokiConfig {
     pub endpoint: UriSerde,
-    pub encoding: EncodingConfigAdapter<EncodingConfig<LokiEncoding>, LokiEncodingMigrator>,
+    pub encoding: EncodingConfig,
     pub tenant_id: Option<Template>,
     pub labels: HashMap<Template, Template>,
     #[serde(default = "crate::serde::default_false")]
@@ -105,14 +100,14 @@ impl SinkConfig for LokiConfig {
             }
         }
 
-        let client = self.build_client(cx.clone())?;
+        let client = self.build_client(cx)?;
 
         let config = LokiConfig {
             auth: self.auth.choose_one(&self.endpoint.auth)?,
             ..self.clone()
         };
 
-        let sink = LokiSink::new(config.clone(), client.clone(), cx)?;
+        let sink = LokiSink::new(config.clone(), client.clone())?;
 
         let healthcheck = healthcheck(config, client).boxed();
 

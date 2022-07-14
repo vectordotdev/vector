@@ -1,10 +1,7 @@
 use std::io::Write;
 
 use bytes::{BufMut, Bytes, BytesMut};
-use codecs::{
-    encoding::{CharacterDelimitedEncoder, Framer, NewlineDelimitedEncoder, Serializer},
-    CharacterDelimitedEncoderConfig, JsonSerializerConfig, TextSerializerConfig,
-};
+use codecs::encoding::{CharacterDelimitedEncoder, Framer, Serializer};
 use flate2::write::{GzEncoder, ZlibEncoder};
 use futures::{future, FutureExt, SinkExt};
 use http::{
@@ -18,17 +15,15 @@ use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
 
 use crate::{
-    codecs::Encoder,
+    codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
     config::{
         AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
         SinkDescription,
     },
     event::Event,
-    generate_custom_encoding_configuration,
     http::{Auth, HttpClient, MaybeAuth},
     sinks::util::{
         self,
-        encoding::{EncodingConfig, EncodingConfigWithFramingAdapter, Transformer},
         http::{BatchedHttpSink, HttpEventEncoder, RequestConfig},
         BatchConfig, Buffer, Compression, RealtimeSizeBasedDefaultBatchSettings,
         TowerRequestConfig, UriSerde,
@@ -50,13 +45,6 @@ enum BuildError {
     },
 }
 
-// We use a custom encoding enum as our usage of text/JSON doesn't use the same framing as most other sinks would use.
-generate_custom_encoding_configuration!(HttpEncoding {
-    Text => (None, TextSerializerConfig::new().into()),
-    Json => (Some(CharacterDelimitedEncoderConfig::new(b',').into()), JsonSerializerConfig::new().into()),
-    Ndjson,
-});
-
 #[derive(Deserialize, Serialize, Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct HttpSinkConfig {
@@ -68,8 +56,7 @@ pub struct HttpSinkConfig {
     #[serde(default)]
     pub compression: Compression,
     #[serde(flatten)]
-    pub encoding:
-        EncodingConfigWithFramingAdapter<EncodingConfig<HttpEncoding>, HttpEncodingMigrator>,
+    pub encoding: EncodingConfigWithFraming,
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
     #[serde(default)]
@@ -131,9 +118,8 @@ struct HttpSink {
 }
 
 #[cfg(test)]
-fn default_sink(encoding: HttpEncoding) -> HttpSink {
-    let (maybe_framing, serializer) = encoding.as_framed_config_adapter().encoding().unwrap();
-    let framing = maybe_framing.unwrap_or_else(|| NewlineDelimitedEncoder::new().into());
+fn default_sink(encoding: EncodingConfigWithFraming) -> HttpSink {
+    let (framing, serializer) = encoding.build(SinkType::MessageBased).unwrap();
     let encoder = Encoder::<Framer>::new(framing, serializer);
 
     HttpSink {
@@ -157,7 +143,7 @@ impl SinkConfig for HttpSinkConfig {
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let client = self.build_http_client(&cx)?;
 
-        let healthcheck = match cx.healthcheck.uri.clone() {
+        let healthcheck = match cx.healthcheck.uri {
             Some(healthcheck_uri) => {
                 healthcheck(healthcheck_uri, self.auth.clone(), client.clone()).boxed()
             }
@@ -168,12 +154,8 @@ impl SinkConfig for HttpSinkConfig {
         request.add_old_option(self.headers.clone());
         validate_headers(&request.headers, &self.auth)?;
 
-        let encoding = self.encoding.encoding()?;
-        let framing = encoding
-            .0
-            .unwrap_or_else(|| NewlineDelimitedEncoder::new().into());
-        let serializer = encoding.1;
-        let encoder = Encoder::<Framer>::new(framing, serializer);
+        let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
+        let encoder = Encoder::<Framer>::new(framer, serializer);
 
         let sink = HttpSink {
             uri: self.uri.with_default_parts(),
@@ -198,7 +180,6 @@ impl SinkConfig for HttpSinkConfig {
             request,
             batch.timeout,
             client,
-            cx.acker(),
         )
         .sink_map_err(|error| error!(message = "Fatal HTTP sink error.", %error));
 
@@ -374,6 +355,10 @@ mod tests {
     };
 
     use bytes::{Buf, Bytes};
+    use codecs::{
+        encoding::FramingConfig, JsonSerializerConfig, NewlineDelimitedEncoderConfig,
+        TextSerializerConfig,
+    };
     use flate2::read::MultiGzDecoder;
     use futures::{channel::mpsc, stream, StreamExt};
     use headers::{Authorization, HeaderMapExt};
@@ -402,7 +387,7 @@ mod tests {
     fn http_encode_event_text() {
         let event = Event::Log(LogEvent::from("hello world"));
 
-        let sink = default_sink(HttpEncoding::Text);
+        let sink = default_sink((None::<FramingConfig>, TextSerializerConfig::new()).into());
         let mut encoder = sink.build_encoder();
         let bytes = encoder.encode_event(event).unwrap();
 
@@ -413,7 +398,13 @@ mod tests {
     fn http_encode_event_ndjson() {
         let event = Event::Log(LogEvent::from("hello world"));
 
-        let sink = default_sink(HttpEncoding::Ndjson);
+        let sink = default_sink(
+            (
+                Some(NewlineDelimitedEncoderConfig::new()),
+                JsonSerializerConfig::new(),
+            )
+                .into(),
+        );
         let mut encoder = sink.build_encoder();
         let bytes = encoder.encode_event(event).unwrap();
 
@@ -434,7 +425,7 @@ mod tests {
     fn http_validates_normal_headers() {
         let config = r#"
         uri = "http://$IN_ADDR/frames"
-        encoding = "text"
+        encoding.codec = "text"
         [request.headers]
         Auth = "token:thing_and-stuff"
         X-Custom-Nonsense = "_%_{}_-_&_._`_|_~_!_#_&_$_"
@@ -448,7 +439,7 @@ mod tests {
     fn http_catches_bad_header_names() {
         let config = r#"
         uri = "http://$IN_ADDR/frames"
-        encoding = "text"
+        encoding.codec = "text"
         [request.headers]
         "\u0001" = "bad"
         "#;
@@ -468,7 +459,7 @@ mod tests {
     async fn http_headers_auth_conflict() {
         let config = r#"
         uri = "http://$IN_ADDR/"
-        encoding = "text"
+        encoding.codec = "text"
         [request.headers]
         Authorization = "Basic base64encodedstring"
         [auth]
@@ -661,7 +652,7 @@ mod tests {
         let config = r#"
         uri = "http://$IN_ADDR/frames"
         compression = "gzip"
-        encoding = "json"
+        encoding.codec = "json"
 
         [auth]
         strategy = "basic"
@@ -752,7 +743,8 @@ mod tests {
             r#"
                 uri = "http://{addr}/frames"
                 compression = "gzip"
-                encoding = "ndjson"
+                framing.method = "newline_delimited"
+                encoding.codec = "json"
                 {extras}
             "#,
             addr = in_addr,

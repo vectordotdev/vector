@@ -1,6 +1,7 @@
 use std::{collections::BTreeMap, sync::Arc};
 
 use chrono::{TimeZone, Utc};
+use codecs::{JsonSerializerConfig, TextSerializerConfig};
 use futures_util::StreamExt;
 use serde::Deserialize;
 use vector_core::{
@@ -8,9 +9,9 @@ use vector_core::{
     event::{Event, LogEvent, Value},
 };
 
-use super::{config::HecLogsEncoding, sink::HecProcessedEvent};
+use super::sink::HecProcessedEvent;
 use crate::{
-    codecs::Encoder,
+    codecs::{Encoder, EncodingConfig},
     config::{SinkConfig, SinkContext},
     sinks::{
         splunk_hec::{
@@ -116,10 +117,9 @@ fn splunk_process_log_event() {
     assert!(metadata.fields.contains("event_field2"));
 }
 
-fn hec_encoder(encoding: HecLogsEncoding) -> HecLogsEncoder {
-    let encoding = encoding.as_config_adapter();
+fn hec_encoder(encoding: EncodingConfig) -> HecLogsEncoder {
     let transformer = encoding.transformer();
-    let serializer = encoding.encoding().unwrap();
+    let serializer = encoding.build().unwrap();
     let encoder = Encoder::<()>::new(serializer);
     HecLogsEncoder {
         transformer,
@@ -130,7 +130,7 @@ fn hec_encoder(encoding: HecLogsEncoding) -> HecLogsEncoder {
 #[test]
 fn splunk_encode_log_event_json() {
     let processed_event = get_processed_event();
-    let encoder = hec_encoder(HecLogsEncoding::Json);
+    let encoder = hec_encoder(JsonSerializerConfig::new().into());
     let mut bytes = Vec::new();
     encoder
         .encode_input(vec![processed_event], &mut bytes)
@@ -165,7 +165,7 @@ fn splunk_encode_log_event_json() {
 #[test]
 fn splunk_encode_log_event_text() {
     let processed_event = get_processed_event();
-    let encoder = hec_encoder(HecLogsEncoding::Text);
+    let encoder = hec_encoder(TextSerializerConfig::new().into());
     let mut bytes = Vec::new();
     encoder
         .encode_input(vec![processed_event], &mut bytes)
@@ -195,7 +195,7 @@ async fn splunk_passthrough_token() {
         index: None,
         sourcetype: None,
         source: None,
-        encoding: HecLogsEncoding::Json.as_config_adapter(),
+        encoding: JsonSerializerConfig::new().into(),
         compression: Compression::None,
         batch: Default::default(),
         request: Default::default(),
@@ -246,7 +246,7 @@ fn splunk_encode_log_event_json_timestamps() {
         timestamp_key: &str,
     ) -> HecEventJson {
         let processed_event = get_processed_event_timestamp(timestamp, timestamp_key);
-        let encoder = hec_encoder(HecLogsEncoding::Json);
+        let encoder = hec_encoder(JsonSerializerConfig::new().into());
         let mut bytes = Vec::new();
         encoder
             .encode_input(vec![processed_event], &mut bytes)

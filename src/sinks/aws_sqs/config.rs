@@ -8,17 +8,13 @@ use snafu::{ResultExt, Snafu};
 use crate::{
     aws::create_client,
     aws::{AwsAuthentication, RegionOrEndpoint},
+    codecs::EncodingConfig,
     common::sqs::SqsClientBuilder,
     config::{
         AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
         SinkContext,
     },
-    sinks::util::{
-        encoding::{
-            EncodingConfig, EncodingConfigAdapter, StandardEncodings, StandardEncodingsMigrator,
-        },
-        TowerRequestConfig,
-    },
+    sinks::util::TowerRequestConfig,
     template::{Template, TemplateParseError},
     tls::TlsConfig,
 };
@@ -41,8 +37,7 @@ pub struct SqsSinkConfig {
     pub queue_url: String,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    pub encoding:
-        EncodingConfigAdapter<EncodingConfig<StandardEncodings>, StandardEncodingsMigrator>,
+    pub encoding: EncodingConfig,
     pub message_group_id: Option<String>,
     pub message_deduplication_id: Option<String>,
     #[serde(default)]
@@ -87,7 +82,7 @@ impl SinkConfig for SqsSinkConfig {
     ) -> crate::Result<(crate::sinks::VectorSink, crate::sinks::Healthcheck)> {
         let client = self.create_client(&cx.proxy).await?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
-        let sink = super::sink::SqsSink::new(self.clone(), cx, client)?;
+        let sink = super::sink::SqsSink::new(self.clone(), client)?;
         Ok((
             crate::sinks::VectorSink::from_event_streamsink(sink),
             healthcheck,

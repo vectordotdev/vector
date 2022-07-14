@@ -3,31 +3,26 @@ use serde::{Deserialize, Serialize};
 use syslog::{Facility, Formatter3164, LogFormat, Severity};
 
 use crate::{
-    codecs::Encoder,
+    codecs::{Encoder, EncodingConfig, Transformer},
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig,
         SinkContext, SinkDescription,
     },
     event::Event,
-    generate_custom_encoding_configuration,
     internal_events::TemplateRenderingError,
-    sinks::util::{
-        encoding::{EncodingConfig, EncodingConfigAdapter, Transformer},
-        tcp::TcpSinkConfig,
-        UriSerde,
-    },
+    sinks::util::tcp::TcpSinkConfig,
     tcp::TcpKeepaliveConfig,
     template::Template,
     tls::TlsEnableableConfig,
 };
 
-generate_custom_encoding_configuration!(PapertrailEncoding { Text, Json });
+use super::util::UriSerde;
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct PapertrailConfig {
+struct PapertrailConfig {
     endpoint: UriSerde,
-    encoding: EncodingConfigAdapter<EncodingConfig<PapertrailEncoding>, PapertrailEncodingMigrator>,
+    encoding: EncodingConfig,
     keepalive: Option<TcpKeepaliveConfig>,
     tls: Option<TlsEnableableConfig>,
     send_buffer_bytes: Option<usize>,
@@ -53,7 +48,7 @@ impl GenerateConfig for PapertrailConfig {
 impl SinkConfig for PapertrailConfig {
     async fn build(
         &self,
-        cx: SinkContext,
+        _cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let host = self
             .endpoint
@@ -80,11 +75,10 @@ impl SinkConfig for PapertrailConfig {
         let sink_config = TcpSinkConfig::new(address, self.keepalive, tls, self.send_buffer_bytes);
 
         let transformer = self.encoding.transformer();
-        let serializer = self.encoding.encoding()?;
+        let serializer = self.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
 
         sink_config.build(
-            cx,
             Transformer::default(),
             PapertrailEncoder {
                 pid,

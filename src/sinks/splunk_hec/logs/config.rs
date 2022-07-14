@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use codecs::TextSerializerConfig;
 use futures_util::FutureExt;
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
@@ -7,9 +8,8 @@ use vector_core::sink::VectorSink;
 
 use super::{encoder::HecLogsEncoder, request_builder::HecLogsRequestBuilder, sink::HecLogsSink};
 use crate::{
-    codecs::Encoder,
+    codecs::{Encoder, EncodingConfig},
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
-    generate_custom_encoding_configuration,
     http::HttpClient,
     sinks::{
         splunk_hec::common::{
@@ -19,17 +19,13 @@ use crate::{
             timestamp_key, EndpointTarget, SplunkHecDefaultBatchSettings,
         },
         util::{
-            encoding::{EncodingConfig, EncodingConfigAdapter},
-            http::HttpRetryLogic,
-            BatchConfig, Compression, ServiceBuilderExt, TowerRequestConfig,
+            http::HttpRetryLogic, BatchConfig, Compression, ServiceBuilderExt, TowerRequestConfig,
         },
         Healthcheck,
     },
     template::Template,
     tls::TlsConfig,
 };
-
-generate_custom_encoding_configuration!(HecLogsEncoding { Text, Json });
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -45,7 +41,7 @@ pub struct HecLogsSinkConfig {
     pub index: Option<Template>,
     pub sourcetype: Option<Template>,
     pub source: Option<Template>,
-    pub encoding: EncodingConfigAdapter<EncodingConfig<HecLogsEncoding>, HecLogsEncodingMigrator>,
+    pub encoding: EncodingConfig,
     #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
@@ -77,7 +73,7 @@ impl GenerateConfig for HecLogsSinkConfig {
             index: None,
             sourcetype: None,
             source: None,
-            encoding: HecLogsEncoding::Text.as_config_adapter(),
+            encoding: TextSerializerConfig::new().into(),
             compression: Compression::default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
@@ -133,7 +129,7 @@ impl HecLogsSinkConfig {
         };
 
         let transformer = self.encoding.transformer();
-        let serializer = self.encoding.clone().encoding()?;
+        let serializer = self.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
         let encoder = HecLogsEncoder {
             transformer,
