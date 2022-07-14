@@ -1,3 +1,5 @@
+//! This sink send data to Google Chronicles unstructured log entries endpoint.
+//! see https://cloud.google.com/chronicle/docs/reference/ingestion-api#unstructuredlogentries
 use bytes::{Bytes, BytesMut};
 use futures_util::{future::BoxFuture, task::Poll};
 use goauth::scopes::Scope;
@@ -50,10 +52,6 @@ use crate::{
 
 const NAME: &str = "gcp_chronicle_unstructured";
 
-// https://cloud.google.com/chronicle/docs/reference/ingestion-api#ingestion_api_reference
-// We can send UDM (unified data model - https://cloud.google.com/chronicle/docs/reference/udm-field-list)
-// events or unstructured log entries.
-// const CHRONICLE_URL: &str = "https://malachiteingestion-pa.googleapis.com";
 
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
