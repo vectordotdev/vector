@@ -1,11 +1,12 @@
 //! All types related to inserting one [`Kind`] into another.
 
-use lookup::lookup_v2::{Path, SimpleSegment};
+use lookup::lookup_v2::{BorrowedSegment, Path};
 use lookup::{Field, Lookup, Segment};
 use std::collections::{btree_map::Entry, BTreeMap, VecDeque};
 
 use super::Kind;
 use crate::kind::{merge, Collection};
+use lookup::path;
 
 /// The strategy to use when an inner segment in a path does not match the actual `Kind`
 /// present.
@@ -497,58 +498,15 @@ impl Kind {
         // need to re-bind self to make a mutable reference
         let mut self_kind = self;
 
-        let mut iter = match path.simple_segment_iter() {
-            Ok(iter) => iter.peekable(),
-            Err(_) => {
-                // an invalid path does not modify the value
-                return;
-            }
-        };
+        let mut iter = path.segment_iter().peekable();
 
-        fn create_inner_element(segment: &SimpleSegment) -> Kind {
-            match segment {
-                SimpleSegment::Field(_) | SimpleSegment::Coalesce(_) => {
-                    Kind::object(Collection::empty())
-                }
-                SimpleSegment::Index(_) => Kind::array(Collection::empty()),
-            }
-        }
-
-        // let create_inner_element = |segment: Option<&&SimpleSegment>| -> Self {
-        //     match segment {
-        //         // The next segment is a field, so we'll insert an object to
-        //         // accommodate.
-        //         Some(segment) if segment || segment.is_coalesce() => {
-        //             Self::object(BTreeMap::default())
-        //         }
-        //
-        //         // The next segment is an index, so we'll insert an array.
-        //         Some(_) => Self::array(BTreeMap::default()),
-        //
-        //         // There is no next segment, so we'll insert the new `Kind`.
-        //         None => kind.clone(),
-        //     }
-        // };
-
-        // let get_inner_object = |kind: &'a mut Self, field: &'a String| -> &'a mut Self {
-        //     kind.as_object_mut()
-        //         .unwrap()
-        //         .known_mut()
-        //         .get_mut(&(field.into()))
-        //         .unwrap()
-        // };
-        //
-        // let get_inner_array = |kind: &'a mut Self, index: usize| -> &'a mut Self {
-        //     kind.as_array_mut()
-        //         .unwrap()
-        //         .known_mut()
-        //         .get_mut(&(index.into()))
-        //         .unwrap()
-        // };
+        // fn create_inner_element(segment: &BorrowedSegment<'_>) -> Kind {
+        //     Kind::null()
+        // }
 
         while let Some(segment) = iter.next() {
             self_kind = match segment {
-                SimpleSegment::Field(field) => {
+                BorrowedSegment::Field(field) | BorrowedSegment::CoalesceEnd(field) => {
                     // field insertion converts the value to an object, so remove all other types
                     *self_kind = Kind::object(
                         self_kind
@@ -559,17 +517,21 @@ impl Kind {
                     let collection = self_kind.object.as_mut().expect("object was just inserted");
 
                     match iter.peek() {
-                        Some(segment) => match collection.known_mut().entry(field.into()) {
-                            Entry::Occupied(entry) => entry.into_mut(),
-                            Entry::Vacant(entry) => entry.insert(create_inner_element(segment)),
-                        },
+                        Some(segment) => {
+                            match collection.known_mut().entry(field.into_owned().into()) {
+                                Entry::Occupied(entry) => entry.into_mut(),
+                                Entry::Vacant(entry) => entry.insert(Kind::null()),
+                            }
+                        }
                         None => {
-                            collection.known_mut().insert(field.into(), kind);
+                            collection
+                                .known_mut()
+                                .insert(field.into_owned().into(), kind);
                             return;
                         }
                     }
                 }
-                SimpleSegment::Index(mut index) => {
+                BorrowedSegment::Index(mut index) => {
                     // array insertion converts the value to an array, so remove all other types
                     *self_kind = Kind::array(
                         self_kind
@@ -579,39 +541,104 @@ impl Kind {
                     );
                     let collection = self_kind.array.as_mut().expect("array was just inserted");
 
-                    // add "null" to all holes, adding it to the "unknown" if it exists
-                    let hole_type = collection
-                        .unknown()
-                        .map(|x| x.to_kind().into_owned())
-                        .unwrap_or(Kind::never())
-                        .or_null();
-
                     if index < 0 {
                         let largest_known_index =
                             collection.known().keys().map(|i| i.to_usize()).max();
+                        // the minimum size of the resulting array
                         let len_required = -index as usize;
 
                         if let Some(unknown) = collection.unknown() {
+                            let unknown_kind = unknown.to_kind();
+
                             // the array may be larger, but this is the largest we can prove the array is from the type information
-                            let min_length = largest_known_index + 1;
+                            let min_length = largest_known_index.map(|i| i + 1).unwrap_or(0);
+
                             if len_required > min_length {
-                                // we can't prove the array is large enough, so holes need to be filled in
-                                for i in min_length..len_required {
-                                    collection.known_mut().insert(i.into(), hole_type.clone());
+                                // We can't prove the array is large enough, so "holes" may be created
+                                // which set the value to null.
+                                // Holes are inserted to the front, which shifts everything to the right.
+                                // We don't know the exact number of holes, but can determine an upper bound
+                                let max_shifts = len_required - min_length;
+
+                                // The number of possible shifts is 0 ..= max_shifts.
+                                // Each shift will be calculated independently and merged into the collection.
+                                // A shift of 0 is the original collection, so that is skipped
+                                for shift_count in 1..=max_shifts {
+                                    let mut shifted_collection = collection.clone();
+                                    // clear all known values and replace with new ones. (in-place shift can overwrite)
+                                    shifted_collection.known_mut().clear();
+
+                                    // add the "null" from holes. Index 0 is handled below
+                                    for i in 1..shift_count {
+                                        shifted_collection
+                                            .known_mut()
+                                            .insert(i.into(), Kind::null());
+                                    }
+
+                                    // Index 0 is always the inserted value if shifts are happening
+                                    if let Some(next_segment) = iter.peek() {
+                                        let mut item = create_inner_element(next_segment);
+                                        item.insert(
+                                            &iter.clone().collect::<Vec<_>>(),
+                                            kind.clone(),
+                                        );
+                                        shifted_collection.known_mut().insert(0.into(), item);
+                                    } else {
+                                        shifted_collection
+                                            .known_mut()
+                                            .insert(0.into(), kind.clone());
+                                    }
+
+                                    // shift known values by the exact "shift_count"
+                                    for (i, i_kind) in collection.known() {
+                                        shifted_collection
+                                            .known_mut()
+                                            .insert(*i + shift_count, i_kind.clone());
+                                    }
+
+                                    // add this shift count as another possible type definition
+                                    collection.merge(shifted_collection, false);
                                 }
                             }
 
-                            let min_index = (min_length - index).max(0) as usize;
+                            // We can prove the positive index won't be less than "min_index"
+                            let min_index = (min_length as isize + index).max(0) as usize;
 
-                            // indices less than the minimum possible index won't change. Set
-                            // it to the current "unknown" type, since that _will_ change.
+                            // sanity check: if holes are added to the type, min_index must be 0
+                            debug_assert!(min_index == 0 || min_length >= len_required);
+
+                            println!("min_index={:?}", min_index);
+
+                            // indices less than the minimum possible index won't change.
+                            // Apply the current "unknown" to indices that don't have an explicit known
+                            // since the "unknown" is about to change
                             for i in 0..min_index {
-                                todo!()
+                                if !collection.known().contains_key(&i.into()) {
+                                    collection
+                                        .known_mut()
+                                        .insert(i.into(), unknown_kind.clone());
+                                }
                             }
-                            // TODO: update known indices >= min_index to include the set kind
-                            // TODO: update unknown to include the set kind, without altering the "infinite" part of an unknown
+                            for (i, i_kind) in collection.known_mut() {
+                                // This index might be set by the insertion, add the insertion type to the existing type
+                                if i.to_usize() >= min_index {
+                                    let mut kind_with_insertion = i_kind.clone();
+                                    let remaining_path_segments = iter.clone().collect::<Vec<_>>();
+                                    kind_with_insertion
+                                        .insert(&remaining_path_segments, kind.clone());
+                                    i_kind.merge_keep(kind_with_insertion, false);
+                                }
+                            }
 
-                            unimplemented!()
+                            let mut unknown_kind_with_insertion = unknown_kind.clone();
+                            let remaining_path_segments = iter.clone().collect::<Vec<_>>();
+                            unknown_kind_with_insertion
+                                .insert(&remaining_path_segments, kind.clone());
+                            let mut new_unknown_kind = unknown_kind;
+                            new_unknown_kind.merge_keep(unknown_kind_with_insertion, false);
+                            collection.set_unknown(new_unknown_kind);
+
+                            return;
                         } else {
                             // If there is no unknown, the exact position of the negative index can be determined
                             if collection.unknown().is_none() {
@@ -626,73 +653,55 @@ impl Kind {
                                         collection.known_mut().insert(i.into(), Kind::null());
                                     }
                                 }
-                                index += (len_required as isize).max(array_len as isize);
+                                index += (len_required as isize).max(exact_array_len as isize);
                             }
                         }
                     }
 
-                    if index >= 0 {
-                        let index = index as usize;
-                        match iter.peek() {
-                            Some(segment) => match collection.known_mut().entry(index.into()) {
-                                Entry::Occupied(entry) => entry.into_mut(),
-                                Entry::Vacant(entry) => entry.insert(create_inner_element(segment)),
-                            },
-                            None => {
-                                collection.known_mut().insert(index.into(), kind);
+                    debug_assert!(index >= 0, "all negative cases have been handled");
+                    let index = index as usize;
 
-                                for i in 0..index {
-                                    if !collection.known_mut().contains_key(&i.into()) {
-                                        collection.known_mut().insert(i.into(), hole_type.clone());
-                                    }
+                    match iter.peek() {
+                        Some(segment) => match collection.known_mut().entry(index.into()) {
+                            Entry::Occupied(entry) => entry.into_mut(),
+                            Entry::Vacant(entry) => entry.insert(create_inner_element(segment)),
+                        },
+                        None => {
+                            collection.known_mut().insert(index.into(), kind);
+
+                            // add "null" to all holes, adding it to the "unknown" if it exists
+                            let hole_type = collection
+                                .unknown()
+                                .map(|x| x.to_kind())
+                                .unwrap_or(Kind::never())
+                                .or_null();
+
+                            for i in 0..index {
+                                if !collection.known_mut().contains_key(&i.into()) {
+                                    collection.known_mut().insert(i.into(), hole_type.clone());
                                 }
-                                return;
                             }
+                            return;
                         }
-                    } else {
-                        // the case where there is no unknown was already handled
-                        unimplemented!()
                     }
+                }
+                BorrowedSegment::CoalesceField(field) => {
+                    // TODO: This can be improved once "undefined" is a type
+                    //   https://github.com/vectordotdev/vector/issues/13459
 
-                    // match self_kind.array {
-                    //     Some(ref mut collection) => match collection.known_mut().entry(
-                    //         usize::try_from(*index)
-                    //             .map_err(|_| Error::InvalidIndex)?
-                    //             .into(),
-                    //     ) {
-                    //         Entry::Occupied(entry) => match iter.peek() {
-                    //             Some(_) => entry.into_mut(),
-                    //             None => {
-                    //                 *(entry.into_mut()) = kind;
-                    //                 return;
-                    //             }
-                    //         },
-                    //         Entry::Vacant(entry) => entry.insert(create_inner_element(iter.peek())),
-                    //     },
-                    //     None => {
-                    //         let index = usize::try_from(*index).map_err(|_| Error::InvalidIndex)?;
-                    //
-                    //         *self_kind = Self::array(BTreeMap::from([(
-                    //             index.into(),
-                    //             create_inner_element(iter.peek()),
-                    //         )]));
-                    //
-                    //         *self_kind = Self::array(BTreeMap::default());
-                    //         get_inner_array(self_kind, index)
-                    //     }
-                    // },
+                    let remaining_segments = iter
+                        .clone()
+                        .skip_while(|segment| matches!(segment, BorrowedSegment::CoalesceField(_)))
+                        // next segment must be a coalesce end, which is skipped
+                        .skip(1)
+                        .collect::<Vec<_>>();
+                    self_kind.insert(
+                        path!(&field.into_owned()).concat(&remaining_segments),
+                        kind.clone(),
+                    );
+                    self_kind
                 }
-                SimpleSegment::Coalesce(fields) => {
-                    unimplemented!()
-                    // for field in fields {
-                    //     let mut segments = iter.clone().cloned().collect::<VecDeque<_>>();
-                    //     segments.push_front(Segment::Field(field.clone()));
-                    //     let path = Lookup::from(segments);
-                    //
-                    //     self_kind.insert(&path, kind.clone());
-                    // }
-                    // return;
-                }
+                BorrowedSegment::Invalid => return,
             };
         }
         *self_kind = kind;
@@ -805,11 +814,8 @@ mod tests {
                     path: owned_path!(1),
                     kind: Kind::integer(),
                     expected: Kind::array(
-                        Collection::from(BTreeMap::from([
-                            (0.into(), Kind::integer().or_null()),
-                            (1.into(), Kind::integer()),
-                        ]))
-                        .with_unknown(Kind::integer()),
+                        Collection::from(BTreeMap::from([(1.into(), Kind::integer())]))
+                            .with_unknown(Kind::integer()),
                     ),
                 },
             ),
@@ -820,11 +826,8 @@ mod tests {
                     path: owned_path!(1),
                     kind: Kind::integer(),
                     expected: Kind::array(
-                        Collection::from(BTreeMap::from([
-                            (0.into(), Kind::null()),
-                            (1.into(), Kind::integer()),
-                        ]))
-                        .with_unknown(Kind::null()),
+                        Collection::from(BTreeMap::from([(1.into(), Kind::integer())]))
+                            .with_unknown(Kind::null()),
                     ),
                 },
             ),
@@ -873,9 +876,142 @@ mod tests {
                     ])),
                 },
             ),
+            (
+                "set negative array index size 1 unknown array",
+                TestCase {
+                    this: Kind::array(
+                        Collection::from(BTreeMap::from([(0.into(), Kind::integer())]))
+                            .with_unknown(Kind::integer()),
+                    ),
+                    path: owned_path!(-1),
+                    kind: Kind::bytes(),
+                    expected: Kind::array(
+                        Collection::from(BTreeMap::from([(0.into(), Kind::bytes().or_integer())]))
+                            .with_unknown(Kind::integer().or_bytes().or_null()),
+                    ),
+                },
+            ),
+            (
+                "set negative array index empty unknown array",
+                TestCase {
+                    this: Kind::array(Collection::empty().with_unknown(Kind::integer())),
+                    path: owned_path!(-1),
+                    kind: Kind::bytes(),
+                    expected: Kind::array(
+                        Collection::empty().with_unknown(Kind::integer().or_bytes().or_null()),
+                    ),
+                },
+            ),
+            (
+                "set negative array index empty unknown array (2)",
+                TestCase {
+                    this: Kind::array(Collection::empty().with_unknown(Kind::integer())),
+                    path: owned_path!(-2),
+                    kind: Kind::bytes(),
+                    expected: Kind::array(
+                        Collection::empty().with_unknown(Kind::integer().or_bytes().or_null()),
+                    ),
+                },
+            ),
+            (
+                "set negative array index unknown array",
+                TestCase {
+                    this: Kind::array(
+                        Collection::from(BTreeMap::from([(1.into(), Kind::float())]))
+                            .with_unknown(Kind::integer()),
+                    ),
+                    path: owned_path!(-3),
+                    kind: Kind::bytes(),
+                    expected: Kind::array(
+                        Collection::from(BTreeMap::from([
+                            (1.into(), Kind::float().or_bytes().or_null().or_integer()),
+                            (2.into(), Kind::float().or_bytes().or_null().or_integer()),
+                        ]))
+                        .with_unknown(Kind::integer().or_bytes().or_null()),
+                    ),
+                },
+            ),
+            (
+                "set negative array index unknown array no holes",
+                TestCase {
+                    this: Kind::array(
+                        Collection::from(BTreeMap::from([
+                            (0.into(), Kind::float()),
+                            (1.into(), Kind::float()),
+                            (2.into(), Kind::float()),
+                        ]))
+                        .with_unknown(Kind::integer()),
+                    ),
+                    path: owned_path!(-3),
+                    kind: Kind::bytes(),
+                    expected: Kind::array(
+                        Collection::from(BTreeMap::from([
+                            (0.into(), Kind::float().or_bytes()),
+                            (1.into(), Kind::float().or_bytes()),
+                            (2.into(), Kind::float().or_bytes()),
+                        ]))
+                        .with_unknown(Kind::integer().or_bytes().or_null()),
+                    ),
+                },
+            ),
+            (
+                "set negative array index on non-array",
+                TestCase {
+                    this: Kind::integer(),
+                    path: owned_path!(-3),
+                    kind: Kind::bytes(),
+                    expected: Kind::array(Collection::from(BTreeMap::from([
+                        (0.into(), Kind::bytes()),
+                        (1.into(), Kind::null()),
+                        (2.into(), Kind::null()),
+                    ]))),
+                },
+            ),
+            (
+                "set nested negative array index on unknown array",
+                TestCase {
+                    this: Kind::array(Collection::empty().with_unknown(Kind::integer())),
+                    path: owned_path!(-3, "foo"),
+                    kind: Kind::bytes(),
+                    expected: Kind::array(
+                        Collection::empty().with_unknown(
+                            Kind::integer()
+                                .or_null()
+                                .or_object(BTreeMap::from([("foo".into(), Kind::bytes())])),
+                        ),
+                    ),
+                },
+            ),
+            // (
+            //     "set nested negative array index on large array",
+            //     TestCase {
+            //         this: Kind::array(Collection::empty().with_unknown(Kind::integer())),
+            //         path: owned_path!(-1, "foo"),
+            //         kind: Kind::bytes(),
+            //         expected: Kind::array(
+            //             Collection::empty().with_unknown(
+            //                 Kind::integer()
+            //                     .or_null()
+            //                     .or_object(BTreeMap::from([("foo".into(), Kind::bytes())])),
+            //             ),
+            //         ),
+            //     },
+            // ),
         ]) {
+            println!("========== {:?} ===========\n", title);
             this.insert(&path, kind);
-            assert_eq!(this, expected, "{}", title);
+            let original_this = this.clone();
+            this = this.canonicalize();
+            if this != expected {
+                // println!("Original: {:?}", original_this.debug_info());
+                println!("Actual  : {:?}\n", this.debug_info());
+                println!("Expected: {:?}\n", expected.debug_info());
+
+                // println!("Raw actual: {:#?}", this);
+                // println!("Raw expected: {:#?}", expected);
+                panic!("\"{:?}\" failed", title);
+            }
+            // assert_eq!(this, expected, "{}", title);
         }
     }
 

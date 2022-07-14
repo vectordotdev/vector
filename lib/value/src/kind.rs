@@ -21,7 +21,7 @@ use crate::Value;
 ///
 /// This struct tracks the known states a type can have. By allowing one type to have multiple
 /// states, the type definition can be progressively refined.
-#[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Eq, PartialOrd)]
 pub struct Kind {
     // NOTE: The internal API uses `Option` over `bool` for primitive types, as it makes internal
     // usage of the API easier to work with. There is no impact on the memory size of the type.
@@ -98,6 +98,60 @@ impl std::fmt::Display for Kind {
         }
 
         Ok(())
+    }
+}
+
+impl PartialEq for Kind {
+    fn eq(&self, other: &Self) -> bool {
+        let a = self.canonicalize();
+        let b = other.canonicalize();
+
+        if a.bytes != b.bytes {
+            return false;
+        }
+        if a.integer != b.integer {
+            return false;
+        }
+        if a.float != b.float {
+            return false;
+        }
+        if a.boolean != b.boolean {
+            return false;
+        }
+        if a.timestamp != b.timestamp {
+            return false;
+        }
+        if a.regex != b.regex {
+            return false;
+        }
+        if a.null != b.null {
+            return false;
+        }
+        if a.array != b.array {
+            return false;
+        }
+        if a.object != b.object {
+            return false;
+        }
+        true
+    }
+}
+
+impl Kind {
+    /// Returns a Kind type in a standard / simple representation.
+    pub fn canonicalize(&self) -> Kind {
+        let mut output = self.clone();
+
+        // todo: exact unknown types containing a matching infinite type can be simplified to just
+        // the infinite type
+
+        if let Some(object) = &mut output.object {
+            *object = object.canonicalize();
+        }
+        if let Some(array) = &mut output.array {
+            *array = array.canonicalize();
+        }
+        output
     }
 }
 

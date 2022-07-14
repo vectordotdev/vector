@@ -55,9 +55,10 @@ impl Kind {
                     .map(InnerKind::Exact)
                     .or_else(|| {
                         collection.unknown().as_ref().and_then(|unknown| {
-                            unknown.as_exact().map(InnerKind::Exact).or_else(|| {
-                                Some(InnerKind::Infinite(unknown.to_kind().into_owned()))
-                            })
+                            unknown
+                                .as_exact()
+                                .map(InnerKind::Exact)
+                                .or_else(|| Some(InnerKind::Infinite(unknown.to_kind())))
                         })
                     })
             })
@@ -78,9 +79,10 @@ impl Kind {
                     .map(InnerKind::Exact)
                     .or_else(|| {
                         collection.unknown().as_ref().and_then(|unknown| {
-                            unknown.as_exact().map(InnerKind::Exact).or_else(|| {
-                                Some(InnerKind::Infinite(unknown.to_kind().into_owned()))
-                            })
+                            unknown
+                                .as_exact()
+                                .map(InnerKind::Exact)
+                                .or_else(|| Some(InnerKind::Infinite(unknown.to_kind())))
                         })
                     })
             })

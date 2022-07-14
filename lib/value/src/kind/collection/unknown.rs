@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::BTreeMap};
+use std::collections::BTreeMap;
 
 use super::Collection;
 use crate::Kind;
@@ -10,6 +10,10 @@ use crate::Kind;
 /// (e.g. the array collection has an integer value at index 0, and is 3 values in size. We don't
 /// know the exact values for indices 1 and 2, but we do know that it has to be the type defined by
 /// `Unknown`).
+///
+/// "unknown" values can either be "undefined" or the "unknown" type.
+/// For example, an array with an infinite unknown of "integer" doesn't imply that _every_
+/// index contains an array. Rather, it says every index contains an "integer" or is "undefined"
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
 pub struct Unknown(pub(super) Inner);
 
@@ -83,14 +87,20 @@ impl Unknown {
     }
 
     /// Get the `Kind` stored in this `Unknown`.
-    ///
-    /// This returns an owned `Kind`.
+    /// This represents the kind of any type not "known".
+    /// It will always include "undefined", since unknown
+    /// values are not guaranteed to exist
     #[must_use]
-    pub fn to_kind(&self) -> Cow<'_, Kind> {
-        match &self.0 {
-            Inner::Infinite(infinite) => Cow::Owned((*infinite).into()),
-            Inner::Exact(kind) => Cow::Borrowed(kind.as_ref()),
-        }
+    pub fn to_kind(&self) -> Kind {
+        let unknown_kind = match &self.0 {
+            Inner::Infinite(infinite) => (*infinite).into(),
+            Inner::Exact(kind) => kind.as_ref().clone(),
+        };
+
+        // unknown types are not guaranteed to exist, therefore the type must contain "undefined".
+        // "null" is the closest that exists today, so that is used instead
+        // TODO: switch to "or_undefined" once https://github.com/vectordotdev/vector/issues/13459 is completed
+        unknown_kind.or_null()
     }
 
     /// Check if `self` is a superset of `other`.

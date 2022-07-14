@@ -58,7 +58,7 @@ fn insert_kind(tree: &mut BTreeMap<String, Value>, kind: &Kind, show_unknown: bo
 fn insert_unknown(tree: &mut BTreeMap<String, Value>, unknown: Option<&Unknown>, prefix: &str) {
     if let Some(unknown) = unknown {
         let mut unknown_tree = BTreeMap::new();
-        insert_kind(&mut unknown_tree, unknown.to_kind().as_ref(), false);
+        insert_kind(&mut unknown_tree, &unknown.to_kind(), false);
         if unknown.is_exact() {
             tree.insert(
                 format!("{}_unknown_exact", prefix),
