@@ -500,10 +500,6 @@ impl Kind {
 
         let mut iter = path.segment_iter().peekable();
 
-        // fn create_inner_element(segment: &BorrowedSegment<'_>) -> Kind {
-        //     Kind::null()
-        // }
-
         while let Some(segment) = iter.next() {
             self_kind = match segment {
                 BorrowedSegment::Field(field) => {
@@ -598,8 +594,6 @@ impl Kind {
                             // sanity check: if holes are added to the type, min_index must be 0
                             debug_assert!(min_index == 0 || min_length >= len_required);
 
-                            println!("min_index={:?}", min_index);
-
                             // indices less than the minimum possible index won't change.
                             // Apply the current "unknown" to indices that don't have an explicit known
                             // since the "unknown" is about to change
@@ -677,7 +671,6 @@ impl Kind {
                     }
                 }
                 BorrowedSegment::CoalesceField(field) => {
-                    println!("coalesce field: {:?}", field);
                     // TODO: This can be improved once "undefined" is a type
                     //   https://github.com/vectordotdev/vector/issues/13459
 
@@ -694,12 +687,10 @@ impl Kind {
                         path!(&field.into_owned()).concat(&remaining_segments),
                         kind.clone(),
                     );
-                    println!("maybe inserted: {:?}", maybe_inserted_kind.debug_info());
                     self_kind.merge_keep(maybe_inserted_kind, false);
                     self_kind
                 }
                 BorrowedSegment::CoalesceEnd(field) => {
-                    println!("coalesce end field: {:?}", field);
                     // TODO: This can be improved once "undefined" is a type
                     //   https://github.com/vectordotdev/vector/issues/13459
 
@@ -711,7 +702,6 @@ impl Kind {
                         path!(&field.into_owned()).concat(&remaining_segments),
                         kind.clone(),
                     );
-                    println!("maybe inserted: {:?}", maybe_inserted_kind.debug_info());
                     self_kind.merge_keep(maybe_inserted_kind, false);
                     return;
                 }
