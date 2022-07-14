@@ -101,6 +101,12 @@ impl Finalizable for EventFinalizers {
     }
 }
 
+impl std::iter::FromIterator<EventFinalizers> for EventFinalizers {
+    fn from_iter<T: IntoIterator<Item = EventFinalizers>>(iter: T) -> Self {
+        Self(iter.into_iter().flat_map(|f| f.0.into_iter()).collect())
+    }
+}
+
 /// An event finalizer is the shared data required to handle tracking the status of an event, and updating the status of
 /// a batch with that when the event is dropped.
 #[derive(Debug)]

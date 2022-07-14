@@ -60,7 +60,7 @@ impl GenerateConfig for ConsoleSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "console")]
 impl SinkConfig for ConsoleSinkConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let transformer = self.encoding.transformer();
         let (framer, serializer) = self.encoding.encoding()?;
         let framer = match (framer, &serializer) {
@@ -81,13 +81,11 @@ impl SinkConfig for ConsoleSinkConfig {
 
         let sink: VectorSink = match self.target {
             Target::Stdout => VectorSink::from_event_streamsink(WriterSink {
-                acker: cx.acker(),
                 output: io::stdout(),
                 transformer,
                 encoder,
             }),
             Target::Stderr => VectorSink::from_event_streamsink(WriterSink {
-                acker: cx.acker(),
                 output: io::stderr(),
                 transformer,
                 encoder,

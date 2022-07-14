@@ -19,7 +19,7 @@ use tokio::{
     io::AsyncWriteExt,
 };
 use tokio_util::codec::Encoder as _;
-use vector_core::{buffers::Acker, internal_event::EventsSent, ByteSizeOf};
+use vector_core::{internal_event::EventsSent, ByteSizeOf};
 
 use crate::{
     codecs::Encoder,
@@ -165,9 +165,9 @@ impl OutFile {
 impl SinkConfig for FileSinkConfig {
     async fn build(
         &self,
-        cx: SinkContext,
+        _cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let sink = FileSink::new(self, cx.acker())?;
+        let sink = FileSink::new(self)?;
         Ok((
             super::VectorSink::from_event_streamsink(sink),
             future::ok(()).boxed(),
@@ -189,7 +189,6 @@ impl SinkConfig for FileSinkConfig {
 
 #[derive(Debug)]
 pub struct FileSink {
-    acker: Acker,
     path: Template,
     transformer: Transformer,
     encoder: Encoder<Framer>,
@@ -199,14 +198,13 @@ pub struct FileSink {
 }
 
 impl FileSink {
-    pub fn new(config: &FileSinkConfig, acker: Acker) -> crate::Result<Self> {
+    pub fn new(config: &FileSinkConfig) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
         let (framer, serializer) = config.encoding.encoding()?;
         let framer = framer.unwrap_or_else(|| NewlineDelimitedEncoder::new().into());
         let encoder = Encoder::<Framer>::new(framer, serializer);
 
         Ok(Self {
-            acker,
             path: config.path.clone(),
             transformer,
             encoder,
@@ -245,10 +243,7 @@ impl FileSink {
             tokio::select! {
                 event = input.next() => {
                     match event {
-                        Some(event) => {
-                            self.process_event(event).await;
-                            self.acker.ack(1);
-                        },
+                        Some(event) => self.process_event(event).await,
                         None => {
                             // If we got `None` - terminate the processing.
                             debug!(message = "Receiver exhausted, terminating the processing loop.");
@@ -453,7 +448,7 @@ mod tests {
             acknowledgements: Default::default(),
         };
 
-        let sink = FileSink::new(&config, Acker::passthrough()).unwrap();
+        let sink = FileSink::new(&config).unwrap();
         let (input, _events) = random_lines_with_stream(100, 64, None);
 
         let events = Box::pin(stream::iter(
@@ -489,7 +484,7 @@ mod tests {
             acknowledgements: Default::default(),
         };
 
-        let sink = FileSink::new(&config, Acker::passthrough()).unwrap();
+        let sink = FileSink::new(&config).unwrap();
         let (input, _) = random_lines_with_stream(100, 64, None);
 
         let events = Box::pin(stream::iter(
@@ -530,7 +525,7 @@ mod tests {
             acknowledgements: Default::default(),
         };
 
-        let sink = FileSink::new(&config, Acker::passthrough()).unwrap();
+        let sink = FileSink::new(&config).unwrap();
 
         let (mut input, _events) = random_events_with_stream(32, 8, None);
         input[0].as_mut_log().insert("date", "2019-26-07");
@@ -615,7 +610,7 @@ mod tests {
             acknowledgements: Default::default(),
         };
 
-        let sink = FileSink::new(&config, Acker::passthrough()).unwrap();
+        let sink = FileSink::new(&config).unwrap();
         let (mut input, _events) = random_lines_with_stream(10, 64, None);
 
         let (mut tx, rx) = futures::channel::mpsc::channel(0);

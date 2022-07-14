@@ -107,7 +107,7 @@ impl SinkConfig for RemoteWriteConfig {
             let mut normalizer = MetricNormalizer::<PrometheusMetricNormalize>::default();
 
             request_settings
-                .partition_sink(HttpRetryLogic, service, buffer, batch.timeout, cx.acker())
+                .partition_sink(HttpRetryLogic, service, buffer, batch.timeout)
                 .with_flat_map(move |event: Event| {
                     let byte_size = event.size_of();
                     stream::iter(normalizer.normalize(event.into_metric()).map(|event| {

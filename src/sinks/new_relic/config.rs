@@ -126,7 +126,7 @@ impl SinkConfig for NewRelicConfig {
 
         let sink = NewRelicSink {
             service,
-            acker: cx.acker(),
+
             transformer: self.encoding.clone(),
             encoder: NewRelicEncoder,
             credentials,

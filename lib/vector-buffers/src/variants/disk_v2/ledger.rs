@@ -205,7 +205,7 @@ impl ArchivedLedgerState {
 }
 
 /// Tracks the internal state of the buffer.
-pub struct Ledger<FS>
+pub(crate) struct Ledger<FS>
 where
     FS: Filesystem,
 {
@@ -274,12 +274,12 @@ where
     /// leads to behavior where writes and reads will change this value only by the size of the
     /// records being written and read, while data files on disk will grow incrementally, and be
     /// deleted in full.
-    pub(super) fn get_total_buffer_size(&self) -> u64 {
+    pub fn get_total_buffer_size(&self) -> u64 {
         self.total_buffer_size.load(Ordering::Acquire)
     }
 
     /// Increments the total number of bytes for all unread records in the buffer.
-    pub(super) fn increment_total_buffer_size(&self, amount: u64) {
+    pub fn increment_total_buffer_size(&self, amount: u64) {
         let last_total_buffer_size = self.total_buffer_size.fetch_add(amount, Ordering::AcqRel);
         trace!(
             previous_buffer_size = last_total_buffer_size,
@@ -289,7 +289,7 @@ where
     }
 
     /// Decrements the total number of bytes for all unread records in the buffer.
-    pub(super) fn decrement_total_buffer_size(&self, amount: u64) {
+    pub fn decrement_total_buffer_size(&self, amount: u64) {
         let last_total_buffer_size = self.total_buffer_size.fetch_sub(amount, Ordering::AcqRel);
         trace!(
             previous_buffer_size = last_total_buffer_size,
@@ -709,7 +709,7 @@ where
         tokio::spawn(async move {
             while let Some((_status, amount)) = stream.next().await {
                 self.increment_pending_acks(amount);
-                self.notify_reader_waiters();
+                self.notify_writer_waiters();
             }
         });
         finalizer

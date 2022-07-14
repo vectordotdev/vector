@@ -94,8 +94,9 @@ This would allow an instance of Vector to receive events from another Vector
 instance that has a `kafka` sink configured like:
 
 ```toml
-[sources.in]
+[sinks.out]
 type = "kafka"
+inputs = ["..."]
 bootstrap_servers = "localhost:9092"
 topic = "vector"
 encoding.codec = "native"

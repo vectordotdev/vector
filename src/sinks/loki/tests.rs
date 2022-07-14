@@ -26,8 +26,8 @@ async fn interpolate_labels() {
     "#,
     )
     .unwrap();
-    let client = config.build_client(cx.clone()).unwrap();
-    let mut sink = LokiSink::new(config, client, cx).unwrap();
+    let client = config.build_client(cx).unwrap();
+    let mut sink = LokiSink::new(config, client).unwrap();
 
     let mut e1 = Event::Log(LogEvent::from("hello world"));
 
@@ -67,8 +67,8 @@ async fn use_label_from_dropped_fields() {
         "#,
     )
     .unwrap();
-    let client = config.build_client(cx.clone()).unwrap();
-    let mut sink = LokiSink::new(config, client, cx).unwrap();
+    let client = config.build_client(cx).unwrap();
+    let mut sink = LokiSink::new(config, client).unwrap();
 
     let mut e1 = Event::Log(LogEvent::from("hello world"));
 

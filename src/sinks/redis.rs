@@ -151,14 +151,14 @@ impl GenerateConfig for RedisSinkConfig {
 impl SinkConfig for RedisSinkConfig {
     async fn build(
         &self,
-        cx: SinkContext,
+        _cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         if self.key.is_empty() {
             return Err("`key` cannot be empty.".into());
         }
         let conn = self.build_client().await.context(RedisCreateFailedSnafu)?;
         let healthcheck = RedisSinkConfig::healthcheck(conn.clone()).boxed();
-        let sink = self.new(conn, cx)?;
+        let sink = self.new(conn)?;
         Ok((sink, healthcheck))
     }
 
@@ -176,11 +176,7 @@ impl SinkConfig for RedisSinkConfig {
 }
 
 impl RedisSinkConfig {
-    pub fn new(
-        &self,
-        conn: ConnectionManager,
-        cx: SinkContext,
-    ) -> crate::Result<super::VectorSink> {
+    pub fn new(&self, conn: ConnectionManager) -> crate::Result<super::VectorSink> {
         let request = self.request.unwrap_with(&TowerRequestConfig {
             concurrency: Concurrency::Fixed(1),
             ..Default::default()
@@ -209,7 +205,7 @@ impl RedisSinkConfig {
             .settings(request, RedisRetryLogic)
             .service(redis);
 
-        let sink = BatchSink::new(svc, buffer, batch.timeout, cx.acker())
+        let sink = BatchSink::new(svc, buffer, batch.timeout)
             .with_flat_map(move |event| {
                 stream::iter(encode_event(event, &key, &transformer, &mut encoder)).map(Ok)
             })
@@ -497,9 +493,8 @@ mod integration_tests {
 
         // Publish events.
         let conn = cnf.build_client().await.unwrap();
-        let cx = SinkContext::new_test();
 
-        let sink = cnf.new(conn, cx).unwrap();
+        let sink = cnf.new(conn).unwrap();
 
         let mut events: Vec<Event> = Vec::new();
         for i in 0..num_events {
@@ -556,9 +551,8 @@ mod integration_tests {
 
         // Publish events.
         let conn = cnf.build_client().await.unwrap();
-        let cx = SinkContext::new_test();
 
-        let sink = cnf.new(conn, cx).unwrap();
+        let sink = cnf.new(conn).unwrap();
         let mut events: Vec<Event> = Vec::new();
         for i in 0..num_events {
             let s: String = i.to_string();
@@ -628,9 +622,8 @@ mod integration_tests {
 
         // Publish events.
         let conn = cnf.build_client().await.unwrap();
-        let cx = SinkContext::new_test();
 
-        let sink = cnf.new(conn, cx).unwrap();
+        let sink = cnf.new(conn).unwrap();
         let (_input, events) = random_lines_with_stream(100, num_events, None);
         sink.run(events).await.unwrap();
 
