@@ -506,7 +506,7 @@ impl Kind {
 
         while let Some(segment) = iter.next() {
             self_kind = match segment {
-                BorrowedSegment::Field(field) | BorrowedSegment::CoalesceEnd(field) => {
+                BorrowedSegment::Field(field) => {
                     // field insertion converts the value to an object, so remove all other types
                     *self_kind = Kind::object(
                         self_kind
@@ -576,18 +576,9 @@ impl Kind {
                                     }
 
                                     // Index 0 is always the inserted value if shifts are happening
-                                    if let Some(next_segment) = iter.peek() {
-                                        let mut item = create_inner_element(next_segment);
-                                        item.insert(
-                                            &iter.clone().collect::<Vec<_>>(),
-                                            kind.clone(),
-                                        );
-                                        shifted_collection.known_mut().insert(0.into(), item);
-                                    } else {
-                                        shifted_collection
-                                            .known_mut()
-                                            .insert(0.into(), kind.clone());
-                                    }
+                                    let mut item = Kind::null();
+                                    item.insert(&iter.clone().collect::<Vec<_>>(), kind.clone());
+                                    shifted_collection.known_mut().insert(0.into(), item);
 
                                     // shift known values by the exact "shift_count"
                                     for (i, i_kind) in collection.known() {
@@ -664,7 +655,7 @@ impl Kind {
                     match iter.peek() {
                         Some(segment) => match collection.known_mut().entry(index.into()) {
                             Entry::Occupied(entry) => entry.into_mut(),
-                            Entry::Vacant(entry) => entry.insert(create_inner_element(segment)),
+                            Entry::Vacant(entry) => entry.insert(Kind::null()),
                         },
                         None => {
                             collection.known_mut().insert(index.into(), kind);
@@ -686,6 +677,7 @@ impl Kind {
                     }
                 }
                 BorrowedSegment::CoalesceField(field) => {
+                    println!("coalesce field: {:?}", field);
                     // TODO: This can be improved once "undefined" is a type
                     //   https://github.com/vectordotdev/vector/issues/13459
 
@@ -695,11 +687,33 @@ impl Kind {
                         // next segment must be a coalesce end, which is skipped
                         .skip(1)
                         .collect::<Vec<_>>();
-                    self_kind.insert(
+
+                    // we don't know for sure if this coalesce will succeed, so the insertion is merged with the original value
+                    let mut maybe_inserted_kind = self_kind.clone();
+                    maybe_inserted_kind.insert(
                         path!(&field.into_owned()).concat(&remaining_segments),
                         kind.clone(),
                     );
+                    println!("maybe inserted: {:?}", maybe_inserted_kind.debug_info());
+                    self_kind.merge_keep(maybe_inserted_kind, false);
                     self_kind
+                }
+                BorrowedSegment::CoalesceEnd(field) => {
+                    println!("coalesce end field: {:?}", field);
+                    // TODO: This can be improved once "undefined" is a type
+                    //   https://github.com/vectordotdev/vector/issues/13459
+
+                    let remaining_segments = iter.clone().collect::<Vec<_>>();
+
+                    // we don't know for sure if this coalesce will succeed, so the insertion is merged with the original value
+                    let mut maybe_inserted_kind = self_kind.clone();
+                    maybe_inserted_kind.insert(
+                        path!(&field.into_owned()).concat(&remaining_segments),
+                        kind.clone(),
+                    );
+                    println!("maybe inserted: {:?}", maybe_inserted_kind.debug_info());
+                    self_kind.merge_keep(maybe_inserted_kind, false);
+                    return;
                 }
                 BorrowedSegment::Invalid => return,
             };
@@ -710,7 +724,7 @@ impl Kind {
 
 #[cfg(test)]
 mod tests {
-    use lookup::lookup_v2::OwnedPath;
+    use lookup::lookup_v2::{parse_path, OwnedPath};
     use lookup::owned_path;
     use std::collections::HashMap;
 
@@ -982,26 +996,91 @@ mod tests {
                     ),
                 },
             ),
-            // (
-            //     "set nested negative array index on large array",
-            //     TestCase {
-            //         this: Kind::array(Collection::empty().with_unknown(Kind::integer())),
-            //         path: owned_path!(-1, "foo"),
-            //         kind: Kind::bytes(),
-            //         expected: Kind::array(
-            //             Collection::empty().with_unknown(
-            //                 Kind::integer()
-            //                     .or_null()
-            //                     .or_object(BTreeMap::from([("foo".into(), Kind::bytes())])),
-            //             ),
-            //         ),
-            //     },
-            // ),
+            (
+                "set nested negative array index on unknown array (no holes)",
+                TestCase {
+                    this: Kind::array(
+                        Collection::from(BTreeMap::from([(0.into(), Kind::integer())]))
+                            .with_unknown(Kind::integer()),
+                    ),
+                    path: owned_path!(-1, "foo"),
+                    kind: Kind::bytes(),
+                    expected: Kind::array(
+                        Collection::from(BTreeMap::from([(
+                            0.into(),
+                            Kind::integer()
+                                .or_object(BTreeMap::from([("foo".into(), Kind::bytes())])),
+                        )]))
+                        .with_unknown(
+                            Kind::integer()
+                                .or_null()
+                                .or_object(BTreeMap::from([("foo".into(), Kind::bytes())])),
+                        ),
+                    ),
+                },
+            ),
+            (
+                "coalesce empty object",
+                TestCase {
+                    this: Kind::object(Collection::empty()),
+                    path: parse_path(".(a|b)"),
+                    kind: Kind::bytes(),
+                    expected: Kind::object(Collection::from(BTreeMap::from([
+                        ("a".into(), Kind::bytes().or_null()),
+                        ("b".into(), Kind::bytes().or_null()),
+                    ]))),
+                },
+            ),
+            (
+                "coalesce first exists",
+                TestCase {
+                    this: Kind::object(Collection::from(BTreeMap::from([(
+                        "a".into(),
+                        Kind::integer(),
+                    )]))),
+                    path: parse_path(".(a|b)"),
+                    kind: Kind::bytes(),
+                    expected: Kind::object(Collection::from(BTreeMap::from([
+                        ("a".into(), Kind::integer().or_bytes()),
+                        ("b".into(), Kind::bytes().or_null()),
+                    ]))),
+                },
+            ),
+            (
+                "coalesce second exists",
+                TestCase {
+                    this: Kind::object(Collection::from(BTreeMap::from([(
+                        "b".into(),
+                        Kind::integer(),
+                    )]))),
+                    path: parse_path(".(a|b)"),
+                    kind: Kind::bytes(),
+                    expected: Kind::object(Collection::from(BTreeMap::from([
+                        ("a".into(), Kind::bytes().or_null()),
+                        ("b".into(), Kind::integer().or_bytes()),
+                    ]))),
+                },
+            ),
+            (
+                "coalesce both exist",
+                TestCase {
+                    this: Kind::object(Collection::from(BTreeMap::from([
+                        ("a".into(), Kind::integer()),
+                        ("b".into(), Kind::integer()),
+                    ]))),
+                    path: parse_path(".(a|b)"),
+                    kind: Kind::bytes(),
+                    expected: Kind::object(Collection::from(BTreeMap::from([
+                        ("a".into(), Kind::integer().or_bytes()),
+                        ("b".into(), Kind::integer().or_bytes()),
+                    ]))),
+                },
+            ),
         ]) {
             println!("========== {:?} ===========\n", title);
             this.insert(&path, kind);
             let original_this = this.clone();
-            this = this.canonicalize();
+            // this = this.canonicalize();
             if this != expected {
                 // println!("Original: {:?}", original_this.debug_info());
                 println!("Actual  : {:?}\n", this.debug_info());

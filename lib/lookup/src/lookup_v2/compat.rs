@@ -15,6 +15,7 @@ impl<'a> Path<'a> for &'a LookupBuf {
     }
 }
 
+#[derive(Clone)]
 pub struct LookupBufPathIter<'a> {
     buf: &'a LookupBuf,
     segment_i: usize,

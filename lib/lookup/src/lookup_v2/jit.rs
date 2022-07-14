@@ -24,6 +24,7 @@ impl JitPath<'_> {
 }
 
 /// This is essentially an iterator over a `JitPath`.
+#[derive(Clone)]
 pub struct JitLookup<'a> {
     path: &'a str,
     chars: CharIndices<'a>,
@@ -53,6 +54,7 @@ impl<'a> Path<'a> for JitPath<'a> {
     }
 }
 
+#[derive(Clone)]
 enum JitState {
     EventRoot,
     Start,

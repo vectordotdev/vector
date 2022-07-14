@@ -231,6 +231,7 @@ impl<'a> Path<'a> for &'a OwnedPath {
     }
 }
 
+#[derive(Clone)]
 pub struct OwnedSegmentSliceIter<'a> {
     segments: &'a [OwnedSegment],
     index: usize,
