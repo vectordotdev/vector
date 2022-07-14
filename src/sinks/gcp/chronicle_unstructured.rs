@@ -19,6 +19,7 @@ use vector_core::{
 };
 
 use crate::{
+    codecs::{self, EncodingConfigWithFraming},
     config::{log_schema, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     gcp::{GcpAuthConfig, GcpAuthenticator},
     http::{HttpClient, HttpError},
@@ -29,10 +30,7 @@ use crate::{
             sink::GcsSink,
         },
         util::{
-            encoding::{
-                Encoder, EncodingConfig, EncodingConfigWithFramingAdapter, StandardEncodings,
-                StandardEncodingsWithFramingMigrator,
-            },
+            encoding::Encoder,
             metadata::{RequestMetadata, RequestMetadataBuilder},
             partitioner::KeyPartitioner,
             request_builder::EncodeResult,
@@ -50,7 +48,6 @@ use crate::{
 };
 
 const NAME: &str = "gcp_chronicle_unstructured";
-
 
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
@@ -71,7 +68,7 @@ pub enum Region {
 }
 
 impl Region {
-    /// Each region has a it's own endpoint.
+    /// Each region has a its own endpoint.
     const fn endpoint(self) -> &'static str {
         match self {
             Region::Eu => "https://europe-malachiteingestion-pa.googleapis.com",
@@ -91,10 +88,7 @@ pub struct ChronicleUnstructuredConfig {
     #[serde(default)]
     pub batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
     #[serde(flatten)]
-    pub encoding: EncodingConfigWithFramingAdapter<
-        EncodingConfig<StandardEncodings>,
-        StandardEncodingsWithFramingMigrator,
-    >,
+    pub encoding: EncodingConfigWithFraming,
     #[serde(default)]
     pub request: TowerRequestConfig,
     #[serde(default)]
@@ -244,7 +238,8 @@ impl Finalizable for ChronicleRequest {
 #[derive(Clone, Debug)]
 struct ChronicleEncoder {
     customer_id: String,
-    encoder: crate::codecs::Encoder<()>,
+    encoder: codecs::Encoder<()>,
+    transformer: codecs::Transformer,
 }
 
 impl Encoder<(String, Vec<Event>)> for ChronicleEncoder {
@@ -257,13 +252,14 @@ impl Encoder<(String, Vec<Event>)> for ChronicleEncoder {
         let mut encoder = self.encoder.clone();
         let events = events
             .into_iter()
-            .filter_map(|event| {
+            .filter_map(|mut event| {
                 let timestamp = event
                     .as_log()
                     .get(log_schema().timestamp_key())
                     .and_then(|ts| ts.as_timestamp())
                     .cloned();
                 let mut bytes = BytesMut::new();
+                self.transformer.transform(&mut event);
                 encoder.encode(event, &mut bytes).ok()?;
 
                 let mut value = json!({
@@ -365,11 +361,14 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
 
 impl RequestSettings {
     fn new(config: &ChronicleUnstructuredConfig) -> crate::Result<Self> {
-        let (_, serializer) = config.encoding.clone().encoding()?;
+        let transformer = config.encoding.transformer();
+        let (_, serializer) = config.encoding.config();
+        let serializer = serializer.build()?;
         let encoder = crate::codecs::Encoder::<()>::new(serializer);
         let encoder = ChronicleEncoder {
             customer_id: config.customer_id.clone(),
             encoder,
+            transformer,
         };
         Ok(Self {
             compression: config.compression,
@@ -439,7 +438,7 @@ mod integration_tests {
     use super::*;
     use crate::test_util::{
         components::{run_and_assert_sink_compliance, SINK_TAGS},
-        random_events_with_stream, random_string, trace_init
+        random_events_with_stream, random_string, trace_init,
     };
 
     fn config(log_type: &str) -> ChronicleUnstructuredConfig {
