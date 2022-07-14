@@ -110,7 +110,7 @@ impl LogsService for Service {
 
         self.pipeline
             .clone()
-            .send_batch(events)
+            .send_batch_named(LOGS, events)
             .map_err(|error| {
                 let message = error.to_string();
                 emit!(StreamClosedError { error, count });
