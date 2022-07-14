@@ -140,7 +140,6 @@ impl Service<GcsRequest> for GcsService {
                 inner,
                 protocol,
                 metadata,
-                bytes_sent: None,
             })
         })
     }
