@@ -10,7 +10,7 @@ use tower::ServiceBuilder;
 
 use crate::{
     aws::{create_client, is_retriable_error, AwsAuthentication, ClientBuilder, RegionOrEndpoint},
-    codecs::Encoder,
+    codecs::{Encoder, EncodingConfig},
     config::{
         AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig, SinkConfig,
         SinkContext,
@@ -22,11 +22,8 @@ use crate::{
             sink::KinesisSink,
         },
         util::{
-            encoding::{
-                EncodingConfig, EncodingConfigAdapter, StandardEncodings, StandardEncodingsMigrator,
-            },
-            retries::RetryLogic,
-            BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig,
+            retries::RetryLogic, BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings,
+            TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -53,8 +50,7 @@ pub struct KinesisFirehoseSinkConfig {
     pub stream_name: String,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    pub encoding:
-        EncodingConfigAdapter<EncodingConfig<StandardEncodings>, StandardEncodingsMigrator>,
+    pub encoding: EncodingConfig,
     #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
@@ -150,7 +146,7 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
             });
 
         let transformer = self.encoding.transformer();
-        let serializer = self.encoding.encoding()?;
+        let serializer = self.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
 
         let request_builder = KinesisRequestBuilder {

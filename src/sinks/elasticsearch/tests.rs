@@ -1,14 +1,12 @@
 use std::{collections::BTreeMap, convert::TryFrom};
 
-use super::BulkAction;
-use crate::sinks::elasticsearch::BulkConfig;
-use crate::sinks::util::encoding::Transformer;
 use crate::{
+    codecs::Transformer,
     event::{LogEvent, Metric, MetricKind, MetricValue, Value},
     sinks::{
         elasticsearch::{
-            sink::process_log, DataStreamConfig, ElasticsearchCommon, ElasticsearchConfig,
-            ElasticsearchMode,
+            sink::process_log, BulkAction, BulkConfig, DataStreamConfig, ElasticsearchCommon,
+            ElasticsearchConfig, ElasticsearchMode,
         },
         util::encoding::Encoder,
     },

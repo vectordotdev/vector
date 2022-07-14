@@ -10,11 +10,12 @@ use super::{
     NewRelicSinkError,
 };
 use crate::{
+    codecs::Transformer,
     config::{AcknowledgementsConfig, DataType, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::util::{
-        encoding::Transformer, retries::RetryLogic, service::ServiceBuilderExt, BatchConfig,
-        Compression, SinkBatchSettings, TowerRequestConfig,
+        retries::RetryLogic, service::ServiceBuilderExt, BatchConfig, Compression,
+        SinkBatchSettings, TowerRequestConfig,
     },
     tls::TlsSettings,
 };

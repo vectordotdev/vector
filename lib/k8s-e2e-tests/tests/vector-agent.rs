@@ -43,7 +43,7 @@ const CUSTOM_RESOURCE_VECTOR_CONFIG: &str = indoc! {r#"
         [sinks.stdout]
             type = "console"
             inputs = ["kubernetes_logs"]
-            encoding = "json"
+            encoding.codec = "json"
 "#};
 
 /// This test validates that vector picks up logs at the simplest case
