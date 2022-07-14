@@ -1,7 +1,9 @@
+use codecs::JsonSerializerConfig;
 use serde::{Deserialize, Serialize};
 
 use super::host_key;
 use crate::{
+    codecs::EncodingConfig,
     config::{
         AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext,
         SinkDescription,
@@ -12,12 +14,9 @@ use crate::{
                 acknowledgements::HecClientAcknowledgementsConfig, timestamp_key, EndpointTarget,
                 SplunkHecDefaultBatchSettings,
             },
-            logs::config::{HecEncoding, HecEncodingMigrator, HecLogsSinkConfig},
+            logs::config::HecLogsSinkConfig,
         },
-        util::{
-            encoding::{EncodingConfig, EncodingConfigAdapter},
-            BatchConfig, Compression, TowerRequestConfig,
-        },
+        util::{BatchConfig, Compression, TowerRequestConfig},
         Healthcheck, VectorSink,
     },
     template::Template,
@@ -34,7 +33,7 @@ pub struct HumioLogsConfig {
     #[serde(alias = "host")]
     pub(super) endpoint: Option<String>,
     pub(super) source: Option<Template>,
-    pub(super) encoding: EncodingConfigAdapter<EncodingConfig<HecEncoding>, HecEncodingMigrator>,
+    pub(super) encoding: EncodingConfig,
     pub(super) event_type: Option<Template>,
     #[serde(default = "host_key")]
     pub(super) host_key: String,
@@ -75,7 +74,7 @@ impl GenerateConfig for HumioLogsConfig {
             token: "${HUMIO_TOKEN}".to_owned(),
             endpoint: None,
             source: None,
-            encoding: EncodingConfig::from(HecEncoding::Json).into(),
+            encoding: JsonSerializerConfig::new().into(),
             event_type: None,
             indexed_fields: vec![],
             index: None,
@@ -308,7 +307,7 @@ mod integration_tests {
             token: token.to_string(),
             endpoint: Some(humio_address()),
             source: None,
-            encoding: EncodingConfig::from(HecEncoding::Json).into(),
+            encoding: JsonSerializerConfig::new().into(),
             event_type: None,
             host_key: log_schema().host_key().to_string(),
             indexed_fields: vec![],

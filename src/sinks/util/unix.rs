@@ -10,6 +10,7 @@ use tokio_util::codec::Encoder;
 use vector_core::ByteSizeOf;
 
 use crate::{
+    codecs::Transformer,
     event::{Event, Finalizable},
     internal_events::{
         ConnectionOpen, OpenGauge, SocketMode, UnixSocketConnectionError,
@@ -18,7 +19,6 @@ use crate::{
     sink::VecSinkExt,
     sinks::{
         util::{
-            encoding::Transformer,
             retries::ExponentialBackoff,
             socket_bytes_sink::{BytesSink, ShutdownCheck},
             EncodedEvent, StreamSink,
@@ -182,7 +182,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use codecs::encoding::Framer;
+    use codecs::{encoding::Framer, NewlineDelimitedEncoder, TextSerializer};
     use tokio::net::UnixListener;
 
     use super::*;
@@ -200,7 +200,10 @@ mod tests {
         let good_path = temp_uds_path("valid_uds");
         let _listener = UnixListener::bind(&good_path).unwrap();
         assert!(UnixSinkConfig::new(good_path)
-            .build(Default::default(), Encoder::<Framer>::default())
+            .build(
+                Default::default(),
+                Encoder::<()>::new(TextSerializer::new().into())
+            )
             .unwrap()
             .1
             .await
@@ -208,7 +211,10 @@ mod tests {
 
         let bad_path = temp_uds_path("no_one_listening");
         assert!(UnixSinkConfig::new(bad_path)
-            .build(Default::default(), Encoder::<Framer>::default())
+            .build(
+                Default::default(),
+                Encoder::<()>::new(TextSerializer::new().into())
+            )
             .unwrap()
             .1
             .await
@@ -226,7 +232,13 @@ mod tests {
         // Set up Sink
         let config = UnixSinkConfig::new(out_path);
         let (sink, _healthcheck) = config
-            .build(Default::default(), Encoder::<Framer>::default())
+            .build(
+                Default::default(),
+                Encoder::<Framer>::new(
+                    NewlineDelimitedEncoder::new().into(),
+                    TextSerializer::new().into(),
+                ),
+            )
             .unwrap();
 
         // Send the test data

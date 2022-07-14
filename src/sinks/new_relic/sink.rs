@@ -14,10 +14,10 @@ use super::{
     NewRelicApiRequest, NewRelicCredentials, NewRelicEncoder,
 };
 use crate::{
+    codecs::Transformer,
     event::Event,
     sinks::util::{
         builder::SinkBuilderExt,
-        encoding::Transformer,
         metadata::{RequestMetadata, RequestMetadataBuilder},
         request_builder::EncodeResult,
         Compression, RequestBuilder, StreamSink,

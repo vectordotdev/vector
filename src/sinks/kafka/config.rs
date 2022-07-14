@@ -1,21 +1,18 @@
 use std::collections::HashMap;
 
+use codecs::JsonSerializerConfig;
 use futures::FutureExt;
 use rdkafka::ClientConfig;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    codecs::EncodingConfig,
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     kafka::{KafkaAuthConfig, KafkaCompression},
     serde::json::to_string,
     sinks::{
         kafka::sink::{healthcheck, KafkaSink},
-        util::{
-            encoding::{
-                EncodingConfig, EncodingConfigAdapter, StandardEncodings, StandardEncodingsMigrator,
-            },
-            BatchConfig, NoDefaultsBatchSettings,
-        },
+        util::{BatchConfig, NoDefaultsBatchSettings},
         Healthcheck, VectorSink,
     },
 };
@@ -28,8 +25,7 @@ pub(crate) struct KafkaSinkConfig {
     pub bootstrap_servers: String,
     pub topic: String,
     pub key_field: Option<String>,
-    pub(crate) encoding:
-        EncodingConfigAdapter<EncodingConfig<StandardEncodings>, StandardEncodingsMigrator>,
+    pub encoding: EncodingConfig,
     /// These batching options will **not** override librdkafka_options values.
     #[serde(default)]
     pub batch: BatchConfig<NoDefaultsBatchSettings>,
@@ -167,7 +163,7 @@ impl GenerateConfig for KafkaSinkConfig {
             bootstrap_servers: "10.14.22.123:9092,10.14.23.332:9092".to_owned(),
             topic: "topic-1234".to_owned(),
             key_field: Some("user_id".to_owned()),
-            encoding: EncodingConfig::from(StandardEncodings::Json).into(),
+            encoding: JsonSerializerConfig::new().into(),
             batch: Default::default(),
             compression: KafkaCompression::None,
             auth: Default::default(),

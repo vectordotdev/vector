@@ -68,22 +68,100 @@ impl Encoder<Event> for JsonSerializer {
 #[cfg(test)]
 mod tests {
     use bytes::BytesMut;
+    use chrono::{TimeZone, Utc};
     use vector_common::btreemap;
-    use vector_core::event::{LogEvent, Value};
+    use vector_core::event::{LogEvent, Metric, MetricKind, MetricValue, StatisticKind, Value};
 
     use super::*;
 
     #[test]
-    fn serialize_json() {
+    fn serialize_json_log() {
         let event = Event::Log(LogEvent::from(btreemap! {
-            "foo" => Value::from("bar")
+            "x" => Value::from("23"),
+            "z" => Value::from(25),
+            "a" => Value::from("0"),
         }));
         let mut serializer = JsonSerializer::new();
         let mut bytes = BytesMut::new();
 
         serializer.encode(event, &mut bytes).unwrap();
 
-        assert_eq!(bytes.freeze(), r#"{"foo":"bar"}"#);
+        assert_eq!(bytes.freeze(), r#"{"a":"0","x":"23","z":25}"#);
+    }
+
+    #[test]
+    fn serialize_json_metric_counter() {
+        let event = Event::Metric(
+            Metric::new(
+                "foos",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 100.0 },
+            )
+            .with_namespace(Some("vector"))
+            .with_tags(Some(
+                vec![
+                    ("key2".to_owned(), "value2".to_owned()),
+                    ("key1".to_owned(), "value1".to_owned()),
+                    ("Key3".to_owned(), "Value3".to_owned()),
+                ]
+                .into_iter()
+                .collect(),
+            ))
+            .with_timestamp(Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11))),
+        );
+
+        let mut serializer = JsonSerializer::new();
+        let mut bytes = BytesMut::new();
+
+        serializer.encode(event, &mut bytes).unwrap();
+
+        assert_eq!(
+            bytes.freeze(),
+            r#"{"name":"foos","namespace":"vector","tags":{"Key3":"Value3","key1":"value1","key2":"value2"},"timestamp":"2018-11-14T08:09:10.000000011Z","kind":"incremental","counter":{"value":100.0}}"#
+        );
+    }
+
+    #[test]
+    fn serialize_json_metric_set() {
+        let event = Event::Metric(Metric::new(
+            "users",
+            MetricKind::Incremental,
+            MetricValue::Set {
+                values: vec!["bob".into()].into_iter().collect(),
+            },
+        ));
+
+        let mut serializer = JsonSerializer::new();
+        let mut bytes = BytesMut::new();
+
+        serializer.encode(event, &mut bytes).unwrap();
+
+        assert_eq!(
+            bytes.freeze(),
+            r#"{"name":"users","kind":"incremental","set":{"values":["bob"]}}"#
+        );
+    }
+
+    #[test]
+    fn serialize_json_metric_histogram_without_timestamp() {
+        let event = Event::Metric(Metric::new(
+            "glork",
+            MetricKind::Incremental,
+            MetricValue::Distribution {
+                samples: vector_core::samples![10.0 => 1],
+                statistic: StatisticKind::Histogram,
+            },
+        ));
+
+        let mut serializer = JsonSerializer::new();
+        let mut bytes = BytesMut::new();
+
+        serializer.encode(event, &mut bytes).unwrap();
+
+        assert_eq!(
+            bytes.freeze(),
+            r#"{"name":"glork","kind":"incremental","distribution":{"samples":[{"value":10.0,"rate":1}],"statistic":"histogram"}}"#
+        );
     }
 
     #[test]

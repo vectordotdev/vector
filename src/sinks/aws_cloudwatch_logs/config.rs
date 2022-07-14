@@ -1,5 +1,6 @@
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 use aws_smithy_types::retry::RetryConfig;
+use codecs::JsonSerializerConfig;
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
@@ -9,7 +10,7 @@ use crate::{
         create_client, create_smithy_client, resolve_region, AwsAuthentication, ClientBuilder,
         RegionOrEndpoint,
     },
-    codecs::Encoder,
+    codecs::{Encoder, EncodingConfig},
     config::{
         log_schema, AcknowledgementsConfig, DataType, GenerateConfig, Input, ProxyConfig,
         SinkConfig, SinkContext,
@@ -20,11 +21,8 @@ use crate::{
             retry::CloudwatchRetryLogic, service::CloudwatchLogsPartitionSvc, sink::CloudwatchSink,
         },
         util::{
-            encoding::{
-                EncodingConfig, EncodingConfigAdapter, StandardEncodings, StandardEncodingsMigrator,
-            },
-            http::RequestConfig,
-            BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig,
+            http::RequestConfig, BatchConfig, Compression, ServiceBuilderExt, SinkBatchSettings,
+            TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -55,8 +53,7 @@ pub struct CloudwatchLogsSinkConfig {
     pub stream_name: Template,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    pub encoding:
-        EncodingConfigAdapter<EncodingConfig<StandardEncodings>, StandardEncodingsMigrator>,
+    pub encoding: EncodingConfig,
     pub create_missing_group: Option<bool>,
     pub create_missing_stream: Option<bool>,
     #[serde(default)]
@@ -126,7 +123,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
                 std::sync::Arc::new(smithy_client),
             ));
         let transformer = self.encoding.transformer();
-        let serializer = self.encoding.clone().encoding()?;
+        let serializer = self.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
         let healthcheck = healthcheck(self.clone(), client).boxed();
         let sink = CloudwatchSink {
@@ -160,17 +157,16 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
 
 impl GenerateConfig for CloudwatchLogsSinkConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::try_from(default_config(StandardEncodings::Json)).unwrap()
+        toml::Value::try_from(default_config(JsonSerializerConfig::new().into())).unwrap()
     }
 }
 
-fn default_config(e: StandardEncodings) -> CloudwatchLogsSinkConfig {
+fn default_config(encoding: EncodingConfig) -> CloudwatchLogsSinkConfig {
     CloudwatchLogsSinkConfig {
-        encoding: EncodingConfig::from(e).into(),
+        encoding,
         group_name: Default::default(),
         stream_name: Default::default(),
         region: Default::default(),
-
         create_missing_group: Default::default(),
         create_missing_stream: Default::default(),
         compression: Default::default(),

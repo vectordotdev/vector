@@ -1,11 +1,9 @@
+use codecs::{encoding::FramingConfig, TextSerializerConfig};
 use tokio::time::{timeout, Duration};
 
 use crate::{
     config::Config,
-    sinks::{
-        console::{ConsoleSinkConfig, Target},
-        util::encoding::{EncodingConfig, StandardEncodings},
-    },
+    sinks::console::{ConsoleSinkConfig, Target},
     sources::demo_logs::DemoLogsConfig,
     test_util::start_topology,
 };
@@ -20,7 +18,7 @@ async fn sources_finished() {
         &["in"],
         ConsoleSinkConfig {
             target: Target::Stdout,
-            encoding: EncodingConfig::from(StandardEncodings::Text).into(),
+            encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
             acknowledgements: Default::default(),
         },
     );

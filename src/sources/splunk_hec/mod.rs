@@ -999,6 +999,7 @@ mod tests {
     use std::{net::SocketAddr, num::NonZeroU64};
 
     use chrono::{TimeZone, Utc};
+    use codecs::{JsonSerializerConfig, TextSerializerConfig};
     use futures_util::Stream;
     use reqwest::{RequestBuilder, Response};
     use serde::Deserialize;
@@ -1006,12 +1007,13 @@ mod tests {
 
     use super::{acknowledgements::HecAcknowledgementsConfig, parse_timestamp, SplunkConfig};
     use crate::{
+        codecs::EncodingConfig,
         config::{log_schema, SinkConfig, SinkContext, SourceConfig, SourceContext},
         event::{Event, LogEvent},
         sinks::{
             splunk_hec::common::timestamp_key,
-            splunk_hec::logs::config::{HecEncoding, HecLogsSinkConfig},
-            util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
+            splunk_hec::logs::config::HecLogsSinkConfig,
+            util::{BatchConfig, Compression, TowerRequestConfig},
             Healthcheck, VectorSink,
         },
         sources::splunk_hec::acknowledgements::{HecAckStatusRequest, HecAckStatusResponse},
@@ -1070,7 +1072,7 @@ mod tests {
 
     async fn sink(
         address: SocketAddr,
-        encoding: impl Into<EncodingConfig<HecEncoding>>,
+        encoding: EncodingConfig,
         compression: Compression,
     ) -> (VectorSink, Healthcheck) {
         HecLogsSinkConfig {
@@ -1081,7 +1083,7 @@ mod tests {
             index: None,
             sourcetype: None,
             source: None,
-            encoding: encoding.into().into(),
+            encoding,
             compression,
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
@@ -1097,7 +1099,7 @@ mod tests {
     }
 
     async fn start(
-        encoding: impl Into<EncodingConfig<HecEncoding>>,
+        encoding: EncodingConfig,
         compression: Compression,
         acknowledgements: Option<HecAcknowledgementsConfig>,
     ) -> (VectorSink, impl Stream<Item = Event> + Unpin) {
@@ -1203,7 +1205,8 @@ mod tests {
     #[tokio::test]
     async fn no_compression_text_event() {
         let message = "gzip_text_event";
-        let (sink, source) = start(HecEncoding::Text, Compression::None, None).await;
+        let (sink, source) =
+            start(TextSerializerConfig::new().into(), Compression::None, None).await;
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
@@ -1219,7 +1222,12 @@ mod tests {
     #[tokio::test]
     async fn one_simple_text_event() {
         let message = "one_simple_text_event";
-        let (sink, source) = start(HecEncoding::Text, Compression::gzip_default(), None).await;
+        let (sink, source) = start(
+            TextSerializerConfig::new().into(),
+            Compression::gzip_default(),
+            None,
+        )
+        .await;
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
@@ -1235,7 +1243,8 @@ mod tests {
     #[tokio::test]
     async fn multiple_simple_text_event() {
         let n = 200;
-        let (sink, source) = start(HecEncoding::Text, Compression::None, None).await;
+        let (sink, source) =
+            start(TextSerializerConfig::new().into(), Compression::None, None).await;
 
         let messages = (0..n)
             .map(|i| format!("multiple_simple_text_event_{}", i))
@@ -1256,7 +1265,12 @@ mod tests {
     #[tokio::test]
     async fn one_simple_json_event() {
         let message = "one_simple_json_event";
-        let (sink, source) = start(HecEncoding::Json, Compression::gzip_default(), None).await;
+        let (sink, source) = start(
+            JsonSerializerConfig::new().into(),
+            Compression::gzip_default(),
+            None,
+        )
+        .await;
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
@@ -1272,7 +1286,12 @@ mod tests {
     #[tokio::test]
     async fn multiple_simple_json_event() {
         let n = 200;
-        let (sink, source) = start(HecEncoding::Json, Compression::gzip_default(), None).await;
+        let (sink, source) = start(
+            JsonSerializerConfig::new().into(),
+            Compression::gzip_default(),
+            None,
+        )
+        .await;
 
         let messages = (0..n)
             .map(|i| format!("multiple_simple_json_event{}", i))
@@ -1292,7 +1311,12 @@ mod tests {
 
     #[tokio::test]
     async fn json_event() {
-        let (sink, source) = start(HecEncoding::Json, Compression::gzip_default(), None).await;
+        let (sink, source) = start(
+            JsonSerializerConfig::new().into(),
+            Compression::gzip_default(),
+            None,
+        )
+        .await;
 
         let mut log = LogEvent::default();
         log.insert("greeting", "hello");
@@ -1309,7 +1333,12 @@ mod tests {
 
     #[tokio::test]
     async fn line_to_message() {
-        let (sink, source) = start(HecEncoding::Json, Compression::gzip_default(), None).await;
+        let (sink, source) = start(
+            JsonSerializerConfig::new().into(),
+            Compression::gzip_default(),
+            None,
+        )
+        .await;
 
         let mut event = LogEvent::default();
         event.insert("line", "hello");
@@ -1552,8 +1581,12 @@ mod tests {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = "passthrough_token_enabled";
             let (source, address) = source_with(None, Some(VALID_TOKENS), None, true).await;
-            let (sink, health) =
-                sink(address, HecEncoding::Text, Compression::gzip_default()).await;
+            let (sink, health) = sink(
+                address,
+                TextSerializerConfig::new().into(),
+                Compression::gzip_default(),
+            )
+            .await;
             assert!(health.await.is_ok());
 
             let event = channel_n(vec![message], sink, source).await.remove(0);
@@ -1596,8 +1629,12 @@ mod tests {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = "no_authorization";
             let (source, address) = source_with(None, None, None, false).await;
-            let (sink, health) =
-                sink(address, HecEncoding::Text, Compression::gzip_default()).await;
+            let (sink, health) = sink(
+                address,
+                TextSerializerConfig::new().into(),
+                Compression::gzip_default(),
+            )
+            .await;
             assert!(health.await.is_ok());
 
             let event = channel_n(vec![message], sink, source).await.remove(0);
@@ -1613,8 +1650,12 @@ mod tests {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = "no_authorization";
             let (source, address) = source_with(None, None, None, true).await;
-            let (sink, health) =
-                sink(address, HecEncoding::Text, Compression::gzip_default()).await;
+            let (sink, health) = sink(
+                address,
+                TextSerializerConfig::new().into(),
+                Compression::gzip_default(),
+            )
+            .await;
             assert!(health.await.is_ok());
 
             let event = channel_n(vec![message], sink, source).await.remove(0);
@@ -1798,7 +1839,12 @@ mod tests {
     async fn host_test() {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = "for the host";
-            let (sink, source) = start(HecEncoding::Text, Compression::gzip_default(), None).await;
+            let (sink, source) = start(
+                TextSerializerConfig::new().into(),
+                Compression::gzip_default(),
+                None,
+            )
+            .await;
 
             let event = channel_n(vec![message], sink, source).await.remove(0);
 
