@@ -5,15 +5,14 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 
 use crate::{
+    codecs::{EncodingConfigWithFraming, Transformer},
     config::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
     },
     sinks::{
         http::{HttpMethod, HttpSinkConfig},
         util::{
-            encoding::{EncodingConfigWithFramingAdapter, Transformer},
-            http::RequestConfig,
-            BatchConfig, Compression, SinkBatchSettings, TowerRequestConfig,
+            http::RequestConfig, BatchConfig, Compression, SinkBatchSettings, TowerRequestConfig,
         },
     },
 };
@@ -135,7 +134,7 @@ impl NewRelicLogsConfig {
             auth: None,
             headers: None,
             compression: self.compression,
-            encoding: EncodingConfigWithFramingAdapter::with_transformer(
+            encoding: EncodingConfigWithFraming::new(
                 Some(CharacterDelimitedEncoderConfig::new(b',').into()),
                 JsonSerializerConfig::new().into(),
                 self.encoding.clone(),
@@ -160,6 +159,7 @@ mod tests {
 
     use super::*;
     use crate::{
+        codecs::SinkType,
         config::SinkConfig,
         event::{Event, LogEvent},
         sinks::util::{service::RATE_LIMIT_NUM_DEFAULT, test::build_test_server, Concurrency},
@@ -200,7 +200,11 @@ mod tests {
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert!(matches!(
-            http_config.encoding.encoding().unwrap().1,
+            http_config
+                .encoding
+                .build(SinkType::MessageBased)
+                .unwrap()
+                .1,
             Serializer::Json(_)
         ));
         assert_eq!(http_config.batch.max_bytes, Some(MAX_PAYLOAD_SIZE));
@@ -242,7 +246,11 @@ mod tests {
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert!(matches!(
-            http_config.encoding.encoding().unwrap().1,
+            http_config
+                .encoding
+                .build(SinkType::MessageBased)
+                .unwrap()
+                .1,
             Serializer::Json(_)
         ));
         assert_eq!(http_config.batch.max_bytes, Some(MAX_PAYLOAD_SIZE));
@@ -282,7 +290,11 @@ mod tests {
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert!(matches!(
-            http_config.encoding.encoding().unwrap().1,
+            http_config
+                .encoding
+                .build(SinkType::MessageBased)
+                .unwrap()
+                .1,
             Serializer::Json(_)
         ));
         assert_eq!(http_config.batch.max_bytes, Some(838860));

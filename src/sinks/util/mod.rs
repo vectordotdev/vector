@@ -37,12 +37,9 @@ pub use buffer::{
     Buffer, Compression, PartitionBuffer, PartitionInnerBuffer,
 };
 pub use builder::SinkBuilderExt;
-use bytes::Bytes;
 pub use compressor::Compressor;
-use encoding::{EncodingConfig, EncodingConfiguration};
 pub use normalizer::Normalizer;
 pub use request_builder::{IncrementalRequestBuilder, RequestBuilder};
-use serde::{Deserialize, Serialize};
 pub use service::{
     Concurrency, ServiceBuilderExt, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,
     TowerRequestLayer, TowerRequestSettings,
@@ -51,7 +48,7 @@ pub use sink::{BatchSink, PartitionBatchSink, StreamSink};
 use snafu::Snafu;
 pub use uri::UriSerde;
 
-use crate::event::{Event, EventFinalizers};
+use crate::event::EventFinalizers;
 
 #[derive(Debug, Snafu)]
 enum SinkBuildError {
@@ -103,44 +100,6 @@ impl<I> EncodedEvent<I> {
             byte_size: self.byte_size,
         }
     }
-}
-
-/**
- * Enum representing different ways to encode events as they are sent into a Sink.
- */
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Encoding {
-    Text,
-    Json,
-}
-
-/**
-* Encodes the given event into raw bytes that can be sent into a Sink, according to
-* the given encoding. If there are any errors encoding the event, logs a warning
-* and returns None.
-**/
-pub fn encode_log(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option<Bytes> {
-    encoding.apply_rules(&mut event);
-    let log = event.into_log();
-
-    let b = match encoding.codec() {
-        Encoding::Json => serde_json::to_vec(&log),
-        Encoding::Text => {
-            let bytes = log
-                .get(crate::config::log_schema().message_key())
-                .map(|v| v.coerce_to_bytes().to_vec())
-                .unwrap_or_default();
-            Ok(bytes)
-        }
-    };
-
-    b.map(|mut b| {
-        b.push(b'\n');
-        Bytes::from(b)
-    })
-    .map_err(|error| error!(message = "Unable to encode.", %error))
-    .ok()
 }
 
 /// Joins namespace with name via delimiter if namespace is present.

@@ -289,9 +289,7 @@ mod test {
 
     use super::{tcp::TcpConfig, udp::UdpConfig, SocketConfig};
     use crate::{
-        config::{
-            log_schema, ComponentKey, GlobalOptions, SinkContext, SourceConfig, SourceContext,
-        },
+        config::{log_schema, ComponentKey, GlobalOptions, SourceConfig, SourceContext},
         event::{Event, LogEvent},
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
         sinks::util::tcp::TcpSinkConfig,
@@ -555,7 +553,6 @@ mod test {
             let message = random_string(512);
             let message_bytes = Bytes::from(message.clone());
 
-            let cx = SinkContext::new_test();
             #[derive(Clone, Debug)]
             struct Serializer {
                 bytes: Bytes,
@@ -573,7 +570,7 @@ mod test {
             let encoder = Serializer {
                 bytes: message_bytes,
             };
-            let (sink, _healthcheck) = sink_config.build(cx, Default::default(), encoder).unwrap();
+            let (sink, _healthcheck) = sink_config.build(Default::default(), encoder).unwrap();
 
             tokio::spawn(async move {
                 let input = stream::repeat_with(|| LogEvent::default().into()).boxed();

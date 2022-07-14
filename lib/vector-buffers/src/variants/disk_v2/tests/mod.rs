@@ -11,11 +11,11 @@ use super::{
     io::{AsyncFile, Metadata, ProductionFilesystem, ReadableMemoryMap, WritableMemoryMap},
     ledger::LEDGER_LEN,
     record::RECORD_HEADER_LEN,
-    Buffer, DiskBufferConfigBuilder, Ledger, Reader, Writer,
+    Buffer, DiskBufferConfigBuilder, Filesystem, Ledger, Reader, Writer,
 };
 use crate::{
     buffer_usage_data::BufferUsageHandle, encoding::FixedEncodable,
-    variants::disk_v2::common::align16, Acker, Bufferable,
+    variants::disk_v2::common::align16, Bufferable,
 };
 
 type FilesystemUnderTest = ProductionFilesystem;
@@ -177,7 +177,6 @@ pub(crate) async fn create_default_buffer_v2<P, R>(
 ) -> (
     Writer<R, FilesystemUnderTest>,
     Reader<R, FilesystemUnderTest>,
-    Acker,
     Arc<Ledger<FilesystemUnderTest>>,
 )
 where
@@ -199,7 +198,6 @@ pub(crate) async fn create_default_buffer_v2_with_usage<P, R>(
 ) -> (
     Writer<R, FilesystemUnderTest>,
     Reader<R, FilesystemUnderTest>,
-    Acker,
     Arc<Ledger<FilesystemUnderTest>>,
     BufferUsageHandle,
 )
@@ -211,10 +209,10 @@ where
         .build()
         .expect("creating buffer should not fail");
     let usage_handle = BufferUsageHandle::noop();
-    let (writer, reader, acker, ledger) = Buffer::from_config_inner(config, usage_handle.clone())
+    let (writer, reader, ledger) = Buffer::from_config_inner(config, usage_handle.clone())
         .await
         .expect("should not fail to create buffer");
-    (writer, reader, acker, ledger, usage_handle)
+    (writer, reader, ledger, usage_handle)
 }
 
 /// Creates a disk v2 buffer that is sized such that only a fixed number of data files are allowed.
@@ -229,7 +227,6 @@ pub(crate) async fn create_buffer_v2_with_data_file_count_limit<P, R>(
 ) -> (
     Writer<R, FilesystemUnderTest>,
     Reader<R, FilesystemUnderTest>,
-    Acker,
     Arc<Ledger<FilesystemUnderTest>>,
 )
 where
@@ -274,7 +271,6 @@ pub(crate) async fn create_buffer_v2_with_max_record_size<P, R>(
 ) -> (
     Writer<R, FilesystemUnderTest>,
     Reader<R, FilesystemUnderTest>,
-    Acker,
     Arc<Ledger<FilesystemUnderTest>>,
 )
 where
@@ -301,7 +297,6 @@ pub(crate) async fn create_buffer_v2_with_max_data_file_size<P, R>(
 ) -> (
     Writer<R, FilesystemUnderTest>,
     Reader<R, FilesystemUnderTest>,
-    Acker,
     Arc<Ledger<FilesystemUnderTest>>,
 )
 where
@@ -329,7 +324,6 @@ pub(crate) async fn create_buffer_v2_with_write_buffer_size<P, R>(
 ) -> (
     Writer<R, FilesystemUnderTest>,
     Reader<R, FilesystemUnderTest>,
-    Acker,
     Arc<Ledger<FilesystemUnderTest>>,
 )
 where
@@ -366,4 +360,24 @@ where
     // This is just the maximum record size, compensating for the record header length.
     let max_record_size = get_corrected_max_record_size(payload);
     u64::try_from(max_record_size).unwrap()
+}
+
+pub(crate) async fn read_next<T, FS>(reader: &mut Reader<T, FS>) -> Option<T>
+where
+    T: Bufferable,
+    FS: Filesystem,
+    FS::File: Unpin,
+{
+    reader.next().await.expect("read should not fail")
+}
+
+pub(crate) async fn read_next_some<T, FS>(reader: &mut Reader<T, FS>) -> T
+where
+    T: Bufferable,
+    FS: Filesystem,
+    FS::File: Unpin,
+{
+    read_next(reader)
+        .await
+        .expect("read should produce a record")
 }

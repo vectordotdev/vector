@@ -9,8 +9,7 @@ use prost::Message;
 use proto_event::EventWrapper;
 use tonic::{body::BoxBody, IntoRequest};
 use vector_core::{
-    buffers::Ackable, event::proto as proto_event, internal_event::EventsSent,
-    stream::DriverResponse,
+    event::proto as proto_event, internal_event::EventsSent, stream::DriverResponse,
 };
 
 use crate::{
@@ -52,12 +51,6 @@ pub struct VectorRequest {
     pub events: Vec<EventWrapper>,
     pub finalizers: EventFinalizers,
     pub events_byte_size: usize,
-}
-
-impl Ackable for VectorRequest {
-    fn ack_size(&self) -> usize {
-        self.events.len()
-    }
 }
 
 impl Finalizable for VectorRequest {

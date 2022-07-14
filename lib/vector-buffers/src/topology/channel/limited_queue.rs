@@ -354,17 +354,17 @@ mod tests {
 
         assert_eq!(7, tx.available_capacity());
 
-        let msgs = vec![
-            MultiEventRecord(1),
-            MultiEventRecord(2),
-            MultiEventRecord(3),
-            MultiEventRecord(4),
+        let msgs1 = vec![
+            MultiEventRecord::new(1),
+            MultiEventRecord::new(2),
+            MultiEventRecord::new(3),
         ];
+        let msg2 = MultiEventRecord::new(4);
 
         // Create our send and receive futures.
         let mut small_sends = spawn(async {
-            for msg in &msgs[0..3] {
-                tx.send(*msg).await?;
+            for msg in msgs1.clone() {
+                tx.send(msg).await?;
             }
 
             Ok::<_, SendError<MultiEventRecord>>(())
@@ -391,14 +391,14 @@ mod tests {
         assert!(recv1.is_woken());
 
         // Now trigger a second send that has four events, and needs to wait for two receives to happen.
-        let mut send2 = spawn(async { tx.send(msgs[3]).await });
+        let mut send2 = spawn(tx.send(msg2.clone()));
 
         assert!(!send2.is_woken());
         assert_pending!(send2.poll());
 
         // Now if we receive the first item, our second send should be woken up but still not able
         // to send.
-        assert_eq!(Some(msgs[0]), assert_ready!(recv1.poll()));
+        assert_eq!(Some(&msgs1[0]), assert_ready!(recv1.poll()).as_ref());
         drop(recv1);
 
         // Callers waiting to acquire permits have the permits immediately transfer to them when one
@@ -412,7 +412,7 @@ mod tests {
         // Our second read should unlock enough available capacity for the second send once complete.
         let mut recv2 = spawn(async { rx.next().await });
         assert!(!recv2.is_woken());
-        assert_eq!(Some(msgs[1]), assert_ready!(recv2.poll()));
+        assert_eq!(Some(&msgs1[1]), assert_ready!(recv2.poll()).as_ref());
         drop(recv2);
 
         assert_eq!(0, rx.available_capacity());
@@ -423,14 +423,14 @@ mod tests {
         // And just make sure we see those last two sends.
         let mut recv3 = spawn(async { rx.next().await });
         assert!(!recv3.is_woken());
-        assert_eq!(Some(msgs[2]), assert_ready!(recv3.poll()));
+        assert_eq!(Some(&msgs1[2]), assert_ready!(recv3.poll()).as_ref());
         drop(recv3);
 
         assert_eq!(3, rx.available_capacity());
 
         let mut recv4 = spawn(async { rx.next().await });
         assert!(!recv4.is_woken());
-        assert_eq!(Some(msgs[3]), assert_ready!(recv4.poll()));
+        assert_eq!(Some(msg2), assert_ready!(recv4.poll()));
         drop(recv4);
 
         assert_eq!(7, rx.available_capacity());
@@ -513,10 +513,10 @@ mod tests {
 
         assert_eq!(1, tx.available_capacity());
 
-        let msg = MultiEventRecord(2);
+        let msg = MultiEventRecord::new(2);
 
         // Create our send and receive futures.
-        let mut send = spawn(async { tx.send(msg).await });
+        let mut send = spawn(async { tx.send(msg.clone()).await });
 
         let mut recv = spawn(async { rx.next().await });
 
@@ -545,11 +545,11 @@ mod tests {
 
         assert_eq!(2, tx.available_capacity());
 
-        let msg1 = MultiEventRecord(1);
-        let msg2 = MultiEventRecord(3);
+        let msg1 = MultiEventRecord::new(1);
+        let msg2 = MultiEventRecord::new(3);
 
         // Create our send future.
-        let mut send = spawn(async { tx.send(msg1).await });
+        let mut send = spawn(async { tx.send(msg1.clone()).await });
 
         // Nobody should be woken up.
         assert!(!send.is_woken());
@@ -562,7 +562,7 @@ mod tests {
 
         // Now we'll trigger another send which has an oversized item.  It shouldn't be able to send
         // until all permits are available.
-        let mut send2 = spawn(async { tx.send(msg2).await });
+        let mut send2 = spawn(async { tx.send(msg2.clone()).await });
 
         assert!(!send2.is_woken());
         assert_pending!(send2.poll());

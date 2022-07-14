@@ -1,12 +1,9 @@
-use std::{collections::BTreeMap, io, iter};
+use std::{collections::BTreeMap, iter};
 
 use serde::Serialize;
 
 use super::sink::HecProcessedEvent;
-use crate::{
-    internal_events::SplunkEventEncodeError,
-    sinks::util::encoding::{Encoder, EncodingConfiguration},
-};
+use crate::{internal_events::SplunkEventEncodeError, sinks::util::encoding::Encoder};
 
 #[derive(Serialize, Debug, PartialEq)]
 #[serde(untagged)]
@@ -84,7 +81,9 @@ impl HecMetricsEncoder {
         match serde_json::to_vec(&hec_data) {
             Ok(value) => Some(value),
             Err(error) => {
-                emit!(SplunkEventEncodeError { error });
+                emit!(SplunkEventEncodeError {
+                    error: error.into()
+                });
                 None
             }
         }
@@ -105,19 +104,5 @@ impl Encoder<Vec<HecProcessedEvent>> for HecMetricsEncoder {
         let encoded_size = encoded_input.len();
         writer.write_all(encoded_input.as_slice())?;
         Ok(encoded_size)
-    }
-}
-
-impl<E> Encoder<Vec<HecProcessedEvent>> for E
-where
-    E: EncodingConfiguration,
-    E::Codec: Encoder<Vec<HecProcessedEvent>>,
-{
-    fn encode_input(
-        &self,
-        input: Vec<HecProcessedEvent>,
-        writer: &mut dyn io::Write,
-    ) -> io::Result<usize> {
-        self.codec().encode_input(input, writer)
     }
 }

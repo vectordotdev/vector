@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use component::ComponentDescription;
 use serde::{Deserialize, Serialize};
-use vector_buffers::{Acker, BufferConfig, BufferType};
+use vector_buffers::{BufferConfig, BufferType};
 use vector_core::config::{AcknowledgementsConfig, GlobalOptions, Input};
 
 use super::{component, schema, ComponentKey, ProxyConfig, Resource};
@@ -149,7 +149,6 @@ pub trait SinkConfig: core::fmt::Debug + Send + Sync {
 
 #[derive(Debug, Clone)]
 pub struct SinkContext {
-    pub acker: Acker,
     pub healthcheck: SinkHealthcheckOptions,
     pub globals: GlobalOptions,
     pub proxy: ProxyConfig,
@@ -160,16 +159,11 @@ impl SinkContext {
     #[cfg(test)]
     pub fn new_test() -> Self {
         Self {
-            acker: Acker::passthrough(),
             healthcheck: SinkHealthcheckOptions::default(),
             globals: GlobalOptions::default(),
             proxy: ProxyConfig::default(),
             schema: schema::Options::default(),
         }
-    }
-
-    pub fn acker(&self) -> Acker {
-        self.acker.clone()
     }
 
     pub const fn globals(&self) -> &GlobalOptions {
