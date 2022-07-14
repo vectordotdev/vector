@@ -10,17 +10,15 @@ use crate::{
     },
     event::Event,
     internal_events::TemplateRenderingError,
-    sinks::util::tcp::TcpSinkConfig,
+    sinks::util::{tcp::TcpSinkConfig, UriSerde},
     tcp::TcpKeepaliveConfig,
     template::Template,
     tls::TlsEnableableConfig,
 };
 
-use super::util::UriSerde;
-
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
-struct PapertrailConfig {
+pub(self) struct PapertrailConfig {
     endpoint: UriSerde,
     encoding: EncodingConfig,
     keepalive: Option<TcpKeepaliveConfig>,

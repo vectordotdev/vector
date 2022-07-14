@@ -32,8 +32,6 @@ pub fn finalize_schema<T>(
 ) where
     T: Configurable + Serialize,
 {
-    //println!("finalize_schema: schema={:?} metadata={:?}", schema, metadata);
-
     // If the type that this schema represents is referencable, check to see if it's been defined
     // before, and if not, then go ahead and define it.
     if let Some(ref_name) = T::referencable_name() {
@@ -64,8 +62,6 @@ pub fn apply_metadata<T>(schema: &mut SchemaObject, metadata: Metadata<T>)
 where
     T: Serialize,
 {
-    //println!("apply_metadata: schema={:?} metadata={:?}", schema, metadata);
-
     // Set the title/description of this schema.
     //
     // By default, we want to populate `description` because most things don't need a title: their property name or type
