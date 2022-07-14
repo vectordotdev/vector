@@ -35,6 +35,8 @@ use tracking_allocator::{
     AllocationGroupId, AllocationGroupToken, AllocationRegistry, AllocationTracker,
 };
 
+mod channel;
+
 mod storage;
 use storage::PageTable;
 
