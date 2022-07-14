@@ -455,7 +455,7 @@ mod integration_tests {
             indoc! { r#"
              endpoint = "{}"
              customer_id = "customer id"
-             credentials_path = "/testchronicleauth.txt"
+             credentials_path = "/chronicleauth.json"
              log_type = "{}"
              encoding.codec = "text"
         "# },
