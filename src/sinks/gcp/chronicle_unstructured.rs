@@ -117,7 +117,9 @@ impl GenerateConfig for ChronicleUnstructuredConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(indoc! {r#"
             credentials_path = "/path/to/credentials.json"
-            encoding.codec = "ndjson"
+            customer_id = "customer_id"
+            log_type = "log_type"
+            encoding.codec = "text"
         "#})
         .unwrap()
     }
@@ -162,7 +164,7 @@ impl SinkConfig for ChronicleUnstructuredConfig {
         let healthcheck_endpoint = self.endpoint("v2/logtypes")?;
 
         let healthcheck = build_healthcheck(client.clone(), &healthcheck_endpoint, creds.clone())?;
-        let sink = self.build_sink(client, endpoint, creds, cx)?;
+        let sink = self.build_sink(client, endpoint, creds)?;
 
         Ok((sink, healthcheck))
     }
@@ -186,7 +188,6 @@ impl ChronicleUnstructuredConfig {
         client: HttpClient,
         base_url: String,
         creds: GcpAuthenticator,
-        cx: SinkContext,
     ) -> crate::Result<VectorSink> {
         use crate::sinks::util::service::ServiceBuilderExt;
 
@@ -205,7 +206,7 @@ impl ChronicleUnstructuredConfig {
 
         let request_settings = RequestSettings::new(self)?;
 
-        let sink = GcsSink::new(cx, svc, request_settings, partitioner, batch_settings);
+        let sink = GcsSink::new(svc, request_settings, partitioner, batch_settings);
 
         Ok(VectorSink::from_event_streamsink(sink))
     }
