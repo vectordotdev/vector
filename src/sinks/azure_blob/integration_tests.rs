@@ -6,6 +6,10 @@ use std::{
 use azure_core::{prelude::Range, HttpError};
 use azure_storage_blobs::prelude::*;
 use bytes::{Buf, BytesMut};
+use codecs::{
+    encoding::FramingConfig, JsonSerializerConfig, NewlineDelimitedEncoderConfig,
+    TextSerializerConfig,
+};
 use flate2::read::GzDecoder;
 use futures::{stream, Stream, StreamExt};
 use http::StatusCode;
@@ -16,10 +20,7 @@ use crate::{
     event::{Event, EventArray, LogEvent},
     sinks::{
         azure_common,
-        util::{
-            encoding::{EncodingConfig, StandardEncodings},
-            Compression, TowerRequestConfig,
-        },
+        util::{Compression, TowerRequestConfig},
         VectorSink,
     },
     test_util::{
@@ -94,7 +95,11 @@ async fn azure_blob_insert_json_into_blob() {
     let config = AzureBlobSinkConfig::new_emulator().await;
     let config = AzureBlobSinkConfig {
         blob_prefix: Some(blob_prefix.clone()),
-        encoding: EncodingConfig::from(StandardEncodings::Ndjson).into(),
+        encoding: (
+            Some(NewlineDelimitedEncoderConfig::new()),
+            JsonSerializerConfig::new(),
+        )
+            .into(),
         ..config
     };
     let sink = config.to_sink();
@@ -150,7 +155,11 @@ async fn azure_blob_insert_json_into_blob_gzip() {
     let config = AzureBlobSinkConfig::new_emulator().await;
     let config = AzureBlobSinkConfig {
         blob_prefix: Some(blob_prefix.clone()),
-        encoding: EncodingConfig::from(StandardEncodings::Ndjson).into(),
+        encoding: (
+            Some(NewlineDelimitedEncoderConfig::new()),
+            JsonSerializerConfig::new(),
+        )
+            .into(),
         compression: Compression::gzip_default(),
         ..config
     };
@@ -219,7 +228,7 @@ impl AzureBlobSinkConfig {
                 blob_prefix: None,
                 blob_time_format: None,
                 blob_append_uuid: None,
-                encoding: EncodingConfig::from(StandardEncodings::Text).into(),
+                encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
                 compression: Compression::None,
                 batch: Default::default(),
                 request: TowerRequestConfig::default(),

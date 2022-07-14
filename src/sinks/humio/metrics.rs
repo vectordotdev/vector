@@ -15,7 +15,7 @@ use crate::{
     event::{Event, EventArray, EventContainer},
     sinks::{
         splunk_hec::common::SplunkHecDefaultBatchSettings,
-        util::{encoding::EncodingConfigAdapter, BatchConfig, Compression, TowerRequestConfig},
+        util::{BatchConfig, Compression, TowerRequestConfig},
         Healthcheck, VectorSink,
     },
     template::Template,
@@ -91,7 +91,7 @@ impl SinkConfig for HumioMetricsConfig {
             token: self.token.clone(),
             endpoint: self.endpoint.clone(),
             source: self.source.clone(),
-            encoding: EncodingConfigAdapter::new(JsonSerializerConfig::new().into()),
+            encoding: JsonSerializerConfig::new().into(),
             event_type: self.event_type.clone(),
             host_key: self.host_key.clone(),
             indexed_fields: self.indexed_fields.clone(),

@@ -15,7 +15,7 @@ use vector_core::config::log_schema;
 
 use super::config::{KafkaRole, KafkaSinkConfig};
 use crate::{
-    codecs::Encoder,
+    codecs::{Encoder, Transformer},
     event::{Event, LogEvent},
     kafka::KafkaStatisticsContext,
     sinks::{
@@ -23,7 +23,7 @@ use crate::{
             config::QUEUED_MIN_MESSAGES, request_builder::KafkaRequestBuilder,
             service::KafkaService,
         },
-        util::{builder::SinkBuilderExt, encoding::Transformer, StreamSink},
+        util::{builder::SinkBuilderExt, StreamSink},
     },
     template::{Template, TemplateParseError},
 };
@@ -59,7 +59,7 @@ impl KafkaSink {
         let producer_config = config.to_rdkafka(KafkaRole::Producer)?;
         let producer = create_producer(producer_config)?;
         let transformer = config.encoding.transformer();
-        let serializer = config.encoding.encoding()?;
+        let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
 
         Ok(KafkaSink {

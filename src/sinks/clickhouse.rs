@@ -6,11 +6,11 @@ use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 
 use crate::{
+    codecs::Transformer,
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     http::{Auth, HttpClient, HttpError, MaybeAuth},
     sinks::util::{
-        encoding::Transformer,
         http::{BatchedHttpSink, HttpEventEncoder, HttpRetryLogic, HttpSink},
         retries::{RetryAction, RetryLogic},
         BatchConfig, Buffer, Compression, RealtimeSizeBasedDefaultBatchSettings,
@@ -309,8 +309,8 @@ mod integration_tests {
 
     use super::*;
     use crate::{
+        codecs::TimestampFormat,
         config::{log_schema, SinkConfig, SinkContext},
-        sinks::util::encoding::TimestampFormat,
         test_util::{
             components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
             random_string, trace_init,

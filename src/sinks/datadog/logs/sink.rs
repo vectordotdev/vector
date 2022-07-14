@@ -23,11 +23,10 @@ use vector_core::{
 
 use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};
 use crate::{
-    codecs::Encoder,
+    codecs::{Encoder, Transformer},
     sinks::util::{
-        encoding::{Encoder as _, Transformer},
-        request_builder::EncodeResult,
-        Compression, Compressor, RequestBuilder, SinkBuilderExt,
+        encoding::Encoder as _, request_builder::EncodeResult, Compression, Compressor,
+        RequestBuilder, SinkBuilderExt,
     },
 };
 #[derive(Default)]

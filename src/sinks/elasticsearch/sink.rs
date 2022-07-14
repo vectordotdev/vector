@@ -9,13 +9,14 @@ use vector_core::{
 };
 
 use crate::{
+    codecs::Transformer,
     event::{Event, LogEvent, Value},
     sinks::{
         elasticsearch::{
             encoder::ProcessedEvent, request_builder::ElasticsearchRequestBuilder,
             service::ElasticsearchRequest, BulkAction, ElasticsearchCommonMode,
         },
-        util::{encoding::Transformer, SinkBuilderExt, StreamSink},
+        util::{SinkBuilderExt, StreamSink},
     },
     transforms::metric_to_log::MetricToLog,
 };

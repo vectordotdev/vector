@@ -167,7 +167,7 @@ type = "stdin"
 [sinks.bar]
 type = "console"
 inputs = ["foo"]
-encoding = "json"
+encoding.codec = "json"
 ```
 
 After the component construction phase, we'll be left with the tasks for each

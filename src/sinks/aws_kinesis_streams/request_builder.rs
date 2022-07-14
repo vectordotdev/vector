@@ -6,11 +6,11 @@ use bytes::Bytes;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    codecs::Encoder,
+    codecs::{Encoder, Transformer},
     event::{Event, EventFinalizers, Finalizable},
     sinks::{
         aws_kinesis_streams::sink::KinesisProcessedEvent,
-        util::{encoding::Transformer, request_builder::EncodeResult, Compression, RequestBuilder},
+        util::{request_builder::EncodeResult, Compression, RequestBuilder},
     },
 };
 

@@ -5,7 +5,7 @@ use std::{
 };
 
 use bytes::BytesMut;
-use codecs::encoding::SerializerConfig;
+use codecs::{encoding::SerializerConfig, TextSerializerConfig};
 use futures::{future::BoxFuture, ready, stream::FuturesUnordered, FutureExt, Sink, Stream};
 use pulsar::authentication::oauth2::{OAuth2Authentication, OAuth2Params};
 use pulsar::error::AuthenticationError;
@@ -20,18 +20,12 @@ use vector_common::internal_event::{BytesSent, EventsSent};
 use vector_core::config::log_schema;
 
 use crate::{
-    codecs::Encoder,
+    codecs::{Encoder, EncodingConfig, Transformer},
     config::{
         AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext, SinkDescription,
     },
     event::{Event, EventFinalizers, Finalizable},
-    sinks::util::{
-        encoding::{
-            EncodingConfig, EncodingConfigAdapter, StandardEncodings, StandardEncodingsMigrator,
-            Transformer,
-        },
-        metadata::RequestMetadata,
-    },
+    sinks::util::metadata::RequestMetadata,
 };
 
 #[derive(Debug, Snafu)]
@@ -46,8 +40,7 @@ pub struct PulsarSinkConfig {
     #[serde(alias = "address")]
     endpoint: String,
     topic: String,
-    pub encoding:
-        EncodingConfigAdapter<EncodingConfig<StandardEncodings>, StandardEncodingsMigrator>,
+    pub encoding: EncodingConfig,
     auth: Option<AuthConfig>,
 }
 
@@ -110,7 +103,7 @@ impl GenerateConfig for PulsarSinkConfig {
         toml::Value::try_from(Self {
             endpoint: "pulsar://127.0.0.1:6650".to_string(),
             topic: "topic-1234".to_string(),
-            encoding: EncodingConfig::from(StandardEncodings::Text).into(),
+            encoding: TextSerializerConfig::new().into(),
             auth: None,
         })
         .unwrap()
@@ -130,7 +123,7 @@ impl SinkConfig for PulsarSinkConfig {
             .context(CreatePulsarSinkSnafu)?;
 
         let transformer = self.encoding.transformer();
-        let serializer = self.encoding.encoding()?;
+        let serializer = self.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
 
         let sink = PulsarSink::new(producer, transformer, encoder)?;
@@ -375,7 +368,7 @@ mod integration_tests {
         let cnf = PulsarSinkConfig {
             endpoint: pulsar_address(),
             topic: topic.clone(),
-            encoding: EncodingConfig::from(StandardEncodings::Text).into(),
+            encoding: TextSerializerConfig::new().into(),
             auth: None,
         };
 
@@ -399,7 +392,7 @@ mod integration_tests {
 
         let producer = cnf.create_pulsar_producer().await.unwrap();
         let transformer = cnf.encoding.transformer();
-        let serializer = cnf.encoding.encoding().unwrap();
+        let serializer = cnf.encoding.build().unwrap();
         let encoder = Encoder::<()>::new(serializer);
         let sink = PulsarSink::new(producer, transformer, encoder).unwrap();
         let sink = VectorSink::from_event_sink(sink);

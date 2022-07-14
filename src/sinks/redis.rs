@@ -4,7 +4,6 @@ use std::{
 };
 
 use bytes::{Bytes, BytesMut};
-use codecs::{encoding::SerializerConfig, JsonSerializerConfig, TextSerializerConfig};
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt, StreamExt};
 use redis::{aio::ConnectionManager, RedisError, RedisResult};
 use serde::{Deserialize, Serialize};
@@ -15,7 +14,7 @@ use vector_common::internal_event::BytesSent;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    codecs::Encoder,
+    codecs::{Encoder, EncodingConfig, Transformer},
     config::{
         self, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
         SinkDescription,
@@ -24,7 +23,6 @@ use crate::{
     internal_events::{RedisSendEventError, TemplateRenderingError},
     sinks::util::{
         batch::BatchConfig,
-        encoding::{EncodingConfig, EncodingConfigAdapter, EncodingConfigMigrator, Transformer},
         retries::{RetryAction, RetryLogic},
         sink::Response,
         BatchSink, Concurrency, EncodedEvent, EncodedLength, ServiceBuilderExt, SinkBatchSettings,
@@ -78,13 +76,6 @@ pub enum Method {
     LPush,
 }
 
-#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
-#[serde(rename_all = "snake_case")]
-pub enum Encoding {
-    Text,
-    Json,
-}
-
 #[derive(Clone, Copy, Debug, Default)]
 pub struct RedisDefaultBatchSettings;
 
@@ -94,24 +85,10 @@ impl SinkBatchSettings for RedisDefaultBatchSettings {
     const TIMEOUT_SECS: f64 = 1.0;
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EncodingMigrator;
-
-impl EncodingConfigMigrator for EncodingMigrator {
-    type Codec = Encoding;
-
-    fn migrate(codec: &Self::Codec) -> SerializerConfig {
-        match codec {
-            Encoding::Text => TextSerializerConfig::new().into(),
-            Encoding::Json => JsonSerializerConfig::new().into(),
-        }
-    }
-}
-
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct RedisSinkConfig {
-    encoding: EncodingConfigAdapter<EncodingConfig<Encoding>, EncodingMigrator>,
+    encoding: EncodingConfig,
     #[serde(default)]
     data_type: DataTypeConfig,
     #[serde(alias = "list")]
@@ -185,7 +162,7 @@ impl RedisSinkConfig {
         let key = Template::try_from(self.key.clone()).context(KeyTemplateSnafu)?;
 
         let transformer = self.encoding.transformer();
-        let serializer = self.encoding.encoding()?;
+        let serializer = self.encoding.build()?;
         let mut encoder = Encoder::<()>::new(serializer);
 
         let method = self.list_option.map(|option| option.method);
@@ -450,6 +427,7 @@ mod tests {
 #[cfg(feature = "redis-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
+    use codecs::JsonSerializerConfig;
     use futures::stream;
     use rand::Rng;
     use redis::AsyncCommands;
@@ -478,7 +456,7 @@ mod integration_tests {
         let cnf = RedisSinkConfig {
             url: redis_server(),
             key: key.clone(),
-            encoding: EncodingConfig::from(Encoding::Json).into(),
+            encoding: JsonSerializerConfig::new().into(),
             data_type: DataTypeConfig::List,
             list_option: Some(ListOption {
                 method: Method::LPush,
@@ -536,7 +514,7 @@ mod integration_tests {
         let cnf = RedisSinkConfig {
             url: redis_server(),
             key: key.clone(),
-            encoding: EncodingConfig::from(Encoding::Json).into(),
+            encoding: JsonSerializerConfig::new().into(),
             data_type: DataTypeConfig::List,
             list_option: Some(ListOption {
                 method: Method::RPush,
@@ -609,7 +587,7 @@ mod integration_tests {
         let cnf = RedisSinkConfig {
             url: redis_server(),
             key: key.clone(),
-            encoding: EncodingConfig::from(Encoding::Json).into(),
+            encoding: JsonSerializerConfig::new().into(),
             data_type: DataTypeConfig::Channel,
             list_option: None,
             batch: BatchConfig::default(),

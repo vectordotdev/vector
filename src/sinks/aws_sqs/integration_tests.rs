@@ -4,16 +4,16 @@ use std::str::FromStr;
 use aws_sdk_sqs::model::QueueAttributeName;
 use aws_sdk_sqs::Client as SqsClient;
 use aws_sdk_sqs::{Endpoint, Region};
+use codecs::TextSerializerConfig;
 use http::Uri;
 use tokio::time::{sleep, Duration};
 
-use super::config::{Encoding, SqsSinkConfig};
+use super::config::SqsSinkConfig;
 use super::sink::SqsSink;
 use crate::aws::create_client;
 use crate::aws::{AwsAuthentication, RegionOrEndpoint};
 use crate::common::sqs::SqsClientBuilder;
 use crate::config::ProxyConfig;
-use crate::sinks::util::encoding::EncodingConfig;
 use crate::sinks::VectorSink;
 use crate::test_util::{
     components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
@@ -52,7 +52,7 @@ async fn sqs_send_message_batch() {
     let config = SqsSinkConfig {
         queue_url: queue_url.clone(),
         region: RegionOrEndpoint::with_both("local", sqs_address().as_str()),
-        encoding: EncodingConfig::from(Encoding::Text).into(),
+        encoding: TextSerializerConfig::new().into(),
         message_group_id: None,
         message_deduplication_id: None,
         request: Default::default(),

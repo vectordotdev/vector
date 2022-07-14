@@ -20,7 +20,7 @@ use super::{
     service::{LokiRequest, LokiRetryLogic, LokiService},
 };
 use crate::{
-    codecs::Encoder,
+    codecs::{Encoder, Transformer},
     config::log_schema,
     http::HttpClient,
     internal_events::{
@@ -29,7 +29,6 @@ use crate::{
     },
     sinks::util::{
         builder::SinkBuilderExt,
-        encoding::Transformer,
         metadata::{RequestMetadata, RequestMetadataBuilder},
         request_builder::EncodeResult,
         service::{ServiceBuilderExt, Svc},
@@ -347,7 +346,7 @@ impl LokiSink {
             .service(LokiService::new(client, config.endpoint, config.auth)?);
 
         let transformer = config.encoding.transformer();
-        let serializer = config.encoding.encoding()?;
+        let serializer = config.encoding.build()?;
         let encoder = Encoder::<()>::new(serializer);
 
         Ok(Self {

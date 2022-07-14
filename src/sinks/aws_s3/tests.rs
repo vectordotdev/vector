@@ -15,6 +15,7 @@ mod integration_tests {
     use aws_sdk_s3::types::SdkError;
     use aws_sdk_s3::Client as S3Client;
     use bytes::Buf;
+    use codecs::{encoding::FramingConfig, TextSerializerConfig};
     use flate2::read::MultiGzDecoder;
     use futures::{stream, Stream};
     use pretty_assertions::assert_eq;
@@ -32,10 +33,7 @@ mod integration_tests {
         sinks::{
             aws_s3::S3SinkConfig,
             s3_common::config::S3Options,
-            util::{
-                encoding::{EncodingConfig, StandardEncodings},
-                BatchConfig, Compression, TowerRequestConfig,
-            },
+            util::{BatchConfig, Compression, TowerRequestConfig},
         },
         test_util::{
             components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
@@ -352,7 +350,7 @@ mod integration_tests {
             filename_extension: None,
             options: S3Options::default(),
             region: RegionOrEndpoint::with_both("minio", s3_address()),
-            encoding: EncodingConfig::from(StandardEncodings::Text).into(),
+            encoding: (None::<FramingConfig>, TextSerializerConfig::new()).into(),
             compression: Compression::None,
             batch,
             request: TowerRequestConfig::default(),

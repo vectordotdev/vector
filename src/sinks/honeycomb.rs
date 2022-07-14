@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::{
+    codecs::Transformer,
     config::{
         log_schema, AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext,
         SinkDescription,
@@ -12,7 +13,6 @@ use crate::{
     event::{Event, Value},
     http::HttpClient,
     sinks::util::{
-        encoding::Transformer,
         http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
         BatchConfig, BoxedRawValue, JsonArrayBuffer, SinkBatchSettings, TowerRequestConfig,
     },

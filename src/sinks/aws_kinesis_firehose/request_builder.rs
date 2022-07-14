@@ -6,11 +6,9 @@ use bytes::Bytes;
 use vector_core::ByteSizeOf;
 
 use crate::{
-    codecs::Encoder,
+    codecs::{Encoder, Transformer},
     event::{Event, EventFinalizers, Finalizable, LogEvent},
-    sinks::util::{
-        encoding::Transformer, request_builder::EncodeResult, Compression, RequestBuilder,
-    },
+    sinks::util::{request_builder::EncodeResult, Compression, RequestBuilder},
 };
 
 pub struct KinesisRequestBuilder {
