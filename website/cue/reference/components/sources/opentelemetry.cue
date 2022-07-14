@@ -63,29 +63,13 @@ components: sources: opentelemetry: {
 				examples: ["0.0.0.0:\(_port)"]
 			}
 		}
-		multiple_outputs: {
-			common: false
-			description: """
-				If this setting is set to `true` logs, metrics and traces will be sent to different outputs. For a source
-				component named `otel` the received logs, metrics, and traces can then be accessed by specifying
-				`otel.logs`, `otel.metrics`, and `otel.traces`, respectively, as the input to another component.
-				"""
-			required: false
-			type: bool: default: false
-		}
 	}
 
 	outputs: [
 		{
-			name: components._default_output.name
-			description: """
-				Default output stream of the component. Use this component's ID as an input to downstream transforms and sinks. Only active if [multiple_outputs](#multiple_outputs) is disabled.
-				"""
-		},
-		{
 			name: "logs"
 			description: """
-				If [multiple_outputs](#multiple_outputs) is enabled, received log events will go to this output stream. Use `<component_id>.logs` as an input to downstream transforms and sinks.
+				Received log events will go to this output stream. Use `<component_id>.logs` as an input to downstream transforms and sinks.
 				"""
 		},
 	]

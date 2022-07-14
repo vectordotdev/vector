@@ -33,12 +33,6 @@ pub struct OpentelemetryConfig {
     tls: Option<TlsEnableableConfig>,
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
-    /// If this setting is set to `true` logs, metrics and traces will be sent to different outputs.
-    ///
-    /// For a source component named `otel` the received logs, metrics, and traces can then be accessed by specifying
-    /// `otel.logs`, `otel.metrics`, and `otel.traces`, respectively, as the input to another component.
-    #[serde(default = "crate::serde::default_false")]
-    multiple_outputs: bool,
 }
 
 impl GenerateConfig for OpentelemetryConfig {
@@ -47,7 +41,6 @@ impl GenerateConfig for OpentelemetryConfig {
             address: "0.0.0.0:6788".parse().unwrap(),
             tls: None,
             acknowledgements: Default::default(),
-            multiple_outputs: false,
         })
         .unwrap()
     }
@@ -73,11 +66,7 @@ impl SourceConfig for OpentelemetryConfig {
     }
 
     fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<Output> {
-        if self.multiple_outputs {
-            vec![Output::default(DataType::Log).with_port(LOGS)]
-        } else {
-            vec![Output::default(DataType::Log)]
-        }
+        vec![Output::default(DataType::Log).with_port(LOGS)]
     }
 
     fn source_type(&self) -> &'static str {
@@ -164,7 +153,6 @@ mod tests {
     };
 
     #[tokio::test]
-    #[allow(deprecated)]
     async fn receive_message() {
         assert_source_compliance(&SOURCE_TAGS, async {
             let addr = test_util::next_addr();
