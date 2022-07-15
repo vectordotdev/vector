@@ -157,6 +157,11 @@ mod tests {
     use futures_util::StreamExt;
     use std::collections::BTreeMap;
 
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<OpentelemetryConfig>();
+    }
+
     #[tokio::test]
     async fn receive_message() {
         assert_source_compliance(&SOURCE_TAGS, async {
