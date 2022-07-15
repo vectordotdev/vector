@@ -139,6 +139,7 @@ async fn handle_batch_status(receiver: Option<BatchStatusReceiver>) -> Result<()
 mod tests {
     use super::*;
     use crate::{
+        event::{into_event_stream, Event, EventStatus, LogEvent, Value},
         opentelemetry::{
             Common::{any_value, AnyValue, KeyValue},
             LogService::logs_service_client::LogsServiceClient,
@@ -151,6 +152,10 @@ mod tests {
         },
         SourceSender,
     };
+    use chrono::{TimeZone, Utc};
+    use futures::Stream;
+    use futures_util::StreamExt;
+    use std::collections::BTreeMap;
 
     #[tokio::test]
     async fn receive_message() {
@@ -158,10 +163,9 @@ mod tests {
             let addr = test_util::next_addr();
             let config = format!(r#"address = "{}""#, addr);
             let source: OpentelemetryConfig = toml::from_str(&config).unwrap();
-
-            let (tx, rx) = SourceSender::new_test();
+            let (sender, logs_output, _) = new_source(EventStatus::Delivered);
             let server = source
-                .build(SourceContext::new_test(tx, None))
+                .build(SourceContext::new_test(sender, None))
                 .await
                 .unwrap();
             tokio::spawn(server);
@@ -210,33 +214,56 @@ mod tests {
                 }],
             });
             let _ = client.export(req).await;
-            let mut output = test_util::collect_ready(rx).await;
+            let mut output = test_util::collect_ready(logs_output).await;
             // we just send one, so only one output
             assert_eq!(output.len(), 1);
             let actual_event = output.pop().unwrap();
-            let expect = r#"
-            {
-            "attributes": {"attr_key": "attr_val"},
-            "resources": {"res_key": "res_val"},
-            "message": "log body",
-            "trace_id": "4ac52aadf321c2e531db005df08792f5",
-            "span_id": "0b9e4bda2a55530d",
-            "severity_number": 9,
-            "severity_text": "info",
-            "flags": 4,
-            "timestamp": 1,
-            "observed_time_unix_nano": 2,
-            "dropped_attributes_count": 3
-            }
-            "#;
-            let expect_json: serde_json::Value = serde_json::from_str(expect).unwrap();
-            let expect_event = Event::try_from(expect_json).unwrap();
+            let expect_vec = vec_into_btmap(vec![
+                (
+                    "attributes",
+                    Value::Object(vec_into_btmap(vec![("attr_key", "attr_val".into())])),
+                ),
+                (
+                    "resources",
+                    Value::Object(vec_into_btmap(vec![("res_key", "res_val".into())])),
+                ),
+                ("message", "log body".into()),
+                ("trace_id", "4ac52aadf321c2e531db005df08792f5".into()),
+                ("span_id", "0b9e4bda2a55530d".into()),
+                ("severity_number", 9.into()),
+                ("severity_text", "info".into()),
+                ("flags", 4.into()),
+                ("dropped_attributes_count", 3.into()),
+                ("timestamp", Utc.timestamp_nanos(1).into()),
+                ("observed_time_unix_nano", Utc.timestamp_nanos(2).into()),
+            ]);
+            let expect_event = Event::from(LogEvent::from(expect_vec));
             assert_eq!(actual_event, expect_event);
         })
         .await;
     }
+    fn new_source(
+        status: EventStatus,
+    ) -> (
+        SourceSender,
+        impl Stream<Item = Event>,
+        impl Stream<Item = Event>,
+    ) {
+        let (mut sender, recv) = SourceSender::new_test_finalize(status);
+        let logs_output = sender
+            .add_outputs(status, LOGS.to_string())
+            .flat_map(into_event_stream);
+        (sender, logs_output, recv)
+    }
     fn str_into_hex_bytes(s: &str) -> Vec<u8> {
         // unwrap is okay in test
         hex::decode(s).unwrap()
+    }
+    fn vec_into_btmap(arr: Vec<(&'static str, Value)>) -> BTreeMap<String, Value> {
+        BTreeMap::from_iter(
+            arr.into_iter()
+                .map(|(k, v)| (k.to_string(), v))
+                .collect::<Vec<(_, _)>>(),
+        )
     }
 }

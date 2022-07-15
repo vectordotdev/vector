@@ -4,11 +4,9 @@ use super::{
     Resource as OtelResource,
 };
 use bytes::Bytes;
+use chrono::{TimeZone, Utc};
 use ordered_float::NotNan;
-use std::{
-    collections::BTreeMap,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::collections::BTreeMap;
 use value::Value;
 use vector_core::{
     config::log_schema,
@@ -119,15 +117,15 @@ impl From<ResourceLog> for Event {
         }
 
         // NOT optional fields
-        le.insert(log_schema().timestamp_key(), rl.log_record.time_unix_nano);
+        le.insert(
+            log_schema().timestamp_key(),
+            Utc.timestamp_nanos(rl.log_record.time_unix_nano as i64),
+        );
         // according to proto, if observed_time_unix_nano is missing, collector should set it
         let observed_timestamp = if rl.log_record.observed_time_unix_nano > 0 {
-            rl.log_record.observed_time_unix_nano
+            Utc.timestamp_nanos(rl.log_record.observed_time_unix_nano as i64)
         } else {
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("SystemTime before UNIX EPOCH!")
-                .as_nanos() as u64
+            Utc::now()
         };
         le.insert(OBSERVED_TIME_UNIX_NANO_KEY, observed_timestamp);
         le.insert(
