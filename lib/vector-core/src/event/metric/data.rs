@@ -93,7 +93,11 @@ impl MetricData {
                         (
                             Some(t2),
                             NonZeroU32::new(
-                                (t1.timestamp_millis() - t2.timestamp_millis()) as u32 + i1.get(),
+                                TryInto::<u32>::try_into(
+                                    t1.timestamp_millis() - t2.timestamp_millis(),
+                                )
+                                .unwrap_or(0)
+                                    + i1.get(),
                             ),
                         )
                     } else {
@@ -102,7 +106,11 @@ impl MetricData {
                         (
                             Some(t1),
                             NonZeroU32::new(
-                                (t2.timestamp_millis() - t1.timestamp_millis()) as u32 + i2.get(),
+                                TryInto::<u32>::try_into(
+                                    t2.timestamp_millis() - t1.timestamp_millis(),
+                                )
+                                .unwrap_or(0)
+                                    + i2.get(),
                             ),
                         )
                     }
