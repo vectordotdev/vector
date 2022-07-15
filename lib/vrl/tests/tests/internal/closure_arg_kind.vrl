@@ -40,7 +40,8 @@
 #                   "subscription_filters": {
 #                     "array": {},
 #                     "array_unknown_exact": {
-#                       "bytes": true
+#                       "bytes": true,
+#                       "null": true
 #                     }
 #                   }
 #                 }
@@ -87,7 +88,8 @@
 #                   "subscription_filters": {
 #                     "array": {},
 #                     "array_unknown_exact": {
-#                       "bytes": true
+#                       "bytes": true,
+#                       "null": true
 #                     }
 #                   }
 #                 }
@@ -101,6 +103,7 @@
 parsed = parse_aws_cloudwatch_log_subscription_message!(.message)
 . = unnest(parsed.log_events)
 . = map_values(.) -> |value| {
+   value = object!(value)
    type = type_def(value)
    event = del(value.log_events)
    event.type = type

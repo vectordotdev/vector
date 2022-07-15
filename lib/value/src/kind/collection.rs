@@ -152,7 +152,7 @@ impl<T: Ord + Clone> Collection<T> {
             .known
             .values_mut()
             .reduce(|lhs, rhs| {
-                lhs.merge_keep(rhs.clone(), true);
+                lhs.merge_keep(rhs.clone(), false);
                 lhs
             })
             .cloned();
@@ -161,7 +161,7 @@ impl<T: Ord + Clone> Collection<T> {
 
         match (self.unknown.as_mut(), known_unknown) {
             (None, Some(rhs)) => self.unknown = Some(rhs.into()),
-            (Some(lhs), Some(rhs)) => lhs.merge(rhs.into(), true),
+            (Some(lhs), Some(rhs)) => lhs.merge(rhs.into(), false),
             _ => {}
         };
     }

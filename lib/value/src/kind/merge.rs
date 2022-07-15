@@ -6,40 +6,6 @@ use std::{collections::BTreeMap, ops::BitOr};
 use super::{Collection, Kind};
 
 impl Kind {
-    // /// Sets the type at the given path
-    // pub fn insert<'a>(mut self, path: impl Path<'a>, kind: Self) {
-    //     let segments = match path.simple_segment_iter() {
-    //         Ok(segments) => {
-    //             for segment in segments {
-    //                 match segment {
-    //                     SimpleSegment::Field(field) => {
-    //                         if let Some(object) = &mut self.object {
-    //                         } else {
-    //                             unimplemented!()
-    //                         }
-    //                     }
-    //                     _ => {
-    //                         unimplemented!()
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //         Err(_) => { /* an invalid path doesn't set a value*/ }
-    //     };
-    //     // if path.is_root() {
-    //     //     other
-    //     // } else {
-    //     //     let nested = other.nest_at_path(
-    //     //         path,
-    //     //         super::nest::Strategy {
-    //     //             coalesced_path: CoalescedPath::Reject,
-    //     //         },
-    //     //     )?;
-    //     //     self.merge_keep(nested, true);
-    //     //     Ok(self)
-    //     // }
-    // }
-
     /// Merge `other` into `self`, using the provided `Strategy`.
     pub fn merge(&mut self, other: Self, strategy: Strategy) {
         match strategy.indices {
@@ -101,7 +67,7 @@ impl Kind {
                 }
 
                 // The indices cannot collide since they are being appended, so switch to overwrite mode.
-                // otherwise the union of the types will include "null"
+                // otherwise the union of the types will include "null" (from the unknown type)
                 lhs.merge(Collection::from_parts(known, rhs_unknown), true);
             }
             _ => {}
@@ -126,7 +92,8 @@ pub struct Strategy {
 /// The choice of "depth" to apply when merging two [`Kind`]s.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum CollisionStrategy {
-    /// Use the 2nd value
+    /// Use the 2nd value. This should no longer be used, and will be removed in the future.
+    /// Try using `Kind::insert` or a custom function instead.
     Overwrite,
 
     /// Merge both together

@@ -1066,21 +1066,27 @@ mod tests {
                     ]))),
                 },
             ),
+            (
+                "coalesce nested",
+                TestCase {
+                    this: Kind::object(Collection::from(BTreeMap::from([]))),
+                    path: parse_path(".(a|b).x"),
+                    kind: Kind::bytes(),
+                    expected: Kind::object(Collection::from(BTreeMap::from([
+                        (
+                            "a".into(),
+                            Kind::object(BTreeMap::from([("x".into(), Kind::bytes())])).or_null(),
+                        ),
+                        (
+                            "b".into(),
+                            Kind::object(BTreeMap::from([("x".into(), Kind::bytes())])).or_null(),
+                        ),
+                    ]))),
+                },
+            ),
         ]) {
-            println!("========== {:?} ===========\n", title);
             this.insert(&path, kind);
-            let original_this = this.clone();
-            // this = this.canonicalize();
-            if this != expected {
-                // println!("Original: {:?}", original_this.debug_info());
-                println!("Actual  : {:?}\n", this.debug_info());
-                println!("Expected: {:?}\n", expected.debug_info());
-
-                // println!("Raw actual: {:#?}", this);
-                // println!("Raw expected: {:#?}", expected);
-                panic!("\"{:?}\" failed", title);
-            }
-            // assert_eq!(this, expected, "{}", title);
+            assert_eq!(this, expected, "{}", title);
         }
     }
 
