@@ -20,7 +20,7 @@ pub const SCALAR: u16 = BYTES | INTEGER | FLOAT | BOOLEAN | TIMESTAMP | REGEX | 
 pub const CONTAINER: u16 = OBJECT | ARRAY;
 
 pub use ::value::{
-    kind::{find, insert, merge, nest, remove, Collection, Field, Index},
+    kind::{find, insert, merge, remove, Collection, Field, Index},
     Kind,
 };
 

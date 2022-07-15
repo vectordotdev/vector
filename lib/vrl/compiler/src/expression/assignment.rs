@@ -355,13 +355,7 @@ impl Target {
             Self::Noop => {}
             Self::Internal(ident, path) => {
                 let type_def = match local.variable(ident) {
-                    None => {
-                        if path.is_root() {
-                            new_type_def
-                        } else {
-                            new_type_def.for_path(&path.to_lookup())
-                        }
-                    }
+                    None => TypeDef::null().with_type_set_at_path(path, new_type_def),
                     Some(&Details { ref type_def, .. }) => {
                         type_def.clone().with_type_set_at_path(path, new_type_def)
                     }

@@ -30,11 +30,7 @@ use std::{
 
 use lookup::{Lookup, LookupBuf};
 use value::{
-    kind::{
-        merge,
-        nest::{CoalescedPath, Strategy},
-        Collection, Field, Index,
-    },
+    kind::{merge, Collection, Field, Index},
     Kind, Value,
 };
 
@@ -86,23 +82,6 @@ impl TypeDef {
             .ok()
             .flatten()
             .map_or_else(Kind::any, Cow::into_owned);
-
-        Self { fallible, kind }
-    }
-
-    #[must_use]
-    pub fn for_path(self, path: &Lookup<'_>) -> TypeDef {
-        let fallible = self.fallible;
-        let kind = self
-            .kind
-            .clone()
-            .nest_at_path(
-                path,
-                Strategy {
-                    coalesced_path: CoalescedPath::Reject,
-                },
-            )
-            .unwrap_or(self.kind);
 
         Self { fallible, kind }
     }

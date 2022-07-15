@@ -8,7 +8,6 @@ mod debug;
 pub mod find;
 pub mod insert;
 pub mod merge;
-pub mod nest;
 pub mod remove;
 
 use std::collections::BTreeMap;
