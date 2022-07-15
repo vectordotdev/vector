@@ -177,6 +177,7 @@ async fn topology_disk_buffer_conflict() {
             max_size: NonZeroU64::new(1024).unwrap(),
             when_full: WhenFull::Block,
         }],
+        acknowledgements: false,
     };
 
     let mut new_config = old_config.clone();
@@ -186,6 +187,7 @@ async fn topology_disk_buffer_conflict() {
             max_size: NonZeroU64::new(1024).unwrap(),
             when_full: WhenFull::Block,
         }],
+        acknowledgements: false,
     };
 
     reload_sink_test(
