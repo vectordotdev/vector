@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::BTreeMap};
+use std::collections::BTreeMap;
 
 use super::Collection;
 use crate::Kind;
@@ -82,15 +82,20 @@ impl Unknown {
         }
     }
 
-    /// Get the `Kind` stored in this `Unknown`.
-    ///
-    /// This returns an owned `Kind`.
+    /// This represents the kind of any type not "known".
+    /// It will always include "undefined", since unknown
+    /// values are not guaranteed to exist
     #[must_use]
-    pub fn to_kind(&self) -> Cow<'_, Kind> {
-        match &self.0 {
-            Inner::Infinite(infinite) => Cow::Owned((*infinite).into()),
-            Inner::Exact(kind) => Cow::Borrowed(kind.as_ref()),
-        }
+    pub fn to_kind(&self) -> Kind {
+        let unknown_kind = match &self.0 {
+            Inner::Infinite(infinite) => (*infinite).into(),
+            Inner::Exact(kind) => kind.as_ref().clone(),
+        };
+
+        // unknown types are not guaranteed to exist, therefore the type must contain "undefined".
+        // "null" is the closest that exists today, so that is used instead
+        // TODO: switch to "or_undefined" once https://github.com/vectordotdev/vector/issues/13459 is completed
+        unknown_kind.or_null()
     }
 
     /// Check if `self` is a superset of `other`.

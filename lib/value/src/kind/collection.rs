@@ -89,10 +89,7 @@ impl<T: Ord> Collection<T> {
     /// Get the "known" and "unknown" parts of the collection.
     #[must_use]
     pub(super) fn into_parts(self) -> (BTreeMap<T, Kind>, Option<Kind>) {
-        (
-            self.known,
-            self.unknown.map(|unknown| unknown.to_kind().into_owned()),
-        )
+        (self.known, self.unknown.map(|unknown| unknown.to_kind()))
     }
 
     /// Get a reference to the "known" elements in the collection.
@@ -223,9 +220,9 @@ impl<T: Ord> Collection<T> {
                 }
             } else if let Some(other_unknown) = other.unknown() {
                 if overwrite {
-                    *self_kind = other_unknown.to_kind().into_owned();
+                    *self_kind = other_unknown.to_kind();
                 } else {
-                    self_kind.merge_keep(other_unknown.to_kind().into_owned(), overwrite);
+                    self_kind.merge_keep(other_unknown.to_kind(), overwrite);
                 }
             } else if !overwrite {
                 // other is missing this field, which returns null
@@ -233,7 +230,7 @@ impl<T: Ord> Collection<T> {
             }
         }
 
-        let self_unknown_kind = self.unknown().map(|unknown| unknown.to_kind().into_owned());
+        let self_unknown_kind = self.unknown().map(|unknown| unknown.to_kind());
         if let Some(self_unknown_kind) = self_unknown_kind {
             for (key, mut other_kind) in other.known {
                 if !overwrite {
@@ -277,7 +274,7 @@ impl<T: Ord> Collection<T> {
             .unwrap_or_else(Kind::never);
 
         if let Some(unknown) = &self.unknown {
-            kind.merge(unknown.to_kind().into_owned(), strategy);
+            kind.merge(unknown.to_kind(), strategy);
         }
         kind
     }
