@@ -77,7 +77,7 @@ impl<'a> ToLua<'a> for Metric {
             tbl.raw_set("timestamp", timestamp_to_table(lua, ts)?)?;
         }
         if let Some(i) = self.data.time.interval_ms {
-            tbl.raw_set("interval", i.get())?;
+            tbl.raw_set("interval_ms", i.get())?;
         }
         if let Some(tags) = self.series.tags {
             tbl.raw_set("tags", tags)?;
@@ -182,7 +182,7 @@ impl<'a> FromLua<'a> for Metric {
             .raw_get::<_, Option<LuaTable>>("timestamp")?
             .map(table_to_timestamp)
             .transpose()?;
-        let interval: Option<u32> = table.raw_get("interval")?;
+        let interval_ms: Option<u32> = table.raw_get("interval_ms")?;
         let namespace: Option<String> = table.raw_get("namespace")?;
         let tags: Option<BTreeMap<String, String>> = table.raw_get("tags")?;
         let kind = table
@@ -273,7 +273,7 @@ impl<'a> FromLua<'a> for Metric {
             .with_namespace(namespace)
             .with_tags(tags)
             .with_timestamp(timestamp)
-            .with_interval_ms(interval.and_then(std::num::NonZeroU32::new)))
+            .with_interval_ms(interval_ms.and_then(std::num::NonZeroU32::new)))
     }
 }
 
