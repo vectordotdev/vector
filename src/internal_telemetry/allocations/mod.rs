@@ -36,6 +36,7 @@ use tracking_allocator::{
 };
 
 mod channel;
+mod experiment;
 
 mod storage;
 use storage::PageTable;

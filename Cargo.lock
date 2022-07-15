@@ -8391,6 +8391,7 @@ version = "0.24.0"
 dependencies = [
  "approx",
  "arc-swap",
+ "arrayvec 0.7.2",
  "assert_cmd",
  "async-compression",
  "async-graphql 4.0.4",
@@ -8431,6 +8432,7 @@ dependencies = [
  "colored",
  "console-subscriber",
  "criterion",
+ "crossbeam-queue",
  "crossbeam-utils",
  "crossterm 0.24.0",
  "csv",
@@ -8524,6 +8526,7 @@ dependencies = [
  "serde_with",
  "serde_yaml",
  "sha2 0.10.2",
+ "slab",
  "smallvec",
  "smpl_jwt",
  "snafu",
