@@ -362,9 +362,9 @@ impl Target {
                             new_type_def.for_path(&path.to_lookup())
                         }
                     }
-                    Some(&Details { ref type_def, .. }) => type_def
-                        .clone()
-                        .with_type_set_at_path(&path.to_lookup(), new_type_def),
+                    Some(&Details { ref type_def, .. }) => {
+                        type_def.clone().with_type_set_at_path(path, new_type_def)
+                    }
                 };
 
                 let details = Details { type_def, value };
@@ -377,7 +377,7 @@ impl Target {
                         .target()
                         .type_def
                         .clone()
-                        .with_type_set_at_path(&path.to_lookup(), new_type_def),
+                        .with_type_set_at_path(path, new_type_def),
                     value,
                 });
             }
