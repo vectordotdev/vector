@@ -80,34 +80,40 @@ impl MetricData {
     #[must_use]
     pub fn update(&mut self, other: &Self) -> bool {
         self.value.add(&other.value) && {
-            let overlap = if let (Some(t1), Some(i1), Some(t2), Some(i2)) = (
+            let (new_ts, new_interval) = match (
                 self.time.timestamp,
                 self.time.interval_ms,
                 other.time.timestamp,
                 other.time.interval_ms,
             ) {
-                if t1.timestamp_millis() > t2.timestamp_millis() {
-                    t1.timestamp_millis() <= t2.timestamp_millis() + (i2.get() as i64)
-                } else {
-                    t2.timestamp_millis() <= t1.timestamp_millis() + (i1.get() as i64)
+                (Some(t1), Some(i1), Some(t2), Some(i2)) => {
+                    if t1 > t2 {
+                        // The interval window starts from the beginning of `other` (aka `t2`)
+                        // and goes to the end of `self` (which is `t1 + i1`).
+                        (
+                            Some(t2),
+                            NonZeroU32::new(
+                                (t1.timestamp_millis() - t2.timestamp_millis()) as u32 + i1.get(),
+                            ),
+                        )
+                    } else {
+                        // The interval window starts from the beginning of `self` (aka `t1`)
+                        // and goes to the end of `other` (which is `t2 + i2`).
+                        (
+                            Some(t1),
+                            NonZeroU32::new(
+                                (t2.timestamp_millis() - t1.timestamp_millis()) as u32 + i2.get(),
+                            ),
+                        )
+                    }
                 }
-            } else {
-                false
+                (Some(t), _, None, _) | (None, _, Some(t), _) => (Some(t), None),
+                (Some(t1), _, Some(t2), _) => (Some(t1.max(t2)), None),
+                (_, _, _, _) => (None, None),
             };
-            // Update the interval covered by the resulting metric
-            self.time.interval_ms = match (self.time.interval_ms, other.time.interval_ms, overlap) {
-                // If metrics time span are overlapping (should be the usual case) we use the longest interval
-                (Some(i1), Some(i2), true) => NonZeroU32::new(i1.get().max(i2.get())),
-                (Some(i1), Some(i2), false) => NonZeroU32::new(i1.get() + i2.get()),
-                // If either interval is None discard the other
-                (_, _, _) => None,
-            };
-            // Update the timestamp to the latest one
-            self.time.timestamp = match (self.time.timestamp, other.time.timestamp) {
-                (None, None) => None,
-                (Some(t), None) | (None, Some(t)) => Some(t),
-                (Some(t1), Some(t2)) => Some(t1.max(t2)),
-            };
+
+            self.time.timestamp = new_ts;
+            self.time.interval_ms = new_interval;
             true
         }
     }
