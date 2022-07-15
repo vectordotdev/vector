@@ -292,7 +292,7 @@ impl From<event::Metric> for WithMetadata<Metric> {
             nanos: ts.timestamp_subsec_nanos() as i32,
         });
 
-        let interval_ms = data.time.interval_ms.map(|i| i.get()).unwrap_or(0);
+        let interval_ms = data.time.interval_ms.map_or(0, std::num::NonZeroU32::get);
 
         let tags = series.tags.unwrap_or_default();
 
