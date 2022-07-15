@@ -2,7 +2,6 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::config::LogNamespace;
 use lookup::LookupBuf;
-use value::kind::insert;
 use value::{
     kind::{merge, Collection},
     Kind,
@@ -160,17 +159,7 @@ impl Definition {
             }
         }
 
-        self.kind
-            .insert_at_path(
-                &path.to_lookup(),
-                kind,
-                insert::Strategy {
-                    inner_conflict: insert::InnerConflict::Replace,
-                    leaf_conflict: insert::LeafConflict::Replace,
-                    coalesced_path: insert::CoalescedPath::Reject,
-                },
-            )
-            .expect("Field definition not valid");
+        self.kind.insert(&path, kind);
 
         if let Some(meaning) = meaning {
             self.meaning.insert(meaning, MeaningPointer::Valid(path));

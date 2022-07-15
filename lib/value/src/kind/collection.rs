@@ -132,6 +132,7 @@ impl<T: Ord + Clone> Collection<T> {
     }
 
     /// Returns a new collection with the unknown set
+    #[must_use]
     pub fn with_unknown(mut self, unknown: impl Into<Option<Kind>>) -> Self {
         self.set_unknown(unknown);
         self
@@ -249,7 +250,7 @@ impl<T: Ord + Clone> Collection<T> {
             }
         }
 
-        let self_unknown_kind = self.unknown().map(|unknown| unknown.to_kind());
+        let self_unknown_kind = self.unknown().map(Unknown::to_kind);
         if let Some(self_unknown_kind) = self_unknown_kind {
             for (key, mut other_kind) in other.known {
                 if !overwrite {

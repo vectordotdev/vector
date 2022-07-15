@@ -1,6 +1,6 @@
 use ::value::Value;
 use lookup_lib::LookupBuf;
-use vrl::{prelude::*, value::kind::merge};
+use vrl::prelude::*;
 
 fn unnest(path: &expression::Query, root_lookup: &LookupBuf, ctx: &mut Context) -> Resolved {
     let lookup_buf = path.path();
@@ -179,35 +179,23 @@ impl Expression for UnnestFn {
 /// And will remove it returning a set of it's elements.
 ///
 /// For example the typedef for this object:
-/// `{ "nonk" => { "shnoog" => [ { "noog" => 2 }, { "noog" => 3 } ] } }`
+/// `{ "a" => { "b" => [ { "c" => 2 }, { "c" => 3 } ] } }`
 ///
 /// Is converted to a typedef for this array:
-/// `[ { "nonk" => { "shnoog" => { "noog" => 2 } } },
-///    { "nonk" => { "shnoog" => { "noog" => 3 } } },
+/// `[ { "a" => { "b" => { "c" => 2 } } },
+///    { "a" => { "b" => { "c" => 3 } } },
 ///  ]`
 ///
 pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &LookupBuf) -> TypeDef {
-    use self::value::kind::insert;
-
     let type_def = typedef.at_path(&path.to_lookup());
 
     let mut array = Kind::from(type_def)
         .into_array()
-        .unwrap_or_else(Collection::any);
+        .expect("must point to an array");
 
     array.known_mut().values_mut().for_each(|kind| {
         let mut tdkind = typedef.kind().clone();
-        tdkind
-            .insert_at_path(
-                &path.to_lookup(),
-                kind.clone(),
-                insert::Strategy {
-                    inner_conflict: insert::InnerConflict::Replace,
-                    leaf_conflict: insert::LeafConflict::Replace,
-                    coalesced_path: insert::CoalescedPath::InsertAll,
-                },
-            )
-            .expect("infallible");
+        tdkind.insert(path, kind.clone());
 
         *kind = tdkind.clone();
     });
@@ -215,20 +203,7 @@ pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &LookupBuf) -> TypeD
     let mut tdkind = typedef.kind().clone();
 
     let unknown = array.unknown().map(|unknown| {
-        tdkind
-            .insert_at_path(
-                &path.to_lookup(),
-                unknown.clone().into(),
-                insert::Strategy {
-                    inner_conflict: insert::InnerConflict::Merge(merge::Strategy {
-                        collisions: merge::CollisionStrategy::Union,
-                        indices: merge::Indices::Keep,
-                    }),
-                    leaf_conflict: insert::LeafConflict::Replace,
-                    coalesced_path: insert::CoalescedPath::InsertAll,
-                },
-            )
-            .expect("infallible");
+        tdkind.insert(path, unknown.clone().into());
         tdkind
     });
 

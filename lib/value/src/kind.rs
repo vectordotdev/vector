@@ -139,7 +139,8 @@ impl PartialEq for Kind {
 
 impl Kind {
     /// Returns a Kind type in a standard / simple representation.
-    pub fn canonicalize(&self) -> Kind {
+    #[must_use]
+    pub fn canonicalize(&self) -> Self {
         let mut output = self.clone();
 
         // todo: exact unknown types containing a matching infinite type can be simplified to just the infinite type

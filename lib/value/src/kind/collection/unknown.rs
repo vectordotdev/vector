@@ -106,7 +106,7 @@ impl Unknown {
     /// This is a temporary function and will not be needed once "undefined" is added
     /// to type definitions.
     ///
-    /// see: https://github.com/vectordotdev/vector/issues/13459
+    // see: https://github.com/vectordotdev/vector/issues/13459
     #[must_use]
     pub fn to_raw_kind(&self) -> Kind {
         match &self.0 {
