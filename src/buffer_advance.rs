@@ -11,10 +11,11 @@ use vector_core::event::{EventArray, EventStatus};
 #[derive(Parser, Debug)]
 #[clap(rename_all = "kebab-case")]
 pub struct Opts {
-    /// Actually bump the read record ID by one. Without this option, this program just outputs the
-    /// current ledger state.
+    /// Specifies the record ID number to advance over. Without this option, this program just
+    /// outputs the current ledger state. If the first record does not have this ID number, this
+    /// program does nothing.
     #[clap(long)]
-    doit: bool,
+    record_id: Option<u64>,
     /// Directory in which the disk buffer resides.
     data_dir: PathBuf,
 }
@@ -59,12 +60,18 @@ pub(crate) async fn cmd(opts: &Opts) -> exitcode::ExitCode {
             let count = record.event_count();
             println!("Next record size: {} events", count);
 
-            if opts.doit {
-                record
-                    .take_finalizers()
-                    .update_status(EventStatus::Delivered);
-                drop(ManuallyDrop::into_inner(record));
-                println!("Marked record as delivered");
+            if let Some(record_id) = opts.record_id {
+                if record_id == state.get_last_reader_record_id() {
+                    record
+                        .take_finalizers()
+                        .update_status(EventStatus::Delivered);
+                    println!("Marked record {} as delivered.", record_id);
+                } else {
+                    println!(
+                        "Record ID {} does not match last reader record ID.",
+                        record_id
+                    );
+                }
             }
         }
         Ok(None) => println!("Buffer has no more records to read."),
