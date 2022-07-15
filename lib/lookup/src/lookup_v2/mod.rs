@@ -3,15 +3,12 @@ mod compat;
 mod concat;
 mod jit;
 mod owned;
-mod simple;
 
 use self::jit::{JitLookup, JitPath};
 
-use crate::lookup_v2::simple::SimpleSegmentIter;
 pub use borrowed::BorrowedSegment;
 pub use concat::PathConcat;
 pub use owned::{OwnedPath, OwnedSegment};
-pub use simple::SimpleSegment;
 
 /// Syntactic sugar for creating a pre-parsed path.
 ///
@@ -51,22 +48,8 @@ pub fn parse_path(path: &str) -> OwnedPath {
 pub trait Path<'a>: Clone {
     type Iter: Iterator<Item = BorrowedSegment<'a>> + Clone;
 
-    /// Iterates over the raw "Borrowed" segments. This should be very fast (no memory allocations)
+    /// Iterates over the raw "Borrowed" segments.
     fn segment_iter(&self) -> Self::Iter;
-
-    /// Pre-processes the segments and then iterates over them. This returns segments that
-    /// are easier to work with, but requires memory allocations. Only use in places where
-    /// performance isn't critical.
-    fn simple_segment_iter(&self) -> Result<SimpleSegmentIter<Self::Iter>, ()> {
-        // check for invalid segments so the "SimpleSegment" enum doesn't need to contain an invalid variant
-        if self
-            .segment_iter()
-            .any(|segment| segment == BorrowedSegment::Invalid)
-        {
-            return Err(());
-        }
-        Ok(SimpleSegmentIter::new(self.segment_iter()))
-    }
 
     fn concat<T: Path<'a>>(&self, path: T) -> PathConcat<Self, T> {
         PathConcat {
