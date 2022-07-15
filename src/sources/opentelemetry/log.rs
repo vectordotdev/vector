@@ -14,9 +14,9 @@ use crate::{
     SourceSender,
 };
 use futures::TryFutureExt;
-use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use tonic::{Request, Response, Status};
+use vector_config::configurable_component;
 use vector_core::{
     config::LogNamespace,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
@@ -25,12 +25,21 @@ use vector_core::{
 
 pub const LOGS: &str = "logs";
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `opentelemetry` source.
+#[configurable_component(source)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct OpentelemetryConfig {
+    /// The address to listen for connections on.
+    ///
+    /// It _must_ include a port.
     address: SocketAddr,
+
+    #[configurable(derived)]
     #[serde(default)]
     tls: Option<TlsEnableableConfig>,
+
+    #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     acknowledgements: AcknowledgementsConfig,
 }
@@ -38,8 +47,8 @@ pub struct OpentelemetryConfig {
 impl GenerateConfig for OpentelemetryConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            address: "0.0.0.0:6788".parse().unwrap(),
-            tls: None,
+            address: "0.0.0.0:4317".parse().unwrap(),
+            tls: Default::default(),
             acknowledgements: Default::default(),
         })
         .unwrap()
