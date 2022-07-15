@@ -42,8 +42,8 @@ where
         // effective sever the link between things like the description of `T` itself and what we show for a field of
         // type `Option<T>`.
         //
-        // To wit, this allows callers to use `#[configurable(derived)]` on a field of `Option<T>` so long as `T` has a
-        // description, and both the optional field and the schema for `T` will get the description... but the
+        // Said another way, this allows callers to use `#[configurable(derived)]` on a field of `Option<T>` so long as
+        // `T` has a description, and both the optional field and the schema for `T` will get the description... but the
         // description for the optional field can still be overridden independently, etc.
         T::metadata().convert()
     }

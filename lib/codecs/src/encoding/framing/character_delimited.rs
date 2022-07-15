@@ -30,7 +30,7 @@ impl CharacterDelimitedEncoderConfig {
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CharacterDelimitedEncoderOptions {
-    /// The 8-bit character that delimits byte sequences.
+    /// The ASCII (7-bit) character that delimits byte sequences.
     #[serde(with = "vector_core::serde::ascii_char")]
     pub delimiter: u8,
 }

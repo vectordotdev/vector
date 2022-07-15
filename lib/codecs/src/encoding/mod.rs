@@ -59,17 +59,17 @@ impl From<std::io::Error> for Error {
 #[serde(tag = "method", rename_all = "snake_case")]
 pub enum FramingConfig {
     /// Event data is not delimited at all.
-    ///
-    /// This implies that all data received in a single I/O operation will be treated as a single event.
     Bytes,
 
-    /// Event data is delimited by a single 8-bit character.
+    /// Event data is delimited by a single ASCII (7-bit) character.
     CharacterDelimited {
         /// Options for the character delimited encoder.
         character_delimited: CharacterDelimitedEncoderOptions,
     },
 
     /// Event data is prefixed with its length in bytes.
+    ///
+    /// The prefix is a 32-bit unsigned integer, little endian.
     LengthDelimited,
 
     /// Event data is delimited by a newline (LF) character.
@@ -212,7 +212,10 @@ pub enum SerializerConfig {
 
     /// No serialization.
     ///
-    /// This emits the raw bytes for a given input.
+    /// This encoding, specifically, will only encode the `message` field of a log event. Users should take care if
+    /// they're modifying their log events (such as by using a `remap` transform, etc) and removing the message field
+    /// while doing additional parsing on it, as this could lead to the encoding emitting empty strings for the given
+    /// event.
     RawMessage,
 
     /// Plaintext serialization.

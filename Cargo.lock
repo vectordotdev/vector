@@ -8473,7 +8473,6 @@ dependencies = [
  "openssl",
  "openssl-probe",
  "ordered-float 3.0.0",
- "paste",
  "percent-encoding",
  "pin-project",
  "portpicker",

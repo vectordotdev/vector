@@ -74,7 +74,10 @@ pub struct TowerRequestConfig {
     #[serde(skip_serializing_if = "concurrency_is_none")]
     pub concurrency: Concurrency,
 
-    /// The maximum time a request can take before being aborted. It is highly recommended that you do not lower this value below the service’s internal timeout, as this could create orphaned requests, pile on retries, and result in duplicate data downstream.
+    /// The maximum time a request can take before being aborted.
+    ///
+    /// It is highly recommended that you do not lower this value below the service’s internal timeout, as this could
+    /// create orphaned requests, pile on retries, and result in duplicate data downstream.
     pub timeout_secs: Option<u64>,
 
     /// The time window, in seconds, used for the `rate_limit_num` option.
@@ -102,12 +105,12 @@ pub struct TowerRequestConfig {
 }
 
 pub const CONCURRENCY_DEFAULT: Concurrency = Concurrency::None;
-pub const RATE_LIMIT_DURATION_SECONDS_DEFAULT: u64 = 1; // one second
+pub const RATE_LIMIT_DURATION_SECONDS_DEFAULT: u64 = 1;
 pub const RATE_LIMIT_NUM_DEFAULT: u64 = i64::max_value() as u64; // i64 avoids TOML deserialize issue
 pub const RETRY_ATTEMPTS_DEFAULT: usize = isize::max_value() as usize; // isize avoids TOML deserialize issue
-pub const RETRY_MAX_DURATION_SECONDS_DEFAULT: u64 = 3_600; // one hour
-pub const RETRY_INITIAL_BACKOFF_SECONDS_DEFAULT: u64 = 1; // one second
-pub const TIMEOUT_SECONDS_DEFAULT: u64 = 60; // one minute
+pub const RETRY_MAX_DURATION_SECONDS_DEFAULT: u64 = 3_600;
+pub const RETRY_INITIAL_BACKOFF_SECONDS_DEFAULT: u64 = 1;
+pub const TIMEOUT_SECONDS_DEFAULT: u64 = 60;
 
 impl Default for TowerRequestConfig {
     fn default() -> Self {
