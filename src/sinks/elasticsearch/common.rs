@@ -146,6 +146,11 @@ impl ElasticsearchCommon {
         if let Some(authorization) = &self.http_auth {
             builder = authorization.apply_builder(builder);
         }
+
+        for (header, value) in &self.request.headers {
+            builder = builder.header(&header[..], &value[..]);
+        }
+
         let mut request = builder.body(Bytes::new())?;
 
         if let Some(credentials_provider) = &self.aws_auth {
