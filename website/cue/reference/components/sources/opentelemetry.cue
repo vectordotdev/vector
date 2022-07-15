@@ -150,14 +150,14 @@ components: sources: opentelemetry: {
 					}
 				}
 				timestamp: {
-					description: "Time when the event occurred measured in nanoseconds."
+					description: "The UTC Datetime when the event occurred."
 					required:    true
 					type: uint: {
 						unit: null
 					}
 				}
-				observed_time_unix_nano: {
-					description: "Time, in nanoseconds, when the event was observed by the collection system."
+				observed_timestamp: {
+					description: "The UTC Datetime when the event was observed by the collection system."
 					required:    true
 					type: uint: {
 						unit: null
