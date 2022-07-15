@@ -134,7 +134,7 @@ vrl-cli = { path = "lib/vrl/cli", optional = true }
 async-stream = { version = "0.3.3", default-features = false }
 async-trait = { version = "0.1.56", default-features = false }
 futures = { version = "0.3.21", default-features = false, features = ["compat", "io-compat"], package = "futures" }
-tokio = { version = "1.19.2", default-features = false, features = ["full"] }
+tokio = { version = "1.20.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.3", default-features = false }
 tokio-stream = { version = "0.1.9", default-features = false, features = ["net", "sync", "time"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io", "time"] }
@@ -229,7 +229,7 @@ bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.7", default-features = false }
-clap = { version = "3.2.10", default-features = false, features = ["derive", "env", "std"] }
+clap = { version = "3.2.12", default-features = false, features = ["derive", "env", "std"] }
 colored = { version = "2.0.0", default-features = false }
 csv = { version = "1.1", default-features = false, optional = true }
 derivative = { version = "2.2.0", default-features = false }
@@ -292,7 +292,7 @@ strip-ansi-escapes = { version = "0.1.1", default-features = false }
 syslog = { version = "6.0.1", default-features = false, optional = true }
 tikv-jemallocator = { version = "0.5.0", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.6", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
-tokio-tungstenite = {version = "0.17.1", default-features = false, features = ["connect"], optional = true}
+tokio-tungstenite = {version = "0.17.2", default-features = false, features = ["connect"], optional = true}
 toml = { version = "0.5.9", default-features = false }
 tonic = { version = "0.7.2", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "compression"] }
 trust-dns-proto = { version = "0.21.0", default-features = false, features = ["dnssec"], optional = true }
@@ -338,7 +338,7 @@ proptest = "1.0"
 quickcheck = "1.0.3"
 reqwest = { version = "0.11", features = ["json"] }
 tempfile = "3.3.0"
-tokio = { version = "1.19.2", features = ["test-util"] }
+tokio = { version = "1.20.0", features = ["test-util"] }
 tokio-test = "0.4.2"
 tower-test = "0.4.0"
 value = { path = "lib/value", features = ["test"] }
