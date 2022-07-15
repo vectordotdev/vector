@@ -16,16 +16,21 @@ fn parse_apache_log(
         None => "%d/%b/%Y:%T %z".to_owned(),
         Some(timestamp_format) => timestamp_format.try_bytes_utf8_lossy()?.to_string(),
     };
-    let regex = match format.as_ref() {
+    let regexes = match format.as_ref() {
         b"common" => &*log_util::REGEX_APACHE_COMMON_LOG,
         b"combined" => &*log_util::REGEX_APACHE_COMBINED_LOG,
         b"error" => &*log_util::REGEX_APACHE_ERROR_LOG,
         _ => unreachable!(),
     };
-    let captures = regex
-        .captures(&message)
-        .ok_or("failed parsing common log line")?;
-    log_util::log_fields(regex, &captures, &timestamp_format, ctx.timezone()).map_err(Into::into)
+
+    log_util::parse_message(
+        regexes,
+        &message,
+        &timestamp_format,
+        ctx.timezone(),
+        std::str::from_utf8(format.as_ref()).unwrap(),
+    )
+    .map_err(Into::into)
 }
 
 fn variants() -> Vec<Value> {
