@@ -427,6 +427,8 @@ protobuf-build = ["dep:tonic-build", "dep:prost-build"]
 
 gcp = ["dep:base64", "dep:goauth", "dep:smpl_jwt"]
 
+opentelemetry = ["dep:hex", "dep:tonic", "protobuf-build"]
+
 # Enrichment Tables
 enrichment-tables = ["enrichment-tables-file","enrichment-tables-geoip"]
 enrichment-tables-file = [ "dep:csv", "dep:seahash", "dep:hash_hasher" ]
@@ -453,6 +455,7 @@ sources-logs = [
   "sources-kubernetes_logs",
   "sources-logstash",
   "sources-nats",
+  "sources-opentelemetry",
   "sources-redis",
   "sources-socket",
   "sources-splunk_hec",
@@ -500,6 +503,7 @@ sources-logstash = ["listenfd", "tokio-util/net", "sources-utils-tcp-keepalive",
 sources-mongodb_metrics = ["dep:mongodb"]
 sources-nats = ["dep:nats", "dep:nkeys"]
 sources-nginx_metrics = ["dep:nom"]
+sources-opentelemetry = ["sources-vector", "opentelemetry"]
 sources-postgresql_metrics = ["dep:postgres-openssl", "dep:tokio-postgres"]
 sources-prometheus = ["dep:prometheus-parser", "sinks-prometheus", "sources-http", "sources-utils-http"]
 sources-redis= ["dep:redis"]
