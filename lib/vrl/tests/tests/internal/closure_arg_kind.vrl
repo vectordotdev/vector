@@ -103,7 +103,6 @@
 parsed = parse_aws_cloudwatch_log_subscription_message!(.message)
 . = unnest(parsed.log_events)
 . = map_values(.) -> |value| {
-   value = object!(value)
    type = type_def(value)
    event = del(value.log_events)
    event.type = type

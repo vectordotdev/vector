@@ -92,15 +92,27 @@ impl Unknown {
     /// values are not guaranteed to exist
     #[must_use]
     pub fn to_kind(&self) -> Kind {
-        let unknown_kind = match &self.0 {
-            Inner::Infinite(infinite) => (*infinite).into(),
-            Inner::Exact(kind) => kind.as_ref().clone(),
-        };
-
         // unknown types are not guaranteed to exist, therefore the type must contain "undefined".
         // "null" is the closest that exists today, so that is used instead
         // TODO: switch to "or_undefined" once https://github.com/vectordotdev/vector/issues/13459 is completed
-        unknown_kind.or_null()
+        self.to_raw_kind().or_null()
+    }
+
+    /// Get the `Kind` stored in this `Unknown`.
+    /// This represents the kind of any _EXISTING_ type not "known".
+    /// This function assumes the type you are accessing actually exists.
+    /// If it's an optional field, `to_kind` should be used instead.
+    ///
+    /// This is a temporary function and will not be needed once "undefined" is added
+    /// to type definitions.
+    ///
+    /// see: https://github.com/vectordotdev/vector/issues/13459
+    #[must_use]
+    pub fn to_raw_kind(&self) -> Kind {
+        match &self.0 {
+            Inner::Infinite(infinite) => (*infinite).into(),
+            Inner::Exact(kind) => kind.as_ref().clone(),
+        }
     }
 
     /// Check if `self` is a superset of `other`.

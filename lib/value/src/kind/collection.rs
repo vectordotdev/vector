@@ -274,7 +274,7 @@ impl<T: Ord + Clone> Collection<T> {
     }
 
     /// Return the reduced `Kind` of the items within the collection.
-    /// This only returns the type of _existing_ values in the collection. Accessing
+    /// This only returns the type of _defined_ values in the collection. Accessing
     /// a non-existing value can return null which is not added to the type here.
     pub fn reduced_kind(&self) -> Kind {
         let strategy = merge::Strategy {
@@ -293,7 +293,10 @@ impl<T: Ord + Clone> Collection<T> {
             .unwrap_or_else(Kind::never);
 
         if let Some(unknown) = &self.unknown {
-            kind.merge(unknown.to_kind(), strategy);
+            // TODO: this can be switched back to `to_kind` once "undefined" is added.
+            //   (undefined can be safely removed then, without losing type information)
+            // see: https://github.com/vectordotdev/vector/issues/13459
+            kind.merge(unknown.to_raw_kind(), strategy);
         }
         kind
     }
@@ -446,7 +449,7 @@ mod tests {
                         Kind::bytes().or_integer(),
                     ),
                     other: Collection::from_unknown(Kind::bytes().or_integer()),
-                    want: true,
+                    want: false,
                 },
             ),
             (
