@@ -36,15 +36,17 @@ components: transforms: throttle: {
 		key_field: {
 			common: false
 			description: """
-				The name of the log field whose value will be hashed to determine if the event should be rate limited.
+				A [template string](/docs/reference/configuration/template-syntax/) that will be rendered to determine
+				if the event should be rate limited.
 
-				Each unique key will create a buckets of related events to be rate limited separately. If left unspecified,
-				or if the event doesn’t have `key_field`, the event be will not be rate limited separately.
+				Each unique rendered template value will create a buckets of related events to be rate limited
+				separately. If left unspecified, or if the event doesn’t have `key_field`, the event be will not be rate
+				limited separately. For example, to throttle events based on the `hostname` field use `{{ hostname }}`.
 				"""
 			required: false
 			type: string: {
 				default: null
-				examples: ["message", "{{ hostname }}"]
+				examples: ["{{ message }}", "{{ hostname }}"]
 				syntax: "template"
 			}
 		}

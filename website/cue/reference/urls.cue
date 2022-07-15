@@ -360,6 +360,7 @@ urls: {
 	nixos:                                      "https://nixos.org/"
 	nixpkgs_9682:                               "\(github)/NixOS/nixpkgs/issues/9682"
 	openssl:                                    "https://www.openssl.org/"
+	opentelemetry:                              "https://opentelemetry.io/"
 	order_of_ops:                               "\(wikipedia)/wiki/Order_of_operations"
 	papertrail:                                 "https://www.papertrail.com/"
 	papertrail_syslog:                          "https://help.papertrailapp.com/kb/how-it-works/http-api/#submitting-log-messages"
