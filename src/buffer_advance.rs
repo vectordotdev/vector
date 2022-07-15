@@ -16,7 +16,7 @@ pub struct Opts {
     /// program does nothing.
     #[clap(long)]
     record_id: Option<u64>,
-    /// Directory in which the disk buffer resides.
+    /// The directory in which the disk buffer resides.
     data_dir: PathBuf,
 }
 

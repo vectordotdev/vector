@@ -167,6 +167,28 @@ cli: {
 	options: _core_options
 
 	commands: {
+		"buffer-advance": {
+			description: """
+				Fix the buffer ledger to advance over records that have failed delivery.
+				"""
+			example: "vector buffer-advance --record-id 123456 /var/lib/vector/sink1/buffer"
+			options: {
+				"record-id": {
+					description: """
+							Specifies the record ID number to advance over.
+							Without this option, this program just outputs the current ledger state.
+							If the first record does not have this ID number, this program does nothing.
+						"""
+					type: "integer"
+				}
+			}
+			args: {
+				data_dir: {
+					description: "The directory in which the disk buffer resides."
+					type:        "string"
+				}
+			}
+		}
 		"graph": {
 			description: """
 				Generate a visual representation of topologies. The output is in the [DOT format](\(urls.dot_format)),

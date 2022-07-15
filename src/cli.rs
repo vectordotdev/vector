@@ -209,7 +209,7 @@ pub enum SubCommand {
     #[cfg(feature = "vrl-cli")]
     Vrl(vrl_cli::Opts),
 
-    /// Manipulate the buffer ledger.
+    /// Fix the buffer ledger to advance over records that have failed delivery.
     BufferAdvance(buffer_advance::Opts),
 }
 
