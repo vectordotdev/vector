@@ -40,6 +40,9 @@ enum BufferTypeKind {
 
 const ALL_FIELDS: [&str; 4] = ["type", "max_events", "max_size", "when_full"];
 
+// Do handle negative acknowledgements by default.
+pub const DEFAULT_ACKNOWLEDGEMENTS: bool = true;
+
 struct BufferTypeVisitor;
 
 impl BufferTypeVisitor {
@@ -165,6 +168,7 @@ impl<'de> de::Visitor<'de> for BufferConfigVisitor {
         let stage = BufferTypeVisitor::visit_map_impl(map)?;
         Ok(BufferConfig {
             stages: vec![stage],
+            acknowledgements: DEFAULT_ACKNOWLEDGEMENTS,
         })
     }
 
@@ -176,7 +180,10 @@ impl<'de> de::Visitor<'de> for BufferConfigVisitor {
         while let Some(stage) = seq.next_element()? {
             stages.push(stage);
         }
-        Ok(BufferConfig { stages })
+        Ok(BufferConfig {
+            stages,
+            acknowledgements: DEFAULT_ACKNOWLEDGEMENTS,
+        })
     }
 }
 
@@ -301,6 +308,7 @@ impl BufferType {
 #[derive(Clone, Debug, PartialEq)]
 pub struct BufferConfig {
     pub stages: Vec<BufferType>,
+    pub acknowledgements: bool,
 }
 
 impl Default for BufferConfig {
@@ -310,6 +318,7 @@ impl Default for BufferConfig {
                 max_events: memory_buffer_default_max_events(),
                 when_full: WhenFull::default(),
             }],
+            acknowledgements: DEFAULT_ACKNOWLEDGEMENTS,
         }
     }
 }
@@ -349,7 +358,7 @@ impl BufferConfig {
         }
 
         builder
-            .build(buffer_id, span)
+            .build(buffer_id, span, self.acknowledgements)
             .await
             .context(FailedToBuildTopologySnafu)
     }

@@ -52,17 +52,19 @@ where
     }
 
     let src_buffer = Box::new(src_buffer);
-    let mut src_reader: ReceiverAdapter<T> =
-        match src_buffer.into_buffer_parts(usage_handle.clone()).await {
-            Ok((_, src_reader)) => src_reader,
-            // If the disk v1 buffer doesn't exist, then that's OK, just return early.
-            Err(_) => return Ok(()),
-        };
+    let mut src_reader: ReceiverAdapter<T> = match src_buffer
+        .into_buffer_parts(usage_handle.clone(), true)
+        .await
+    {
+        Ok((_, src_reader)) => src_reader,
+        // If the disk v1 buffer doesn't exist, then that's OK, just return early.
+        Err(_) => return Ok(()),
+    };
 
     let dst_buffer_dir = get_disk_v2_data_dir_path(base_data_dir, id);
 
     let (mut dst_writer, _) =
-        build_disk_v2_buffer(usage_handle, base_data_dir, id, buffer_max_size)
+        build_disk_v2_buffer(usage_handle, base_data_dir, id, buffer_max_size, true)
             .await
             .map_err(|e| format!("Failed to build `disk_v2` buffer: {}", e))?;
 

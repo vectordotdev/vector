@@ -11,6 +11,7 @@ use super::{
     ledger::LEDGER_LEN,
     record::RECORD_HEADER_LEN,
 };
+use crate::config::DEFAULT_ACKNOWLEDGEMENTS;
 
 // We don't want data files to be bigger than 128MB, but we might end up overshooting slightly.
 pub const DEFAULT_MAX_DATA_FILE_SIZE: usize = 128 * 1024 * 1024;
@@ -159,6 +160,9 @@ pub struct DiskBufferConfig<FS> {
     /// implementation essentially defines how we open and delete data files, as well as the type of
     /// the data file objects we get when opening a data file.
     pub(crate) filesystem: FS,
+
+    /// Enable handling of negative acknowledgements.
+    pub(crate) acknowledgements: bool,
 }
 
 /// Builder for [`DiskBufferConfig`].
@@ -173,6 +177,7 @@ where
     pub(crate) max_record_size: Option<usize>,
     pub(crate) write_buffer_size: Option<usize>,
     pub(crate) flush_interval: Option<Duration>,
+    pub(crate) acknowledgements: Option<bool>,
     pub(crate) filesystem: FS,
 }
 
@@ -188,6 +193,7 @@ impl DiskBufferConfigBuilder {
             max_record_size: None,
             write_buffer_size: None,
             flush_interval: None,
+            acknowledgements: None,
             filesystem: ProductionFilesystem,
         }
     }
@@ -287,8 +293,16 @@ where
             max_record_size: self.max_record_size,
             write_buffer_size: self.write_buffer_size,
             flush_interval: self.flush_interval,
+            acknowledgements: self.acknowledgements,
             filesystem,
         }
+    }
+
+    /// Sets the handling of negative acknowledgements.
+    #[allow(dead_code)]
+    pub fn acknowledgements(mut self, acknowledgements: bool) -> Self {
+        self.acknowledgements = Some(acknowledgements);
+        self
     }
 
     /// Consumes this builder and constructs a `DiskBufferConfig`.
@@ -301,6 +315,7 @@ where
         let max_record_size = self.max_record_size.unwrap_or(DEFAULT_MAX_RECORD_SIZE);
         let write_buffer_size = self.write_buffer_size.unwrap_or(DEFAULT_WRITE_BUFFER_SIZE);
         let flush_interval = self.flush_interval.unwrap_or(DEFAULT_FLUSH_INTERVAL);
+        let acknowledgements = self.acknowledgements.unwrap_or(DEFAULT_ACKNOWLEDGEMENTS);
         let filesystem = self.filesystem;
 
         // Validate the input parameters.
@@ -428,6 +443,7 @@ where
             write_buffer_size,
             flush_interval,
             filesystem,
+            acknowledgements,
         })
     }
 }

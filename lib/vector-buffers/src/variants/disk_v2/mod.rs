@@ -292,6 +292,7 @@ where
     async fn into_buffer_parts(
         self: Box<Self>,
         usage_handle: BufferUsageHandle,
+        acknowledgements: bool,
     ) -> Result<(SenderAdapter<T>, ReceiverAdapter<T>), Box<dyn Error + Send + Sync>> {
         // Attempt to migrate a disk v1 buffer based on the same data directory and buffer ID if one
         // exists. If one doesn't exist, then this method does nothing.
@@ -303,6 +304,7 @@ where
             &self.data_dir,
             self.id.as_str(),
             self.max_size,
+            acknowledgements,
         )
         .await?;
 
@@ -315,6 +317,7 @@ async fn build_disk_v2_buffer<T>(
     data_dir: &Path,
     id: &str,
     max_size: NonZeroU64,
+    acknowledgements: bool,
 ) -> Result<
     (
         Writer<T, ProductionFilesystem>,
@@ -330,6 +333,7 @@ where
     let buffer_path = get_disk_v2_data_dir_path(data_dir, id);
     let config = DiskBufferConfigBuilder::from_path(buffer_path)
         .max_buffer_size(max_size.get())
+        .acknowledgements(acknowledgements)
         .build()?;
     Buffer::from_config(config, usage_handle)
         .await

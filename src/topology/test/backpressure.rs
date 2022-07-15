@@ -137,6 +137,7 @@ async fn buffer_drop_fan_out() {
             max_events: MEMORY_BUFFER_DEFAULT_MAX_EVENTS,
             when_full: WhenFull::DropNewest,
         }],
+        acknowledgements: true,
     };
     config.add_sink_outer("out2", sink_outer);
 

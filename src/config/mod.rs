@@ -169,16 +169,20 @@ impl Config {
             }
         }
 
+        // Propagate the acknowledgements setting to the sink's buffer config.
+        for (_, mut sink) in &mut self.sinks {
+            sink.buffer.acknowledgements = sink
+                .inner
+                .acknowledgements()
+                .unwrap_or(&self.global.acknowledgements)
+                .merge_default(&self.global.acknowledgements)
+                .enabled();
+        }
+
         let inputs: Vec<_> = self
             .sinks
             .iter()
-            .filter(|(_, sink)| {
-                sink.inner
-                    .acknowledgements()
-                    .unwrap_or(&self.global.acknowledgements)
-                    .merge_default(&self.global.acknowledgements)
-                    .enabled()
-            })
+            .filter(|(_, sink)| sink.buffer.acknowledgements)
             .flat_map(|(name, sink)| {
                 sink.inputs
                     .iter()

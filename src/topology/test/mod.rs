@@ -780,6 +780,7 @@ async fn topology_disk_buffer_flushes_on_idle() {
             max_size: std::num::NonZeroU64::new(1024).unwrap(),
             when_full: WhenFull::DropNewest,
         }],
+        acknowledgements: true,
     };
     config.add_sink_outer("out1", sink1_outer);
 

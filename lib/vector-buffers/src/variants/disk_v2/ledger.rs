@@ -237,6 +237,8 @@ where
     usage_handle: BufferUsageHandle,
     // Tracks when a negative acknowledgement has been received
     reader_done: AtomicBool,
+    // Enable handling negative acknowledgements.
+    acknowledgements: bool,
 }
 
 impl<FS> Ledger<FS>
@@ -654,6 +656,7 @@ where
         // handle.  This handles making sure we account for the starting size of the buffer, and
         // what not.
         let mut ledger = Ledger {
+            acknowledgements: config.acknowledgements,
             config,
             ledger_lock,
             state: ledger_state,
@@ -723,20 +726,18 @@ where
     pub(super) fn spawn_finalizer(self: Arc<Self>) -> OrderedFinalizer<u64> {
         let (finalizer, mut stream) = OrderedFinalizer::new(ShutdownSignal::noop());
         let data_dir = self.config.data_dir.clone();
+        let acknowledgements = self.acknowledgements;
         tokio::spawn(async move {
             while let Some((status, amount)) = stream.next().await {
-                match status {
-                    BatchStatus::Delivered => {
-                        self.increment_pending_acks(amount);
-                        self.notify_writer_waiters();
-                    }
-                    BatchStatus::Errored | BatchStatus::Rejected => {
-                        emit(BufferStopping {
-                            data_dir,
-                            record_id: self.state().get_last_reader_record_id(),
-                        });
-                        break;
-                    }
+                if !acknowledgements || status == BatchStatus::Delivered {
+                    self.increment_pending_acks(amount);
+                    self.notify_writer_waiters();
+                } else {
+                    emit(BufferStopping {
+                        data_dir,
+                        record_id: self.state().get_last_reader_record_id(),
+                    });
+                    break;
                 }
             }
             self.stop_reader();

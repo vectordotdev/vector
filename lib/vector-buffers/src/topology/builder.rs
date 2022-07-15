@@ -32,6 +32,7 @@ pub trait IntoBuffer<T: Bufferable> {
     async fn into_buffer_parts(
         self: Box<Self>,
         usage_handle: BufferUsageHandle,
+        acknowledgements: bool,
     ) -> Result<(SenderAdapter<T>, ReceiverAdapter<T>), Box<dyn Error + Send + Sync>>;
 }
 
@@ -108,6 +109,7 @@ impl<T: Bufferable> TopologyBuilder<T> {
         self,
         buffer_id: String,
         span: Span,
+        acknowledgements: bool,
     ) -> Result<(BufferSender<T>, BufferReceiver<T>), TopologyError> {
         // We pop stages off in reverse order to build from the inside out.
         let mut buffer_usage = BufferUsage::from_span(span);
@@ -139,7 +141,7 @@ impl<T: Bufferable> TopologyBuilder<T> {
             let provides_instrumentation = stage.untransformed.provides_instrumentation();
             let (sender, receiver) = stage
                 .untransformed
-                .into_buffer_parts(usage_handle.clone())
+                .into_buffer_parts(usage_handle.clone(), acknowledgements)
                 .await
                 .context(FailedToBuildStageSnafu { stage_idx })?;
 
@@ -191,7 +193,7 @@ impl<T: Bufferable> TopologyBuilder<T> {
 
         let memory_buffer = Box::new(MemoryBuffer::new(max_events));
         let (sender, receiver) = memory_buffer
-            .into_buffer_parts(usage_handle.clone())
+            .into_buffer_parts(usage_handle.clone(), false)
             .await
             .expect("should not fail to directly create a memory buffer");
 
@@ -226,7 +228,7 @@ impl<T: Bufferable> TopologyBuilder<T> {
     ) -> (BufferSender<T>, BufferReceiver<T>) {
         let memory_buffer = Box::new(MemoryBuffer::new(max_events));
         let (sender, receiver) = memory_buffer
-            .into_buffer_parts(usage_handle.clone())
+            .into_buffer_parts(usage_handle.clone(), false)
             .await
             .expect("should not fail to directly create a memory buffer");
 
@@ -271,7 +273,9 @@ mod tests {
             MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
             WhenFull::Block,
         );
-        let result = builder.build(String::from("test"), Span::none()).await;
+        let result = builder
+            .build(String::from("test"), Span::none(), false)
+            .await;
         assert!(result.is_ok());
 
         let (mut sender, _) = result.unwrap();
@@ -285,7 +289,9 @@ mod tests {
             MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
             WhenFull::DropNewest,
         );
-        let result = builder.build(String::from("test"), Span::none()).await;
+        let result = builder
+            .build(String::from("test"), Span::none(), false)
+            .await;
         assert!(result.is_ok());
 
         let (mut sender, _) = result.unwrap();
@@ -299,7 +305,9 @@ mod tests {
             MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
             WhenFull::Overflow,
         );
-        let result = builder.build(String::from("test"), Span::none()).await;
+        let result = builder
+            .build(String::from("test"), Span::none(), false)
+            .await;
         match result {
             Err(TopologyError::OverflowWhenLast) => {}
             r => panic!("unexpected build result: {:?}", r),
@@ -317,7 +325,9 @@ mod tests {
             MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
             WhenFull::Block,
         );
-        let result = builder.build(String::from("test"), Span::none()).await;
+        let result = builder
+            .build(String::from("test"), Span::none(), false)
+            .await;
         match result {
             Err(TopologyError::NextStageNotUsed { stage_idx }) => assert_eq!(stage_idx, 0),
             r => panic!("unexpected build result: {:?}", r),
@@ -335,7 +345,9 @@ mod tests {
             MemoryBuffer::new(NonZeroUsize::new(1).unwrap()),
             WhenFull::Block,
         );
-        let result = builder.build(String::from("test"), Span::none()).await;
+        let result = builder
+            .build(String::from("test"), Span::none(), false)
+            .await;
         match result {
             Err(TopologyError::NextStageNotUsed { stage_idx }) => assert_eq!(stage_idx, 0),
             r => panic!("unexpected build result: {:?}", r),
@@ -354,7 +366,9 @@ mod tests {
             WhenFull::Block,
         );
 
-        let result = builder.build(String::from("test"), Span::none()).await;
+        let result = builder
+            .build(String::from("test"), Span::none(), false)
+            .await;
         assert!(result.is_ok());
 
         let (mut sender, _) = result.unwrap();

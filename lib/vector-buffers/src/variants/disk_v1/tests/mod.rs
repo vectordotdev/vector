@@ -5,8 +5,8 @@ use tracing::{Metadata, Span};
 
 use super::{open, Reader, Writer};
 use crate::{
-    buffer_usage_data::BufferUsageHandle, test::install_tracing_helpers,
-    variants::disk_v1::reader::FLUSH_INTERVAL, Bufferable,
+    buffer_usage_data::BufferUsageHandle, config::DEFAULT_ACKNOWLEDGEMENTS,
+    test::install_tracing_helpers, variants::disk_v1::reader::FLUSH_INTERVAL, Bufferable,
 };
 
 mod acknowledgements;
@@ -30,6 +30,7 @@ where
         "disk_buffer_v1",
         DEFAULT_DISK_BUFFER_V1_SIZE_BYTES,
         false,
+        DEFAULT_ACKNOWLEDGEMENTS,
         usage_handle,
     )
     .expect("should not fail to create buffer")
@@ -48,6 +49,7 @@ where
         "disk_buffer_v1",
         DEFAULT_DISK_BUFFER_V1_SIZE_BYTES,
         false,
+        DEFAULT_ACKNOWLEDGEMENTS,
         usage_handle.clone(),
     )
     .expect("should not fail to create buffer");
@@ -71,6 +73,7 @@ where
         "disk_buffer_v1",
         max_buffer_size,
         false,
+        DEFAULT_ACKNOWLEDGEMENTS,
         usage_handle,
     )
     .expect("should not fail to create buffer");

@@ -114,6 +114,7 @@ where
     async fn into_buffer_parts(
         self: Box<Self>,
         usage_handle: BufferUsageHandle,
+        acknowledgements: bool,
     ) -> Result<(SenderAdapter<T>, ReceiverAdapter<T>), Box<dyn Error + Send + Sync>> {
         usage_handle.set_buffer_limits(Some(self.max_size.get()), None);
 
@@ -123,6 +124,7 @@ where
             &self.id,
             self.max_size,
             self.is_migrating,
+            acknowledgements,
             usage_handle,
         )?;
 
@@ -141,6 +143,7 @@ pub(self) fn open<T>(
     name: &str,
     max_size: NonZeroU64,
     is_migrating: bool,
+    acknowledgements: bool,
     usage_handle: BufferUsageHandle,
 ) -> Result<(Writer<T>, Reader<T>), DataDirError>
 where
@@ -233,7 +236,13 @@ where
         }
     }
 
-    build(&path, max_size, is_migrating, usage_handle)
+    build(
+        &path,
+        max_size,
+        is_migrating,
+        acknowledgements,
+        usage_handle,
+    )
 }
 
 #[derive(Default)]
@@ -363,6 +372,7 @@ fn build<T: Bufferable>(
     path: &Path,
     max_size: NonZeroU64,
     is_migrating: bool,
+    acknowledgements: bool,
     usage_handle: BufferUsageHandle,
 ) -> Result<(Writer<T>, Reader<T>), DataDirError> {
     // New `max_size` of the buffer is used for storing the unacked events.
@@ -404,19 +414,16 @@ fn build<T: Bufferable>(
         let data_dir = path.into();
         tokio::spawn(async move {
             while let Some((status, amount)) = stream.next().await {
-                match status {
-                    BatchStatus::Delivered => {
-                        let amount = amount.try_into().expect("too many records on 32-bit");
-                        ack_counter.fetch_add(amount, Ordering::Relaxed);
-                        read_waker.notify_one();
-                    }
-                    BatchStatus::Errored | BatchStatus::Rejected => {
-                        emit(BufferStopping {
-                            data_dir,
-                            record_id: delete_offset.load(Ordering::Relaxed) as u64,
-                        });
-                        break;
-                    }
+                if !acknowledgements || status == BatchStatus::Delivered {
+                    let amount = amount.try_into().expect("too many records on 32-bit");
+                    ack_counter.fetch_add(amount, Ordering::Relaxed);
+                    read_waker.notify_one();
+                } else {
+                    emit(BufferStopping {
+                        data_dir,
+                        record_id: delete_offset.load(Ordering::Relaxed) as u64,
+                    });
+                    break;
                 }
             }
             reader_done.store(true, Ordering::Relaxed);

@@ -29,6 +29,7 @@ where
     async fn into_buffer_parts(
         self: Box<Self>,
         usage_handle: BufferUsageHandle,
+        _acknowledgements: bool,
     ) -> Result<(SenderAdapter<T>, ReceiverAdapter<T>), Box<dyn Error + Send + Sync>> {
         usage_handle.set_buffer_limits(None, Some(self.capacity.get()));
 
