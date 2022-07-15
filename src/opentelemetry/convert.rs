@@ -19,7 +19,7 @@ const TRACE_ID_KEY: &str = "trace_id";
 const SPAN_ID_KEY: &str = "span_id";
 const SEVERITY_TEXT_KEY: &str = "severity_text";
 const SEVERITY_NUMBER_KEY: &str = "severity_number";
-const OBSERVED_TIME_UNIX_NANO_KEY: &str = "observed_time_unix_nano";
+const OBSERVED_TIMESTAMP_KEY: &str = "observed_timestamp";
 const DROPPED_ATTRIBUTES_COUNT_KEY: &str = "dropped_attributes_count";
 const FLAGS_KEY: &str = "flags";
 
@@ -116,18 +116,24 @@ impl From<ResourceLog> for Event {
             le.insert(FLAGS_KEY, rl.log_record.flags);
         }
 
-        // NOT optional fields
-        le.insert(
-            log_schema().timestamp_key(),
-            Utc.timestamp_nanos(rl.log_record.time_unix_nano as i64),
-        );
         // according to proto, if observed_time_unix_nano is missing, collector should set it
         let observed_timestamp = if rl.log_record.observed_time_unix_nano > 0 {
             Utc.timestamp_nanos(rl.log_record.observed_time_unix_nano as i64)
+                .into()
         } else {
-            Utc::now()
+            Value::Timestamp(Utc::now())
         };
-        le.insert(OBSERVED_TIME_UNIX_NANO_KEY, observed_timestamp);
+        le.insert(OBSERVED_TIMESTAMP_KEY, observed_timestamp.clone());
+
+        // If time_unix_nano is not present (0 represents missing or unknown timestamp) use observed time
+        let timestamp = if rl.log_record.time_unix_nano > 0 {
+            Utc.timestamp_nanos(rl.log_record.time_unix_nano as i64)
+                .into()
+        } else {
+            observed_timestamp
+        };
+        le.insert(log_schema().timestamp_key(), timestamp);
+
         le.insert(
             DROPPED_ATTRIBUTES_COUNT_KEY,
             rl.log_record.dropped_attributes_count,

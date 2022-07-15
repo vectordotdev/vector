@@ -240,13 +240,14 @@ mod tests {
                 ("flags", 4.into()),
                 ("dropped_attributes_count", 3.into()),
                 ("timestamp", Utc.timestamp_nanos(1).into()),
-                ("observed_time_unix_nano", Utc.timestamp_nanos(2).into()),
+                ("observed_timestamp", Utc.timestamp_nanos(2).into()),
             ]);
             let expect_event = Event::from(LogEvent::from(expect_vec));
             assert_eq!(actual_event, expect_event);
         })
         .await;
     }
+
     fn new_source(
         status: EventStatus,
     ) -> (
@@ -260,10 +261,12 @@ mod tests {
             .flat_map(into_event_stream);
         (sender, logs_output, recv)
     }
+
     fn str_into_hex_bytes(s: &str) -> Vec<u8> {
         // unwrap is okay in test
         hex::decode(s).unwrap()
     }
+
     fn vec_into_btmap(arr: Vec<(&'static str, Value)>) -> BTreeMap<String, Value> {
         BTreeMap::from_iter(
             arr.into_iter()
