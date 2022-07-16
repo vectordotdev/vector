@@ -127,7 +127,7 @@ releases: "0.23.0": {
 				* `region_name`
 				* `metro_code`
 
-				This brings the transform up to parity with the fields encriched by Logstash's geoip filter (though the
+				This brings the transform up to parity with the fields enriched by Logstash's geoip filter (though the
 				field names are not the same).
 				"""
 			pr_numbers: [12803]
