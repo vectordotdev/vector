@@ -1,9 +1,5 @@
 //! Allocation tracking exposed via internal telemetry.
 
-// TODO: We need to make the late registration thread update group entries after it registers them in `metrics`,
-// otherwise we risk futures changes -- such as switching to generational storage -- breaking how these metrics are
-// collected if we're not going through the normal `Counter` interface.
-//
 // TODO: We don't currently register the root allocation group which means we're missing all the allocations that happen
 // outside of the various component tasks. Additionally, we are likely missing span propagation for spawned tasks that
 // occur under component tasks. Likely, not for sure... but likely.
@@ -27,134 +23,247 @@
 // the caller, so that they never even needed to bother doing that. This would be cleaner than having to generate the
 // vector of tags by hand, which is obviously a "do it once and then never change it" thing but would look a lot cleaner
 // in this proposed method.
-use std::sync::atomic::{AtomicUsize, Ordering};
+//
+// TODO: We should explore a design where we essentially bring in `tracking-allocator` directly and tweak it such that
+// we collapse a majority of the various thread locals, and combine it with the channel data structures. For example,
+// what if there was a single thread local that held a producer, and the producer had its own temporary internal buffer
+// that held on to a chunk such that we could as cheaply as possible write individual events into it, and once we tried
+// to write and it had no space, it would send and then fetch a new chunk, etc etc. Basically, reduce the amount of
+// memory copies, other thread local variables, needing to access/enter them, etc etc. It's not as modular but
+// modularity doesn't mean shit when you're adding 50% overhead.
 
+#![allow(dead_code)]
+
+use std::{
+    cell::UnsafeCell,
+    num::NonZeroUsize,
+    sync::{
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+        Arc,
+    },
+    thread,
+    time::Duration,
+};
+
+use crossbeam_queue::ArrayQueue;
+use crossbeam_utils::Backoff;
 use once_cell::sync::OnceCell;
-use thread_local::ThreadLocal;
+use slab::Slab;
 use tracking_allocator::{
     AllocationGroupId, AllocationGroupToken, AllocationRegistry, AllocationTracker,
 };
 
 mod channel;
-mod experiment;
+use self::channel::{create_channel, Consumer, Producer};
 
-mod storage;
-use storage::PageTable;
+const BATCH_SIZE: usize = 256;
+const BATCHES: usize = 256;
 
-static COLLECTOR: OnceCell<Collector> = OnceCell::new();
+static REGISTRATIONS: OnceCell<Registrations> = OnceCell::new();
 
-fn get_global_collector() -> &'static Collector {
-    COLLECTOR.get_or_init(|| {
-        // Create the collector, but more importantly, register the root allocation group as we must ensure it exists
-        // before enabling tracking, as its the only group that can exist prior to tracking being enabled, and that
-        // doesn't get registered through our own allocation group token registration flow, which is where we would
-        // otherwise register group IDs in the page table.
-        let collector = Collector::new();
-        //collector.register(AllocationGroupId::ROOT);
-        collector
-    })
+thread_local! {
+    static LOCAL_PRODUCER: UnsafeCell<Option<Producer<BATCH_SIZE, BATCHES, AllocatorEvent>>> = UnsafeCell::new(None);
 }
 
-/// Snapshot of the statistics for an allocation group.
-/*struct GroupStatisticsSnapshot {
-    allocated_bytes: usize,
-    deallocated_bytes: usize,
-    allocations: usize,
-    deallocations: usize,
+fn get_registrations() -> &'static Registrations {
+    REGISTRATIONS.get_or_init(|| Registrations::new())
 }
 
-impl GroupStatisticsSnapshot {
-    fn merge(&mut self, other: GroupStatisticsSnapshot) {
-        self.allocated_bytes += other.allocated_bytes;
-        self.allocations += other.allocations;
-        self.deallocated_bytes += other.deallocated_bytes;
-        self.deallocations += other.deallocations;
-    }
-}*/
+//#[inline]
+fn with_local_event_producer<F>(mut f: F)
+where
+    F: FnMut(&mut Producer<BATCH_SIZE, BATCHES, AllocatorEvent>),
+{
+    let _result = LOCAL_PRODUCER.try_with(|maybe_producer| {
+        // SAFETY: The producer lives in a thread local, so we have guaranteed exclusive access to it, which
+        // ensures our creation of a mutable reference is safe within the closure given to `LocalKey::try_with`.
+        //
+        // Additionally, we know the pointer-to-reference cast is safe/always valid because we just got it from `UnsafeCell`.
+        let producer = unsafe {
+            maybe_producer
+                .get()
+                .as_mut()
+                .expect("producer pointer should always be valid")
+                .get_or_insert_with(register_event_channel)
+        };
 
-/// Statistics for an allocation group.
-#[derive(Default)]
-struct GroupStatistics {
-    allocated_bytes: AtomicUsize,
-    deallocated_bytes: AtomicUsize,
-    allocations: AtomicUsize,
-    deallocations: AtomicUsize,
+        f(producer);
+    });
 }
 
-impl GroupStatistics {
-    /// Tracks an allocation.
-    fn track_allocation(&self, bytes: usize) {
-        self.allocated_bytes.fetch_add(bytes, Ordering::Relaxed);
-        self.allocations.fetch_add(1, Ordering::Relaxed);
-    }
+fn register_event_channel() -> Producer<BATCH_SIZE, BATCHES, AllocatorEvent> {
+    let (producer, consumer) = create_channel();
+    let registrations = get_registrations();
+    registrations.register(consumer);
 
-    /// Tracks a deallocation.
-    fn track_deallocation(&self, bytes: usize) {
-        self.deallocated_bytes.fetch_add(bytes, Ordering::Relaxed);
-        self.deallocations.fetch_sub(1, Ordering::Relaxed);
-    }
+    producer
+}
 
-    /*
-    /// Collects the current statistics values, resetting the counters back to zero.
-    fn collect(&self) -> GroupStatisticsSnapshot {
-        GroupStatisticsSnapshot {
-            allocated_bytes: self.allocated_bytes.swap(0, Ordering::Relaxed),
-            allocations: self.allocations.swap(0, Ordering::Relaxed),
-            deallocated_bytes: self.deallocated_bytes.swap(0, Ordering::Relaxed),
-            deallocations: self.deallocations.swap(0, Ordering::Relaxed),
+#[derive(Clone, Copy)]
+enum AllocatorEvent {
+    Allocation {
+        group_id: NonZeroUsize,
+        wrapped_size: usize,
+    },
+
+    Deallocation {
+        source_group_id: NonZeroUsize,
+        wrapped_size: usize,
+    },
+}
+
+struct Registrations {
+    pending: ArrayQueue<Consumer<BATCH_SIZE, BATCHES, AllocatorEvent>>,
+    has_pending: AtomicBool,
+}
+
+impl Registrations {
+    fn new() -> Self {
+        Self {
+            pending: ArrayQueue::new(1024),
+            has_pending: AtomicBool::new(false),
         }
-    }*/
+    }
+
+    fn register(&self, mut consumer: Consumer<BATCH_SIZE, BATCHES, AllocatorEvent>) {
+        // Try sending the consumer to the collector until we succeed, as it should be checking
+        // `has_pending_registrations` to see if there's anything to process and then following up quickly... so if
+        // we're waiting here for a slot to open, all we can really do is wait out the blockade.
+        let backoff = Backoff::new();
+        while let Err(old_consumer) = self.pending.push(consumer) {
+            backoff.snooze();
+            consumer = old_consumer;
+        }
+
+        // Once we add it to the pending queue, we now mark `has_pending` for real.
+        self.has_pending.store(true, Ordering::Release);
+    }
+
+    fn has_pending_registrations(&self) -> bool {
+        self.has_pending.load(Ordering::Relaxed)
+    }
+
+    fn get_pending_registration(&self) -> Option<Consumer<BATCH_SIZE, BATCHES, AllocatorEvent>> {
+        let result = self.pending.pop();
+        if result.is_none() {
+            self.has_pending.store(false, Ordering::Release);
+        }
+
+        result
+    }
 }
 
 struct Collector {
-    statistics: &'static ThreadLocal<PageTable<GroupStatistics>>,
+    consumers: Slab<Consumer<BATCH_SIZE, BATCHES, AllocatorEvent>>,
+    consumer_empty: Vec<usize>,
+    registrations: &'static Registrations,
 }
 
 impl Collector {
     fn new() -> Self {
-        let statistics = Box::leak(Box::new(ThreadLocal::new()));
+        let registrations = get_registrations();
 
-        Self { statistics }
-    }
-
-    fn get_tracker(&self) -> Tracker {
-        Tracker {
-            statistics: self.statistics,
+        Self {
+            consumers: Slab::new(),
+            consumer_empty: Vec::new(),
+            registrations,
         }
     }
 
-    /*
-    fn register(&self, group_id: AllocationGroupId) {
-        let local_stats_table = self.statistics.get_or_default();
-        local_stats_table.register(group_id.as_usize().get())
+    fn run(&mut self) {
+        // Create two simple atomics for tracking the number of allocations and deallocations, and spawn a separate
+        // thread to print out those values on an interval.
+        let allocs = Arc::new(AtomicUsize::new(0));
+        let deallocs = Arc::new(AtomicUsize::new(0));
+
+        {
+            let allocs = Arc::clone(&allocs);
+            let deallocs = Arc::clone(&deallocs);
+
+            let alloc_reporter = thread::Builder::new().name("vector-alloc-reporter".to_string());
+            alloc_reporter
+                .spawn(move || loop {
+                    thread::sleep(Duration::from_secs(1));
+
+                    /*println!(
+                        "allocator activity: allocs={} deallocs={}",
+                        allocs.load(Ordering::Relaxed),
+                        deallocs.load(Ordering::Relaxed)
+                    );*/
+                })
+                .unwrap();
+        }
+
+        // We don't want to track allocator events here, because speed is the name of the game, and also, things could
+        // potentially get into a not-so-great feedback loop.
+        AllocationRegistry::untracked(|| {
+            loop {
+                // Check if any consumers are pending registration.
+                if self.registrations.has_pending_registrations() {
+                    while let Some(consumer) = self.registrations.get_pending_registration() {
+                        self.consumers.insert(consumer);
+                    }
+                }
+
+                // Process all consumers, getting all outstanding events. We loop through every consumer at least once, and
+                // for any consumer that we get events back from, we'll try to immediately consume from it again. We don't
+                // consume until nothing is left, because we might otherwise get bottlenecked on a super busy consumer. We
+                // want to make sure that we service registrations in a timely fashion, because while we don't need to
+                // register a consumer before anything can be produced, the clock is one as soon as the registration is
+                // pending, and we need to register and start consuming before the channel fills up, which would then really
+                // screw things up for that thread. All allocations would be blocked, which is not good.
+                let mut local_allocs = 0;
+                let mut local_deallocs = 0;
+
+                let mut processor = |events: &[AllocatorEvent]| {
+                    for event in events {
+                        match event {
+                            AllocatorEvent::Allocation { .. } => local_allocs += 1,
+                            AllocatorEvent::Deallocation { .. } => local_deallocs += 1,
+                        }
+                    }
+                };
+
+                let mut loops = 0;
+                let mut should_sleep = false;
+                loop {
+                    // We need to force ourselves to yield temporarily so that we can check registrations, but we make
+                    // sure that we don't bother sleeping because we know if we looped this much, there's a lot of
+                    // allocator activity and we don't want to starve producers for writable chunks.
+                    if loops > 1000 {
+                        break;
+                    }
+
+                    // Loop over every consumer, trying to consume a readable chunk if one is available.
+                    let mut consumed = false;
+                    for (_, consumer) in self.consumers.iter_mut() {
+                        if let Some(_) = consumer.try_consume(&mut processor) {
+                            consumed = true;
+                        }
+                    }
+
+                    // If we didn't get anything at all, break out early and briefly sleep.
+                    if !consumed {
+                        should_sleep = true;
+                        break;
+                    }
+
+                    loops += 1;
+                }
+
+                allocs.fetch_add(local_allocs, Ordering::Relaxed);
+                deallocs.fetch_add(local_deallocs, Ordering::Relaxed);
+
+                if should_sleep {
+                    // Sleep for a brief period.
+                    thread::sleep(Duration::from_millis(10));
+                }
+            }
+        });
     }
-
-    fn collect_statistics(&self) -> HashMap<usize, GroupStatisticsSnapshot> {
-        let mut groups = HashMap::new();
-
-        for local_groups in self.statistics.iter() {}
-
-        groups
-    }*/
 }
 
-struct Tracker {
-    statistics: &'static ThreadLocal<PageTable<GroupStatistics>>,
-}
-
-impl Tracker {
-    fn get_local_group_stats(&self, group_id: AllocationGroupId) -> Option<&GroupStatistics> {
-        let local_stats_table = self.statistics.try_get_or_default().ok()?;
-
-        // SAFETY: In order for calls to `get` to be safe, the group ID we pass must have been previously registered
-        // (via `register`) otherwise we will instantaneously trigger UB. As this method overall can only be called by
-        // the global allocator, it implies that we're inside an allocation group, and allocation groups can only be
-        // entered after acquiring a token via `register_allocation_group_token`, which the group ID is derived from.
-        //
-        // Thus, we cannot be here without the given group ID having already been registered correctly.
-        unsafe { Some(local_stats_table.get(group_id.as_usize().get())) }
-    }
-}
+struct Tracker;
 
 impl AllocationTracker for Tracker {
     fn allocated(
@@ -164,9 +273,12 @@ impl AllocationTracker for Tracker {
         wrapped_size: usize,
         group_id: AllocationGroupId,
     ) {
-        if let Some(local_group_stats) = self.get_local_group_stats(group_id) {
-            local_group_stats.track_allocation(wrapped_size);
-        }
+        with_local_event_producer(|producer| {
+            producer.write(AllocatorEvent::Allocation {
+                group_id: group_id.as_usize(),
+                wrapped_size,
+            });
+        });
     }
 
     fn deallocated(
@@ -177,18 +289,23 @@ impl AllocationTracker for Tracker {
         source_group_id: AllocationGroupId,
         _current_group_id: AllocationGroupId,
     ) {
-        if let Some(local_group_stats) = self.get_local_group_stats(source_group_id) {
-            local_group_stats.track_deallocation(wrapped_size);
-        }
+        with_local_event_producer(|producer| {
+            producer.write(AllocatorEvent::Deallocation {
+                source_group_id: source_group_id.as_usize(),
+                wrapped_size,
+            });
+        });
     }
 }
 
 /// Initializes allocation tracking.
 pub fn init_allocation_tracking() {
-    let collector = get_global_collector();
-    let tracker = collector.get_tracker();
+    let mut collector = Collector::new();
 
-    let _ = AllocationRegistry::set_global_tracker(tracker)
+    let alloc_processor = thread::Builder::new().name("vector-alloc-processor".to_string());
+    alloc_processor.spawn(move || collector.run()).unwrap();
+
+    let _ = AllocationRegistry::set_global_tracker(Tracker)
         .expect("no other global tracker should be set yet");
 
     AllocationRegistry::enable_tracking();
@@ -208,19 +325,8 @@ pub fn init_allocation_tracking() {
 /// traditional `metrics` macros, so the given tags should match the span fields that would traditionally be set for a
 /// given span in order to ensure that they match.
 pub fn acquire_allocation_group_token(_tags: Vec<(String, String)>) -> AllocationGroupToken {
-    let token =
-        AllocationGroupToken::register().expect("failed to register allocation group token");
-
-    //let collector = get_global_collector();
-    //collector.register(token.id());
-
-    // BROKEN: currently, we register a token on the thread it's created, which initializes the page it needs, etc
-    // etc... but what we actually need to do is initialize it in all threads, or know that it isn't already initialized
-    // in the current thread and do so... but that implies tracking a lot of per-thread state which might get squicky,
-    // and would mean a runtime check per tracked allocation, which kinda sucks...
-    //
-    // this might mean that we actually want to do at least the `is_initialized`/`initialize` call automatically in
-    // `LazilyAllocatedPage::get` if we can make sure it's super cheap, and then we can make that method much safer
-
-    token
+    // TODO: register the allocation group token with its tags via `Collector`: we can't do it via `Registrations`
+    // because that gets checked lazily/periodically, and we need to be able to associate a group ID with its tags
+    // immediately so that we don't misassociate events
+    AllocationGroupToken::register().expect("failed to register allocation group token")
 }

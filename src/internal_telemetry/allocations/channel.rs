@@ -1,4 +1,4 @@
-use std::mem::{MaybeUninit, self};
+use std::mem::MaybeUninit;
 use std::slice;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
@@ -10,11 +10,11 @@ const READABLE: bool = true;
 /// This is specifically aligned to 64 bytes, and uses a fixed-size layout, to optimize for performance.
 #[repr(C, align(64))]
 #[derive(Clone, Copy)]
-pub struct Chunk<const CHUNK_LEN: usize, T: Copy>([MaybeUninit<T>; CHUNK_LEN]);
+struct Chunk<const CHUNK_LEN: usize, T: Copy>([MaybeUninit<T>; CHUNK_LEN]);
 
 impl<const CHUNK_LEN: usize, T: Copy> Chunk<CHUNK_LEN, T> {
     /// Creates a new `Chunk`.
-    pub const fn new() -> Self {
+    const fn new() -> Self {
         // SAFETY: We're initializing an array of `MaybeUninit<..>` elements, which themselves need no initialization,
         // making this safe to perform.
         unsafe { Self(MaybeUninit::uninit().assume_init()) }
@@ -50,7 +50,7 @@ impl<const CHUNK_LEN: usize, T: Copy> Chunk<CHUNK_LEN, T> {
     }
 }
 
-pub struct Inner<const CHUNK_LEN: usize, const CHUNKS: usize, T: Copy> {
+struct Inner<const CHUNK_LEN: usize, const CHUNKS: usize, T: Copy> {
     /// Individual chunks.
     chunks: [Chunk<CHUNK_LEN, T>; CHUNKS],
 
@@ -76,25 +76,14 @@ pub struct Inner<const CHUNK_LEN: usize, const CHUNKS: usize, T: Copy> {
 
 impl<const CHUNK_LEN: usize, const CHUNKS: usize, T: Copy> Inner<CHUNK_LEN, CHUNKS, T> {
     /// Creates a new `Inner`.
-    pub fn new() -> Self {
-        // Create our chunk state and chunk lengths arrays manually since atomics aren't `Copy`, so we can't just use
-        // the normal array initializer approach where it copies the element for each index.
-        //
-        // SAFETY: `MaybeUninit` does not require initialization, so we can create these arrays safely. We also ensure
-        // every atomic is initialized, so we're safe to initialize the arrays. Finally, it's safe to transmute because
-        // `MaybeUninit<T>` has an identical layout to `T`.
-        let mut raw_chunk_state: [MaybeUninit<AtomicBool>; CHUNKS] = unsafe { MaybeUninit::uninit().assume_init() };
-        for element in &mut raw_chunk_state[..] {
-            element.write(AtomicBool::new(WRITABLE));
-        }
-        let chunk_state = unsafe { mem::transmute::<_, [AtomicBool; CHUNKS]>(raw_chunk_state) };
+    fn new() -> Self {
+        // We use `generate_fixed_size_array` because atomics aren't `Copy`, so the normal initializer shorthand doesn't
+        // work here like it does below for `Chunk`.
+        let chunk_state =
+            generate_fixed_size_array::<CHUNKS, _, AtomicBool>(|| AtomicBool::new(WRITABLE));
+        let chunk_lens =
+            generate_fixed_size_array::<CHUNKS, _, AtomicUsize>(|| AtomicUsize::new(0));
 
-        let mut raw_chunk_lens: [MaybeUninit<AtomicUsize>; CHUNKS] = unsafe { MaybeUninit::uninit().assume_init() };
-        for element in &mut raw_chunk_lens[..] {
-            element.write(AtomicUsize::new(0));
-        }
-        let chunk_lens = unsafe { mem::transmute::<_, [AtomicUsize; CHUNKS]>(raw_chunk_lens) };
-    
         Self {
             chunks: [Chunk::<CHUNK_LEN, T>::new(); CHUNKS],
             chunk_state,
@@ -104,14 +93,16 @@ impl<const CHUNK_LEN: usize, const CHUNKS: usize, T: Copy> Inner<CHUNK_LEN, CHUN
     }
 
     /// Marks the producer as closed.
-    pub fn mark_producer_closed(&self) {
+    fn mark_producer_closed(&self) {
         self.producer_closed.store(true, Ordering::Release);
     }
 
+    /*
     /// Returns whether or not the producer is closed.
-    pub fn is_producer_closed(&self) -> bool {
+    fn is_producer_closed(&self) -> bool {
         self.producer_closed.load(Ordering::Acquire)
     }
+    */
 
     #[inline]
     fn try_find_readable_chunk_pos(&self) -> Option<usize> {
@@ -168,15 +159,9 @@ impl<const CHUNK_LEN: usize, const CHUNKS: usize, T: Copy> Inner<CHUNK_LEN, CHUN
     /// guard, `ChunkWriter`, that provides convenience methods for writing and sending the chunk, as well as ensuring
     /// the chunk is always returned to the consumer by the time the chunk writer is dropped.
     #[inline]
-    fn try_find_writable_chunk(&self) -> Option<(usize, &mut [T])> {
-        self.try_find_writable_chunk_pos().map(|idx| {
-            // SAFETY: We take a mutable reference to the chunk data only if the chunk is writable, which
-            // implies the chunk won't be accessed for reading (chunks are read XOR write). The arrangement of
-            // `Inner` ensures that there is only ever one producer attached to a given `Inner`, so we know that
-            // we do not have to worry about another call to `try_find_writable_chunk` taking a mutable
-            // reference to this chunk.
-            (idx, unsafe { self.chunks[idx].as_mut() })
-        })
+    fn try_find_writable_chunk(&self) -> Option<(usize, &Chunk<CHUNK_LEN, T>)> {
+        self.try_find_writable_chunk_pos()
+            .map(|idx| (idx, &self.chunks[idx]))
     }
 
     /// Marks a chunk as readable.
@@ -195,46 +180,86 @@ impl<const CHUNK_LEN: usize, const CHUNKS: usize, T: Copy> Inner<CHUNK_LEN, CHUN
     }
 }
 
-pub struct Producer<const CHUNK_LEN: usize, const CHUNKS: usize, T>
+pub(crate) struct Producer<const CHUNK_LEN: usize, const CHUNKS: usize, T>
 where
     T: Copy + 'static,
 {
     inner: &'static Inner<CHUNK_LEN, CHUNKS, T>,
+    current_chunk: Option<&'static Chunk<CHUNK_LEN, T>>,
+    current_chunk_idx: usize,
+    current_chunk_len: usize,
 }
 
 impl<const CHUNK_LEN: usize, const CHUNKS: usize, T> Producer<CHUNK_LEN, CHUNKS, T>
 where
     T: Copy + 'static,
 {
-    /// Acquires a chunk for writing.
+    fn from_inner(inner: &'static Inner<CHUNK_LEN, CHUNKS, T>) -> Self {
+        Self {
+            inner,
+            current_chunk: None,
+            current_chunk_idx: 0,
+            current_chunk_len: 0,
+        }
+    }
+
+    /// Writes the given data.
     ///
-    /// This method will search indefinitely for the next available writable chunk, so consumers should ensure that they
-    /// consume readable chunks as fast as reasonably possible to reduce producer waiting.
-    ///
-    /// The chunk is returned in a guard, `ChunkWriter`, which ensures mutable access to the chunk as well as ensuring
-    /// the chunk is sent (if it wasn't already) when the guard is dropped.
+    /// Data is written into an internal buffer rather than sent immediately to the consumer. When the internal buffer
+    /// overflows, it will be sent to the consumer and then further writes will continue to buffer until the buffer
+    /// overflows, and so on.
+    pub(crate) fn write(&mut self, data: T) {
+        loop {
+            // Make sure we have a current chunk to write into.
+            if self.current_chunk.is_none() {
+                self.acquire_chunk();
+            }
+
+            // Make sure we have capacity in the current chunk. Otherwise, send the chunk to the
+            // consumer and then get a new one to start writing into.
+            let available = CHUNK_LEN - self.current_chunk_len;
+            if available == 0 {
+                self.send_current_chunk();
+                continue;
+            }
+
+            let buffer = self
+                .current_chunk
+                .map(|chunk| unsafe { &mut chunk.as_mut()[self.current_chunk_len..] })
+                .expect("current chunk must exist at this point");
+
+            buffer[0] = data;
+            self.current_chunk_len += 1;
+
+            break;
+        }
+    }
+
     #[inline]
-    pub fn acquire_chunk(&mut self) -> ChunkWriter<'_, CHUNK_LEN, CHUNKS, T> {
+    fn acquire_chunk(&mut self) {
         loop {
             if let Some((idx, chunk)) = self.inner.try_find_writable_chunk() {
-                return ChunkWriter {
-                    producer: self,
-                    idx,
-                    written: 0,
-                    chunk,
-                }
+                self.current_chunk = Some(chunk);
+                self.current_chunk_idx = idx;
+                break;
             }
         }
     }
 
-    /// Marks a chunk as readable.
-    #[inline]
-    fn mark_chunk_readable(&self, idx: usize, len: usize) {
-        self.inner.mark_chunk_readable(idx, len)
+    fn send_current_chunk(&mut self) {
+        // if we're already using acq/rel ordering on the ownership store op, maybe we should also just avoid using
+        // atomics for the chunk length, and bundle that into the chunk itself... or if we're committed to only sending
+        // full chunks (kinda am! but we need to think through the low load/lack-of-send-via-overflow scenario...) then
+        // we don't even _need_ the length, because we know the chunk will be full.
+        self.inner
+            .mark_chunk_readable(self.current_chunk_idx, self.current_chunk_len);
+        self.current_chunk = None;
+        self.current_chunk_idx = 0;
+        self.current_chunk_len = 0;
     }
 
     fn mark_closed(&mut self) {
-        self.inner.producer_closed.store(true, Ordering::Release);
+        self.inner.mark_producer_closed();
     }
 }
 
@@ -243,79 +268,15 @@ where
     T: Copy + 'static,
 {
     fn drop(&mut self) {
+        if self.current_chunk.is_some() {
+            self.send_current_chunk();
+        }
+
         self.mark_closed();
     }
 }
 
-/// RAII structure used to provide exclusive write access to a [`Chunk`].
-///
-/// When the guard is dropped, the chunk will be sent to the consumer if it was not already.
-pub struct ChunkWriter<'a, const CHUNK_LEN: usize, const CHUNKS: usize, T>
-where
-    T: Copy + 'static,
-{
-    producer: &'a mut Producer<CHUNK_LEN, CHUNKS, T>,
-    chunk: &'a mut [T],
-    idx: usize,
-    written: usize,
-}
-
-impl<'a, const CHUNK_LEN: usize, const CHUNKS: usize, T> ChunkWriter<'a, CHUNK_LEN, CHUNKS, T>
-where
-    T: Copy + 'static,
-{
-    /// Attempts to write data into the chunk.
-    ///
-    /// If the chunk has remaining capacity, `try_write` will write as many elements from `data` as it can, and return
-    /// `Some(usize)`, containing the number of elements it was able to write. If there was no remaining capacity,
-    /// `None` will be returned.
-    ///
-    /// Even if the write attempt fills the remaining capacity of the chunk, or if there was no remaining capacity at
-    /// the time of the call, the chunk will not be automatically sent to the consumer. Callers must use `send`, or must
-    /// drop the guard, to send the chunk.
-    pub fn try_write(&mut self, data: impl AsRef<[T]>) -> Option<usize> {
-        // See if we have capacity left in this chunk, and figure out how many elements we can write based on the
-        // available capacity and the size of the data slice we've been given.
-        let available = CHUNK_LEN - self.written;
-        if available == 0 {
-            return None;
-        }
-
-        let elements_to_write = available.min(data.as_ref().len());
-
-        // Copy the data over.
-        let (_, remaining) = self.chunk.split_at_mut(available);
-        let writable_data = &data.as_ref()[..elements_to_write];
-        remaining.copy_from_slice(writable_data);
-
-        // Track how many elements were written and inform the caller.
-        self.written += elements_to_write;
-        Some(elements_to_write)
-    }
-
-    /// Sends this chunk to the consumer, consuming the guard.
-    pub fn send(mut self) {
-        self.send_inner();
-    }
-
-    fn send_inner(&mut self) {
-        // Mark the chunk as readable, which stores the data length (so that the consumer doesn't read stale entries)
-        // and sets the chunk state so the consumer knows it is readable.
-        self.producer.mark_chunk_readable(self.idx, self.written);
-    }
-}
-
-impl<'a, const CHUNK_LEN: usize, const CHUNKS: usize, T> Drop
-    for ChunkWriter<'a, CHUNK_LEN, CHUNKS, T>
-where
-    T: Copy + 'static,
-{
-    fn drop(&mut self) {
-        self.send_inner();
-    }
-}
-
-pub struct Consumer<const CHUNK_LEN: usize, const CHUNKS: usize, T>
+pub(crate) struct Consumer<const CHUNK_LEN: usize, const CHUNKS: usize, T>
 where
     T: Copy + 'static,
 {
@@ -333,7 +294,7 @@ where
     /// containing the result of the closure.
     ///
     /// Otherwise, `None` is returned, indicating that no readable chunk was found.
-    pub fn try_consume<F, O>(&mut self, mut f: F) -> Option<O>
+    pub(crate) fn try_consume<F, O>(&mut self, mut f: F) -> Option<O>
     where
         F: FnMut(&[T]) -> O,
     {
@@ -347,6 +308,16 @@ where
             .map(|reader| f(reader.as_ref()))
     }
 
+    /*
+    /// Returns whether or not the producer is closed.
+    ///
+    /// There may still be outstanding chunks to consume, but if this function returns `false` and subsequent calls to
+    /// `try_consume` return `None`, then the consumer can safely drop.
+    fn is_producer_closed(&self) -> bool {
+        self.inner.is_producer_closed()
+    }
+    */
+
     /// Marks a chunk as writable.
     #[inline]
     fn mark_chunk_writable(&self, idx: usize) {
@@ -357,7 +328,7 @@ where
 /// RAII structure used to provide exclusive read access to a [`Chunk`].
 ///
 /// When the guard is dropped, the chunk will be sent back to the producer.
-pub struct ChunkReader<'a, const CHUNK_LEN: usize, const CHUNKS: usize, T>
+pub(crate) struct ChunkReader<'a, const CHUNK_LEN: usize, const CHUNKS: usize, T>
 where
     T: Copy + 'static,
 {
@@ -387,7 +358,7 @@ where
     }
 }
 
-pub fn create_channel<const CHUNK_LEN: usize, const CHUNKS: usize, T>() -> (
+pub(crate) fn create_channel<const CHUNK_LEN: usize, const CHUNKS: usize, T>() -> (
     Producer<CHUNK_LEN, CHUNKS, T>,
     Consumer<CHUNK_LEN, CHUNKS, T>,
 )
@@ -427,5 +398,24 @@ where
     // dropped to know its time to fail open, we can also do the cleanup logic when the producer drops.
 
     let inner = Box::leak(Box::new(Inner::<CHUNK_LEN, CHUNKS, T>::new()));
-    (Producer { inner }, Consumer { inner })
+    (Producer::from_inner(inner), Consumer { inner })
+}
+
+/// Creates a fixed-size array by initializing each element to the return value of `f`.
+///
+/// This is a simple helper to more succinctly generate fixed-sized arrays without as much rigamarole or literal loop
+/// unrolling tactics that are commonly required.
+fn generate_fixed_size_array<const N: usize, F, T>(f: F) -> [T; N]
+where
+    F: Fn() -> T,
+{
+    // SAFETY: `MaybeUninit` itself does not require initialization.
+    let mut raw_array: [MaybeUninit<T>; N] = unsafe { MaybeUninit::uninit().assume_init() };
+
+    for element in &mut raw_array[..] {
+        element.write(f());
+    }
+
+    // SAFETY: We've initialized each element.
+    raw_array.map(|x| unsafe { x.assume_init() })
 }
