@@ -189,9 +189,14 @@ impl Expression for UnnestFn {
 pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &LookupBuf) -> TypeDef {
     let type_def = typedef.at_path(&path.to_lookup());
 
-    let mut array = Kind::from(type_def)
-        .into_array()
-        .expect("must point to an array");
+    println!("Type Def: {:?}", type_def.kind().debug_info());
+
+    let mut array = if let Some(array) = Kind::from(type_def).into_array() {
+        array
+    } else {
+        // guaranteed fallible
+        return TypeDef::never().fallible();
+    };
 
     array.known_mut().values_mut().for_each(|kind| {
         let mut tdkind = typedef.kind().clone();
@@ -385,40 +390,29 @@ mod tests {
                 ] },
             },
             //// Coalesce with known path first
-            ////
-            //// FIXME(Jean): There's still a bug in the `InsertValid` implementation that prevents
-            //// this from working as expected.
-            ////
-            //// I'm assuming it has something to do with us _inserting_ the coalesced field, and
-            //// _then_ checking if a certain field in the list of coalesced fields can be null at
-            //// runtime. Instead, we should check so _before_ inserting the field.
-            ////
-            //// This is existing behavior though, and it's not "breaking" anything, in that the
-            //// resulting type definition is more expansive than it needs to be, requiring operators
-            //// to add more type coercing, but it'd be nice to fix this at some point.
-            //TestCase {
-            //    old: type_def! { object {
-            //        "nonk" => type_def! { object {
-            //            "shnoog" => type_def! { array [
-            //                type_def! { object {
-            //                    "noog" => type_def! { bytes },
-            //                    "nork" => type_def! { bytes },
-            //                } },
-            //            ] },
-            //        } },
-            //    } },
-            //    path: ".(nonk | nork).shnoog",
-            //    new: type_def! { array [
-            //        type_def! { object {
-            //            "nonk" => type_def! { object {
-            //                "shnoog" => type_def! { object {
-            //                    "noog" => type_def! { bytes },
-            //                    "nork" => type_def! { bytes },
-            //                } },
-            //            } },
-            //        } },
-            //    ] },
-            //},
+            TestCase {
+                old: type_def! { object {
+                    "nonk" => type_def! { object {
+                        "shnoog" => type_def! { array [
+                            type_def! { object {
+                                "noog" => type_def! { bytes },
+                                "nork" => type_def! { bytes },
+                            } },
+                        ] },
+                    } },
+                } },
+                path: ".(nonk | nork).shnoog",
+                new: type_def! { array [
+                    type_def! { object {
+                        "nonk" => type_def! { object {
+                            "shnoog" => type_def! { object {
+                                "noog" => type_def! { bytes },
+                                "nork" => type_def! { bytes },
+                            } },
+                        } },
+                    } },
+                ] },
+            },
             // Coalesce with known path second
             TestCase {
                 old: type_def! { object {
@@ -512,16 +506,8 @@ mod tests {
                 value!({"hostname": "localhost", "events": [{"message": "hello"}, {"message": "world"}]}),
                 Err("expected array, got string".to_owned()),
                 UnnestFn::new("hostname"),
-                type_def! { array [
-                    type_def! { object {
-                        "hostname" => type_def! { unknown },
-                        "events" => type_def! { array [
-                            type_def! { object {
-                                "message" => type_def! { bytes },
-                            } },
-                        ] },
-                    } },
-                ] },
+                // guaranteed to always fail
+                TypeDef::never().fallible(),
             ),
         ];
 

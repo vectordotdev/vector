@@ -142,8 +142,6 @@ impl Kind {
     pub fn canonicalize(&self) -> Self {
         let mut output = self.clone();
 
-        // todo: exact unknown types containing a matching infinite type can be simplified to just the infinite type
-
         if let Some(object) = &mut output.object {
             *object = object.canonicalize();
         }
