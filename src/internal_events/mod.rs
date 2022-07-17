@@ -117,6 +117,8 @@ mod udp;
 mod unix;
 #[cfg(feature = "sinks-websocket")]
 mod websocket;
+#[cfg(feature = "sinks-mqtt")]
+mod mqtt;
 
 #[cfg(any(
     feature = "sources-file",
@@ -258,6 +260,8 @@ pub(crate) use self::throttle::*;
 pub(crate) use self::unix::*;
 #[cfg(feature = "sinks-websocket")]
 pub(crate) use self::websocket::*;
+#[cfg(feature = "sinks-mqtt")]
+pub(crate) use self::mqtt::*;
 #[cfg(windows)]
 pub(crate) use self::windows::*;
 pub(crate) use self::{

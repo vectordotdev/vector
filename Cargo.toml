@@ -285,6 +285,7 @@ rdkafka = { version = "0.28.0", default-features = false, features = ["tokio", "
 redis = { version = "0.21.6", default-features = false, features = ["connection-manager", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex = { version = "1.6.0", default-features = false, features = ["std", "perf"] }
 roaring = { version = "0.10.1", default-features = false, optional = true }
+rumqttc = { version = "0.9", default-features = false, optional = true }
 seahash = { version = "4.1.0", default-features = false }
 semver = { version = "1.0.13", default-features = false, features = ["serde", "std"], optional = true }
 smallvec = { version = "1", default-features = false, features = ["union"] }
@@ -603,6 +604,7 @@ sinks-logs = [
   "sinks-kafka",
   "sinks-logdna",
   "sinks-loki",
+  "sinks-mqtt",
   "sinks-nats",
   "sinks-new_relic_logs",
   "sinks-new_relic",
@@ -659,6 +661,7 @@ sinks-influxdb = []
 sinks-kafka = ["dep:rdkafka"]
 sinks-logdna = []
 sinks-loki = []
+sinks-mqtt = ["dep:rumqttc"]
 sinks-nats = ["dep:nats", "dep:nkeys"]
 sinks-new_relic_logs = ["sinks-http"]
 sinks-new_relic = []

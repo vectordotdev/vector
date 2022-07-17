@@ -63,6 +63,8 @@ pub mod kafka;
 pub mod logdna;
 #[cfg(feature = "sinks-loki")]
 pub mod loki;
+#[cfg(feature = "sinks-mqtt")]
+pub mod mqtt;
 #[cfg(feature = "sinks-nats")]
 pub mod nats;
 #[cfg(feature = "sinks-new_relic")]
