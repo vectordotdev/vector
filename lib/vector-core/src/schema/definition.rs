@@ -195,10 +195,8 @@ impl Definition {
         // Ensure the path exists in the collection.
         assert!(
             self.kind
-                .find_at_path(&path.to_lookup())
-                .ok()
-                .flatten()
-                .is_some(),
+                .get(&path)
+                .contains_any_defined(),
             "meaning must point to a valid path"
         );
 

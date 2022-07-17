@@ -409,7 +409,7 @@ mod tests {
                     path: owned_path!(-1),
                     kind: Kind::bytes(),
                     expected: Kind::array(
-                        Collection::empty().with_unknown(Kind::integer().or_bytes().or_null()),
+                        Collection::empty().with_unknown(Kind::integer().or_bytes()),
                     ),
                 },
             ),
@@ -420,7 +420,7 @@ mod tests {
                     path: owned_path!(-2),
                     kind: Kind::bytes(),
                     expected: Kind::array(
-                        Collection::empty().with_unknown(Kind::integer().or_bytes().or_null()),
+                        Collection::empty().with_unknown(Kind::integer().or_bytes()),
                     ),
                 },
             ),
@@ -461,7 +461,7 @@ mod tests {
                             (1.into(), Kind::float().or_bytes()),
                             (2.into(), Kind::float().or_bytes()),
                         ]))
-                        .with_unknown(Kind::integer().or_bytes().or_null()),
+                        .with_unknown(Kind::integer().or_bytes()),
                     ),
                 },
             ),
@@ -593,6 +593,10 @@ mod tests {
             ),
         ]) {
             this.insert(&path, kind);
+            if this != expected {
+                println!("Actual: {:?}", this.debug_info());
+                println!("Expected: {:?}", expected.debug_info());
+            }
             assert_eq!(this, expected, "{}", title);
         }
     }

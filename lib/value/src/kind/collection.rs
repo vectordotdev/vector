@@ -134,6 +134,17 @@ impl<T: Ord + Clone> Collection<T> {
         }
     }
 
+    /// Returns true if the unknown variant is "Exact" (vs "Infinite").
+    /// This can be used to determine when to stop recursing into an unknown kind.
+    /// Once the unknown is infinite, this will return false and all unknowns after that
+    /// will return the same kind.
+    pub fn is_unknown_exact(&self) -> bool {
+        match &self.unknown {
+            Some(unknown) => unknown.is_exact(),
+            None => true
+        }
+    }
+
     /// Set all "unknown" collection elements to the given kind.
     pub fn set_unknown(&mut self, unknown: impl Into<Option<Kind>>) {
         self.unknown = unknown.into().map(Unknown::from);

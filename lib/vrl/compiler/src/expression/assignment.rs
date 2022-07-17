@@ -1,7 +1,7 @@
-use std::{borrow::Cow, convert::TryFrom, fmt};
+use std::{convert::TryFrom, fmt};
 
 use diagnostic::{DiagnosticMessage, Label, Note};
-use lookup::{Lookup, LookupBuf, Segment};
+use lookup::{LookupBuf, SegmentBuf};
 use value::{Kind, Value};
 
 use crate::{
@@ -221,7 +221,7 @@ fn verify_overwriteable(
     assignment_span: Span,
     rhs_expr: Expr,
 ) -> Result<(), Error> {
-    let mut path = target.lookup();
+    let mut path = target.lookup_buf();
 
     let root_kind = match target {
         Target::Noop => Kind::any(),
@@ -239,13 +239,10 @@ fn verify_overwriteable(
     // object or array.
     while let Some(last) = path.pop_back() {
         let parent_kind = root_kind
-            .find_at_path(&path)
-            .ok()
-            .flatten()
-            .map_or_else(Kind::any, Cow::into_owned);
+            .get(&path);
 
         let (variant, segment_span, valid) = match last {
-            segment @ (Segment::Field(_) | Segment::Coalesce(_)) => {
+            segment @ (SegmentBuf::Field(_) | SegmentBuf::Coalesce(_)) => {
                 let segment_str = segment.to_string();
                 let segment_start = parent_span.end() - segment_str.len();
                 let segment_span = Span::new(segment_start, parent_span.end());
@@ -255,7 +252,7 @@ fn verify_overwriteable(
 
                 ("object", segment_span, parent_kind.contains_object())
             }
-            Segment::Index(index) => {
+            SegmentBuf::Index(index) => {
                 let segment_start = parent_span.end() - format!("[{index}]").len();
                 let segment_span = Span::new(segment_start, parent_span.end());
 
@@ -407,11 +404,11 @@ impl Target {
         }
     }
 
-    fn lookup(&self) -> Lookup<'_> {
+    fn lookup_buf(&self) -> LookupBuf {
         match self {
-            Self::Noop => Lookup::root(),
-            Self::Internal(_, path) => path.to_lookup(),
-            Self::External(path) => path.to_lookup(),
+            Self::Noop => LookupBuf::root(),
+            Self::Internal(_, path) => path.clone(),
+            Self::External(path) => path.clone(),
         }
     }
 }
