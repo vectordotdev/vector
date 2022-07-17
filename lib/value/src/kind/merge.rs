@@ -22,6 +22,7 @@ impl Kind {
         self.timestamp = self.timestamp.or(other.timestamp);
         self.regex = self.regex.or(other.regex);
         self.null = self.null.or(other.null);
+        self.undefined = self.undefined.or(other.undefined);
     }
 
     fn merge_objects(&mut self, other: Option<Collection<Field>>, overwrite: bool) {
@@ -32,7 +33,15 @@ impl Kind {
         };
     }
 
+    /// Returns the union of self and other.
+    pub fn union(&self, other: Self) -> Self {
+        let mut kind = self.clone();
+        kind.merge_keep(other, false);
+        kind
+    }
+
     /// Merge `other` into `self`, optionally overwriting on conflicts.
+    // deprecated
     pub fn merge_keep(&mut self, other: Self, overwrite: bool) {
         self.merge_primitives(&other);
         self.merge_objects(other.object, overwrite);

@@ -31,6 +31,7 @@ pub struct Kind {
     timestamp: Option<()>,
     regex: Option<()>,
     null: Option<()>,
+    undefined: Option<()>,
     array: Option<Collection<Index>>,
     object: Option<Collection<Field>>,
 }
@@ -74,12 +75,16 @@ impl std::fmt::Display for Kind {
         if self.contains_null() {
             kinds.push("null");
         }
+        if self.contains_undefined() {
+            kinds.push("undefined");
+        }
         if self.contains_array() {
             kinds.push("array");
         }
         if self.contains_object() {
             kinds.push("object");
         }
+
         if kinds.is_empty() {
             return f.write_str("never");
         }
@@ -124,6 +129,9 @@ impl PartialEq for Kind {
             return false;
         }
         if a.null != b.null {
+            return false;
+        }
+        if a.undefined != b.undefined {
             return false;
         }
         if a.array != b.array {

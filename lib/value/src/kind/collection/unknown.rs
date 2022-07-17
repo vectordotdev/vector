@@ -92,27 +92,24 @@ impl Unknown {
     /// values are not guaranteed to exist
     #[must_use]
     pub fn to_kind(&self) -> Kind {
-        // unknown types are not guaranteed to exist, therefore the type must contain "undefined".
-        // "null" is the closest that exists today, so that is used instead
-        // TODO: switch to "or_undefined" once https://github.com/vectordotdev/vector/issues/13459 is completed
-        self.to_raw_kind().or_null()
+        self.to_existing_kind().or_undefined()
     }
 
     /// Get the `Kind` stored in this `Unknown`.
+    ///
     /// This represents the kind of any _EXISTING_ type not "known".
     /// This function assumes the type you are accessing actually exists.
     /// If it's an optional field, `to_kind` should be used instead.
     ///
-    /// This is a temporary function and will not be needed once "undefined" is added
-    /// to type definitions.
-    ///
-    // see: https://github.com/vectordotdev/vector/issues/13459
+    /// This will never have "undefined" as part of the type
     #[must_use]
-    pub fn to_raw_kind(&self) -> Kind {
-        match &self.0 {
+    pub fn to_existing_kind(&self) -> Kind {
+        let mut result = match &self.0 {
             Inner::Infinite(infinite) => (*infinite).into(),
             Inner::Exact(kind) => kind.as_ref().clone(),
-        }
+        };
+        result.remove_undefined();
+        result
     }
 
     /// Check if `self` is a superset of `other`.
@@ -145,14 +142,14 @@ impl Unknown {
     }
 }
 
-impl From<Unknown> for Kind {
-    fn from(unknown: Unknown) -> Self {
-        match unknown.0 {
-            Inner::Infinite(infinite) => infinite.into(),
-            Inner::Exact(exact) => *exact,
-        }
-    }
-}
+// impl From<Unknown> for Kind {
+//     fn from(unknown: Unknown) -> Self {
+//         match unknown.0 {
+//             Inner::Infinite(infinite) => infinite.into(),
+//             Inner::Exact(exact) => *exact,
+//         }
+//     }
+// }
 
 impl From<Kind> for Unknown {
     fn from(kind: Kind) -> Self {

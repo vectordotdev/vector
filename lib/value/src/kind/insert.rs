@@ -9,7 +9,7 @@ use lookup::path;
 
 impl Kind {
     /// Insert the `Kind` at the given `path` within `self`.
-    /// This has the same behavior as setting a value at a given path at runtime.
+    /// This has the same behavior as `Value::insert`.
     #[allow(clippy::too_many_lines)]
     #[allow(clippy::needless_pass_by_value)] // only reference types implement Path
     pub fn insert<'a>(&'a mut self, path: impl Path<'a>, kind: Self) {

@@ -1,7 +1,7 @@
 //! The `value` crate contains types shared across Vector libraries to support it's use of `Value`
 //! and the closely linked `Kind` in support of progressive type checking.
 
-#![deny(warnings)]
+// #![deny(warnings)]
 #![deny(
     clippy::all,
     clippy::cargo,
@@ -20,7 +20,7 @@
     rustdoc::missing_crate_level_docs,
     rustdoc::private_doc_tests,
     rustdoc::private_intra_doc_links,
-    unused
+    // unused
 )]
 #![allow(
     clippy::cast_lossless,

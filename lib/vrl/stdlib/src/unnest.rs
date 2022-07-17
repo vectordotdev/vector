@@ -187,7 +187,7 @@ impl Expression for UnnestFn {
 ///  ]`
 ///
 pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &LookupBuf) -> TypeDef {
-    let type_def = typedef.at_path(&path.to_lookup());
+    let type_def = typedef.at_path(&path);
 
     let mut array = if let Some(array) = Kind::from(type_def).into_array() {
         array
@@ -204,9 +204,8 @@ pub(crate) fn invert_array_at_path(typedef: &TypeDef, path: &LookupBuf) -> TypeD
     });
 
     let mut tdkind = typedef.kind().clone();
-
     let unknown = array.unknown().map(|unknown| {
-        tdkind.insert(path, unknown.clone().into());
+        tdkind.insert(path, unknown.to_existing_kind());
         tdkind
     });
 
@@ -387,6 +386,86 @@ mod tests {
                     } },
                 ] },
             },
+            // Coalesce with known path first
+            // This result is "correct", but the coalescing can be improved once "undefined" is a type
+            // see: https://github.com/vectordotdev/vector/issues/13459
+            TestCase {
+                old: type_def! { object {
+                    "nonk" => type_def! { object {
+                        "shnoog" => type_def! { array [
+                            type_def! { object {
+                                "noog" => type_def! { bytes },
+                                "nork" => type_def! { bytes },
+                            } },
+                        ] },
+                    } },
+                } },
+                path: ".(nonk | nork).shnoog",
+                new: type_def! { array [
+                    type_def! { object {
+                        "nonk" => type_def! { object {
+                            "shnoog" => {
+                                type_def! { object {
+                                    "noog" => type_def! { bytes },
+                                    "nork" => type_def! { bytes },
+                                } }.union(
+                                    type_def! { array [
+                                    type_def! { object {
+                                        "noog" => type_def! { bytes },
+                                        "nork" => type_def! { bytes },
+                                    } },
+                                ] }
+                                )
+                            },
+                        } },
+                        "nork" => type_def! { object {
+                            "shnoog" => type_def! { object {
+                                    "noog" => type_def! { bytes },
+                                    "nork" => type_def! { bytes },
+                                } },
+                        } }.union(TypeDef::null()),
+                    } },
+                ] },
+            },
+            // Coalesce with known path second
+            // This result is "correct", but the coalescing can be improved once "undefined" is a type
+            // see: https://github.com/vectordotdev/vector/issues/13459
+            TestCase {
+                old: type_def! { object {
+                    unknown => type_def! { bytes },
+                    "nonk" => type_def! { object {
+                        "shnoog" => type_def! { array [
+                            type_def! { object {
+                                "noog" => type_def! { bytes },
+                                "nork" => type_def! { bytes },
+                            } },
+                        ] },
+                    } },
+                } },
+                path: ".(nork | nonk).shnoog",
+                new: type_def! { array [
+                    type_def! { object {
+                        unknown => type_def! { bytes },
+                        "nonk" => type_def! { object {
+                            "shnoog" => type_def! { object {
+                                "noog" => type_def! { bytes },
+                                "nork" => type_def! { bytes },
+                            } }.union(type_def! { array [
+                            type_def! { object {
+                                "noog" => type_def! { bytes },
+                                "nork" => type_def! { bytes },
+                            } },
+                        ] }),
+                        } },
+                        "nork" => type_def! { object {
+                            "shnoog" => type_def! { object {
+                                "noog" => type_def! { bytes },
+                                "nork" => type_def! { bytes },
+                            } },
+                        } }.union(TypeDef::bytes()).union(TypeDef::null()),
+                    } },
+                ] },
+            },
             // Non existent, the types we know are moved into the returned array.
             TestCase {
                 old: type_def! { object {
@@ -405,7 +484,6 @@ mod tests {
         for case in cases {
             let path = LookupBuf::from_str(case.path).unwrap();
             let new = invert_array_at_path(&case.old, &path);
-
             assert_eq!(case.new, new, "{}", path);
         }
     }

@@ -23,12 +23,9 @@
 //! `Field` can be a specifix field name of the object, or `Any` which represents any element found
 //! within that object.
 
-use std::{
-    borrow::Cow,
-    ops::{Deref, DerefMut},
-};
+use std::ops::{Deref, DerefMut};
 
-use lookup::{Lookup, LookupBuf};
+use lookup::LookupBuf;
 use value::{
     kind::{merge, Collection, Field, Index},
     Kind, Value,
@@ -73,15 +70,10 @@ impl TypeDef {
         &mut self.kind
     }
 
-    pub fn at_path(&self, path: &Lookup<'_>) -> TypeDef {
+    pub fn at_path(&self, path: &LookupBuf) -> TypeDef {
         let fallible = self.fallible;
 
-        let kind = self
-            .kind
-            .find_at_path(path)
-            .ok()
-            .flatten()
-            .map_or_else(Kind::any, Cow::into_owned);
+        let kind = self.kind.get(path);
 
         Self { fallible, kind }
     }
@@ -326,7 +318,7 @@ impl TypeDef {
     }
 
     #[must_use]
-    pub fn merge_deep(mut self, other: Self) -> Self {
+    pub fn union(mut self, other: Self) -> Self {
         self.merge(
             other,
             merge::Strategy {
@@ -412,7 +404,7 @@ impl Details {
     /// Returns the union of 2 possible states
     pub(crate) fn merge(self, other: Self) -> Self {
         Self {
-            type_def: self.type_def.merge_deep(other.type_def),
+            type_def: self.type_def.union(other.type_def),
             value: if self.value == other.value {
                 self.value
             } else {

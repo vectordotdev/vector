@@ -36,12 +36,10 @@ impl<T: Ord + Clone> Collection<T> {
         //TODO: canonicalize the Unknown (should be added once https://github.com/vectordotdev/vector/issues/13459 is done)
 
         let mut output = (*self).clone();
-        if let Some(unknown) = self.unknown() {
-            let unknown_kind = unknown.to_kind();
-            output
-                .known_mut()
-                .retain(|i, i_kind| *i_kind != unknown_kind);
-        }
+        let unknown_kind = self.unknown_kind();
+        output
+            .known_mut()
+            .retain(|i, i_kind| *i_kind != unknown_kind);
         output
     }
 
@@ -122,13 +120,23 @@ impl<T: Ord + Clone> Collection<T> {
     /// If `None` is returned, it means all elements within the collection are known, i.e. it's
     /// a "closed" collection.
     #[must_use]
+    // deprecated
     pub fn unknown(&self) -> Option<&Unknown> {
         self.unknown.as_ref()
     }
 
+    /// Gets the type of "unknown" elements in the collection.
+    /// The returned type will always have "undefined" included.
+    pub fn unknown_kind(&self) -> Kind {
+        match &self.unknown {
+            None => Kind::undefined(),
+            Some(x) => x.to_kind(),
+        }
+    }
+
     /// Set all "unknown" collection elements to the given kind.
     pub fn set_unknown(&mut self, unknown: impl Into<Option<Kind>>) {
-        self.unknown = unknown.into().map(Into::into);
+        self.unknown = unknown.into().map(Unknown::from);
     }
 
     /// Returns a new collection with the unknown set
@@ -297,7 +305,7 @@ impl<T: Ord + Clone> Collection<T> {
             // TODO: this can be switched back to `to_kind` once "undefined" is added.
             //   (undefined can be safely removed then, without losing type information)
             // see: https://github.com/vectordotdev/vector/issues/13459
-            kind.merge(unknown.to_raw_kind(), strategy);
+            kind.merge(unknown.to_existing_kind(), strategy);
         }
         kind
     }

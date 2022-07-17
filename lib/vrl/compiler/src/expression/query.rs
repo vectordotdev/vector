@@ -119,15 +119,10 @@ impl Expression for Query {
         use Target::{Container, External, FunctionCall, Internal};
 
         match &self.target {
-            External => state
-                .1
-                .target()
-                .clone()
-                .type_def
-                .at_path(&self.path.to_lookup()),
-            Internal(variable) => variable.type_def(state).at_path(&self.path.to_lookup()),
-            FunctionCall(call) => call.type_def(state).at_path(&self.path.to_lookup()),
-            Container(container) => container.type_def(state).at_path(&self.path.to_lookup()),
+            External => state.1.target().clone().type_def.at_path(&self.path),
+            Internal(variable) => variable.type_def(state).at_path(&self.path),
+            FunctionCall(call) => call.type_def(state).at_path(&self.path),
+            Container(container) => container.type_def(state).at_path(&self.path),
         }
     }
 }
