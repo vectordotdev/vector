@@ -34,6 +34,7 @@ pub struct SampleConfig {
     pub exclude: Option<AnyCondition>,
 }
 
+// TODO: Deprecate the name `sampler`
 inventory::submit! {
     TransformDescription::new::<SampleConfig>("sampler")
 }
@@ -68,11 +69,11 @@ impl TransformConfig for SampleConfig {
     }
 
     fn input(&self) -> Input {
-        Input::log()
+        Input::new(DataType::Log | DataType::Trace)
     }
 
     fn outputs(&self, _: &schema::Definition) -> Vec<Output> {
-        vec![Output::default(DataType::Log)]
+        vec![Output::default(DataType::Log | DataType::Trace)]
     }
 
     fn transform_type(&self) -> &'static str {
