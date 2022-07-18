@@ -53,6 +53,8 @@ use tracking_allocator::{
     AllocationGroupId, AllocationGroupToken, AllocationRegistry, AllocationTracker,
 };
 
+mod allocator;
+
 mod channel;
 use self::channel::{create_channel, Consumer, Producer};
 
