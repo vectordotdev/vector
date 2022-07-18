@@ -334,12 +334,11 @@ mod tests {
         }
 
         error_line_threaded_mpms_valid {
-            args: func_args![value: r#"[Mon Dec 27 16:39:10.968303 2021] [proxy:error] [pid 23964] (113)No route to host: AH00957: HTTP: attempt to connect to 10.1.0.244:9000 (hostname.domain.com) failed"#,
-                             timestamp_format: "%a %b %d %H:%M:%S.%f %Y",
+            args: func_args![value: r#"[01/Mar/2021:12:00:19 +0000] [proxy:error] [pid 23964] (113)No route to host: AH00957: HTTP: attempt to connect to 10.1.0.244:9000 (hostname.domain.com) failed"#,
                              format: "error"
                              ],
             want: Ok(btreemap! {
-                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2021-12-27T23:39:10.000968303Z").unwrap().into()),
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2021-03-01T12:00:19Z").unwrap().into()),
                 "message1" => "(113)No route to host: AH00957: ",
                 "message2" => "HTTP: attempt to connect to 10.1.0.244:9000 (hostname.domain.com) failed",
                 "module" => "proxy",
