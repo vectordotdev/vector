@@ -19,7 +19,7 @@ use vector_core::{
 };
 
 use crate::{
-    codecs::{self, EncodingConfigWithFraming},
+    codecs::{self, EncodingConfig},
     config::{log_schema, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     gcp::{GcpAuthConfig, GcpAuthenticator},
     http::{HttpClient, HttpError},
@@ -88,7 +88,7 @@ pub struct ChronicleUnstructuredConfig {
     #[serde(default)]
     pub batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
     #[serde(flatten)]
-    pub encoding: EncodingConfigWithFraming,
+    pub encoding: EncodingConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
     #[serde(default)]
@@ -362,8 +362,7 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
 impl RequestSettings {
     fn new(config: &ChronicleUnstructuredConfig) -> crate::Result<Self> {
         let transformer = config.encoding.transformer();
-        let (_, serializer) = config.encoding.config();
-        let serializer = serializer.build()?;
+        let serializer = config.encoding.config().build()?;
         let encoder = crate::codecs::Encoder::<()>::new(serializer);
         let encoder = ChronicleEncoder {
             customer_id: config.customer_id.clone(),
