@@ -74,6 +74,7 @@ depends = ""
 [workspace]
 members = [
   ".",
+  "examples/perf_vrl",
   "lib/codecs",
   "lib/enrichment",
   "lib/vector-buffers",
