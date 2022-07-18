@@ -2,8 +2,8 @@ use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 use aws_smithy_types::retry::RetryConfig;
 use codecs::JsonSerializerConfig;
 use futures::FutureExt;
-use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
+use vector_config::configurable_component;
 
 use crate::{
     aws::{
@@ -46,27 +46,72 @@ impl ClientBuilder for CloudwatchLogsClientBuilder {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Configuration for the `aws_cloudwatch_logs` sink.
+#[configurable_component(sink)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct CloudwatchLogsSinkConfig {
+    /// The [group name][group_name] of the target CloudWatch Logs stream.
+    ///
+    /// [group_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
     pub group_name: Template,
+
+    /// The [stream name][stream_name] of the target CloudWatch Logs stream.
+    ///
+    /// Note that there can only be one writer to a log stream at a time. If you have multiple instances of Vector
+    /// writing to the same log group, you must include an identifier in the stream name that is guaranteed to be unique per
+    /// Vector instance.
+    ///
+    /// For example, you might choose `host`.
+    ///
+    /// [stream_name]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
     pub stream_name: Template,
+
+    /// The [AWS region][aws_region] of the target service.
+    ///
+    /// [aws_region]: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.RegionsAndAvailabilityZones.html
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
-    pub encoding: EncodingConfig,
+
+    /// Dynamically create a [log group][log_group] if it does not already exist.
+    ///
+    /// This will ignore `create_missing_stream` directly after creating the group and will create the first stream.
+    ///
+    /// [log_group]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
     pub create_missing_group: Option<bool>,
+
+    /// Dynamically create a [log stream][log_stream] if it does not already exist.
+    ///
+    /// [log_stream]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html
     pub create_missing_stream: Option<bool>,
+
+    #[configurable(derived)]
+    pub encoding: EncodingConfig,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub compression: Compression,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<CloudwatchLogsDefaultBatchSettings>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub request: RequestConfig,
+
+    #[configurable(derived)]
     pub tls: Option<TlsConfig>,
-    // Deprecated name. Moved to auth.
+
+    /// The ARN of an [IAM role](\(urls.aws_iam_role)) to assume at startup.
+    #[configurable(deprecated)]
     pub assume_role: Option<String>,
+
+    #[configurable(derived)]
     #[serde(default)]
     pub auth: AwsAuthentication,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",

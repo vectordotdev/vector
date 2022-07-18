@@ -64,14 +64,6 @@ pub enum OutOfOrderAction {
     Accept,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum Encoding {
-    Json,
-    Text,
-    Logfmt,
-}
-
 impl GenerateConfig for LokiConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(

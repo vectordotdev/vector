@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, fmt, path::Path};
+use std::{collections::BTreeMap, path::Path};
 
 use chrono::{DateTime, Utc};
 use futures::StreamExt;
@@ -6,18 +6,9 @@ use glob::{Pattern, PatternError};
 #[cfg(not(target_os = "windows"))]
 use heim::units::ratio::ratio;
 use heim::units::time::second;
-use serde::{
-    de::{self, Visitor},
-    Deserialize, Deserializer, Serialize, Serializer,
-};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
-use vector_config::{
-    configurable_component,
-    schema::{finalize_schema, generate_string_schema},
-    schemars::{gen::SchemaGenerator, schema::SchemaObject},
-    Configurable, Metadata,
-};
+use vector_config::configurable_component;
 use vector_core::config::LogNamespace;
 use vector_core::ByteSizeOf;
 
@@ -457,16 +448,28 @@ impl FilterList {
     }
 }
 
-// Pattern doesn't implement Deserialize or Serialize, and we can't
-// implement them ourselves due the orphan rules, so make a wrapper.
+/// A compiled Unix shell-style pattern.
+///
+/// - `?` matches any single character.
+/// - `*` matches any (possibly empty) sequence of characters.
+/// - `**` matches the current directory and arbitrary subdirectories. This sequence must form a single path component,
+///   so both `**a` and `b**` are invalid and will result in an error. A sequence of more than two consecutive `*`
+///   characters is also invalid.
+/// - `[...]` matches any character inside the brackets. Character sequences can also specify ranges of characters, as
+///   ordered by Unicode, so e.g. `[0-9]` specifies any character between 0 and 9 inclusive. An unclosed bracket is
+///   invalid.
+/// - `[!...]` is the negation of `[...]`, i.e. it matches any characters not in the brackets.
+///
+/// The metacharacters `?`, `*`, `[`, `]` can be matched by using brackets (e.g. `[?]`). When a `]` occurs immediately
+/// following `[` or `[!` then it is interpreted as being part of, rather then ending, the character set, so `]` and NOT
+/// `]` can be matched by `[]]` and `[!]]` respectively. The `-` character can be specified inside a character sequence
+/// pattern by placing it at the start or the end, e.g. `[abc-]`.
+#[configurable_component]
 #[derive(Clone, Debug)]
+#[serde(try_from = "String", into = "String")]
 struct PatternWrapper(Pattern);
 
 impl PatternWrapper {
-    fn new(pattern: impl AsRef<str>) -> Result<PatternWrapper, PatternError> {
-        Ok(PatternWrapper(Pattern::new(pattern.as_ref())?))
-    }
-
     fn matches_str(&self, s: &str) -> bool {
         self.0.matches(s)
     }
@@ -476,47 +479,17 @@ impl PatternWrapper {
     }
 }
 
-impl<'de> Deserialize<'de> for PatternWrapper {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        deserializer.deserialize_str(PatternVisitor)
+impl TryFrom<String> for PatternWrapper {
+    type Error = PatternError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Pattern::new(value.as_ref()).map(PatternWrapper)
     }
 }
 
-struct PatternVisitor;
-
-impl<'de> Visitor<'de> for PatternVisitor {
-    type Value = PatternWrapper;
-
-    fn expecting(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(fmt, "a string")
-    }
-
-    fn visit_str<E: de::Error>(self, s: &str) -> Result<Self::Value, E> {
-        PatternWrapper::new(s).map_err(de::Error::custom)
-    }
-}
-
-impl Serialize for PatternWrapper {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(self.0.as_str())
-    }
-}
-
-// NOTE: We have to do a manual implementation of `Configurable` because `configurable_component` derives
-// `Serialize`/`Deserialize` automatically, which we can't do here since they're already implemented by hand here.
-impl<'de> Configurable<'de> for PatternWrapper {
-    fn referencable_name() -> Option<&'static str> {
-        Some("glob::PatternWrapper")
-    }
-
-    fn description() -> Option<&'static str> {
-        Some("A compiled Unix shell style pattern.")
-    }
-
-    fn generate_schema(gen: &mut SchemaGenerator, overrides: Metadata<'de, Self>) -> SchemaObject {
-        let mut schema = generate_string_schema();
-        finalize_schema(gen, &mut schema, overrides);
-        schema
+impl From<PatternWrapper> for String {
+    fn from(pattern: PatternWrapper) -> Self {
+        pattern.0.to_string()
     }
 }
 
@@ -539,8 +512,8 @@ pub(self) mod tests {
     fn filterlist_includes_works() {
         let filters = FilterList {
             includes: Some(vec![
-                PatternWrapper::new("sda").unwrap(),
-                PatternWrapper::new("dm-*").unwrap(),
+                PatternWrapper::try_from("sda".to_string()).unwrap(),
+                PatternWrapper::try_from("dm-*".to_string()).unwrap(),
             ]),
             excludes: None,
         };
@@ -558,8 +531,8 @@ pub(self) mod tests {
         let filters = FilterList {
             includes: None,
             excludes: Some(vec![
-                PatternWrapper::new("sda").unwrap(),
-                PatternWrapper::new("dm-*").unwrap(),
+                PatternWrapper::try_from("sda".to_string()).unwrap(),
+                PatternWrapper::try_from("dm-*".to_string()).unwrap(),
             ]),
         };
         assert!(filters.contains_test(Some("sd")));
@@ -575,10 +548,10 @@ pub(self) mod tests {
     fn filterlist_includes_and_excludes_works() {
         let filters = FilterList {
             includes: Some(vec![
-                PatternWrapper::new("sda").unwrap(),
-                PatternWrapper::new("dm-*").unwrap(),
+                PatternWrapper::try_from("sda".to_string()).unwrap(),
+                PatternWrapper::try_from("dm-*".to_string()).unwrap(),
             ]),
-            excludes: Some(vec![PatternWrapper::new("dm-5").unwrap()]),
+            excludes: Some(vec![PatternWrapper::try_from("dm-5".to_string()).unwrap()]),
         };
         assert!(!filters.contains_test(Some("sd")));
         assert!(filters.contains_test(Some("sda")));
@@ -746,10 +719,12 @@ pub(self) mod tests {
         let keys = collect_tag_values(&all_metrics, tag);
         // Pick an arbitrary key value
         if let Some(key) = keys.into_iter().next() {
-            let key_prefix = &key[..key.len() - 1];
+            let key_prefix = &key[..key.len() - 1].to_string();
+            let key_prefix_pattern = PatternWrapper::try_from(format!("{}*", key_prefix)).unwrap();
+            let key_pattern = PatternWrapper::try_from(key.clone()).unwrap();
 
             let filtered_metrics_with = get_metrics(FilterList {
-                includes: Some(vec![PatternWrapper::new(&key).unwrap()]),
+                includes: Some(vec![key_pattern.clone()]),
                 excludes: None,
             })
             .await;
@@ -759,9 +734,7 @@ pub(self) mod tests {
             assert!(all_tags_match(&filtered_metrics_with, tag, |s| s == key));
 
             let filtered_metrics_with_match = get_metrics(FilterList {
-                includes: Some(vec![
-                    PatternWrapper::new(&format!("{}*", key_prefix)).unwrap()
-                ]),
+                includes: Some(vec![key_prefix_pattern.clone()]),
                 excludes: None,
             })
             .await;
@@ -773,7 +746,7 @@ pub(self) mod tests {
 
             let filtered_metrics_without = get_metrics(FilterList {
                 includes: None,
-                excludes: Some(vec![PatternWrapper::new(&key).unwrap()]),
+                excludes: Some(vec![key_pattern]),
             })
             .await;
 
@@ -782,9 +755,7 @@ pub(self) mod tests {
 
             let filtered_metrics_without_match = get_metrics(FilterList {
                 includes: None,
-                excludes: Some(vec![
-                    PatternWrapper::new(&format!("{}*", key_prefix)).unwrap()
-                ]),
+                excludes: Some(vec![key_prefix_pattern]),
             })
             .await;
 

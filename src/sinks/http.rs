@@ -286,7 +286,7 @@ impl util::http::HttpSink for HttpSink {
                 builder = builder.header("Content-Encoding", "gzip");
 
                 let buffer = BytesMut::new();
-                let mut w = GzEncoder::new(buffer.writer(), level);
+                let mut w = GzEncoder::new(buffer.writer(), level.as_flate2());
                 w.write_all(&body).expect("Writing to Vec can't fail");
                 body = w.finish().expect("Writing to Vec can't fail").into_inner();
             }
@@ -294,7 +294,7 @@ impl util::http::HttpSink for HttpSink {
                 builder = builder.header("Content-Encoding", "deflate");
 
                 let buffer = BytesMut::new();
-                let mut w = ZlibEncoder::new(buffer.writer(), level);
+                let mut w = ZlibEncoder::new(buffer.writer(), level.as_flate2());
                 w.write_all(&body).expect("Writing to Vec can't fail");
                 body = w.finish().expect("Writing to Vec can't fail").into_inner();
             }
