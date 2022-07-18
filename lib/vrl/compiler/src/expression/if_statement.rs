@@ -14,6 +14,7 @@ pub struct IfStatement {
     predicate: Predicate,
     consequent: Block,
     alternative: Option<Block>,
+    selection_vector_ok: Vec<usize>,
     selection_vector_if: Vec<usize>,
     selection_vector_else: Vec<usize>,
 }
@@ -25,6 +26,7 @@ impl IfStatement {
             predicate,
             consequent,
             alternative,
+            selection_vector_ok: vec![],
             selection_vector_if: vec![],
             selection_vector_else: vec![],
         }
@@ -51,49 +53,31 @@ impl Expression for IfStatement {
     fn resolve_batch(&mut self, ctx: &mut BatchContext, selection_vector: &[usize]) {
         self.predicate.resolve_batch(ctx, selection_vector);
 
-        self.selection_vector_if.resize(selection_vector.len(), 0);
-        self.selection_vector_if.copy_from_slice(selection_vector);
+        self.selection_vector_ok.truncate(0);
 
-        let mut len = self.selection_vector_if.len();
-        let mut i = 0;
-        loop {
-            if i >= len {
-                break;
-            }
-
-            let index = self.selection_vector_if[i];
-            if ctx.resolved_values[index].is_err() {
-                len -= 1;
-                self.selection_vector_if.swap(i, len);
-            } else {
-                i += 1;
+        for index in selection_vector {
+            let index = *index;
+            if ctx.resolved_values[index].is_ok() {
+                self.selection_vector_ok.push(index);
             }
         }
-        self.selection_vector_if.truncate(len);
 
+        self.selection_vector_if.truncate(0);
         self.selection_vector_else.truncate(0);
 
-        let mut len = self.selection_vector_if.len();
-        let mut i = 0;
-        loop {
-            if i >= len {
-                break;
-            }
-
-            let index = self.selection_vector_if[i];
+        for index in &self.selection_vector_ok {
+            let index = *index;
             let predicate = match ctx.resolved_values.get(index) {
                 Some(Ok(Value::Boolean(predicate))) => *predicate,
                 _ => unreachable!("predicate has been checked for error and must be boolean"),
             };
+
             if predicate {
-                i += 1;
+                self.selection_vector_if.push(index);
             } else {
-                len -= 1;
-                self.selection_vector_if.swap(i, len);
                 self.selection_vector_else.push(index);
             }
         }
-        self.selection_vector_if.truncate(len);
 
         self.consequent
             .resolve_batch(ctx, &self.selection_vector_if);

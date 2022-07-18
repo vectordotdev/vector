@@ -16,6 +16,7 @@ pub struct Op {
     pub(crate) lhs: Box<Expr>,
     pub(crate) rhs: Box<Expr>,
     pub(crate) opcode: ast::Opcode,
+    selection_vector_lhs_ok: Vec<usize>,
     selection_vector_ok: Vec<usize>,
     resolved_values_rhs: Vec<Resolved>,
 }
@@ -75,6 +76,7 @@ impl Op {
             lhs: Box::new(lhs),
             rhs: Box::new(rhs),
             opcode,
+            selection_vector_lhs_ok: vec![],
             selection_vector_ok: vec![],
             resolved_values_rhs: vec![],
         })
@@ -176,54 +178,29 @@ impl Expression for Op {
 
         self.lhs.resolve_batch(ctx, selection_vector);
 
-        self.selection_vector_ok.resize(selection_vector.len(), 0);
-        self.selection_vector_ok.copy_from_slice(selection_vector);
-
-        let mut len = self.selection_vector_ok.len();
-        let mut i = 0;
-        loop {
-            if i >= len {
-                break;
-            }
-
-            let index = self.selection_vector_ok[i];
-            if ctx.resolved_values[index].is_err() {
-                len -= 1;
-                self.selection_vector_ok.swap(i, len);
-            } else {
-                i += 1;
+        self.selection_vector_lhs_ok.truncate(0);
+        for index in selection_vector {
+            let index = *index;
+            if ctx.resolved_values[index].is_ok() {
+                self.selection_vector_lhs_ok.push(index);
             }
         }
-        self.selection_vector_ok.truncate(len);
 
         self.resolved_values_rhs.truncate(0);
         self.resolved_values_rhs
             .resize(ctx.resolved_values.len(), Ok(Value::Null));
 
         std::mem::swap(ctx.resolved_values, &mut self.resolved_values_rhs);
-        self.rhs.resolve_batch(ctx, &self.selection_vector_ok);
+        self.rhs.resolve_batch(ctx, &self.selection_vector_lhs_ok);
         std::mem::swap(ctx.resolved_values, &mut self.resolved_values_rhs);
 
-        let mut len = self.selection_vector_ok.len();
-        let mut i = 0;
-        loop {
-            if i >= len {
-                break;
-            }
-
-            let index = self.selection_vector_ok[i];
-            if self.resolved_values_rhs[index].is_err() {
-                len -= 1;
-                self.selection_vector_ok.swap(i, len);
-                std::mem::swap(
-                    &mut self.resolved_values_rhs[index],
-                    &mut ctx.resolved_values[index],
-                )
-            } else {
-                i += 1;
+        self.selection_vector_ok.truncate(0);
+        for index in selection_vector {
+            let index = *index;
+            if self.resolved_values_rhs[index].is_ok() {
+                self.selection_vector_ok.push(index);
             }
         }
-        self.selection_vector_ok.truncate(len);
 
         match self.opcode {
             Mul => {
@@ -755,6 +732,7 @@ mod tests {
             lhs: Box::new(lhs.into()),
             rhs: Box::new(rhs.into()),
             opcode,
+            selection_vector_lhs_ok: vec![],
             selection_vector_ok: vec![],
             resolved_values_rhs: vec![],
         }
@@ -930,6 +908,7 @@ mod tests {
                 lhs: Box::new(Literal::from(true).into()),
                 rhs: Box::new(Literal::from(NotNan::new(1.0).unwrap()).into()),
                 opcode: Div,
+                selection_vector_lhs_ok: vec![],
                 selection_vector_ok: vec![],
                 resolved_values_rhs: vec![],
             },
@@ -947,6 +926,7 @@ mod tests {
                     lhs: Box::new(Literal::from(1).into()),
                     rhs: Box::new(Variable::new(Span::default(), Ident::new("foo"), local).unwrap().into()),
                     opcode: Div,
+                    selection_vector_lhs_ok: vec![],
                     selection_vector_ok: vec![],
                     resolved_values_rhs: vec![],
                 }
@@ -1095,11 +1075,13 @@ mod tests {
                     lhs: Box::new(Literal::from("foo").into()),
                     rhs: Box::new(Literal::from(1).into()),
                     opcode: Div,
+                    selection_vector_lhs_ok: vec![],
                     selection_vector_ok: vec![],
                     resolved_values_rhs: vec![],
                 }.into()),
                 rhs: Box::new(Literal::from(true).into()),
                 opcode: Err,
+                selection_vector_lhs_ok: vec![],
                 selection_vector_ok: vec![],
                 resolved_values_rhs: vec![],
             },
@@ -1112,6 +1094,7 @@ mod tests {
                     lhs: Box::new(Literal::from("foo").into()),
                     rhs: Box::new(Literal::from(NotNan::new(0.0).unwrap()).into()),
                     opcode: Div,
+                    selection_vector_lhs_ok: vec![],
                     selection_vector_ok: vec![],
                     resolved_values_rhs: vec![],
                 }.into()),
@@ -1119,10 +1102,12 @@ mod tests {
                     lhs: Box::new(Literal::from(true).into()),
                     rhs: Box::new(Literal::from(NotNan::new(0.0).unwrap()).into()),
                     opcode: Div,
+                    selection_vector_lhs_ok: vec![],
                     selection_vector_ok: vec![],
                     resolved_values_rhs: vec![],
                 }.into()),
                 opcode: Err,
+                selection_vector_lhs_ok: vec![],
                 selection_vector_ok: vec![],
                 resolved_values_rhs: vec![],
             },
@@ -1135,6 +1120,7 @@ mod tests {
                     lhs: Box::new(Literal::from("foo").into()),
                     rhs: Box::new(Literal::from(1).into()),
                     opcode: Div,
+                    selection_vector_lhs_ok: vec![],
                     selection_vector_ok: vec![],
                     resolved_values_rhs: vec![],
                 }.into()),
@@ -1143,15 +1129,18 @@ mod tests {
                         lhs: Box::new(Literal::from(true).into()),
                         rhs: Box::new(Literal::from(1).into()),
                         opcode: Div,
+                        selection_vector_lhs_ok: vec![],
                         selection_vector_ok: vec![],
                         resolved_values_rhs: vec![],
                     }.into()),
                     rhs: Box::new(Literal::from("foo").into()),
                     opcode: Err,
+                    selection_vector_lhs_ok: vec![],
                     selection_vector_ok: vec![],
                     resolved_values_rhs: vec![],
                 }.into()),
                 opcode: Err,
+                selection_vector_lhs_ok: vec![],
                 selection_vector_ok: vec![],
                 resolved_values_rhs: vec![],
             },
@@ -1169,6 +1158,7 @@ mod tests {
                 ),
                 rhs: Box::new(Literal::from("another string").into()),
                 opcode: Or,
+                selection_vector_lhs_ok: vec![],
                 selection_vector_ok: vec![],
                 resolved_values_rhs: vec![],
             },
@@ -1186,6 +1176,7 @@ mod tests {
                 ),
                 rhs: Box::new(Literal::from("another string").into()),
                 opcode: Or,
+                selection_vector_lhs_ok: vec![],
                 selection_vector_ok: vec![],
                 resolved_values_rhs: vec![],
             },
