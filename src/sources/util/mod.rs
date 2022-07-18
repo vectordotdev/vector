@@ -1,6 +1,8 @@
 #[cfg(any(feature = "sources-http"))]
 mod body_decoding;
 mod encoding_config;
+#[cfg(any(feature = "sources-pipe", feature = "sources-stdin",))]
+pub mod file_descriptor;
 #[cfg(all(unix, feature = "sources-dnstap"))]
 pub mod framestream;
 #[cfg(feature = "sources-vector")]
