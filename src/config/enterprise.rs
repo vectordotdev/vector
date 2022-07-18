@@ -118,9 +118,9 @@ const fn default_enable_logs_reporting() -> bool {
     true
 }
 
-/// By default, report to Datadog every 5 seconds.
+/// By default, scrape internal metrics and report to Datadog every 1 seconds.
 const fn default_reporting_interval_secs() -> f64 {
-    5.0
+    1.0
 }
 
 /// By default, keep retrying (recoverable) failed reporting
